@@ -137,3 +137,38 @@ class Dice:
             raise BadDice(f"{face} is not a face of {die}")
         return Roll(die=die, faces=[face], modifiers=list(modifiers or []),
                     label=label, visibility="player")
+
+    def given_total(
+        self,
+        total: int,
+        notation: str,
+        modifiers: list[Modifier] | None = None,
+        label: str = "",
+    ) -> Roll:
+        """A player-supplied result for a pool of dice — 2d6 comes back as one number.
+
+        Asking for each die separately is how a program would do it and not how a person
+        does it: you roll two dice, look at them, and say "nine". The engine still owns
+        every modifier; only the dice total comes from the player.
+
+        Natural 20s and 1s stay meaningful because a 1d20 pool is stored as a single
+        face, which is what `Roll.natural` looks for.
+        """
+        count, faces, flat = self.parse(notation)
+        low, high = count, count * faces
+        if not low <= total <= high:
+            raise BadDice(
+                f"{total} is not a possible result for {notation} ({low}-{high})"
+            )
+        mods = list(modifiers or [])
+        if flat:
+            mods.append(Modifier(flat, "notation"))
+        # Distribute the reported total across the dice so `faces` stays honest about
+        # how many were rolled. Only the sum is load-bearing.
+        base, extra = divmod(total - count, faces - 1) if faces > 1 else (0, 0)
+        spread = []
+        for i in range(count):
+            v = 1 + (faces - 1 if i < base else (extra if i == base else 0))
+            spread.append(v)
+        return Roll(die=notation.strip(), faces=spread, modifiers=mods,
+                    label=label, visibility="player")

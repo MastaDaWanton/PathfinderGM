@@ -63,7 +63,8 @@ class GMAgent:
         losing the turn.
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
-        messages = prompts.call_one_messages(brief, history, player_input)
+        base = prompts.call_one_messages(brief, history, player_input)
+        messages = base
 
         attempts: list[Attempt] = []
         rejections: list[str] = []
@@ -77,7 +78,7 @@ class GMAgent:
                 data = reply.json()
             except ValueError as exc:
                 rejections.append(f"attempt {n + 1}: {exc}")
-                messages = _with_correction(messages, reply.text, str(exc))
+                messages = _with_correction(base, reply.text, str(exc))
                 continue
 
             narration = str(data.get("narration", "")).strip()
@@ -89,7 +90,7 @@ class GMAgent:
                 intents = self.engine.validate(data.get("intents"))
             except IntentError as exc:
                 rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
-                messages = _with_correction(messages, reply.text, str(exc))
+                messages = _with_correction(base, reply.text, str(exc))
                 continue
 
             # Check 4 is the only one that gets a targeted repair, because the narration
@@ -164,11 +165,24 @@ class GMAgent:
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
 
 
-def _with_correction(messages: list[dict], bad_reply: str, problem: str) -> list[dict]:
-    """Feed the rejection back so the retry is a repair rather than a fresh guess."""
-    return messages + [
+def _with_correction(base: list[dict], bad_reply: str, problem: str) -> list[dict]:
+    """Feed the rejection back so the retry is a repair rather than a fresh guess.
+
+    Built from `base` every time rather than from the previous attempt's messages, so a
+    fifth try is not reading four earlier rejected attempts. Accumulating them anchored
+    the model to its first structural choice: asked to attack a guildhand it emitted a
+    `check`, and then spent four more attempts fixing the params of a `check` rather
+    than reaching for `attack`.
+
+    The wording matters for the same reason. "Send the same turn again, corrected" told
+    it to keep the shape at the exact moment the rejection was telling it to change —
+    the shape of a prompt becoming the shape of the output, in the retry path.
+    """
+    return base + [
         {"role": "assistant", "content": bad_reply},
         {"role": "user", "content":
-            f"That was rejected by the rules engine: {problem}\n"
-            f"Send the same turn again, corrected."},
+            f"The rules engine rejected that: {problem}\n\n"
+            f"Send the whole turn again, fixed. If the rejection names a different op or "
+            f"a different value, use that one — do not keep the shape that was "
+            f"rejected."},
     ]

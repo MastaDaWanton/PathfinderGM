@@ -46,8 +46,40 @@ def _state(c) -> dict:
                 for r, a in c.scene.actors.items()
             ],
         },
-        "log": c.turn_log[-30:],
+        # The player sees their own rolls and nobody else's. Hidden rolls are stripped
+        # here, at the edge, rather than in the template — a number that never reaches
+        # the browser cannot be read out of the page source either.
+        "log": [_player_visible_entry(e) for e in c.turn_log[-30:]],
     }
+
+
+def _player_visible_entry(entry: dict) -> dict:
+    """Rebuild a log entry from nothing, keeping only what the player may see.
+
+    Allow-list rather than deny-list. The first version filtered hidden *rolls* out of
+    each outcome and shipped everything else — which still sent the GM's raw intents, so
+    "the guildhand makes an Acrobatics check" was sitting in the page source even though
+    its roll was gone. Stripping named fields leaks whatever you forgot to name; naming
+    what to keep does not.
+
+    The server keeps the full entry on disk. This is only what crosses to the browser.
+    """
+    outcomes = []
+    for o in entry.get("outcomes", []):
+        rolls = [r for r in o.get("rolls", []) if r.get("visibility") == "player"]
+        if not rolls:
+            # Nothing of this outcome is the player's. Its tell reaches them through the
+            # narration; it does not need a line in the roll log.
+            continue
+        outcomes.append({
+            "op": o.get("op"),
+            "verdict": o.get("verdict"),
+            "margin": o.get("margin"),
+            "because": o.get("because"),
+            "dc": o.get("dc"),
+            "rolls": rolls,
+        })
+    return {"kind": entry.get("kind"), "outcomes": outcomes}
 
 
 @ensure_csrf_cookie
@@ -113,16 +145,24 @@ def roll(request):
     if not c.scene.awaiting:
         return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
 
+    from rules.dice import Dice
+
     body = json.loads(request.body or "{}")
+    prompt = c.scene.awaiting
+    notation = prompt.get("die", "1d20")
+    low = prompt.get("min", 1)
+    high = prompt.get("max", 20)
+
     face = body.get("face")
     if face is None:
         # The engine rolls it on the player's behalf if they would rather not.
-        from rules.dice import Dice
-        face = Dice().roll("1d20").raw
+        face = Dice().roll(notation).raw
 
     face = int(face)
-    if not 1 <= face <= 20:
-        return JsonResponse({"error": "a d20 has faces 1 to 20"}, status=400)
+    if not low <= face <= high:
+        return JsonResponse(
+            {"error": f"{notation} gives a result between {low} and {high}"}, status=400
+        )
 
     engine = c.engine()
     resolution = engine.resume(face)

@@ -65,6 +65,7 @@ CLASSES = {
         "bab": "three_quarter",
         "good_saves": ("ref",),
         "skill_ranks": 8,
+        "proficiencies": ("simple", "rapier", "sap", "shortbow", "shortsword"),
         "class_skills": (
             "acrobatics", "appraise", "bluff", "climb", "craft", "diplomacy",
             "disable device", "disguise", "escape artist", "intimidate",
@@ -79,6 +80,7 @@ CLASSES = {
         "bab": "full",
         "good_saves": ("fort",),
         "skill_ranks": 2,
+        "proficiencies": ("simple", "martial"),
         "class_skills": (
             "climb", "craft", "handle animal", "intimidate",
             "knowledge (dungeoneering)", "knowledge (engineering)", "profession",
@@ -91,6 +93,7 @@ CLASSES = {
         "bab": "half",
         "good_saves": ("will",),
         "skill_ranks": 2,
+        "proficiencies": ("club", "dagger", "light crossbow", "quarterstaff"),
         "class_skills": (
             "appraise", "craft", "fly", "knowledge (arcana)", "knowledge (dungeoneering)",
             "knowledge (engineering)", "knowledge (geography)", "knowledge (history)",
@@ -105,6 +108,7 @@ CLASSES = {
         "bab": "three_quarter",
         "good_saves": ("fort", "will"),
         "skill_ranks": 2,
+        "proficiencies": ("simple",),
         "class_skills": (
             "appraise", "craft", "diplomacy", "heal", "knowledge (arcana)",
             "knowledge (history)", "knowledge (nobility)", "knowledge (planes)",
@@ -170,7 +174,30 @@ FEATS: dict[str, dict] = {
     "toughness": {"name": "Toughness", "hp_bonus": True},
     "dodge": {"name": "Dodge", "ac": 1, "ac_type": "dodge"},
     "point-blank shot": {"name": "Point-Blank Shot", "ranged_near": {"attack": 1, "damage": 1}},
+    # Weapon Focus is per-weapon: sheets write it as "weapon focus (rapier)".
+    "weapon focus": {"name": "Weapon Focus", "weapon_attack": 1},
+    "weapon specialization": {"name": "Weapon Specialization", "weapon_damage": 2},
+    # Power Attack is a choice made per attack, not a passive bonus, so the numbers are
+    # computed in sheet.power_attack_terms() rather than sitting in this table.
+    "power attack": {"name": "Power Attack", "power_attack": True,
+                     "requires": {"bab": 1, "str": 13}},
 }
+
+# Feats written with a parenthesised target, e.g. "weapon focus (rapier)".
+FEAT_TARGET_RE = r"^(?P<feat>[^(]+?)\s*\((?P<target>[^)]+)\)$"
+
+
+def power_attack_terms(bab: int, two_handed: bool) -> tuple[int, int]:
+    """PF1e Power Attack: -1 attack for +2 damage, both scaling every 4 points of BAB,
+    and half again as much damage in two hands.
+
+    Returns (attack_penalty, damage_bonus), attack_penalty negative.
+    """
+    steps = 1 + max(0, bab) // 4
+    damage = steps * 2
+    if two_handed:
+        damage = (steps * 3)
+    return -steps, damage
 
 # --- Conditions ------------------------------------------------------------------
 
@@ -262,29 +289,46 @@ CIRCUMSTANCE = {"favorable": 2, "unfavorable": -2}
 
 # --- Weapons and armour (the slice's subset) --------------------------------------
 
+# `prof` is the proficiency group a character must have to use the weapon without the
+# -4 non-proficiency penalty; `hands` matters for Power Attack's larger damage bonus.
 WEAPONS: dict[str, dict] = {
     "rapier": {"name": "rapier", "damage": "1d6", "crit_range": 18, "crit_mult": 2,
-               "type": "piercing", "category": "melee", "finessable": True},
+               "type": "piercing", "category": "melee", "finessable": True,
+               "prof": "martial", "hands": 1},
     "dagger": {"name": "dagger", "damage": "1d4", "crit_range": 19, "crit_mult": 2,
-               "type": "piercing", "category": "melee", "finessable": True},
+               "type": "piercing", "category": "melee", "finessable": True,
+               "prof": "simple", "hands": 1},
     "shortsword": {"name": "short sword", "damage": "1d6", "crit_range": 19, "crit_mult": 2,
-                   "type": "piercing", "category": "melee", "finessable": True},
+                   "type": "piercing", "category": "melee", "finessable": True,
+                   "prof": "martial", "hands": 1},
     "sap": {"name": "sap", "damage": "1d6", "crit_range": 20, "crit_mult": 2,
             "type": "bludgeoning", "category": "melee", "finessable": True,
-            "nonlethal": True},
+            "nonlethal": True, "prof": "martial", "hands": 1},
     "longsword": {"name": "longsword", "damage": "1d8", "crit_range": 19, "crit_mult": 2,
-                  "type": "slashing", "category": "melee", "finessable": False},
+                  "type": "slashing", "category": "melee", "finessable": False,
+                  "prof": "martial", "hands": 1},
     "club": {"name": "club", "damage": "1d6", "crit_range": 20, "crit_mult": 2,
-             "type": "bludgeoning", "category": "melee", "finessable": False},
+             "type": "bludgeoning", "category": "melee", "finessable": False,
+             "prof": "simple", "hands": 1},
+    "quarterstaff": {"name": "quarterstaff", "damage": "1d6", "crit_range": 20,
+                     "crit_mult": 2, "type": "bludgeoning", "category": "melee",
+                     "finessable": False, "prof": "simple", "hands": 2},
+    "greatsword": {"name": "greatsword", "damage": "2d6", "crit_range": 19, "crit_mult": 2,
+                   "type": "slashing", "category": "melee", "finessable": False,
+                   "prof": "martial", "hands": 2},
     "shortbow": {"name": "shortbow", "damage": "1d6", "crit_range": 20, "crit_mult": 3,
-                 "type": "piercing", "category": "ranged", "finessable": False},
+                 "type": "piercing", "category": "ranged", "finessable": False,
+                 "prof": "martial", "hands": 2},
     "light crossbow": {"name": "light crossbow", "damage": "1d8", "crit_range": 19,
                        "crit_mult": 2, "type": "piercing", "category": "ranged",
-                       "finessable": False},
+                       "finessable": False, "prof": "simple", "hands": 2},
     "unarmed": {"name": "unarmed strike", "damage": "1d3", "crit_range": 20, "crit_mult": 2,
                 "type": "bludgeoning", "category": "melee", "finessable": False,
-                "nonlethal": True},
+                "nonlethal": True, "prof": "simple", "hands": 1},
 }
+
+# Using a weapon you are not proficient with.
+NON_PROFICIENT_PENALTY = -4
 
 ARMOUR: dict[str, dict] = {
     "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0},

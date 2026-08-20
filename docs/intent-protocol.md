@@ -33,6 +33,17 @@ discrepancy.** It is not an error and it does not stop the turn — models will 
 a turn that dies because the model said "+7" is worse than one that quietly overrides it.
 But the log is the early-warning that a prompt has drifted.
 
+This applies to whole *parameters*, not just values. `ENGINE_OWNED_PARAMS` in
+`rules/intents.py` lists the ones the GM keeps supplying — `damage_type`, `dice`,
+`damage_roll`, `attack_bonus`, `target_ac` and friends — and they are dropped and
+recorded on the intent. A param that is merely **unrecognised** is still rejected
+outright, and the difference matters: a dropped engine-owned param is a value we can
+already compute, while an unknown one is a mechanic the GM believes it applied and we
+have never heard of.
+
+Hard-rejecting the first kind cost five consecutive attempts to attack a guard in live
+play, over three params the engine reads off the weapon anyway.
+
 ### Why bands and not integers
 
 The GM does not pick DCs as numbers. It picks from the PF1e difficulty table's own
@@ -148,7 +159,7 @@ and gets a real id.
 |---|---|---|
 | `check` | `skill`, `dc`, `opposed_by?`, `circumstance?`, `aid?` | Skill and ability checks. `opposed_by` makes it a contest; the engine rolls both sides. |
 | `save` | `save`, `dc`, `on_success?`, `on_failure?` | Fort / Ref / Will. |
-| `attack` | `weapon?`, `full_attack`, `manoeuvre?` | Engine owns BAB, iteratives, size, crit range, and every modifier. `manoeuvre` covers trip/grapple/disarm via CMB/CMD. |
+| `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` is rejected until CMB/CMD lands, rather than silently resolving as an ordinary swing. |
 | `cast` | `spell`, `at?` | Engine checks the slot exists, computes DC and caster level, and **emits the derived saves and attacks itself** — the GM does not get to also declare them. |
 | `damage` | `amount`, `type`, `to` | Environmental and untyped sources only; weapon damage rides on `attack`. |
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
@@ -211,7 +222,27 @@ What resolution produces, and what call 2 is handed.
   becomes "the guard's head comes up — he's heard something." The GM never receives the
   number it might leak.
 
-### 4.1 The suspend point
+### 4.1 What the player rolls
+
+**The player rolls every die that is theirs**, and nothing else. For an attack that is
+the to-hit, the critical confirmation if one is threatened, and the damage — so a single
+attack can suspend three times, and a full attack once more per iterative. All of it is
+one intent; the progress lives in the continuation.
+
+The reverse is equally strict: **no roll that is not the PC's own can be player-visible.**
+An NPC's attack, save or check is rolled by the engine and reaches the GM only as a
+`tell`. The engine demotes any `player` visibility on a non-PC actor rather than trusting
+the GM to get it right.
+
+The player also never sees anyone else's numbers. Hidden rolls are stripped at the view
+boundary, not hidden in the template — a number that never reaches the browser cannot be
+read out of the page source either.
+
+A damage pool comes back as **one number**, not one per die: you roll two dice, look at
+them, and say "nine". The prompt carries `die`, `min` and `max` so the popup knows what it
+is asking for; the engine still owns every modifier.
+
+### 4.2 The suspend point
 
 Player rolls make resolution a state machine, not a function. `resolve()` returns either an
 `Outcome` or:

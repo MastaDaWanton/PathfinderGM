@@ -15,10 +15,13 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import re
+
 from .dice import Modifier
 from .tables import (
-    ARMOUR, CLASSES, CONDITIONS, FEATS, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
-    WEAPONS, ability_modifier, bab_for, iterative_attacks, save_for,
+    ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS, NON_PROFICIENT_PENALTY,
+    SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS, WEAPONS, ability_modifier, bab_for,
+    iterative_attacks, power_attack_terms, save_for,
 )
 
 
@@ -163,9 +166,9 @@ class Actor:
             if acp_applies and self.armour_check_penalty:
                 mods.append(Modifier(self.armour_check_penalty, "armour check"))
             for feat in self.feats:
-                bonus = FEATS.get(feat.lower(), {}).get("skills", {}).get(skill)
+                bonus = FEATS.get(self._feat_name(feat), {}).get("skills", {}).get(skill)
                 if bonus:
-                    mods.append(Modifier(bonus, FEATS[feat.lower()]["name"]))
+                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
         if skill == "stealth":
             size_mod = SIZES.get(self.size, SIZES["medium"])["stealth"]
@@ -196,9 +199,9 @@ class Actor:
             if am:
                 mods.append(Modifier(am, SAVE_ABILITY[save].title()))
             for feat in self.feats:
-                bonus = FEATS.get(feat.lower(), {}).get("saves", {}).get(save)
+                bonus = FEATS.get(self._feat_name(feat), {}).get("saves", {}).get(save)
                 if bonus:
-                    mods.append(Modifier(bonus, FEATS[feat.lower()]["name"]))
+                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
         mods.extend(self._condition_mods("saves"))
         return mods
@@ -214,9 +217,9 @@ class Actor:
             if am:
                 mods.append(Modifier(am, "Dex"))
             for feat in self.feats:
-                bonus = FEATS.get(feat.lower(), {}).get("initiative")
+                bonus = FEATS.get(self._feat_name(feat), {}).get("initiative")
                 if bonus:
-                    mods.append(Modifier(bonus, FEATS[feat.lower()]["name"]))
+                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
         return mods
 
     # --- attack and damage --------------------------------------------------------------
@@ -230,34 +233,103 @@ class Actor:
     def _uses_finesse(self, weapon: dict) -> bool:
         return (
             weapon.get("finessable", False)
-            and any(FEATS.get(f.lower(), {}).get("finesse") for f in self.feats)
+            and any(self._feat_name(f) == "weapon finesse" for f in self.feats)
             and self.ability_mod("dex") > self.ability_mod("str")
         )
 
-    def attack_modifiers(self, weapon_key: str | None = None, iteration: int = 0) -> list[Modifier]:
+    @staticmethod
+    def _feat_name(feat: str) -> str:
+        """"Weapon Focus (rapier)" -> "weapon focus"."""
+        m = re.match(FEAT_TARGET_RE, feat.strip(), re.IGNORECASE)
+        return (m.group("feat") if m else feat).strip().lower()
+
+    @staticmethod
+    def _feat_target(feat: str) -> str | None:
+        m = re.match(FEAT_TARGET_RE, feat.strip(), re.IGNORECASE)
+        return m.group("target").strip().lower() if m else None
+
+    def has_feat(self, name: str, target: str | None = None) -> bool:
+        name = name.strip().lower()
+        for f in self.feats:
+            if self._feat_name(f) != name:
+                continue
+            if target is None or self._feat_target(f) in (None, target.strip().lower()):
+                return True
+        return False
+
+    def is_proficient(self, weapon_key: str | None = None) -> bool:
+        """Proficiency comes from the class, or from a Martial/Simple Weapon Proficiency
+        feat, or from the weapon being named specifically."""
+        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        w = WEAPONS.get(key, {})
+        if self.flat_attack is not None:
+            return True          # an NPC stat block's attack bonus already accounts for it
+        granted = {p.lower() for p in self.class_data.get("proficiencies", ())}
+        for f in self.feats:
+            if self._feat_name(f).endswith("weapon proficiency"):
+                t = self._feat_target(f)
+                if t:
+                    granted.add(t)
+                granted.add(self._feat_name(f).split()[0])
+        return key in granted or w.get("prof") in granted
+
+    def power_attack_terms(self, weapon_key: str | None = None) -> tuple[int, int]:
         w = self.weapon(weapon_key)
+        return power_attack_terms(self.bab, w.get("hands", 1) == 2)
+
+    def can_power_attack(self) -> str | None:
+        """None if legal, otherwise why not. PF1e requires the feat, BAB +1 and Str 13."""
+        if not self.has_feat("power attack"):
+            return f"{self.name} does not have Power Attack"
+        if self.bab < 1:
+            return f"{self.name} has BAB +{self.bab}; Power Attack needs +1"
+        if self.ability_score("str") < 13:
+            return f"{self.name} has Str {self.ability_score('str')}; Power Attack needs 13"
+        return None
+
+    def attack_modifiers(
+        self, weapon_key: str | None = None, iteration: int = 0,
+        power_attack: bool = False,
+    ) -> list[Modifier]:
+        w = self.weapon(weapon_key)
+        key = (weapon_key or self.equipped or "unarmed").strip().lower()
         mods: list[Modifier] = []
 
         if self.flat_attack is not None:
             mods.append(Modifier(self.flat_attack, "attack bonus"))
         else:
             mods.append(Modifier(self.bab, "BAB"))
+            # Str for melee, Dex for ranged — and Dex for melee only when Weapon Finesse
+            # applies and actually helps.
             if w["category"] == "ranged":
-                ab = "dex"
+                ab, label = "dex", "Dex"
             elif self._uses_finesse(w):
-                ab = "dex"
+                ab, label = "dex", "Dex (Finesse)"
             else:
-                ab = "str"
+                ab, label = "str", "Str"
             am = self.ability_mod(ab)
             if am:
-                mods.append(Modifier(am, f"{ab.title()}{' (Finesse)' if ab == 'dex' and w['category'] == 'melee' else ''}"))
+                mods.append(Modifier(am, label))
 
-        size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
-        if size_mod:
-            mods.append(Modifier(size_mod, f"{self.size} size"))
+            if not self.is_proficient(key):
+                mods.append(Modifier(NON_PROFICIENT_PENALTY,
+                                     f"not proficient with {w['name']}"))
+            if self.has_feat("weapon focus", key):
+                mods.append(Modifier(1, "Weapon Focus"))
+
+            # Size only when the number was derived. A stat block's printed attack bonus
+            # already includes the creature's size, and adding it again gave a small
+            # NPC a free +1 on every swing.
+            size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
+            if size_mod:
+                mods.append(Modifier(size_mod, f"{self.size} size"))
 
         if iteration:
             mods.append(Modifier(-5 * iteration, f"iterative #{iteration + 1}"))
+
+        if power_attack:
+            penalty, _ = self.power_attack_terms(key)
+            mods.append(Modifier(penalty, "Power Attack"))
 
         mods.extend(self._condition_mods("attack"))
         if w["category"] == "melee":
@@ -273,8 +345,11 @@ class Actor:
             return [0]
         return list(range(len(iterative_attacks(self.bab))))
 
-    def damage_modifiers(self, weapon_key: str | None = None) -> list[Modifier]:
+    def damage_modifiers(
+        self, weapon_key: str | None = None, power_attack: bool = False,
+    ) -> list[Modifier]:
         w = self.weapon(weapon_key)
+        key = (weapon_key or self.equipped or "unarmed").strip().lower()
         mods: list[Modifier] = []
         if w["category"] == "melee":
             # Str applies to melee damage even when Finesse supplied the attack roll —
@@ -283,6 +358,11 @@ class Actor:
             am = self.ability_mod("str")
             if am:
                 mods.append(Modifier(am, "Str"))
+        if self.has_feat("weapon specialization", key):
+            mods.append(Modifier(2, "Weapon Specialization"))
+        if power_attack:
+            _, bonus = self.power_attack_terms(key)
+            mods.append(Modifier(bonus, "Power Attack"))
         mods.extend(self._condition_mods("damage"))
         return mods
 
@@ -316,13 +396,14 @@ class Actor:
                 if dex:
                     mods.append(Modifier(dex, "Dex"))
             for feat in self.feats:
-                bonus = FEATS.get(feat.lower(), {}).get("ac")
+                bonus = FEATS.get(self._feat_name(feat), {}).get("ac")
                 if bonus:
-                    mods.append(Modifier(bonus, FEATS[feat.lower()]["name"]))
+                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
-        size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
-        if size_mod:
-            mods.append(Modifier(size_mod, f"{self.size} size"))
+            # As with attack: a printed AC already accounts for size.
+            size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
+            if size_mod:
+                mods.append(Modifier(size_mod, f"{self.size} size"))
 
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
@@ -414,7 +495,8 @@ class Actor:
                 s: sum(m.value for m in self.skill_modifiers(s))
                 for s in sorted(self.ranks)
             }
-            out["feats"] = [FEATS.get(f.lower(), {}).get("name", f) for f in self.feats]
+            out["feats"] = [f if self._feat_target(f) else FEATS.get(self._feat_name(f), {}).get("name", f)
+                            for f in self.feats]
             out["weapon"] = self.weapon()["name"]
         return out
 
@@ -508,12 +590,15 @@ def validate(actor: Actor) -> None:
                     f"{actor.level}"
                 )
     for f in actor.feats:
-        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
+        if Actor._feat_name(f) in FEATS:
+            continue
+        # Not fatal: an unrecognised feat contributes nothing and says so, which is
+        # better than silently pretending it applied.
+        #
         # Guarded against re-appending, because the campaign save round-trips through
-        # here on every load and an unguarded += grows the note file without bound.
-        if f.lower() not in FEATS and note not in actor.notes:
-            # Not fatal: an unrecognised feat contributes nothing and says so, which is
-            # better than silently pretending it applied.
+        # here on every load and an unguarded += grows the note without bound.
+        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
+        if note not in actor.notes:
             actor.notes += f"\n{note}"
     if actor.armour not in ARMOUR:
         raise IllegalSheet(f"{actor.name}: unknown armour {actor.armour!r}")

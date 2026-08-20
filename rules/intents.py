@@ -123,7 +123,11 @@ def _suggest(name: str, candidates) -> str:
 OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid"), "player"),
     "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
-    "attack": ((), ("weapon", "full_attack", "manoeuvre"), "hidden"),
+    # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
+    # this to `hidden` meant the engine silently rolled the player's attacks for them,
+    # which contradicts the architecture decision outright. NPC attacks still resolve
+    # hidden — `Engine._force_visibility` demotes any non-PC actor.
+    "attack": ((), ("weapon", "full_attack", "manoeuvre", "power_attack"), "player"),
     "damage": (("amount", "type"), ("to",), "hidden"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
@@ -134,6 +138,23 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
 }
 
 VISIBILITIES = ("player", "hidden")
+
+# Params the GM keeps supplying that the *engine* owns. docs/intent-protocol.md §1 is
+# explicit about these: "the engine ignores it and logs the discrepancy... a turn that
+# dies because the model said '+7' is worse than one that overrides it." Hard-rejecting
+# them contradicted that rule, and in live play it killed five consecutive attack
+# attempts over `damage_type`, `dice` and `damage_roll` — all of which the engine reads
+# off the weapon anyway.
+#
+# A param that is merely *unrecognised* is still rejected. The difference matters: an
+# ignored engine-owned param is a value we can already compute, while an unknown one is
+# a mechanic the GM believes it applied and we have never heard of.
+ENGINE_OWNED_PARAMS = {
+    "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",
+    "attack_bonus", "attack_roll", "to_hit", "bonus", "modifier", "modifiers",
+    "ac", "target_ac", "hit", "crit", "critical", "result", "outcome", "total",
+    "skill", "roll", "dc_value", "save_bonus", "initiative",
+}
 
 # The model keeps reaching for a third word meaning "the engine rolls this one, not the
 # player" — observed as "gm" and "game" on separate live turns. That is exactly what
@@ -168,6 +189,9 @@ class Intent:
     params: dict = field(default_factory=dict)
     visibility: str = ""
     id: str = ""
+    # Engine-owned params the GM supplied and we dropped. Not an error, but the log is
+    # the early warning that a prompt has drifted.
+    ignored_params: list[str] = field(default_factory=list)
 
     def targets(self) -> list[str]:
         if self.target is None:
@@ -178,6 +202,7 @@ class Intent:
         return {
             "id": self.id, "op": self.op, "actor": self.actor, "target": self.target,
             "because": self.because, "params": self.params, "visibility": self.visibility,
+            "ignored_params": self.ignored_params,
         }
 
 
@@ -205,9 +230,15 @@ def parse(raw: dict, index: int = 0) -> Intent:
         )
 
     unknown = set(params) - set(required) - set(optional)
+    ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
+    for key in ignored:
+        params.pop(key, None)
+    unknown -= set(ignored)
     if unknown:
         raise IntentError(
-            f"{op}: unknown param(s) {', '.join(sorted(unknown))}", "schema", index
+            f"{op}: unknown param(s) {', '.join(sorted(unknown))}. "
+            f"{op} takes {', '.join(sorted(set(required) | set(optional))) or 'no params'}.",
+            "schema", index,
         )
 
     visibility = str(raw.get("visibility") or default_vis).strip().lower()
@@ -227,6 +258,7 @@ def parse(raw: dict, index: int = 0) -> Intent:
         params=params,
         visibility=visibility,
         id=str(raw.get("id") or f"i{index + 1}"),
+        ignored_params=ignored,
     )
     _check_params(intent, index)
     return intent
@@ -239,6 +271,23 @@ def _check_params(intent: Intent, index: int) -> None:
 
     if op == "check":
         raw_skill = str(p["skill"]).strip().lower()
+        # Attacking is not a skill check in 1e, and the model reaches for one. Say so,
+        # rather than making it guess from a list that will never contain the answer.
+        if raw_skill in ("attack", "melee", "melee attack", "ranged attack", "to hit",
+                         "weapon", "combat", "strike", "hit"):
+            raise IntentError(
+                f"check: attacking is not a skill check. Use "
+                '{"op": "attack", "actor": "...", "target": "..."} — the engine works '
+                "out the attack bonus, the target's AC and the damage from the sheets.",
+                "schema", index,
+            )
+        if raw_skill in ("initiative", "init", "reflexes"):
+            raise IntentError(
+                "check: initiative is not a skill check. Use "
+                '{"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], '
+                '"them": ["<ref>"]}}} — the engine rolls initiative for everyone.',
+                "schema", index,
+            )
         skill = normalise_skill(raw_skill)
         if skill is None:
             raise IntentError(

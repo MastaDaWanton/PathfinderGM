@@ -40,13 +40,34 @@ def test_missing_required_param_is_rejected():
         parse({"op": "save", "actor": "pc", "params": {"save": "ref"}})
 
 
-def test_unknown_param_is_rejected_rather_than_ignored():
-    """A param the engine silently drops is a mechanic the GM believes it applied. The
-    model invented `params.bonus` in testing; ignoring it would have meant the GM thought
-    it had granted a bonus that never existed."""
+def test_a_genuinely_unknown_param_is_rejected():
+    """A param the engine silently drops is a mechanic the GM believes it applied. If we
+    have never heard of it, we cannot know it was harmless."""
     with pytest.raises(IntentError, match="unknown param"):
         parse({"op": "check", "actor": "pc",
-               "params": {"skill": "stealth", "dc": {"band": "tough"}, "bonus": 4}})
+               "params": {"skill": "stealth", "dc": {"band": "tough"},
+                          "moon_phase": "waxing"}})
+
+
+def test_engine_owned_params_are_dropped_and_logged_not_rejected():
+    """docs/intent-protocol.md §1: "the engine ignores it and logs the discrepancy... a
+    turn that dies because the model said '+7' is worse than one that overrides it."
+
+    Hard-rejecting these contradicted that rule, and in live play it killed five
+    consecutive attempts to attack a guard over `damage_type`, `dice` and `damage_roll`
+    — every one of which the engine reads off the weapon anyway.
+    """
+    got = parse({"op": "attack", "actor": "pc", "target": "c1",
+                 "params": {"weapon": "rapier", "damage_type": "piercing",
+                            "dice": "1d6", "damage_roll": 4, "attack_bonus": 3}})
+    assert got.params == {"weapon": "rapier", "full_attack": False}
+    assert got.ignored_params == ["attack_bonus", "damage_roll", "damage_type", "dice"]
+
+
+def test_the_rejection_names_the_params_the_op_does_take():
+    with pytest.raises(IntentError, match="attack takes full_attack, manoeuvre"):
+        parse({"op": "attack", "actor": "pc", "target": "c1",
+               "params": {"enthusiasm": "high"}})
 
 
 def test_other_editions_skill_names_are_mapped_rather_than_rejected():
@@ -67,15 +88,26 @@ def test_other_editions_skill_names_are_mapped_rather_than_rejected():
 
 
 def test_a_skill_that_means_nothing_is_rejected_with_the_legal_list():
-    """"melee" is not a 1e skill and is not unambiguously any of them. Rejecting it
-    without saying what *is* legal costs a whole regeneration, so the rejection carries
-    the list and the nearest matches."""
+    """Rejecting an unknown skill without saying what *is* legal costs a whole
+    regeneration, so the rejection carries the list and the nearest matches."""
     with pytest.raises(IntentError) as e:
         parse({"op": "check", "actor": "pc",
-               "params": {"skill": "melee", "dc": {"band": "tough"}}})
+               "params": {"skill": "parkour", "dc": {"band": "tough"}}})
     msg = str(e.value)
     assert "not a Pathfinder 1e skill" in msg
     assert "stealth" in msg and "perception" in msg   # the legal list travels with it
+
+
+@pytest.mark.parametrize("said", ["attack", "melee", "to hit", "weapon", "strike"])
+def test_attacking_is_pointed_at_the_attack_op_not_at_a_skill_list(said):
+    """Measured: the model tried `check` with skill "attack", then spent four more
+    attempts guessing at `attack`'s params. Attacking is not a skill check in 1e and no
+    list of skills will ever contain the answer, so the rejection names the right op
+    instead of offering 34 wrong ones.
+    """
+    with pytest.raises(IntentError, match=r'"op": "attack"'):
+        parse({"op": "check", "actor": "pc",
+               "params": {"skill": said, "dc": {"band": "tough"}}})
 
 
 def test_ambiguous_cross_edition_names_are_not_guessed():
@@ -84,6 +116,15 @@ def test_ambiguous_cross_edition_names_are_not_guessed():
     with pytest.raises(IntentError):
         parse({"op": "check", "actor": "pc",
                "params": {"skill": "athletics", "dc": {"band": "tough"}}})
+
+
+def test_initiative_is_pointed_at_begin_encounter():
+    """Also measured while trying to attack a guard: the model reached for a skill check
+    called "initiative". The nearest-match suggestion offered "intimidate", which is
+    worse than useless — so this one is answered directly too."""
+    with pytest.raises(IntentError, match="begin_encounter"):
+        parse({"op": "check", "actor": "pc",
+               "params": {"skill": "initiative", "dc": {"band": "tough"}}})
 
 
 def test_initiative_cannot_be_used_as_an_opposing_skill():

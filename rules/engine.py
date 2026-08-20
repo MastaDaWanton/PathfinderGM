@@ -30,6 +30,9 @@ class Scene:
     actors: dict[str, Actor] = field(default_factory=dict)
     zones: dict[str, str] = field(default_factory=dict)
     initiative: list[tuple[str, int]] = field(default_factory=list)
+    # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
+    # which is usually several points of AC and is the thing an ambush is *for*.
+    acted: set[str] = field(default_factory=set)
     round: int = 0
     clock_minutes: int = 0
     log: list[dict] = field(default_factory=list)
@@ -222,6 +225,21 @@ class Engine:
                     f"(has {', '.join(actor.weapons) or 'nothing'})",
                     "legality", index,
                 )
+            if intent.params.get("power_attack"):
+                why = actor.can_power_attack()
+                if why:
+                    raise IntentError(f"attack: {why}", "legality", index)
+            if intent.params.get("manoeuvre"):
+                # Accepted by the schema but not yet resolved. Saying so is the only
+                # honest option: silently resolving a trip as an ordinary sword swing
+                # would be a mechanic the GM believes it applied, which is precisely
+                # what the four checks exist to prevent.
+                raise IntentError(
+                    f"attack: combat manoeuvres ({intent.params['manoeuvre']}) are not "
+                    "resolved yet. Narrate the attempt and use an ordinary attack, or a "
+                    "check, until CMB/CMD lands.",
+                    "legality", index,
+                )
 
     # --- Running --------------------------------------------------------------------
 
@@ -260,6 +278,9 @@ class Engine:
             queue.pop(0)
             partial = {}
             outcomes.append(outcome)
+            # Anyone who has done something is no longer flat-footed.
+            if intent.actor and intent.op in ("attack", "check", "move", "save"):
+                self.scene.acted.add(intent.actor)
             self.scene.log.append(outcome.as_dict())
         return Resolution(outcomes=outcomes)
 
@@ -407,68 +428,114 @@ class Engine:
     # attack -------------------------------------------------------------------------------
 
     def _op_attack(self, intent: Intent, partial: dict) -> Outcome:
+        """An attack, resolved one stage at a time.
+
+        The PC rolls their own to-hit *and* their own damage, so a single attack can
+        suspend up to three times (attack, crit confirmation, damage) and a full attack
+        once more per iterative. All of the progress lives in `partial`, which survives
+        the round trip through the dice popup.
+
+        The engine still owns every number: the player supplies faces, never modifiers.
+        """
         actor = self.scene.actors[intent.actor]
         targets = intent.targets()
         if not targets:
             raise IntentError("attack: needs a target", "schema")
         defender = self.scene.actors[targets[0]]
-        weapon_key = intent.params.get("weapon") or actor.equipped or "unarmed"
+        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         full = bool(intent.params.get("full_attack"))
+        power = bool(intent.params.get("power_attack"))
 
-        rolls: list[Roll] = []
-        effects: list[dict] = []
-        tell_bits: list[str] = []
-        target_ac = defender.ac(against=weapon["category"])
+        # Flat-footed: a defender who has not acted yet loses Dex to AC. Outside an
+        # encounter nobody has acted, so the first blow of a fight lands against a
+        # flat-footed target — which is the common ambush case and is worth getting
+        # right, since it is usually several points of AC.
+        flat_footed = (
+            defender.has_condition("flat-footed")
+            or not self.scene.initiative
+            or not self._has_acted(defender.ref)
+        )
+        target_ac = defender.ac(against=weapon["category"], flat_footed=flat_footed)
+        ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
 
-        for iteration in actor.attack_sequence(weapon_key, full):
-            mods = actor.attack_modifiers(weapon_key, iteration)
-            atk = self.dice.d20(mods, label=f"{actor.name} attack", visibility=intent.visibility)
-            rolls.append(atk)
-            natural = atk.natural
+        state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
+                                                "effects": [], "tells": []}
+        sequence = actor.attack_sequence(weapon_key, full)
 
-            if natural == 1:
-                tell_bits.append(f"{actor.name}'s attack goes badly wide (natural 1).")
-                continue
-            hit = natural == 20 or atk.total >= target_ac
-            if not hit:
-                tell_bits.append(
-                    f"{actor.name}'s attack misses {defender.name} "
-                    f"({atk.total} against AC {target_ac})."
+        while state["i"] < len(sequence):
+            iteration = sequence[state["i"]]
+            atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
+
+            if state["stage"] == "attack":
+                atk = self._roll_or_suspend_stage(
+                    intent, actor, atk_mods, f"Attack with {weapon['name']}",
+                    target_ac, partial, state, "1d20",
                 )
-                continue
+                state["rolls"].append(atk.as_dict())
+                natural = atk.natural
+                if natural == 1:
+                    state["tells"].append(
+                        f"{actor.name}'s attack goes badly wide (natural 1).")
+                    state["i"] += 1
+                    continue
+                if not (natural == 20 or atk.total >= target_ac):
+                    state["tells"].append(
+                        f"{actor.name}'s attack misses {defender.name} "
+                        f"({atk.total} against {ac_note}).")
+                    state["i"] += 1
+                    continue
+                state["hit_total"] = atk.total
+                # A threat is not a crit until it is confirmed — exactly the sort of step
+                # a person forgets mid-fight and code does not.
+                threat = natural is not None and natural >= weapon["crit_range"]
+                state["stage"] = "confirm" if threat else "damage"
+                state["crit"] = False
 
-            # Crit confirmation — a threat is not a crit until it is confirmed, which is
-            # exactly the sort of step a person forgets and code does not.
-            crit = False
-            if natural is not None and natural >= weapon["crit_range"]:
-                confirm = self.dice.d20(
-                    actor.attack_modifiers(weapon_key, iteration),
-                    label="crit confirm", visibility=intent.visibility,
+            if state["stage"] == "confirm":
+                confirm = self._roll_or_suspend_stage(
+                    intent, actor, atk_mods, f"Confirm critical ({weapon['name']})",
+                    target_ac, partial, state, "1d20",
                 )
-                rolls.append(confirm)
-                crit = confirm.total >= target_ac
+                state["rolls"].append(confirm.as_dict())
+                state["crit"] = confirm.total >= target_ac
+                state["stage"] = "damage"
 
-            mult = weapon["crit_mult"] if crit else 1
-            total_damage = 0
-            for _ in range(mult):
-                dmg = self.dice.roll(weapon["damage"], actor.damage_modifiers(weapon_key),
-                                     label="damage", visibility="hidden")
-                total_damage += max(1, dmg.total)
-            effects.append(self._apply_damage(defender, total_damage, weapon["type"]))
-            tell_bits.append(
-                f"{actor.name} {'critically ' if crit else ''}hits {defender.name} "
-                f"for {total_damage} {weapon['type']}."
-            )
+            if state["stage"] == "damage":
+                mult = weapon["crit_mult"] if state.get("crit") else 1
+                dice_notation = _multiply_dice(weapon["damage"], mult)
+                dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power)
+                if mult > 1:
+                    dmg_mods = [Modifier(m.value * mult, f"{m.source} x{mult}")
+                                for m in dmg_mods]
+                dmg = self._roll_or_suspend_stage(
+                    intent, actor, dmg_mods,
+                    f"Damage ({weapon['name']}{' — CRITICAL' if mult > 1 else ''})",
+                    None, partial, state, dice_notation,
+                )
+                state["rolls"].append(dmg.as_dict())
+                amount = max(1, dmg.total)
+                state["effects"].append(
+                    self._apply_damage(defender, amount, weapon["type"]))
+                state["tells"].append(
+                    f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
+                    f"{defender.name} for {amount} {weapon['type']}.")
+                state["i"] += 1
+                state["stage"] = "attack"
 
-        effects.extend(self._hp_state_effects(defender))
+        rolls = [_roll_from_dict(r) for r in state["rolls"]]
+        effects = list(state["effects"]) + self._hp_state_effects(defender)
         any_hit = any(e.get("kind") == "damage" for e in effects)
         return Outcome(
             intent_id=intent.id, op="attack", rolls=rolls,
-            dc={"value": target_ac, "explain": f"AC {target_ac}"},
+            dc={"value": target_ac, "explain": ac_note, "flat_footed": flat_footed},
             verdict="hit" if any_hit else "miss",
-            effects=effects, tell=" ".join(tell_bits), because=intent.because,
+            effects=effects, tell=" ".join(state["tells"]), because=intent.because,
         )
+
+    def _has_acted(self, ref: str) -> bool:
+        """Whether this combatant has taken a turn in the current encounter."""
+        return ref in self.scene.acted
 
     # damage, condition, move, time, spawn, encounter ------------------------------------
 
@@ -556,6 +623,9 @@ class Engine:
         order.sort(key=lambda t: -t[1])
         self.scene.initiative = order
         self.scene.round = 1
+        # Nobody has acted at the top of round one, so everyone is flat-footed until
+        # their first turn comes round.
+        self.scene.acted = set()
         names = ", ".join(self.scene.actors[r].name for r, _ in order)
         return Outcome(
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
@@ -587,6 +657,38 @@ class Engine:
 
     # --- helpers ------------------------------------------------------------------------
 
+    def _roll_or_suspend_stage(
+        self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
+        dc: int | None, partial: dict, state: dict, notation: str,
+    ) -> Roll:
+        """One stage of a multi-stage intent: roll it, or hand it to the player and stop.
+
+        Unlike `_roll_or_suspend` this carries the accumulated `state` into the
+        suspension, so an attack that has already rolled to-hit does not roll it again
+        when the player comes back to roll damage.
+        """
+        if intent.visibility == "player" and actor.is_pc:
+            if "player_face" in partial:
+                face = partial.pop("player_face")
+                return self.dice.given_total(face, notation, mods, label=label)
+            count, faces, _ = self.dice.parse(notation)
+            raise _NeedsPlayerRoll(
+                {
+                    "label": label,
+                    "die": notation,
+                    "actor": actor.name,
+                    "min": count,
+                    "max": count * faces,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": dc,
+                    "because": intent.because,
+                    "intent_id": intent.id,
+                },
+                {"attack_state": state},
+            )
+        return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+
     def _roll_or_suspend(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int, partial: dict, extra_partial: dict | None = None,
@@ -603,6 +705,8 @@ class Engine:
                 "label": label,
                 "die": "1d20",
                 "actor": actor.name,
+                "min": 1,
+                "max": 20,
                 "modifier": sum(m.value for m in mods),
                 "breakdown": [m.as_dict() for m in mods],
                 "dc": dc,
@@ -651,6 +755,17 @@ def _rehydrate(d: dict) -> Outcome:
         dc=d.get("dc"), verdict=d.get("verdict"), margin=d.get("margin"),
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
     )
+
+
+def _multiply_dice(notation: str, mult: int) -> str:
+    """1d6 x3 -> 3d6. A critical multiplies the dice, not the rolled result."""
+    if mult <= 1:
+        return notation
+    count, faces, flat = Dice().parse(notation)
+    out = f"{count * mult}d{faces}"
+    if flat:
+        out += f"{flat:+d}"
+    return out
 
 
 def _to_rounds(amount: int, unit: str) -> int:

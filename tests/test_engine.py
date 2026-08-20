@@ -6,6 +6,7 @@ import pytest
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
+from rules.intents import IntentError
 from rules.sheet import load_pc
 
 
@@ -24,6 +25,22 @@ def engine(scene):
 
 def run(engine, raw):
     return engine.run(engine.validate(raw))
+
+
+def play_through(engine, raw, faces):
+    """Run an intent list, answering every dice prompt from `faces` in order.
+
+    The PC rolls their own to-hit *and* their own damage, so one attack can suspend
+    several times. Returns (resolution, prompts_seen).
+    """
+    res = engine.run(engine.validate(raw))
+    prompts = []
+    supply = list(faces)
+    while res.awaiting:
+        prompts.append(res.awaiting)
+        assert supply, f"ran out of faces at prompt {res.awaiting['label']!r}"
+        res = engine.resume(supply.pop(0))
+    return res, prompts
 
 
 # --- Suspend and resume ---------------------------------------------------------------
@@ -153,23 +170,137 @@ def test_every_outcome_carries_a_tell_written_by_code(engine):
 
 # --- Combat maths --------------------------------------------------------------------------
 
-def test_attack_resolves_against_the_defenders_real_ac(engine, scene):
-    res = run(engine, [{"op": "attack", "actor": "pc", "target": "c1",
-                        "because": "she has run out of talking"}])
+def test_the_player_rolls_their_own_to_hit_and_their_own_damage(engine, scene):
+    """The architecture decision is "player rolls surface on a dice popup and the player
+    rolls them" — which has to include the attack roll and the damage roll.
+
+    The `attack` op defaulted to hidden visibility, so the engine was silently rolling
+    the player's own attacks for them. Found by the user attacking a guard.
+    """
+    res, prompts = play_through(
+        engine,
+        [{"op": "attack", "actor": "pc", "target": "c1",
+          "because": "she has run out of talking"}],
+        faces=[15, 4],          # to-hit, then damage (15 hits without threatening)
+    )
+    assert [p["label"] for p in prompts] == [
+        "Attack with rapier", "Damage (rapier)",
+    ]
+    # The to-hit prompt shows the terms and what to beat; the damage prompt shows a d6.
+    assert prompts[0]["dc"] == 10                      # guildhand AC, flat-footed
+    assert {b["source"] for b in prompts[0]["breakdown"]} == {"BAB", "Dex (Finesse)"}
+    assert prompts[1]["die"] == "1d6"
+    assert (prompts[1]["min"], prompts[1]["max"]) == (1, 6)
+    assert [b["source"] for b in prompts[1]["breakdown"]] == ["Str"]
+
     o = res.outcomes[0]
-    assert o.dc["value"] == 10          # guildhand AC
-    assert o.verdict in ("hit", "miss")
-    if o.verdict == "hit":
-        assert scene.get("c1").hp < scene.get("c1").hp_max
+    assert o.verdict == "hit"
+    assert all(r.visibility == "player" for r in o.rolls)
+    assert scene.get("c1").hp == 4 - 5                 # 4 on the die, +1 Str
+
+
+def test_a_missed_attack_never_asks_for_damage(engine):
+    """A miss ends the attack. Asking for damage after one would be the clearest
+    possible tell that the popup is cosmetic rather than part of resolution."""
+    res, prompts = play_through(
+        engine, [{"op": "attack", "actor": "pc", "target": "c1"}], faces=[2],
+    )
+    assert [p["label"] for p in prompts] == ["Attack with rapier"]
+    assert res.outcomes[0].verdict == "miss"
 
 
 def test_a_full_attack_at_bab_zero_is_still_one_attack(engine):
     """Kesst is BAB +0. A GM that asks for a full attack does not thereby grant her an
     iterative she has not earned."""
-    res = run(engine, [{"op": "attack", "actor": "pc", "target": "c1",
-                        "params": {"full_attack": True}}])
-    attack_rolls = [r for r in res.outcomes[0].rolls if r.label.endswith("attack")]
-    assert len(attack_rolls) == 1
+    res, prompts = play_through(
+        engine, [{"op": "attack", "actor": "pc", "target": "c1",
+                  "params": {"full_attack": True}}],
+        faces=[15, 4],
+    )
+    assert len([p for p in prompts if p["label"].startswith("Attack")]) == 1
+
+
+def test_an_npc_attack_is_rolled_by_the_engine_and_never_prompts(engine, scene):
+    """Only the PC's rolls reach the popup. The thug's attack is the engine's business,
+    and its rolls stay hidden from the GM."""
+    res = run(engine, [{"op": "attack", "actor": "c1", "target": "pc"}])
+    assert res.status == "complete"
+    assert all(r.visibility == "hidden" for r in res.outcomes[0].rolls)
+    assert res.outcomes[0].player_visible()["rolls"] == []
+
+
+def test_a_critical_threat_asks_the_player_to_confirm_it(engine, scene):
+    """A rapier threatens on 18-20, and a threat is not a crit until it is confirmed —
+    the step a person forgets mid-fight. The confirmation is the player's roll too."""
+    res, prompts = play_through(
+        engine, [{"op": "attack", "actor": "pc", "target": "c1"}],
+        faces=[19, 15, 7],       # threat, confirm, damage (2d6 on a x2 crit)
+    )
+    assert [p["label"] for p in prompts] == [
+        "Attack with rapier", "Confirm critical (rapier)", "Damage (rapier — CRITICAL)",
+    ]
+    assert prompts[2]["die"] == "2d6"
+    # Str is multiplied by the crit multiplier along with the dice.
+    assert [b["source"] for b in prompts[2]["breakdown"]] == ["Str x2"]
+    assert "critically hits" in res.outcomes[0].tell
+
+
+def test_an_unaware_defender_is_flat_footed_and_loses_dex_to_ac(engine, scene):
+    """Kesst opens on a guildhand who has not acted. AC 10 either way for that NPC, so
+    the assertion is on a defender who actually has a Dex bonus to lose."""
+    from rules.bestiary import instantiate
+
+    dog = instantiate("guard dog", scene=scene)
+    scene.add(dog)
+    assert dog.ac() == 14
+    assert dog.ac(flat_footed=True) == 14   # flat_ac stat blocks carry one number
+
+    kesst = scene.pc()
+    assert kesst.ac() == 15
+    assert kesst.ac(flat_footed=True) == 12
+
+    _, prompts = play_through(
+        engine, [{"op": "attack", "actor": "c1", "target": "pc"}], faces=[],
+    )
+    assert prompts == []                     # NPC attack never prompts
+
+
+def test_power_attack_is_declared_by_the_gm_but_scored_by_the_engine(scene):
+    """The tactical choice is fiction and the GM may declare it; the -1/+2 and its
+    scaling are the engine's. A character without the feat cannot use it at all."""
+    from rules.sheet import from_dict
+
+    brute = from_dict({
+        "name": "Borin", "kind": "pc", "class": "fighter", "level": 8,
+        "abilities": {"str": 18, "dex": 12, "con": 14, "int": 10, "wis": 10, "cha": 8},
+        "hp": 70, "ranks": {}, "feats": ["power attack"],
+        "armour": "breastplate", "weapons": ["greatsword"], "equipped": "greatsword",
+    }, ref="brute")
+    assert brute.bab == 8
+    # BAB 8 -> 3 steps of Power Attack; two-handed, so +3 damage per step.
+    assert brute.power_attack_terms("greatsword") == (-3, 9)
+    atk = sum(m.value for m in brute.attack_modifiers("greatsword", power_attack=True))
+    plain = sum(m.value for m in brute.attack_modifiers("greatsword"))
+    assert plain - atk == 3
+    dmg = sum(m.value for m in brute.damage_modifiers("greatsword", power_attack=True))
+    assert dmg == 4 + 9          # Str 18 plus the Power Attack bonus
+
+
+def test_power_attack_without_the_feat_is_refused(engine):
+    """Kesst has neither the feat nor the BAB nor the Str for it."""
+    with pytest.raises(IntentError, match="does not have Power Attack"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"power_attack": True}}])
+
+
+def test_non_proficiency_costs_four(scene):
+    """Kesst is a rogue: proficient with the rapier, not with the longsword. A -4 nobody
+    applies is four points of pure invisible cheating."""
+    kesst = scene.pc()
+    assert kesst.is_proficient("rapier")
+    assert not kesst.is_proficient("longsword")
+    terms = {m.source: m.value for m in kesst.attack_modifiers("longsword")}
+    assert terms["not proficient with longsword"] == -4
 
 
 def test_damage_drops_the_target_and_the_engine_applies_the_condition(engine, scene):
