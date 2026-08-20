@@ -6,6 +6,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pathfinder GM — Pangrella</title>
 <style>
+  /* Cinzel if it has been installed (see play/static/fonts/README.md), Palatino if not.
+     `local()` first so a system install is used without a copy in the repo, and the
+     whole stack degrades quietly — the sheet is designed to look right either way,
+     because a font that has to be fetched would break the moment the machine is
+     offline, which is the one condition this app exists to survive. */
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
+  }
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
+    src: local("Cinzel SemiBold"), url("{% static 'fonts/Cinzel-SemiBold.woff2' %}") format("woff2");
+  }
+
+  :root {
+    /* One place to change the display face for the whole app. */
+    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua",
+               Georgia, serif;
+    /* Cinzel is a display face — carved capitals, unreadable in running text.
+       Prose and values stay on a book serif. */
+    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  }
   :root {
     --bg: #0f0d0b; --panel: #17130f; --edge: #3a2f22; --ink: #e6dcc6;
     --dim: #8e816a; --accent: #c9a86a; --player: #8fb0c8; --alarm: #a8443a;
@@ -16,77 +38,108 @@
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 16px/1.6 Georgia, "Iowan Old Style", serif;
-    display: grid; grid-template-columns: 1fr 340px; height: 100vh;
+    margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
+    display: grid; grid-template-columns: 1fr 350px; height: 100vh;
+    background:
+      radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
+      repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
   }
-  main { display: flex; flex-direction: column; min-width: 0; }
-  #story { flex: 1; overflow-y: auto; padding: 32px 40px; }
-  .beat { margin: 0 0 20px; max-width: 62ch; white-space: pre-wrap; }
+  main { display: flex; flex-direction: column; min-width: 0; position: relative; }
+  #story { flex: 1; overflow-y: auto; padding: 40px 48px; }
+  .beat { margin: 0 0 22px; max-width: 64ch; white-space: pre-wrap; }
   .beat.player { color: var(--player); font-style: italic; }
-  .beat.player::before { content: "› "; opacity: .6; }
+  .beat.player::before { content: "❧ "; opacity: .55; font-style: normal; }
   .beat.consequence { color: var(--ink); }
-  .beat.setup { color: #d8d2c6; }
-  footer { border-top: 1px solid var(--edge); padding: 16px 40px 24px; }
+  .beat.setup { color: #cfc4ab; }
+  footer {
+    border-top: 1px solid var(--gold-dim); padding: 18px 48px 26px;
+    box-shadow: 0 -1px 0 rgba(217,192,138,.08);
+  }
   form { display: flex; gap: 10px; }
   input[type=text] {
-    flex: 1; background: var(--panel); border: 1px solid var(--edge); color: var(--ink);
-    padding: 12px 14px; font: inherit; border-radius: 3px;
+    flex: 1; color: var(--ink); padding: 13px 16px; font: inherit; border-radius: 2px;
+    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.6);
   }
   input[type=text]:focus { outline: none; border-color: var(--accent); }
+  input[type=text]::placeholder { color: #574d3c; font-style: italic; }
   button {
-    background: var(--accent); border: 0; color: #1a1610; padding: 12px 20px;
-    font: 600 15px/1 system-ui, sans-serif; border-radius: 3px; cursor: pointer;
+    background: linear-gradient(#2b2318, #1a150e); border: 1px solid var(--gold-dim);
+    color: var(--gold); padding: 12px 24px; border-radius: 2px; cursor: pointer;
+    font: 400 15px/1 var(--display); letter-spacing: .16em; font-variant: small-caps;
   }
-  button:disabled { opacity: .4; cursor: default; }
-  button.ghost { background: transparent; color: var(--dim); border: 1px solid var(--edge); }
+  button:hover:not(:disabled) { color: #f0e2bd; border-color: var(--accent); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.ghost { background: transparent; color: var(--dim); }
 
   aside {
-    background: var(--panel); border-left: 1px solid var(--edge);
-    overflow-y: auto; padding: 20px; font: 14px/1.5 system-ui, sans-serif;
+    border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
+    font: 14px/1.55 var(--body);
+    background: linear-gradient(#16120e, #100d0a);
+    box-shadow: inset 1px 0 0 rgba(217,192,138,.08);
   }
   aside h2 {
-    font: 600 11px/1 system-ui, sans-serif; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--dim); margin: 22px 0 10px;
+    color: var(--gold); font: 400 16px/1 var(--display); letter-spacing: .13em;
+    font-variant: small-caps; margin: 24px 0 10px; padding-bottom: 5px;
+    border-bottom: 1px solid #2b2319;
   }
   aside h2:first-child { margin-top: 0; }
-  .name { font: 600 17px/1.2 Georgia, serif; }
-  .sub { color: var(--dim); font-size: 13px; margin-bottom: 12px; }
-  .bar { height: 6px; background: #2a2620; border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
-  .bar > i { display: block; height: 100%; background: var(--accent); }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .cell { background: #232019; border-radius: 3px; padding: 6px 8px; }
-  .cell b { display: block; font: 600 10px/1 system-ui; color: var(--dim);
-            letter-spacing: .1em; text-transform: uppercase; }
-  .cell span { font: 600 15px/1.4 Georgia, serif; }
-  .row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .name { color: var(--gold); font: 400 24px/1.15 var(--display);
+          letter-spacing: .04em; font-variant: small-caps; }
+  .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
+  .bar { height: 7px; background: #221c14; border-radius: 2px; overflow: hidden;
+         margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7); }
+  .bar > i { display: block; height: 100%;
+             background: linear-gradient(90deg, #8a6f3e, var(--accent)); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .cell {
+    background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
+    border-radius: 2px; padding: 7px 9px; text-align: center;
+  }
+  .cell b { display: block; color: var(--dim); font: 400 12px/1.3 var(--display);
+            letter-spacing: .1em; font-variant: small-caps; }
+  .cell span { color: var(--gold); font: 400 19px/1.35 var(--display); }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
   .row span:last-child { color: var(--accent); font-variant-numeric: tabular-nums; }
-  .who { display: flex; justify-content: space-between; padding: 5px 0;
-         border-bottom: 1px solid #262218; }
+  .who { display: flex; justify-content: space-between; padding: 6px 0;
+         border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
 
   #veil {
-    position: fixed; inset: 0; background: rgba(8,7,5,.82);
+    position: fixed; inset: 0; background: rgba(6,5,4,.86);
     display: none; place-items: center; z-index: 20;
   }
   #veil.on { display: grid; }
   .popup {
-    background: var(--panel); border: 1px solid var(--accent); border-radius: 6px;
-    padding: 26px 28px; width: 400px; font: 15px/1.5 system-ui, sans-serif;
+    width: 420px; padding: 28px 30px; font: 15px/1.55 var(--body);
+    background:
+      linear-gradient(#1b1611, #120f0b) padding-box,
+      linear-gradient(#5a4931, #2a2219) border-box;
+    border: 1px solid transparent; border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(217,192,138,.10), 0 18px 60px rgba(0,0,0,.8);
   }
-  .popup h3 { margin: 0 0 4px; font: 600 20px/1.2 Georgia, serif; color: var(--accent); }
-  .popup .because { color: var(--dim); font-style: italic; margin-bottom: 16px; }
-  .terms { background: #232019; border-radius: 4px; padding: 10px 12px; margin: 12px 0; }
+  .popup h3 {
+    margin: 0 0 4px; color: var(--gold); font: 400 26px/1.2 var(--display);
+    letter-spacing: .06em; font-variant: small-caps;
+  }
+  .popup .because { color: var(--dim); font-style: italic; margin-bottom: 18px; }
+  .terms {
+    background: rgba(0,0,0,.34); border: 1px solid #2b2319; border-radius: 2px;
+    padding: 11px 13px; margin: 14px 0;
+  }
   .terms .row { font-size: 13px; }
-  .terms .row.total { border-top: 1px solid #383225; margin-top: 6px; padding-top: 6px;
-                      font-weight: 600; }
+  .terms .row.total { border-top: 1px solid #3a3022; margin-top: 7px; padding-top: 7px;
+                      color: var(--gold); }
   .dieface {
-    width: 100%; background: #14120f; border: 1px solid var(--edge); color: var(--ink);
-    font: 600 34px/1 Georgia, serif; text-align: center; padding: 14px; border-radius: 4px;
-    margin-bottom: 12px;
+    width: 100%; color: var(--gold); text-align: center; padding: 16px;
+    font: 400 42px/1 var(--display); border-radius: 2px; margin-bottom: 14px;
+    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a;
+    box-shadow: inset 0 3px 10px rgba(0,0,0,.7);
   }
-  .popup .acts { display: flex; gap: 8px; }
+  .dieface:focus { outline: none; border-color: var(--accent); }
+  .popup .acts { display: flex; gap: 9px; }
   .popup .acts button { flex: 1; }
+  #busy, #err { font-family: var(--body); }
   /* --- The full character sheet ------------------------------------------------
      Unfolds from the sidebar across the whole window. The sidebar quick reference
      stays as it was; this is the paper sheet, with the Folio's own section names as
@@ -119,19 +172,18 @@
   }
   .sigil { width: 46px; height: 62px; flex: none; color: var(--blood); }
   .sheethead h1 {
-    margin: 0; color: var(--gold); font: 400 38px/1.05 "Palatino Linotype", Palatino,
-    "Book Antiqua", Georgia, serif; letter-spacing: .045em; font-variant: small-caps;
+    margin: 0; color: var(--gold); font: 400 38px/1.05 var(--display); letter-spacing: .045em; font-variant: small-caps;
     text-shadow: 0 2px 10px rgba(0,0,0,.9);
   }
   .sheethead .meta {
-    color: var(--dim); font: 14px/1.4 "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--dim); font: 14px/1.4 var(--body);
     letter-spacing: .09em; align-self: flex-end; padding-bottom: 8px;
   }
   .sheethead .close {
     margin-left: auto; background: linear-gradient(#1d1813, #131009);
     border: 1px solid var(--gold-dim); color: var(--gold);
     padding: 9px 18px; border-radius: 2px; cursor: pointer;
-    font: 400 12px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 400 12px/1 var(--display);
     letter-spacing: .18em; font-variant: small-caps;
   }
   .sheethead .close:hover { color: #f0e2bd; border-color: var(--accent); }
@@ -143,7 +195,7 @@
   .tabs button {
     background: transparent; border: 1px solid transparent; border-bottom: 0;
     color: var(--dim); padding: 11px 20px 10px; cursor: pointer; white-space: nowrap;
-    font: 400 15px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 400 15px/1 var(--display);
     letter-spacing: .14em; font-variant: small-caps; border-radius: 3px 3px 0 0;
     position: relative; top: 1px;
   }
@@ -176,12 +228,12 @@
   .card { padding: 17px 19px; }
   .card > h3 {
     margin: 0 0 12px; color: var(--gold);
-    font: 400 17px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 400 17px/1 var(--display);
     letter-spacing: .11em; font-variant: small-caps;
     border-bottom: 1px solid #2b2319; padding-bottom: 7px;
   }
   .bignum {
-    font: 400 38px/1 "Palatino Linotype", Palatino, Georgia, serif; color: var(--gold);
+    font: 400 38px/1 var(--display); color: var(--gold);
     text-shadow: 0 2px 8px rgba(0,0,0,.8);
   }
   .bignum small { font: 400 13px/1 system-ui, sans-serif; color: var(--dim); }
@@ -194,11 +246,11 @@
   .terms .t b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
   table.sheet {
     width: 100%; border-collapse: collapse;
-    font: 15px/1.5 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 15px/1.5 var(--body);
   }
   table.sheet th {
     text-align: left; color: var(--gold); padding: 7px 10px;
-    font: 400 14px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 400 14px/1 var(--display);
     letter-spacing: .1em; font-variant: small-caps;
     border-bottom: 1px solid var(--gold-dim);
   }
@@ -206,17 +258,17 @@
   table.sheet td.num { text-align: right; font-variant-numeric: tabular-nums;
                        color: var(--accent); white-space: nowrap; }
   table.sheet tr.dim td { color: var(--dim); }
-  .why { color: var(--dim); font: italic 13px/1.5 "Palatino Linotype", Palatino, Georgia, serif; }
+  .why { color: var(--dim); font: italic 13px/1.5 var(--body); }
   .pill {
     display: inline-block; border: 1px solid #33291d; border-radius: 2px;
     padding: 1px 7px; background: #1d1710; color: var(--dim);
-    font: 400 12px/1.6 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 400 12px/1.6 var(--display);
     letter-spacing: .08em; font-variant: small-caps;
   }
   .pill.warn { color: var(--alarm); border-color: #4a2620; }
   .pill.good { color: var(--accent); border-color: var(--gold-dim); }
   .empty { color: var(--dim); font-style: italic;
-           font-family: "Palatino Linotype", Palatino, Georgia, serif; }
+           font-family: var(--display); }
 
   /* Corner flourishes on the sheet itself. Four rotated copies of one L-shaped mark. */
   .corner {
@@ -237,7 +289,7 @@
   .figure > svg { width: 100%; max-width: 300px; height: auto; color: #6a5a3c; }
   .figcap {
     display: inline-block; margin-top: 10px; padding: 5px 26px;
-    color: var(--gold); font: 400 14px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--gold); font: 400 14px/1 var(--display);
     letter-spacing: .13em; font-variant: small-caps;
     border-top: 1px solid var(--gold-dim); border-bottom: 1px solid var(--gold-dim);
     background: linear-gradient(90deg, transparent, rgba(217,192,138,.06), transparent);
@@ -256,7 +308,7 @@
   .medallion svg { width: 26px; height: 26px; }
   .slothead {
     display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-    color: var(--gold); font: 400 17px/1 "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--gold); font: 400 17px/1 var(--display);
     letter-spacing: .1em; font-variant: small-caps; margin-bottom: 5px;
   }
   .slothead button {
@@ -269,7 +321,7 @@
   .slotrow { display: flex; gap: 6px; margin-bottom: 5px; }
   .slotinput {
     flex: 1; min-width: 0; color: var(--ink); border-radius: 2px; padding: 7px 10px;
-    font: 15px/1.3 "Palatino Linotype", Palatino, Georgia, serif;
+    font: 15px/1.3 var(--body);
     background: linear-gradient(var(--sunk), #14100c);
     border: 1px solid #2e251a;
     box-shadow: inset 0 2px 5px rgba(0,0,0,.6);
@@ -286,7 +338,7 @@
   }
   .slotrow .delslot:hover { color: var(--alarm); border-color: var(--alarm); }
   .slotholds {
-    color: var(--dim); font: 12px/1.4 "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--dim); font: 12px/1.4 var(--body);
     font-style: italic;
   }
   @media (max-width: 1000px) {
