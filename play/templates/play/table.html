@@ -160,6 +160,55 @@
   .pill.warn { color: var(--alarm); }
   .pill.good { color: var(--accent); }
   .empty { color: var(--dim); font-style: italic; }
+  /* --- Body slots -------------------------------------------------------------- */
+  .bodylayout {
+    display: grid; grid-template-columns: minmax(210px, 1fr) minmax(180px, 300px) minmax(210px, 1fr);
+    gap: 22px; align-items: start;
+  }
+  .slotcol { display: flex; flex-direction: column; gap: 10px; }
+  .figure { position: sticky; top: 0; text-align: center; color: var(--edge); }
+  .figure svg { width: 100%; max-width: 260px; height: auto; color: #4a4335; }
+  .figcap { color: var(--dim); font: 13px/1.4 system-ui, sans-serif; margin-top: 6px; }
+  .slot {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 4px;
+    padding: 8px 10px 9px;
+  }
+  .slothead {
+    display: flex; align-items: center; justify-content: space-between;
+    font: 600 10px/1 system-ui, sans-serif; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--dim); margin-bottom: 6px;
+  }
+  .slothead button {
+    background: transparent; border: 1px solid var(--edge); color: var(--dim);
+    width: 20px; height: 20px; line-height: 1; border-radius: 3px; padding: 0;
+    cursor: pointer; font: 600 14px/1 system-ui, sans-serif;
+  }
+  .slothead button:hover { color: var(--accent); border-color: var(--accent); }
+  .slotrow { display: flex; gap: 5px; margin-bottom: 4px; }
+  .slotinput {
+    flex: 1; min-width: 0; background: #14120f; border: 1px solid var(--edge);
+    color: var(--ink); border-radius: 3px; padding: 6px 8px;
+    font: 14px/1.3 Georgia, serif;
+  }
+  .slotinput:focus { outline: none; border-color: var(--accent); }
+  .slotinput:disabled { color: var(--dim); font-style: italic; background: #191710; }
+  .slotinput::placeholder { color: #5c5545; font-style: italic; }
+  .slotrow.isempty .slotinput { border-style: dashed; }
+  .slotrow.beyond .slotinput { border-left: 3px solid var(--alarm); }
+  .slotrow .delslot {
+    background: transparent; border: 1px solid var(--edge); color: var(--dim);
+    width: 24px; border-radius: 3px; cursor: pointer; padding: 0;
+    font: 14px/1 system-ui, sans-serif;
+  }
+  .slotrow .delslot:hover { color: var(--alarm); border-color: var(--alarm); }
+  .slotholds {
+    color: var(--dim); font: 11px/1.35 system-ui, sans-serif; margin-top: 4px;
+  }
+  @media (max-width: 900px) {
+    .bodylayout { grid-template-columns: 1fr 1fr; }
+    .figure { display: none; }
+  }
+
   .opensheet {
     width: 100%; margin-top: 14px; background: transparent; color: var(--accent);
     border: 1px solid var(--edge); padding: 10px; border-radius: 3px; cursor: pointer;
@@ -361,6 +410,36 @@ $("#sayform").onsubmit = async e => {
 
 let SHEET = null, SHEET_TAB = "defense";
 
+// A plain standing figure, drawn here rather than traced from anyone's artwork. It is
+// only a place to hang the slots, so it is deliberately anonymous — no gear, no weapon,
+// no gender, nothing that contradicts whoever the character actually is.
+const FIGURE_SVG = `
+<svg viewBox="0 0 200 460" role="img" aria-label="Body slot diagram">
+  <g fill="none" stroke="currentColor" stroke-width="2.2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="100" cy="42" r="26"/>
+    <path d="M100 68 v22"/>
+    <path d="M62 104 q38 -16 76 0"/>
+    <path d="M62 104 q-6 60 2 96 h72 q8 -36 2 -96"/>
+    <path d="M64 108 q-22 44 -26 92 q-2 14 6 22"/>
+    <path d="M136 108 q22 44 26 92 q2 14 -6 22"/>
+    <path d="M40 226 q-6 12 0 20 q8 8 16 2"/>
+    <path d="M160 226 q6 12 0 20 q-8 8 -16 2"/>
+    <path d="M66 200 q-4 60 2 108 q3 60 6 96"/>
+    <path d="M134 200 q4 60 -2 108 q-3 60 -6 96"/>
+    <path d="M74 404 h22 M126 404 h-22"/>
+    <path d="M68 428 q-10 6 -2 12 h30 q4 -8 -2 -12"/>
+    <path d="M132 428 q10 6 2 12 h-30 q-4 -8 2 -12"/>
+  </g>
+  <g fill="currentColor" opacity=".5">
+    <circle cx="100" cy="26" r="3"/><circle cx="100" cy="52" r="3"/>
+    <circle cx="100" cy="82" r="3"/><circle cx="100" cy="118" r="3"/>
+    <circle cx="100" cy="150" r="3"/><circle cx="100" cy="192" r="3"/>
+    <circle cx="46" cy="238" r="3"/><circle cx="154" cy="238" r="3"/>
+    <circle cx="100" cy="436" r="3"/>
+  </g>
+</svg>`;
+
 const TABS = [
   ["defense",   "Defense",   s => tabDefense(s)],
   ["offense",   "Offense",   s => tabOffense(s)],
@@ -555,36 +634,96 @@ function tabSpells(s) {
 }
 
 // --- Equipment ---
-function tabEquipment(s) {
-  const e = s.equipment;
-  return `<div class="cols">
-    <div class="card">
-      <h3>Worn</h3>
-      <table class="sheet">
-        <tr><th>Item</th><th>AC</th><th>Max Dex</th><th>Check penalty</th></tr>
-        <tr><td>${esc(e.armour.name)}</td><td class="num">${sign(e.armour.ac)}</td>
-            <td class="num">${e.armour.max_dex > 90 ? "—" : sign(e.armour.max_dex)}</td>
-            <td class="num">${e.armour.acp || "—"}</td></tr>
-        <tr><td>${esc(e.shield.name)}</td><td class="num">${sign(e.shield.ac)}</td>
-            <td class="num">—</td><td class="num">${e.shield.acp || "—"}</td></tr>
-      </table>
-      <div class="why" style="margin-top:10px">
-        Total armour check penalty ${e.armour_check_penalty || 0}, applied to
-        Acrobatics, Climb, Disable Device, Escape Artist, Fly, Ride, Sleight of Hand,
-        Stealth and Swim.
+// The body-slot page: a figure with the slots arranged down either side, roughly where
+// each thing is worn. Empty slots are drawn as blanks rather than hidden — showing what
+// is *not* filled is the whole reason for laying it out on a body.
+function slotBox(sl, side) {
+  const canAdd = sl.items.length < sl.max;
+  return `
+    <div class="slot ${side}" data-slot="${sl.key}">
+      <div class="slothead">
+        <span>${esc(sl.label)}</span>
+        ${canAdd ? `<button class="addslot" data-slot="${sl.key}" title="Add another ${esc(sl.label.toLowerCase())} slot">+</button>` : ""}
       </div>
-    </div>
-    <div class="card">
-      <h3>Carried weapons</h3>
-      ${e.weapons.length
-        ? `<ul style="margin:0;padding-left:18px">${e.weapons.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
-        : `<div class="empty">Nothing.</div>`}
-      <div class="why" style="margin-top:10px">
-        Gear, coin and encumbrance are not tracked yet.
-      </div>
-    </div>
-  </div>`;
+      ${sl.items.map(it => `
+        <div class="slotrow${it.empty ? " isempty" : ""}${it.beyond_rules ? " beyond" : ""}">
+          <input class="slotinput" data-slot="${sl.key}" data-index="${it.index}"
+                 value="${esc(it.item || "")}" placeholder="empty"
+                 ${sl.derived ? "disabled" : ""}>
+          ${sl.items.length > 1 && !sl.derived
+            ? `<button class="delslot" data-slot="${sl.key}" data-index="${it.index}" title="Remove this slot">×</button>`
+            : ""}
+        </div>`).join("")}
+      <div class="slotholds">${esc(sl.holds)}${
+        sl.max > sl.rules_limit ? ` · ${sl.rules_limit} work${sl.rules_limit === 1 ? "s" : ""} at once` : ""}</div>
+    </div>`;
 }
+
+function tabEquipment(s) {
+  const e = s.equipment, sl = e.slots;
+  return `
+    <div class="bodylayout">
+      <div class="slotcol">${sl.left.map(x => slotBox(x, "left")).join("")}</div>
+      <div class="figure">${FIGURE_SVG}
+        <div class="figcap">${sl.filled} of ${sl.total} slots filled</div>
+      </div>
+      <div class="slotcol">${sl.right.map(x => slotBox(x, "right")).join("")}</div>
+    </div>
+
+    <div class="cols" style="margin-top:26px">
+      <div class="card">
+        <h3>Armour and shield</h3>
+        <table class="sheet">
+          <tr><th>Item</th><th>AC</th><th>Max Dex</th><th>Check penalty</th></tr>
+          <tr><td>${esc(e.armour.name)}</td><td class="num">${sign(e.armour.ac)}</td>
+              <td class="num">${e.armour.max_dex > 90 ? "—" : sign(e.armour.max_dex)}</td>
+              <td class="num">${e.armour.acp || "—"}</td></tr>
+          <tr><td>${esc(e.shield.name)}</td><td class="num">${sign(e.shield.ac)}</td>
+              <td class="num">—</td><td class="num">${e.shield.acp || "—"}</td></tr>
+        </table>
+        <div class="why" style="margin-top:10px">
+          Total armour check penalty ${e.armour_check_penalty || 0}, applied to
+          Acrobatics, Climb, Disable Device, Escape Artist, Fly, Ride, Sleight of Hand,
+          Stealth and Swim. The armour and shield slots are filled from here, so there
+          is only one place that says what you are wearing.
+        </div>
+      </div>
+      <div class="card">
+        <h3>Carried weapons</h3>
+        ${e.weapons.length
+          ? `<ul style="margin:0;padding-left:18px">${e.weapons.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
+          : `<div class="empty">Nothing.</div>`}
+        <div class="why" style="margin-top:10px">
+          Slots record what is worn. Their effects are not applied to your numbers yet —
+          a ring of protection here will not move your AC until magic items are modelled.
+          Gear, coin and encumbrance are not tracked either.
+        </div>
+      </div>
+    </div>`;
+}
+
+async function slotAction(payload) {
+  try {
+    SHEET = await post("/api/slots", payload);
+    drawSheet();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+// Delegated so the handlers survive every redraw.
+document.addEventListener("click", e => {
+  const add = e.target.closest(".addslot");
+  if (add) return slotAction({action: "add", slot: add.dataset.slot});
+  const del = e.target.closest(".delslot");
+  if (del) return slotAction({action: "remove", slot: del.dataset.slot,
+                              index: Number(del.dataset.index)});
+});
+document.addEventListener("change", e => {
+  const input = e.target.closest(".slotinput");
+  if (input) slotAction({action: "set", slot: input.dataset.slot,
+                         index: Number(input.dataset.index), item: input.value});
+});
 
 // --- Background ---
 function tabBackground(s) {

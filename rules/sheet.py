@@ -21,6 +21,7 @@ from .dice import Modifier
 from .tables import (
     ABILITIES, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
+    SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ability_modifier, bab_for, iterative_attacks, power_attack_terms, save_for,
 )
 
@@ -86,6 +87,47 @@ class Actor:
     flat_cmd: int | None = None
 
     notes: str = ""
+
+    # Worn magic items, keyed by body slot: {"ring": ["ring of protection +1", None]}.
+    # A None is an empty slot that exists — the sheet shows it as a blank to fill, which
+    # is the point of drawing the slots at all.
+    slots: dict[str, list] = field(default_factory=dict)
+
+    # --- body slots ----------------------------------------------------------------
+
+    def slot_list(self, key: str) -> list:
+        """The slots of one kind, created at their default count on first access."""
+        if key not in SLOTS:
+            raise KeyError(f"no such body slot {key!r}")
+        if key not in self.slots:
+            self.slots[key] = [None] * SLOTS[key]["count"]
+        return self.slots[key]
+
+    def add_slot(self, key: str) -> int:
+        """Add another slot of this kind. Returns its index."""
+        spec = SLOTS[key]
+        current = self.slot_list(key)
+        if len(current) >= spec["max"]:
+            raise IllegalSheet(
+                f"{spec['label']}: {self.name} already has {len(current)}, "
+                f"which is the most the sheet holds"
+            )
+        current.append(None)
+        return len(current) - 1
+
+    def remove_slot(self, key: str, index: int) -> None:
+        current = self.slot_list(key)
+        if not 0 <= index < len(current):
+            raise IllegalSheet(f"{key}: no slot {index}")
+        if len(current) <= 1:
+            raise IllegalSheet(f"{SLOTS[key]['label']}: the last slot cannot be removed")
+        current.pop(index)
+
+    def set_slot(self, key: str, index: int, item: str | None) -> None:
+        current = self.slot_list(key)
+        if not 0 <= index < len(current):
+            raise IllegalSheet(f"{key}: no slot {index}")
+        current[index] = (item or "").strip() or None
 
     # --- basics ------------------------------------------------------------------
 
@@ -550,6 +592,54 @@ def _terms(mods: list[Modifier]) -> dict:
             "terms": [m.as_dict() for m in mods]}
 
 
+def body_slots(actor: Actor) -> dict:
+    """Every body slot, in the order it is worn down the figure.
+
+    Empty slots are returned as `None` rather than omitted — the whole point of drawing
+    the slots is to show what is *not* filled, so a blank has to be a thing the sheet
+    knows about.
+
+    The armour and shield slots read from the character's worn armour rather than from
+    the slot store, because those are already tracked and having two places to say what
+    someone is wearing is how they end up disagreeing.
+    """
+    def one(key: str) -> dict:
+        spec = SLOTS[key]
+        items = list(actor.slot_list(key))
+        if key == "armor" and actor.armour != "none":
+            items[0] = ARMOUR[actor.armour]["name"]
+        if key == "shield" and actor.shield != "none":
+            items[0] = SHIELDS[actor.shield]["name"]
+        rules_limit = SLOT_RULES_LIMIT.get(key, 1)
+        return {
+            "key": key,
+            "label": spec["label"],
+            "holds": spec["holds"],
+            "max": spec["max"],
+            "rules_limit": rules_limit,
+            "derived": key in ("armor", "shield"),
+            "items": [
+                {"index": i, "item": it, "empty": it is None,
+                 # Slots past the rules limit are recorded but do not stack — a third
+                 # ring is worn, not working.
+                 "beyond_rules": i >= rules_limit}
+                for i, it in enumerate(items)
+            ],
+        }
+
+    left = [one(k) for k in SLOT_ORDER_LEFT]
+    right = [one(k) for k in SLOT_ORDER_RIGHT]
+    return {
+        "left": left,
+        "right": right,
+        # Counted from the built slots, not from the store, so the armour and shield
+        # filled by the character's own gear are included. Counting the store alone
+        # reported "0 slots filled" on a page visibly showing leather armour.
+        "filled": sum(1 for s in left + right for it in s["items"] if not it["empty"]),
+        "total": sum(len(s["items"]) for s in left + right),
+    }
+
+
 def full_sheet(actor: Actor) -> dict:
     """Everything on the character, with every number's provenance attached.
 
@@ -677,6 +767,7 @@ def full_sheet(actor: Actor) -> dict:
             "armour_check_penalty": actor.armour_check_penalty,
             "weapons": [WEAPONS[w.lower()]["name"] for w in weapons
                         if w and w.lower() in WEAPONS],
+            "slots": body_slots(actor),
         },
         "background": {
             "heritage": actor.heritage,
@@ -721,6 +812,7 @@ def to_dict(actor: Actor) -> dict:
         "flat_ac": actor.flat_ac, "flat_attack": actor.flat_attack,
         "flat_damage": actor.flat_damage, "flat_initiative": actor.flat_initiative,
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
+        "slots": {k: list(v) for k, v in actor.slots.items()},
     }
 
 
@@ -754,6 +846,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         flat_initiative=data.get("flat_initiative"),
         flat_cmd=data.get("flat_cmd"),
         notes=data.get("notes", ""),
+        slots={k: list(v) for k, v in (data.get("slots") or {}).items()
+               if k in SLOTS},
     )
     for c in data.get("conditions", []):
         a.add_condition(c if isinstance(c, str) else c["key"],

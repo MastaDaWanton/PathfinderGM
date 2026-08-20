@@ -401,6 +401,58 @@ ARMOUR: dict[str, dict] = {
     "full plate": {"name": "full plate", "ac": 9, "max_dex": 1, "acp": -6},
 }
 
+# --- Magic item body slots ---------------------------------------------------------
+
+# Ultimate Equipment p.206: "There are 15 categories of slotted wondrous items. Armor,
+# rings, and shields are described in other sections of this book, while the 11 other
+# body slots are detailed below."
+#
+# `count` is how many of that slot a character has by default and `max` is how many the
+# sheet will let you add. The rules give everyone two ring slots and one neck slot, and
+# a creature only benefits from one item per slot — but sheets need to *record* what is
+# owned and worn beyond that, so the maxima here are deliberately generous. Extra slots
+# past the rules default are marked `beyond_rules` in the sheet so the display can say
+# so rather than implying they all work.
+SLOTS: dict[str, dict] = {
+    "head":      {"label": "Head", "count": 1, "max": 1, "side": "left",
+                  "holds": "circlets, crowns, hats, helms, masks"},
+    "headband":  {"label": "Headband", "count": 1, "max": 1, "side": "right",
+                  "holds": "headbands, phylacteries"},
+    "eyes":      {"label": "Eyes", "count": 1, "max": 1, "side": "left",
+                  "holds": "goggles, lenses, spectacles"},
+    "neck":      {"label": "Neck", "count": 1, "max": 5, "side": "right",
+                  "holds": "amulets, brooches, necklaces, periapts, scarabs"},
+    "shoulders": {"label": "Shoulders", "count": 1, "max": 1, "side": "left",
+                  "holds": "capes, cloaks, mantles"},
+    "chest":     {"label": "Chest", "count": 1, "max": 1, "side": "right",
+                  "holds": "jackets, shirts, vests"},
+    "body":      {"label": "Body", "count": 1, "max": 1, "side": "left",
+                  "holds": "robes, vestments, body wraps"},
+    "armor":     {"label": "Armour", "count": 1, "max": 1, "side": "left",
+                  "holds": "worn armour"},
+    "belt":      {"label": "Belt", "count": 1, "max": 1, "side": "right",
+                  "holds": "belts, girdles, sashes"},
+    "wrists":    {"label": "Wrists", "count": 1, "max": 1, "side": "left",
+                  "holds": "bracers, bracelets"},
+    "hands":     {"label": "Hands", "count": 1, "max": 1, "side": "right",
+                  "holds": "gauntlets, gloves"},
+    "ring":      {"label": "Rings", "count": 2, "max": 10, "side": "right",
+                  "holds": "rings"},
+    "feet":      {"label": "Feet", "count": 1, "max": 1, "side": "left",
+                  "holds": "boots, sandals, shoes, slippers"},
+    "shield":    {"label": "Shield", "count": 1, "max": 1, "side": "right",
+                  "holds": "carried shields"},
+}
+
+# How many of a slot the *rules* let you benefit from at once, where that differs from
+# the sheet's maximum. Everything else is one.
+SLOT_RULES_LIMIT = {"ring": 2}
+
+# Top-to-bottom order down each side of the figure, so the boxes sit roughly where the
+# thing is worn.
+SLOT_ORDER_LEFT = ("head", "eyes", "shoulders", "body", "armor", "wrists", "feet")
+SLOT_ORDER_RIGHT = ("headband", "neck", "chest", "hands", "ring", "belt", "shield")
+
 SHIELDS: dict[str, dict] = {
     "none": {"name": "no shield", "ac": 0, "acp": 0},
     "buckler": {"name": "buckler", "ac": 1, "acp": -1},

@@ -121,6 +121,44 @@ def sheet(request):
 
 
 @require_POST
+def slots(request):
+    """Add, remove or fill a body slot.
+
+    Editing the sheet is not a GM intent — nobody rolls for putting a ring on — so it
+    goes straight to the character rather than through the engine.
+    """
+    from rules.sheet import IllegalSheet, full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+
+    body = json.loads(request.body or "{}")
+    action = str(body.get("action", "")).strip().lower()
+    key = str(body.get("slot", "")).strip().lower()
+
+    try:
+        if action == "add":
+            pc.add_slot(key)
+        elif action == "remove":
+            pc.remove_slot(key, int(body.get("index", -1)))
+        elif action == "set":
+            pc.set_slot(key, int(body.get("index", -1)), body.get("item"))
+        else:
+            return JsonResponse(
+                {"error": "action must be add, remove or set"}, status=400
+            )
+    except KeyError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except IllegalSheet as exc:
+        return JsonResponse({"error": str(exc)}, status=409)
+
+    c.save()
+    return JsonResponse(full_sheet(pc))
+
+
+@require_POST
 def say(request):
     """A player turn: GM call 1, validation, resolution."""
     c = campaign_mod.current()
