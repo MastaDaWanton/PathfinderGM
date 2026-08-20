@@ -1,0 +1,222 @@
+"""Tests for resolution, including the suspend/resume round trip a player roll forces."""
+from __future__ import annotations
+
+import pytest
+
+from rules.bestiary import instantiate
+from rules.dice import Dice
+from rules.engine import Engine, Scene
+from rules.sheet import load_pc
+
+
+@pytest.fixture
+def scene():
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.add(instantiate("guildhand", scene=s, name="the guildhand"))
+    return s
+
+
+@pytest.fixture
+def engine(scene):
+    return Engine(scene, Dice(seed=20250819))
+
+
+def run(engine, raw):
+    return engine.run(engine.validate(raw))
+
+
+# --- Suspend and resume ---------------------------------------------------------------
+
+def test_a_player_roll_suspends_the_whole_list(engine):
+    """Resolution is a state machine, not a function: a player roll is asynchronous human
+    input in the middle of an intent list, and everything after it must wait."""
+    res = run(engine, [
+        {"op": "check", "actor": "pc", "because": "going over the wall",
+         "params": {"skill": "stealth",
+                    "opposed_by": {"ref": "c1", "skill": "perception"}}},
+        {"op": "advance_time", "params": {"amount": 1, "unit": "minute"}},
+    ])
+    assert res.status == "awaiting_player_roll"
+    assert res.outcomes == []
+    assert res.awaiting["label"] == "Stealth check"
+    assert res.awaiting["modifier"] == 9
+
+
+def test_the_prompt_carries_the_itemised_modifier_and_the_reason(engine):
+    """The popup has to say what you are rolling and why. A bare '+9' is the bookkeeping
+    the app exists to expose, still hidden."""
+    res = run(engine, [{
+        "op": "check", "actor": "pc", "because": "the lamp is at the far end of its swing",
+        "params": {"skill": "stealth", "dc": {"band": "tough"}},
+    }])
+    p = res.awaiting
+    assert p["because"] == "the lamp is at the far end of its swing"
+    assert {b["source"] for b in p["breakdown"]} == {"ranks", "class skill", "Dex", "Stealthy"}
+    assert p["dc"] == 15
+
+
+def test_resume_finishes_the_list_from_where_it_stopped(engine):
+    res = run(engine, [
+        {"op": "check", "actor": "pc", "params": {"skill": "stealth", "dc": {"band": "easy"}}},
+        {"op": "advance_time", "params": {"amount": 1, "unit": "minute"}},
+    ])
+    assert res.status == "awaiting_player_roll"
+    done = engine.resume(face=13)
+    assert done.status == "complete"
+    assert [o.op for o in done.outcomes] == ["check", "advance_time"]
+    assert done.outcomes[0].rolls[0].total == 22
+    assert done.outcomes[0].verdict == "success"
+
+
+def test_the_opposed_roll_is_made_before_suspending_and_is_not_rerolled(engine):
+    """If the hidden side were rolled after the resume, a player who reloaded the page
+    would get a fresh opponent roll — a re-roll they could farm. It is rolled once,
+    before the suspend, and carried through the continuation.
+    """
+    run(engine, [{
+        "op": "check", "actor": "pc",
+        "params": {"skill": "stealth", "opposed_by": {"ref": "c1", "skill": "perception"}},
+    }])
+    carried = engine.scene.pending_partial["opposed_roll"]
+    first = engine.resume(face=10)
+    assert first.outcomes[0].rolls[1].as_dict()["faces"] == carried["faces"]
+
+
+def test_an_npc_roll_can_never_be_player_visible(engine):
+    """Measured on the first fully successful live turn: the GM marked the guildhand's
+    Perception check `visibility: "player"`.
+
+    Nothing suspended, because the popup only ever asks the player for their own rolls —
+    so the engine rolled it and then labelled it player-visible, which would show the
+    player a number nobody rolled and hand the GM a hidden roll it could leak. Only the
+    PC's rolls can be player-visible, and that is enforced, not requested.
+    """
+    intents = engine.validate([{
+        "op": "check", "actor": "c1", "visibility": "player",
+        "params": {"skill": "perception", "dc": {"band": "tough"}},
+    }])
+    assert intents[0].visibility == "hidden"
+
+    res = engine.run(intents)
+    assert res.status == "complete"
+    assert all(r.visibility == "hidden" for r in res.outcomes[0].rolls)
+    assert res.outcomes[0].player_visible()["rolls"] == []
+
+
+def test_the_pcs_own_roll_keeps_player_visibility(engine):
+    intents = engine.validate([{
+        "op": "check", "actor": "pc", "visibility": "player",
+        "params": {"skill": "stealth", "dc": {"band": "tough"}},
+    }])
+    assert intents[0].visibility == "player"
+
+
+def test_hidden_rolls_never_suspend(engine):
+    """Only the player's own rolls reach the popup. The guildhand's Perception is the
+    engine's business."""
+    res = run(engine, [{
+        "op": "check", "actor": "c1", "visibility": "hidden",
+        "params": {"skill": "perception", "dc": {"band": "average"}},
+    }])
+    assert res.status == "complete"
+    assert res.outcomes[0].rolls[0].visibility == "hidden"
+
+
+# --- What the GM is allowed to see -------------------------------------------------------
+
+def test_hidden_roll_numbers_are_stripped_before_the_gm_sees_them(engine):
+    """The GM cannot leak a number it was never given. This is why the narrator is handed
+    `player_visible()` and not the outcome."""
+    res = run(engine, [{
+        "op": "check", "actor": "c1", "visibility": "hidden", "because": "he heard something",
+        "params": {"skill": "perception", "dc": {"band": "average"}},
+    }])
+    visible = res.outcomes[0].player_visible()
+    assert visible["rolls"] == []
+    assert visible["tell"]
+    assert visible["verdict"] in ("success", "failure")
+
+
+def test_every_outcome_carries_a_tell_written_by_code(engine):
+    """If the narrator model falls over mid-turn, the tell renders raw and play
+    continues. The narrator is a garnish on a game that works without it."""
+    res = run(engine, [
+        {"op": "check", "actor": "pc", "visibility": "hidden",
+         "params": {"skill": "perception", "dc": {"band": "easy"}}},
+        {"op": "condition", "params": {"condition": "shaken", "to": "c1",
+                                       "duration": {"amount": 3, "unit": "round"}}},
+    ])
+    assert all(o.tell for o in res.outcomes)
+    assert "shaken for 3 rounds" in res.outcomes[1].tell
+
+
+# --- Combat maths --------------------------------------------------------------------------
+
+def test_attack_resolves_against_the_defenders_real_ac(engine, scene):
+    res = run(engine, [{"op": "attack", "actor": "pc", "target": "c1",
+                        "because": "she has run out of talking"}])
+    o = res.outcomes[0]
+    assert o.dc["value"] == 10          # guildhand AC
+    assert o.verdict in ("hit", "miss")
+    if o.verdict == "hit":
+        assert scene.get("c1").hp < scene.get("c1").hp_max
+
+
+def test_a_full_attack_at_bab_zero_is_still_one_attack(engine):
+    """Kesst is BAB +0. A GM that asks for a full attack does not thereby grant her an
+    iterative she has not earned."""
+    res = run(engine, [{"op": "attack", "actor": "pc", "target": "c1",
+                        "params": {"full_attack": True}}])
+    attack_rolls = [r for r in res.outcomes[0].rolls if r.label.endswith("attack")]
+    assert len(attack_rolls) == 1
+
+
+def test_damage_drops_the_target_and_the_engine_applies_the_condition(engine, scene):
+    """1e's death thresholds are applied by code, so nobody has to remember them
+    mid-scene. The guildhand has 4 hp and Con 11."""
+    res = run(engine, [{"op": "damage", "params": {"amount": 6, "type": "bludgeoning",
+                                                   "to": "c1"}}])
+    assert scene.get("c1").hp == -2
+    assert scene.get("c1").has_condition("unconscious")
+    assert any(e["kind"] == "condition" for e in res.outcomes[0].effects)
+
+
+def test_time_passing_expires_timed_conditions(engine, scene):
+    run(engine, [{"op": "condition", "params": {"condition": "shaken", "to": "c1",
+                                                "duration": {"amount": 2, "unit": "round"}}}])
+    assert scene.get("c1").has_condition("shaken")
+    res = run(engine, [{"op": "advance_time", "params": {"amount": 1, "unit": "minute"}}])
+    assert not scene.get("c1").has_condition("shaken")
+    assert "Shaken" in res.outcomes[0].tell
+
+
+def test_initiative_orders_everyone_on_the_board(engine, scene):
+    res = run(engine, [{"op": "begin_encounter",
+                        "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}])
+    assert scene.round == 1
+    assert len(scene.initiative) == 2
+    assert scene.initiative[0][1] >= scene.initiative[1][1]
+
+
+def test_spawn_mints_a_real_ref_the_gm_can_then_use(engine, scene):
+    """The GM cannot invent an NPC by naming one, but it can ask for one — and what it
+    gets back is a registered ref that passes check 2."""
+    res = run(engine, [{"op": "spawn", "params": {"template": "watchman", "count": 2}}])
+    made = res.outcomes[0].effects[0]["actors"]
+    assert [m["ref"] for m in made] == ["c2", "c3"]
+    engine.validate([{"op": "attack", "actor": "c2", "target": "pc"}])
+
+
+def test_seeded_dice_make_a_whole_scene_reproducible(scene):
+    """Every roll goes through one Dice instance, so a seed replays a scene exactly.
+    Without it, a failing scene cannot be re-run."""
+    def play():
+        s = Scene()
+        s.add(load_pc("fixtures/pc-kesst.json"))
+        s.add(instantiate("thug", scene=s))
+        e = Engine(s, Dice(seed=7))
+        r = e.run(e.validate([{"op": "attack", "actor": "c1", "target": "pc"}]))
+        return [roll.faces for roll in r.outcomes[0].rolls]
+
+    assert play() == play()

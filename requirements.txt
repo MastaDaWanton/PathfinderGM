@@ -1,0 +1,6 @@
+# Kept deliberately short. Every dependency is another thing PyInstaller has to be told
+# about and another thing that can break in the frozen build, so the Ollama client is
+# stdlib urllib rather than requests, and the tests configure Django themselves rather
+# than pulling in pytest-django.
+Django>=5.0
+pytest>=8.0

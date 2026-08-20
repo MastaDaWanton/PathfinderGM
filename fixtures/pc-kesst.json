@@ -1,0 +1,38 @@
+{
+  "name": "Kesst Vayr",
+  "kind": "pc",
+  "level": 1,
+  "class": "rogue",
+  "race": "human",
+  "size": "medium",
+
+  "heritage": "Zhilakai",
+  "world_people_id": "2aca2b7d6467",
+  "world_entity_id": null,
+
+  "abilities": { "str": 12, "dex": 17, "con": 12, "int": 13, "wis": 10, "cha": 14 },
+
+  "ranks": {
+    "stealth": 1,
+    "perception": 1,
+    "disable device": 1,
+    "acrobatics": 1,
+    "sense motive": 1,
+    "bluff": 1,
+    "diplomacy": 1,
+    "climb": 1,
+    "knowledge (local)": 1,
+    "appraise": 1
+  },
+
+  "feats": ["weapon finesse", "stealthy"],
+
+  "armour": "leather",
+  "shield": "none",
+  "weapons": ["rapier", "dagger"],
+  "equipped": "rapier",
+
+  "hp": 9,
+
+  "notes": "Zhilakai — flightless, in a city whose nobility is winged. Pangrella's own facts name the Zhilakai as its shadow power and its standing tension as 'winged nobility against merchant castes'; Kesst works the seam between the two. Rules race is human (PF1e); Zhilakai is her people in the world, not a game race. The two are tracked separately on purpose."
+}
