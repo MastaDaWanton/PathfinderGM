@@ -1,0 +1,147 @@
+{
+ "slug": "codex-monstrueux",
+ "abbr": "CM",
+ "kind": "reference-only",
+ "title": "Codex Monstrueux",
+ "note": "outline too thin to index and too slow to text-scan; not searchable",
+ "source_file": "Pathfinder - Codex Monstrueux.pdf",
+ "pdf_pages": 258,
+ "counts": {
+  "sections": 26,
+  "tables": 0,
+  "entries": 0
+ },
+ "tables": [],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Couverture",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Bourbiérin",
+   "page": 6
+  },
+  {
+   "depth": 0,
+   "title": "Drow",
+   "page": 18
+  },
+  {
+   "depth": 0,
+   "title": "Duergar",
+   "page": 30
+  },
+  {
+   "depth": 0,
+   "title": "Géant du feu",
+   "page": 42
+  },
+  {
+   "depth": 0,
+   "title": "Géant du froid",
+   "page": 54
+  },
+  {
+   "depth": 0,
+   "title": "Gnoll",
+   "page": 66
+  },
+  {
+   "depth": 0,
+   "title": "Gobelin",
+   "page": 78
+  },
+  {
+   "depth": 0,
+   "title": "Gobelours",
+   "page": 90
+  },
+  {
+   "depth": 0,
+   "title": "Goule",
+   "page": 102
+  },
+  {
+   "depth": 0,
+   "title": "Hobgobelin",
+   "page": 114
+  },
+  {
+   "depth": 0,
+   "title": "Homme-lézard",
+   "page": 126
+  },
+  {
+   "depth": 0,
+   "title": "Homme-rat",
+   "page": 138
+  },
+  {
+   "depth": 0,
+   "title": "Homme-serpent",
+   "page": 150
+  },
+  {
+   "depth": 0,
+   "title": "Kobold",
+   "page": 162
+  },
+  {
+   "depth": 0,
+   "title": "Ogre",
+   "page": 174
+  },
+  {
+   "depth": 0,
+   "title": "Orque",
+   "page": 186
+  },
+  {
+   "depth": 0,
+   "title": "Sahuagin",
+   "page": 198
+  },
+  {
+   "depth": 0,
+   "title": "Troglodyte",
+   "page": 210
+  },
+  {
+   "depth": 0,
+   "title": "Troll",
+   "page": 222
+  },
+  {
+   "depth": 0,
+   "title": "Vampire",
+   "page": 234
+  },
+  {
+   "depth": 0,
+   "title": "Appendice 1 : modifier les monstres",
+   "page": 246
+  },
+  {
+   "depth": 0,
+   "title": "Appendice 2 : index des capacités",
+   "page": 250
+  },
+  {
+   "depth": 0,
+   "title": "Appendice 3 : index des règles",
+   "page": 250
+  },
+  {
+   "depth": 0,
+   "title": "Couverture",
+   "page": 257
+  }
+ ]
+}

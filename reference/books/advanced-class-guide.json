@@ -1,0 +1,4217 @@
+{
+ "slug": "advanced-class-guide",
+ "abbr": "ACG",
+ "kind": "player",
+ "title": "Advanced Class Guide",
+ "source_file": "Pathfinder_Advanced_Class_Guide.pdf",
+ "pdf_pages": 256,
+ "counts": {
+  "sections": 825,
+  "tables": 15,
+  "entries": 755
+ },
+ "tables": [
+  {
+   "number": "1-1",
+   "title": "Arcanist",
+   "page": 11
+  },
+  {
+   "number": "1-2",
+   "title": "Arcanist Spells Known",
+   "page": 15
+  },
+  {
+   "number": "1-3",
+   "title": "Bloodrager",
+   "page": 18
+  },
+  {
+   "number": "1-4",
+   "title": "Bloodrager Spells Known",
+   "page": 19
+  },
+  {
+   "number": "1-5",
+   "title": "Brawler",
+   "page": 26
+  },
+  {
+   "number": "1-6",
+   "title": "Hunter",
+   "page": 28
+  },
+  {
+   "number": "1-7",
+   "title": "Hunter Spells Known",
+   "page": 30
+  },
+  {
+   "number": "1-8",
+   "title": "Investigator",
+   "page": 32
+  },
+  {
+   "number": "1-9",
+   "title": "Shaman",
+   "page": 37
+  },
+  {
+   "number": "1-10",
+   "title": "Skald",
+   "page": 51
+  },
+  {
+   "number": "1-11",
+   "title": "Skald Spells Known",
+   "page": 52
+  },
+  {
+   "number": "1-12",
+   "title": "Slayer",
+   "page": 55
+  },
+  {
+   "number": "1-13",
+   "title": "Swashbuckler",
+   "page": 58
+  },
+  {
+   "number": "1-14",
+   "title": "Warpriest",
+   "page": 62
+  },
+  {
+   "number": "3-1",
+   "title": "Feats",
+   "page": 138
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover (Retail 1st Printing Mistake)",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Front Cover (PDF)",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Title Page",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Credits",
+   "page": 3
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 5
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Classes",
+   "page": 7
+  },
+  {
+   "depth": 1,
+   "title": "Hybrid Classes",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Classes",
+   "page": 9
+  },
+  {
+   "depth": 1,
+   "title": "Arcanist",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-1: Arcanist",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-2: Arcanist Spells Known",
+   "page": 15
+  },
+  {
+   "depth": 1,
+   "title": "Bloodrager",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-3: Bloodrager",
+   "page": 18
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-4: Bloodrager Spells Known",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Bloodrager Bloodlines",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Aberrant",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Abyssal",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Arcane",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Celestial",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Destined",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Draconic",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Elemental",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Fey",
+   "page": 22
+  },
+  {
+   "depth": 3,
+   "title": "Infernal",
+   "page": 22
+  },
+  {
+   "depth": 3,
+   "title": "Undead",
+   "page": 23
+  },
+  {
+   "depth": 2,
+   "title": "Bloodrager Spells",
+   "page": 23
+  },
+  {
+   "depth": 1,
+   "title": "Brawler",
+   "page": 24
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 24
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 24
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-5: Brawler",
+   "page": 26
+  },
+  {
+   "depth": 1,
+   "title": "Hunter",
+   "page": 27
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 27
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 27
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-6: Hunter",
+   "page": 28
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-7: Hunter Spells Known",
+   "page": 30
+  },
+  {
+   "depth": 1,
+   "title": "Investigator",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-8: Investigator",
+   "page": 32
+  },
+  {
+   "depth": 1,
+   "title": "Shaman",
+   "page": 36
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 36
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 36
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-9: Shaman",
+   "page": 37
+  },
+  {
+   "depth": 2,
+   "title": "Spirits",
+   "page": 38
+  },
+  {
+   "depth": 3,
+   "title": "Battle",
+   "page": 38
+  },
+  {
+   "depth": 3,
+   "title": "Bones",
+   "page": 39
+  },
+  {
+   "depth": 3,
+   "title": "Flame",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Heavens",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Life",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Lore",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Nature",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Stone",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Waves",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Wind",
+   "page": 47
+  },
+  {
+   "depth": 2,
+   "title": "Spirit Animal",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "Shaman Spells",
+   "page": 49
+  },
+  {
+   "depth": 1,
+   "title": "Skald",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-10: Skald",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-11: Skald Spells Known",
+   "page": 52
+  },
+  {
+   "depth": 1,
+   "title": "Slayer",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-12: Slayer",
+   "page": 55
+  },
+  {
+   "depth": 1,
+   "title": "Swashbuckler",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-13: Swashbuckler",
+   "page": 58
+  },
+  {
+   "depth": 1,
+   "title": "Warpriest",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "Table 1-14: Warpriest",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Ex-Warpriests",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Blessings",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Air Blessing",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Animal Blessing",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Artifice Blessing",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Chaos Blessing",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Charm Blessing",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Community Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Darkness Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Death Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Destruction Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Evil Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Fire Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Glory Blessing",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Good Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Healing Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Knowledge Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Law Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Liberation Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Luck Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Madness Blessing",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Magic Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Nobility Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Plant Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Protection Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Repose Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Rune Blessing",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Strength Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Sun Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Travel Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Trickery Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "War Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Water Blessing",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Weather Blessing",
+   "page": 69
+  },
+  {
+   "depth": 1,
+   "title": "Racial Favored Class Options",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Dwarves",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Elves",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Gnomes",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Half-Elves",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Halflings",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Half-Orcs",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Humans",
+   "page": 72
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Archetypes and Class Options",
+   "page": 73
+  },
+  {
+   "depth": 1,
+   "title": "Selecting Archetypes",
+   "page": 75
+  },
+  {
+   "depth": 1,
+   "title": "Alchemist",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Discoveries",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Inspired Chemist",
+   "page": 76
+  },
+  {
+   "depth": 1,
+   "title": "Arcanist",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Blade Adept",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Blood Arcanist",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Brown-Fur Transmuter",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Eldritch Font",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Elemental Master",
+   "page": 79
+  },
+  {
+   "depth": 2,
+   "title": "Occultist",
+   "page": 79
+  },
+  {
+   "depth": 2,
+   "title": "School Savant",
+   "page": 79
+  },
+  {
+   "depth": 2,
+   "title": "Spell Specialist",
+   "page": 79
+  },
+  {
+   "depth": 2,
+   "title": "Unlettered Arcanist",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "White Mage",
+   "page": 80
+  },
+  {
+   "depth": 1,
+   "title": "Barbarian",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Rage Powers",
+   "page": 81
+  },
+  {
+   "depth": 1,
+   "title": "Bard",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Flame Dancer",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Voice of the Wild",
+   "page": 82
+  },
+  {
+   "depth": 1,
+   "title": "Bloodrager",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Blood Conduit",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Bloodrider",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Crossblooded Rager",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Greenrager",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Metamagic Rager",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Primalist",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Rageshaper",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Spelleater",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Steelblood",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Untouchable Rager",
+   "page": 86
+  },
+  {
+   "depth": 1,
+   "title": "Brawler",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Exemplar",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Mutagenic Mauler",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Shield Champion",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Snakebite Striker",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Steel-Breaker",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Strangler",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Wild Child",
+   "page": 90
+  },
+  {
+   "depth": 1,
+   "title": "Cavalier",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "Cavalier Order",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Order of the Beast",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "Cavalier Archetype",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Daring Champion",
+   "page": 91
+  },
+  {
+   "depth": 1,
+   "title": "Cleric",
+   "page": 92
+  },
+  {
+   "depth": 2,
+   "title": "Ecclesitheurge",
+   "page": 92
+  },
+  {
+   "depth": 1,
+   "title": "Druid",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Feral Shifter",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Nature Fang",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Wild Whisperer",
+   "page": 93
+  },
+  {
+   "depth": 1,
+   "title": "Fighter",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Martial Master",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Mutation Warrior",
+   "page": 94
+  },
+  {
+   "depth": 1,
+   "title": "Gunslinger",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Dares",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Bolt Ace",
+   "page": 95
+  },
+  {
+   "depth": 1,
+   "title": "Hunter",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "Divine Hunter",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "Feral Hunter",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "Packmaster",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "Primal Companion Hunter",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "Verminous Hunter",
+   "page": 99
+  },
+  {
+   "depth": 1,
+   "title": "Inquisitor",
+   "page": 100
+  },
+  {
+   "depth": 2,
+   "title": "Sacred Huntsmaster",
+   "page": 100
+  },
+  {
+   "depth": 2,
+   "title": "Sanctified Slayer",
+   "page": 100
+  },
+  {
+   "depth": 1,
+   "title": "Investigator",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Empiricist",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Infiltrator",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Mastermind",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Sleuth",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Spiritualist",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "Steel Hound",
+   "page": 104
+  },
+  {
+   "depth": 1,
+   "title": "Magus",
+   "page": 105
+  },
+  {
+   "depth": 2,
+   "title": "Magus Arcana",
+   "page": 105
+  },
+  {
+   "depth": 2,
+   "title": "Eldritch Scion",
+   "page": 105
+  },
+  {
+   "depth": 1,
+   "title": "Monk",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "Kata Master",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "Wildcat",
+   "page": 106
+  },
+  {
+   "depth": 1,
+   "title": "Oracle",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Psychic Searcher",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Spirit Guide",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Warsighted",
+   "page": 107
+  },
+  {
+   "depth": 1,
+   "title": "Paladin",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Holy Guide",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Temple Champion",
+   "page": 108
+  },
+  {
+   "depth": 1,
+   "title": "Ranger",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Divine Tracker",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Hooded Champion",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Wild Hunter",
+   "page": 109
+  },
+  {
+   "depth": 1,
+   "title": "Rogue",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "Counterfeit Mage",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "Underground Chemist",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "Visionary",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Witch Doctor",
+   "page": 114
+  },
+  {
+   "depth": 1,
+   "title": "Shaman",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Animist",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Possessed Shaman",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Speaker for the Past",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Spirit Warden",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Unsworn Shaman",
+   "page": 113
+  },
+  {
+   "depth": 1,
+   "title": "Skald",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Rage Powers",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Fated Champion",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Herald of the Horn",
+   "page": 116
+  },
+  {
+   "depth": 2,
+   "title": "Spell Warrior",
+   "page": 117
+  },
+  {
+   "depth": 2,
+   "title": "Totemic Skald",
+   "page": 118
+  },
+  {
+   "depth": 1,
+   "title": "Slayer",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "New Combat Style",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Bounty Hunter",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Cleaner",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Cutthroat",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Deliverer",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Grave Warden",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Sniper",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Stygian Slayer",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Vanguard",
+   "page": 122
+  },
+  {
+   "depth": 1,
+   "title": "Sorcerer",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Eldritch Scrapper",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Mongrel Mage",
+   "page": 123
+  },
+  {
+   "depth": 1,
+   "title": "Summoner",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Naturalist",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Spirit Summoner",
+   "page": 124
+  },
+  {
+   "depth": 1,
+   "title": "Swashbuckler",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Daring Infiltrator",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Flying Blade",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Inspired Blade",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Mouser",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Musketeer",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Mysterious Avenger",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Picaroon",
+   "page": 128
+  },
+  {
+   "depth": 1,
+   "title": "Warpriest",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Champion of the Faith",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Cult Leader",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Disenchanter",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Divine Commander",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Forgepriest",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Sacred Fist",
+   "page": 131
+  },
+  {
+   "depth": 1,
+   "title": "Witch",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Hex Channeler",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Mountain Witch",
+   "page": 133
+  },
+  {
+   "depth": 1,
+   "title": "Wizard",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Exploiter Wizard",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spell Sage",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spirit Whisperer",
+   "page": 134
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Feats",
+   "page": 135
+  },
+  {
+   "depth": 1,
+   "title": "Types of Feats",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Combat Feats",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Panache Feats",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Style Feats",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Teamwork Feats",
+   "page": 137
+  },
+  {
+   "depth": 1,
+   "title": "Table 3–1: Feats",
+   "page": 138
+  },
+  {
+   "depth": 1,
+   "title": "Feat Descriptions",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 137
+  },
+  {
+   "depth": 3,
+   "title": "Aberrant Tumor",
+   "page": 137
+  },
+  {
+   "depth": 3,
+   "title": "Amateur Investigator",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Amateur Swashbuckler (Combat)",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Animal Soul",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Anticipate Dodge (Combat)",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Barroom Brawler (Combat)",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Battle Cry (Combat)",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Befuddling Strike (Combat)",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Believer’s Boon",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Believer’s Hands",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Blasting Charge",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Blessed Striker",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Blooded Arcane Strike (Combat)",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Bookish Rogue",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Canny Tumble (Combat)",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Channeled Blessing",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Channeling Force (Combat)",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Confounding Tumble Deed (Panache)",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Coordinated Shot (Combat, Teamwork)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Counter Reflexes (Combat)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Counterpunch (Combat)",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Dazing Fist (Combat)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Disable Dweomer",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Disarming Threat Deed (Panache)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Disheartening Display (Combat)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Distracting Charge (Combat, Teamwork)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Divine Protection",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Draining Strike (Combat)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Dual Enhancement",
+   "page": 146
+  },
+  {
+   "depth": 3,
+   "title": "Dueling Cape (Combat, Panache)",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Energy Channel",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Esoteric Linguistics",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Evolved Companion",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Evolved Summoned Monster",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Expanded Preparation",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Extended Animal Focus",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Extra Arcanist Exploit",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Extra Channel",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Extra Hex",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Inspiration",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Investigator Talent",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Martial Flexibility",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Panache (Panache)",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Reservoir",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extra Slayer Talent",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Extreme Prejudice (Combat)",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Favored Enemy Spellcasting",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Faerie’s Strike (Combat)",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Flexible Hex",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Flexible Wizardry",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Focused Inspiration",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Force Dash",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Formula Recollection",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "G",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Grabbing Drag (Combat)",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Grabbing Master (Combat)",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Grabbing Style (Combat, Style)",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Grasping Strike (Combat)",
+   "page": 149
+  },
+  {
+   "depth": 3,
+   "title": "Greater Dirge of Doom",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Greater Skald’s Vigor",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Greater Weapon of the Chosen (Combat)",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Gruesome Slaughter (Combat)",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Awesome Blow (Combat)",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Dirge of Doom",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Duck and Cover (Teamwork)",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Flexible Wizardry",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Spell Sharing (Teamwork)",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Studied Combatant",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Swap Places (Combat, Teamwork)",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Improved Weapon of the Chosen (Combat)",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Insightful Delivery",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Inspired Alchemy",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Inspired by Fear",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Inspired Strike",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Intercept Charge (Combat, Teamwork)",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Intimidating Performance",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "J",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Jabbing Dancer (Combat)",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Jabbing Master (Combat)",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Jabbing Style (Combat, Style)",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "K",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Kick Up (Combat)",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Killing Flourish (Combat)",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Lay of the Land",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Lunging Spell Touch",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Manifested Blood",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Merciless Butchery (Combat)",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Nature Magic",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "O",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Orator",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Pack Flanking (Teamwork)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Paralyzing Strike (Combat)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Pommel Strike Deed (Panache)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Pummeling Bully (Combat)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Pummeling Charge (Combat)",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Pummeling Style (Combat, Style)",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Q",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Quicken Blessing",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Rage Casting",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Raging Absorption",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Raging Blood",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Raging Concentration",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Ranged Study",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Reactive Healing",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Reckless Rage",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Recovered Rage",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Resilient Armor",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Riving Strike (Combat)",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Seething Hatred (Combat)",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Seize Advantage (Combat)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Share Healing (Teamwork)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Silent Kill (Combat)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Skald’s Vigor",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Skilled Rager",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Slashing Grace (Combat)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Slayer’s Feint (Combat)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Slow Faller",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Spirit Talker",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Spirit’s Gift",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Spiritual Guardian",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Spontaneous Nature’s Ally",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Staggering Fist (Combat)",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Stalker’s Focus",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Steadfast Personality",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Stouthearted",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Studied Combatant",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Surprise Maneuver",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Talented Magician",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Twinned Feint (Combat)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Twist Away",
+   "page": 159
+  },
+  {
+   "depth": 2,
+   "title": "U",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Undersized Mount (Combat)",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Unfettered Familiar",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "War Blessing",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Weapon of the Chosen (Combat)",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Winter’s Strike (Combat)",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Wounded Paw Gambit (Combat, Teamwork)",
+   "page": 160
+  },
+  {
+   "depth": 1,
+   "title": "Sidebar: Feats That Grant Extra Uses",
+   "page": 160
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Spells",
+   "page": 161
+  },
+  {
+   "depth": 1,
+   "title": "Spell Lists",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "Alchemist Spells",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "Antipaladin Spells",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Bard Spells",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Bloodrager Spells",
+   "page": 165
+  },
+  {
+   "depth": 2,
+   "title": "Cleric Spells",
+   "page": 165
+  },
+  {
+   "depth": 2,
+   "title": "Druid Spells",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Inquisitor Spells",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Magus Spells",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Paladin Spells",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Ranger Spells",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Shaman Spells",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerer/Wizard Spells",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Summoner Spells",
+   "page": 171
+  },
+  {
+   "depth": 2,
+   "title": "Witch Spells",
+   "page": 171
+  },
+  {
+   "depth": 1,
+   "title": "Spell Descriptions",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Adhesive Blood",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Adhesive Spittle",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Adjustable Disguise",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Adjustable Polymorph",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Aggressive Thundercloud",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Aggressive Thundercloud, Greater",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Air Geyser",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Air Step",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Align Weapon, Communal",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Alter Musical Instrument",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Anchored Step",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Animal Purpose Training",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Anonymous Interaction",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Anti-Incorporeal Shell",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Aura Sight",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Banshee Blast",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Barrow Haze",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Beastspeak",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Bestow Auras",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Blade Lash",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Blazing Rainbow",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Blessed Fist",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Bloatbomb",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Blood Armor",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Blood Sentinel",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Blurred Movement",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Body Capacitance",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Bullet Ward",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Buoyancy",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Chameleon Stride, Greater",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Climbing Beanstalk",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Companion Life Link",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Contingent Action",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Contingent Scroll",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Creeping Ice",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Crimson Confession",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Curse of Burning Sleep",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Bounce",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Disable Construct",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Discern Next of Kin",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Disguise Weapon",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Enchantment Foil",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Enemy Insight",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Euphoric Cloud",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Extreme Flexibility",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Eyes of the Void",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Fairy Ring Retreat",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Familiar Double",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Feast on Fear",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Flaming Sphere, Greater",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Flexible Fury",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Focused Scrutiny",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Font of Spirit Magic",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "G",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Gentle Breeze",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Glue Seal",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Guardian of Faith",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "H",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Heart of the Metal",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Heightened Awareness",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Heightened Reflexes",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Hex Glyph",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Hex Glyph, Greater",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Hex Vulnerability",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Holy Ice Weapon",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Investigative Mind",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility Alarm",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Life Pact",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Line in the Sand",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Long Arm",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Longstrider, Greater",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Magnifying Chime",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Mantle of Calm",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Marching Chant",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Mark of Obvious Ethics",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Memorize Page",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Mindlocked Messenger",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Hideaway",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Polish",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Transport",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Molten Orb",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Monkey Fish",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Muffle Sound",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Nauseating Dart",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Nauseating Trail",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Path of Glory",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Path of Glory, Greater",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Persistent Vigor",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Blood",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Pierce Disguise",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Planeslayer’s Call",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Polymorph Familiar",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Refine Improvised Weapon",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Repair Undead",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Repair Undead, Mass",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "River Whip",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Sense Spirit Magic",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Shield Companion",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Shield of Fortification",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Shield of Fortification, Greater",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Sickening Entanglement",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Silent Table",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Silver Darts",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Slowing Mud",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Sonic Form",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Sonic Scream",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Speak with Haunt",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Spellcrash",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Spellcrash, Greater",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Spellcrash, Lesser",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Stench of Prey",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Stone Discus",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Stricken Heart",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Stunning Barrier",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Stunning Barrier, Greater",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Sunder Breaker",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Sundering Shards",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Laughter",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Thorn Javelin",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Thorny Entanglement",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Thunderstomp",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Thunderstomp, Greater",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Time Shudder",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Triggered Suggestion",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Twilight Haze",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "U",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Unbearable Brightness",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Unholy Ice Weapon",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Unliving Rage",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "V",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Vampiric Shadow Shield",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Blindness/Deafness",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Nausea",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Wave Shield",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Whip of Ants",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Whip of Centipedes",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Whip of Spiders",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Widen Auras",
+   "page": 200
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 5: Gear and Magic Items",
+   "page": 201
+  },
+  {
+   "depth": 1,
+   "title": "Adventuring Gear",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Animal Call",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Arcanist’s Kit",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Bloodrager’s Kit",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Book Lariat",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Book of Puzzles",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Book of War Prayers",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Braille Bracelet",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Brawler’s Kit",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Calumet",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Cheat Sheath",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Cipher Rings",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Collapsible Trampoline",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Cork Vest",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Courtesan’s Kit",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Fire Pump",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Footprint Book",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Grappler’s Grease",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Hand Rotary Quern",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Hunter’s Kit",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Hunter’s Sight",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Investigator’s Kit",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Marlinspike",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Mobile Hospital",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Musk Kit",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Obals",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Portable Prison",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Roperunner",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Scavenger Beetle Colony",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Shaman’s Kit",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Skald’s Kit",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Slayer’s Kit",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Sleeve Holster",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Snuffbox",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Sugar Glass Bottle",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Swashbuckler’s Kit",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Tome of Epics",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Traveling Bee Hive",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Traveling Garden",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Warpriest’s Kit",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Alchemical Remedies",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Antiemetic Snuff",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Blood-Clotter Salve",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Fortifying Brew",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Poison Ward Salve",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Rager’s Aid",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Alchemical Tools",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Bloodvine Rope",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Gravelly Tonic",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Light Fire Ink",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Liquid Traction",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Lozenge of the Songbird",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Masking Scent",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Oil of the Masters",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Pathstones",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Reagent Paper",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Tracker’s Snuff",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Tracking Powder",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Vomit Capsule",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Woad Painting Kit",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Alchemical Weapons",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Dust Knuckles",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Holy Weapon Balm",
+   "page": 210
+  },
+  {
+   "depth": 1,
+   "title": "Magic Items",
+   "page": 210
+  },
+  {
+   "depth": 2,
+   "title": "Armor Special Abilities",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Amorphous",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Burdenless",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Calming",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Jarring",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Restful",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Sensing",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Spell Dodging",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Spiteful",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Trackless",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Vouchsafing",
+   "page": 211
+  },
+  {
+   "depth": 2,
+   "title": "Specific Armors and Shields",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Clawhand Shield",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Full Plate of the Corpse",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Hero’s Hauberk",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Stalking Armor",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Tireless Tracking Hide",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Special Abilities",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Answering",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Blood-Hunting",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Bloodsong",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Brawling",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Confounding",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Distracting",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Distracting, Greater",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Exclusionary",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Exhausting",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Fate-Stealing",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Flamboyant",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Flamboyant, Greater",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Flying",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Fortuitous",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Inspired",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Ammunition",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Prehensile",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Sacred",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Sneaky",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Spirit-Hunting",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Specific Weapons",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Duelist’s Comate",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Headsman’s Blade",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Rapier of Battlefield Movement",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Swashbuckler’s Rapier",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Rings",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Ancestral Blood Magic",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Eloquence",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Lingering Blood Magic",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Natural Attunement (Drake)",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Natural Attunement (Kami)",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Natural Attunement (Leshy)",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Powerful Blood Magic",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Resilience",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Aeon)",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Agathion)",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Angel)",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Archon)",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Asura)",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Daemon)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Div)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Inevitable)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Kyton)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Protean)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Psychopomp)",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Summoning Affinity (Qlippoth)",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Vengeful Blood Magic",
+   "page": 221
+  },
+  {
+   "depth": 2,
+   "title": "Rods",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Abrupt Hexes",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Grasping Hexes",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Interminable Hexes",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Potent Hexes",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Voracious Hexes",
+   "page": 222
+  },
+  {
+   "depth": 2,
+   "title": "Staves",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Ember Staff",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Gravedigger’s Spade",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Monstrification Staff",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Spark Staff",
+   "page": 222
+  },
+  {
+   "depth": 2,
+   "title": "Wondrous Items",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Amulet of the Blooded",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Amulet of the Spirits",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Amulet of Uncanny Defense",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Aspect Mask",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Assassin’s Dust",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Banner of Restful Nights",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Bell of Returning Spirits",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Belt of Superior Maneuvers",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Bloodstained Gloves",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Blouse of the Boastful Bastard",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Boots of Gusto",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Boots of Swift Fury",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Boots of the Battle Herald",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Boots of Vaulting",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Bottled Scream",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Brass Spider",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Cape of Daring Deeds",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Cape of Feinting",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Cloak of Disarming",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Cloak of the Sneaky Scoundrel",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Cups of Rapport",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Dire Collar",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Dire Collar, Greater",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Drinking Horn of the Panacea",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Elixir of Sex Shift",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Elixir of the Thundering Voice",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "False Face",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Gloves of Marking",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Glowing Gourd",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Handkerchief of Finding",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Headband of the Wolf",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Helm of the Valkyrie",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Howling Bracers",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Hunter’s Tree Fort",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Incense of Eidos",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Investigator’s Pipe",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Iron Collar of the Unbound Coven",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Lantern of Auras",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Lenses of the Predator’s Gaze",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Lute of the Battle Ready",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "One-Way Window",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Physician’s Spectacles",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Plume of Panache",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Poet’s Cloak",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Preyfinder",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Restoration Dust",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Runes of the Crone’s Coven",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Runes of the Old Faith",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Runestone of Power",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Saboteur’s Goggles",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Scabbard of Many Blades",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Skullcrusher Gauntlets",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Slayer’s Robe",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Spell Lattice",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Storyteller’s Dust",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Swordmaster’s Flair",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Tin Imp (Figurine of Wondrous Power)",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Toothpick of Pyrotechnics",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Torc of Bloody Rage",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Torc of the Primal Song",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Trollbone",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Vanishing Sheath",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Wand Key Ring",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Whistle of Calling",
+   "page": 238
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 6: Designing Classes",
+   "page": 239
+  },
+  {
+   "depth": 1,
+   "title": "Class, Archetype, or Prestige Class?",
+   "page": 241
+  },
+  {
+   "depth": 1,
+   "title": "Class Design",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Concept",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Rules Space",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Checking Your Concept",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Class Story",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Basic Mechanics",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Designing a Spell List",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Review and Polish",
+   "page": 247
+  },
+  {
+   "depth": 1,
+   "title": "Archetype Design",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "Concept and Rules",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "Design Principles",
+   "page": 249
+  },
+  {
+   "depth": 1,
+   "title": "Prestige Class Design",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Concept and Rules",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Requirements and Levels",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Basic Mechanics",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Feature Design",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Integration",
+   "page": 250
+  },
+  {
+   "depth": 0,
+   "title": "Index",
+   "page": 251
+  },
+  {
+   "depth": 0,
+   "title": "OGL",
+   "page": 254
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 255
+  }
+ ]
+}

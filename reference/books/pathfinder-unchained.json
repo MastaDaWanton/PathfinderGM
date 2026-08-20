@@ -1,0 +1,236 @@
+{
+ "slug": "pathfinder-unchained",
+ "abbr": "PU",
+ "kind": "player",
+ "title": "Pathfinder Unchained",
+ "source_file": "Pathfinder - Pathfinder Unchained.pdf",
+ "pdf_pages": 258,
+ "counts": {
+  "sections": 44,
+  "tables": 0,
+  "entries": 36
+ },
+ "tables": [],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Couverture",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Classes",
+   "page": 6
+  },
+  {
+   "depth": 1,
+   "title": "Barbare",
+   "page": 8
+  },
+  {
+   "depth": 1,
+   "title": "Invocateur",
+   "page": 14
+  },
+  {
+   "depth": 1,
+   "title": "Le Moine",
+   "page": 29
+  },
+  {
+   "depth": 1,
+   "title": "Roublard",
+   "page": 35
+  },
+  {
+   "depth": 1,
+   "title": "Bonus de base fractionnaires",
+   "page": 40
+  },
+  {
+   "depth": 1,
+   "title": "Progression échelonnée",
+   "page": 42
+  },
+  {
+   "depth": 0,
+   "title": "Compétences et options",
+   "page": 45
+  },
+  {
+   "depth": 1,
+   "title": "Compétences contextuelles",
+   "page": 46
+  },
+  {
+   "depth": 1,
+   "title": "Compétences fusionnées",
+   "page": 54
+  },
+  {
+   "depth": 1,
+   "title": "Compétences groupées",
+   "page": 70
+  },
+  {
+   "depth": 1,
+   "title": "Règles alternatives sur les professions et les artisanats",
+   "page": 72
+  },
+  {
+   "depth": 1,
+   "title": "Extensions des compétences",
+   "page": 82
+  },
+  {
+   "depth": 1,
+   "title": "Variante de multiclassage",
+   "page": 88
+  },
+  {
+   "depth": 0,
+   "title": "Mécanismes de jeu",
+   "page": 92
+  },
+  {
+   "depth": 1,
+   "title": "L’alignement",
+   "page": 95
+  },
+  {
+   "depth": 1,
+   "title": "Éliminer l’alignement",
+   "page": 100
+  },
+  {
+   "depth": 1,
+   "title": "Gestion d’actions révisée",
+   "page": 102
+  },
+  {
+   "depth": 1,
+   "title": "Éliminer les attaques multiples",
+   "page": 110
+  },
+  {
+   "depth": 1,
+   "title": "L’endurance et les astuces martiales",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "Les seuils de blessure",
+   "page": 136
+  },
+  {
+   "depth": 1,
+   "title": "Les maladies et les poisons",
+   "page": 138
+  },
+  {
+   "depth": 0,
+   "title": "La magie",
+   "page": 142
+  },
+  {
+   "depth": 1,
+   "title": "L’incantation simplifiée",
+   "page": 144
+  },
+  {
+   "depth": 1,
+   "title": "Les altérations de la magie",
+   "page": 146
+  },
+  {
+   "depth": 1,
+   "title": "Les composantes matérielles ésotériques",
+   "page": 150
+  },
+  {
+   "depth": 1,
+   "title": "Bonus de progression automatique",
+   "page": 156
+  },
+  {
+   "depth": 1,
+   "title": "Bonus intrinsèques des objets",
+   "page": 158
+  },
+  {
+   "depth": 1,
+   "title": "Les objets évolutifs",
+   "page": 160
+  },
+  {
+   "depth": 1,
+   "title": "Création dynamique d’objets magiques",
+   "page": 180
+  },
+  {
+   "depth": 0,
+   "title": "Les Monstres",
+   "page": 192
+  },
+  {
+   "depth": 1,
+   "title": "La création de monstres simplif iée",
+   "page": 194
+  },
+  {
+   "depth": 1,
+   "title": "étape 1 : la gamme",
+   "page": 196
+  },
+  {
+   "depth": 1,
+   "title": "étape 2 : greffe de type ou de classe",
+   "page": 204
+  },
+  {
+   "depth": 1,
+   "title": "étape 3 : greffe de sous-type",
+   "page": 214
+  },
+  {
+   "depth": 1,
+   "title": "étape 4 : greffe d’archétype",
+   "page": 216
+  },
+  {
+   "depth": 1,
+   "title": "étape 5 : greffe de taille",
+   "page": 217
+  },
+  {
+   "depth": 1,
+   "title": "étape 6 : les sorts",
+   "page": 218
+  },
+  {
+   "depth": 1,
+   "title": "étape 7 : les options de monstre",
+   "page": 228
+  },
+  {
+   "depth": 1,
+   "title": "étape 8 : les compétences",
+   "page": 240
+  },
+  {
+   "depth": 1,
+   "title": "Exemples de création de monstres",
+   "page": 242
+  },
+  {
+   "depth": 0,
+   "title": "Index",
+   "page": 254
+  }
+ ]
+}

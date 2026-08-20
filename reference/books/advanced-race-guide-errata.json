@@ -1,0 +1,3207 @@
+{
+ "slug": "advanced-race-guide-errata",
+ "abbr": "ARG-errata",
+ "kind": "errata",
+ "title": "Advanced Race Guide — first printing errata",
+ "source_file": "Advanced Race Guide.pdf",
+ "pdf_pages": 256,
+ "counts": {
+  "sections": 619,
+  "tables": 19,
+  "entries": 588
+ },
+ "tables": [
+  {
+   "number": "1-1",
+   "title": "Dwarven Weapons",
+   "page": 16
+  },
+  {
+   "number": "2-1",
+   "title": "Goblin Weapons",
+   "page": 117
+  },
+  {
+   "number": "2-2",
+   "title": "Kobold Tail Attachments",
+   "page": 134
+  },
+  {
+   "number": "2-3",
+   "title": "Ratfolk Weapons",
+   "page": 153
+  },
+  {
+   "number": "2-4",
+   "title": "Fiendish Patrons",
+   "page": 170
+  },
+  {
+   "number": "3-1",
+   "title": "Duergar Poison",
+   "page": 186
+  },
+  {
+   "number": "3-2",
+   "title": "Gillman Weapon",
+   "page": 188
+  },
+  {
+   "number": "3-3",
+   "title": "Grippli Poison",
+   "page": 190
+  },
+  {
+   "number": "3-5",
+   "title": "Svirfneblin Weapon",
+   "page": 204
+  },
+  {
+   "number": "4-1",
+   "title": "Racial Points and Trait Maximums by Power Level",
+   "page": 213
+  },
+  {
+   "number": "5-1",
+   "title": "Core Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "number": "5-2",
+   "title": "Featured Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "number": "5-3",
+   "title": "Uncommon Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "number": "5-4",
+   "title": "Core Race Aging Effects",
+   "page": 248
+  },
+  {
+   "number": "5-5",
+   "title": "Featured Race Aging Effects",
+   "page": 248
+  },
+  {
+   "number": "5-6",
+   "title": "Uncommon Race Aging Effects",
+   "page": 248
+  },
+  {
+   "number": "5-7",
+   "title": "Core Race Random Height & Weight",
+   "page": 249
+  },
+  {
+   "number": "5-8",
+   "title": "Featured Race Random Height & Weight",
+   "page": 249
+  },
+  {
+   "number": "5-9",
+   "title": "Uncommon Race Random Height & Weight",
+   "page": 249
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Credits",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 3
+  },
+  {
+   "depth": 1,
+   "title": "Navigating This Book",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Core Races",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Core Races",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "General Description",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "Racial Traits",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 8
+  },
+  {
+   "depth": 1,
+   "title": "Dwarves",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Dwarf Racial Traits",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 10
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 10
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 12
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 12
+  },
+  {
+   "depth": 3,
+   "title": "Exarch (Inquisitor)",
+   "page": 12
+  },
+  {
+   "depth": 3,
+   "title": "Foehammer (Fighter)",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "Forgemaster (Cleric)",
+   "page": 14
+  },
+  {
+   "depth": 3,
+   "title": "Stonelord (Paladin)",
+   "page": 15
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Dwarven Equipment",
+   "page": 16
+  },
+  {
+   "depth": 4,
+   "title": "Table 1–1: Dwarven Weapons",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Dwarven Feats",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Dwarven Magic Items",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Dwarven Spells",
+   "page": 18
+  },
+  {
+   "depth": 1,
+   "title": "Elves",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Elf Racial Traits",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 22
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 22
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 23
+  },
+  {
+   "depth": 3,
+   "title": "Ancient Lorekeeper (Oracle)",
+   "page": 23
+  },
+  {
+   "depth": 3,
+   "title": "Spell Dancer (Magus)",
+   "page": 23
+  },
+  {
+   "depth": 3,
+   "title": "Spellbinder (Wizard)",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Treesinger (Druid)",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Plant Companions",
+   "page": 25
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Elven Equipment",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Elven Feats",
+   "page": 27
+  },
+  {
+   "depth": 3,
+   "title": "Elven Magic Items",
+   "page": 27
+  },
+  {
+   "depth": 3,
+   "title": "Elven Spells",
+   "page": 28
+  },
+  {
+   "depth": 1,
+   "title": "Gnomes",
+   "page": 29
+  },
+  {
+   "depth": 2,
+   "title": "Gnome Racial Traits",
+   "page": 29
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 33
+  },
+  {
+   "depth": 3,
+   "title": "Experimental Gunsmith (Gunslinger)",
+   "page": 33
+  },
+  {
+   "depth": 3,
+   "title": "Prankster (Bard)",
+   "page": 34
+  },
+  {
+   "depth": 3,
+   "title": "Saboteur (Alchemist)",
+   "page": 35
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 35
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Equipment",
+   "page": 35
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Feats",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Magic Items",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Spells",
+   "page": 38
+  },
+  {
+   "depth": 1,
+   "title": "Half-Elves",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Half-Elf Racial Traits",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 41
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Bonded Witch (Witch)",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: New Alchemist Discovery",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Bramble Brewer (Alchemist)",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Wild Caller (Summoner)",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Wild Shadow (Ranger)",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elven Equipment",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elven Feats",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elven Magic Items",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elven Spells",
+   "page": 47
+  },
+  {
+   "depth": 1,
+   "title": "Half-Orcs",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Half-Orc Racial Traits",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 52
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Blood God Disciple (Summoner)",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Hateful Rager (Barbarian)",
+   "page": 53
+  },
+  {
+   "depth": 3,
+   "title": "Redeemer (Paladin)",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Skulking Slayer (Rogue)",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc Equipment",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc Feats",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc Magic Items",
+   "page": 57
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc Spells",
+   "page": 57
+  },
+  {
+   "depth": 1,
+   "title": "Halflings",
+   "page": 59
+  },
+  {
+   "depth": 2,
+   "title": "Halfling Racial Traits",
+   "page": 59
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes & Orders",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Community Guardian (Oracle)",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Filcher (Rogue)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Order of the Paw (Cavalier)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Underfoot Adept (Monk)",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Halfling Equipment",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Halfling Feats",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Halfling Magic Items",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Halfling Spells",
+   "page": 67
+  },
+  {
+   "depth": 1,
+   "title": "Humans",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Human Racial Traits",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Rules",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Alternate Racial Traits",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Racial Subtypes",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Favored Class Options",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes & Bloodlines",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Buccaneer (Gunslinger)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Feral Child (Druid)",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Imperious Bloodline (Sorcerer)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Wanderer (Monk)",
+   "page": 75
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Human Equipment",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Human Feats",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Human Magic Items",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Human Spells",
+   "page": 78
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Featured Races",
+   "page": 79
+  },
+  {
+   "depth": 1,
+   "title": "Featured Races",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "General Description",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Racial Traits",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 82
+  },
+  {
+   "depth": 1,
+   "title": "Aasimars",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Aasimar Racial Traits",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Purifier (Oracle)",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Tranquil Guardian (Paladin)",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Aasimar Equipment",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Aasimar Feats",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Aasimar Magic Items",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Aasimar Spells",
+   "page": 88
+  },
+  {
+   "depth": 1,
+   "title": "Catfolk",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Catfolk Racial Traits",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Catfolk Rogue Talents",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Cat Burglar (Rogue)",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Nimble Guardian (Monk)",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Equipment",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Feats",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Magic Items",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Spells",
+   "page": 94
+  },
+  {
+   "depth": 1,
+   "title": "Dhampirs",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "Dhampir Racial Traits",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Cruoromancer (Wizard)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Kinslayer (Inquisitor)",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dhampir Equipment",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dhampir Feats",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dhampir Magic Items",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Dhampir Spells",
+   "page": 100
+  },
+  {
+   "depth": 1,
+   "title": "Drow",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Drow Racial Traits",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Cavern Sniper (Fighter)",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Demonic Apostle (Cleric)",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Drow Equipment",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Drow Feats",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Drow Magic Items",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Drow Spells",
+   "page": 105
+  },
+  {
+   "depth": 1,
+   "title": "Fetchlings",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Fetchling Racial Traits",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Dusk Stalker (Ranger)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Caller (Summoner)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Shadow Creature (CR +1)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "New Evolutions",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Fetchling Equipment",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Fetchling Feats",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Fetchling Magic Items",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Fetchling Spells",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "Goblins",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Goblin Racial Traits",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Goblin Discoveries",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Feral Gnasher (Barbarian)",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Fire Bomber (Alchemist)",
+   "page": 116
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Goblin Equipment",
+   "page": 116
+  },
+  {
+   "depth": 4,
+   "title": "Table 2–1: Goblin Weapons",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Goblin Feats",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Goblin Magic Items",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Goblin Spells",
+   "page": 118
+  },
+  {
+   "depth": 1,
+   "title": "Hobgoblins",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Hobgoblin Racial Traits",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Fell Rider (Cavalier)",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Ironskin Monk (Monk)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Hobgoblin Equipment",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Hobgoblin Feats",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Hobgoblin Magic Items",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Hobgoblin Spells",
+   "page": 124
+  },
+  {
+   "depth": 1,
+   "title": "Ifrits",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Ifrit Racial Traits",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 127
+  },
+  {
+   "depth": 3,
+   "title": "Immolator (Inquisitor)",
+   "page": 127
+  },
+  {
+   "depth": 3,
+   "title": "Wishcrafter (Sorcerer)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Ifrit Equipment",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Ifrit Feats",
+   "page": 129
+  },
+  {
+   "depth": 3,
+   "title": "Ifrit Magic Items",
+   "page": 129
+  },
+  {
+   "depth": 3,
+   "title": "Ifrit Spells",
+   "page": 129
+  },
+  {
+   "depth": 1,
+   "title": "Kobolds",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Kobold Racial Traits",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes & Bloodlines",
+   "page": 133
+  },
+  {
+   "depth": 3,
+   "title": "Bushwhacker (Gunslinger)",
+   "page": 133
+  },
+  {
+   "depth": 3,
+   "title": "Kobold Sorcerer Bloodline",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 134
+  },
+  {
+   "depth": 3,
+   "title": "Kobold Equipment",
+   "page": 134
+  },
+  {
+   "depth": 4,
+   "title": "Table 2–2: Kobold Tail Attachments",
+   "page": 134
+  },
+  {
+   "depth": 3,
+   "title": "Kobold Feats",
+   "page": 135
+  },
+  {
+   "depth": 3,
+   "title": "Kobold Magic Items",
+   "page": 136
+  },
+  {
+   "depth": 3,
+   "title": "Kobold Spells",
+   "page": 136
+  },
+  {
+   "depth": 1,
+   "title": "Orcs",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Orc Racial Traits",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 139
+  },
+  {
+   "depth": 3,
+   "title": "Dirty Fighter (Fighter)",
+   "page": 139
+  },
+  {
+   "depth": 3,
+   "title": "Scarred Witch Doctor (Witch)",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Orc Equipment",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Orc Feats",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Orc Magic Items",
+   "page": 141
+  },
+  {
+   "depth": 3,
+   "title": "Orc Spells",
+   "page": 142
+  },
+  {
+   "depth": 1,
+   "title": "Oreads",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Oread Racial Traits",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Shaitan Binder (Summoner)",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Student of Stone (Monk)",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Oread Equipment",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Oread Feats",
+   "page": 146
+  },
+  {
+   "depth": 3,
+   "title": "Oread Magic Items",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Oread Spells",
+   "page": 148
+  },
+  {
+   "depth": 1,
+   "title": "Ratfolk",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Ratfolk Racial Traits",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Gulch Gunner (Gunslinger)",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Plague Bringer (Alchemist)",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Ratfolk Discoveries",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Equipment",
+   "page": 152
+  },
+  {
+   "depth": 4,
+   "title": "Table 2–3: Ratfolk Weapons",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Feats",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Magic Items",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Spells",
+   "page": 154
+  },
+  {
+   "depth": 1,
+   "title": "Sylphs",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Sylph Racial Traits",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Sky Druid (Druid)",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Wind Listener (Wizard)",
+   "page": 157
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Sylph Equipment",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Sylph Feats",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Sylph Magic Items",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Sylph Spells",
+   "page": 159
+  },
+  {
+   "depth": 1,
+   "title": "Tengus",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Tengu Racial Traits",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Shigenjo (Oracle)",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Swordmaster (Rogue)",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Tengu Equipment",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Tengu Feats",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Tengu Magic Items",
+   "page": 165
+  },
+  {
+   "depth": 3,
+   "title": "Tengu Spells",
+   "page": 166
+  },
+  {
+   "depth": 1,
+   "title": "Tieflings",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Tiefling Racial Traits",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Fiend Flayer (Magus)",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Fiendish Vessel (Cleric)",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Table 2–4: Fiendish Patrons",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Tiefling Equipment",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Tiefling Feats",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Tiefling Magic Items",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Tiefling Spells",
+   "page": 172
+  },
+  {
+   "depth": 1,
+   "title": "Undines",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "Undine Racial Traits",
+   "page": 174
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Undine Adept (Druid)",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Watersinger (Bard)",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Undine Equipment",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Undine Feats",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Undine Magic Items",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Undine Spells",
+   "page": 177
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Uncommon Races",
+   "page": 179
+  },
+  {
+   "depth": 1,
+   "title": "Uncommon Races",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "General Description",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Racial Traits",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 182
+  },
+  {
+   "depth": 1,
+   "title": "Changelings",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "Changeling Racial Traits",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Dreamweaver (Witch)",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Changeling Feats",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Changeling Spells",
+   "page": 184
+  },
+  {
+   "depth": 1,
+   "title": "Duergar",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Duergar Racial Traits",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Gray Disciple (Monk)",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Duergar Equipment",
+   "page": 186
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–1: Duergar Poison",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Duergar Feats",
+   "page": 186
+  },
+  {
+   "depth": 1,
+   "title": "Gillmen",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Gillman Racial Traits",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Eldritch Raider (Rogue)",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Gillman Equipment",
+   "page": 188
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–2: Gillman Weapon",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Gillman Spells",
+   "page": 188
+  },
+  {
+   "depth": 1,
+   "title": "Gripplis",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Grippli Racial Traits",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Bogborn Alchemist (Alchemist)",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Grippli Discoveries",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Grippli Equipment",
+   "page": 190
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–3: Grippli Poison",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Grippli Feats",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Grippli Magic Items",
+   "page": 190
+  },
+  {
+   "depth": 1,
+   "title": "Kitsune",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Kitsune Racial Traits",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Kitsune Trickster (Rogue)",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Rogue Talents",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Kitsune Feats",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Kitsune Magic Items",
+   "page": 192
+  },
+  {
+   "depth": 1,
+   "title": "Merfolk",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Merfolk Racial Traits",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Wave Warden (Ranger)",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Merfolk Equipment",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Merfolk Feats",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Merfolk Magic Items",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Merfolk Spells",
+   "page": 194
+  },
+  {
+   "depth": 1,
+   "title": "Nagaji",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Nagaji Racial Traits",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Naga Aspirant (Druid)",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Nagaji Feats",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Nagaji Magic Items",
+   "page": 196
+  },
+  {
+   "depth": 1,
+   "title": "Samsarans",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Samsaran Racial Traits",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Reincarnated Oracle (Oracle)",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Samsaran Equipment",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Samsaran Feats",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Samsaran Magic Items",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Samsaran Spells",
+   "page": 198
+  },
+  {
+   "depth": 1,
+   "title": "Strix",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Strix Racial Traits",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Airborne Ambusher (Fighter)",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Strix Equipment",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Strix Feats",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Strix Magic Items",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Strix Spells",
+   "page": 200
+  },
+  {
+   "depth": 1,
+   "title": "Sulis",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Suli Racial Traits",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Knight (Magus)",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Suli Equipment",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Suli Feats",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Suli Spells",
+   "page": 202
+  },
+  {
+   "depth": 1,
+   "title": "Svirfneblin",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Svirfneblin Racial Traits",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Deep Bomber (Alchemist)",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Svirfneblin Discoveries",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Svirfneblin Equipment",
+   "page": 204
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–5: Svirfneblin Weapon",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Svirfneblin Feats",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Svirfneblin Spells",
+   "page": 204
+  },
+  {
+   "depth": 1,
+   "title": "Vanaras",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Vanara Racial Traits",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Treetop Monk (Monk)",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Equipment",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Feats",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Magic Items",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Spells",
+   "page": 206
+  },
+  {
+   "depth": 1,
+   "title": "Vishkanyas",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Vishkanya Racial Traits",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Courtesan (Rogue)",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Equipment",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Feats",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Magic Items",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Spells",
+   "page": 208
+  },
+  {
+   "depth": 1,
+   "title": "Wayangs",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Racial Traits",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class Options",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Wayang Racial Traits",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Racial Archetypes",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Puppeteer (Bard)",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "New Racial Rules",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Wayang Equipment",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Wayang Feats",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Wayang Magic Items",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Wayang Spells",
+   "page": 210
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Race Builder",
+   "page": 211
+  },
+  {
+   "depth": 1,
+   "title": "Race Examples",
+   "page": 213
+  },
+  {
+   "depth": 1,
+   "title": "Creating a New Race",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–1: Racial Points and Trait Maximums by Power Level",
+   "page": 213
+  },
+  {
+   "depth": 1,
+   "title": "Step 1: Concept",
+   "page": 213
+  },
+  {
+   "depth": 1,
+   "title": "Step 2: Racial Qualities",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Races without Constitution",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Type Quality",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Special Subtypes",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Aberration (3 RP)",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Dragon (10 RP)",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Fey (2 RP)",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Humanoid (0 RP)",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Humanoid (3 RP)",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Outsider (native) (3 RP)",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Plant (10 RP)",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Undead (16 RP)",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Size Quality",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Base Speed Quality",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Race Example: Centaur",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Challenging Advanced and Monstrous Races",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Ability Score Modifier Quality",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Language Quality",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Humanoid Subtypes as Prerequisites",
+   "page": 219
+  },
+  {
+   "depth": 1,
+   "title": "Step 3: Racial Traits",
+   "page": 219
+  },
+  {
+   "depth": 2,
+   "title": "Ability Score Racial Traits",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 219
+  },
+  {
+   "depth": 2,
+   "title": "Defense Racial Traits",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Drider",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Gargoyle",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 223
+  },
+  {
+   "depth": 2,
+   "title": "Feat and Skill Racial Traits",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Gnoll",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Lizardfolk",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "Magical Racial Traits",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Ogre",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Gathlain",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Movement Racial Traits",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "Offense Racial Traits",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Kasatha",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Trox",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Quadrupeds and Magic Item Slots",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "Senses Racial Traits",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "Weakness Racial Traits",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Wyrwood",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Other Racial Traits",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Standard Traits",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Example Race: Wyvaran",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Traits",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Traits",
+   "page": 238
+  },
+  {
+   "depth": 1,
+   "title": "Core Race Examples",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Dwarves",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Elves",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Gnomes",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Half-Elves",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Half-Orcs",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Halflings",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Humans",
+   "page": 240
+  },
+  {
+   "depth": 1,
+   "title": "Expanded Race Examples",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Aasimars",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Catfolk",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Dhampirs",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Drow",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Drow Nobles",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Duergar",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Fetchlings",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Goblins",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Gripplis",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Hobgoblins",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Ifrits",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Kobolds",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Orcs",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Oreads",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Ratfolk",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Sulis",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Svirfneblin",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Sylphs",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Tengus",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Tieflings",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Undines",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Vanaras",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Vishkanyas",
+   "page": 246
+  },
+  {
+   "depth": 0,
+   "title": "Appendices",
+   "page": 247
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 1: Age",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–1: Core Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–2: Featured Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–3: Uncommon Race Random Starting Ages",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–4: Core Race Aging Effects",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–5: Featured Race Aging Effects",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–6: Uncommon Race Aging Effects",
+   "page": 248
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 2: Height and Weight",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–7: Core Race Random Height & Weight",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–8: Featured Race Random Height & Weight",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–9: Uncommon Race Random Height & Weight",
+   "page": 249
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 3: Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Alchemist Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Antipaladin Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Bard Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Cleric Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Druid Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Inquisitor Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Magus Spells",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Paladin Spells",
+   "page": 251
+  },
+  {
+   "depth": 2,
+   "title": "Ranger Spells",
+   "page": 251
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerer/Wizard Spells",
+   "page": 251
+  },
+  {
+   "depth": 2,
+   "title": "Summoner Spells",
+   "page": 251
+  },
+  {
+   "depth": 2,
+   "title": "Witch Spells",
+   "page": 251
+  },
+  {
+   "depth": 1,
+   "title": "Index",
+   "page": 252
+  },
+  {
+   "depth": 0,
+   "title": "Open Game License",
+   "page": 254
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 255
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "slug": "player-character-folio",
+ "abbr": "PCF",
+ "kind": "sheet",
+ "title": "Player Character Folio",
+ "source_file": "PZO1122 Player Character Folio-3.pdf",
+ "pdf_pages": 22,
+ "counts": {
+  "sections": 15,
+  "tables": 0,
+  "entries": 0
+ },
+ "tables": [],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Main",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Defense",
+   "page": 3
+  },
+  {
+   "depth": 0,
+   "title": "Offense",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Skills",
+   "page": 5
+  },
+  {
+   "depth": 0,
+   "title": "Feats",
+   "page": 6
+  },
+  {
+   "depth": 0,
+   "title": "Spells",
+   "page": 7
+  },
+  {
+   "depth": 0,
+   "title": "Equipment",
+   "page": 9
+  },
+  {
+   "depth": 0,
+   "title": "Companions",
+   "page": 11
+  },
+  {
+   "depth": 0,
+   "title": "Background",
+   "page": 13
+  },
+  {
+   "depth": 0,
+   "title": "Adventures",
+   "page": 15
+  },
+  {
+   "depth": 0,
+   "title": "Skill Checks",
+   "page": 17
+  },
+  {
+   "depth": 0,
+   "title": "OGL",
+   "page": 20
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 21
+  }
+ ]
+}

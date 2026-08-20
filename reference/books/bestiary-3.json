@@ -1,0 +1,3942 @@
+{
+ "slug": "bestiary-3",
+ "abbr": "B3",
+ "kind": "bestiary",
+ "title": "Bestiary 3",
+ "source_file": "pathfinder - bestiary 3.pdf",
+ "pdf_pages": 321,
+ "counts": {
+  "sections": 587,
+  "tables": 2,
+  "entries": 552,
+  "creatures": 195,
+  "carried_over": true
+ },
+ "tables": [
+  {
+   "number": "1-1",
+   "title": "Monster Statistics by CR",
+   "page": 291
+  },
+  {
+   "number": "3-1",
+   "title": "Natural Attacks by Size",
+   "page": 297
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Title Page",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 1,
+   "title": "Alphabetical Listing of Monsters",
+   "page": 3
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Sidebar: Monster Icons",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Stat Block",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Description",
+   "page": 6
+  },
+  {
+   "depth": 0,
+   "title": "Monsters",
+   "page": 7
+  },
+  {
+   "depth": 1,
+   "title": "A",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "Adaro",
+   "page": 7
+  },
+  {
+   "depth": 2,
+   "title": "Adherer",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Adlet",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Ahuizotl",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Akhlut",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Allip",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Alraune",
+   "page": 13
+  },
+  {
+   "depth": 2,
+   "title": "Animal Lord",
+   "page": 14
+  },
+  {
+   "depth": 3,
+   "title": "Creating an Animal Lord",
+   "page": 14
+  },
+  {
+   "depth": 4,
+   "title": "Species Affinity",
+   "page": 15
+  },
+  {
+   "depth": 2,
+   "title": "Annis Hag",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Ant Lion",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Ant Lion, Giant",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Ant Lion, Giant Adult",
+   "page": 17
+  },
+  {
+   "depth": 2,
+   "title": "Archon",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Archon, Harbinger",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Archon, Legion",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Ascomoid",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Asura",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Known Asura Ranas",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Asura, Adhukait",
+   "page": 22
+  },
+  {
+   "depth": 3,
+   "title": "Asura, Aghasura",
+   "page": 23
+  },
+  {
+   "depth": 3,
+   "title": "Asura, Asurendra",
+   "page": 24
+  },
+  {
+   "depth": 4,
+   "title": "Blasphemous Sages",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Asura, Tripurasura",
+   "page": 26
+  },
+  {
+   "depth": 3,
+   "title": "Asura, Upasunda",
+   "page": 27
+  },
+  {
+   "depth": 2,
+   "title": "Atomie",
+   "page": 28
+  },
+  {
+   "depth": 2,
+   "title": "Axe Beak",
+   "page": 29
+  },
+  {
+   "depth": 2,
+   "title": "Azruverda",
+   "page": 30
+  },
+  {
+   "depth": 1,
+   "title": "B",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Baku",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Bandersnatch",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Variant Bandersnatches",
+   "page": 33
+  },
+  {
+   "depth": 2,
+   "title": "Baregara",
+   "page": 34
+  },
+  {
+   "depth": 2,
+   "title": "Baykok",
+   "page": 35
+  },
+  {
+   "depth": 2,
+   "title": "Behemoth",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Behemoth, Tempest",
+   "page": 37
+  },
+  {
+   "depth": 3,
+   "title": "Behemoth, Thalassic",
+   "page": 38
+  },
+  {
+   "depth": 3,
+   "title": "Behemoth, Thunder",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Berbalang",
+   "page": 40
+  },
+  {
+   "depth": 2,
+   "title": "Bhuta",
+   "page": 41
+  },
+  {
+   "depth": 2,
+   "title": "Bogeyman",
+   "page": 42
+  },
+  {
+   "depth": 2,
+   "title": "Brain Ooze",
+   "page": 43
+  },
+  {
+   "depth": 1,
+   "title": "C",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "Carbuncle",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "Carnivorous Crystal",
+   "page": 45
+  },
+  {
+   "depth": 2,
+   "title": "Caryatid Column",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 46
+  },
+  {
+   "depth": 2,
+   "title": "Catfolk",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Characters",
+   "page": 47
+  },
+  {
+   "depth": 2,
+   "title": "Caulborn",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "Cecaelia",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Ceratioidi",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Cerberi",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Cerebric Fungus",
+   "page": 52
+  },
+  {
+   "depth": 2,
+   "title": "Clockwork",
+   "page": 53
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Goliath",
+   "page": 54
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Leviathan",
+   "page": 55
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Servant",
+   "page": 56
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 56
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Soldier",
+   "page": 57
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 57
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Spy",
+   "page": 58
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 58
+  },
+  {
+   "depth": 2,
+   "title": "Cold Rider",
+   "page": 59
+  },
+  {
+   "depth": 2,
+   "title": "Crab",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Crab, Shark-Eating",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Crab, Shipwrecker",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "Cyclops, Great",
+   "page": 61
+  },
+  {
+   "depth": 1,
+   "title": "D",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Daemon",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Daemon, Crucidaemon",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Daemon, Vulnudaemon",
+   "page": 63
+  },
+  {
+   "depth": 2,
+   "title": "Deathtrap Ooze",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Deathweb",
+   "page": 65
+  },
+  {
+   "depth": 2,
+   "title": "Demilich",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Becoming a Demilich",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Awakened Demiliches",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Demodand",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Demodand, Shaggy",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Demodand, Slimy",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Demodand, Tarry",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Demon",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Demon, Coloxus",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Demon, Incubus",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Demon, Schir",
+   "page": 74
+  },
+  {
+   "depth": 2,
+   "title": "Derhii",
+   "page": 75
+  },
+  {
+   "depth": 2,
+   "title": "Devil, Contract",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Infernal Contracts",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Breaking an Infernal Contract",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Dinosaur",
+   "page": 78
+  },
+  {
+   "depth": 3,
+   "title": "Dinosaur, Dimetrodon",
+   "page": 78
+  },
+  {
+   "depth": 3,
+   "title": "Dinosaur, Iguanodon",
+   "page": 78
+  },
+  {
+   "depth": 3,
+   "title": "Dinosaur, Pachycephalosaurus",
+   "page": 79
+  },
+  {
+   "depth": 3,
+   "title": "Dinosaur, Spinosaurus",
+   "page": 79
+  },
+  {
+   "depth": 2,
+   "title": "Dire Corby",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Dread Corby",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "Disenchanter",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Div",
+   "page": 82
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Ahriman",
+   "page": 82
+  },
+  {
+   "depth": 3,
+   "title": "Div, Aghash",
+   "page": 83
+  },
+  {
+   "depth": 3,
+   "title": "Div, Akvan",
+   "page": 84
+  },
+  {
+   "depth": 4,
+   "title": "Akvan Princes",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Div, Doru",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Div, Ghawwas",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Div, Pairaka",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Div, Sepid",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Div, Shira",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Dragon",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dragon, Faerie",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dragon, Imperial",
+   "page": 92
+  },
+  {
+   "depth": 4,
+   "title": "Age Categories",
+   "page": 92
+  },
+  {
+   "depth": 4,
+   "title": "Combat",
+   "page": 92
+  },
+  {
+   "depth": 4,
+   "title": "Additional Dragon Rules",
+   "page": 92
+  },
+  {
+   "depth": 4,
+   "title": "Table: Dragon Age Categories",
+   "page": 93
+  },
+  {
+   "depth": 4,
+   "title": "Table: Dragon Ability Scores",
+   "page": 93
+  },
+  {
+   "depth": 4,
+   "title": "Table: Dragon Attacks and Speeds",
+   "page": 93
+  },
+  {
+   "depth": 4,
+   "title": "Imperial Dragon, Forest",
+   "page": 94
+  },
+  {
+   "depth": 4,
+   "title": "Imperial Dragon, Sea",
+   "page": 96
+  },
+  {
+   "depth": 4,
+   "title": "Imperial Dragon, Sky",
+   "page": 98
+  },
+  {
+   "depth": 4,
+   "title": "Imperial Dragon, Sovereign",
+   "page": 100
+  },
+  {
+   "depth": 4,
+   "title": "Imperial Dragon, Underworld",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Dragonne",
+   "page": 104
+  },
+  {
+   "depth": 2,
+   "title": "Drake",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Drake, Desert",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Drake, Rift",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Drake, River",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Dybbuk",
+   "page": 108
+  },
+  {
+   "depth": 1,
+   "title": "E",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Ecorche",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Eidolon, Unfettered",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Creating an Unfettered Eidolon",
+   "page": 110
+  },
+  {
+   "depth": 4,
+   "title": "Evolution Points",
+   "page": 110
+  },
+  {
+   "depth": 4,
+   "title": "Small Eidolons",
+   "page": 111
+  },
+  {
+   "depth": 1,
+   "title": "F",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Familiar",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Small Familiars",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Faun",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Festrog",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Fey Creature",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Fey Creature",
+   "page": 116
+  },
+  {
+   "depth": 2,
+   "title": "Flail Snail",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Flumph",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Foo Creature",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Foo Creature",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Creating an Imperial Foo Creature",
+   "page": 121
+  },
+  {
+   "depth": 1,
+   "title": "G",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Garden Ooze",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Garuda",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Ghorazagh",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Ghul",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Giant",
+   "page": 126
+  },
+  {
+   "depth": 3,
+   "title": "Giant, Ash",
+   "page": 126
+  },
+  {
+   "depth": 3,
+   "title": "Giant, Cave",
+   "page": 127
+  },
+  {
+   "depth": 3,
+   "title": "Giant, Desert",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Giant, Jungle",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Girtablilu",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Globster",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Goblin Snake",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Golem",
+   "page": 133
+  },
+  {
+   "depth": 3,
+   "title": "Golem, Bone",
+   "page": 133
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 133
+  },
+  {
+   "depth": 3,
+   "title": "Golem, Brass",
+   "page": 134
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 134
+  },
+  {
+   "depth": 3,
+   "title": "Golem, Cannon",
+   "page": 135
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 135
+  },
+  {
+   "depth": 3,
+   "title": "Golem, Fossil",
+   "page": 136
+  },
+  {
+   "depth": 4,
+   "title": "Construction",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Gorynych",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Graveknight",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Graveknight",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Graveknight Armor",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "Graven Guardian",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Guardian Domains",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 141
+  },
+  {
+   "depth": 2,
+   "title": "Gremlin, Fuath",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Grodair",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Grootslang",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Guecubu",
+   "page": 145
+  },
+  {
+   "depth": 1,
+   "title": "H",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Hellwasp Swarm",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Herd Animal",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Herd Animal, Antelope",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Herd Animal, Elk",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Hodag",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Hollow Serpent",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Huecuva",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Humbaba",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Hungry Fog",
+   "page": 152
+  },
+  {
+   "depth": 1,
+   "title": "I",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Iku-Turso",
+   "page": 153
+  },
+  {
+   "depth": 1,
+   "title": "J",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Jackalwere",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Jellyfish",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Jellyfish, Death’s Head",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Jellyfish, Sapphire",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Jorogumo",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Jubjub Bird",
+   "page": 157
+  },
+  {
+   "depth": 1,
+   "title": "K",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "Kamadan",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "Kami",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Kami, Jinushigami",
+   "page": 160
+  },
+  {
+   "depth": 4,
+   "title": "Elder Jinushigami",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "Kami, Kodama",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Kami, Shikigami",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Kami, Toshigami",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Kami, Zuishin",
+   "page": 165
+  },
+  {
+   "depth": 2,
+   "title": "Kappa",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Kech",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Kirin",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Kongamato",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Kyton",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Kyton Demagogues",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Kyton, Augur",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Kyton, Eremite",
+   "page": 172
+  },
+  {
+   "depth": 4,
+   "title": "Eremite Overlords",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Kyton, Interlocutor",
+   "page": 174
+  },
+  {
+   "depth": 1,
+   "title": "L",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "Lammasu",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "Leshy",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Growing a Leshy",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Leshy, Fungus",
+   "page": 177
+  },
+  {
+   "depth": 4,
+   "title": "Growing a Fungus Leshy",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Leshy, Gourd",
+   "page": 178
+  },
+  {
+   "depth": 4,
+   "title": "Growing a Gourd Leshy",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Leshy, Leaf",
+   "page": 179
+  },
+  {
+   "depth": 4,
+   "title": "Growing a Leaf Leshy",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Leshy, Seaweed",
+   "page": 180
+  },
+  {
+   "depth": 4,
+   "title": "Growing a Seaweed Leshy",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Linnorm",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Linnorm Special Abilities",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Linnorm, Cairn",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Linnorm, Fjord",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Linnorm, Taiga",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Linnorm, Tor",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Lizard",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Lizard, Giant Gecko",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Lizard, Giant Chameleon",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Lukwata",
+   "page": 187
+  },
+  {
+   "depth": 1,
+   "title": "M",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Maftet",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Magmin",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Manananggal",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Marsupial",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Marsupial, Kangaroo",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Marsupial, Thylacine",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Megafauna",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Megafauna, Archelon",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Megafauna, Baluchitherium",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Megafauna, Basilosaurus",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Megafauna, Megalania",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Mobogo",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Moon-Beast",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Myceloid",
+   "page": 196
+  },
+  {
+   "depth": 1,
+   "title": "N",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Naga",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Naga, Lunar",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Naga, Royal",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Naga, Water",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Nephilim",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Nixie",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Bog Nixies",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Norn",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Nuckelavee",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Nue",
+   "page": 204
+  },
+  {
+   "depth": 1,
+   "title": "O",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Oni",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Known Oni Daimyo",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Fire Yai",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Ice Yai",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Kuwa",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Spirit",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Void Yai",
+   "page": 210
+  },
+  {
+   "depth": 4,
+   "title": "Voidlords",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Oni, Water Yai",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Owl",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Owl, Giant",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Owl, Great Horned",
+   "page": 213
+  },
+  {
+   "depth": 1,
+   "title": "P",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Pale Stranger",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Parasite",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Parasite, Rot Grub Swarm",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Parasite, Giant Rot Grub",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Penanggalen",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Penanggalen",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Peri",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Phantom Fungus",
+   "page": 219
+  },
+  {
+   "depth": 2,
+   "title": "Plasma Ooze",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Popobala",
+   "page": 221
+  },
+  {
+   "depth": 2,
+   "title": "Porcupine",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Porcupine",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Porcupine, Giant",
+   "page": 222
+  },
+  {
+   "depth": 2,
+   "title": "Pukwudgie",
+   "page": 223
+  },
+  {
+   "depth": 1,
+   "title": "R",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "Rakshasa",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Rakshasa Immortals",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa, Dandasuka",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa, Maharaja",
+   "page": 226
+  },
+  {
+   "depth": 4,
+   "title": "Rakshasa Rajadhirajas",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa, Marai",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa, Raktavarna",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa, Tataka",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Ratfolk",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Characters",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "Rusalka",
+   "page": 232
+  },
+  {
+   "depth": 1,
+   "title": "S",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "Sabosan",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "Sagari",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Sargassum Fiend",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "Sasquatch",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Scorpion",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Scorpion, Deadfall",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Scorpion, Ghost",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Sea Anemone, Giant",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Sea Bonze",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Sea Serpent, Deep",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Shadow Mastiff",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Shae",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Shedu",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Shinigami",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Simurgh",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Siyokoy",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Skunk",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Skunk",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Skunk, Giant",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Sleipnir",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "Snake Swarm",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Snake Swarm",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Snake Swarm, Venomous",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "Sphinx",
+   "page": 250
+  },
+  {
+   "depth": 3,
+   "title": "Sphinx, Androsphinx",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Sphinx, Criosphinx",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Sphinx, Hieracosphinx",
+   "page": 253
+  },
+  {
+   "depth": 2,
+   "title": "Spider",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Spider, Giant Crab",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Spider, Ogre",
+   "page": 254
+  },
+  {
+   "depth": 2,
+   "title": "Spider Eater",
+   "page": 255
+  },
+  {
+   "depth": 2,
+   "title": "Sprite",
+   "page": 256
+  },
+  {
+   "depth": 2,
+   "title": "Stymphalidies",
+   "page": 257
+  },
+  {
+   "depth": 2,
+   "title": "Suli",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Suli Characters",
+   "page": 258
+  },
+  {
+   "depth": 1,
+   "title": "T",
+   "page": 259
+  },
+  {
+   "depth": 2,
+   "title": "Tanuki",
+   "page": 259
+  },
+  {
+   "depth": 2,
+   "title": "Taotieh",
+   "page": 260
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 260
+  },
+  {
+   "depth": 2,
+   "title": "Tatzlwyrm",
+   "page": 261
+  },
+  {
+   "depth": 2,
+   "title": "Terra-Cotta Soldier",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 262
+  },
+  {
+   "depth": 2,
+   "title": "Thriae",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Thriae Merope",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Thriae Queen",
+   "page": 264
+  },
+  {
+   "depth": 4,
+   "title": "Thriae Larvae",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Thriae Seer",
+   "page": 266
+  },
+  {
+   "depth": 3,
+   "title": "Thriae Soldier",
+   "page": 267
+  },
+  {
+   "depth": 2,
+   "title": "Titan, Hekatonkheires",
+   "page": 268
+  },
+  {
+   "depth": 2,
+   "title": "Tojanida",
+   "page": 270
+  },
+  {
+   "depth": 2,
+   "title": "Tophet",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 271
+  },
+  {
+   "depth": 2,
+   "title": "Troll",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Troll, Jotund",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Troll, Moss",
+   "page": 273
+  },
+  {
+   "depth": 2,
+   "title": "Trollhound",
+   "page": 274
+  },
+  {
+   "depth": 2,
+   "title": "Tupilaq",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Construction",
+   "page": 275
+  },
+  {
+   "depth": 2,
+   "title": "Tzitzimitl",
+   "page": 276
+  },
+  {
+   "depth": 1,
+   "title": "V",
+   "page": 277
+  },
+  {
+   "depth": 2,
+   "title": "Valkyrie",
+   "page": 277
+  },
+  {
+   "depth": 2,
+   "title": "Vampire, Jiang-Shi",
+   "page": 278
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Jiang-Shi",
+   "page": 278
+  },
+  {
+   "depth": 2,
+   "title": "Vanara",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Characters",
+   "page": 280
+  },
+  {
+   "depth": 2,
+   "title": "Vishkanya",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Characters",
+   "page": 281
+  },
+  {
+   "depth": 2,
+   "title": "Vodyanoi",
+   "page": 282
+  },
+  {
+   "depth": 2,
+   "title": "Voonith",
+   "page": 283
+  },
+  {
+   "depth": 2,
+   "title": "Vulture",
+   "page": 284
+  },
+  {
+   "depth": 2,
+   "title": "Vulture, Giant",
+   "page": 284
+  },
+  {
+   "depth": 1,
+   "title": "W",
+   "page": 285
+  },
+  {
+   "depth": 2,
+   "title": "Wolf-in-Sheep’s-Clothing",
+   "page": 285
+  },
+  {
+   "depth": 1,
+   "title": "Y",
+   "page": 286
+  },
+  {
+   "depth": 2,
+   "title": "Yithian",
+   "page": 286
+  },
+  {
+   "depth": 2,
+   "title": "Yuki-Onna",
+   "page": 287
+  },
+  {
+   "depth": 1,
+   "title": "Z",
+   "page": 288
+  },
+  {
+   "depth": 2,
+   "title": "Zoog",
+   "page": 288
+  },
+  {
+   "depth": 2,
+   "title": "Zuvembie",
+   "page": 289
+  },
+  {
+   "depth": 0,
+   "title": "Appendices",
+   "page": 290
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 1: Monster Creation",
+   "page": 290
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 2: Monster Advancement",
+   "page": 290
+  },
+  {
+   "depth": 2,
+   "title": "Templates",
+   "page": 290
+  },
+  {
+   "depth": 2,
+   "title": "Simple Templates",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Creature (CR +1)",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Celestial Creature (CR +0 or +1)",
+   "page": 290
+  },
+  {
+   "depth": 4,
+   "title": "Table: Celestial Creature Defenses",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Entropic Creature (CR +0 or +1)",
+   "page": 290
+  },
+  {
+   "depth": 4,
+   "title": "Table: Entropic Creature Defenses",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Fiendish Creature (CR +0 or +1)",
+   "page": 290
+  },
+  {
+   "depth": 4,
+   "title": "Table: Fiendish Creature Defenses",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Giant Creature (+1)",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Resolute Creature (CR +0 or +1)",
+   "page": 291
+  },
+  {
+   "depth": 4,
+   "title": "Table: Resolute Creature Defenses",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Young Creature (CR –1)",
+   "page": 291
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–1: Monster Statistics by CR",
+   "page": 291
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 3: Glossary",
+   "page": 292
+  },
+  {
+   "depth": 2,
+   "title": "Universal Monster Rules",
+   "page": 292
+  },
+  {
+   "depth": 3,
+   "title": "Universal Monster Rules",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Ability Damage and Drain (Ex or Su)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "All-Around Vision (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Amorphous (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Amphibious (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Attach (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Bleed (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Blindsense (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Blindsight (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Blood Drain (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Breath Weapon (Su)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Burn (Ex)",
+   "page": 292
+  },
+  {
+   "depth": 4,
+   "title": "Capsize (Ex)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Change Shape (Su)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Channel Resistance (Ex)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Compression (Ex)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Constrict (Ex)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Construct Traits (Ex)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Curse (Su)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Damage Reduction (Ex or Su)",
+   "page": 293
+  },
+  {
+   "depth": 4,
+   "title": "Disease (Ex or Su)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Distraction (Ex)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Earth Glide (Ex)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Energy Drain (Su)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Engulf (Ex)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Entrap (Ex or Su)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Fast Healing (Ex)",
+   "page": 294
+  },
+  {
+   "depth": 4,
+   "title": "Fast Swallow (Ex)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Fear (Su or Sp)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Fear Aura (Su)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Fear Cone (Sp) and Ray (Su)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Ferocity (Ex)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Flight (Ex, Sp, or Su)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Freeze (Ex)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Frightful Presence (Ex)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Gaze (Su)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Grab (Ex)",
+   "page": 295
+  },
+  {
+   "depth": 4,
+   "title": "Heat (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Hold Breath (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Immunity (Ex or Su)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Incorporeal (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Jet (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Keen Scent (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Lifesense (Su)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Light Blindness (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Light Sensitivity (Ex)",
+   "page": 296
+  },
+  {
+   "depth": 4,
+   "title": "Multiweapon Mastery (Ex)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "Negative Energy Affinity (Ex)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "No Breath (Ex)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "Paralysis (Ex or Su)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "Plant Traits (Ex)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "Poison (Ex or Su)",
+   "page": 297
+  },
+  {
+   "depth": 4,
+   "title": "Pounce (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Powerful Charge (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Pull (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Push (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Rake (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Regeneration (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Rend (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Resistance (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Rock Catching (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Rock Throwing (Ex)",
+   "page": 298
+  },
+  {
+   "depth": 4,
+   "title": "Scent (Ex)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "See in Darkness (Su)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "Sound Mimicry (Ex)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "Spell-Like Abilities (Sp)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "Spell Resistance (Ex)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "Split (Ex)",
+   "page": 299
+  },
+  {
+   "depth": 4,
+   "title": "Stench (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Summon (Sp)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Sunlight Powerlessness (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Swallow Whole (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Telepathy (Su)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Trample (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Tremorsense (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Trip (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Undead Traits (Ex)",
+   "page": 300
+  },
+  {
+   "depth": 4,
+   "title": "Undersized Weapons (Ex)",
+   "page": 301
+  },
+  {
+   "depth": 4,
+   "title": "Vulnerabilities (Ex or Su)",
+   "page": 301
+  },
+  {
+   "depth": 4,
+   "title": "Water Breathing (Ex)",
+   "page": 301
+  },
+  {
+   "depth": 4,
+   "title": "Water Dependency (Ex)",
+   "page": 301
+  },
+  {
+   "depth": 4,
+   "title": "Web (Ex)",
+   "page": 301
+  },
+  {
+   "depth": 4,
+   "title": "Whirlwind (Su)",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–1: Natural Attacks by Size",
+   "page": 297
+  },
+  {
+   "depth": 2,
+   "title": "Creature Types",
+   "page": 302
+  },
+  {
+   "depth": 2,
+   "title": "Creature SubTypes",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Adlet Subtype",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Air Subtype",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Aquatic Subtype",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Archon Subtype",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Augmented Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Asura Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Behemoth Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Catfolk Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Chaotic Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Clockwork Subtype",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Cold Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Daemon Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Demodand Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Demon Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Devil Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Div Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Earth Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Evil Subtype",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Extraplanar Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Fire Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Giant Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Good Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Human Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Incorporeal Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Kyton Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Lawful Subtype",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Leshy Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Native Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Oni Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Rakshasa Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Ratfolk Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Reptilian Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Sasquatch Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Shapechanger Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Swarm Subtype",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Vanara Subtype",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Vishkanya Subtype",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Water Subtype",
+   "page": 308
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 4: Monsters as PCs",
+   "page": 308
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 5: Monster Feats",
+   "page": 308
+  },
+  {
+   "depth": 2,
+   "title": "Ability Focus",
+   "page": 308
+  },
+  {
+   "depth": 2,
+   "title": "Awesome Blow (Combat)",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Craft Construct (Item Creation)",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Empower Spell-Like Ability",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Flyby Attack",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Hover",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Improved Natural Armor",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Improved Natural Attack",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Multiattack (Combat)",
+   "page": 310
+  },
+  {
+   "depth": 2,
+   "title": "Multiweapon Fighting (Combat)",
+   "page": 310
+  },
+  {
+   "depth": 2,
+   "title": "Quicken Spell-Like Ability",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Table: Empowered and Quickened Spell-Like Abilities",
+   "page": 310
+  },
+  {
+   "depth": 2,
+   "title": "Snatch",
+   "page": 310
+  },
+  {
+   "depth": 2,
+   "title": "Wingover",
+   "page": 310
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 6: Monster Cohorts",
+   "page": 310
+  },
+  {
+   "depth": 2,
+   "title": "Table: Monster Cohorts",
+   "page": 311
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 7: Animal Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Table: Animal Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Antelope Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Archelon Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Axe Beak Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Baluchitherium Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Basilosaurus Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Dimetrodon Companions",
+   "page": 311
+  },
+  {
+   "depth": 2,
+   "title": "Elk Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Giant Chameleon Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Giant Gecko Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Giant Vulture Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Iguanodon Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Kangaroo Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Megalania Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Pachycephalosaurus Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Spinosaurus Companions",
+   "page": 312
+  },
+  {
+   "depth": 2,
+   "title": "Thylacine Companions",
+   "page": 312
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 8: Monsters by Type",
+   "page": 312
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 9: Monsters by CR",
+   "page": 313
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 10: Monsters by Terrain",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 11: Variant Monster Index",
+   "page": 317
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 12: Ability Index",
+   "page": 317
+  },
+  {
+   "depth": 1,
+   "title": "Appendix 13: Monster Roles",
+   "page": 318
+  },
+  {
+   "depth": 0,
+   "title": "Open Game License",
+   "page": 319
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 320
+  }
+ ],
+ "creatures": [
+  {
+   "name": "Adaro",
+   "page": 7,
+   "cr": "3"
+  },
+  {
+   "name": "Adherer",
+   "page": 8,
+   "cr": "3"
+  },
+  {
+   "name": "Adlet",
+   "page": 9,
+   "cr": "10"
+  },
+  {
+   "name": "Ahuizotl",
+   "page": 10,
+   "cr": "6"
+  },
+  {
+   "name": "Akhlut",
+   "page": 11,
+   "cr": "13"
+  },
+  {
+   "name": "Allip",
+   "page": 12,
+   "cr": "3"
+  },
+  {
+   "name": "Alraune",
+   "page": 13,
+   "cr": "13"
+  },
+  {
+   "name": "Annis Hag",
+   "page": 16,
+   "cr": "6"
+  },
+  {
+   "name": "Ant Lion, Giant",
+   "page": 17,
+   "cr": "5"
+  },
+  {
+   "name": "Ant Lion, Giant Adult",
+   "page": 17,
+   "cr": "6"
+  },
+  {
+   "name": "Archon, Harbinger",
+   "page": 18,
+   "cr": "2"
+  },
+  {
+   "name": "Archon, Legion",
+   "page": 19,
+   "cr": "7"
+  },
+  {
+   "name": "Ascomoid",
+   "page": 20,
+   "cr": "5"
+  },
+  {
+   "name": "Atomie",
+   "page": 28,
+   "cr": "1"
+  },
+  {
+   "name": "Axe Beak",
+   "page": 29,
+   "cr": "2"
+  },
+  {
+   "name": "Azruverda",
+   "page": 30,
+   "cr": "13"
+  },
+  {
+   "name": "Baku",
+   "page": 31,
+   "cr": "8"
+  },
+  {
+   "name": "Bandersnatch",
+   "page": 32,
+   "cr": "17"
+  },
+  {
+   "name": "Baregara",
+   "page": 34,
+   "cr": "12"
+  },
+  {
+   "name": "Baykok",
+   "page": 35,
+   "cr": "9"
+  },
+  {
+   "name": "Behemoth, Tempest",
+   "page": 37,
+   "cr": "22"
+  },
+  {
+   "name": "Behemoth, Thalassic",
+   "page": 38,
+   "cr": "20"
+  },
+  {
+   "name": "Behemoth, Thunder",
+   "page": 39,
+   "cr": "18"
+  },
+  {
+   "name": "Berbalang",
+   "page": 40,
+   "cr": "6"
+  },
+  {
+   "name": "Bhuta",
+   "page": 41,
+   "cr": "11"
+  },
+  {
+   "name": "Bogeyman",
+   "page": 42,
+   "cr": "10"
+  },
+  {
+   "name": "Brain Ooze",
+   "page": 43,
+   "cr": "7"
+  },
+  {
+   "name": "Carbuncle",
+   "page": 44,
+   "cr": "1"
+  },
+  {
+   "name": "Carnivorous Crystal",
+   "page": 45,
+   "cr": "11"
+  },
+  {
+   "name": "Caryatid Column",
+   "page": 46,
+   "cr": "3"
+  },
+  {
+   "name": "Catfolk",
+   "page": 47,
+   "cr": "1/2"
+  },
+  {
+   "name": "Caulborn",
+   "page": 48,
+   "cr": "7"
+  },
+  {
+   "name": "Cecaelia",
+   "page": 49,
+   "cr": "5"
+  },
+  {
+   "name": "Ceratioidi",
+   "page": 50,
+   "cr": "3"
+  },
+  {
+   "name": "Cerberi",
+   "page": 51,
+   "cr": "6"
+  },
+  {
+   "name": "Cerebric Fungus",
+   "page": 52,
+   "cr": "3"
+  },
+  {
+   "name": "Clockwork Goliath",
+   "page": 54,
+   "cr": "19"
+  },
+  {
+   "name": "Clockwork Leviathan",
+   "page": 55,
+   "cr": "12"
+  },
+  {
+   "name": "Clockwork Servant",
+   "page": 56,
+   "cr": "2"
+  },
+  {
+   "name": "Clockwork Soldier",
+   "page": 57,
+   "cr": "6"
+  },
+  {
+   "name": "Clockwork Spy",
+   "page": 58,
+   "cr": "1/2"
+  },
+  {
+   "name": "Cold Rider",
+   "page": 59,
+   "cr": "8"
+  },
+  {
+   "name": "Crab, Shark-Eating",
+   "page": 60,
+   "cr": "7"
+  },
+  {
+   "name": "Crab, Shipwrecker",
+   "page": 60,
+   "cr": "13"
+  },
+  {
+   "name": "Cyclops, Great",
+   "page": 61,
+   "cr": "12"
+  },
+  {
+   "name": "Deathtrap Ooze",
+   "page": 64,
+   "cr": "8"
+  },
+  {
+   "name": "Deathweb",
+   "page": 65,
+   "cr": "6"
+  },
+  {
+   "name": "Demilich",
+   "page": 66,
+   "cr": "14"
+  },
+  {
+   "name": "Demodand, Shaggy",
+   "page": 69,
+   "cr": "18"
+  },
+  {
+   "name": "Demodand, Slimy",
+   "page": 70,
+   "cr": "16"
+  },
+  {
+   "name": "Demodand, Tarry",
+   "page": 71,
+   "cr": "13"
+  },
+  {
+   "name": "Derhii",
+   "page": 75,
+   "cr": "5"
+  },
+  {
+   "name": "Devil, Contract",
+   "page": 76,
+   "cr": "10"
+  },
+  {
+   "name": "Dire Corby",
+   "page": 80,
+   "cr": "1"
+  },
+  {
+   "name": "Disenchanter",
+   "page": 81,
+   "cr": "3"
+  },
+  {
+   "name": "Dragon, Faerie",
+   "page": 91,
+   "cr": "2"
+  },
+  {
+   "name": "Dragonne",
+   "page": 104,
+   "cr": "7"
+  },
+  {
+   "name": "Drake, Desert",
+   "page": 105,
+   "cr": "8"
+  },
+  {
+   "name": "Drake, Rift",
+   "page": 106,
+   "cr": "9"
+  },
+  {
+   "name": "Drake, River",
+   "page": 107,
+   "cr": "3"
+  },
+  {
+   "name": "Dybbuk",
+   "page": 108,
+   "cr": "15"
+  },
+  {
+   "name": "Ecorche",
+   "page": 109,
+   "cr": "16"
+  },
+  {
+   "name": "Eidolon, Unfettered",
+   "page": 110,
+   "cr": "8"
+  },
+  {
+   "name": "Faun",
+   "page": 114,
+   "cr": "1"
+  },
+  {
+   "name": "Festrog",
+   "page": 115,
+   "cr": "1"
+  },
+  {
+   "name": "Flail Snail",
+   "page": 118,
+   "cr": "4"
+  },
+  {
+   "name": "Flumph",
+   "page": 119,
+   "cr": "1"
+  },
+  {
+   "name": "Garden Ooze",
+   "page": 122,
+   "cr": "2"
+  },
+  {
+   "name": "Garuda",
+   "page": 123,
+   "cr": "9"
+  },
+  {
+   "name": "Ghorazagh",
+   "page": 124,
+   "cr": "13"
+  },
+  {
+   "name": "Ghul",
+   "page": 125,
+   "cr": "5"
+  },
+  {
+   "name": "Giant, Ash",
+   "page": 126,
+   "cr": "11"
+  },
+  {
+   "name": "Giant, Cave",
+   "page": 127,
+   "cr": "6"
+  },
+  {
+   "name": "Giant, Desert",
+   "page": 128,
+   "cr": "9"
+  },
+  {
+   "name": "Giant, Jungle",
+   "page": 129,
+   "cr": "10"
+  },
+  {
+   "name": "Girtablilu",
+   "page": 130,
+   "cr": "8"
+  },
+  {
+   "name": "Globster",
+   "page": 131,
+   "cr": "5"
+  },
+  {
+   "name": "Goblin Snake",
+   "page": 132,
+   "cr": "1"
+  },
+  {
+   "name": "Golem, Bone",
+   "page": 133,
+   "cr": "8"
+  },
+  {
+   "name": "Golem, Brass",
+   "page": 134,
+   "cr": "14"
+  },
+  {
+   "name": "Golem, Cannon",
+   "page": 135,
+   "cr": "15"
+  },
+  {
+   "name": "Golem, Fossil",
+   "page": 136,
+   "cr": "12"
+  },
+  {
+   "name": "Gorynych",
+   "page": 137,
+   "cr": "15"
+  },
+  {
+   "name": "Graveknight",
+   "page": 138,
+   "cr": "11"
+  },
+  {
+   "name": "Graven Guardian",
+   "page": 140,
+   "cr": "5"
+  },
+  {
+   "name": "Grodair",
+   "page": 143,
+   "cr": "5"
+  },
+  {
+   "name": "Grootslang",
+   "page": 144,
+   "cr": "16"
+  },
+  {
+   "name": "Guecubu",
+   "page": 145,
+   "cr": "8"
+  },
+  {
+   "name": "Hellwasp Swarm",
+   "page": 146,
+   "cr": "8"
+  },
+  {
+   "name": "Hodag",
+   "page": 148,
+   "cr": "6"
+  },
+  {
+   "name": "Hollow Serpent",
+   "page": 149,
+   "cr": "16"
+  },
+  {
+   "name": "Huecuva",
+   "page": 150,
+   "cr": "2"
+  },
+  {
+   "name": "Humbaba",
+   "page": 151,
+   "cr": "19"
+  },
+  {
+   "name": "Hungry Fog",
+   "page": 152,
+   "cr": "6"
+  },
+  {
+   "name": "Iku-Turso",
+   "page": 153,
+   "cr": "8"
+  },
+  {
+   "name": "Jackalwere",
+   "page": 154,
+   "cr": "2"
+  },
+  {
+   "name": "Jellyfish, Death’s Head",
+   "page": 155,
+   "cr": "1"
+  },
+  {
+   "name": "Jellyfish, Sapphire",
+   "page": 155,
+   "cr": "11"
+  },
+  {
+   "name": "Jorogumo",
+   "page": 156,
+   "cr": "12"
+  },
+  {
+   "name": "Jubjub Bird",
+   "page": 157,
+   "cr": "15"
+  },
+  {
+   "name": "Kamadan",
+   "page": 158,
+   "cr": "4"
+  },
+  {
+   "name": "Kappa",
+   "page": 166,
+   "cr": "2"
+  },
+  {
+   "name": "Kech",
+   "page": 167,
+   "cr": "3"
+  },
+  {
+   "name": "Kirin",
+   "page": 168,
+   "cr": "7"
+  },
+  {
+   "name": "Kongamato",
+   "page": 169,
+   "cr": "15"
+  },
+  {
+   "name": "Lammasu",
+   "page": 175,
+   "cr": "8"
+  },
+  {
+   "name": "Leshy, Fungus",
+   "page": 177,
+   "cr": "2"
+  },
+  {
+   "name": "Leshy, Gourd",
+   "page": 178,
+   "cr": "1"
+  },
+  {
+   "name": "Leshy, Leaf",
+   "page": 179,
+   "cr": "1/2"
+  },
+  {
+   "name": "Leshy, Seaweed",
+   "page": 180,
+   "cr": "3"
+  },
+  {
+   "name": "Linnorm, Cairn",
+   "page": 182,
+   "cr": "18"
+  },
+  {
+   "name": "Linnorm, Fjord",
+   "page": 183,
+   "cr": "16"
+  },
+  {
+   "name": "Linnorm, Taiga",
+   "page": 184,
+   "cr": "19"
+  },
+  {
+   "name": "Linnorm, Tor",
+   "page": 185,
+   "cr": "21"
+  },
+  {
+   "name": "Lukwata",
+   "page": 187,
+   "cr": "11"
+  },
+  {
+   "name": "Maftet",
+   "page": 188,
+   "cr": "6"
+  },
+  {
+   "name": "Magmin",
+   "page": 189,
+   "cr": "3"
+  },
+  {
+   "name": "Manananggal",
+   "page": 190,
+   "cr": "7"
+  },
+  {
+   "name": "Mobogo",
+   "page": 194,
+   "cr": "10"
+  },
+  {
+   "name": "Moon-Beast",
+   "page": 195,
+   "cr": "11"
+  },
+  {
+   "name": "Myceloid",
+   "page": 196,
+   "cr": "4"
+  },
+  {
+   "name": "Naga, Lunar",
+   "page": 197,
+   "cr": "6"
+  },
+  {
+   "name": "Naga, Royal",
+   "page": 198,
+   "cr": "11"
+  },
+  {
+   "name": "Naga, Water",
+   "page": 199,
+   "cr": "7"
+  },
+  {
+   "name": "Nephilim",
+   "page": 200,
+   "cr": "8"
+  },
+  {
+   "name": "Nixie",
+   "page": 201,
+   "cr": "1"
+  },
+  {
+   "name": "Norn",
+   "page": 202,
+   "cr": "18"
+  },
+  {
+   "name": "Nuckelavee",
+   "page": 203,
+   "cr": "9"
+  },
+  {
+   "name": "Nue",
+   "page": 204,
+   "cr": "10"
+  },
+  {
+   "name": "Oni, Spirit",
+   "page": 209,
+   "cr": "2"
+  },
+  {
+   "name": "Owl, Giant",
+   "page": 213,
+   "cr": "5"
+  },
+  {
+   "name": "Owl, Great Horned",
+   "page": 213,
+   "cr": "1"
+  },
+  {
+   "name": "Pale Stranger",
+   "page": 214,
+   "cr": "10"
+  },
+  {
+   "name": "Penanggalen",
+   "page": 216,
+   "cr": "5"
+  },
+  {
+   "name": "Peri",
+   "page": 218,
+   "cr": "14"
+  },
+  {
+   "name": "Phantom Fungus",
+   "page": 219,
+   "cr": "3"
+  },
+  {
+   "name": "Plasma Ooze",
+   "page": 220,
+   "cr": "16"
+  },
+  {
+   "name": "Popobala",
+   "page": 221,
+   "cr": "15"
+  },
+  {
+   "name": "Porcupine",
+   "page": 222,
+   "cr": "1/4"
+  },
+  {
+   "name": "Porcupine, Giant",
+   "page": 222,
+   "cr": "2"
+  },
+  {
+   "name": "Pukwudgie",
+   "page": 223,
+   "cr": "7"
+  },
+  {
+   "name": "Ratfolk",
+   "page": 231,
+   "cr": "1/3"
+  },
+  {
+   "name": "Rusalka",
+   "page": 232,
+   "cr": "12"
+  },
+  {
+   "name": "Sabosan",
+   "page": 233,
+   "cr": "5"
+  },
+  {
+   "name": "Sagari",
+   "page": 234,
+   "cr": "1/2"
+  },
+  {
+   "name": "Sargassum Fiend",
+   "page": 235,
+   "cr": "9"
+  },
+  {
+   "name": "Sasquatch",
+   "page": 236,
+   "cr": "2"
+  },
+  {
+   "name": "Scorpion, Deadfall",
+   "page": 237,
+   "cr": "8"
+  },
+  {
+   "name": "Scorpion, Ghost",
+   "page": 237,
+   "cr": "1/2"
+  },
+  {
+   "name": "Sea Anemone, Giant",
+   "page": 238,
+   "cr": "2"
+  },
+  {
+   "name": "Sea Bonze",
+   "page": 239,
+   "cr": "15"
+  },
+  {
+   "name": "Sea Serpent, Deep",
+   "page": 240,
+   "cr": "19"
+  },
+  {
+   "name": "Shadow Mastiff",
+   "page": 241,
+   "cr": "5"
+  },
+  {
+   "name": "Shae",
+   "page": 242,
+   "cr": "4"
+  },
+  {
+   "name": "Shedu",
+   "page": 243,
+   "cr": "9"
+  },
+  {
+   "name": "Shinigami",
+   "page": 244,
+   "cr": "17"
+  },
+  {
+   "name": "Simurgh",
+   "page": 245,
+   "cr": "18"
+  },
+  {
+   "name": "Siyokoy",
+   "page": 246,
+   "cr": "10"
+  },
+  {
+   "name": "Skunk",
+   "page": 247,
+   "cr": "1/4"
+  },
+  {
+   "name": "Skunk, Giant",
+   "page": 247,
+   "cr": "3"
+  },
+  {
+   "name": "Sleipnir",
+   "page": 248,
+   "cr": "11"
+  },
+  {
+   "name": "Snake Swarm",
+   "page": 249,
+   "cr": "2"
+  },
+  {
+   "name": "Snake Swarm, Venomous",
+   "page": 249,
+   "cr": "4"
+  },
+  {
+   "name": "Spider, Giant Crab",
+   "page": 254,
+   "cr": "1/2"
+  },
+  {
+   "name": "Spider, Ogre",
+   "page": 254,
+   "cr": "5"
+  },
+  {
+   "name": "Spider Eater",
+   "page": 255,
+   "cr": "5"
+  },
+  {
+   "name": "Sprite",
+   "page": 256,
+   "cr": "1/3"
+  },
+  {
+   "name": "Stymphalidies",
+   "page": 257,
+   "cr": "8"
+  },
+  {
+   "name": "Suli",
+   "page": 258,
+   "cr": "1/2"
+  },
+  {
+   "name": "Tanuki",
+   "page": 259,
+   "cr": "4"
+  },
+  {
+   "name": "Taotieh",
+   "page": 260,
+   "cr": "11"
+  },
+  {
+   "name": "Tatzlwyrm",
+   "page": 261,
+   "cr": "2"
+  },
+  {
+   "name": "Terra-Cotta Soldier",
+   "page": 262,
+   "cr": "6"
+  },
+  {
+   "name": "Thriae Queen",
+   "page": 264,
+   "cr": "18"
+  },
+  {
+   "name": "Thriae Seer",
+   "page": 266,
+   "cr": "11"
+  },
+  {
+   "name": "Thriae Soldier",
+   "page": 267,
+   "cr": "4"
+  },
+  {
+   "name": "Tojanida",
+   "page": 270,
+   "cr": "5"
+  },
+  {
+   "name": "Tophet",
+   "page": 271,
+   "cr": "10"
+  },
+  {
+   "name": "Troll, Jotund",
+   "page": 272,
+   "cr": "15"
+  },
+  {
+   "name": "Troll, Moss",
+   "page": 273,
+   "cr": "3"
+  },
+  {
+   "name": "Trollhound",
+   "page": 274,
+   "cr": "3"
+  },
+  {
+   "name": "Tupilaq",
+   "page": 275,
+   "cr": "7"
+  },
+  {
+   "name": "Tzitzimitl",
+   "page": 276,
+   "cr": "19"
+  },
+  {
+   "name": "Valkyrie",
+   "page": 277,
+   "cr": "12"
+  },
+  {
+   "name": "Vanara",
+   "page": 280,
+   "cr": "1/2"
+  },
+  {
+   "name": "Vishkanya",
+   "page": 281,
+   "cr": "1/2"
+  },
+  {
+   "name": "Vodyanoi",
+   "page": 282,
+   "cr": "5"
+  },
+  {
+   "name": "Voonith",
+   "page": 283,
+   "cr": "4"
+  },
+  {
+   "name": "Vulture",
+   "page": 284,
+   "cr": "1/2"
+  },
+  {
+   "name": "Vulture, Giant",
+   "page": 284,
+   "cr": "4"
+  },
+  {
+   "name": "Wolf-in-Sheep’s-Clothing",
+   "page": 285,
+   "cr": "8"
+  },
+  {
+   "name": "Yithian",
+   "page": 286,
+   "cr": "9"
+  },
+  {
+   "name": "Yuki-Onna",
+   "page": 287,
+   "cr": "8"
+  },
+  {
+   "name": "Zoog",
+   "page": 288,
+   "cr": "1"
+  },
+  {
+   "name": "Zuvembie",
+   "page": 289,
+   "cr": "4"
+  }
+ ],
+ "headings": []
+}

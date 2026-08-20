@@ -1,0 +1,4592 @@
+{
+ "slug": "ultimate-combat",
+ "abbr": "UC",
+ "kind": "player",
+ "title": "Ultimate Combat",
+ "source_file": "Pathfinder - Ultimate Combat.pdf",
+ "pdf_pages": 258,
+ "counts": {
+  "sections": 880,
+  "tables": 35,
+  "entries": 783
+ },
+ "tables": [
+  {
+   "number": "2-1",
+   "title": "Feats",
+   "page": 80
+  },
+  {
+   "number": "2-2",
+   "title": "New Item Craft DCs",
+   "page": 101
+  },
+  {
+   "number": "3-1",
+   "title": "Eastern Armor",
+   "page": 129
+  },
+  {
+   "number": "3-2",
+   "title": "Eastern Weapons—Martial",
+   "page": 131
+  },
+  {
+   "number": "3-3",
+   "title": "Eastern Weapons—Exotic",
+   "page": 132
+  },
+  {
+   "number": "3-4",
+   "title": "Early Firearms",
+   "page": 138
+  },
+  {
+   "number": "3-5",
+   "title": "Advanced Firearms",
+   "page": 138
+  },
+  {
+   "number": "3-6",
+   "title": "Firearm Gear",
+   "page": 141
+  },
+  {
+   "number": "3-7",
+   "title": "Gladiator Weapons",
+   "page": 145
+  },
+  {
+   "number": "3-8",
+   "title": "Stone Age Weapons",
+   "page": 148
+  },
+  {
+   "number": "3-9",
+   "title": "Bronze Age Weapons",
+   "page": 148
+  },
+  {
+   "number": "3-10",
+   "title": "Dueling Counter Modifiers",
+   "page": 151
+  },
+  {
+   "number": "3-11",
+   "title": "Siege Engine Assembly",
+   "page": 159
+  },
+  {
+   "number": "3-12",
+   "title": "Indirect Attack Check Modifiers",
+   "page": 160
+  },
+  {
+   "number": "3-13",
+   "title": "Ranged Siege Engines",
+   "page": 161
+  },
+  {
+   "number": "3-14",
+   "title": "Special Siege Engine Ammunition",
+   "page": 163
+  },
+  {
+   "number": "3-15",
+   "title": "Close Assault Siege Engines",
+   "page": 165
+  },
+  {
+   "number": "3-16",
+   "title": "Bridges and Escalade Ladders",
+   "page": 165
+  },
+  {
+   "number": "3-17",
+   "title": "Siege Tower Complement",
+   "page": 166
+  },
+  {
+   "number": "3-18",
+   "title": "Buildings",
+   "page": 167
+  },
+  {
+   "number": "3-20",
+   "title": "Gates",
+   "page": 167
+  },
+  {
+   "number": "3-19",
+   "title": "Walls",
+   "page": 167
+  },
+  {
+   "number": "4-1",
+   "title": "Vehicle Size by Squares",
+   "page": 172
+  },
+  {
+   "number": "4-3",
+   "title": "Ramming Damage by Size",
+   "page": 179
+  },
+  {
+   "number": "4-4",
+   "title": "Vehicle Hit Points by Material",
+   "page": 179
+  },
+  {
+   "number": "4-5",
+   "title": "Vehicle AC and CMB Modifier by Size",
+   "page": 180
+  },
+  {
+   "number": "5-1",
+   "title": "Armor Composition and DR",
+   "page": 192
+  },
+  {
+   "number": "5-2",
+   "title": "Natural Armor Conversion to DR",
+   "page": 192
+  },
+  {
+   "number": "5-3",
+   "title": "Unusual Creatures and Armor DR",
+   "page": 192
+  },
+  {
+   "number": "5-4",
+   "title": "Called Shot Locations",
+   "page": 194
+  },
+  {
+   "number": "5-5",
+   "title": "Half-Plate Suit Pieces",
+   "page": 199
+  },
+  {
+   "number": "5-6",
+   "title": "Donning Armor Pieces",
+   "page": 200
+  },
+  {
+   "number": "5-7",
+   "title": "Arm Armor Pieces",
+   "page": 201
+  },
+  {
+   "number": "5-8",
+   "title": "Leg Armor Pieces",
+   "page": 202
+  },
+  {
+   "number": "5-9",
+   "title": "Torso Armor Pieces",
+   "page": 204
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Frontmatter",
+   "page": 0
+  },
+  {
+   "depth": 1,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 1,
+   "title": "Title Page",
+   "page": 1
+  },
+  {
+   "depth": 1,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 1,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 2,
+   "title": "Navigating This Book",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Classes",
+   "page": 6
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Base Classes",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Classes",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Archetypes",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Who Needs This Book?",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "The New Classes",
+   "page": 8
+  },
+  {
+   "depth": 3,
+   "title": "Starting Wealth",
+   "page": 8
+  },
+  {
+   "depth": 1,
+   "title": "Classes",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "The Gunslinger",
+   "page": 9
+  },
+  {
+   "depth": 3,
+   "title": "Class Skills",
+   "page": 9
+  },
+  {
+   "depth": 3,
+   "title": "Class Features",
+   "page": 9
+  },
+  {
+   "depth": 3,
+   "title": "Progression Table 1–1: Gunslinger",
+   "page": 10
+  },
+  {
+   "depth": 3,
+   "title": "Optional Rule: Daring Act",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Ninja",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "Class Skills",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "Class Features",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "Progression Table 1–2: Ninja",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Samurai",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Class Skills",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Class Features",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Progression Table 1–3: Samurai",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Samurai Orders",
+   "page": 21
+  },
+  {
+   "depth": 4,
+   "title": "Order of the Warrior",
+   "page": 21
+  },
+  {
+   "depth": 4,
+   "title": "Ronin",
+   "page": 21
+  },
+  {
+   "depth": 1,
+   "title": "Class Archetypes",
+   "page": 22
+  },
+  {
+   "depth": 2,
+   "title": "Using Archetypes",
+   "page": 22
+  },
+  {
+   "depth": 2,
+   "title": "Alternate Class Features",
+   "page": 23
+  },
+  {
+   "depth": 2,
+   "title": "Adapting Existing Characters",
+   "page": 23
+  },
+  {
+   "depth": 2,
+   "title": "Alchemist",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Discoveries",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Beastmorph",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Ragechemist",
+   "page": 25
+  },
+  {
+   "depth": 2,
+   "title": "Barbarian",
+   "page": 26
+  },
+  {
+   "depth": 3,
+   "title": "Rage Powers",
+   "page": 26
+  },
+  {
+   "depth": 3,
+   "title": "Armored Hulk",
+   "page": 28
+  },
+  {
+   "depth": 3,
+   "title": "Scarred Rager",
+   "page": 29
+  },
+  {
+   "depth": 3,
+   "title": "Sea Reaver",
+   "page": 29
+  },
+  {
+   "depth": 3,
+   "title": "Titan Mauler",
+   "page": 30
+  },
+  {
+   "depth": 3,
+   "title": "True Primitive",
+   "page": 30
+  },
+  {
+   "depth": 3,
+   "title": "Urban Barbarian",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Wild Rager",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Bard",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Archaeologist",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Daredevil",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Dervish Dancer",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "Cavalier",
+   "page": 34
+  },
+  {
+   "depth": 3,
+   "title": "Cavalier Orders",
+   "page": 34
+  },
+  {
+   "depth": 4,
+   "title": "Order of the Blue Rose",
+   "page": 34
+  },
+  {
+   "depth": 4,
+   "title": "Order of the Seal",
+   "page": 34
+  },
+  {
+   "depth": 4,
+   "title": "Order of the Tome",
+   "page": 35
+  },
+  {
+   "depth": 3,
+   "title": "Cavalier Archetypes",
+   "page": 36
+  },
+  {
+   "depth": 4,
+   "title": "Beast Rider",
+   "page": 36
+  },
+  {
+   "depth": 4,
+   "title": "Emissary",
+   "page": 36
+  },
+  {
+   "depth": 4,
+   "title": "Gendarme",
+   "page": 37
+  },
+  {
+   "depth": 4,
+   "title": "Honor Guard",
+   "page": 37
+  },
+  {
+   "depth": 4,
+   "title": "Luring Cavalier",
+   "page": 38
+  },
+  {
+   "depth": 4,
+   "title": "Musketeer",
+   "page": 38
+  },
+  {
+   "depth": 4,
+   "title": "Standard Bearer",
+   "page": 39
+  },
+  {
+   "depth": 4,
+   "title": "Strategist",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Cleric",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Crusader",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Divine Strategist",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Evangelist",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Merciful Healer",
+   "page": 41
+  },
+  {
+   "depth": 2,
+   "title": "Druid",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Ape Shaman",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Bat Shaman",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Boar Shaman",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "World Walker",
+   "page": 43
+  },
+  {
+   "depth": 2,
+   "title": "Fighter",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Armor Master",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Brawler",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Cad",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Dragoon",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Gladiator",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Tactician",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Thunderstriker",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "Tower Shield Specialist",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "Unarmed Fighter",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "Unbreakable",
+   "page": 49
+  },
+  {
+   "depth": 3,
+   "title": "Expanded Weapon Groups",
+   "page": 45
+  },
+  {
+   "depth": 2,
+   "title": "Gunslinger",
+   "page": 50
+  },
+  {
+   "depth": 3,
+   "title": "Gun Talk",
+   "page": 50
+  },
+  {
+   "depth": 3,
+   "title": "Musket Master",
+   "page": 50
+  },
+  {
+   "depth": 3,
+   "title": "Mysterious Stranger",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Pistolero",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Inquisitor",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Inquisitions",
+   "page": 52
+  },
+  {
+   "depth": 4,
+   "title": "Black Powder Inquisition",
+   "page": 52
+  },
+  {
+   "depth": 4,
+   "title": "Spellkiller Inquisition",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Iconoclast",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Spellbreaker",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Witch Hunter",
+   "page": 53
+  },
+  {
+   "depth": 2,
+   "title": "Magus",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Magus Arcana",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Kensai",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Myrmidarch",
+   "page": 56
+  },
+  {
+   "depth": 3,
+   "title": "Skirnir",
+   "page": 56
+  },
+  {
+   "depth": 3,
+   "title": "Soul Forger",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Monk",
+   "page": 58
+  },
+  {
+   "depth": 3,
+   "title": "Flowing Monk",
+   "page": 58
+  },
+  {
+   "depth": 3,
+   "title": "Maneuver Master",
+   "page": 58
+  },
+  {
+   "depth": 3,
+   "title": "Martial Artist",
+   "page": 59
+  },
+  {
+   "depth": 3,
+   "title": "Master of Many Styles",
+   "page": 59
+  },
+  {
+   "depth": 3,
+   "title": "Sensei",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Sohei",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Tetori",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "Paladin",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Divine Hunter",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Empyreal Knight",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Holy Gun",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Holy Tactician",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Knight of the Sepulcher",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Sacred Shield",
+   "page": 65
+  },
+  {
+   "depth": 2,
+   "title": "Ranger",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Battle Scout",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Deep Walker",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Falconer",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Trophy Hunter",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Warden",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Wild Stalker",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "Rogue",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Rogue Talents",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Rogue Talents",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Bandit",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Chameleon",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Charlatan",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Driver",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Knife Master",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Pirate",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Roof Runner",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Sanctified Rogue",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Survivalist",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Wizard",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Bomber",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Siege Mage",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spellsunger",
+   "page": 74
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Feats",
+   "page": 76
+  },
+  {
+   "depth": 1,
+   "title": "Types of Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Combat Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Critical Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Grit Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Metamagic Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Performance Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Style Feats",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Teamwork Feats",
+   "page": 79
+  },
+  {
+   "depth": 1,
+   "title": "Table 2–1: Feats",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "Grit Feats",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Performance Feats",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Style Feats",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Teamwork Feats",
+   "page": 88
+  },
+  {
+   "depth": 1,
+   "title": "Feat Descriptions",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Adder Strike (Combat)",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Adept Champion",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Amateur Gunslinger (Combat)",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Arc Slinger (Combat)",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Back to Back (Teamwork)",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Betrayer",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Binding Throw (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Bludgeoner (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Boar Ferocity (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Boar Shred (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Boar Style (Combat, Style)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Body Shield (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Bolstered Resilience",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Bonebreaker (Combat)",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Branded for Retribution",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Break Guard (Combat)",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Broken Wing Gambit (Combat, Teamwork)",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Cartwheel Dodge",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Cavalry Formation (Combat, Teamwork)",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Channeled Revival",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Channeling Scourge",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Charging Hurler (Combat)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Chokehold (Combat)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Cleaving Finish (Combat)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Close-Quarters Thrower (Combat)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Clustered Shots (Combat)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Combat Medic (Teamwork)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Combat Style Master (Combat)",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Contingent Channeling",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Coordinated Charge (Combat, Teamwork)",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Crane Riposte (Combat)",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Crane Style (Combat, Style)",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Crane Wing (Combat)",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Crusader’s Fist (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Crusader’s Flurry",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Crushing Blow (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Finish (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Death from Above (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Death or Glory (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Deathless Initiate (Combat)",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Deathless Master (Combat)",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Deathless Zealot (Combat)",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Deceptive Exchange",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Defensive Weapon Training (Combat)",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Deft Shootist Deed (Grit)",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Destructive Dispel",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Devastating Strike (Combat)",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Agility",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Assault",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Dervish",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Maneuvers",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Savant",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Discordant Voice",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Disengaging Feint (Combat)",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Disengaging Flourish (Combat)",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Disengaging Shot (Combat)",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Disorienting Maneuver",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Synergy",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Dispelling Critical (Critical)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Dispelling Fist",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Disposable Weapon",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Disruptive Recall",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Distance Thrower (Combat)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Djinni Spin (Combat)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Djinni Spirit (Combat)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Djinni Style (Combat, Style)",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Domain Strike (Combat)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Double Bane",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Drag Down (Combat)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dragon Ferocity (Combat)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dragon Roar (Combat)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dragon Style (Combat, Style)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Dramatic Display (Combat, Performance)",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Earth Child Binder (Combat)",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Earth Child Style (Combat, Style)",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Earth Child Topple (Combat)",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Efreeti Stance (Combat)",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Efreeti Style (Combat, Style)",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Efreeti Touch (Combat)",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Elusive Redirection",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Enfilading Fire (Combat, Teamwork)",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Escape Route (Teamwork)",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Expert Driver",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Extra Bane",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Extra Grit (Grit)",
+   "page": 100
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "False Opening (Combat)",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Feint Partner (Combat, Teamwork)",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Felling Escape (Combat)",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Felling Smash (Combat)",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Feral Combat Training (Combat)",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Field Repair",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Final Embrace (Combat)",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Final Embrace Horror (Combat)",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Final Embrace Master (Combat)",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Flanking Foil (Combat)",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Fortified Armor Training (Combat)",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Furious Finish",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "G",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Gory Finish (Combat)",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Greater Channel Smite",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Greater Rending Fury (Combat)",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Greater Snap Shot (Combat)",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Greater Whip Mastery (Combat)",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Guided Hand",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Gunsmithing",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "H",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Hammer the Gap (Combat)",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Harmonic Sage",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Haunted Gnome (Combat)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Haunted Gnome Assault (Combat)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Haunted Gnome Shroud (Combat)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Hero’s Display (Combat, Performance)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Hex Strike (Combat)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Horse Master (Combat)",
+   "page": 104
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Impact Critical Shot (Combat, Critical)",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Impaling Critical (Combat, Critical)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Back to Back (Teamwork)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Charging Hurler (Combat)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Cleaving Finish (Combat)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Devastating Strike (Combat)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Feint Partner (Combat, Teamwork)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Impaling Critical (Combat, Critical)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Rending Fury (Combat)",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Improved Snap Shot (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Improved Stalwart",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Improved Two-Weapon Feint (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Improved Whip Mastery (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Instant Judgment",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Intimidating Bane",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "J",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Janni Rush (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Janni Style (Combat, Style)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Janni Tempest (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Jawbreaker (Combat)",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "K",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Kirin Path (Combat)",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Kirin Strike (Combat)",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Kirin Style (Combat, Style)",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Knockout Artist",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Landing Roll (Combat)",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Leaping Shot Deed (Grit)",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Mantis Style (Combat, Style)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Mantis Torment (Combat)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Mantis Wisdom (Combat)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Marid Coldsnap (Combat)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Marid Spirit (Combat)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Marid Style (Combat, Style)",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Master Combat Performer (Combat)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Master Siege Engineer (Combat)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Masterful Display (Combat, Performance)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Maximized Spellstrike",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Menacing Bane",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Merciful Bane",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Mocking Dance (Combat, Performance)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Monastic Legacy (Combat)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Monkey Moves (Combat)",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Monkey Shine (Combat)",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Monkey Style (Combat, Style)",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Moonlight Stalker (Combat)",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Moonlight Stalker Feint (Combat)",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Moonlight Stalker Master (Combat)",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Murderer’s Circle (Combat, Performance)",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Neckbreaker (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Net Adept (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Net and Trident (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Net Maneuvering (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Net Trickery (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Nightmare Fist (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Nightmare Striker (Combat)",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Nightmare Weaver (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "No Name (Grit)",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "O",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Opening Volley (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Pack Attack (Combat, Teamwork)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Panther Claw (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Panther Parry (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Panther Style (Combat, Style)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Passing Trick (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Performance Weapon Mastery (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Performing Combatant (Combat)",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Pin Down (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Pinning Knockout (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Pinning Rend (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Pinpoint Poisoner (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Planar Wild Shape",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Prone Shooter (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Prone Slinger (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Q",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Quick Bull Rush (Combat)",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Quick Dirty Trick (Combat)",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Quick Drag (Combat)",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Quick Reposition (Combat)",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Quick Steal (Combat)",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Raging Brutality",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Raging Deathblow",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Raging Hurler",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Raging Throw",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Rapid Grappler (Combat)",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Rapid Reload (Combat)",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Rebounding Leap (Combat)",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Rebuffing Reduction (Combat)",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Rending Fury (Combat)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Revelation Strike (Combat)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Rhetorical Flourish",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Ricochet Shot Deed (Grit)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Righteous Healing",
+   "page": 116
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Sap Adept (Combat)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Sap Master (Combat)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Savage Display (Combat, Performance)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "School Strike (Combat)",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Sea Legs",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Secret Stash Deed (Grit)",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Seize the Moment (Combat, Teamwork)",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Shaitan Earthblast (Combat)",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Shaitan Skin (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Shaitan Style (Combat, Style)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Shake It Off (Teamwork)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Shapeshifter Foil",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Shapeshifting Hunter",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Shared Judgment",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Siege Commander (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Siege Engineer (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Siege Gunner (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Signature Deed (Grit)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Skilled Driver",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Slayer’s Knack",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Sling Flail (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Snake Fang (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Snake Sidewind (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Snake Style (Combat, Style)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Snap Shot (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Snapping Turtle Clutch (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Snapping Turtle Shell (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Snapping Turtle Style (Combat, Style)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Sneaking Precision",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Sorcerous Strike (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Spell Bane",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Spinning Throw (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Splintering Weapon",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Stage Combatant (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Stalwart",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Stealth Synergy (Teamwork)",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Strangler (Combat)",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Strong Comeback",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Stunning Pin (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Sure Grasp",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Sword and Pistol (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Tandem Trip (Combat, Teamwork)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Target of Opportunity (Combat, Teamwork)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Team Pickpocketing (Teamwork)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Tiger Claws (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Tiger Pounce (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Tiger Style (Combat, Style)",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Trapper’s Setup",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Twin Thunders (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Twin Thunders Flurry (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Twin Thunders Master (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Two-Handed Thrower (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Two-Weapon Feint (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "V",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Vicious Stomp (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Wave Strike (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Whip Mastery (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 1,
+   "title": "Table 2–2: New Item Craft DCs",
+   "page": 101
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Mastering Combat",
+   "page": 124
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Eastern Armor and Weapons",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Firearms",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Gladiator Weapons",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Primitive Armor and Weapons",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Duels",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Performance Combat",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Siege Engines",
+   "page": 127
+  },
+  {
+   "depth": 1,
+   "title": "Eastern Armor and Weapons",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Eastern Armor",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–1: Eastern Armor",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Eastern Weapons",
+   "page": 130
+  },
+  {
+   "depth": 3,
+   "title": "Weapon Descriptions",
+   "page": 130
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–2: Eastern Weapons—Martial",
+   "page": 131
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–3: Eastern Weapons—Exotic",
+   "page": 132
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Eastern Weapon Equivalents",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Firearms",
+   "page": 135
+  },
+  {
+   "depth": 3,
+   "title": "Firearms in Your Campaign",
+   "page": 135
+  },
+  {
+   "depth": 3,
+   "title": "Firearm Rules",
+   "page": 135
+  },
+  {
+   "depth": 3,
+   "title": "Firearm Descriptions",
+   "page": 137
+  },
+  {
+   "depth": 3,
+   "title": "Early Firearms",
+   "page": 137
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–4: Early Firearms",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Advanced Firearms",
+   "page": 139
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–5: Advanced Firearms",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Firearm Ammunition and Adventuring Gear",
+   "page": 140
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–6: Firearm Gear",
+   "page": 141
+  },
+  {
+   "depth": 3,
+   "title": "Firearm Magic Items",
+   "page": 141
+  },
+  {
+   "depth": 4,
+   "title": "Firearm Ammunition Special Ability",
+   "page": 141
+  },
+  {
+   "depth": 4,
+   "title": "Specific Firearm Ammunition",
+   "page": 142
+  },
+  {
+   "depth": 4,
+   "title": "Magic Firearm Special Abilities",
+   "page": 142
+  },
+  {
+   "depth": 4,
+   "title": "Wondrous Items",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Gladiator Weapons",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Gladiator Weapon Descriptions",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Table 3-7: Gladiator Weapons",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Primitive Armor and Weapons",
+   "page": 146
+  },
+  {
+   "depth": 3,
+   "title": "Primitive Materials",
+   "page": 146
+  },
+  {
+   "depth": 4,
+   "title": "Bone",
+   "page": 146
+  },
+  {
+   "depth": 4,
+   "title": "Bronze",
+   "page": 146
+  },
+  {
+   "depth": 4,
+   "title": "Gold",
+   "page": 147
+  },
+  {
+   "depth": 4,
+   "title": "Obsidian",
+   "page": 147
+  },
+  {
+   "depth": 4,
+   "title": "Stone",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "The Stone Age",
+   "page": 147
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–8: Stone Age Weapons",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "The Bronze Age",
+   "page": 149
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–9: Bronze Age Weapons",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Broken Condition and Sundering",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Duels",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Starting a Duel",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Duel Combat",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Dueling Counter",
+   "page": 151
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–10: Dueling Counter Modifiers",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Dueling Dodge",
+   "page": 151
+  },
+  {
+   "depth": 3,
+   "title": "Dueling Parry",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Dueling Resolve",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Duels and Performance Combat",
+   "page": 152
+  },
+  {
+   "depth": 3,
+   "title": "Duel Results",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Performance Combat",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Types of Performance Combat",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Crowd Attitudes",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Crowd’s Starting Attitude",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Performance Combat Check",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Performance Combat Check DC",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Affecting the Crowd's Attitude",
+   "page": 156
+  },
+  {
+   "depth": 4,
+   "title": "Swift Action Checks",
+   "page": 156
+  },
+  {
+   "depth": 4,
+   "title": "Free Action or Immediate Action Checks",
+   "page": 156
+  },
+  {
+   "depth": 4,
+   "title": "Mandatory Checks",
+   "page": 157
+  },
+  {
+   "depth": 4,
+   "title": "Victory Points",
+   "page": 157
+  },
+  {
+   "depth": 4,
+   "title": "Determining a Winner",
+   "page": 157
+  },
+  {
+   "depth": 4,
+   "title": "Serialized Performance Combats",
+   "page": 157
+  },
+  {
+   "depth": 2,
+   "title": "Siege Engines",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Siege Engine Rules",
+   "page": 158
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–11: Siege Engine Assembly",
+   "page": 159
+  },
+  {
+   "depth": 4,
+   "title": "Siege Engine Qualities",
+   "page": 159
+  },
+  {
+   "depth": 4,
+   "title": "Ranged Siege Engines",
+   "page": 159
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–12: Indirect Attack Check Modifiers",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Siege Weapon Descriptions",
+   "page": 160
+  },
+  {
+   "depth": 4,
+   "title": "Table 3–13: Ranged Siege Engines",
+   "page": 161
+  },
+  {
+   "depth": 4,
+   "title": "Special Siege Engine Ammunition",
+   "page": 163
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–14: Special Siege Engine Ammunition",
+   "page": 163
+  },
+  {
+   "depth": 4,
+   "title": "Close Assault Siege Engines",
+   "page": 165
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–15: Close Assault Siege Engines",
+   "page": 165
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–16: Bridges and Escalade Ladders",
+   "page": 165
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–17: Siege Tower Complement",
+   "page": 166
+  },
+  {
+   "depth": 3,
+   "title": "Structure Hardness and Hit Points",
+   "page": 166
+  },
+  {
+   "depth": 4,
+   "title": "Buildings",
+   "page": 167
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–18: Buildings",
+   "page": 167
+  },
+  {
+   "depth": 4,
+   "title": "Gates",
+   "page": 167
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–20: Gates",
+   "page": 167
+  },
+  {
+   "depth": 4,
+   "title": "Walls",
+   "page": 167
+  },
+  {
+   "depth": 5,
+   "title": "Table 3–19: Walls",
+   "page": 167
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Vehicles",
+   "page": 168
+  },
+  {
+   "depth": 1,
+   "title": "Vehicles",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Vehicle Basics",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Full Vehicle Rules",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Drivers",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Occupants",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Propulsion and Driving Checks",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Vehicle Size and Space",
+   "page": 172
+  },
+  {
+   "depth": 4,
+   "title": "Table 4–1: Vehicle Size by Squares",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Vehicle Facing and Movement",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Driving Vehicles",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Optional Rule: Wide Turns",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Vehicles in Combat",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Propulsion Devices",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Driving Devices",
+   "page": 177
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–3: Ramming Damage by Size",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–4: Vehicle Hit Points by Material",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–5: Vehicle AC and CMB Modifier by Size",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Vehicle Statistics",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Land Vehicles",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Water Vehicles",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "Air Vehicles",
+   "page": 186
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 5: Variant Rules",
+   "page": 188
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Armor as Damage Reduction",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Called Shots",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Piecemeal Armor",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Wounds and Vigor",
+   "page": 190
+  },
+  {
+   "depth": 1,
+   "title": "Armor as Damage Reduction",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Defense",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Armor as Damage Reduction",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Critical Hits and Defense",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–1: Armor Composition and DR",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–2: Natural Armor Conversion to DR",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–3: Unusual Creatures and Armor DR",
+   "page": 192
+  },
+  {
+   "depth": 1,
+   "title": "Called Shots",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Making Called Shots",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Additional Rules",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Called Shot Effects",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Table 5–4: Called Shot Locations",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Called Shot Feats",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Arm",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Chest",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Ear",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Eye",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Hand",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Head",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Heart",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Leg",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Neck",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Vitals",
+   "page": 197
+  },
+  {
+   "depth": 1,
+   "title": "Piecemeal Armor",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Armor Pieces and Armor Suits",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Armor Pieces and Proficiency",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–5: Half-Plate Suit Pieces",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Masterwork, Special Material, and Magic Armor",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Adamantine",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Dragonhide",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Mithral",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Getting Into and Out of Armor Pieces",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Table 5–6: Donning Armor Pieces",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Armor Pieces for Unusual Creatures",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Armor and Armor Piece Hit Points and Hardness",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Armor Piece Descriptions",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Arms",
+   "page": 200
+  },
+  {
+   "depth": 4,
+   "title": "Table 5–7: Arm Armor Pieces",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Legs",
+   "page": 202
+  },
+  {
+   "depth": 4,
+   "title": "Table 5–8: Leg Armor Pieces",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Torso",
+   "page": 203
+  },
+  {
+   "depth": 4,
+   "title": "Table 5–9: Torso Armor Pieces",
+   "page": 204
+  },
+  {
+   "depth": 1,
+   "title": "Wounds and Vigor",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Determining Wound Points and Vigor Points",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Wound Points",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Vigor Points",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Regaining Wound Points and Vigor Points",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Attacks that Deal Wound Point Damage",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Other Considerations",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Wounds and Vigor Variant Feats",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Deathless Initiate (Combat)",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Deathless Master (Combat)",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Diehard",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Toughness",
+   "page": 207
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 6: Spells",
+   "page": 208
+  },
+  {
+   "depth": 1,
+   "title": "Spells",
+   "page": 210
+  },
+  {
+   "depth": 2,
+   "title": "Alchemist Spells",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Alchemist Spells",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Alchemist Spells",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Alchemist Spells",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Alchemist Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Alchemist Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Alchemist Spells",
+   "page": 211
+  },
+  {
+   "depth": 2,
+   "title": "Antipaladin Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Antipaladin Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Antipaladin Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Antipaladin Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Antipaladin Spells",
+   "page": 211
+  },
+  {
+   "depth": 2,
+   "title": "Bard Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "0-Level Bard Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Bard Spells",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Bard Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Bard Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Bard Spells",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Cleric Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Cleric Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Cleric Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Cleric Spells",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "7th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "8th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "9th-Level Cleric Spells",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Druid Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Druid Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Druid Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Druid Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Druid Spells",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Druid Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Druid Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "7th-Level Druid Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "8th-Level Druid Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "9th-Level Druid Spells",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Inquisitor Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Inquisitor Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Inquisitor Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Inquisitor Spells",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Inquisitor Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Inquisitor Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Inquisitor Spells",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Magus Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Magus Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Magus Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Magus Spells",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Magus Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Magus Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Magus Spells",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Paladin Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Paladin Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Paladin Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Paladin Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Paladin Spells",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Ranger Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Ranger Spells",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Ranger Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Ranger Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Ranger Spells",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerer/Wizard Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "0-Level Sorcerer/Wizard Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Sorcerer/Wizard Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Sorcerer/Wizards Spells",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Sorcerer/Wizard Spells",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Sorcerer/Wizard Spells",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Sorcerer/Wizard Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Sorcerer/Wizard Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "7th-Level Sorcerer/Wizard Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "8th-Level Sorcerer/Wizard Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "9th-Level Sorcerer/Wizard Spells",
+   "page": 219
+  },
+  {
+   "depth": 2,
+   "title": "Summoner Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Summoner Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Summoner Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Summoner Spells",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Summoner Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Summoner Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Summoner Spells",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Witch Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "1st-Level Witch Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "2nd-Level Witch Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "3rd-Level Witch Spells",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "4th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "5th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "6th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "7th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "8th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "9th-Level Witch Spells",
+   "page": 221
+  },
+  {
+   "depth": 1,
+   "title": "Spell Descriptions",
+   "page": 221
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Ablative Barrier",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Absorb Toxicity",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Abundant Ammunition",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Adjuring Step",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Adoration",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Air Bubble",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Air Walk, Communal",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Animal Aspect",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Animal Aspect, Greater",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Ant Haul, Communal",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Cannon",
+   "page": 223
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Bestow Weapon Proficiency",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Blistering Invective",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Bowstaff",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Brow Gasher",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Bullet Shield",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Burst of Speed",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Caging Bomb Admixture",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Certain Grip",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Chain of Perdition",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Companion Mind Link",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Compel Hostility",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Damp Powder",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Darkvision, Communal",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Daybreak Arrow",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Juggernaut",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Deadeye’s Lore",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Debilitating Portent",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Delay Poison, Communal",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Destabilize Powder",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Discovery Torch",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Divine Arrow",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Dust Form",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Effortless Armor",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Endure Elements, Communal",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Energy Siege Shot",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Energy Siege Shot, Greater",
+   "page": 229
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Fabricate Bullets",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Fiery Shuriken",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Find Quarry",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Flash Fire",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Forest Friend",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Frightful Aspect",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Frost Fall",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "H",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Haunted Fey Aspect",
+   "page": 230
+  },
+  {
+   "depth": 3,
+   "title": "Healing Thief",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Heroic Invocation",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Hostile Juxtaposition",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Hostile Juxtaposition, Greater",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Hostile Levitation",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Illusion of Calm",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Instrument of Agony",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "J",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Jolting Portent",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Judgment Light",
+   "page": 232
+  },
+  {
+   "depth": 3,
+   "title": "Jury-Rig",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "K",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Kinetic Reverberation",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Languid Bomb Admixture",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Liberating Command",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Life Conduit",
+   "page": 233
+  },
+  {
+   "depth": 3,
+   "title": "Life Conduit, Greater",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Life Conduit, Improved",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Lightning Lash Bomb Admixture",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Defense",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Eloquence",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Entanglement",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Escape",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Madness",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Righteousness",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Sight",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Sloth",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Thunder",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Vengeance",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Warding",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Litany of Weakness",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Locate Weakness",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Lock Gaze",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Longshot",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Magic Siege Engine",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Magic Siege Engine, Greater",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Mask Dweomer, Communal",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Mind Blank, Communal",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Strike",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Moment of Greatness",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Mount, Communal",
+   "page": 237
+  },
+  {
+   "depth": 3,
+   "title": "Mutagenic Touch",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Named Bullet",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Named Bullet, Greater",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Negative Reaction",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Nondetection, Communal",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "O",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Obsidian Flow",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Peacebond",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Pellet Blast",
+   "page": 238
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Chariot",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Driver",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Steed, Communal",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Pilfering Hand",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Arrows, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Chaos, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Energy, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Evil, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Good, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Law, Communal",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Pup Shape",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Q",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Qualm",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Recoil Fire",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Reinforce Armaments",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Reinforce Armaments, Communal",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Reloading Hands",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Resinous Skin",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Resist Energy, Communal",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Returning Weapon",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Returning Weapon, Communal",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Ricochet Shot",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "See Alignment",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Bomb Admixture",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Share Language, Communal",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Shock Shield",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Shocking Image",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Siege of Trees",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Siege of Trees, Greater",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Spell Immunity, Communal",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Spell Immunity, Greater Communal",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Spider Climb, Communal",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Spontaneous Immolation",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Stabilize Powder",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Stoneskin, Communal",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Summoner Conduit",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Sun Metal",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Striking",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Tactical Acumen",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Tar Pool",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Targeted Bomb Admixture",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Telekinetic Assembly",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Telekinetic Charge",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Terrain Bond",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Thunder Fire",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Tongues, Communal",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Touch Injection",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Twisted Space",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "U",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Unerring Weapon",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "V",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Viper Bomb Admixture",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Walk through Space",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Warding Weapon",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Water Walk, Communal",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Weaken Powder",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Wilderness Soldiers",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Wreath of Blades",
+   "page": 249
+  },
+  {
+   "depth": 0,
+   "title": "Backmatter",
+   "page": 250
+  },
+  {
+   "depth": 1,
+   "title": "Appendix: New Weapons",
+   "page": 250
+  },
+  {
+   "depth": 1,
+   "title": "Ultimate Combat Index",
+   "page": 252
+  },
+  {
+   "depth": 1,
+   "title": "Open Game License",
+   "page": 253
+  },
+  {
+   "depth": 1,
+   "title": "Ads",
+   "page": 254
+  },
+  {
+   "depth": 1,
+   "title": "Rear Cover",
+   "page": 257
+  }
+ ]
+}

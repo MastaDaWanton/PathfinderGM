@@ -1,0 +1,2652 @@
+{
+ "slug": "ultimate-campaign",
+ "abbr": "UCam",
+ "kind": "gm",
+ "title": "Ultimate Campaign",
+ "source_file": "PZO1125 - Pathfinder RPG - Ultimate Campaign.pdf",
+ "pdf_pages": 258,
+ "counts": {
+  "sections": 514,
+  "tables": 13,
+  "entries": 483
+ },
+ "tables": [
+  {
+   "number": "2-1",
+   "title": "Capital Values",
+   "page": 77
+  },
+  {
+   "number": "2-2",
+   "title": "Rooms And Teams Reference",
+   "page": 131
+  },
+  {
+   "number": "3-1",
+   "title": "Changing Alignment",
+   "page": 137
+  },
+  {
+   "number": "3-2",
+   "title": "Travel Time (1 Hex)",
+   "page": 154
+  },
+  {
+   "number": "3-3",
+   "title": "Exploration Time (1 Hex)",
+   "page": 154
+  },
+  {
+   "number": "3-4",
+   "title": "Investment Rewards",
+   "page": 165
+  },
+  {
+   "number": "3-5",
+   "title": "Fame Events",
+   "page": 180
+  },
+  {
+   "number": "3-6",
+   "title": "Sphere of Influence Modifiers",
+   "page": 182
+  },
+  {
+   "number": "3-7",
+   "title": "Negative Fame Reactions",
+   "page": 184
+  },
+  {
+   "number": "3-8",
+   "title": "Retraining Synergies",
+   "page": 190
+  },
+  {
+   "number": "3-9",
+   "title": "Random Young Starting Ages",
+   "page": 194
+  },
+  {
+   "number": "4-6",
+   "title": "Terrain and Terrain Improvements",
+   "page": 214
+  },
+  {
+   "number": "4-5",
+   "title": "Settlement Size and Base Value",
+   "page": 212
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Frontmatter",
+   "page": 0
+  },
+  {
+   "depth": 1,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 1,
+   "title": "Title Page",
+   "page": 1
+  },
+  {
+   "depth": 1,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 1,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 2,
+   "title": "Navigating this Book",
+   "page": 4
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Character Background",
+   "page": 6
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "How to Create a Background",
+   "page": 8
+  },
+  {
+   "depth": 3,
+   "title": "Brainstorming Your Background",
+   "page": 8
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Unique Character Concept",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "Using This Section",
+   "page": 9
+  },
+  {
+   "depth": 1,
+   "title": "Early Life",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Circumstances of Birth",
+   "page": 9
+  },
+  {
+   "depth": 2,
+   "title": "Family",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Region",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Social Rank and Education",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Magic",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Religion and Ritual",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Major Childhood Event",
+   "page": 12
+  },
+  {
+   "depth": 1,
+   "title": "Adolescence",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Initiation Rites",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Friends, Allies, and Influences",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Class Event",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "First Love",
+   "page": 13
+  },
+  {
+   "depth": 2,
+   "title": "Duty and Responsibilities",
+   "page": 13
+  },
+  {
+   "depth": 1,
+   "title": "Adulthood",
+   "page": 13
+  },
+  {
+   "depth": 2,
+   "title": "Conflict and Behavior",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Vulnerability",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Friends, Associates, and Companions",
+   "page": 15
+  },
+  {
+   "depth": 1,
+   "title": "Sidebar: Two Quirks and a Flaw: Quick and Dirty Character Establishment",
+   "page": 15
+  },
+  {
+   "depth": 1,
+   "title": "Background Generator",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Step 1—Homeland, Family, and Childhood",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Dwarf",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Elf",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Gnome",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elf",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Halfling",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Human",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Siblings",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Unusual Homeland",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Circumstance of Birth",
+   "page": 20
+  },
+  {
+   "depth": 3,
+   "title": "Parents’ Profession",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Adopted Outside Your Race",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Nobility",
+   "page": 22
+  },
+  {
+   "depth": 3,
+   "title": "Major Childhood Event",
+   "page": 23
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Crime and Punishment",
+   "page": 23
+  },
+  {
+   "depth": 2,
+   "title": "Step 2—Adolescence And Training",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Alchemist",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Barbarian",
+   "page": 26
+  },
+  {
+   "depth": 3,
+   "title": "Bard",
+   "page": 27
+  },
+  {
+   "depth": 3,
+   "title": "Cavalier",
+   "page": 28
+  },
+  {
+   "depth": 3,
+   "title": "Cleric",
+   "page": 29
+  },
+  {
+   "depth": 3,
+   "title": "Druid",
+   "page": 30
+  },
+  {
+   "depth": 3,
+   "title": "Fighter",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Gunslinger",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Inquisitor",
+   "page": 33
+  },
+  {
+   "depth": 3,
+   "title": "Magus",
+   "page": 34
+  },
+  {
+   "depth": 3,
+   "title": "Monk",
+   "page": 35
+  },
+  {
+   "depth": 3,
+   "title": "Oracle",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Paladin",
+   "page": 37
+  },
+  {
+   "depth": 3,
+   "title": "Ranger",
+   "page": 38
+  },
+  {
+   "depth": 3,
+   "title": "Rogue",
+   "page": 39
+  },
+  {
+   "depth": 3,
+   "title": "Sorcerer",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Summoner",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Witch",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Wizard",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Influential Associates",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "Step 3—Moral Conflicts, Relationships, and Drawbacks",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Major Conflict and Alignment",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Conflicts",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Conflict Subject",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Conflict Motivation",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Resolution",
+   "page": 47
+  },
+  {
+   "depth": 2,
+   "title": "Deity and Religious Philosophy",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "Romantic Relationships",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "Relationship with Fellow Adventurers",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Character Drawback",
+   "page": 49
+  },
+  {
+   "depth": 1,
+   "title": "Traits",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Basic Traits",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Combat Traits",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Faith Traits",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Magic Traits",
+   "page": 56
+  },
+  {
+   "depth": 3,
+   "title": "Social Traits",
+   "page": 59
+  },
+  {
+   "depth": 2,
+   "title": "Race Traits",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Dwarf Race Traits",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Elf Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Half-Elf Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Halfling Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Half-Orc Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Human Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Bloodline Race Traits",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Regional Traits",
+   "page": 63
+  },
+  {
+   "depth": 2,
+   "title": "Religion Traits",
+   "page": 63
+  },
+  {
+   "depth": 2,
+   "title": "Drawbacks",
+   "page": 64
+  },
+  {
+   "depth": 1,
+   "title": "Story Feats",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "Common Rules",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "Story Feats and Stacking",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Accursed (Story)",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Arisen (Story)",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Battlefield Healer (Story)",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Champion (Story)",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Damned (Story)",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Deny the Reaper (Story)",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "Eldritch Researcher (Story)",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "Fearless Zeal (Story)",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "Feral Heart (Story)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Foeslayer (Story)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Forgotten Past (Story)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Glimpse Beyond (Story)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Innocent Blood (Story)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Liberator (Story)",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Lost Legacy (Story)",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Magnum Opus (Story)",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Monument Builder (Story)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Nation Builder (Story)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Nemesis (Story)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Prophet (Story)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Redemption (Story)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Shamed (Story)",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Stronghold (Story)",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Thief of Legend (Story)",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Town Tamer (Story)",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "True Love (Story)",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Unforgotten (Story)",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Vengeance (Story)",
+   "page": 73
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Downtime",
+   "page": 74
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Overview",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Downtime Terminology",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Downtime and Kingdom Building",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Gaining Capital",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Table 2–1: Capital Values",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Working Weekends",
+   "page": 79
+  },
+  {
+   "depth": 3,
+   "title": "Converting Capital",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Moving Capital",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Spending Limits",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Using Followers",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "Downtime Phases",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Spend Capital to Boost Checks",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Upkeep Phase",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Activity Phase",
+   "page": 82
+  },
+  {
+   "depth": 3,
+   "title": "Income Phase",
+   "page": 82
+  },
+  {
+   "depth": 3,
+   "title": "Event Phase",
+   "page": 83
+  },
+  {
+   "depth": 1,
+   "title": "Downtime Activities",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Add Spells to Your Spellbook",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Construct Buildings",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Craft Magic Items",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Craft Mundane Items",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Earn Capital",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Earn XP",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Gather Information",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Heal Others",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Lead Your Kingdom",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Promote a Business",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Replace Your Animal Companion",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Replace Your Familiar",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Recruit for an Organization",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Research a Spell",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Research Facts and Lore",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Rest",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Retrain",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Run a Business",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Scheme for an Upcoming Adventure",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Train an Animal",
+   "page": 87
+  },
+  {
+   "depth": 1,
+   "title": "Managers",
+   "page": 88
+  },
+  {
+   "depth": 2,
+   "title": "Reading a Manager Stat Block",
+   "page": 88
+  },
+  {
+   "depth": 2,
+   "title": "Example Managers",
+   "page": 88
+  },
+  {
+   "depth": 1,
+   "title": "Rooms and Teams",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Construction Examples",
+   "page": 91
+  },
+  {
+   "depth": 2,
+   "title": "Reading a Unit Stat Block",
+   "page": 92
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Restrictions on Earnings",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Construction and Recruitment Delays",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Moving an Organization",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Rooms",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Room Augmentations",
+   "page": 104
+  },
+  {
+   "depth": 2,
+   "title": "Teams",
+   "page": 104
+  },
+  {
+   "depth": 1,
+   "title": "Buildings and Organizations",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Buildings",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Map: Fort",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Map: Guildhall",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Map: Upscale and Common Taverns",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Organizations",
+   "page": 113
+  },
+  {
+   "depth": 1,
+   "title": "Downtime Events",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Generic Building Events",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Alchemist Events",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Bardic College Events",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Caster’s Tower Events",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Castle Events",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Dance Hall Events",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Guildhall Events",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "Herbalist Events",
+   "page": 118
+  },
+  {
+   "depth": 3,
+   "title": "House Events",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Map: Trade Shop & Pier",
+   "page": 119
+  },
+  {
+   "depth": 3,
+   "title": "Inn Events",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Library Events",
+   "page": 120
+  },
+  {
+   "depth": 3,
+   "title": "Magic Shop Events",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Magical Academy Events",
+   "page": 121
+  },
+  {
+   "depth": 3,
+   "title": "Menagerie Events",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Military Academy Events",
+   "page": 122
+  },
+  {
+   "depth": 3,
+   "title": "Monastery Events",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Shop Events",
+   "page": 123
+  },
+  {
+   "depth": 3,
+   "title": "Smithy Events",
+   "page": 124
+  },
+  {
+   "depth": 3,
+   "title": "Map: Smithy & Shop",
+   "page": 124
+  },
+  {
+   "depth": 3,
+   "title": "Stable Events",
+   "page": 125
+  },
+  {
+   "depth": 3,
+   "title": "Tavern Events",
+   "page": 125
+  },
+  {
+   "depth": 3,
+   "title": "Temple Events",
+   "page": 126
+  },
+  {
+   "depth": 3,
+   "title": "Map: Temple",
+   "page": 126
+  },
+  {
+   "depth": 3,
+   "title": "Theater Events",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Organization Events",
+   "page": 127
+  },
+  {
+   "depth": 3,
+   "title": "Cabal Events",
+   "page": 127
+  },
+  {
+   "depth": 3,
+   "title": "Cult Events",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Mercenary Company Events",
+   "page": 128
+  },
+  {
+   "depth": 3,
+   "title": "Thieves’ Guild Events",
+   "page": 129
+  },
+  {
+   "depth": 4,
+   "title": "Map: Thieves' Guild",
+   "page": 129
+  },
+  {
+   "depth": 1,
+   "title": "Downtime Tracking Sheet",
+   "page": 130
+  },
+  {
+   "depth": 1,
+   "title": "Table 2–2: Rooms And Teams Reference",
+   "page": 131
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Campaign Systems",
+   "page": 132
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 134
+  },
+  {
+   "depth": 1,
+   "title": "Alignment",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Lawful Good",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Neutral Good",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Chaotic Good",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Lawful Neutral",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Neutral",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Chaotic Neutral",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Lawful Evil",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Neutral Evil",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Chaotic Evil",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Changing Alignment",
+   "page": 136
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–1: Changing Alignment",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Forced Alignment Change",
+   "page": 137
+  },
+  {
+   "depth": 1,
+   "title": "Bargaining",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Valuation",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Bargaining Rules",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Step 1: Seller Sets the Asking Price",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Step 2: Evaluate Item",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Step 3: Determine Undercut",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Step 4: Set Offers",
+   "page": 138
+  },
+  {
+   "depth": 3,
+   "title": "Step 5: Bargain",
+   "page": 139
+  },
+  {
+   "depth": 3,
+   "title": "Examples of Bargaining",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Using Magic to Bargain",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "Collector NPCs",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "Flooding the Market",
+   "page": 139
+  },
+  {
+   "depth": 2,
+   "title": "Trade Goods",
+   "page": 139
+  },
+  {
+   "depth": 1,
+   "title": "Companions",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Controlling Companions",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Aspects of Control",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Issues of Control",
+   "page": 141
+  },
+  {
+   "depth": 2,
+   "title": "Advancing Companions",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Intelligent Animals",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Remembering Companions",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Tips for Remembering Companions",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Remembering Followers",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Companion Plot Hooks",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Animal Companion",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Cohort",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Eidolon",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Familiar",
+   "page": 146
+  },
+  {
+   "depth": 3,
+   "title": "Follower",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Reviving and Replacing Companions",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Reviving a Dead Companion",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Finding a Replacement",
+   "page": 147
+  },
+  {
+   "depth": 1,
+   "title": "Contacts",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Trust",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Risk",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Negotiation Checks",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Gaining, Cultivating, and Losing Contacts",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Types of Contacts",
+   "page": 151
+  },
+  {
+   "depth": 1,
+   "title": "Exploration",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Sandbox Exploration",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Movement",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–2: Travel Time (1 Hex)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–3: Exploration Time (1 Hex)",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Tracking Travel",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Exploration Rewards",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Keep Things Interesting",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "Getting Lost",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Random Encounters",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Planned Encounters",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Hex Terrain Types",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Desert",
+   "page": 156
+  },
+  {
+   "depth": 3,
+   "title": "Forest",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Hill",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Marsh",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Mountain",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Plain",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Settlement",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Water",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "Random Map Generation",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "Map: Example Exploration Map",
+   "page": 159
+  },
+  {
+   "depth": 2,
+   "title": "Hazards",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Bad Weather (Any)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Blight (Any)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Gas (Desert, Marsh)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Dust Devil (Desert, Hill, Plain)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Grass Fire (Hill, Plain)",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Volcanic Tremor (Hill, Mountain)",
+   "page": 159
+  },
+  {
+   "depth": 1,
+   "title": "Honor",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "Honor Points",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "Gaining and Losing Honor",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Spending Honor",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Consequences of Losing Honor",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "General Honor Events",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "Chivalric Code",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Criminal Code",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Political Code",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Samurai Code",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Tribal Code",
+   "page": 163
+  },
+  {
+   "depth": 1,
+   "title": "Investment",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Investment Mechanics",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Example Investments and Problems",
+   "page": 165
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–4: Investment Rewards",
+   "page": 165
+  },
+  {
+   "depth": 1,
+   "title": "Lineage",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Developing Your Family",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Complicated and Dysfunctional Families",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Family Values",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Including Families in the Game",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Support and Obligation",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Inheritance",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Family Members as Foes",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Death in the Family",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Famous Lineages",
+   "page": 169
+  },
+  {
+   "depth": 1,
+   "title": "Magic Item Creation",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Pricing New Items",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Cooperative Crafting",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Upgrading Items",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Recharging Charged Items",
+   "page": 171
+  },
+  {
+   "depth": 2,
+   "title": "Altering Existing Items",
+   "page": 172
+  },
+  {
+   "depth": 2,
+   "title": "Adjusting Character Wealth by Level",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "Creating Items For Profit",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "Talismanic Components",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Enriching the Campaign",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Using Components",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Requiring Components",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Components as Commodities",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Components as Treasure",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Example Components",
+   "page": 174
+  },
+  {
+   "depth": 1,
+   "title": "Relationships",
+   "page": 176
+  },
+  {
+   "depth": 2,
+   "title": "Relationship Levels",
+   "page": 176
+  },
+  {
+   "depth": 2,
+   "title": "Growing Relationships",
+   "page": 177
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Reversing Relationships",
+   "page": 177
+  },
+  {
+   "depth": 2,
+   "title": "Example Relationships",
+   "page": 177
+  },
+  {
+   "depth": 2,
+   "title": "Parent",
+   "page": 177
+  },
+  {
+   "depth": 2,
+   "title": "Sibling",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Childhood Rival",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Spouse",
+   "page": 179
+  },
+  {
+   "depth": 1,
+   "title": "Reputation and Fame",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–5: Fame Events",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Fame",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Sphere of Influence",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–6: Sphere of Influence Modifiers",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Prestige Points",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Awards",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Fame 1",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Fame 10",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Fame 20",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Fame 30",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Fame 40",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Fame 55+",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "Disrepute and Infamy",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–7: Negative Fame Reactions",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "Shared Fame",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Alter Egos, Aliases, and Secret Identities",
+   "page": 185
+  },
+  {
+   "depth": 1,
+   "title": "Retirement",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "The Simple Life",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Relationship to the PCs",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Taking a Different Path",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Betrayal",
+   "page": 187
+  },
+  {
+   "depth": 1,
+   "title": "Retraining",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Ability Score Increase",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Archetype",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Class Feature",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Class Level",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–8: Retraining Synergies",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Feat",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Hit Points",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "New Language",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Racial Trait",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Skill Ranks",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Spells Known",
+   "page": 191
+  },
+  {
+   "depth": 1,
+   "title": "Taxation",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Types of Taxes",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Types of Service",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Compliance",
+   "page": 193
+  },
+  {
+   "depth": 1,
+   "title": "Young Characters",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Creating Young Characters",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–9: Random Young Starting Ages",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Leaving Youth Behind",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Considerations of Youth",
+   "page": 195
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Kingdoms and War",
+   "page": 196
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 198
+  },
+  {
+   "depth": 1,
+   "title": "Kingdom Building",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Overview",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Kingdom Terminology",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Kingdom Building Quick Reference",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Founding a Kingdom",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Leadership Roles",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Ruler",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Consort",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Councilor",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "General",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Grand Diplomat",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Heir",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "High Priest",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Magister",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Marshal",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Royal Enforcer",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Spymaster",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Treasurer",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Viceroy",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Warden",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Who Rolls the Kingdom Check?",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Build Points",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Wealthy Sponsor",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Starting from Scratch",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Kingdom Turn Sequence",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Upkeep Phase",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Edict Phase",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Income Phase",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Capital City",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Event Phase",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Edicts",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Holiday Edicts",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Improvement Edicts",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Promotion Edicts",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Taxation Edicts",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Edict Tables",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Losing Hexes",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Terrain Improvements",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Aqueduct*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Bridge*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Canal*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Farm*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Fishery*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Fort*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Highway*",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Mine",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Quarry",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Road*",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Sawmill",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Watchtower*",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Special Terrain",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–6: Terrain and Terrain Improvements",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Settlements and Districts",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–5: Settlement Size and Base Value",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Founding a Settlement",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Magic Items in Settlements",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Claiming Water and Islands",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Buildings",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Building Descriptions",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Gaining Experience for Leadership",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Events",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Handout: One-Lot Buildings, Bridges & Waterways",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "Handout: Two-Lot Buildings & Four-Lot Buildings",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "Handout: District Grid Worksheet",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "Handout: Kingdom Sheet",
+   "page": 227
+  },
+  {
+   "depth": 1,
+   "title": "Optional Kingdom Rules",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "Abandoned Buildings",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "Deities and Holy Sites",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "Diplomatic Edicts",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Type of Diplomatic Relationships",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Special Edicts",
+   "page": 229
+  },
+  {
+   "depth": 3,
+   "title": "Relationships with Multiple Kingdoms",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Expanding Settlement Modifiers",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Exploration Edicts",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Fame and Infamy",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "Forms of Government",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "Independence and Unification",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Declaring Independence",
+   "page": 231
+  },
+  {
+   "depth": 3,
+   "title": "Forming a Union",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Leadership Role Skills",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Settlement Sizes",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Trade Edicts",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Vassalage Edicts",
+   "page": 233
+  },
+  {
+   "depth": 1,
+   "title": "Mass Combat",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Overview",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Army Statistics",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Mass Combat Quick Reference",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Beyond the Kingdom",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Battle Phases",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Attacking and Taking Damage",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "More Than Two Armies",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Running Mass Combats",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Battlefield Conditions",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Army Tactics",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Strategy Track",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Rout",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Victory, Rout, or Defeat",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Recovery",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Commanders",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Boons",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Kingdom Leader Commanders",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Losing Commanders",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Recruiting Armies",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Army Resources",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Transferring Resources",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Special Abilities",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Player Characters in Battles",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Optional Mass Combat Rules",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Combining Armies",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Reforming an Army",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Reserve Army",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Splitting an Army",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Sample Armies",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Handout: Army Sheet",
+   "page": 251
+  },
+  {
+   "depth": 0,
+   "title": "Backmatter",
+   "page": 252
+  },
+  {
+   "depth": 1,
+   "title": "Index",
+   "page": 252
+  },
+  {
+   "depth": 1,
+   "title": "Open Game License",
+   "page": 254
+  },
+  {
+   "depth": 1,
+   "title": "Ads",
+   "page": 255
+  },
+  {
+   "depth": 1,
+   "title": "Rear Cover",
+   "page": 257
+  }
+ ]
+}

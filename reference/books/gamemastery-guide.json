@@ -1,0 +1,4592 @@
+{
+ "slug": "gamemastery-guide",
+ "abbr": "GMG",
+ "kind": "gm",
+ "title": "Pathfinder Roleplaying Game GameMastery Guide",
+ "source_file": "Pathfinder Roleplaying Game - GameMastery Guide.pdf",
+ "pdf_pages": 322,
+ "counts": {
+  "sections": 789,
+  "tables": 126,
+  "entries": 646
+ },
+ "tables": [
+  {
+   "number": "2-1",
+   "title": "Plots",
+   "page": 52
+  },
+  {
+   "number": "2-2",
+   "title": "Plot Twists",
+   "page": 53
+  },
+  {
+   "number": "2-3",
+   "title": "Macguffins and Quest Items",
+   "page": 53
+  },
+  {
+   "number": "2-4",
+   "title": "Cultural Titles",
+   "page": 54
+  },
+  {
+   "number": "4-1",
+   "title": "NPC Backgrounds",
+   "page": 94
+  },
+  {
+   "number": "4-2",
+   "title": "NPC Goals",
+   "page": 94
+  },
+  {
+   "number": "4-3",
+   "title": "NPC Physical Characteristics",
+   "page": 95
+  },
+  {
+   "number": "4-4",
+   "title": "NPC Personality Characteristics",
+   "page": 95
+  },
+  {
+   "number": "4-5",
+   "title": "NPC Occupations",
+   "page": 97
+  },
+  {
+   "number": "4-6",
+   "title": "NPC Secrets",
+   "page": 98
+  },
+  {
+   "number": "4-7",
+   "title": "NPC Rewards for Heroic Deeds",
+   "page": 98
+  },
+  {
+   "number": "4-8",
+   "title": "Random Adventuring Party Name Generator",
+   "page": 99
+  },
+  {
+   "number": "5-2",
+   "title": "Random Items",
+   "page": 118
+  },
+  {
+   "number": "5-3",
+   "title": "Random Armor",
+   "page": 118
+  },
+  {
+   "number": "5-4",
+   "title": "Random Armor and Shields",
+   "page": 118
+  },
+  {
+   "number": "5-5",
+   "title": "Random Shields",
+   "page": 118
+  },
+  {
+   "number": "5-6",
+   "title": "Armor Special Materials",
+   "page": 119
+  },
+  {
+   "number": "5-7",
+   "title": "Shield Special Materials",
+   "page": 119
+  },
+  {
+   "number": "5-8",
+   "title": "Magic Armor and Shields",
+   "page": 119
+  },
+  {
+   "number": "5-9",
+   "title": "Magic Armor Special Abilities",
+   "page": 120
+  },
+  {
+   "number": "5-10",
+   "title": "Magic Shield Special Abilities",
+   "page": 120
+  },
+  {
+   "number": "5-11",
+   "title": "Random Weapons",
+   "page": 121
+  },
+  {
+   "number": "5-12",
+   "title": "Simple Weapons",
+   "page": 121
+  },
+  {
+   "number": "5-13",
+   "title": "Martial Weapons",
+   "page": 121
+  },
+  {
+   "number": "5-14",
+   "title": "Exotic Weapons",
+   "page": 122
+  },
+  {
+   "number": "5-15",
+   "title": "Weapon Special Materials",
+   "page": 122
+  },
+  {
+   "number": "5-16",
+   "title": "Magic Weapons",
+   "page": 122
+  },
+  {
+   "number": "5-17",
+   "title": "Magic Melee WeaponSpecial Abilities",
+   "page": 123
+  },
+  {
+   "number": "5-18",
+   "title": "Magic Ranged WeaponSpecial Abilities",
+   "page": 123
+  },
+  {
+   "number": "5-19",
+   "title": "Random Potions and Oils",
+   "page": 124
+  },
+  {
+   "number": "5-20",
+   "title": "0-Level Potions and Oils",
+   "page": 124
+  },
+  {
+   "number": "5-21",
+   "title": "1st-Level Potion and Oils",
+   "page": 124
+  },
+  {
+   "number": "5-22",
+   "title": "2nd-Level Potion and Oils",
+   "page": 124
+  },
+  {
+   "number": "5-23",
+   "title": "3rd-Level Potion and Oils",
+   "page": 125
+  },
+  {
+   "number": "5-24",
+   "title": "Random Scrolls",
+   "page": 125
+  },
+  {
+   "number": "5-25",
+   "title": "Number of Spells on Scroll",
+   "page": 125
+  },
+  {
+   "number": "5-26",
+   "title": "Scroll Level",
+   "page": 125
+  },
+  {
+   "number": "5-27",
+   "title": "0-Level Arcane Spells",
+   "page": 125
+  },
+  {
+   "number": "5-28",
+   "title": "1st-Level Arcane Spells",
+   "page": 126
+  },
+  {
+   "number": "5-29",
+   "title": "2nd-Level Arcane Spells",
+   "page": 126
+  },
+  {
+   "number": "5-30",
+   "title": "3rd-Level Arcane Spells",
+   "page": 127
+  },
+  {
+   "number": "5-31",
+   "title": "4th-Level Arcane Spells",
+   "page": 127
+  },
+  {
+   "number": "5-32",
+   "title": "5th-Level Arcane Spells",
+   "page": 128
+  },
+  {
+   "number": "5-33",
+   "title": "6th-Level Arcane Spells",
+   "page": 128
+  },
+  {
+   "number": "5-34",
+   "title": "7th-Level Arcane Spells",
+   "page": 129
+  },
+  {
+   "number": "5-35",
+   "title": "8th-Level Arcane Spells",
+   "page": 129
+  },
+  {
+   "number": "5-36",
+   "title": "9th-Level Arcane Spells",
+   "page": 130
+  },
+  {
+   "number": "5-37",
+   "title": "0-Level Divine Spells",
+   "page": 130
+  },
+  {
+   "number": "5-38",
+   "title": "1st-Level Divine Spells",
+   "page": 130
+  },
+  {
+   "number": "5-39",
+   "title": "2nd-Level Divine Spells",
+   "page": 131
+  },
+  {
+   "number": "5-40",
+   "title": "3rd-Level Divine Spells",
+   "page": 131
+  },
+  {
+   "number": "5-41",
+   "title": "4th-Level Divine Spells",
+   "page": 132
+  },
+  {
+   "number": "5-42",
+   "title": "5th-Level Divine Spells",
+   "page": 132
+  },
+  {
+   "number": "5-43",
+   "title": "6th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "number": "5-44",
+   "title": "7th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "number": "5-45",
+   "title": "8th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "number": "5-46",
+   "title": "9th-Level Divine Spells",
+   "page": 134
+  },
+  {
+   "number": "5-46",
+   "title": "9th-Level Divine Spells",
+   "page": 134
+  },
+  {
+   "number": "5-48",
+   "title": "0-Level Wands",
+   "page": 134
+  },
+  {
+   "number": "5-49",
+   "title": "1st-Level Wands",
+   "page": 134
+  },
+  {
+   "number": "5-50",
+   "title": "2nd-Level Wands",
+   "page": 135
+  },
+  {
+   "number": "5-51",
+   "title": "3rd-Level Wands",
+   "page": 136
+  },
+  {
+   "number": "5-52",
+   "title": "4th-Level Wands",
+   "page": 136
+  },
+  {
+   "number": "7-1",
+   "title": "Places to Find Dungeons",
+   "page": 178
+  },
+  {
+   "number": "7-2",
+   "title": "Types of Dungeons",
+   "page": 178
+  },
+  {
+   "number": "7-3",
+   "title": "Dungeon Entrances",
+   "page": 179
+  },
+  {
+   "number": "7-4",
+   "title": "Dungeon Rooms",
+   "page": 179
+  },
+  {
+   "number": "7-5",
+   "title": "Mundane Room Characteristics",
+   "page": 180
+  },
+  {
+   "number": "7-6",
+   "title": "Exotic Room Characteristics",
+   "page": 180
+  },
+  {
+   "number": "7-7",
+   "title": "100 Pieces of Minor and Major Dungeon Dressing",
+   "page": 181
+  },
+  {
+   "number": "7-8",
+   "title": "Dragon’s Lair",
+   "page": 182
+  },
+  {
+   "number": "7-9",
+   "title": "Goblin Den",
+   "page": 182
+  },
+  {
+   "number": "7-10",
+   "title": "Graveyard/Necropolis",
+   "page": 182
+  },
+  {
+   "number": "7-11",
+   "title": "Lost Jungle City",
+   "page": 182
+  },
+  {
+   "number": "7-12",
+   "title": "Planar Stronghold",
+   "page": 183
+  },
+  {
+   "number": "7-13",
+   "title": "Underwater Ruin",
+   "page": 183
+  },
+  {
+   "number": "7-14",
+   "title": "Unholy Temple",
+   "page": 183
+  },
+  {
+   "number": "7-15",
+   "title": "Wizard’s Laboratory",
+   "page": 183
+  },
+  {
+   "number": "7-17",
+   "title": "Random Planar Destinations",
+   "page": 194
+  },
+  {
+   "number": "7-18",
+   "title": "Demiplanes",
+   "page": 194
+  },
+  {
+   "number": "7-19",
+   "title": "Portal Descriptions",
+   "page": 194
+  },
+  {
+   "number": "7-20",
+   "title": "Astral Plane",
+   "page": 195
+  },
+  {
+   "number": "7-21",
+   "title": "Ethereal Plane",
+   "page": 195
+  },
+  {
+   "number": "7-22",
+   "title": "Shadow Plane",
+   "page": 195
+  },
+  {
+   "number": "7-23",
+   "title": "Chaos-Aligned Plane",
+   "page": 195
+  },
+  {
+   "number": "7-24",
+   "title": "Evil-Aligned Plane",
+   "page": 196
+  },
+  {
+   "number": "7-25",
+   "title": "Good-Aligned Plane",
+   "page": 196
+  },
+  {
+   "number": "7-26",
+   "title": "Lawful-Aligned Plane",
+   "page": 196
+  },
+  {
+   "number": "7-27",
+   "title": "Neutral-Aligned Plane",
+   "page": 196
+  },
+  {
+   "number": "7-28",
+   "title": "Air-Dominant Plane",
+   "page": 197
+  },
+  {
+   "number": "7-29",
+   "title": "Earth-Dominant Plane",
+   "page": 197
+  },
+  {
+   "number": "7-30",
+   "title": "Fire-Dominant Plane",
+   "page": 197
+  },
+  {
+   "number": "7-31",
+   "title": "Water-Dominant Plane",
+   "page": 197
+  },
+  {
+   "number": "7-32",
+   "title": "Unique Tavern Traits",
+   "page": 200
+  },
+  {
+   "number": "7-33",
+   "title": "Random Tavern Name Generator",
+   "page": 200
+  },
+  {
+   "number": "7-34",
+   "title": "Menu Items",
+   "page": 201
+  },
+  {
+   "number": "7-35",
+   "title": "Amenities",
+   "page": 201
+  },
+  {
+   "number": "7-38",
+   "title": "Unique City Decorations",
+   "page": 210
+  },
+  {
+   "number": "7-39",
+   "title": "Shop Names",
+   "page": 210
+  },
+  {
+   "number": "7-40",
+   "title": "100 City Locations",
+   "page": 211
+  },
+  {
+   "number": "7-41",
+   "title": "Arena",
+   "page": 212
+  },
+  {
+   "number": "7-42",
+   "title": "Castle/Estate",
+   "page": 212
+  },
+  {
+   "number": "7-43",
+   "title": "Menagerie/Museum",
+   "page": 212
+  },
+  {
+   "number": "7-44",
+   "title": "Rooftop",
+   "page": 212
+  },
+  {
+   "number": "7-45",
+   "title": "Sewer",
+   "page": 213
+  },
+  {
+   "number": "7-46",
+   "title": "Slum",
+   "page": 213
+  },
+  {
+   "number": "7-47",
+   "title": "Tavern",
+   "page": 213
+  },
+  {
+   "number": "7-48",
+   "title": "Thieves’ Guild",
+   "page": 213
+  },
+  {
+   "number": "7-50",
+   "title": "Undiscovered Islands",
+   "page": 216
+  },
+  {
+   "number": "7-51",
+   "title": "Pieces of Interesting Flotsam",
+   "page": 216
+  },
+  {
+   "number": "7-52",
+   "title": "Ghost Ships and Shipwrecks",
+   "page": 217
+  },
+  {
+   "number": "7-53",
+   "title": "Sailors and Boatmen",
+   "page": 218
+  },
+  {
+   "number": "7-54",
+   "title": "Types of Boats and Ships",
+   "page": 219
+  },
+  {
+   "number": "7-55",
+   "title": "Captains and Ships",
+   "page": 219
+  },
+  {
+   "number": "7-56",
+   "title": "Things Found on the Roadside",
+   "page": 224
+  },
+  {
+   "number": "7-57",
+   "title": "Types of Weather",
+   "page": 224
+  },
+  {
+   "number": "7-58",
+   "title": "Scenic Spots",
+   "page": 225
+  },
+  {
+   "number": "7-59",
+   "title": "Terrain Types",
+   "page": 225
+  },
+  {
+   "number": "7-60",
+   "title": "Beach/Coast",
+   "page": 226
+  },
+  {
+   "number": "7-61",
+   "title": "Eldritch Forest",
+   "page": 226
+  },
+  {
+   "number": "7-62",
+   "title": "Oasis",
+   "page": 226
+  },
+  {
+   "number": "7-63",
+   "title": "Polar",
+   "page": 226
+  },
+  {
+   "number": "7-64",
+   "title": "Sky",
+   "page": 227
+  },
+  {
+   "number": "7-65",
+   "title": "Temperate Plains",
+   "page": 227
+  },
+  {
+   "number": "7-66",
+   "title": "Volcano",
+   "page": 227
+  },
+  {
+   "number": "7-67",
+   "title": "Wasteland",
+   "page": 227
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Title Page",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 1,
+   "title": "Defining the Game Master",
+   "page": 5
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Getting Started",
+   "page": 6
+  },
+  {
+   "depth": 1,
+   "title": "Duties of a GM",
+   "page": 8
+  },
+  {
+   "depth": 2,
+   "title": "A Game Master’s Glossary",
+   "page": 9
+  },
+  {
+   "depth": 1,
+   "title": "Tone and Maturity",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Style of Play",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Tone and Setting",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Group Styles",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Retaining Interest",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Sensitive Topics",
+   "page": 11
+  },
+  {
+   "depth": 1,
+   "title": "The GM as Host",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Number of Players",
+   "page": 12
+  },
+  {
+   "depth": 3,
+   "title": "Small Groups",
+   "page": 12
+  },
+  {
+   "depth": 3,
+   "title": "Large Groups",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Finding Players",
+   "page": 12
+  },
+  {
+   "depth": 2,
+   "title": "Where to Play",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "The Building",
+   "page": 13
+  },
+  {
+   "depth": 3,
+   "title": "The Room",
+   "page": 13
+  },
+  {
+   "depth": 2,
+   "title": "When to Play",
+   "page": 13
+  },
+  {
+   "depth": 1,
+   "title": "Rules of the House",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Player Absence",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Calling Off a Session",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Food at the Game Table",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Children and Pets",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Other Activities at the Game Table",
+   "page": 15
+  },
+  {
+   "depth": 3,
+   "title": "Out-of-Character Talking",
+   "page": 15
+  },
+  {
+   "depth": 2,
+   "title": "Interplayer Conflict",
+   "page": 15
+  },
+  {
+   "depth": 1,
+   "title": "Preparing to Run a Game",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Things to Have at the Table",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Seven Essentials for Good Preparation",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Know the Characters and Players",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Know the Scene",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Know the Story",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Know the Adversaries",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Know the Rules",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Don’t Overdo It",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Lay a Few Alternate Plans",
+   "page": 17
+  },
+  {
+   "depth": 2,
+   "title": "One-Shot Games",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Characters",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Getting Started",
+   "page": 18
+  },
+  {
+   "depth": 3,
+   "title": "Wrapping Up",
+   "page": 18
+  },
+  {
+   "depth": 2,
+   "title": "Campaigns",
+   "page": 18
+  },
+  {
+   "depth": 2,
+   "title": "Essentials of Good Campaigns",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Setting and Scope",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Story",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Movers and Shakers",
+   "page": 19
+  },
+  {
+   "depth": 3,
+   "title": "Campaign Endings",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Winging it",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Published or Homegrown?",
+   "page": 17
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Sharing the Load",
+   "page": 18
+  },
+  {
+   "depth": 1,
+   "title": "Creating a Campaign Guide",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "System",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Setting",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Story",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Voice",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Publication",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Print",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Electronic",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Copyrights",
+   "page": 21
+  },
+  {
+   "depth": 3,
+   "title": "Other Media",
+   "page": 21
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Running a Game",
+   "page": 22
+  },
+  {
+   "depth": 1,
+   "title": "How to Run a Game",
+   "page": 24
+  },
+  {
+   "depth": 2,
+   "title": "GMing Style Choices",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Pregame Preparation",
+   "page": 24
+  },
+  {
+   "depth": 3,
+   "title": "Running the Game",
+   "page": 25
+  },
+  {
+   "depth": 3,
+   "title": "Post Game",
+   "page": 26
+  },
+  {
+   "depth": 2,
+   "title": "Example of Play",
+   "page": 26
+  },
+  {
+   "depth": 1,
+   "title": "The Art of GMing",
+   "page": 27
+  },
+  {
+   "depth": 2,
+   "title": "Making It Happen",
+   "page": 28
+  },
+  {
+   "depth": 3,
+   "title": "Forcing Things",
+   "page": 28
+  },
+  {
+   "depth": 3,
+   "title": "Follow the PCs’ Lead",
+   "page": 28
+  },
+  {
+   "depth": 3,
+   "title": "The Illusion of Free Choice",
+   "page": 28
+  },
+  {
+   "depth": 2,
+   "title": "GM as Actor",
+   "page": 29
+  },
+  {
+   "depth": 3,
+   "title": "Volume and Style",
+   "page": 29
+  },
+  {
+   "depth": 3,
+   "title": "Giving Direction",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "Presentation",
+   "page": 30
+  },
+  {
+   "depth": 3,
+   "title": "Handouts and Props",
+   "page": 30
+  },
+  {
+   "depth": 3,
+   "title": "Music",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Lighting",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Attention and Distractions",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Narrative Techniques",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Description",
+   "page": 31
+  },
+  {
+   "depth": 3,
+   "title": "Spotlight",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Backstory",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Cliffhangers",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Cut Scenes",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Flashbacks",
+   "page": 32
+  },
+  {
+   "depth": 3,
+   "title": "Foreshadowing",
+   "page": 33
+  },
+  {
+   "depth": 3,
+   "title": "Secrets",
+   "page": 33
+  },
+  {
+   "depth": 2,
+   "title": "Cheating",
+   "page": 33
+  },
+  {
+   "depth": 1,
+   "title": "The Science of GMing",
+   "page": 34
+  },
+  {
+   "depth": 2,
+   "title": "Basics",
+   "page": 34
+  },
+  {
+   "depth": 3,
+   "title": "Dice Mechanics",
+   "page": 34
+  },
+  {
+   "depth": 3,
+   "title": "Game Accessories",
+   "page": 34
+  },
+  {
+   "depth": 2,
+   "title": "Creating Adventures",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Linear Adventure",
+   "page": 36
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Unrestricted Adventure",
+   "page": 37
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Nonlinear Adventure",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "Running Smooth Combats",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Building Encounters",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "Play to the PCs’ Strengths",
+   "page": 40
+  },
+  {
+   "depth": 3,
+   "title": "High- and Low-CR Encounters",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Solo Monsters vs. Groups of Monsters",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Winning Monster Combos",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Don’t Stymie the PCs",
+   "page": 42
+  },
+  {
+   "depth": 2,
+   "title": "Unusual Campaigns",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "No Healers",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "No Spellcasters",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "All Spellcasters",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Small Party",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Large Party",
+   "page": 43
+  },
+  {
+   "depth": 2,
+   "title": "Variant Play Experiences",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Solo Campaigns",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Convention Play",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Online Games",
+   "page": 45
+  },
+  {
+   "depth": 2,
+   "title": "Fixing a “Broken” Game",
+   "page": 45
+  },
+  {
+   "depth": 1,
+   "title": "GM Considerations",
+   "page": 46
+  },
+  {
+   "depth": 2,
+   "title": "Game Changers",
+   "page": 46
+  },
+  {
+   "depth": 2,
+   "title": "Emergency Game Prep",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "TPKs",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Overpowered PCs",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Personalizing Published Adventures",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Converting Content from 3.5 or Other Systems",
+   "page": 51
+  },
+  {
+   "depth": 1,
+   "title": "Tools for Game Masters",
+   "page": 52
+  },
+  {
+   "depth": 2,
+   "title": "Table 2–1: Plots",
+   "page": 52
+  },
+  {
+   "depth": 2,
+   "title": "Table 2–2: Plot Twists",
+   "page": 53
+  },
+  {
+   "depth": 2,
+   "title": "Table 2–3: Macguffins and Quest Items",
+   "page": 53
+  },
+  {
+   "depth": 2,
+   "title": "Table 2–4: Cultural Titles",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Words Every Game Master Should Know",
+   "page": 55
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Player Characters",
+   "page": 56
+  },
+  {
+   "depth": 1,
+   "title": "Starting Characters",
+   "page": 58
+  },
+  {
+   "depth": 2,
+   "title": "The Face of the Enemy",
+   "page": 58
+  },
+  {
+   "depth": 2,
+   "title": "Before the Game",
+   "page": 58
+  },
+  {
+   "depth": 3,
+   "title": "Group Composition",
+   "page": 58
+  },
+  {
+   "depth": 3,
+   "title": "Character Creation",
+   "page": 59
+  },
+  {
+   "depth": 2,
+   "title": "During the Game",
+   "page": 59
+  },
+  {
+   "depth": 3,
+   "title": "Fair Gameplay",
+   "page": 59
+  },
+  {
+   "depth": 3,
+   "title": "Player Knowledge",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Plot Development",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "After the Game",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Keeping Current",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Feedback",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Creativity Between Sessions",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Character Backgrounds",
+   "page": 59
+  },
+  {
+   "depth": 1,
+   "title": "New Players",
+   "page": 63
+  },
+  {
+   "depth": 1,
+   "title": "The Life of a Party",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Gathering A Group",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Shared Past",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Shared Goal",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "In Media Res",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Flash Forward",
+   "page": 65
+  },
+  {
+   "depth": 2,
+   "title": "Party Composition",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Splitting the Party",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Adjusting for Limitations",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Secondary Characters",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "Handling Treasure",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "Death of a Hero",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "When to Resurrect",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Back from the Grave",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Alignment",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Predestination",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Free Will",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Defining Deeds",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Changing Alignment",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "Evil Characters",
+   "page": 69
+  },
+  {
+   "depth": 1,
+   "title": "Player Interactions",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Antagonist",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Continuity Expert",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Diva",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Entrepreneur",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Flake",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Glass Jaw",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Loner",
+   "page": 74
+  },
+  {
+   "depth": 2,
+   "title": "Lump",
+   "page": 74
+  },
+  {
+   "depth": 2,
+   "title": "One-Trick Pony",
+   "page": 75
+  },
+  {
+   "depth": 2,
+   "title": "Multitask Master",
+   "page": 75
+  },
+  {
+   "depth": 2,
+   "title": "Power Gamer",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Rules Lawyer",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "Tagalong",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Thespian",
+   "page": 77
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Nonplayer Characters",
+   "page": 78
+  },
+  {
+   "depth": 1,
+   "title": "Cast of Characters",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "Designing NPCs",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "NPC Roles",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "NPC Basics",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Good to Read, Good to Play",
+   "page": 81
+  },
+  {
+   "depth": 1,
+   "title": "Making NPCs Unique",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Naming NPCs",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "Stereotypes",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Monstrous NPCs",
+   "page": 85
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Avoiding NPC Overwork",
+   "page": 85
+  },
+  {
+   "depth": 1,
+   "title": "Life of an NPC",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Building Connections",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Dead Ends",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Who’s in Control?",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Beyond Expectations",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "NPC Traps",
+   "page": 87
+  },
+  {
+   "depth": 1,
+   "title": "NPC Boons",
+   "page": 88
+  },
+  {
+   "depth": 2,
+   "title": "Adept",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Aristocrat",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Commoner",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Expert",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Warrior",
+   "page": 89
+  },
+  {
+   "depth": 1,
+   "title": "Villains",
+   "page": 89
+  },
+  {
+   "depth": 2,
+   "title": "Villainous Archetypes",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Crime Lord",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Evil Overlord",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Evil Priest",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Mad Wizard",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Scheming Noble",
+   "page": 92
+  },
+  {
+   "depth": 2,
+   "title": "Advanced Villainy",
+   "page": 92
+  },
+  {
+   "depth": 2,
+   "title": "Playing Villains",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Hands-On Management",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Secret Villains",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "The Disembodied Voice",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "A Bolt-Hole",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: The Villain’s Escape Kit",
+   "page": 93
+  },
+  {
+   "depth": 1,
+   "title": "NPC Creator’s Toolbox",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–1: NPC Backgrounds",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–2: NPC Goals",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–3: NPC Physical Characteristics",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–4: NPC Personality Characteristics",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–5: NPC Occupations",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–6: NPC Secrets",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–7: NPC Rewards for Heroic Deeds",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–8: Random Adventuring Party Name Generator",
+   "page": 99
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 5: Rewards",
+   "page": 100
+  },
+  {
+   "depth": 1,
+   "title": "The Role of Rewards",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Experience",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Backgrounded Experience",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Downtime Experience",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Immediate Experience",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Handwaved Experience",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Ad Hoc Experience",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "Treasure",
+   "page": 105
+  },
+  {
+   "depth": 2,
+   "title": "Magic Items",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "High or Low Magic?",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Reducing Magic with Rules Adjustments",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Reducing Magic with World Description",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Magic Shops",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Types of Magic Shops",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Trouble Items",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Story Items",
+   "page": 107
+  },
+  {
+   "depth": 1,
+   "title": "Starting Treasure",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Starting With Magic Items",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Heirloom Items",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Setting Items",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Plot Items",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Mighty Items",
+   "page": 109
+  },
+  {
+   "depth": 2,
+   "title": "Wealthy Characters",
+   "page": 109
+  },
+  {
+   "depth": 1,
+   "title": "What is a Reward?",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "Making Basic Treasure Interesting",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Does the item reinforce a PC’s characterization?",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Can the item reflect the adventure’s theme?",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Would the item foster an interesting debate or conflict within the party?",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Is there a detail that will become important later?",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Can an item of treasure be used to subtly introduce an NPC?",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Would an item lead the characters to interact nonviolently with an enemy who wouldn’t ordinarily talk to them?",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Burdensome Treasure",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Special Treasures",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Services, Franchises, & Property",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Intangible Benefits",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Story Benefits",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Treasures as Adventures",
+   "page": 113
+  },
+  {
+   "depth": 3,
+   "title": "Exit Rewards",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Non-Adventuring Magic Items",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Coins",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "PCs Controlling Rewards",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Research and Designing Spells",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Good Spells and Bad Spells",
+   "page": 114
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Spell",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Spell Components",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Components for New Spells",
+   "page": 115
+  },
+  {
+   "depth": 3,
+   "title": "Enhanced Components",
+   "page": 115
+  },
+  {
+   "depth": 2,
+   "title": "Wishes",
+   "page": 116
+  },
+  {
+   "depth": 2,
+   "title": "Making Magic Items",
+   "page": 116
+  },
+  {
+   "depth": 3,
+   "title": "Ad-Hoc Pricing",
+   "page": 117
+  },
+  {
+   "depth": 3,
+   "title": "Keeping the Balance",
+   "page": 117
+  },
+  {
+   "depth": 1,
+   "title": "Random Item Generators",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–2: Random Items",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–3: Random Armor",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–4: Random Armor and Shields",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–5: Random Shields",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–6: Armor Special Materials",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–7: Shield Special Materials",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–8: Magic Armor and Shields",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–9: Magic Armor Special Abilities",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–10: Magic Shield Special Abilities",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–11: Random Weapons",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–12: Simple Weapons",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–13: Martial Weapons",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–14: Exotic Weapons",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–15: Weapon Special Materials",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–16: Magic Weapons",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–17: Magic Melee WeaponSpecial Abilities",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–18: Magic Ranged WeaponSpecial Abilities",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–19: Random Potions and Oils",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–20: 0-Level Potions and Oils",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–21: 1st-Level Potion and Oils",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–22: 2nd-Level Potion and Oils",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–23: 3rd-Level Potion and Oils",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–24: Random Scrolls",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–25: Number of Spells on Scroll",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–26: Scroll Level",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–27: 0-Level Arcane Spells",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–28: 1st-Level Arcane Spells",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–29: 2nd-Level Arcane Spells",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–30: 3rd-Level Arcane Spells",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–31: 4th-Level Arcane Spells",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–32: 5th-Level Arcane Spells",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–33: 6th-Level Arcane Spells",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–34: 7th-Level Arcane Spells",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–35: 8th-Level Arcane Spells",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–36: 9th-Level Arcane Spells",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–37: 0-Level Divine Spells",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–38: 1st-Level Divine Spells",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–39: 2nd-Level Divine Spells",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–40: 3rd-Level Divine Spells",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–41: 4th-Level Divine Spells",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–42: 5th-Level Divine Spells",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–43: 6th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–44: 7th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–45: 8th-Level Divine Spells",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–46: 9th-Level Divine Spells",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–46: 9th-Level Divine Spells",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–48: 0-Level Wands",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–49: 1st-Level Wands",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–50: 2nd-Level Wands",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–51: 3rd-Level Wands",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Table 5–52: 4th-Level Wands",
+   "page": 136
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 6: Creating a World",
+   "page": 138
+  },
+  {
+   "depth": 1,
+   "title": "World Building",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Defining a Setting",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Tools of the Trade",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Building a City",
+   "page": 140
+  },
+  {
+   "depth": 1,
+   "title": "Detailing Your World",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "The Heroic Details",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "What’s my base of operations?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Do I look different from everybody else?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "How do I make a living?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Have I been doing this long?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "Are we at war or at peace?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "What am I doing with these other guys?",
+   "page": 142
+  },
+  {
+   "depth": 3,
+   "title": "How are lives affected by magic?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "How are lives affected by religion?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Who or what is going to try to kill me?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Where can I sell this loot?",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "The Mundane Details",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Who’s in charge?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Who has the biggest army?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Who has the most money and power?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "Who maintains law and order?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "How hard do poor people have it?",
+   "page": 143
+  },
+  {
+   "depth": 3,
+   "title": "How do people travel, and how easy is it?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What are the best-known landmarks?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "Why is everybody celebrating?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What do people do for a good time?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "How weird does it get around here?",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "The Scholarly Details",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "How did the world come to be?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What is the nature of the gods?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What is the source of magic?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What happens when you die?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What cycles or events define the calendar?",
+   "page": 144
+  },
+  {
+   "depth": 3,
+   "title": "What do you see when you look at the sky?",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "What constitutes cutting-edge technology?",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Where do monsters come from?",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Which is strongest: magic, gods, or nature?",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "If I drop this off the balcony, what happens?",
+   "page": 145
+  },
+  {
+   "depth": 1,
+   "title": "Geography",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Creating a World Map",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Starting Size",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Terrain Hierarchy",
+   "page": 146
+  },
+  {
+   "depth": 3,
+   "title": "Step 1: Coastlines",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Step 2: Elevations",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Step 3: Rivers",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Step 4: Vegetation",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Step 5: Tags",
+   "page": 147
+  },
+  {
+   "depth": 3,
+   "title": "Breaking the Rules",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Geologic Touchstones",
+   "page": 147
+  },
+  {
+   "depth": 1,
+   "title": "Cultural Considerations",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Core Elements of the People",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Government and Law",
+   "page": 148
+  },
+  {
+   "depth": 3,
+   "title": "Economics",
+   "page": 149
+  },
+  {
+   "depth": 1,
+   "title": "The Primitive Society",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Defining Primitive Culture",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Leadership and Control",
+   "page": 150
+  },
+  {
+   "depth": 3,
+   "title": "Religion, Taboos, Rituals, and Superstitions",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Questions about Your Primitive Society",
+   "page": 151
+  },
+  {
+   "depth": 1,
+   "title": "The Feudal Society",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Ruling a Feudal Society",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "The Feudal Hierarchy",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Religion’s Role",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Questions about your Feudal Society",
+   "page": 153
+  },
+  {
+   "depth": 1,
+   "title": "The Rural/Agrarian Society",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Life in an Agrarian Society",
+   "page": 154
+  },
+  {
+   "depth": 3,
+   "title": "The Religion of Farmers",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Social Structure and Economy",
+   "page": 155
+  },
+  {
+   "depth": 3,
+   "title": "Challenges",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Questions About Your Rural/Agrarian Society",
+   "page": 155
+  },
+  {
+   "depth": 1,
+   "title": "The Cosmopolitan Society",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "City Requirements",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Urban Planning",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Questions About Your City",
+   "page": 157
+  },
+  {
+   "depth": 1,
+   "title": "Other Societies",
+   "page": 158
+  },
+  {
+   "depth": 1,
+   "title": "Technology",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "Contentious Technology",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "Multiple Levels of Technology",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Magic and Technology",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Anachronisms",
+   "page": 161
+  },
+  {
+   "depth": 1,
+   "title": "Time",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "The Role of Time",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "The Role of Time",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Celebrating Time",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Crafting Time",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "The Age of the World",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Youthful Worlds",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Ancient Worlds",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Traps and Opportunities",
+   "page": 163
+  },
+  {
+   "depth": 1,
+   "title": "The Cosmos",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Creating Your Planet",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Other Worlds",
+   "page": 164
+  },
+  {
+   "depth": 2,
+   "title": "Space Travel",
+   "page": 165
+  },
+  {
+   "depth": 2,
+   "title": "Extraterrestrials",
+   "page": 165
+  },
+  {
+   "depth": 1,
+   "title": "The Planes",
+   "page": 165
+  },
+  {
+   "depth": 2,
+   "title": "The Purpose of Planes",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Planar Models",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Location and Travel",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Other Considerations",
+   "page": 167
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Sample Cosmological Shapes",
+   "page": 167
+  },
+  {
+   "depth": 1,
+   "title": "Parallel Worlds",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Creating a Parallel World",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Sample Parallel Worlds",
+   "page": 168
+  },
+  {
+   "depth": 3,
+   "title": "Going Home",
+   "page": 169
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 7: Adventures",
+   "page": 170
+  },
+  {
+   "depth": 1,
+   "title": "Elements of Adventure",
+   "page": 172
+  },
+  {
+   "depth": 2,
+   "title": "What Makes a great Adventure?",
+   "page": 172
+  },
+  {
+   "depth": 2,
+   "title": "Choosing Your Adventure",
+   "page": 172
+  },
+  {
+   "depth": 1,
+   "title": "Dungeons",
+   "page": 173
+  },
+  {
+   "depth": 2,
+   "title": "The Dungeon Concept",
+   "page": 174
+  },
+  {
+   "depth": 2,
+   "title": "Drawing a Dungeon Map",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Sketching the Map",
+   "page": 174
+  },
+  {
+   "depth": 3,
+   "title": "Inking the Map",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Tagging the Map",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Adding Details to the Map",
+   "page": 176
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Map Symbols",
+   "page": 175
+  },
+  {
+   "depth": 2,
+   "title": "Dungeon Ecology",
+   "page": 176
+  },
+  {
+   "depth": 2,
+   "title": "Encounter Archetypes",
+   "page": 176
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Resting in the Dungeon",
+   "page": 177
+  },
+  {
+   "depth": 2,
+   "title": "Dungeon Toolbox",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–1: Places to Find Dungeons",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–2: Types of Dungeons",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–3: Dungeon Entrances",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–4: Dungeon Rooms",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–5: Mundane Room Characteristics",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–6: Exotic Room Characteristics",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–7: 100 Pieces of Minor and Major Dungeon Dressing",
+   "page": 181
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–8: Dragon’s Lair",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–9: Goblin Den",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–10: Graveyard/Necropolis",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–11: Lost Jungle City",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–12: Planar Stronghold",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–13: Underwater Ruin",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–14: Unholy Temple",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–15: Wizard’s Laboratory",
+   "page": 183
+  },
+  {
+   "depth": 1,
+   "title": "Planar",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "What is a Plane?",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "Planar Traits",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Physical Traits",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Gravity",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Time",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Shape and Size",
+   "page": 185
+  },
+  {
+   "depth": 3,
+   "title": "Morphic Traits",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Elemental and Energy Traits",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Alignment Traits",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Magic Traits",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "The Great Beyond",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Material Plane",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Plane",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Negative Energy Plane",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Positive Energy Plane",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Plane of Air",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Plane of Earth",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Plane of Fire",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Plane of Water",
+   "page": 190
+  },
+  {
+   "depth": 3,
+   "title": "Ethereal Plane",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Astral Plane",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Abaddon (Neutral Evil)",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "The Abyss (Chaotic Evil)",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Elysium (Chaotic Good)",
+   "page": 191
+  },
+  {
+   "depth": 3,
+   "title": "Heaven (Lawful Good)",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Hell (Lawful Evil)",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Limbo (Chaotic Neutral)",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Nirvana (Neutral Good)",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Purgatory (Neutral)",
+   "page": 193
+  },
+  {
+   "depth": 3,
+   "title": "Utopia (Lawful Neutral)",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Planar Toolbox",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–17: Random Planar Destinations",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Table 7-18 Demiplanes",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–19: Portal Descriptions",
+   "page": 194
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–20: Astral Plane",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–21: Ethereal Plane",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–22: Shadow Plane",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–23: Chaos-Aligned Plane",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–24: Evil-Aligned Plane",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–25: Good-Aligned Plane",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–26: Lawful-Aligned Plane",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–27: Neutral-Aligned Plane",
+   "page": 196
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–28: Air-Dominant Plane",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–29: Earth-Dominant Plane",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–30: Fire-Dominant Plane",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–31: Water-Dominant Plane",
+   "page": 197
+  },
+  {
+   "depth": 1,
+   "title": "Taverns",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Services",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Setting and Quality",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Drinks",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Food",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Entertainment",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Bedding",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Other Amenities",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Staff and Patrons",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Staff",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Patrons",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Describing Personalities",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Tavern Toolbox",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–32: Unique Tavern Traits",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–33: Random Tavern Name Generator",
+   "page": 200
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–34: Menu Items",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–35: Amenities",
+   "page": 201
+  },
+  {
+   "depth": 1,
+   "title": "Urban",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "The Shape of Civilization",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Streets and Traffic",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Settlements in Play",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "The Settlement Stat Block",
+   "page": 204
+  },
+  {
+   "depth": 3,
+   "title": "Settlement Modifiers",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Settlement Alignment",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Settlement Government",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Settlement Qualities",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Settlement Disadvantages",
+   "page": 207
+  },
+  {
+   "depth": 3,
+   "title": "Sample Settlements",
+   "page": 208
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Settlement Population Ranges",
+   "page": 203
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Guards! Guards!",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Urban Toolbox",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–38: Unique City Decorations",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–39: Shop Names",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–40: 100 City Locations",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–41: Arena",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–42: Castle/Estate",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–43: Menagerie/Museum",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–44: Rooftop",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–45: Sewer",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–46: Slum",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–47: Tavern",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–48: Thieves’ Guild",
+   "page": 213
+  },
+  {
+   "depth": 1,
+   "title": "Water",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Aquatic Adventures",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Adapting to Aquatic Environments",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Nautical Adventures",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Fast-Play Ship Combat",
+   "page": 214
+  },
+  {
+   "depth": 3,
+   "title": "Sinking",
+   "page": 215
+  },
+  {
+   "depth": 3,
+   "title": "Ship Statistics",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Water Toolbox",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–50: Undiscovered Islands",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–51: Pieces of Interesting Flotsam",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–52: Ghost Ships and Shipwrecks",
+   "page": 217
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–53: Sailors and Boatmen",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–54: Types of Boats and Ships",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–55: Captains and Ships",
+   "page": 219
+  },
+  {
+   "depth": 1,
+   "title": "Wilderness",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Climate and Weather",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Climate",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Weather",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Environment",
+   "page": 221
+  },
+  {
+   "depth": 3,
+   "title": "Deserts",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Forests/Jungles",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Hills",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Marshes, Swamps, and Bogs",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Mountains",
+   "page": 222
+  },
+  {
+   "depth": 3,
+   "title": "Plains",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Underground",
+   "page": 223
+  },
+  {
+   "depth": 2,
+   "title": "Encounters on a Journey",
+   "page": 223
+  },
+  {
+   "depth": 2,
+   "title": "Wilderness Toolbox",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–56: Things Found on the Roadside",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–57: Types of Weather",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–58: Scenic Spots",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–59: Terrain Types",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–60: Beach/Coast",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–61: Eldritch Forest",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–62: Oasis",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–63: Polar",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–64: Sky",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–65: Temperate Plains",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–66: Volcano",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–67: Wasteland",
+   "page": 227
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 8: Advanced Topics",
+   "page": 228
+  },
+  {
+   "depth": 1,
+   "title": "Customizing Your Game",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "When to Design?",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "When to Disguise?",
+   "page": 231
+  },
+  {
+   "depth": 1,
+   "title": "Chases",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Building a Chase",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Chase Obstacles",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Running a Chase",
+   "page": 232
+  },
+  {
+   "depth": 1,
+   "title": "Disasters",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Volcanoes",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Lava",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Lava Bombs (CR 2 or 8)",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Poisonous Gas (CR 5)",
+   "page": 234
+  },
+  {
+   "depth": 3,
+   "title": "Pyroclastic Flows (CR 10)",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Tsunamis",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Undead Uprising",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "The Unquiet Dead",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Skeletal Awakening",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Lost Souls",
+   "page": 235
+  },
+  {
+   "depth": 3,
+   "title": "Necropolis",
+   "page": 235
+  },
+  {
+   "depth": 1,
+   "title": "Drugs and Addiction",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Drugs",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Addiction",
+   "page": 236
+  },
+  {
+   "depth": 3,
+   "title": "Curing Addiction",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Sample Drugs",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Drunkenness",
+   "page": 237
+  },
+  {
+   "depth": 1,
+   "title": "Fortune-telling",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Basic Fortune-Telling Methods",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Fortune-Telling Props",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Fortune-Telling as Theater",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Mundane and Magical Fortune-Telling",
+   "page": 239
+  },
+  {
+   "depth": 1,
+   "title": "Gambling and Games of Chance",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Creating the Right Atmosphere",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Types of Gambling Games",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Gambling and Skill Checks",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "Games of Chance",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Designing a Gambling Game",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Sample game: Twentybone",
+   "page": 241
+  },
+  {
+   "depth": 1,
+   "title": "Haunts",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Haunt Rules",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Elements of a Haunt",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "Creating a Haunt",
+   "page": 243
+  },
+  {
+   "depth": 1,
+   "title": "Hazards",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Sample Hazards",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Accursed Pool (CR 3)",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Bad Air (CR 1 or 4)",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Dweomersink (CR 6)",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Ear Seekers (CR 5)",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Magnetized Ore (CR 2)",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Mnemonic Crystals (CR 3)",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Poison Oak (CR 1 or 3)",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Rot Grubs (CR 4)",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Infestations",
+   "page": 245
+  },
+  {
+   "depth": 1,
+   "title": "Mysteries and Investigations",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "The Fantasy Mystery",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Running a Mystery",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Magical Investigations",
+   "page": 247
+  },
+  {
+   "depth": 1,
+   "title": "Puzzles and Riddles",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "The Setup",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "The Mechanism",
+   "page": 248
+  },
+  {
+   "depth": 2,
+   "title": "The Clues",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "The Answer",
+   "page": 249
+  },
+  {
+   "depth": 2,
+   "title": "Sample Puzzles",
+   "page": 249
+  },
+  {
+   "depth": 1,
+   "title": "Sanity and Madness",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Going Insane",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Curing Insanity",
+   "page": 250
+  },
+  {
+   "depth": 2,
+   "title": "Types of Insanity",
+   "page": 250
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 8: NPC Gallery",
+   "page": 252
+  },
+  {
+   "depth": 1,
+   "title": "NPC Gallery",
+   "page": 254
+  },
+  {
+   "depth": 2,
+   "title": "An NPC by Any Other Name",
+   "page": 254
+  },
+  {
+   "depth": 2,
+   "title": "NPC Boons",
+   "page": 255
+  },
+  {
+   "depth": 1,
+   "title": "Adventurers",
+   "page": 256
+  },
+  {
+   "depth": 2,
+   "title": "Battle Mage \bCR 5",
+   "page": 256
+  },
+  {
+   "depth": 2,
+   "title": "Monster Hunter \bCR 5",
+   "page": 257
+  },
+  {
+   "depth": 2,
+   "title": "Tomb Raider \bCR 5",
+   "page": 257
+  },
+  {
+   "depth": 1,
+   "title": "Brigands",
+   "page": 258
+  },
+  {
+   "depth": 2,
+   "title": "Bandit \bCR 1/2",
+   "page": 258
+  },
+  {
+   "depth": 2,
+   "title": "Highwayman \bCR 6",
+   "page": 259
+  },
+  {
+   "depth": 2,
+   "title": "Bandit Lord \bCR 11",
+   "page": 259
+  },
+  {
+   "depth": 1,
+   "title": "City Watch",
+   "page": 260
+  },
+  {
+   "depth": 2,
+   "title": "Guard \bCR 1",
+   "page": 260
+  },
+  {
+   "depth": 2,
+   "title": "Guard Officer \bCR 3",
+   "page": 261
+  },
+  {
+   "depth": 2,
+   "title": "Watch Captain CR 6",
+   "page": 261
+  },
+  {
+   "depth": 1,
+   "title": "Coliseum",
+   "page": 262
+  },
+  {
+   "depth": 2,
+   "title": "Gladiator \bCR 5",
+   "page": 262
+  },
+  {
+   "depth": 2,
+   "title": "Beast Master \bCR 6",
+   "page": 263
+  },
+  {
+   "depth": 2,
+   "title": "Champion \bCR 9",
+   "page": 263
+  },
+  {
+   "depth": 1,
+   "title": "Criminals I",
+   "page": 264
+  },
+  {
+   "depth": 2,
+   "title": "Pickpocket \bCR 1/2",
+   "page": 264
+  },
+  {
+   "depth": 2,
+   "title": "Street Thug \bCR 1",
+   "page": 265
+  },
+  {
+   "depth": 2,
+   "title": "Burglar \bCR 2",
+   "page": 265
+  },
+  {
+   "depth": 1,
+   "title": "Criminals II",
+   "page": 266
+  },
+  {
+   "depth": 2,
+   "title": "Slaver \bCR 3",
+   "page": 266
+  },
+  {
+   "depth": 2,
+   "title": "Slayer \bCR 8",
+   "page": 267
+  },
+  {
+   "depth": 2,
+   "title": "Guild Master CR 10",
+   "page": 267
+  },
+  {
+   "depth": 1,
+   "title": "Crusaders",
+   "page": 268
+  },
+  {
+   "depth": 2,
+   "title": "Squire CR 1/3",
+   "page": 268
+  },
+  {
+   "depth": 2,
+   "title": "Holy Warrior CR 6",
+   "page": 269
+  },
+  {
+   "depth": 2,
+   "title": "Saint CR 11",
+   "page": 269
+  },
+  {
+   "depth": 1,
+   "title": "Dungeon",
+   "page": 270
+  },
+  {
+   "depth": 2,
+   "title": "Prisoner \bCR 2",
+   "page": 270
+  },
+  {
+   "depth": 2,
+   "title": "Turnkey \bCR 3",
+   "page": 271
+  },
+  {
+   "depth": 2,
+   "title": "Torturer \bCR 5",
+   "page": 271
+  },
+  {
+   "depth": 1,
+   "title": "Entertainers",
+   "page": 272
+  },
+  {
+   "depth": 2,
+   "title": "Storyteller \bCR 1",
+   "page": 272
+  },
+  {
+   "depth": 2,
+   "title": "Minstrel \bCR 5",
+   "page": 273
+  },
+  {
+   "depth": 2,
+   "title": "Celebrity Bard \bCR 10",
+   "page": 273
+  },
+  {
+   "depth": 1,
+   "title": "Fighting School",
+   "page": 274
+  },
+  {
+   "depth": 2,
+   "title": "Initiate \bCR 1",
+   "page": 274
+  },
+  {
+   "depth": 2,
+   "title": "Battle Monk \bCR 4",
+   "page": 275
+  },
+  {
+   "depth": 2,
+   "title": "Master \bCR 14",
+   "page": 275
+  },
+  {
+   "depth": 1,
+   "title": "Frontier",
+   "page": 276
+  },
+  {
+   "depth": 2,
+   "title": "Trapper \bCR 3",
+   "page": 276
+  },
+  {
+   "depth": 2,
+   "title": "Hermit \bCR 6",
+   "page": 277
+  },
+  {
+   "depth": 2,
+   "title": "Guide \bCR 7",
+   "page": 277
+  },
+  {
+   "depth": 1,
+   "title": "Heretics",
+   "page": 278
+  },
+  {
+   "depth": 2,
+   "title": "Cultist \bCR 2",
+   "page": 278
+  },
+  {
+   "depth": 2,
+   "title": "Conjurist \bCR 6",
+   "page": 279
+  },
+  {
+   "depth": 2,
+   "title": "Cult Leader \bCR 11",
+   "page": 279
+  },
+  {
+   "depth": 1,
+   "title": "Marauders",
+   "page": 280
+  },
+  {
+   "depth": 2,
+   "title": "Raider \bCR 5",
+   "page": 280
+  },
+  {
+   "depth": 2,
+   "title": "Viking \bCR 7",
+   "page": 281
+  },
+  {
+   "depth": 2,
+   "title": "Pirate Captain \bCR 11",
+   "page": 281
+  },
+  {
+   "depth": 1,
+   "title": "Mercenaries",
+   "page": 282
+  },
+  {
+   "depth": 2,
+   "title": "Caravan Guard \bCR 1",
+   "page": 282
+  },
+  {
+   "depth": 2,
+   "title": "Sellsword \bCR 7",
+   "page": 283
+  },
+  {
+   "depth": 2,
+   "title": "Bounty Hunter CR 11",
+   "page": 283
+  },
+  {
+   "depth": 1,
+   "title": "Merchants",
+   "page": 284
+  },
+  {
+   "depth": 2,
+   "title": "Shopkeep \bCR 1",
+   "page": 284
+  },
+  {
+   "depth": 2,
+   "title": "Traveling Merchant \bCR 5",
+   "page": 285
+  },
+  {
+   "depth": 2,
+   "title": "Merchant Prince \bCR 9",
+   "page": 285
+  },
+  {
+   "depth": 1,
+   "title": "Military",
+   "page": 286
+  },
+  {
+   "depth": 2,
+   "title": "Foot Soldier \bCR 1/3",
+   "page": 286
+  },
+  {
+   "depth": 2,
+   "title": "Cavalry \bCR 5",
+   "page": 287
+  },
+  {
+   "depth": 2,
+   "title": "General \bCR 10",
+   "page": 287
+  },
+  {
+   "depth": 1,
+   "title": "Nobles",
+   "page": 288
+  },
+  {
+   "depth": 2,
+   "title": "Noble Scion \bCR 2",
+   "page": 288
+  },
+  {
+   "depth": 2,
+   "title": "Knight \bCR 7",
+   "page": 289
+  },
+  {
+   "depth": 2,
+   "title": "Noble \bCR 8",
+   "page": 289
+  },
+  {
+   "depth": 1,
+   "title": "Road",
+   "page": 290
+  },
+  {
+   "depth": 2,
+   "title": "Wanderer \bCR 2",
+   "page": 290
+  },
+  {
+   "depth": 2,
+   "title": "Vagabond \bCR 1",
+   "page": 291
+  },
+  {
+   "depth": 2,
+   "title": "Pilgrim \bCR 3",
+   "page": 291
+  },
+  {
+   "depth": 1,
+   "title": "Royalty",
+   "page": 292
+  },
+  {
+   "depth": 2,
+   "title": "Princess \bCR 6",
+   "page": 292
+  },
+  {
+   "depth": 2,
+   "title": "Queen \bCR 10",
+   "page": 293
+  },
+  {
+   "depth": 2,
+   "title": "King \bCR 14",
+   "page": 293
+  },
+  {
+   "depth": 1,
+   "title": "Sailors",
+   "page": 294
+  },
+  {
+   "depth": 2,
+   "title": "Shipmate \bCR 1/2",
+   "page": 294
+  },
+  {
+   "depth": 2,
+   "title": "First Mate \bCR 8",
+   "page": 295
+  },
+  {
+   "depth": 2,
+   "title": "Captain \bCR 11",
+   "page": 295
+  },
+  {
+   "depth": 1,
+   "title": "Scholars",
+   "page": 296
+  },
+  {
+   "depth": 2,
+   "title": "Hedge Wizard \bCR 4",
+   "page": 296
+  },
+  {
+   "depth": 2,
+   "title": "Archaeologist \bCR 6",
+   "page": 297
+  },
+  {
+   "depth": 2,
+   "title": "Sage \bCR 11",
+   "page": 297
+  },
+  {
+   "depth": 1,
+   "title": "Seers",
+   "page": 298
+  },
+  {
+   "depth": 2,
+   "title": "Doomsayer \bCR 1",
+   "page": 298
+  },
+  {
+   "depth": 2,
+   "title": "Medium \bCR 4",
+   "page": 299
+  },
+  {
+   "depth": 2,
+   "title": "Fortune Teller \bCR 5",
+   "page": 299
+  },
+  {
+   "depth": 1,
+   "title": "Street",
+   "page": 300
+  },
+  {
+   "depth": 2,
+   "title": "Beggar \bCR 1",
+   "page": 300
+  },
+  {
+   "depth": 2,
+   "title": "Prostitute \bCR 1",
+   "page": 301
+  },
+  {
+   "depth": 2,
+   "title": "Dealer \bCR 3",
+   "page": 301
+  },
+  {
+   "depth": 1,
+   "title": "Tavern",
+   "page": 302
+  },
+  {
+   "depth": 2,
+   "title": "Barmaid \bCR 1/2",
+   "page": 302
+  },
+  {
+   "depth": 2,
+   "title": "Drunkard \bCR 1",
+   "page": 303
+  },
+  {
+   "depth": 2,
+   "title": "Barkeep \bCR 3",
+   "page": 303
+  },
+  {
+   "depth": 1,
+   "title": "Temple",
+   "page": 304
+  },
+  {
+   "depth": 2,
+   "title": "Acolyte \bCR 1/2",
+   "page": 304
+  },
+  {
+   "depth": 2,
+   "title": "Priest \bCR 8",
+   "page": 305
+  },
+  {
+   "depth": 2,
+   "title": "High Priest \bCR 12",
+   "page": 305
+  },
+  {
+   "depth": 1,
+   "title": "Tribe",
+   "page": 306
+  },
+  {
+   "depth": 2,
+   "title": "Cannibal CR 1",
+   "page": 306
+  },
+  {
+   "depth": 2,
+   "title": "Shaman \bCR 5",
+   "page": 307
+  },
+  {
+   "depth": 2,
+   "title": "Chieftain \bCR 10",
+   "page": 307
+  },
+  {
+   "depth": 1,
+   "title": "Villagers",
+   "page": 308
+  },
+  {
+   "depth": 2,
+   "title": "Village Idiot \bCR 1/3",
+   "page": 308
+  },
+  {
+   "depth": 2,
+   "title": "Farmer \bCR 1/2",
+   "page": 309
+  },
+  {
+   "depth": 2,
+   "title": "Mayor \bCR 8",
+   "page": 309
+  },
+  {
+   "depth": 0,
+   "title": "Appendix",
+   "page": 310
+  },
+  {
+   "depth": 1,
+   "title": "Recommended Literature",
+   "page": 310
+  },
+  {
+   "depth": 1,
+   "title": "Recommended Films",
+   "page": 311
+  },
+  {
+   "depth": 1,
+   "title": "Roleplaying Shorthand",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Character Elements",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Combat Basics",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Basic Rules Cheat Sheet",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Actions During Combat",
+   "page": 315
+  },
+  {
+   "depth": 1,
+   "title": "Advanced Combat Actions",
+   "page": 315
+  },
+  {
+   "depth": 0,
+   "title": "Index",
+   "page": 316
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 321
+  }
+ ]
+}

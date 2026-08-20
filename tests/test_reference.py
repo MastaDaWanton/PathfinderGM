@@ -133,25 +133,105 @@ def test_the_conditions_the_engine_does_not_implement_yet_are_named(conditions):
 
 # --- The index ------------------------------------------------------------------------
 
-def test_the_index_covers_both_books(index):
-    books = index["books"]
-    assert set(books) == {"crb", "gmg"}
-    assert len(books["crb"]["sections"]) > 1000
-    assert len(books["gmg"]["sections"]) > 500
+def _book(slug):
+    p = REF / "books" / f"{slug}.json"
+    if not p.exists():
+        pytest.skip(f"{slug} not built")
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
-def test_numbered_tables_are_indexed_with_their_pages(index):
-    """125 numbered tables in the Core Rulebook, each with a page. This is what makes
+def test_the_index_covers_the_library(index):
+    """Every PDF in the library should be recognised. A book that is present but not in
+    `reference/books.py` is silently absent from every lookup, which is the kind of gap
+    you only notice when a rule cannot be found."""
+    slugs = {b["slug"] for b in index["books"]}
+    for expected in ("core-rulebook", "gamemastery-guide", "bestiary-1",
+                     "advanced-players-guide", "ultimate-equipment"):
+        assert expected in slugs
+    assert not index["unrecognised_files"], (
+        f"unrecognised PDFs: {index['unrecognised_files']} — add them to "
+        f"reference/books.py"
+    )
+
+
+def test_numbered_tables_are_indexed_with_their_pages():
+    """124 numbered tables in the Core Rulebook, each with a page. This is what makes
     the reference a substitute for opening the PDF: the app can look up "Table 12-1" and
     know where it is."""
-    tables = {t["number"]: t for t in index["books"]["crb"]["tables"]}
+    crb = _book("core-rulebook")
+    tables = {t["number"]: t for t in crb["tables"]}
     assert len(tables) > 100
     assert "12-1" in tables and "Encounter Design" in tables["12-1"]["title"]
     assert all(isinstance(t["page"], int) for t in tables.values())
 
 
-def test_the_combat_chapter_is_findable(index):
+def test_the_combat_chapter_is_findable():
     """The manoeuvre rules live at CRB p.198-201; the index has to lead there."""
-    titles = {s["title"].lower(): s["page"] for s in index["books"]["crb"]["sections"]}
+    crb = _book("core-rulebook")
+    titles = {s["title"].lower(): s["page"] for s in crb["sections"]}
     assert "combat maneuvers" in titles
     assert 195 <= titles["combat maneuvers"] <= 205
+
+
+# --- Creatures --------------------------------------------------------------------
+
+def test_every_extracted_creature_has_a_usable_rating():
+    """Encounter building for a single PC is an open architecture question, and it
+    cannot be attempted without knowing what a creature is worth.
+
+    Coverage is deliberately not asserted as a total: it varies by book because it
+    depends on how each one's text layer sets its stat-block headers. What *is* asserted
+    is that nothing lands in the list without a rating, because a creature with a hole
+    where its CR should be is worse than one that is simply absent.
+    """
+    b1 = _book("bestiary-1")
+    creatures = b1["creatures"]
+    assert len(creatures) > 200
+    assert all(c["cr"] for c in creatures), "every listed creature must have a CR"
+    assert all(isinstance(c["page"], int) for c in creatures)
+    assert len({(c["name"], c["page"]) for c in creatures}) == len(creatures)
+
+
+@pytest.mark.parametrize("name,cr", [
+    ("Aboleth", "7"), ("Basilisk", "5"), ("Behir", "8"), ("Bugbear", "2"),
+    ("Choker", "2"), ("Chuul", "7"), ("Ghoul", "1"), ("Goblin", "1/3"),
+    ("Minotaur", "4"), ("Ogre", "3"), ("Orc", "1/3"), ("Owlbear", "4"),
+    ("Troll", "5"), ("Wraith", "5"), ("Zombie", "1/2"),
+])
+def test_challenge_ratings_match_the_book(name, cr):
+    """Hand-checked against Bestiary 1. A wrong CR is worse than a missing one, because
+    the encounter builder acts on it without knowing to doubt it.
+
+    Two earlier versions produced wrong ones: taking the first CR on the page gave every
+    creature sharing a page the first one's rating, and falling back to the head of a
+    comma-separated name gave "Barghest, Greater" the plain barghest's CR 4.
+    """
+    found = {c["name"].lower(): c["cr"] for c in _book("bestiary-1")["creatures"]}
+    assert found.get(name.lower()) == cr
+
+
+def test_names_are_recovered_from_the_display_face():
+    """Stat-block headers are set in a face whose text layer comes out as "AChAIERAI"
+    and "AkhAnA". The names have to be readable or nothing can look them up."""
+    import re
+
+    for slug in ("bestiary-1", "bestiary-2"):
+        for c in _book(slug)["creatures"]:
+            assert not re.search(r"[a-z][A-Z]{2}", c["name"]), (
+                f"{slug}: {c['name']!r} still has display-face casing"
+            )
+
+
+# --- The cross-book lookup --------------------------------------------------------------
+
+def test_lookup_finds_a_creature_in_the_right_book():
+    path = REF / "lookup.json"
+    if not path.exists():
+        pytest.skip("lookup not built")
+    lookup = json.loads(path.read_text(encoding="utf-8"))
+    assert len(lookup) > 5000
+
+    hits = lookup.get("goblin", [])
+    assert hits, "goblin should be findable"
+    assert any(h["book"].startswith("B") for h in hits)
+    assert all({"book", "slug", "page", "name"} <= set(h) for h in hits)

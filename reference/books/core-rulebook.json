@@ -1,0 +1,8682 @@
+{
+ "slug": "core-rulebook",
+ "abbr": "CRB",
+ "kind": "core",
+ "title": "Pathfinder Roleplaying Game Core Rulebook",
+ "source_file": "Pathfinder_Core_Rulebook.pdf",
+ "pdf_pages": 578,
+ "counts": {
+  "sections": 1609,
+  "tables": 124,
+  "entries": 1460
+ },
+ "tables": [
+  {
+   "number": "1-1",
+   "title": "Ability Score Costs",
+   "page": 16
+  },
+  {
+   "number": "1-2",
+   "title": "Ability Score Points",
+   "page": 16
+  },
+  {
+   "number": "1-3",
+   "title": "Ability Modifiers and Bonus Spells",
+   "page": 17
+  },
+  {
+   "number": "3-1",
+   "title": "Character Advancement and Level-Dependent Bonuses",
+   "page": 30
+  },
+  {
+   "number": "3-2",
+   "title": "Barbarian",
+   "page": 32
+  },
+  {
+   "number": "3-3",
+   "title": "Bard",
+   "page": 36
+  },
+  {
+   "number": "3-4",
+   "title": "Bard Spells Known",
+   "page": 37
+  },
+  {
+   "number": "3-5",
+   "title": "Cleric",
+   "page": 40
+  },
+  {
+   "number": "3-6",
+   "title": "Deities of the Pathfinder Chronicles",
+   "page": 43
+  },
+  {
+   "number": "3-7",
+   "title": "Druid",
+   "page": 50
+  },
+  {
+   "number": "3-8",
+   "title": "Animal Companion Base Statistics",
+   "page": 52
+  },
+  {
+   "number": "3-9",
+   "title": "Fighter",
+   "page": 56
+  },
+  {
+   "number": "3-10",
+   "title": "Monk",
+   "page": 58
+  },
+  {
+   "number": "3-11",
+   "title": "Paladin",
+   "page": 62
+  },
+  {
+   "number": "3-12",
+   "title": "Ranger",
+   "page": 66
+  },
+  {
+   "number": "3-13",
+   "title": "Rogue",
+   "page": 69
+  },
+  {
+   "number": "3-14",
+   "title": "Sorcerer",
+   "page": 72
+  },
+  {
+   "number": "3-15",
+   "title": "Sorcerer Spells Known",
+   "page": 73
+  },
+  {
+   "number": "3-16",
+   "title": "Wizard",
+   "page": 80
+  },
+  {
+   "number": "4-1",
+   "title": "Skill Ranks",
+   "page": 87
+  },
+  {
+   "number": "4-2",
+   "title": "Skill Check Bonuses",
+   "page": 87
+  },
+  {
+   "number": "4-3",
+   "title": "Skill Summary",
+   "page": 89
+  },
+  {
+   "number": "4-4",
+   "title": "Craft Skills",
+   "page": 93
+  },
+  {
+   "number": "4-5",
+   "title": "Wind Effects on Flight",
+   "page": 97
+  },
+  {
+   "number": "4-6",
+   "title": "Knowledge Skill DCs",
+   "page": 101
+  },
+  {
+   "number": "4-7",
+   "title": "Spellcraft DCs",
+   "page": 106
+  },
+  {
+   "number": "5-1",
+   "title": "Feats",
+   "page": 114
+  },
+  {
+   "number": "5-2",
+   "title": "Leadership",
+   "page": 129
+  },
+  {
+   "number": "6-1",
+   "title": "Starting Character Wealth",
+   "page": 140
+  },
+  {
+   "number": "6-2",
+   "title": "Coins",
+   "page": 140
+  },
+  {
+   "number": "6-3",
+   "title": "Trade Goods",
+   "page": 140
+  },
+  {
+   "number": "6-4",
+   "title": "Weapons",
+   "page": 142
+  },
+  {
+   "number": "6-5",
+   "title": "Tiny and Large Weapon Damage",
+   "page": 145
+  },
+  {
+   "number": "6-6",
+   "title": "Armor and Shields",
+   "page": 151
+  },
+  {
+   "number": "6-8",
+   "title": "Armor for Unusual Creatures",
+   "page": 153
+  },
+  {
+   "number": "6-7",
+   "title": "Donning Armor",
+   "page": 153
+  },
+  {
+   "number": "6-9",
+   "title": "Goods and Services",
+   "page": 158
+  },
+  {
+   "number": "7-2",
+   "title": "Aging Effects",
+   "page": 169
+  },
+  {
+   "number": "7-4",
+   "title": "Carrying Capacity",
+   "page": 171
+  },
+  {
+   "number": "7-5",
+   "title": "Encumbrance Effects",
+   "page": 171
+  },
+  {
+   "number": "7-6",
+   "title": "Movement and Distance",
+   "page": 172
+  },
+  {
+   "number": "7-8",
+   "title": "Terrain and Overland Movement",
+   "page": 172
+  },
+  {
+   "number": "7-9",
+   "title": "Mounts and Vehicles",
+   "page": 174
+  },
+  {
+   "number": "7-10",
+   "title": "Light Sources and Illumination",
+   "page": 174
+  },
+  {
+   "number": "7-11",
+   "title": "Size and Armor Class of Objects",
+   "page": 174
+  },
+  {
+   "number": "7-12",
+   "title": "Common Armor, Weapon, andShield Hardness and Hit Points",
+   "page": 175
+  },
+  {
+   "number": "7-13",
+   "title": "Substance Hardnessand Hit Points",
+   "page": 175
+  },
+  {
+   "number": "7-14",
+   "title": "Object Hardness and Hit Points",
+   "page": 175
+  },
+  {
+   "number": "7-15",
+   "title": "DCs to Break or Burst Items",
+   "page": 175
+  },
+  {
+   "number": "8-1",
+   "title": "Size Modifiers",
+   "page": 179
+  },
+  {
+   "number": "8-2",
+   "title": "Actions in Combat",
+   "page": 183
+  },
+  {
+   "number": "8-3",
+   "title": "Tactical Speed",
+   "page": 193
+  },
+  {
+   "number": "8-4",
+   "title": "Creature Size and Scale",
+   "page": 195
+  },
+  {
+   "number": "8-5",
+   "title": "Attack Roll Modifiers",
+   "page": 195
+  },
+  {
+   "number": "8-6",
+   "title": "Armor Class Modifiers",
+   "page": 195
+  },
+  {
+   "number": "8-7",
+   "title": "Two-Weapon Fighting Penalties",
+   "page": 202
+  },
+  {
+   "number": "9-1",
+   "title": "Concentration Check DCs",
+   "page": 207
+  },
+  {
+   "number": "9-2",
+   "title": "Items Affected by Magical Attacks",
+   "page": 216
+  },
+  {
+   "number": "11-1",
+   "title": "Arcane Archer",
+   "page": 375
+  },
+  {
+   "number": "11-2",
+   "title": "Arcane Trickster",
+   "page": 377
+  },
+  {
+   "number": "11-3",
+   "title": "Assassin",
+   "page": 379
+  },
+  {
+   "number": "11-4",
+   "title": "Dragon Disciple",
+   "page": 380
+  },
+  {
+   "number": "11-5",
+   "title": "Duelist",
+   "page": 383
+  },
+  {
+   "number": "11-6",
+   "title": "Eldritch Knight",
+   "page": 384
+  },
+  {
+   "number": "11-7",
+   "title": "Loremaster",
+   "page": 387
+  },
+  {
+   "number": "11-8",
+   "title": "Mystic Theurge",
+   "page": 389
+  },
+  {
+   "number": "11-9",
+   "title": "Pathfinder Chronicler",
+   "page": 391
+  },
+  {
+   "number": "11-10",
+   "title": "Shadowdancer",
+   "page": 392
+  },
+  {
+   "number": "12-1",
+   "title": "Encounter Design",
+   "page": 397
+  },
+  {
+   "number": "12-3",
+   "title": "CR Equivalencies",
+   "page": 398
+  },
+  {
+   "number": "12-2",
+   "title": "Experience Point Awards",
+   "page": 398
+  },
+  {
+   "number": "12-4",
+   "title": "Character Wealth by Level",
+   "page": 399
+  },
+  {
+   "number": "12-5",
+   "title": "Treasure Values per Encounter",
+   "page": 399
+  },
+  {
+   "number": "13-1",
+   "title": "Walls",
+   "page": 411
+  },
+  {
+   "number": "13-2",
+   "title": "Doors",
+   "page": 413
+  },
+  {
+   "number": "13-3",
+   "title": "CR Modifiers forMechanical Traps",
+   "page": 422
+  },
+  {
+   "number": "13-4",
+   "title": "CR Modifiers for Magic Traps",
+   "page": 423
+  },
+  {
+   "number": "13-5",
+   "title": "Cost Modifiers for Magic Device Traps",
+   "page": 424
+  },
+  {
+   "number": "13-6",
+   "title": "Craft (Traps) DCs",
+   "page": 424
+  },
+  {
+   "number": "13-7",
+   "title": "Combat Adjustments Underwater",
+   "page": 433
+  },
+  {
+   "number": "13-8",
+   "title": "Siege Engines",
+   "page": 435
+  },
+  {
+   "number": "13-9",
+   "title": "Random Weather",
+   "page": 439
+  },
+  {
+   "number": "13-10",
+   "title": "Wind Effects",
+   "page": 439
+  },
+  {
+   "number": "13-11",
+   "title": "Damage from Falling Objects",
+   "page": 443
+  },
+  {
+   "number": "14-1",
+   "title": "Adept",
+   "page": 448
+  },
+  {
+   "number": "14-2",
+   "title": "Aristocrat",
+   "page": 450
+  },
+  {
+   "number": "14-3",
+   "title": "Commoner",
+   "page": 450
+  },
+  {
+   "number": "14-4",
+   "title": "Expert",
+   "page": 451
+  },
+  {
+   "number": "14-5",
+   "title": "Warrior",
+   "page": 451
+  },
+  {
+   "number": "14-6",
+   "title": "NPC Ability Scores",
+   "page": 453
+  },
+  {
+   "number": "14-7",
+   "title": "Racial Ability Adjustments",
+   "page": 453
+  },
+  {
+   "number": "14-8",
+   "title": "NPC Skill Selections",
+   "page": 453
+  },
+  {
+   "number": "14-9",
+   "title": "NPC Gear",
+   "page": 454
+  },
+  {
+   "number": "15-1",
+   "title": "Available Magic Items",
+   "page": 461
+  },
+  {
+   "number": "15-2",
+   "title": "Random Magic Item Generation",
+   "page": 461
+  },
+  {
+   "number": "15-3",
+   "title": "Armor and Shields",
+   "page": 461
+  },
+  {
+   "number": "15-4",
+   "title": "Armor Special Abilities",
+   "page": 463
+  },
+  {
+   "number": "15-5",
+   "title": "Shield Special Abilities",
+   "page": 463
+  },
+  {
+   "number": "15-6",
+   "title": "Specific Armors",
+   "page": 464
+  },
+  {
+   "number": "15-7",
+   "title": "Specific Shields",
+   "page": 467
+  },
+  {
+   "number": "15-8",
+   "title": "Weapons",
+   "page": 468
+  },
+  {
+   "number": "15-9",
+   "title": "Melee Weapon Special Abilities",
+   "page": 469
+  },
+  {
+   "number": "15-10",
+   "title": "Ranged Weapon Special Abilities",
+   "page": 469
+  },
+  {
+   "number": "15-11",
+   "title": "Specific Weapons",
+   "page": 471
+  },
+  {
+   "number": "15-12",
+   "title": "Potions",
+   "page": 478
+  },
+  {
+   "number": "15-13",
+   "title": "Rings",
+   "page": 479
+  },
+  {
+   "number": "15-14",
+   "title": "Rods",
+   "page": 485
+  },
+  {
+   "number": "15-15",
+   "title": "Scrolls",
+   "page": 491
+  },
+  {
+   "number": "15-16",
+   "title": "Staves",
+   "page": 492
+  },
+  {
+   "number": "15-17",
+   "title": "Wands",
+   "page": 496
+  },
+  {
+   "number": "15-18",
+   "title": "Minor Wondrous Items",
+   "page": 497
+  },
+  {
+   "number": "15-19",
+   "title": "Medium Wondrous Items",
+   "page": 498
+  },
+  {
+   "number": "15-20",
+   "title": "Major Wondrous Items",
+   "page": 499
+  },
+  {
+   "number": "15-21",
+   "title": "Intelligent Item Alignment",
+   "page": 533
+  },
+  {
+   "number": "15-22",
+   "title": "Intelligent Item Ability Scores",
+   "page": 533
+  },
+  {
+   "number": "15-23",
+   "title": "Intelligent Item Senses and Communication",
+   "page": 533
+  },
+  {
+   "number": "15-24",
+   "title": "Intelligent Item Powers",
+   "page": 534
+  },
+  {
+   "number": "15-25",
+   "title": "Intelligent Item Purpose",
+   "page": 534
+  },
+  {
+   "number": "15-26",
+   "title": "Special Purpose Item Dedicated Powers",
+   "page": 534
+  },
+  {
+   "number": "15-27",
+   "title": "Common Item Curses",
+   "page": 537
+  },
+  {
+   "number": "15-28",
+   "title": "Specific Cursed Items",
+   "page": 537
+  },
+  {
+   "number": "15-29",
+   "title": "Estimating Magic Item Gold Piece Values",
+   "page": 550
+  },
+  {
+   "number": "16-1",
+   "title": "Special Ability Types",
+   "page": 555
+  },
+  {
+   "number": "16-2",
+   "title": "Sample Poisons",
+   "page": 559
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Cover",
+   "page": 0
+  },
+  {
+   "depth": 1,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 1,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 1,
+   "title": "Monte Cook's Intro",
+   "page": 4
+  },
+  {
+   "depth": 1,
+   "title": "Jason Bulmahn's Intro",
+   "page": 5
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1 - Getting Started",
+   "page": 6
+  },
+  {
+   "depth": 1,
+   "title": "The Most Important Rule",
+   "page": 9
+  },
+  {
+   "depth": 1,
+   "title": "Using This book",
+   "page": 9
+  },
+  {
+   "depth": 1,
+   "title": "Common Terms",
+   "page": 11
+  },
+  {
+   "depth": 1,
+   "title": "Example of Play",
+   "page": 13
+  },
+  {
+   "depth": 1,
+   "title": "Generating a Character",
+   "page": 14
+  },
+  {
+   "depth": 1,
+   "title": "Ability Scores",
+   "page": 15
+  },
+  {
+   "depth": 2,
+   "title": "Generating Ability Scores",
+   "page": 15
+  },
+  {
+   "depth": 3,
+   "title": "Determine Bonuses",
+   "page": 15
+  },
+  {
+   "depth": 3,
+   "title": "Table 1–1: Ability Score Costs",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Table 1–2: Ability Score Points",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "Abilities and Spellcasters",
+   "page": 16
+  },
+  {
+   "depth": 2,
+   "title": "The Abilities",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Table 1–3: Ability Modifiers and Bonus Spells",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Strength",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Dexterity",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Constitution",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Intelligence",
+   "page": 16
+  },
+  {
+   "depth": 3,
+   "title": "Wisdom",
+   "page": 17
+  },
+  {
+   "depth": 3,
+   "title": "Charisma",
+   "page": 17
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2 - Races",
+   "page": 18
+  },
+  {
+   "depth": 1,
+   "title": "Dwarves",
+   "page": 21
+  },
+  {
+   "depth": 1,
+   "title": "Elves",
+   "page": 22
+  },
+  {
+   "depth": 1,
+   "title": "Gnomes",
+   "page": 23
+  },
+  {
+   "depth": 1,
+   "title": "Half-Elves",
+   "page": 24
+  },
+  {
+   "depth": 1,
+   "title": "Half-Orcs",
+   "page": 25
+  },
+  {
+   "depth": 1,
+   "title": "Halflings",
+   "page": 26
+  },
+  {
+   "depth": 1,
+   "title": "Humans",
+   "page": 27
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3 - Classes",
+   "page": 28
+  },
+  {
+   "depth": 1,
+   "title": "Character Advancement",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–1: Character Advancement and Level-Dependent Bonuses",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "Advancing Your Character",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "Multiclassing",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "Favored Class",
+   "page": 31
+  },
+  {
+   "depth": 1,
+   "title": "Barbarian",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–2: Barbarian",
+   "page": 32
+  },
+  {
+   "depth": 1,
+   "title": "Bard",
+   "page": 34
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 34
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 35
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–3: Bard",
+   "page": 36
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–4: Bard Spells Known",
+   "page": 37
+  },
+  {
+   "depth": 1,
+   "title": "Cleric",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 39
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–5: Cleric",
+   "page": 40
+  },
+  {
+   "depth": 2,
+   "title": "Ex-Clerics",
+   "page": 41
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–6: Deities of the Pathfinder Chronicles",
+   "page": 43
+  },
+  {
+   "depth": 2,
+   "title": "Domains",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Air Domain",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Animal Domain",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Artifice Domain",
+   "page": 41
+  },
+  {
+   "depth": 3,
+   "title": "Chaos Domain",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Charm Domain",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Community Domain",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Darkness Domain",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Death Domain",
+   "page": 42
+  },
+  {
+   "depth": 3,
+   "title": "Destruction Domain",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Earth Domain",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Evil Domain",
+   "page": 43
+  },
+  {
+   "depth": 3,
+   "title": "Fire Domain",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Glory Domain",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Good Domain",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Healing Domain",
+   "page": 44
+  },
+  {
+   "depth": 3,
+   "title": "Knowledge Domain",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Law Domain",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Liberation Domain",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Luck Domain",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Madness Domain",
+   "page": 45
+  },
+  {
+   "depth": 3,
+   "title": "Magic Domain",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Nobility Domain",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Plant Domain",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Protection Domain",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Repose Domain",
+   "page": 46
+  },
+  {
+   "depth": 3,
+   "title": "Rune Domain",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Strength Domain",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Sun Domain",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Travel Domain",
+   "page": 47
+  },
+  {
+   "depth": 3,
+   "title": "Trickery Domain",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "War Domain",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "Water Domain",
+   "page": 48
+  },
+  {
+   "depth": 3,
+   "title": "Weather Domain",
+   "page": 48
+  },
+  {
+   "depth": 1,
+   "title": "Druid",
+   "page": 48
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–7: Druid",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "Ex-Druids",
+   "page": 51
+  },
+  {
+   "depth": 2,
+   "title": "Animal Companions",
+   "page": 51
+  },
+  {
+   "depth": 3,
+   "title": "Table 3–8: Animal Companion Base Statistics",
+   "page": 52
+  },
+  {
+   "depth": 3,
+   "title": "Animal Skills",
+   "page": 53
+  },
+  {
+   "depth": 3,
+   "title": "Animal Feats",
+   "page": 53
+  },
+  {
+   "depth": 3,
+   "title": "Animal Choices",
+   "page": 53
+  },
+  {
+   "depth": 1,
+   "title": "Fighter",
+   "page": 55
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 55
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 55
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–9: Fighter",
+   "page": 56
+  },
+  {
+   "depth": 1,
+   "title": "Monk",
+   "page": 56
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 57
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–10: Monk",
+   "page": 58
+  },
+  {
+   "depth": 2,
+   "title": "Ex-Monks",
+   "page": 60
+  },
+  {
+   "depth": 1,
+   "title": "Paladin",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–11: Paladin",
+   "page": 62
+  },
+  {
+   "depth": 2,
+   "title": "Ex-Paladins",
+   "page": 64
+  },
+  {
+   "depth": 1,
+   "title": "Ranger",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 64
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–12: Ranger",
+   "page": 66
+  },
+  {
+   "depth": 1,
+   "title": "Rogue",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 67
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–13: Rogue",
+   "page": 69
+  },
+  {
+   "depth": 1,
+   "title": "Sorcerer",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–14: Sorcerer",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–15: Sorcerer Spells Known",
+   "page": 73
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerer Bloodlines",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Aberrant",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Abyssal",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Arcane",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Celestial",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Destined",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Draconic",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Elemental",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Fey",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Infernal",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Undead",
+   "page": 77
+  },
+  {
+   "depth": 1,
+   "title": "Wizard",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 78
+  },
+  {
+   "depth": 2,
+   "title": "Table 3–16: Wizard",
+   "page": 80
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Schools",
+   "page": 79
+  },
+  {
+   "depth": 3,
+   "title": "Abjuration School",
+   "page": 79
+  },
+  {
+   "depth": 3,
+   "title": "Conjuration School",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Divination School",
+   "page": 80
+  },
+  {
+   "depth": 3,
+   "title": "Enchantment School",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Evocation School",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Illusion School",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Necromancy School",
+   "page": 81
+  },
+  {
+   "depth": 3,
+   "title": "Transmutation School",
+   "page": 82
+  },
+  {
+   "depth": 3,
+   "title": "Universalist School",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Familiars",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Spells and Armor",
+   "page": 83
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4 - Skills",
+   "page": 84
+  },
+  {
+   "depth": 1,
+   "title": "Acquiring Skills",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Skill Checks",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Taking 10 and Taking 20",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Aid Another",
+   "page": 86
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–1: Skill Ranks",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–2: Skill Check Bonuses",
+   "page": 87
+  },
+  {
+   "depth": 1,
+   "title": "Table 4–3: Skill Summary",
+   "page": 89
+  },
+  {
+   "depth": 1,
+   "title": "Skill Descriptions",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Acrobatics (Dex; Armor Check Penalty)",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "Appraise (Int)",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Bluff (Cha)",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Climb (Str; Armor Check Penalty)",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "Craft (Int)",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–4: Craft Skills",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Diplomacy (Cha)",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "Disable Device (Dex; Armor Check Penalty; Trained Only)",
+   "page": 94
+  },
+  {
+   "depth": 2,
+   "title": "Disguise (Cha)",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Escape Artist (Dex; Armor Check Penalty)",
+   "page": 95
+  },
+  {
+   "depth": 2,
+   "title": "Fly (Dex; Armor Check Penalty)",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–5: Wind Effects on Flight",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "Handle Animal (Cha; Trained Only)",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "Heal (Wis)",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "Intimidate (Cha)",
+   "page": 99
+  },
+  {
+   "depth": 2,
+   "title": "Knowledge (Int; Trained Only)",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–6: Knowledge Skill DCs",
+   "page": 101
+  },
+  {
+   "depth": 2,
+   "title": "Linguistics (Int; Trained Only)",
+   "page": 100
+  },
+  {
+   "depth": 2,
+   "title": "Perception (Wis)",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Perform (Cha)",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "Profession (Wis; Trained Only)",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "Ride (Dex; Armor Check Penalty)",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "Sense Motive (Wis)",
+   "page": 104
+  },
+  {
+   "depth": 2,
+   "title": "Sleight of Hand (Dex; Armor Check Penalty; Trained Only)",
+   "page": 104
+  },
+  {
+   "depth": 2,
+   "title": "Spellcraft (Int; Trained Only)",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Table 4–7: Spellcraft DCs",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "Stealth (Dex; Armor Check Penalty)",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "Survival (Wis)",
+   "page": 107
+  },
+  {
+   "depth": 2,
+   "title": "Swim (Str; Armor Check Penalty)",
+   "page": 108
+  },
+  {
+   "depth": 2,
+   "title": "Use Magic Device (Cha; Trained Only)",
+   "page": 108
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 5 - Feats",
+   "page": 110
+  },
+  {
+   "depth": 1,
+   "title": "Prerequisites",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "Types of Feats",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Combat Feats",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Critical Feats",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Item Creation Feats",
+   "page": 112
+  },
+  {
+   "depth": 2,
+   "title": "Metamagic Feats",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "Table 5–1: Feats",
+   "page": 114
+  },
+  {
+   "depth": 1,
+   "title": "Feat Descriptions",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Acrobatic",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Acrobatic Steps",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Agile Maneuvers (Combat)",
+   "page": 117
+  },
+  {
+   "depth": 2,
+   "title": "Alertness",
+   "page": 117
+  },
+  {
+   "depth": 2,
+   "title": "Alignment Channel",
+   "page": 117
+  },
+  {
+   "depth": 2,
+   "title": "Animal Affinity",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Armor Mastery (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Armor Training (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Strike (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Armor Proficiency, Heavy",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Armor Proficiency, Light",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Armor Proficiency, Medium",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Athletic",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Augment Summoning",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Bleeding Critical (Combat, Critical)",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Blind-Fight (Combat)",
+   "page": 118
+  },
+  {
+   "depth": 2,
+   "title": "Blinding Critical (Combat, Critical)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Brew Potion (Item Creation)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Catch Off-Guard (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Channel Smite (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Cleave (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Combat Casting",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Combat Expertise (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Combat Reflexes (Combat)",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Command Undead",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Craft Magic Arms and Armor (Item Creation)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Craft Rod (Item Creation)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Craft Staff (Item Creation)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Craft Wand (Item Creation)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Craft Wondrous Item (Item Creation)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Critical Focus (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Critical Mastery (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Dazzling Display (Combat)",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Deadly Aim (Combat)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Deadly Stroke (Combat)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Deafening Critical (Combat, Critical)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Deceitful",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Defensive Combat Training (Combat)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Deflect Arrows (Combat)",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Deft Hands",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Diehard",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Disruptive (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Dodge (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Double Slice (Combat)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Elemental Channel",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Empower Spell (Metamagic)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Endurance",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Enlarge Spell (Metamagic)",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "Eschew Materials",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Exhausting Critical (Combat, Critical)",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Exotic Weapon Proficiency (Combat)",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Extend Spell (Metamagic)",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Extra Channel",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Extra Ki",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Extra Lay On Hands",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Extra Mercy",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Extra Performance",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Extra Rage",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Far Shot (Combat)",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Fleet",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Forge Ring (Item Creation)",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Gorgon’s Fist (Combat)",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Great Cleave (Combat)",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Great Fortitude",
+   "page": 124
+  },
+  {
+   "depth": 2,
+   "title": "Greater Bull Rush (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Disarm (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Feint (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Grapple (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Overrun (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Penetrating Strike (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Shield Focus (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Spell Focus",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Spell Penetration",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Sunder (Combat)",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Greater Trip (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Greater Two-Weapon Fighting (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Greater Vital Strike (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Greater Weapon Focus (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Greater Weapon Specialization (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Heighten Spell (Metamagic)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Improved Bull Rush (Combat)",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Improved Channel",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Improved Counterspell",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Improved Critical (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Disarm (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Familiar",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Feint (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Grapple (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Great Fortitude",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Initiative (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Iron Will",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Lightning Reflexes",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Overrun (Combat)",
+   "page": 127
+  },
+  {
+   "depth": 2,
+   "title": "Improved Precise Shot (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Shield Bash (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Sunder (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Trip (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Two-Weapon Fighting (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Unarmed Strike (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improved Vital Strike (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Improvised Weapon Mastery (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Intimidating Prowess (Combat)",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Iron Will",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Leadership",
+   "page": 129
+  },
+  {
+   "depth": 3,
+   "title": "Table 5–2: Leadership",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Lightning Reflexes",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Lightning Stance (Combat)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Lunge (Combat)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Magical Aptitude",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Manyshot (Combat)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Martial Weapon Proficiency",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Master Craftsman",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Maximize Spell (Metamagic)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Medusa’s Wrath (Combat)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Mobility (Combat)",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Mounted Archery (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Mounted Combat (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Natural Spell",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Nimble Moves",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Penetrating Strike (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Persuasive",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Pinpoint Targeting (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Point-Blank Shot (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Power Attack (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Precise Shot (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Quick Draw (Combat)",
+   "page": 131
+  },
+  {
+   "depth": 2,
+   "title": "Quicken Spell (Metamagic)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Rapid Reload (Combat)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Rapid Shot (Combat)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Ride-By Attack (Combat)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Run",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Scorpion Style (Combat)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Scribe Scroll (Item Creation)",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Selective Channeling",
+   "page": 132
+  },
+  {
+   "depth": 2,
+   "title": "Self-Sufficient",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shatter Defenses (Combat)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shield Focus (Combat)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shield Master (Combat)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shield Proficiency",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shield Slam (Combat)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Shot on the Run (Combat)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Sickening Critical (Combat, Critical)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Silent Spell (Metamagic)",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Simple Weapon Proficiency",
+   "page": 133
+  },
+  {
+   "depth": 2,
+   "title": "Skill Focus",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Snatch Arrows (Combat)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spell Focus",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spell Mastery",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spell Penetration",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spellbreaker (Combat)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spirited Charge (Combat)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Spring Attack (Combat)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Staggering Critical (Combat, Critical)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Stand Still (Combat)",
+   "page": 134
+  },
+  {
+   "depth": 2,
+   "title": "Stealthy",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Step Up (Combat)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Still Spell (Metamagic)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Strike Back (Combat)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Stunning Critical (Combat, Critical)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Stunning Fist (Combat)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Throw Anything (Combat)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Tiring Critical (Combat, Critical)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Toughness",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Tower Shield Proficiency (Combat)",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Trample (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Turn Undead",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Two-Weapon Defense (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Two-Weapon Fighting (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Two-Weapon Rend (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Unseat (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Vital Strike (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Finesse (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Focus (Combat)",
+   "page": 136
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Specialization (Combat)",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Whirlwind Attack (Combat)",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Widen Spell (Metamagic)",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Wind Stance (Combat)",
+   "page": 137
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 6 - Equipment",
+   "page": 138
+  },
+  {
+   "depth": 1,
+   "title": "Wealth",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Table 6–1: Starting Character Wealth",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Coins",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–2: Coins",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Other Wealth",
+   "page": 140
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–3: Trade Goods",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Selling Treasure",
+   "page": 140
+  },
+  {
+   "depth": 1,
+   "title": "Weapons",
+   "page": 140
+  },
+  {
+   "depth": 2,
+   "title": "Table 6–4: Weapons",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Qualities",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Weapon Descriptions",
+   "page": 145
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–5: Tiny and Large Weapon Damage",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Masterwork Weapons",
+   "page": 149
+  },
+  {
+   "depth": 1,
+   "title": "Armor",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Table 6–6: Armor and Shields",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Armor Descriptions",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Masterwork Armor",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Armor for Unusual Creatures",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–8: Armor for Unusual Creatures",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Getting Into and Out of Armor",
+   "page": 153
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–7: Donning Armor",
+   "page": 153
+  },
+  {
+   "depth": 1,
+   "title": "Special Materials",
+   "page": 154
+  },
+  {
+   "depth": 1,
+   "title": "Goods and Services",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Table 6–9: Goods and Services",
+   "page": 158
+  },
+  {
+   "depth": 2,
+   "title": "Adventuring Gear",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Special Substances and Items",
+   "page": 160
+  },
+  {
+   "depth": 2,
+   "title": "Tools and Skill Kits",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Clothing",
+   "page": 161
+  },
+  {
+   "depth": 2,
+   "title": "Food, Drink, and Lodging",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Mounts and Related Gear",
+   "page": 162
+  },
+  {
+   "depth": 2,
+   "title": "Transport",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "Spellcasting and Services",
+   "page": 163
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 7 - Additional Rules",
+   "page": 164
+  },
+  {
+   "depth": 1,
+   "title": "Alignment",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Good Versus Evil",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Law Versus Chaos",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Alignment Steps",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "The Nine Alignments",
+   "page": 166
+  },
+  {
+   "depth": 2,
+   "title": "Changing Alignments",
+   "page": 168
+  },
+  {
+   "depth": 1,
+   "title": "Vital Statistics",
+   "page": 168
+  },
+  {
+   "depth": 2,
+   "title": "Age",
+   "page": 168
+  },
+  {
+   "depth": 3,
+   "title": "Tables 7-1: Random Starting Ages",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Table 7-2: Aging Effects",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Height and Weight",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Tables 7-3: Random Height and Weight",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Carrying Capacity",
+   "page": 169
+  },
+  {
+   "depth": 3,
+   "title": "Armor and Encumbrance for Other Base Speeds",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–4: Carrying Capacity",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–5: Encumbrance Effects",
+   "page": 171
+  },
+  {
+   "depth": 1,
+   "title": "Movement",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Tactical Movement",
+   "page": 170
+  },
+  {
+   "depth": 3,
+   "title": "Table 7-6: Movement and Distance",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Tables 7-7: Hampered Movement",
+   "page": 172
+  },
+  {
+   "depth": 2,
+   "title": "Local Movement",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Overland Movement",
+   "page": 171
+  },
+  {
+   "depth": 3,
+   "title": "Table 7-8: Terrain and Overland Movement",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–9: Mounts and Vehicles",
+   "page": 174
+  },
+  {
+   "depth": 2,
+   "title": "Evasion and Pursuit",
+   "page": 171
+  },
+  {
+   "depth": 1,
+   "title": "Exploration",
+   "page": 172
+  },
+  {
+   "depth": 2,
+   "title": "Vision and Light",
+   "page": 172
+  },
+  {
+   "depth": 3,
+   "title": "Table 7–10: Light Sources and Illumination",
+   "page": 174
+  },
+  {
+   "depth": 2,
+   "title": "Breaking and Entering",
+   "page": 173
+  },
+  {
+   "depth": 3,
+   "title": "Smashing an Object",
+   "page": 173
+  },
+  {
+   "depth": 4,
+   "title": "Table 7–11: Size and Armor Class of Objects",
+   "page": 174
+  },
+  {
+   "depth": 4,
+   "title": "Table 7–12: Common Armor, Weapon, andShield Hardness and Hit Points",
+   "page": 175
+  },
+  {
+   "depth": 4,
+   "title": "Table 7–13: Substance Hardnessand Hit Points",
+   "page": 175
+  },
+  {
+   "depth": 4,
+   "title": "Table 7–14: Object Hardness and Hit Points",
+   "page": 175
+  },
+  {
+   "depth": 4,
+   "title": "Table 7–15: DCs to Break or Burst Items",
+   "page": 175
+  },
+  {
+   "depth": 3,
+   "title": "Breaking Items",
+   "page": 175
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 8 - Combat",
+   "page": 176
+  },
+  {
+   "depth": 1,
+   "title": "How Combat Works",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "The Combat Round",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Initiative",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Surprise",
+   "page": 178
+  },
+  {
+   "depth": 1,
+   "title": "Combat Statistics",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Attack Roll",
+   "page": 178
+  },
+  {
+   "depth": 3,
+   "title": "Table 8–1: Size Modifiers",
+   "page": 179
+  },
+  {
+   "depth": 2,
+   "title": "Attack Bonus",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Armor Class",
+   "page": 179
+  },
+  {
+   "depth": 2,
+   "title": "Damage",
+   "page": 179
+  },
+  {
+   "depth": 2,
+   "title": "Hit Points",
+   "page": 179
+  },
+  {
+   "depth": 2,
+   "title": "Attacks of Opportunity",
+   "page": 180
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Attacks of Opportunity",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Speed",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Saving Throws",
+   "page": 180
+  },
+  {
+   "depth": 1,
+   "title": "Actions in Combat",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Action Types",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Standard Actions",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Table 8–2: Actions in Combat",
+   "page": 183
+  },
+  {
+   "depth": 3,
+   "title": "Attack",
+   "page": 182
+  },
+  {
+   "depth": 3,
+   "title": "Activate Magic Item",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Cast a Spell",
+   "page": 184
+  },
+  {
+   "depth": 3,
+   "title": "Start/Complete Full-Round Action",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Total Defense",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Use Special Ability",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Move Actions",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Move",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Direct or Redirect a Spell",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Draw or Sheathe a Weapon",
+   "page": 186
+  },
+  {
+   "depth": 3,
+   "title": "Manipulate an Item",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Mount/Dismount a Steed",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Ready or Drop a Shield",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Stand Up",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Full-Round Actions",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Full Attack",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Cast a Spell",
+   "page": 187
+  },
+  {
+   "depth": 3,
+   "title": "Move 5 Feet through Difficult Terrain",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Run",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Use Special Ability",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Withdraw",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Free Actions",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Cease Concentration on Spell",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Drop an Item",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Drop Prone",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Speak",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Swift Actions",
+   "page": 188
+  },
+  {
+   "depth": 3,
+   "title": "Cast a Quickened Spell",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Immediate Actions",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Miscellaneous Actions",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Take 5-Foot Step",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Use Feat",
+   "page": 189
+  },
+  {
+   "depth": 3,
+   "title": "Use Skill",
+   "page": 189
+  },
+  {
+   "depth": 1,
+   "title": "Injury and Death",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Loss of Hit Points",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Disabled (0 Hit Points)",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Dying (Negative Hit Points)",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Dead",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Stable Characters and Recovery",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Healing",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Temporary Hit Points",
+   "page": 191
+  },
+  {
+   "depth": 2,
+   "title": "Nonlethal Damage",
+   "page": 191
+  },
+  {
+   "depth": 1,
+   "title": "Movement, Position, and Distance",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Tactical Movement",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Tactical Movement",
+   "page": 192
+  },
+  {
+   "depth": 3,
+   "title": "Table 8–3: Tactical Speed",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Measuring Distance",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Moving Through a Square",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Terrain and Obstacles",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Special Movement Rules",
+   "page": 194
+  },
+  {
+   "depth": 1,
+   "title": "Big and Little Creatures in Combat",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Table 8–4: Creature Size and Scale",
+   "page": 195
+  },
+  {
+   "depth": 1,
+   "title": "Combat Modifiers",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Table 8–5: Attack Roll Modifiers",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Table 8–6: Armor Class Modifiers",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Cover",
+   "page": 195
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Cover",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Concealment",
+   "page": 196
+  },
+  {
+   "depth": 2,
+   "title": "Flanking",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Flanking",
+   "page": 196
+  },
+  {
+   "depth": 2,
+   "title": "Helpless Defenders",
+   "page": 197
+  },
+  {
+   "depth": 1,
+   "title": "Special Attacks",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Aid Another",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Charge",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Combat Maneuvers",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Bull Rush",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Disarm",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Grapple",
+   "page": 199
+  },
+  {
+   "depth": 3,
+   "title": "Overrun",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Sunder",
+   "page": 201
+  },
+  {
+   "depth": 3,
+   "title": "Trip",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Feint",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Mounted Combat",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Throw Splash Weapon",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Two-Weapon Fighting",
+   "page": 202
+  },
+  {
+   "depth": 3,
+   "title": "Table 8–7: Two-Weapon Fighting Penalties",
+   "page": 202
+  },
+  {
+   "depth": 1,
+   "title": "Special Initiative Actions",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Delay",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Ready",
+   "page": 203
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 9 - Magic",
+   "page": 204
+  },
+  {
+   "depth": 1,
+   "title": "Casting Spells",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Choosing a Spell",
+   "page": 206
+  },
+  {
+   "depth": 2,
+   "title": "Concentration",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Table 9–1: Concentration Check DCs",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Counterspells",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Caster Level",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Spell Failure",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "The Spell’s Result",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Special Spell Effects",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Combining Magic Effects",
+   "page": 208
+  },
+  {
+   "depth": 1,
+   "title": "Spell Descriptions",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Name",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "School (Subschool)",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Abjuration",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Conjuration",
+   "page": 209
+  },
+  {
+   "depth": 3,
+   "title": "Divination",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Enchantment",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Evocation",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Illusion",
+   "page": 210
+  },
+  {
+   "depth": 3,
+   "title": "Necromancy",
+   "page": 211
+  },
+  {
+   "depth": 3,
+   "title": "Transmutation",
+   "page": 211
+  },
+  {
+   "depth": 2,
+   "title": "[Descriptor]",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Level",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Components",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Casting Time",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Range",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Aiming a Spell",
+   "page": 213
+  },
+  {
+   "depth": 3,
+   "title": "Diagram: Spell Areas",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Duration",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Saving Throw",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Table 9–2: Items Affected by Magical Attacks",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Spell Resistance",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Descriptive Text",
+   "page": 218
+  },
+  {
+   "depth": 1,
+   "title": "Arcane Spells",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Preparing Wizard Spells",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Arcane Magical Writings",
+   "page": 218
+  },
+  {
+   "depth": 3,
+   "title": "Wizard Spells and Borrowed Spellbooks",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Adding Spells to a Wizard’s Spellbook",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Writing a New Spell into a Spellbook",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Replacing and Copying Spellbooks",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Selling a Spellbook",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerers and Bards",
+   "page": 220
+  },
+  {
+   "depth": 1,
+   "title": "Divine Spells",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Preparing Divine Spells",
+   "page": 220
+  },
+  {
+   "depth": 2,
+   "title": "Divine Magical Writings",
+   "page": 221
+  },
+  {
+   "depth": 2,
+   "title": "New Divine Spells",
+   "page": 221
+  },
+  {
+   "depth": 1,
+   "title": "Special Abilities",
+   "page": 221
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 10 - Spells",
+   "page": 222
+  },
+  {
+   "depth": 1,
+   "title": "Bard Spells",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "0-Level Bard Spells",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Bard Spells",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Bard Spells",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Bard Spells",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Bard Spells",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "5th-Level Bard Spells",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "6th-Level Bard Spells",
+   "page": 226
+  },
+  {
+   "depth": 1,
+   "title": "Cleric Spells",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "0-Level Cleric Spells (Orisons)",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Cleric Spells",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Cleric Spells",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Cleric Spells",
+   "page": 227
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Cleric Spells",
+   "page": 227
+  },
+  {
+   "depth": 2,
+   "title": "5th-Level Cleric Spells",
+   "page": 227
+  },
+  {
+   "depth": 2,
+   "title": "6th-Level Cleric Spells",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "7th-Level Cleric Spells",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "8th-Level Cleric Spells",
+   "page": 228
+  },
+  {
+   "depth": 2,
+   "title": "9th-Level Cleric Spells",
+   "page": 229
+  },
+  {
+   "depth": 1,
+   "title": "Druid Spells",
+   "page": 229
+  },
+  {
+   "depth": 2,
+   "title": "0-Level Druid Spells (Orisons)",
+   "page": 229
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Druid Spells",
+   "page": 229
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Druid Spells",
+   "page": 229
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Druid Spells",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Druid Spells",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "5th-Level Druid Spells",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "6th-Level Druid Spells",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "7th-Level Druid Spells",
+   "page": 230
+  },
+  {
+   "depth": 2,
+   "title": "8th-Level Druid Spells",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "9th-Level Druid Spells",
+   "page": 231
+  },
+  {
+   "depth": 1,
+   "title": "Paladin Spells",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Paladin Spells",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Paladin Spells",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Paladin Spells",
+   "page": 231
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Paladin Spells",
+   "page": 231
+  },
+  {
+   "depth": 1,
+   "title": "Ranger Spells",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Ranger Spells",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Ranger Spells",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Ranger Spells",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Ranger Spells",
+   "page": 232
+  },
+  {
+   "depth": 1,
+   "title": "Sorcerer/Wizard Spells",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "0-Level Sorcerer/Wizard Spells (Cantrips)",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "1st-Level Sorcerer/Wizard Spells",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "2nd-Level Sorcerer/Wizard Spells",
+   "page": 233
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Level Sorcerer/Wizard Spells",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "4th-Level Sorcerer/Wizard Spells",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "5th-Level Sorcerer/Wizard Spells",
+   "page": 235
+  },
+  {
+   "depth": 2,
+   "title": "6th-Level Sorcerer/Wizard Spells",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "7th-Level Sorcerer/Wizard Spells",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "8th-Level Sorcerer/Wizard Spells",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "9th-Level Sorcerer/Wizard Spells",
+   "page": 238
+  },
+  {
+   "depth": 1,
+   "title": "Spell Descriptions",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Spells - A",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Acid Arrow",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Acid Fog",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Acid Splash",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Aid",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Air Walk",
+   "page": 239
+  },
+  {
+   "depth": 3,
+   "title": "Alarm",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Align Weapon",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Alter Self",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Analyze Dweomer",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Animal Growth",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Animal Messenger",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Animal Shapes",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Animal Trance",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Animate Dead",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Animate Object",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Animate Plants",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Animate Rope",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Antilife Shell",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Antimagic Field",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "Antipathy",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Antiplant Shell",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Eye",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Lock",
+   "page": 243
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Mark",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Sight",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Sight, Greater",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Astral Projection",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Atonement",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Augury",
+   "page": 245
+  },
+  {
+   "depth": 3,
+   "title": "Awaken",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "Spells - B",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Baleful Polymorph",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Bane",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Banishment",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Barkskin",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Bear's Endurance",
+   "page": 246
+  },
+  {
+   "depth": 3,
+   "title": "Bear's Endurance, Mass",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Beast Shape I",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Beast Shape II",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Beast Shape III",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Beast Shape IV",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Bestow Curse",
+   "page": 247
+  },
+  {
+   "depth": 3,
+   "title": "Binding",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Black Tentacles",
+   "page": 248
+  },
+  {
+   "depth": 3,
+   "title": "Blade Barrier",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Blasphemy",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Bleed",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Bless",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Bless Water",
+   "page": 249
+  },
+  {
+   "depth": 3,
+   "title": "Bless Weapon",
+   "page": 250
+  },
+  {
+   "depth": 3,
+   "title": "Blindness/Deafness",
+   "page": 250
+  },
+  {
+   "depth": 3,
+   "title": "Blink",
+   "page": 250
+  },
+  {
+   "depth": 3,
+   "title": "Blight",
+   "page": 250
+  },
+  {
+   "depth": 3,
+   "title": "Blur",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Break Enchantment",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Breath of Life",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Bull's Strength",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Bull's Strength, Mass",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Burning Hands",
+   "page": 251
+  },
+  {
+   "depth": 2,
+   "title": "Spells - C",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Call Lightning",
+   "page": 251
+  },
+  {
+   "depth": 3,
+   "title": "Call Lightning Storm",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Calm Animals",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Calm Emotions",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Cat's Grace",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Cat's Grace, Mass",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Cause Fear",
+   "page": 252
+  },
+  {
+   "depth": 3,
+   "title": "Chain Lightning",
+   "page": 253
+  },
+  {
+   "depth": 3,
+   "title": "Changestaff",
+   "page": 253
+  },
+  {
+   "depth": 3,
+   "title": "Chaos Hammer",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Charm Animal",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Charm Monster",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Charm Monster, Mass",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Charm Person",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Chill Metal",
+   "page": 254
+  },
+  {
+   "depth": 3,
+   "title": "Chill Touch",
+   "page": 255
+  },
+  {
+   "depth": 3,
+   "title": "Circle of Death",
+   "page": 255
+  },
+  {
+   "depth": 3,
+   "title": "Claidaudience/Clairvoyance",
+   "page": 255
+  },
+  {
+   "depth": 3,
+   "title": "Clenched Fist",
+   "page": 255
+  },
+  {
+   "depth": 3,
+   "title": "Cloak of Chaos",
+   "page": 255
+  },
+  {
+   "depth": 3,
+   "title": "Clone",
+   "page": 256
+  },
+  {
+   "depth": 3,
+   "title": "Cloudkill",
+   "page": 256
+  },
+  {
+   "depth": 3,
+   "title": "Color Spray",
+   "page": 256
+  },
+  {
+   "depth": 3,
+   "title": "Command",
+   "page": 256
+  },
+  {
+   "depth": 3,
+   "title": "Command, Greater",
+   "page": 257
+  },
+  {
+   "depth": 3,
+   "title": "Command Plants",
+   "page": 257
+  },
+  {
+   "depth": 3,
+   "title": "Command Undead",
+   "page": 257
+  },
+  {
+   "depth": 3,
+   "title": "Commune",
+   "page": 257
+  },
+  {
+   "depth": 3,
+   "title": "Commune with Nature",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Comprehend Languages",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Cone of Cold",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Confusion",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Confusion, Lesser",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Consecrate",
+   "page": 258
+  },
+  {
+   "depth": 3,
+   "title": "Contact Other Plane",
+   "page": 259
+  },
+  {
+   "depth": 3,
+   "title": "Contagion",
+   "page": 259
+  },
+  {
+   "depth": 3,
+   "title": "Contingency",
+   "page": 259
+  },
+  {
+   "depth": 3,
+   "title": "Continual Flame",
+   "page": 260
+  },
+  {
+   "depth": 3,
+   "title": "Control Plants",
+   "page": 260
+  },
+  {
+   "depth": 3,
+   "title": "Control Undead",
+   "page": 260
+  },
+  {
+   "depth": 3,
+   "title": "Control Water",
+   "page": 260
+  },
+  {
+   "depth": 3,
+   "title": "Control Weather",
+   "page": 261
+  },
+  {
+   "depth": 3,
+   "title": "Control Winds",
+   "page": 261
+  },
+  {
+   "depth": 3,
+   "title": "Create Food and Water",
+   "page": 261
+  },
+  {
+   "depth": 3,
+   "title": "Create Greater Undead",
+   "page": 261
+  },
+  {
+   "depth": 3,
+   "title": "Create Undead",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Create Water",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Creeping Doom",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Crushing Despair",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Crushing Hand",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Cure Critical Wounds",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Cure Critical Wounds, Mass",
+   "page": 262
+  },
+  {
+   "depth": 3,
+   "title": "Cure Light Wounds",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Cure Light Wounds, Mass",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Cure Moderate Wounds",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Cure Moderate Wounds, Mass",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Cure Serious Wounds",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Cure Serious Wounds, Mass",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Curse Water",
+   "page": 263
+  },
+  {
+   "depth": 2,
+   "title": "Spells - D",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Dancing Lights",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Darkness",
+   "page": 263
+  },
+  {
+   "depth": 3,
+   "title": "Darkvision",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Daylight",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Daze",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Daze Monster",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Death Knell",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Death Ward",
+   "page": 264
+  },
+  {
+   "depth": 3,
+   "title": "Deathwatch",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Deep Slumber",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Deeper Darkness",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Delay Poison",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Delayed Blast Fireball",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Demand",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Desecrate",
+   "page": 265
+  },
+  {
+   "depth": 3,
+   "title": "Destruction",
+   "page": 266
+  },
+  {
+   "depth": 3,
+   "title": "Detect Animals or Plants",
+   "page": 266
+  },
+  {
+   "depth": 3,
+   "title": "Detect Chaos",
+   "page": 266
+  },
+  {
+   "depth": 3,
+   "title": "Detect Evil",
+   "page": 266
+  },
+  {
+   "depth": 3,
+   "title": "Detect Good",
+   "page": 267
+  },
+  {
+   "depth": 3,
+   "title": "Detect Law",
+   "page": 267
+  },
+  {
+   "depth": 3,
+   "title": "Detect Magic",
+   "page": 267
+  },
+  {
+   "depth": 3,
+   "title": "Detect Poison",
+   "page": 268
+  },
+  {
+   "depth": 3,
+   "title": "Detect Scrying",
+   "page": 268
+  },
+  {
+   "depth": 3,
+   "title": "Detect Secret Doors",
+   "page": 268
+  },
+  {
+   "depth": 3,
+   "title": "Detect Snares and Pits",
+   "page": 268
+  },
+  {
+   "depth": 3,
+   "title": "Detect Thoughts",
+   "page": 268
+  },
+  {
+   "depth": 3,
+   "title": "Detect Undead",
+   "page": 269
+  },
+  {
+   "depth": 3,
+   "title": "Dictum",
+   "page": 269
+  },
+  {
+   "depth": 3,
+   "title": "Dimension Door",
+   "page": 269
+  },
+  {
+   "depth": 3,
+   "title": "Dimentional Anchor",
+   "page": 270
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Lock",
+   "page": 270
+  },
+  {
+   "depth": 3,
+   "title": "Diminish Plants",
+   "page": 270
+  },
+  {
+   "depth": 3,
+   "title": "Discern Lies",
+   "page": 270
+  },
+  {
+   "depth": 3,
+   "title": "Discern Location",
+   "page": 270
+  },
+  {
+   "depth": 3,
+   "title": "Disguise Self",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Disintegrate",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Dismissal",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Chaos",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Evil",
+   "page": 271
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Good",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Law",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Magic",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Magic, Greater",
+   "page": 272
+  },
+  {
+   "depth": 3,
+   "title": "Displacement",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Disrupt Undead",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Disrupting Weapon",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Divination",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Divine Favor",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Divine Power",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Dominate Animal",
+   "page": 273
+  },
+  {
+   "depth": 3,
+   "title": "Dominate Monster",
+   "page": 274
+  },
+  {
+   "depth": 3,
+   "title": "Dominate Person",
+   "page": 274
+  },
+  {
+   "depth": 3,
+   "title": "Doom",
+   "page": 274
+  },
+  {
+   "depth": 3,
+   "title": "Dream",
+   "page": 274
+  },
+  {
+   "depth": 2,
+   "title": "Spells - E",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Eagle's Splendor",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Eagle's Splendor, Mass",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Earthquake",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Body I",
+   "page": 275
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Body II",
+   "page": 276
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Body III",
+   "page": 276
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Body IV",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Swarm",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Endure Elements",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Energy Drain",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Enervation",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Enlarge Person",
+   "page": 277
+  },
+  {
+   "depth": 3,
+   "title": "Enlarge Person, Mass",
+   "page": 278
+  },
+  {
+   "depth": 3,
+   "title": "Entangle",
+   "page": 278
+  },
+  {
+   "depth": 3,
+   "title": "Enthrall",
+   "page": 278
+  },
+  {
+   "depth": 3,
+   "title": "Entropic Shield",
+   "page": 278
+  },
+  {
+   "depth": 3,
+   "title": "Erase",
+   "page": 279
+  },
+  {
+   "depth": 3,
+   "title": "Ethereal Jaunt",
+   "page": 279
+  },
+  {
+   "depth": 3,
+   "title": "Etherealness",
+   "page": 279
+  },
+  {
+   "depth": 3,
+   "title": "Expeditious Retreat",
+   "page": 279
+  },
+  {
+   "depth": 3,
+   "title": "Explosive Runes",
+   "page": 279
+  },
+  {
+   "depth": 3,
+   "title": "Eyebite",
+   "page": 280
+  },
+  {
+   "depth": 2,
+   "title": "Spells - F",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "Fabricate",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "Faerie Fire",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "False Life",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "False Vision",
+   "page": 280
+  },
+  {
+   "depth": 3,
+   "title": "Fear",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Feather Fall",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Feeblemind",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Find the Path",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Find Traps",
+   "page": 281
+  },
+  {
+   "depth": 3,
+   "title": "Finger of Death",
+   "page": 282
+  },
+  {
+   "depth": 3,
+   "title": "Fire Shield",
+   "page": 282
+  },
+  {
+   "depth": 3,
+   "title": "Fire Seeds",
+   "page": 282
+  },
+  {
+   "depth": 3,
+   "title": "Fire Storm",
+   "page": 282
+  },
+  {
+   "depth": 3,
+   "title": "Fire Trap",
+   "page": 282
+  },
+  {
+   "depth": 3,
+   "title": "Fireball",
+   "page": 283
+  },
+  {
+   "depth": 3,
+   "title": "Flame Arrow",
+   "page": 283
+  },
+  {
+   "depth": 3,
+   "title": "Flame Blade",
+   "page": 283
+  },
+  {
+   "depth": 3,
+   "title": "Flame Strike",
+   "page": 283
+  },
+  {
+   "depth": 3,
+   "title": "Flaming Sphere",
+   "page": 283
+  },
+  {
+   "depth": 3,
+   "title": "Flare",
+   "page": 284
+  },
+  {
+   "depth": 3,
+   "title": "Flesh to Stone",
+   "page": 284
+  },
+  {
+   "depth": 3,
+   "title": "Floating Disk",
+   "page": 284
+  },
+  {
+   "depth": 3,
+   "title": "Fly",
+   "page": 284
+  },
+  {
+   "depth": 3,
+   "title": "Fog Cloud",
+   "page": 284
+  },
+  {
+   "depth": 3,
+   "title": "Forbiddance",
+   "page": 285
+  },
+  {
+   "depth": 3,
+   "title": "Forcecage",
+   "page": 285
+  },
+  {
+   "depth": 3,
+   "title": "Forceful Hand",
+   "page": 285
+  },
+  {
+   "depth": 3,
+   "title": "Foresight",
+   "page": 285
+  },
+  {
+   "depth": 3,
+   "title": "Form of the Dragon I",
+   "page": 286
+  },
+  {
+   "depth": 3,
+   "title": "Form of the Dragon II",
+   "page": 286
+  },
+  {
+   "depth": 3,
+   "title": "Form of the Dragon III",
+   "page": 286
+  },
+  {
+   "depth": 3,
+   "title": "Fox's Cunning",
+   "page": 286
+  },
+  {
+   "depth": 3,
+   "title": "Fox's Cunning, Mass",
+   "page": 286
+  },
+  {
+   "depth": 3,
+   "title": "Freedom",
+   "page": 287
+  },
+  {
+   "depth": 3,
+   "title": "Freedom of Movement",
+   "page": 287
+  },
+  {
+   "depth": 3,
+   "title": "Freezing Sphere",
+   "page": 287
+  },
+  {
+   "depth": 2,
+   "title": "Spells - G",
+   "page": 287
+  },
+  {
+   "depth": 3,
+   "title": "Gaseous Form",
+   "page": 287
+  },
+  {
+   "depth": 3,
+   "title": "Gate",
+   "page": 287
+  },
+  {
+   "depth": 3,
+   "title": "Geas/Quest",
+   "page": 288
+  },
+  {
+   "depth": 3,
+   "title": "Geas, Lesser",
+   "page": 288
+  },
+  {
+   "depth": 3,
+   "title": "Gentle Repose",
+   "page": 289
+  },
+  {
+   "depth": 3,
+   "title": "Ghost Sound",
+   "page": 289
+  },
+  {
+   "depth": 3,
+   "title": "Ghoul Touch",
+   "page": 289
+  },
+  {
+   "depth": 3,
+   "title": "Giant Form I",
+   "page": 289
+  },
+  {
+   "depth": 3,
+   "title": "Giant Form II",
+   "page": 289
+  },
+  {
+   "depth": 3,
+   "title": "Giant Vermin",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Glibness",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Glitterdust",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Globe of Invulnerability",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Globe of Invulnerability, Lesser",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Glyph of Warding",
+   "page": 290
+  },
+  {
+   "depth": 3,
+   "title": "Glyph of Warding, Greater",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Goodberry",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Good Hope",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Grasping Hand",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Grease",
+   "page": 291
+  },
+  {
+   "depth": 3,
+   "title": "Greater (Spell Name)",
+   "page": 292
+  },
+  {
+   "depth": 3,
+   "title": "Guards and Wards",
+   "page": 292
+  },
+  {
+   "depth": 3,
+   "title": "Guidance",
+   "page": 292
+  },
+  {
+   "depth": 2,
+   "title": "Spells - H",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Gust of Wind",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Hallow",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Hallucinatory Terrain",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Halt Undead",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Harm",
+   "page": 293
+  },
+  {
+   "depth": 3,
+   "title": "Haste",
+   "page": 294
+  },
+  {
+   "depth": 3,
+   "title": "Heal",
+   "page": 294
+  },
+  {
+   "depth": 3,
+   "title": "Heal, Mass",
+   "page": 294
+  },
+  {
+   "depth": 3,
+   "title": "Heal Mount",
+   "page": 294
+  },
+  {
+   "depth": 3,
+   "title": "Heat Metal",
+   "page": 294
+  },
+  {
+   "depth": 3,
+   "title": "Helping Hand",
+   "page": 295
+  },
+  {
+   "depth": 3,
+   "title": "Heroes' Feast",
+   "page": 295
+  },
+  {
+   "depth": 3,
+   "title": "Heroism",
+   "page": 295
+  },
+  {
+   "depth": 3,
+   "title": "Heroism, Greater",
+   "page": 295
+  },
+  {
+   "depth": 3,
+   "title": "Hide from Animals",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hide from Undead",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hideous Laughter",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Animal",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Monster",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Monster, Mass",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Person",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Person, Mass",
+   "page": 296
+  },
+  {
+   "depth": 3,
+   "title": "Hold Portal",
+   "page": 297
+  },
+  {
+   "depth": 3,
+   "title": "Holy Aura",
+   "page": 297
+  },
+  {
+   "depth": 3,
+   "title": "Holy Smite",
+   "page": 297
+  },
+  {
+   "depth": 3,
+   "title": "Holy Sword",
+   "page": 297
+  },
+  {
+   "depth": 3,
+   "title": "Holy Word",
+   "page": 297
+  },
+  {
+   "depth": 3,
+   "title": "Horrid Wilting",
+   "page": 298
+  },
+  {
+   "depth": 3,
+   "title": "Hypnotic Pattern",
+   "page": 298
+  },
+  {
+   "depth": 3,
+   "title": "Hypnotism",
+   "page": 298
+  },
+  {
+   "depth": 2,
+   "title": "Spells - I",
+   "page": 298
+  },
+  {
+   "depth": 3,
+   "title": "Ice Storm",
+   "page": 298
+  },
+  {
+   "depth": 3,
+   "title": "Identify",
+   "page": 299
+  },
+  {
+   "depth": 3,
+   "title": "Illusory Script",
+   "page": 299
+  },
+  {
+   "depth": 3,
+   "title": "Illusory Wall",
+   "page": 299
+  },
+  {
+   "depth": 3,
+   "title": "Imbue with Spell Ability",
+   "page": 299
+  },
+  {
+   "depth": 3,
+   "title": "Implosion",
+   "page": 299
+  },
+  {
+   "depth": 3,
+   "title": "Imprisonment",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Incendiary Cloud",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Critical Wounds",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Critical Wounds, Mass",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Light Wounds",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Light Wounds, Mass",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Moderate Wounds",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Moderate Wounds, Mass",
+   "page": 300
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Serious Wounds",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Serious Wounds, Mass",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Insanity",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Insect Plague",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Instant Summons",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Interposing Hand",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility",
+   "page": 301
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility, Greater",
+   "page": 302
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility, Mass",
+   "page": 302
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility Purge",
+   "page": 302
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility Sphere",
+   "page": 302
+  },
+  {
+   "depth": 3,
+   "title": "Iron Body",
+   "page": 302
+  },
+  {
+   "depth": 3,
+   "title": "Ironwood",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Irresistable Dance",
+   "page": 303
+  },
+  {
+   "depth": 2,
+   "title": "Spells - J",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Jump",
+   "page": 303
+  },
+  {
+   "depth": 2,
+   "title": "Spells - K",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Keen Edge",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Knock",
+   "page": 303
+  },
+  {
+   "depth": 3,
+   "title": "Know Direction",
+   "page": 304
+  },
+  {
+   "depth": 2,
+   "title": "Spells - L",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Legend Lore",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Lesser (Spell Name)",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Levitate",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Light",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Lightning Bold",
+   "page": 304
+  },
+  {
+   "depth": 3,
+   "title": "Limited Wish",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Liveoak",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Locate Creature",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Locate Object",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Longstrider",
+   "page": 305
+  },
+  {
+   "depth": 3,
+   "title": "Lullaby",
+   "page": 305
+  },
+  {
+   "depth": 2,
+   "title": "Spells - M",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage Armor",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage Hand",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Disjunction",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Faithful Hound",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Lucubration",
+   "page": 306
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Magnificent Mansion",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Private Sanctum",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Mage's Sword",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Magic Aura",
+   "page": 307
+  },
+  {
+   "depth": 3,
+   "title": "Magic Circle against Chaos",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Magic Circle against Evil",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Magic Circle against Good",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Magic Circle against Law",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Magic Fang",
+   "page": 308
+  },
+  {
+   "depth": 3,
+   "title": "Magic Fang, Greater",
+   "page": 309
+  },
+  {
+   "depth": 3,
+   "title": "Magic Jar",
+   "page": 309
+  },
+  {
+   "depth": 3,
+   "title": "Magic Missile",
+   "page": 309
+  },
+  {
+   "depth": 3,
+   "title": "Magic Mouth",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Magic Stone",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Magic Vestment",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Magic Weapon",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Magic Weapon, Greater",
+   "page": 310
+  },
+  {
+   "depth": 3,
+   "title": "Major Creation",
+   "page": 311
+  },
+  {
+   "depth": 3,
+   "title": "Major Image",
+   "page": 311
+  },
+  {
+   "depth": 3,
+   "title": "Make Whole",
+   "page": 311
+  },
+  {
+   "depth": 3,
+   "title": "Mark of Justice",
+   "page": 312
+  },
+  {
+   "depth": 3,
+   "title": "Mass (Spell Name)",
+   "page": 312
+  },
+  {
+   "depth": 3,
+   "title": "Maze",
+   "page": 312
+  },
+  {
+   "depth": 3,
+   "title": "Meld into Stone",
+   "page": 312
+  },
+  {
+   "depth": 3,
+   "title": "Mending",
+   "page": 312
+  },
+  {
+   "depth": 3,
+   "title": "Message",
+   "page": 313
+  },
+  {
+   "depth": 3,
+   "title": "Meteor Swarm",
+   "page": 313
+  },
+  {
+   "depth": 3,
+   "title": "Mind Blink",
+   "page": 313
+  },
+  {
+   "depth": 3,
+   "title": "Mind Fog",
+   "page": 313
+  },
+  {
+   "depth": 3,
+   "title": "Minor Creation",
+   "page": 313
+  },
+  {
+   "depth": 3,
+   "title": "Minor Image",
+   "page": 314
+  },
+  {
+   "depth": 3,
+   "title": "Miracle",
+   "page": 314
+  },
+  {
+   "depth": 3,
+   "title": "Mirage Arcana",
+   "page": 314
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Image",
+   "page": 314
+  },
+  {
+   "depth": 3,
+   "title": "Misdirection",
+   "page": 314
+  },
+  {
+   "depth": 3,
+   "title": "Mislead",
+   "page": 315
+  },
+  {
+   "depth": 3,
+   "title": "Mnemonic Enhancer",
+   "page": 315
+  },
+  {
+   "depth": 3,
+   "title": "Modify Memory",
+   "page": 315
+  },
+  {
+   "depth": 3,
+   "title": "Moment of Prescience",
+   "page": 315
+  },
+  {
+   "depth": 3,
+   "title": "Mount",
+   "page": 315
+  },
+  {
+   "depth": 3,
+   "title": "Move Earth",
+   "page": 316
+  },
+  {
+   "depth": 2,
+   "title": "Spells - N",
+   "page": 316
+  },
+  {
+   "depth": 3,
+   "title": "Neutralize Poison",
+   "page": 316
+  },
+  {
+   "depth": 3,
+   "title": "Nightmare",
+   "page": 316
+  },
+  {
+   "depth": 2,
+   "title": "Spells - O",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Obscure Object",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Obscuring Mist",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Open/Close",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Order's Wrath",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Overland Flight",
+   "page": 317
+  },
+  {
+   "depth": 3,
+   "title": "Owl's Wisdom",
+   "page": 318
+  },
+  {
+   "depth": 3,
+   "title": "Owl's Wisdom, Mass",
+   "page": 318
+  },
+  {
+   "depth": 2,
+   "title": "Spells - P",
+   "page": 318
+  },
+  {
+   "depth": 3,
+   "title": "Passwall",
+   "page": 318
+  },
+  {
+   "depth": 3,
+   "title": "Pass without Trace",
+   "page": 318
+  },
+  {
+   "depth": 3,
+   "title": "Permanency",
+   "page": 318
+  },
+  {
+   "depth": 3,
+   "title": "Permanent Image",
+   "page": 319
+  },
+  {
+   "depth": 3,
+   "title": "Persistent Image",
+   "page": 319
+  },
+  {
+   "depth": 3,
+   "title": "Phantasmal Killer",
+   "page": 319
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Steed",
+   "page": 319
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Trap",
+   "page": 320
+  },
+  {
+   "depth": 3,
+   "title": "Phase Door",
+   "page": 320
+  },
+  {
+   "depth": 3,
+   "title": "Planar Ally",
+   "page": 320
+  },
+  {
+   "depth": 3,
+   "title": "Planar Ally, Greater",
+   "page": 320
+  },
+  {
+   "depth": 3,
+   "title": "Planar Ally, Lesser",
+   "page": 320
+  },
+  {
+   "depth": 3,
+   "title": "Planar Binding",
+   "page": 321
+  },
+  {
+   "depth": 3,
+   "title": "Planar Binding, Greater",
+   "page": 321
+  },
+  {
+   "depth": 3,
+   "title": "Planar Binding, Lesser",
+   "page": 321
+  },
+  {
+   "depth": 3,
+   "title": "Plane Shift",
+   "page": 322
+  },
+  {
+   "depth": 3,
+   "title": "Plant Growth",
+   "page": 322
+  },
+  {
+   "depth": 3,
+   "title": "Plant Shape I",
+   "page": 322
+  },
+  {
+   "depth": 3,
+   "title": "Plant Shape II",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Plant Shape III",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Poison",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Polar Ray",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Polymorph",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Polymorph, Greater",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Polymorph Any Object",
+   "page": 323
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Blind",
+   "page": 324
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Kill",
+   "page": 324
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Stun",
+   "page": 324
+  },
+  {
+   "depth": 3,
+   "title": "Player",
+   "page": 324
+  },
+  {
+   "depth": 3,
+   "title": "Prestidigitation",
+   "page": 325
+  },
+  {
+   "depth": 3,
+   "title": "Prismatic Sphere",
+   "page": 325
+  },
+  {
+   "depth": 3,
+   "title": "Prismatic Spray",
+   "page": 325
+  },
+  {
+   "depth": 3,
+   "title": "Prismatic Wall",
+   "page": 325
+  },
+  {
+   "depth": 3,
+   "title": "Prying Eyes",
+   "page": 326
+  },
+  {
+   "depth": 3,
+   "title": "Prying Eyes, Greater",
+   "page": 326
+  },
+  {
+   "depth": 3,
+   "title": "Produce Flame",
+   "page": 326
+  },
+  {
+   "depth": 3,
+   "title": "Programmed Image",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Project Image",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Arrows",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Chaos",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Energy",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Evil",
+   "page": 327
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Good",
+   "page": 328
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Law",
+   "page": 328
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Spells",
+   "page": 328
+  },
+  {
+   "depth": 3,
+   "title": "Purify Food and Drink",
+   "page": 328
+  },
+  {
+   "depth": 3,
+   "title": "Pyrotechnics",
+   "page": 328
+  },
+  {
+   "depth": 2,
+   "title": "Spells - Q",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Quench",
+   "page": 329
+  },
+  {
+   "depth": 2,
+   "title": "Spells - R",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Rage",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Rainbow Pattern",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Raise Dead",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Ray of Enfeeblement",
+   "page": 329
+  },
+  {
+   "depth": 3,
+   "title": "Ray of Exhaustion",
+   "page": 330
+  },
+  {
+   "depth": 3,
+   "title": "Ray of Frost",
+   "page": 330
+  },
+  {
+   "depth": 3,
+   "title": "Read Magic",
+   "page": 330
+  },
+  {
+   "depth": 3,
+   "title": "Reduce Animal",
+   "page": 330
+  },
+  {
+   "depth": 3,
+   "title": "Reduce Person",
+   "page": 330
+  },
+  {
+   "depth": 3,
+   "title": "Reduce Person, Mass",
+   "page": 331
+  },
+  {
+   "depth": 3,
+   "title": "Refuge",
+   "page": 331
+  },
+  {
+   "depth": 3,
+   "title": "Regenerate",
+   "page": 331
+  },
+  {
+   "depth": 3,
+   "title": "Reincarnate",
+   "page": 331
+  },
+  {
+   "depth": 3,
+   "title": "Remove Blindness/Deafness",
+   "page": 332
+  },
+  {
+   "depth": 3,
+   "title": "Remove Curse",
+   "page": 332
+  },
+  {
+   "depth": 3,
+   "title": "Remove Disease",
+   "page": 332
+  },
+  {
+   "depth": 3,
+   "title": "Remove Fear",
+   "page": 332
+  },
+  {
+   "depth": 3,
+   "title": "Remove Paralysis",
+   "page": 332
+  },
+  {
+   "depth": 3,
+   "title": "Repel Metal or Stone",
+   "page": 333
+  },
+  {
+   "depth": 3,
+   "title": "Repel Vermin",
+   "page": 333
+  },
+  {
+   "depth": 3,
+   "title": "Repel Wood",
+   "page": 333
+  },
+  {
+   "depth": 3,
+   "title": "Repulsion",
+   "page": 333
+  },
+  {
+   "depth": 3,
+   "title": "Resilient Sphere",
+   "page": 333
+  },
+  {
+   "depth": 3,
+   "title": "Resistance",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Resist Energy",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Restoration",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Restoration, Greater",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Restoration, Lesser",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Resurrection",
+   "page": 334
+  },
+  {
+   "depth": 3,
+   "title": "Reverse Gravity",
+   "page": 335
+  },
+  {
+   "depth": 3,
+   "title": "Righteous Might",
+   "page": 335
+  },
+  {
+   "depth": 3,
+   "title": "Rope Trick",
+   "page": 335
+  },
+  {
+   "depth": 3,
+   "title": "Rusting Grasp",
+   "page": 335
+  },
+  {
+   "depth": 2,
+   "title": "Spells - S",
+   "page": 336
+  },
+  {
+   "depth": 3,
+   "title": "Sanctuary",
+   "page": 336
+  },
+  {
+   "depth": 3,
+   "title": "Scare",
+   "page": 336
+  },
+  {
+   "depth": 3,
+   "title": "Scintillating Pattern",
+   "page": 336
+  },
+  {
+   "depth": 3,
+   "title": "Scorching Ray",
+   "page": 337
+  },
+  {
+   "depth": 3,
+   "title": "Screen",
+   "page": 337
+  },
+  {
+   "depth": 3,
+   "title": "Scrying",
+   "page": 337
+  },
+  {
+   "depth": 3,
+   "title": "Scrying, Greater",
+   "page": 337
+  },
+  {
+   "depth": 3,
+   "title": "Sculpt Sound",
+   "page": 338
+  },
+  {
+   "depth": 3,
+   "title": "Searing Light",
+   "page": 338
+  },
+  {
+   "depth": 3,
+   "title": "Secret Chest",
+   "page": 338
+  },
+  {
+   "depth": 3,
+   "title": "Secret Page",
+   "page": 338
+  },
+  {
+   "depth": 3,
+   "title": "Secure Shelter",
+   "page": 338
+  },
+  {
+   "depth": 3,
+   "title": "See Invisibility",
+   "page": 339
+  },
+  {
+   "depth": 3,
+   "title": "Seeming",
+   "page": 339
+  },
+  {
+   "depth": 3,
+   "title": "Sending",
+   "page": 339
+  },
+  {
+   "depth": 3,
+   "title": "Sepia Snake Sigil",
+   "page": 339
+  },
+  {
+   "depth": 3,
+   "title": "Sequester",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shades",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Conjuration",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Conjuration, Greater",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Evocation",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Evocation, Greater",
+   "page": 340
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Walk",
+   "page": 341
+  },
+  {
+   "depth": 3,
+   "title": "Shambler",
+   "page": 341
+  },
+  {
+   "depth": 3,
+   "title": "Shapechange",
+   "page": 341
+  },
+  {
+   "depth": 3,
+   "title": "Shatter",
+   "page": 341
+  },
+  {
+   "depth": 3,
+   "title": "Shield",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shield of Faith",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shield of Law",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shield Other",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shillelagh",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shrink Item",
+   "page": 342
+  },
+  {
+   "depth": 3,
+   "title": "Shocking Grasp",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Shout",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Shout, Greater",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Silence",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Silent Image",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Simulacrum",
+   "page": 343
+  },
+  {
+   "depth": 3,
+   "title": "Slay Living",
+   "page": 344
+  },
+  {
+   "depth": 3,
+   "title": "Sleep",
+   "page": 344
+  },
+  {
+   "depth": 3,
+   "title": "Sleet Storm",
+   "page": 344
+  },
+  {
+   "depth": 3,
+   "title": "Slow",
+   "page": 344
+  },
+  {
+   "depth": 3,
+   "title": "Snare",
+   "page": 344
+  },
+  {
+   "depth": 3,
+   "title": "Soften Earth and Stone",
+   "page": 345
+  },
+  {
+   "depth": 3,
+   "title": "Solid Fog",
+   "page": 345
+  },
+  {
+   "depth": 3,
+   "title": "Song of Discord",
+   "page": 345
+  },
+  {
+   "depth": 3,
+   "title": "Soul Bind",
+   "page": 345
+  },
+  {
+   "depth": 3,
+   "title": "Sound Burst",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Speak with Animals",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Speak with Dead",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Speak with Plants",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Spectral Hand",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Spell Immunity",
+   "page": 346
+  },
+  {
+   "depth": 3,
+   "title": "Spell Immunity, Greater",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spell Resistance",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spellstaff",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spell Turning",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spider Climb",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spike Growth",
+   "page": 347
+  },
+  {
+   "depth": 3,
+   "title": "Spike Stones",
+   "page": 348
+  },
+  {
+   "depth": 3,
+   "title": "Spiritual Weapon",
+   "page": 348
+  },
+  {
+   "depth": 3,
+   "title": "Stabilize",
+   "page": 348
+  },
+  {
+   "depth": 3,
+   "title": "Statue",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Status",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Stinking Cloud",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Stone Shape",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Stoneskin",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Stone Tell",
+   "page": 349
+  },
+  {
+   "depth": 3,
+   "title": "Stone to Flesh",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Storm of Vengeance",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Suggestion",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Suggestion, Mass",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Summon Instrument",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster I",
+   "page": 350
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster II",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster III",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster IV",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster V",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster VI",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster VII",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster VIII",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Monster IX",
+   "page": 352
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally I",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally II",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally III",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally IV",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally V",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally VI",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally VII",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally VIII",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Nature's Ally IX",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Summon Swarm",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Sunbeam",
+   "page": 354
+  },
+  {
+   "depth": 3,
+   "title": "Sunburst",
+   "page": 355
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Death",
+   "page": 355
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Fear",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Insanity",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Pain",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Persuation",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Sleep",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Stunning",
+   "page": 356
+  },
+  {
+   "depth": 3,
+   "title": "Symbol of Weakness",
+   "page": 357
+  },
+  {
+   "depth": 3,
+   "title": "Smpathetic Vibration",
+   "page": 357
+  },
+  {
+   "depth": 3,
+   "title": "Sympathy",
+   "page": 357
+  },
+  {
+   "depth": 2,
+   "title": "Spells - T",
+   "page": 357
+  },
+  {
+   "depth": 3,
+   "title": "Telekinesis",
+   "page": 357
+  },
+  {
+   "depth": 3,
+   "title": "Telekinetic Sphere",
+   "page": 358
+  },
+  {
+   "depth": 3,
+   "title": "Telepathic Bond",
+   "page": 358
+  },
+  {
+   "depth": 3,
+   "title": "Teleport",
+   "page": 358
+  },
+  {
+   "depth": 3,
+   "title": "Teleport, Greater",
+   "page": 359
+  },
+  {
+   "depth": 3,
+   "title": "Teleport Object",
+   "page": 359
+  },
+  {
+   "depth": 3,
+   "title": "Teleportation Circle",
+   "page": 359
+  },
+  {
+   "depth": 3,
+   "title": "Temporal Stasis",
+   "page": 359
+  },
+  {
+   "depth": 3,
+   "title": "Time Stop",
+   "page": 359
+  },
+  {
+   "depth": 3,
+   "title": "Tiny Hut",
+   "page": 360
+  },
+  {
+   "depth": 3,
+   "title": "Tongues",
+   "page": 360
+  },
+  {
+   "depth": 3,
+   "title": "Touch of Fatigue",
+   "page": 360
+  },
+  {
+   "depth": 3,
+   "title": "Touch of Idiocy",
+   "page": 360
+  },
+  {
+   "depth": 3,
+   "title": "Transformation",
+   "page": 360
+  },
+  {
+   "depth": 3,
+   "title": "Transmute Metal to Wood",
+   "page": 361
+  },
+  {
+   "depth": 3,
+   "title": "Transmute Mud to Rock",
+   "page": 361
+  },
+  {
+   "depth": 3,
+   "title": "Transmute Rock to Mud",
+   "page": 361
+  },
+  {
+   "depth": 3,
+   "title": "Transport via plants",
+   "page": 361
+  },
+  {
+   "depth": 3,
+   "title": "Trap the Soul",
+   "page": 362
+  },
+  {
+   "depth": 3,
+   "title": "Tree Shape",
+   "page": 362
+  },
+  {
+   "depth": 3,
+   "title": "Tree Stride",
+   "page": 362
+  },
+  {
+   "depth": 3,
+   "title": "True Resurrection",
+   "page": 362
+  },
+  {
+   "depth": 3,
+   "title": "True Seeing",
+   "page": 363
+  },
+  {
+   "depth": 3,
+   "title": "True Strike",
+   "page": 363
+  },
+  {
+   "depth": 2,
+   "title": "Spells - U",
+   "page": 363
+  },
+  {
+   "depth": 3,
+   "title": "Undeath to Death",
+   "page": 363
+  },
+  {
+   "depth": 3,
+   "title": "Undetectable Alignment",
+   "page": 363
+  },
+  {
+   "depth": 3,
+   "title": "Unhallow",
+   "page": 363
+  },
+  {
+   "depth": 3,
+   "title": "Unholy Aura",
+   "page": 364
+  },
+  {
+   "depth": 3,
+   "title": "Unholy Blight",
+   "page": 364
+  },
+  {
+   "depth": 3,
+   "title": "Unseen Servant",
+   "page": 364
+  },
+  {
+   "depth": 2,
+   "title": "Spells - V",
+   "page": 364
+  },
+  {
+   "depth": 3,
+   "title": "Vampiric Touch",
+   "page": 364
+  },
+  {
+   "depth": 3,
+   "title": "Veil",
+   "page": 364
+  },
+  {
+   "depth": 3,
+   "title": "Ventriloquism",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Virtue",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Vision",
+   "page": 365
+  },
+  {
+   "depth": 2,
+   "title": "Spells - W",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Wail of the Banshee",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Fire",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Force",
+   "page": 365
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Ice",
+   "page": 366
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Iron",
+   "page": 367
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Stone",
+   "page": 367
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Thorns",
+   "page": 367
+  },
+  {
+   "depth": 3,
+   "title": "Warp Wood",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Water Breathing",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Water Walk",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Waves of Exhaustion",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Waves of Fatigue",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Web",
+   "page": 368
+  },
+  {
+   "depth": 3,
+   "title": "Weird",
+   "page": 369
+  },
+  {
+   "depth": 3,
+   "title": "Whirlwind",
+   "page": 369
+  },
+  {
+   "depth": 3,
+   "title": "Whispering Wind",
+   "page": 369
+  },
+  {
+   "depth": 3,
+   "title": "Wind Walk",
+   "page": 369
+  },
+  {
+   "depth": 3,
+   "title": "Wind Wall",
+   "page": 370
+  },
+  {
+   "depth": 3,
+   "title": "Wish",
+   "page": 370
+  },
+  {
+   "depth": 3,
+   "title": "Wood Shape",
+   "page": 370
+  },
+  {
+   "depth": 3,
+   "title": "Word of Recall",
+   "page": 371
+  },
+  {
+   "depth": 3,
+   "title": "Word of Chaos",
+   "page": 371
+  },
+  {
+   "depth": 2,
+   "title": "Spells - Z",
+   "page": 371
+  },
+  {
+   "depth": 3,
+   "title": "Zone of Silence",
+   "page": 371
+  },
+  {
+   "depth": 3,
+   "title": "Zone of Truth",
+   "page": 371
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 11 - Prestige Classes",
+   "page": 372
+  },
+  {
+   "depth": 1,
+   "title": "Definitions of Terms",
+   "page": 374
+  },
+  {
+   "depth": 1,
+   "title": "Arcane Archer",
+   "page": 374
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 374
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 374
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 374
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-1: Arcane Archer",
+   "page": 375
+  },
+  {
+   "depth": 1,
+   "title": "Arcane Trickster",
+   "page": 376
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 376
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 376
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 377
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-2: Arcane Trickster",
+   "page": 377
+  },
+  {
+   "depth": 1,
+   "title": "Assassin",
+   "page": 378
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 378
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 378
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 378
+  },
+  {
+   "depth": 2,
+   "title": "Table 11–3: Assassin",
+   "page": 379
+  },
+  {
+   "depth": 1,
+   "title": "Dragon Disciple",
+   "page": 380
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 380
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 381
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 381
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-4: Dragon Disciple",
+   "page": 380
+  },
+  {
+   "depth": 1,
+   "title": "Duelist",
+   "page": 382
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 382
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 382
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 382
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-5: Duelist",
+   "page": 383
+  },
+  {
+   "depth": 1,
+   "title": "Eldritch Knight",
+   "page": 384
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 384
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 384
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 384
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-6: Eldritch Knight",
+   "page": 384
+  },
+  {
+   "depth": 1,
+   "title": "Loremaster",
+   "page": 385
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 386
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 386
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 386
+  },
+  {
+   "depth": 2,
+   "title": "Table 11–7: Loremaster",
+   "page": 387
+  },
+  {
+   "depth": 3,
+   "title": "Loremaster Secrets",
+   "page": 387
+  },
+  {
+   "depth": 1,
+   "title": "Mystic Theuge",
+   "page": 387
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 387
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 387
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 387
+  },
+  {
+   "depth": 2,
+   "title": "Table 11–8: Mystic Theurge",
+   "page": 389
+  },
+  {
+   "depth": 1,
+   "title": "Pathfinder Chronicler",
+   "page": 388
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 389
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 389
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 389
+  },
+  {
+   "depth": 2,
+   "title": "Table 11–9: Pathfinder Chronicler",
+   "page": 391
+  },
+  {
+   "depth": 1,
+   "title": "Shadowdancer",
+   "page": 391
+  },
+  {
+   "depth": 2,
+   "title": "Requirements",
+   "page": 392
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 392
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 392
+  },
+  {
+   "depth": 2,
+   "title": "Table 11-10: Shadowdancer",
+   "page": 392
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 12 - Gamemastering",
+   "page": 394
+  },
+  {
+   "depth": 1,
+   "title": "Starting a Campaign",
+   "page": 396
+  },
+  {
+   "depth": 1,
+   "title": "Published Adventures",
+   "page": 396
+  },
+  {
+   "depth": 1,
+   "title": "Building An Adventure",
+   "page": 396
+  },
+  {
+   "depth": 2,
+   "title": "Stat Blocks",
+   "page": 397
+  },
+  {
+   "depth": 2,
+   "title": "Designing Encounters",
+   "page": 397
+  },
+  {
+   "depth": 3,
+   "title": "Table 12–1: Encounter Design",
+   "page": 397
+  },
+  {
+   "depth": 3,
+   "title": "Table 12–3: CR Equivalencies",
+   "page": 398
+  },
+  {
+   "depth": 2,
+   "title": "Awarding Experience",
+   "page": 399
+  },
+  {
+   "depth": 3,
+   "title": "Table 12–2: Experience Point Awards",
+   "page": 398
+  },
+  {
+   "depth": 2,
+   "title": "Placing Treasure",
+   "page": 399
+  },
+  {
+   "depth": 3,
+   "title": "Table 12–4: Character Wealth by Level",
+   "page": 399
+  },
+  {
+   "depth": 3,
+   "title": "Table 12–5: Treasure Values per Encounter",
+   "page": 399
+  },
+  {
+   "depth": 2,
+   "title": "Building a Treasure Hoard",
+   "page": 400
+  },
+  {
+   "depth": 1,
+   "title": "Preparing for the Game",
+   "page": 401
+  },
+  {
+   "depth": 1,
+   "title": "During the Game",
+   "page": 402
+  },
+  {
+   "depth": 2,
+   "title": "Campaign Journal",
+   "page": 403
+  },
+  {
+   "depth": 1,
+   "title": "Campaign Tips",
+   "page": 404
+  },
+  {
+   "depth": 2,
+   "title": "Cost of Living",
+   "page": 405
+  },
+  {
+   "depth": 2,
+   "title": "Monstrous Characters",
+   "page": 405
+  },
+  {
+   "depth": 3,
+   "title": "Alternative Races",
+   "page": 406
+  },
+  {
+   "depth": 1,
+   "title": "Ending the Campaign",
+   "page": 406
+  },
+  {
+   "depth": 2,
+   "title": "Beyond 20th Level",
+   "page": 406
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 13 - Environment",
+   "page": 408
+  },
+  {
+   "depth": 1,
+   "title": "Dungeons",
+   "page": 410
+  },
+  {
+   "depth": 2,
+   "title": "Types of Dungeons",
+   "page": 410
+  },
+  {
+   "depth": 2,
+   "title": "Dungeon Terrain",
+   "page": 410
+  },
+  {
+   "depth": 3,
+   "title": "Walls",
+   "page": 410
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–1: Walls",
+   "page": 411
+  },
+  {
+   "depth": 3,
+   "title": "Floors",
+   "page": 411
+  },
+  {
+   "depth": 3,
+   "title": "Doors",
+   "page": 412
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–2: Doors",
+   "page": 413
+  },
+  {
+   "depth": 3,
+   "title": "Walls, Doors, and Detect Spells",
+   "page": 415
+  },
+  {
+   "depth": 3,
+   "title": "Stairs",
+   "page": 415
+  },
+  {
+   "depth": 3,
+   "title": "Cave-Ins and Collapses (CR 8)",
+   "page": 415
+  },
+  {
+   "depth": 3,
+   "title": "Slimes, Molds, and Fungi",
+   "page": 415
+  },
+  {
+   "depth": 1,
+   "title": "Traps",
+   "page": 416
+  },
+  {
+   "depth": 2,
+   "title": "Elements of a Trap",
+   "page": 416
+  },
+  {
+   "depth": 3,
+   "title": "Type",
+   "page": 416
+  },
+  {
+   "depth": 3,
+   "title": "Perception and Disable Device DCs",
+   "page": 417
+  },
+  {
+   "depth": 3,
+   "title": "Trigger",
+   "page": 417
+  },
+  {
+   "depth": 3,
+   "title": "Duration",
+   "page": 417
+  },
+  {
+   "depth": 3,
+   "title": "Reset",
+   "page": 417
+  },
+  {
+   "depth": 3,
+   "title": "Bypass (Optional Element)",
+   "page": 418
+  },
+  {
+   "depth": 3,
+   "title": "Effect",
+   "page": 418
+  },
+  {
+   "depth": 3,
+   "title": "Miscellaneous Trap Features",
+   "page": 419
+  },
+  {
+   "depth": 2,
+   "title": "Sample Traps",
+   "page": 420
+  },
+  {
+   "depth": 2,
+   "title": "Designing a Trap",
+   "page": 423
+  },
+  {
+   "depth": 3,
+   "title": "Challenge Rating of a Trap",
+   "page": 423
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–3: CR Modifiers forMechanical Traps",
+   "page": 422
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–4: CR Modifiers for Magic Traps",
+   "page": 423
+  },
+  {
+   "depth": 3,
+   "title": "Mechanical Trap Cost",
+   "page": 423
+  },
+  {
+   "depth": 3,
+   "title": "Magic Device Trap Cost",
+   "page": 423
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–5: Cost Modifiers for Magic Device Traps",
+   "page": 424
+  },
+  {
+   "depth": 3,
+   "title": "Spell Trap Cost",
+   "page": 423
+  },
+  {
+   "depth": 3,
+   "title": "Craft DCs for Mechanical Traps",
+   "page": 423
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–6: Craft (Traps) DCs",
+   "page": 424
+  },
+  {
+   "depth": 1,
+   "title": "Wilderness",
+   "page": 424
+  },
+  {
+   "depth": 2,
+   "title": "Getting Lost",
+   "page": 424
+  },
+  {
+   "depth": 2,
+   "title": "Forest Terrain",
+   "page": 425
+  },
+  {
+   "depth": 3,
+   "title": "Forest Fires (CR 6)",
+   "page": 426
+  },
+  {
+   "depth": 2,
+   "title": "Marsh Terrain",
+   "page": 427
+  },
+  {
+   "depth": 2,
+   "title": "Hills Terrain",
+   "page": 427
+  },
+  {
+   "depth": 2,
+   "title": "Mountain Terrain",
+   "page": 428
+  },
+  {
+   "depth": 3,
+   "title": "Avalanches (CR 7)",
+   "page": 429
+  },
+  {
+   "depth": 3,
+   "title": "Mountain Travel",
+   "page": 430
+  },
+  {
+   "depth": 2,
+   "title": "Desert Terrain",
+   "page": 430
+  },
+  {
+   "depth": 3,
+   "title": "Sandstorms",
+   "page": 431
+  },
+  {
+   "depth": 2,
+   "title": "Plains Terrain",
+   "page": 431
+  },
+  {
+   "depth": 2,
+   "title": "Aquatic Terrain",
+   "page": 432
+  },
+  {
+   "depth": 3,
+   "title": "Underwater Combat",
+   "page": 432
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–7: Combat Adjustments Underwater",
+   "page": 433
+  },
+  {
+   "depth": 3,
+   "title": "Floods",
+   "page": 433
+  },
+  {
+   "depth": 1,
+   "title": "Urban Adventures",
+   "page": 433
+  },
+  {
+   "depth": 2,
+   "title": "Weapon and Spell Restrictions",
+   "page": 433
+  },
+  {
+   "depth": 2,
+   "title": "Urban Features",
+   "page": 433
+  },
+  {
+   "depth": 3,
+   "title": "Walls and Gates",
+   "page": 433
+  },
+  {
+   "depth": 3,
+   "title": "Guards and Soldiers",
+   "page": 434
+  },
+  {
+   "depth": 3,
+   "title": "Siege Engines",
+   "page": 434
+  },
+  {
+   "depth": 4,
+   "title": "Table 13–8: Siege Engines",
+   "page": 435
+  },
+  {
+   "depth": 3,
+   "title": "City Streets",
+   "page": 436
+  },
+  {
+   "depth": 3,
+   "title": "Above and Beneath the Streets",
+   "page": 437
+  },
+  {
+   "depth": 3,
+   "title": "City Buildings",
+   "page": 437
+  },
+  {
+   "depth": 3,
+   "title": "City Lights",
+   "page": 437
+  },
+  {
+   "depth": 1,
+   "title": "Weather",
+   "page": 437
+  },
+  {
+   "depth": 2,
+   "title": "Table 13–9: Random Weather",
+   "page": 439
+  },
+  {
+   "depth": 2,
+   "title": "Rain, Snow, Sleet, and Hail",
+   "page": 438
+  },
+  {
+   "depth": 2,
+   "title": "Storms",
+   "page": 438
+  },
+  {
+   "depth": 2,
+   "title": "Fog",
+   "page": 439
+  },
+  {
+   "depth": 2,
+   "title": "Winds",
+   "page": 439
+  },
+  {
+   "depth": 3,
+   "title": "Table 13–10: Wind Effects",
+   "page": 439
+  },
+  {
+   "depth": 1,
+   "title": "The Planes",
+   "page": 440
+  },
+  {
+   "depth": 2,
+   "title": "Layered Planes",
+   "page": 441
+  },
+  {
+   "depth": 2,
+   "title": "How Planes Interact",
+   "page": 441
+  },
+  {
+   "depth": 1,
+   "title": "Environmental Rules",
+   "page": 442
+  },
+  {
+   "depth": 2,
+   "title": "Acid Effects",
+   "page": 442
+  },
+  {
+   "depth": 2,
+   "title": "Cold Dangers",
+   "page": 442
+  },
+  {
+   "depth": 3,
+   "title": "Ice Effects",
+   "page": 442
+  },
+  {
+   "depth": 2,
+   "title": "Darkness",
+   "page": 442
+  },
+  {
+   "depth": 2,
+   "title": "Falling",
+   "page": 443
+  },
+  {
+   "depth": 2,
+   "title": "Falling Objects",
+   "page": 443
+  },
+  {
+   "depth": 3,
+   "title": "Table 13–11: Damage from Falling Objects",
+   "page": 443
+  },
+  {
+   "depth": 2,
+   "title": "Heat Dangers",
+   "page": 444
+  },
+  {
+   "depth": 3,
+   "title": "Catching on Fire",
+   "page": 444
+  },
+  {
+   "depth": 3,
+   "title": "Lava Effects",
+   "page": 444
+  },
+  {
+   "depth": 2,
+   "title": "Smoke Effects",
+   "page": 444
+  },
+  {
+   "depth": 2,
+   "title": "Starvation and Thirst",
+   "page": 444
+  },
+  {
+   "depth": 2,
+   "title": "Suffocation",
+   "page": 445
+  },
+  {
+   "depth": 2,
+   "title": "Water Dangers",
+   "page": 445
+  },
+  {
+   "depth": 3,
+   "title": "Drowning",
+   "page": 445
+  },
+  {
+   "depth": 0,
+   "title": "Chaper 14 - Creating NPCs",
+   "page": 446
+  },
+  {
+   "depth": 1,
+   "title": "Adept",
+   "page": 448
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 448
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 448
+  },
+  {
+   "depth": 2,
+   "title": "Adept Spell List",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Table 14–1: Adept",
+   "page": 448
+  },
+  {
+   "depth": 1,
+   "title": "Aristocrat",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Table 14–2: Aristocrat",
+   "page": 450
+  },
+  {
+   "depth": 1,
+   "title": "Commoner",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 449
+  },
+  {
+   "depth": 2,
+   "title": "Table 14–3: Commoner",
+   "page": 450
+  },
+  {
+   "depth": 1,
+   "title": "Expert",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Table 14–4: Expert",
+   "page": 451
+  },
+  {
+   "depth": 1,
+   "title": "Warrior",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Class Skills",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Class Features",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Table 14–5: Warrior",
+   "page": 451
+  },
+  {
+   "depth": 1,
+   "title": "Creating NPCs",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Step 1: The Basics",
+   "page": 450
+  },
+  {
+   "depth": 2,
+   "title": "Step 2: Determine Ability Scores",
+   "page": 450
+  },
+  {
+   "depth": 3,
+   "title": "Table 14–6: NPC Ability Scores",
+   "page": 453
+  },
+  {
+   "depth": 3,
+   "title": "Table 14–7: Racial Ability Adjustments",
+   "page": 453
+  },
+  {
+   "depth": 2,
+   "title": "Step 3: Skills",
+   "page": 451
+  },
+  {
+   "depth": 3,
+   "title": "Table 14–8: NPC Skill Selections",
+   "page": 453
+  },
+  {
+   "depth": 2,
+   "title": "Step 4: Feats",
+   "page": 452
+  },
+  {
+   "depth": 2,
+   "title": "Step 5: Class Features",
+   "page": 453
+  },
+  {
+   "depth": 2,
+   "title": "Step 6: Gear",
+   "page": 453
+  },
+  {
+   "depth": 3,
+   "title": "Table 14–9: NPC Gear",
+   "page": 454
+  },
+  {
+   "depth": 2,
+   "title": "Step 7: Details",
+   "page": 454
+  },
+  {
+   "depth": 2,
+   "title": "Example: Kiramor, the Forest Shadow",
+   "page": 454
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 15 - Magic Items",
+   "page": 456
+  },
+  {
+   "depth": 1,
+   "title": "Magic Items and Detect Magic",
+   "page": 458
+  },
+  {
+   "depth": 1,
+   "title": "Using Items",
+   "page": 458
+  },
+  {
+   "depth": 2,
+   "title": "Size and Magic Items",
+   "page": 459
+  },
+  {
+   "depth": 1,
+   "title": "Magic Items on the Body",
+   "page": 459
+  },
+  {
+   "depth": 1,
+   "title": "Saving Throws Against Magic Item Powers",
+   "page": 459
+  },
+  {
+   "depth": 1,
+   "title": "Damaging Magic Items",
+   "page": 459
+  },
+  {
+   "depth": 2,
+   "title": "Repairing Magic Items",
+   "page": 459
+  },
+  {
+   "depth": 2,
+   "title": "Charges, Doses, and Multiple Uses",
+   "page": 459
+  },
+  {
+   "depth": 1,
+   "title": "Purchasing Magic Items",
+   "page": 460
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–1: Available Magic Items",
+   "page": 461
+  },
+  {
+   "depth": 1,
+   "title": "Magic Item Descriptions",
+   "page": 460
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–2: Random Magic Item Generation",
+   "page": 461
+  },
+  {
+   "depth": 1,
+   "title": "Armor",
+   "page": 461
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–3: Armor and Shields",
+   "page": 461
+  },
+  {
+   "depth": 2,
+   "title": "Magic Armor and Shield Special Ability Descriptions",
+   "page": 462
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–4: Armor Special Abilities",
+   "page": 463
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–5: Shield Special Abilities",
+   "page": 463
+  },
+  {
+   "depth": 2,
+   "title": "Magic Armor and Shield Special Ability Descriptions",
+   "page": 462
+  },
+  {
+   "depth": 2,
+   "title": "Specific Armors",
+   "page": 464
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–6: Specific Armors",
+   "page": 464
+  },
+  {
+   "depth": 2,
+   "title": "Specific Shields",
+   "page": 466
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–7: Specific Shields",
+   "page": 467
+  },
+  {
+   "depth": 1,
+   "title": "Weapons",
+   "page": 467
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–8: Weapons",
+   "page": 468
+  },
+  {
+   "depth": 2,
+   "title": "Magic Weapon Special Ability Descriptions",
+   "page": 468
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–9: Melee Weapon Special Abilities",
+   "page": 469
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–10: Ranged Weapon Special Abilities",
+   "page": 469
+  },
+  {
+   "depth": 2,
+   "title": "Specific Weapons",
+   "page": 472
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–11: Specific Weapons",
+   "page": 471
+  },
+  {
+   "depth": 1,
+   "title": "Potions",
+   "page": 477
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–12: Potions",
+   "page": 478
+  },
+  {
+   "depth": 1,
+   "title": "Rings",
+   "page": 478
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–13: Rings",
+   "page": 479
+  },
+  {
+   "depth": 1,
+   "title": "Rods",
+   "page": 484
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–14: Rods",
+   "page": 485
+  },
+  {
+   "depth": 1,
+   "title": "Scrolls",
+   "page": 490
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–15: Scrolls",
+   "page": 491
+  },
+  {
+   "depth": 1,
+   "title": "Staves",
+   "page": 491
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–16: Staves",
+   "page": 492
+  },
+  {
+   "depth": 1,
+   "title": "Wands",
+   "page": 496
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–17: Wands",
+   "page": 496
+  },
+  {
+   "depth": 1,
+   "title": "Wondrous Items",
+   "page": 496
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–18: Minor Wondrous Items",
+   "page": 497
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–19: Medium Wondrous Items",
+   "page": 498
+  },
+  {
+   "depth": 2,
+   "title": "Table 15–20: Major Wondrous Items",
+   "page": 499
+  },
+  {
+   "depth": 1,
+   "title": "Intelligent Items",
+   "page": 532
+  },
+  {
+   "depth": 2,
+   "title": "Designing an Intelligent Item",
+   "page": 532
+  },
+  {
+   "depth": 2,
+   "title": "Intelligent Item Alignment",
+   "page": 533
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–21: Intelligent Item Alignment",
+   "page": 533
+  },
+  {
+   "depth": 2,
+   "title": "Intelligent Item Ability Scores",
+   "page": 533
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–22: Intelligent Item Ability Scores",
+   "page": 533
+  },
+  {
+   "depth": 2,
+   "title": "Languages Spoken by Item",
+   "page": 533
+  },
+  {
+   "depth": 2,
+   "title": "Senses and Communication",
+   "page": 533
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–23: Intelligent Item Senses and Communication",
+   "page": 533
+  },
+  {
+   "depth": 2,
+   "title": "Intelligent Item Powers",
+   "page": 535
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–24: Intelligent Item Powers",
+   "page": 534
+  },
+  {
+   "depth": 2,
+   "title": "Special Purpose Items",
+   "page": 535
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–25: Intelligent Item Purpose",
+   "page": 534
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–26: Special Purpose Item Dedicated Powers",
+   "page": 534
+  },
+  {
+   "depth": 2,
+   "title": "Dedicated Powers",
+   "page": 535
+  },
+  {
+   "depth": 2,
+   "title": "Item Ego",
+   "page": 535
+  },
+  {
+   "depth": 2,
+   "title": "Items against Characters",
+   "page": 535
+  },
+  {
+   "depth": 1,
+   "title": "Cursed Items",
+   "page": 536
+  },
+  {
+   "depth": 2,
+   "title": "Common Cursed Item Effects",
+   "page": 536
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–27: Common Item Curses",
+   "page": 537
+  },
+  {
+   "depth": 2,
+   "title": "Specific Cursed Items",
+   "page": 538
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–28: Specific Cursed Items",
+   "page": 537
+  },
+  {
+   "depth": 1,
+   "title": "Artifacts",
+   "page": 543
+  },
+  {
+   "depth": 2,
+   "title": "Minor Artifacts",
+   "page": 543
+  },
+  {
+   "depth": 2,
+   "title": "Major Artifacts",
+   "page": 547
+  },
+  {
+   "depth": 1,
+   "title": "Magic Item Creation",
+   "page": 548
+  },
+  {
+   "depth": 2,
+   "title": "Magic Item Gold Piece Values",
+   "page": 549
+  },
+  {
+   "depth": 3,
+   "title": "Table 15–29: Estimating Magic Item Gold Piece Values",
+   "page": 550
+  },
+  {
+   "depth": 2,
+   "title": "Creating Magic Armor",
+   "page": 550
+  },
+  {
+   "depth": 2,
+   "title": "Creating Magic Weapons",
+   "page": 551
+  },
+  {
+   "depth": 2,
+   "title": "Creating Potions",
+   "page": 551
+  },
+  {
+   "depth": 2,
+   "title": "Creating Rings",
+   "page": 551
+  },
+  {
+   "depth": 2,
+   "title": "Creating Rods",
+   "page": 552
+  },
+  {
+   "depth": 2,
+   "title": "Creating Scrolls",
+   "page": 552
+  },
+  {
+   "depth": 2,
+   "title": "Creating Staves",
+   "page": 552
+  },
+  {
+   "depth": 2,
+   "title": "Creating Wands",
+   "page": 553
+  },
+  {
+   "depth": 2,
+   "title": "Creating Wondrous Items",
+   "page": 553
+  },
+  {
+   "depth": 2,
+   "title": "Adding New Abilities",
+   "page": 553
+  },
+  {
+   "depth": 0,
+   "title": "Appendix 1: Special Abilities",
+   "page": 554
+  },
+  {
+   "depth": 1,
+   "title": "Table 16–1: Special Ability Types",
+   "page": 555
+  },
+  {
+   "depth": 1,
+   "title": "Ability Score Bonuses",
+   "page": 554
+  },
+  {
+   "depth": 1,
+   "title": "Ability Score Damage, Penalty, and Drain",
+   "page": 555
+  },
+  {
+   "depth": 1,
+   "title": "Afflictions",
+   "page": 555
+  },
+  {
+   "depth": 2,
+   "title": "Curses",
+   "page": 556
+  },
+  {
+   "depth": 2,
+   "title": "Diseases",
+   "page": 557
+  },
+  {
+   "depth": 2,
+   "title": "Poison",
+   "page": 557
+  },
+  {
+   "depth": 3,
+   "title": "Table 16–2: Sample Poisons",
+   "page": 559
+  },
+  {
+   "depth": 1,
+   "title": "Blindsight and Blindsense",
+   "page": 560
+  },
+  {
+   "depth": 1,
+   "title": "Channel Resistance",
+   "page": 561
+  },
+  {
+   "depth": 1,
+   "title": "Charm and Compulsion",
+   "page": 561
+  },
+  {
+   "depth": 1,
+   "title": "Damage Reduction",
+   "page": 561
+  },
+  {
+   "depth": 1,
+   "title": "Darkvision",
+   "page": 562
+  },
+  {
+   "depth": 1,
+   "title": "Death Attacks",
+   "page": 562
+  },
+  {
+   "depth": 1,
+   "title": "Energy Drain and Negative Levels",
+   "page": 562
+  },
+  {
+   "depth": 1,
+   "title": "Energy Immunity and Vulnerability",
+   "page": 562
+  },
+  {
+   "depth": 1,
+   "title": "Energy Resistance",
+   "page": 562
+  },
+  {
+   "depth": 1,
+   "title": "Fear",
+   "page": 563
+  },
+  {
+   "depth": 1,
+   "title": "Invisibility",
+   "page": 563
+  },
+  {
+   "depth": 1,
+   "title": "Low-Light Vision",
+   "page": 564
+  },
+  {
+   "depth": 1,
+   "title": "Paralysis",
+   "page": 564
+  },
+  {
+   "depth": 1,
+   "title": "Scent",
+   "page": 564
+  },
+  {
+   "depth": 1,
+   "title": "Spell Resistance",
+   "page": 564
+  },
+  {
+   "depth": 1,
+   "title": "When Spell Resistance Applies",
+   "page": 565
+  },
+  {
+   "depth": 1,
+   "title": "Successful Spell Resistance",
+   "page": 565
+  },
+  {
+   "depth": 0,
+   "title": "Appendix 2: Conditions",
+   "page": 565
+  },
+  {
+   "depth": 0,
+   "title": "Appendix 3: Inspiring Reading",
+   "page": 568
+  },
+  {
+   "depth": 0,
+   "title": "Appendix 4: Game Aids",
+   "page": 569
+  },
+  {
+   "depth": 0,
+   "title": "Character Sheet",
+   "page": 570
+  },
+  {
+   "depth": 0,
+   "title": "Index",
+   "page": 572
+  }
+ ]
+}

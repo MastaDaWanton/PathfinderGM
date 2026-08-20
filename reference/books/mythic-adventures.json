@@ -1,0 +1,4392 @@
+{
+ "slug": "mythic-adventures",
+ "abbr": "MA",
+ "kind": "player",
+ "title": "Mythic Adventures",
+ "source_file": "pathfinder - mythic adventures.pdf",
+ "pdf_pages": 255,
+ "counts": {
+  "sections": 855,
+  "tables": 20,
+  "entries": 775
+ },
+ "tables": [
+  {
+   "number": "1-1",
+   "title": "Base Mythic Abilities",
+   "page": 12
+  },
+  {
+   "number": "1-2",
+   "title": "Mythic Trials per Tier",
+   "page": 13
+  },
+  {
+   "number": "1-3",
+   "title": "Archmage",
+   "page": 14
+  },
+  {
+   "number": "1-4",
+   "title": "Champion",
+   "page": 20
+  },
+  {
+   "number": "1-5",
+   "title": "Guardian",
+   "page": 26
+  },
+  {
+   "number": "1-6",
+   "title": "Hierophant",
+   "page": 32
+  },
+  {
+   "number": "1-7",
+   "title": "Marshal",
+   "page": 38
+  },
+  {
+   "number": "1-8",
+   "title": "Trickster",
+   "page": 44
+  },
+  {
+   "number": "2-1",
+   "title": "Feats",
+   "page": 56
+  },
+  {
+   "number": "4-1",
+   "title": "High CR Experience Point Awards",
+   "page": 130
+  },
+  {
+   "number": "4-2",
+   "title": "High CR Treasure per Encounter",
+   "page": 130
+  },
+  {
+   "number": "5-1",
+   "title": "Apocalypse Box Monsters",
+   "page": 163
+  },
+  {
+   "number": "6-1",
+   "title": "Mythic Lich Abilities",
+   "page": 207
+  },
+  {
+   "number": "6-2",
+   "title": "Mythic Vampire Abilities",
+   "page": 221
+  },
+  {
+   "number": "6-3",
+   "title": "Invincible Template Defenses",
+   "page": 224
+  },
+  {
+   "number": "6-4",
+   "title": "Savage Template Defenses",
+   "page": 224
+  },
+  {
+   "number": "6-5",
+   "title": "Mythic Subtype Abilities",
+   "page": 226
+  },
+  {
+   "number": "6-6",
+   "title": "Dragon Blood Damage",
+   "page": 227
+  },
+  {
+   "number": "6-7",
+   "title": "Lingering Breath Damage",
+   "page": 227
+  },
+  {
+   "number": "6-8",
+   "title": "Monster Statistics by CR",
+   "page": 229
+  }
+ ],
+ "sections": [
+  {
+   "depth": 0,
+   "title": "Front Cover",
+   "page": 0
+  },
+  {
+   "depth": 0,
+   "title": "Title Page",
+   "page": 1
+  },
+  {
+   "depth": 0,
+   "title": "Credits",
+   "page": 2
+  },
+  {
+   "depth": 0,
+   "title": "Table of Contents",
+   "page": 3
+  },
+  {
+   "depth": 0,
+   "title": "Introduction",
+   "page": 4
+  },
+  {
+   "depth": 1,
+   "title": "What is Mythic?",
+   "page": 4
+  },
+  {
+   "depth": 2,
+   "title": "What Makes Mythic Adventures Different?",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Sidebar: Mythic versus Non-Mythic",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Navigating this Book",
+   "page": 5
+  },
+  {
+   "depth": 1,
+   "title": "Sidebar: Book References",
+   "page": 7
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 1: Mythic Heroes",
+   "page": 8
+  },
+  {
+   "depth": 1,
+   "title": "Creating a Mythic Character",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Ascension",
+   "page": 10
+  },
+  {
+   "depth": 2,
+   "title": "Selecting a Path",
+   "page": 11
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Paths",
+   "page": 11
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–1: Base Mythic Abilities",
+   "page": 12
+  },
+  {
+   "depth": 1,
+   "title": "Base Mythic Abilities",
+   "page": 12
+  },
+  {
+   "depth": 1,
+   "title": "Gaining Tiers",
+   "page": 13
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–2: Mythic Trials per Tier",
+   "page": 13
+  },
+  {
+   "depth": 1,
+   "title": "Archmage",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–3: Archmage",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "Archmage Features",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Archmage Path Abilities",
+   "page": 14
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Archmage Path Abilities",
+   "page": 18
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Archmage Path Abilities",
+   "page": 19
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Archmage Builds",
+   "page": 19
+  },
+  {
+   "depth": 1,
+   "title": "Champion",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–4: Champion",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "Champion Features",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Champion Path Abilities",
+   "page": 20
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Champion Path Abilities",
+   "page": 23
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Champion Path Abilities",
+   "page": 25
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Champion Builds",
+   "page": 25
+  },
+  {
+   "depth": 1,
+   "title": "Guardian",
+   "page": 26
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–5: Guardian",
+   "page": 26
+  },
+  {
+   "depth": 2,
+   "title": "Guardian Features",
+   "page": 26
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Guardian Path Abilities",
+   "page": 26
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Guardian Path Abilities",
+   "page": 30
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Guardian Path Abilities",
+   "page": 31
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Guardian Builds",
+   "page": 31
+  },
+  {
+   "depth": 1,
+   "title": "Hierophant",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–6: Hierophant",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "Hierophant Features",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Hierophant Path Abilities",
+   "page": 32
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Hierophant Path Abilities",
+   "page": 35
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Hierophant Path Abilities",
+   "page": 37
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Hierophant Builds",
+   "page": 37
+  },
+  {
+   "depth": 1,
+   "title": "Marshal",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–7: Marshal",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "Marshal Features",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Marshal Path Abilities",
+   "page": 38
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Marshal Path Abilities",
+   "page": 41
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Marshal Path Abilities",
+   "page": 42
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Marshal Builds",
+   "page": 43
+  },
+  {
+   "depth": 1,
+   "title": "Trickster",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "Table 1–8: Trickster",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "Trickster Features",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Trickster Path Abilities",
+   "page": 44
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Trickster Path Abilities",
+   "page": 47
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Trickster Path Abilities",
+   "page": 49
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Trickster Builds",
+   "page": 49
+  },
+  {
+   "depth": 1,
+   "title": "Universal Path Abilities",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "1st-Tier Universal Path Abilities",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "3rd-Tier Universal Path Abilities",
+   "page": 50
+  },
+  {
+   "depth": 2,
+   "title": "6th-Tier Universal Path Abilities",
+   "page": 51
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 2: Mythic Feats",
+   "page": 52
+  },
+  {
+   "depth": 1,
+   "title": "Types of Feats",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Metamagic Feats",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Feats",
+   "page": 54
+  },
+  {
+   "depth": 1,
+   "title": "Feat Descriptions",
+   "page": 54
+  },
+  {
+   "depth": 2,
+   "title": "Table 2–1: Feats",
+   "page": 56
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Mythic and Metamagic Feats",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Accursed Hex (Mythic)",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Acrobatic (Mythic)",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Alertness (Mythic)",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Alignment Channel (Mythic)",
+   "page": 54
+  },
+  {
+   "depth": 3,
+   "title": "Animal Affinity (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Armor Training (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Blast (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Shield (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Strike (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Ascendant Spell (Metamagic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Aspect of the Beast (Mythic)",
+   "page": 55
+  },
+  {
+   "depth": 3,
+   "title": "Athletic (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Augment Summoning (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Bleeding Critical (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Blind-Fight (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Catch Off-Guard (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Channel Smite (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Charge Through (Mythic)",
+   "page": 60
+  },
+  {
+   "depth": 3,
+   "title": "Cleave (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Combat Expertise (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Combat Reflexes (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Command Undead (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Critical Focus (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Critical Mastery (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Dastardly Finish (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Dazzling Display (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Aim (Mythic)",
+   "page": 61
+  },
+  {
+   "depth": 3,
+   "title": "Deadly Stroke (Mythic)",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Death from Above (Mythic)",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Deceitful (Mythic)",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Deepsight (Mythic)",
+   "page": 62
+  },
+  {
+   "depth": 3,
+   "title": "Defensive Combat Training (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Deflect Arrows (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Deft Hands (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Detect Expertise (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Disruptive (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Distance Thrower (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Divine Interference (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Dodge (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Dreadful Carnage (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Drink Is Life (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 3,
+   "title": "Dual Path (Mythic)",
+   "page": 63
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Eagle Eyes (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Eldritch Heritage (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Channel (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Fist (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Focus (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Elven Accuracy (Mythic)",
+   "page": 64
+  },
+  {
+   "depth": 3,
+   "title": "Endurance (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Eschew Materials (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Extra Mythic Power (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Extra Path Ability (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Fabulous Figments (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Far Shot (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Fast Empathy (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Fire Music (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Fleet (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Furious Focus (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 2,
+   "title": "G",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Gnome Trickster (Mythic)",
+   "page": 65
+  },
+  {
+   "depth": 3,
+   "title": "Gorgon’s Fist (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Great Fortitude (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Guided Hand (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "H",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Heroic Defiance (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Heroic Recovery (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Bull Rush (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Channel (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Counterspell (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Critical (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Dirty Trick (Mythic)",
+   "page": 66
+  },
+  {
+   "depth": 3,
+   "title": "Improved Disarm (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Drag (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Familiar (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Grapple (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Initiative (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Overrun (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Reposition (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Steal (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Stonecunning (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Sunder (Mythic)",
+   "page": 67
+  },
+  {
+   "depth": 3,
+   "title": "Improved Trip (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Improved Unarmed Strike (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Intimidating Prowess (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Iron Will (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "K",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Knockout Artist (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Legendary Teamwork (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Lightning Reflexes (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Lucky Halfling (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Lucky Surge (Mythic)",
+   "page": 68
+  },
+  {
+   "depth": 3,
+   "title": "Lunge (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Magical Aptitude (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Manyshot (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Marked for Glory",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Maximize Surge (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Medusa’s Wrath (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Missile Shield (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Mobility (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Monastic Legacy (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Mounted Archery (Mythic)",
+   "page": 69
+  },
+  {
+   "depth": 3,
+   "title": "Mounted Combat (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Companion",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Crafter (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Paragon (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Spell Lore (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Natural Spell (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Nimble Moves (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Penetrating Strike (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Persuasive (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Pinpoint Targeting (Mythic)",
+   "page": 70
+  },
+  {
+   "depth": 3,
+   "title": "Point-Blank Shot (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Potent Surge (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Power Attack (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Powerful Shape (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Prophetic Visionary (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "Q",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Quick Draw (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Racial Heritage (Mythic)",
+   "page": 71
+  },
+  {
+   "depth": 3,
+   "title": "Rapid Reload (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Rapid Shot (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Rhetorical Flourish (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Ride-By Attack (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Run (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Saving Shield (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Scorpion Style (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Selective Channeling (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Self-Sufficient (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Shatter Defenses (Mythic)",
+   "page": 72
+  },
+  {
+   "depth": 3,
+   "title": "Shield Focus (Mythic)",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Shield Slam (Mythic)",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Shot on the Run (Mythic)",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Skill Focus (Mythic)",
+   "page": 73
+  },
+  {
+   "depth": 3,
+   "title": "Snatch Arrows (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Sociable (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spell Focus (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spell Mastery (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spell Penetration (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spellbreaker (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spirited Charge (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spontaneous Metafocus (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Spring Attack (Mythic)",
+   "page": 74
+  },
+  {
+   "depth": 3,
+   "title": "Stealthy (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Strike Back (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Strong Comeback (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Stunning Fist (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Throw Anything (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Titan Strike (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Toughness (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Trample (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Tripping Staff (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Turn Undead (Mythic)",
+   "page": 75
+  },
+  {
+   "depth": 3,
+   "title": "Two-Fisted Drinker (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Two-Weapon Defense (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Two-Weapon Fighting (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Two-Weapon Rend (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "U",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Undead Master (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Unseat (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 2,
+   "title": "V",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Valiant Vault (Mythic)",
+   "page": 76
+  },
+  {
+   "depth": 3,
+   "title": "Vital Strike (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Voice of the Sibyl (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Warrior Priest (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Weapon Finesse (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Weapon Focus (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Weapon Specialization (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 3,
+   "title": "Witch Knife (Mythic)",
+   "page": 77
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 3: Mythic Spells",
+   "page": 78
+  },
+  {
+   "depth": 1,
+   "title": "Spell Lists",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Alchemist Mythic Formulae",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Antipaladin Mythic Spells",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Bard Mythic Spells",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Cleric Mythic Spells",
+   "page": 81
+  },
+  {
+   "depth": 2,
+   "title": "Druid Mythic Spells",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Inquisitor Mythic Spells",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Magus Mythic Spells",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Paladin Mythic Spells",
+   "page": 82
+  },
+  {
+   "depth": 2,
+   "title": "Ranger Mythic Spells",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Sorcerer/Wizard Mythic Spells",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Summoner Mythic Spells",
+   "page": 83
+  },
+  {
+   "depth": 2,
+   "title": "Witch Mythic Spells",
+   "page": 83
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Spell Descriptions",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "A",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Ablative Barrier",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Animal Aspect",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Animate Dead",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Animate Objects",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Animate Plants",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Anticipate Peril",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Antimagic Field",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Arboreal Hammer",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Arcane Cannon",
+   "page": 84
+  },
+  {
+   "depth": 2,
+   "title": "B",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Baleful Polymorph",
+   "page": 84
+  },
+  {
+   "depth": 3,
+   "title": "Bane",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Barkskin",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Battle Trance",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Battlemind Link",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Beast Shape (all)",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Black Mark",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Black Tentacles",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Blade Barrier",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Blasphemy",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Bless",
+   "page": 85
+  },
+  {
+   "depth": 3,
+   "title": "Blessing of Fervor",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Blinding Ray",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Blindness/Deafness",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Blink",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Blistering Invective",
+   "page": 86
+  },
+  {
+   "depth": 3,
+   "title": "Blood Crow Strike",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Boiling Blood",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Break",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Break Enchantment",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Breath of Life",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Burning Gaze",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Burning Hands",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Burrow",
+   "page": 87
+  },
+  {
+   "depth": 2,
+   "title": "C",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Call Animal",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Call Lightning",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Cape of Wasps",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Chain Lightning",
+   "page": 87
+  },
+  {
+   "depth": 3,
+   "title": "Changestaff",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Chaos Hammer",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Chill Metal",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Chord of Shards",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Circle of Death",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Cloudkill",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Color Spray",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Command",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Companion Mind Link",
+   "page": 88
+  },
+  {
+   "depth": 3,
+   "title": "Cone of Cold",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Confusion",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Conjure Black Pudding",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Consecrate",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Contagion",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Contingency",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Control Weather",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Cup of Dust",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Cure Critical Wounds",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Cure Light Wounds",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Cure Moderate Wounds",
+   "page": 89
+  },
+  {
+   "depth": 3,
+   "title": "Cure Serious Wounds",
+   "page": 90
+  },
+  {
+   "depth": 2,
+   "title": "D",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Damnation Stride",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Darkness",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Daybreak Arrow",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Daylight",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Death Knell",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Deep Slumber",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Defile Armor",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Desecrate",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Detect Scrying",
+   "page": 90
+  },
+  {
+   "depth": 3,
+   "title": "Devolution",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dictum",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dimension Door",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dimensional Lock",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Discordant Blast",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Disfiguring Touch",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Disintegrate",
+   "page": 91
+  },
+  {
+   "depth": 3,
+   "title": "Dispel Magic",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Divine Favor",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Divine Pursuit",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Dominate Person",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Draconic Reservoir",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Dragon’s Breath",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Dream",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Dust of Twilight",
+   "page": 92
+  },
+  {
+   "depth": 2,
+   "title": "E",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Ear-Piercing Scream",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Earthquake",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Body (all)",
+   "page": 92
+  },
+  {
+   "depth": 3,
+   "title": "Endure Elements",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Enemy Hammer",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Enervation",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Enlarge Person",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Entangle",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Entropic Shield",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Expeditious Retreat",
+   "page": 93
+  },
+  {
+   "depth": 2,
+   "title": "F",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Faerie Fire",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "False Life",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Feast of Ashes",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Feather Fall",
+   "page": 93
+  },
+  {
+   "depth": 3,
+   "title": "Finger of Death",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Fire Seeds",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Fire Shield",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Fire Snake",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Fire Storm",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Fireball",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Firestream",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Flame Blade",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Flame Strike",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Flames of the Faithful",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Flesh to Stone",
+   "page": 94
+  },
+  {
+   "depth": 3,
+   "title": "Floating Disk",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Fly",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Fog Cloud",
+   "page": 95
+  },
+  {
+   "depth": 3,
+   "title": "Force Punch",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Foresight",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Form of the Dragon (All)",
+   "page": 96
+  },
+  {
+   "depth": 2,
+   "title": "G",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Gaseous Form",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Giant Vermin",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Globe of Invulnerability",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Glyph of Warding",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Goodberry",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Grease",
+   "page": 96
+  },
+  {
+   "depth": 3,
+   "title": "Guards and Wards",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Gust of Wind",
+   "page": 97
+  },
+  {
+   "depth": 2,
+   "title": "H",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Harm",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Haste",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Heal",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Healing Thief",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Heat Metal",
+   "page": 97
+  },
+  {
+   "depth": 3,
+   "title": "Heroism",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Hex Ward",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Hideous Laughter",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Hold Portal",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Holy Smite",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Holy Word",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Hydraulic Push",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Hydraulic Torrent",
+   "page": 98
+  },
+  {
+   "depth": 2,
+   "title": "I",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Ice Storm",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Ill Omen",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Critical Wounds",
+   "page": 98
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Light Wounds",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Moderate Wounds",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Inflict Serious Wounds",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Invisibility",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Irresistible Dance",
+   "page": 99
+  },
+  {
+   "depth": 2,
+   "title": "J",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Jitterbugs",
+   "page": 99
+  },
+  {
+   "depth": 2,
+   "title": "K",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Knock",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Know the Enemy",
+   "page": 99
+  },
+  {
+   "depth": 2,
+   "title": "L",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Levitate",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Lightning Arc",
+   "page": 99
+  },
+  {
+   "depth": 3,
+   "title": "Lightning Bolt",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Limited Wish",
+   "page": 100
+  },
+  {
+   "depth": 2,
+   "title": "M",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Mage Armor",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Mage’s Disjunction",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Magic Fang",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Magic Fang, Greater",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Magic Missile",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Magic Vestment",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Magic Weapon, Greater",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Make Whole",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Maze",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Memory Lapse",
+   "page": 100
+  },
+  {
+   "depth": 3,
+   "title": "Meteor Swarm",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Mighty Fist of the Earth",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Mirror Image",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Mislead",
+   "page": 101
+  },
+  {
+   "depth": 3,
+   "title": "Modify Memory",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Monstrous Physique (all)",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Move Earth",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Murderous Command",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "N",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Named Bullet",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Nightmare",
+   "page": 102
+  },
+  {
+   "depth": 2,
+   "title": "O",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Oath of Peace",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Obscuring Mist",
+   "page": 102
+  },
+  {
+   "depth": 3,
+   "title": "Orb of the Void",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Order’s Wrath",
+   "page": 103
+  },
+  {
+   "depth": 2,
+   "title": "P",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Pernicious Poison",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Phantasmal Killer",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Phantom Steed",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Pillar of Life",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Plane Shift",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Polar Ray",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Blind",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Kill",
+   "page": 103
+  },
+  {
+   "depth": 3,
+   "title": "Power Word Stun",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Pox Pustules",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Prayer",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Prismatic Sphere",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Prismatic Spray",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Arrows",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Chaos",
+   "page": 104
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Evil",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Good",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Protection from Law",
+   "page": 105
+  },
+  {
+   "depth": 2,
+   "title": "R",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Ray of Enfeeblement",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Reduce Person",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Regenerate",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Repel Wood",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Resist Energy",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Resonating Word",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Reverse Gravity",
+   "page": 105
+  },
+  {
+   "depth": 3,
+   "title": "Ricochet Shot",
+   "page": 106
+  },
+  {
+   "depth": 2,
+   "title": "S",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Sacred Bond",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Sanctify Armor",
+   "page": 106
+  },
+  {
+   "depth": 3,
+   "title": "Sanctuary",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Sands of Time",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Saving Finale",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Scorching Ash Form",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Scorching Ray",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Scouring Winds",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Searing Light",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Sending",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Anchor",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Shadow Weapon",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Shatter",
+   "page": 107
+  },
+  {
+   "depth": 3,
+   "title": "Shield of Faith",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Shield Other",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Shocking Grasp",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Shout",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Silence",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Silent Image",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Sleep",
+   "page": 108
+  },
+  {
+   "depth": 3,
+   "title": "Slow",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Solid Fog",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Spider Climb",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Spike Stones",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Spiritual Weapon",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Stinking Cloud",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Stone Shape",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Stoneskin",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Storm of Vengeance",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Strangling Hair",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Suggestion",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Summon Swarm",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Sun Metal",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Sunbeam",
+   "page": 109
+  },
+  {
+   "depth": 3,
+   "title": "Surmount Affliction",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "T",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Telekinesis",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Theft Ward",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Time Stop",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Touch Injection",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Transformation",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "True Form",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "True Strike",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Tsunami",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "U",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Unholy Blight",
+   "page": 110
+  },
+  {
+   "depth": 3,
+   "title": "Unshakable Chill",
+   "page": 110
+  },
+  {
+   "depth": 2,
+   "title": "V",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Vampiric Touch",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Vomit Twin",
+   "page": 111
+  },
+  {
+   "depth": 2,
+   "title": "W",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Walk through Space",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Fire",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Force",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Ice",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Iron",
+   "page": 111
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Stone",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Wall of Thorns",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Web",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Whirlwind",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Wish",
+   "page": 112
+  },
+  {
+   "depth": 3,
+   "title": "Word of Chaos",
+   "page": 112
+  },
+  {
+   "depth": 1,
+   "title": "New Spells",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Ascension",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Bleed Glory",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Deathless",
+   "page": 113
+  },
+  {
+   "depth": 2,
+   "title": "Lend Path",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Severance",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Restore Mythic Power",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Share Glory",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Steal Power",
+   "page": 114
+  },
+  {
+   "depth": 2,
+   "title": "Terraform",
+   "page": 114
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 4: Running a Mythic Game",
+   "page": 116
+  },
+  {
+   "depth": 1,
+   "title": "Making a Mythic Atmosphere",
+   "page": 118
+  },
+  {
+   "depth": 1,
+   "title": "Different Scales of Mythic Campaigns",
+   "page": 118
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Story Structure",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Contact",
+   "page": 119
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: The Importance of Failure",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Awakening",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Journey",
+   "page": 120
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Starting Off Mythic",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Return",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Life Afterward",
+   "page": 121
+  },
+  {
+   "depth": 2,
+   "title": "Elements of a Mythic Adventure",
+   "page": 122
+  },
+  {
+   "depth": 2,
+   "title": "The World’s Reaction",
+   "page": 123
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Themes",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: The Monomyth",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Eldritch Magic",
+   "page": 123
+  },
+  {
+   "depth": 2,
+   "title": "Legendary Encounter",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Lost Inheritance",
+   "page": 125
+  },
+  {
+   "depth": 2,
+   "title": "Planar Might",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Power of the Gods",
+   "page": 126
+  },
+  {
+   "depth": 2,
+   "title": "Stolen Might",
+   "page": 127
+  },
+  {
+   "depth": 1,
+   "title": "Designing Encounters",
+   "page": 128
+  },
+  {
+   "depth": 2,
+   "title": "Rewarding Mythic Characters",
+   "page": 129
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Trials",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Adjusting CR and Level",
+   "page": 129
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–1: High CR Experience Point Awards",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Table 4–2: High CR Treasure per Encounter",
+   "page": 130
+  },
+  {
+   "depth": 2,
+   "title": "Sample Trials",
+   "page": 130
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Boons",
+   "page": 132
+  },
+  {
+   "depth": 1,
+   "title": "Recurring Mythic Villains",
+   "page": 133
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Flaws",
+   "page": 134
+  },
+  {
+   "depth": 1,
+   "title": "Ideas for Mythic Adventures",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Eternal Gaze",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "Falling Stars",
+   "page": 135
+  },
+  {
+   "depth": 2,
+   "title": "For Love of Sport",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Moments of Powerlessness",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "Legacy of Earth",
+   "page": 137
+  },
+  {
+   "depth": 2,
+   "title": "The Nascent Sphere",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Perilous Peaks",
+   "page": 138
+  },
+  {
+   "depth": 2,
+   "title": "Unexpected Travels",
+   "page": 139
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 5: Mythic Magic Items",
+   "page": 140
+  },
+  {
+   "depth": 1,
+   "title": "Magic Items",
+   "page": 142
+  },
+  {
+   "depth": 1,
+   "title": "Armor and Shield Special Abilities",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Deflecting",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Denying",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Resonating",
+   "page": 142
+  },
+  {
+   "depth": 1,
+   "title": "Specific Armors and Shields",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Bastion of the Inheritor",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Spiritwalk Armor",
+   "page": 142
+  },
+  {
+   "depth": 2,
+   "title": "Stalwart Breastplate",
+   "page": 143
+  },
+  {
+   "depth": 1,
+   "title": "Weapon Special Abilities",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Disjoining",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Harvesting",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Bane",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Potent",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Sacrosanct",
+   "page": 143
+  },
+  {
+   "depth": 1,
+   "title": "Specific Weapons",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Bow of Erastil",
+   "page": 143
+  },
+  {
+   "depth": 2,
+   "title": "Brutal Axe",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Chaos Hammer",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Dagger of a Thousand Bites",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Dragonbreath Bow",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Fire Goddess’s Blade",
+   "page": 144
+  },
+  {
+   "depth": 2,
+   "title": "Gun With No Name",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Pick of Stonecleaving",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Sacred Avenger",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Shadow Spike",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Shadow’s Touch",
+   "page": 145
+  },
+  {
+   "depth": 2,
+   "title": "Skirmishing Spear",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Spellbreaker",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Stormcaller",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Sword of Inner Fire",
+   "page": 146
+  },
+  {
+   "depth": 1,
+   "title": "Other Magic Items",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Ambrosia",
+   "page": 146
+  },
+  {
+   "depth": 2,
+   "title": "Anchoring Belt",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Blind Helm",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Book of Banishing",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Book of Perfect Jokes",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Boots of Earth and Wind",
+   "page": 147
+  },
+  {
+   "depth": 2,
+   "title": "Bountiful Bottle",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Bracers of Might",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Bracers of the Shield Mates",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Canopic Jar",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Cape of Free Will",
+   "page": 148
+  },
+  {
+   "depth": 2,
+   "title": "Cayden’s Cup",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Censer of Sanctuary",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Chime of Disillusionment",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Cloak of Quick Reflexes",
+   "page": 149
+  },
+  {
+   "depth": 2,
+   "title": "Cloak of the Hunt",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Cornucopia of Plenty",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Death Warden’s Bandolier",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Dolorous Rod",
+   "page": 150
+  },
+  {
+   "depth": 2,
+   "title": "Everburning Lantern",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Eye Orb",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Figurine of Wondrous Power, Basalt Dragon",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Gallows Rope",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Gloves of Distant Action",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Gloves of Spell Snaring",
+   "page": 151
+  },
+  {
+   "depth": 2,
+   "title": "Golden Holy Symbol",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Headband of Sealed Thoughts",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Helm of the Serpent King",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Herbs of the Primal Beast",
+   "page": 152
+  },
+  {
+   "depth": 2,
+   "title": "Immolation Cloak",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Inescapable Gloves",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Laurel Wreath",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Lyre of Storms",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Mantle of the Faithful Vessel",
+   "page": 153
+  },
+  {
+   "depth": 2,
+   "title": "Mirroring Belt",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Mithral Rose",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Monocle of Unveiled Auras",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Moonstone Cat",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Necklace of Spectral Strikes",
+   "page": 154
+  },
+  {
+   "depth": 2,
+   "title": "Nectar of the Gods",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Pauldrons of Unflinching Fortitude",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Penitent’s Robes",
+   "page": 155
+  },
+  {
+   "depth": 2,
+   "title": "Phoenix Cloak",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Ring of Energy Dampening",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Ring of Transcendent Spells",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Root of the World Tree",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Seven-League Boots",
+   "page": 156
+  },
+  {
+   "depth": 2,
+   "title": "Stonefist Gloves",
+   "page": 157
+  },
+  {
+   "depth": 2,
+   "title": "Torc of Truespeech",
+   "page": 157
+  },
+  {
+   "depth": 1,
+   "title": "Artifacts",
+   "page": 157
+  },
+  {
+   "depth": 2,
+   "title": "Minor Artifacts",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Aegis",
+   "page": 157
+  },
+  {
+   "depth": 3,
+   "title": "Black Iron Axe",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Bullroarers of Outburst",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Elemental Chain",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Fleshhook of Mythic Sustenance",
+   "page": 158
+  },
+  {
+   "depth": 3,
+   "title": "Fortune’s Arrow",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Glabrezu Claw",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Hermetic Flask",
+   "page": 159
+  },
+  {
+   "depth": 3,
+   "title": "Nexus Crystal",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Ring of Equilibrium",
+   "page": 160
+  },
+  {
+   "depth": 3,
+   "title": "Rod of Spell Sundering",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "Screaming Spear of the Sun",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "Staff of Eldritch Sovereignty",
+   "page": 161
+  },
+  {
+   "depth": 3,
+   "title": "Sword of the Mists",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Torc of the Heavens",
+   "page": 162
+  },
+  {
+   "depth": 3,
+   "title": "Witherfang",
+   "page": 163
+  },
+  {
+   "depth": 2,
+   "title": "Major Artifacts",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Apocalypse Box",
+   "page": 163
+  },
+  {
+   "depth": 4,
+   "title": "Table 5–1: Apocalypse Box Monsters",
+   "page": 163
+  },
+  {
+   "depth": 3,
+   "title": "Diadem of Nod",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Emperor’s Mammoth",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Frozen Heart of Cocytus",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Legendsbane",
+   "page": 164
+  },
+  {
+   "depth": 3,
+   "title": "Netherworld Cauldron",
+   "page": 165
+  },
+  {
+   "depth": 3,
+   "title": "Nimbus of Radiant Truth",
+   "page": 165
+  },
+  {
+   "depth": 3,
+   "title": "Plaguebringer",
+   "page": 166
+  },
+  {
+   "depth": 3,
+   "title": "Scepter of the Shining Lord",
+   "page": 166
+  },
+  {
+   "depth": 3,
+   "title": "Shadowwraith Heart",
+   "page": 167
+  },
+  {
+   "depth": 3,
+   "title": "Silver Maiden",
+   "page": 167
+  },
+  {
+   "depth": 3,
+   "title": "Tarnhelm",
+   "page": 168
+  },
+  {
+   "depth": 3,
+   "title": "Trueforge",
+   "page": 168
+  },
+  {
+   "depth": 1,
+   "title": "Legendary Items",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Becoming Legendary",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Legendary Artifacts",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Base Legendary Abilities",
+   "page": 169
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Legendary Surge",
+   "page": 170
+  },
+  {
+   "depth": 2,
+   "title": "Legendary Item Abilities",
+   "page": 171
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 6: Mythic Monsters",
+   "page": 174
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Monster Origins",
+   "page": 176
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Rank",
+   "page": 176
+  },
+  {
+   "depth": 1,
+   "title": "Reading a Mythic Monster Stat Block",
+   "page": 176
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Monster Descriptions",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Aboleth",
+   "page": 178
+  },
+  {
+   "depth": 2,
+   "title": "Barghest, Greater",
+   "page": 179
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Barghest",
+   "page": 179
+  },
+  {
+   "depth": 2,
+   "title": "Cockatrice",
+   "page": 180
+  },
+  {
+   "depth": 2,
+   "title": "Cyclops, Great",
+   "page": 181
+  },
+  {
+   "depth": 2,
+   "title": "Demon, Marilith",
+   "page": 182
+  },
+  {
+   "depth": 2,
+   "title": "Demon, Nalfeshnee",
+   "page": 183
+  },
+  {
+   "depth": 2,
+   "title": "Demon, Vrock",
+   "page": 184
+  },
+  {
+   "depth": 2,
+   "title": "Devil, Bone",
+   "page": 185
+  },
+  {
+   "depth": 2,
+   "title": "Devil, Ice",
+   "page": 186
+  },
+  {
+   "depth": 2,
+   "title": "Dragon, Black",
+   "page": 187
+  },
+  {
+   "depth": 2,
+   "title": "Dragon, Blue",
+   "page": 188
+  },
+  {
+   "depth": 2,
+   "title": "Dragon, Green",
+   "page": 189
+  },
+  {
+   "depth": 2,
+   "title": "Dragon, Red",
+   "page": 190
+  },
+  {
+   "depth": 2,
+   "title": "Dragon, White",
+   "page": 192
+  },
+  {
+   "depth": 2,
+   "title": "Elemental, Air",
+   "page": 193
+  },
+  {
+   "depth": 2,
+   "title": "Elemental, Earth",
+   "page": 194
+  },
+  {
+   "depth": 2,
+   "title": "Elemental, Fire",
+   "page": 195
+  },
+  {
+   "depth": 2,
+   "title": "Elemental, Water",
+   "page": 196
+  },
+  {
+   "depth": 2,
+   "title": "Ettin",
+   "page": 197
+  },
+  {
+   "depth": 3,
+   "title": "Variant Mythic Ettins",
+   "page": 197
+  },
+  {
+   "depth": 4,
+   "title": "Hillblood Ettin",
+   "page": 197
+  },
+  {
+   "depth": 4,
+   "title": "Orcblood Ettin",
+   "page": 197
+  },
+  {
+   "depth": 4,
+   "title": "Stoneblood Ettin",
+   "page": 197
+  },
+  {
+   "depth": 2,
+   "title": "Gargoyle",
+   "page": 198
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Kapoacinth",
+   "page": 198
+  },
+  {
+   "depth": 2,
+   "title": "Giant, Fire",
+   "page": 199
+  },
+  {
+   "depth": 2,
+   "title": "Giant, Hill",
+   "page": 200
+  },
+  {
+   "depth": 2,
+   "title": "Golem, Flesh",
+   "page": 201
+  },
+  {
+   "depth": 2,
+   "title": "Griffon",
+   "page": 202
+  },
+  {
+   "depth": 2,
+   "title": "Hell Hound",
+   "page": 203
+  },
+  {
+   "depth": 2,
+   "title": "Hydra",
+   "page": 204
+  },
+  {
+   "depth": 2,
+   "title": "Lamia",
+   "page": 205
+  },
+  {
+   "depth": 3,
+   "title": "Lamia Matriarch",
+   "page": 205
+  },
+  {
+   "depth": 2,
+   "title": "Lich",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Mythic Lich",
+   "page": 206
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–1: Mythic Lich Abilities",
+   "page": 207
+  },
+  {
+   "depth": 2,
+   "title": "Manticore",
+   "page": 208
+  },
+  {
+   "depth": 2,
+   "title": "Medusa",
+   "page": 209
+  },
+  {
+   "depth": 2,
+   "title": "Minotaur",
+   "page": 210
+  },
+  {
+   "depth": 2,
+   "title": "Mummy",
+   "page": 211
+  },
+  {
+   "depth": 2,
+   "title": "Ogre",
+   "page": 212
+  },
+  {
+   "depth": 3,
+   "title": "Ogre Dragonslayer",
+   "page": 212
+  },
+  {
+   "depth": 2,
+   "title": "Owlbear",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Owlbear, The First",
+   "page": 213
+  },
+  {
+   "depth": 2,
+   "title": "Phoenix",
+   "page": 214
+  },
+  {
+   "depth": 2,
+   "title": "Rakshasa",
+   "page": 215
+  },
+  {
+   "depth": 2,
+   "title": "Skeleton",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Mythic Skeleton",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Other Mythic Skeletons",
+   "page": 216
+  },
+  {
+   "depth": 3,
+   "title": "Mythic Skeletal Champion",
+   "page": 216
+  },
+  {
+   "depth": 2,
+   "title": "Sphinx",
+   "page": 217
+  },
+  {
+   "depth": 2,
+   "title": "Treant",
+   "page": 218
+  },
+  {
+   "depth": 2,
+   "title": "Troll",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Ice Troll",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Jotund Troll",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Moss Troll",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Rock Troll",
+   "page": 219
+  },
+  {
+   "depth": 3,
+   "title": "Scrag",
+   "page": 219
+  },
+  {
+   "depth": 2,
+   "title": "Vampire",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Creating a Mythic Vampire",
+   "page": 220
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–2: Mythic Vampire Abilities",
+   "page": 221
+  },
+  {
+   "depth": 2,
+   "title": "Worg",
+   "page": 222
+  },
+  {
+   "depth": 2,
+   "title": "Worg, Winter Wolf",
+   "page": 222
+  },
+  {
+   "depth": 2,
+   "title": "Wyvern",
+   "page": 223
+  },
+  {
+   "depth": 3,
+   "title": "Variant Mythic Wyverns",
+   "page": 223
+  },
+  {
+   "depth": 1,
+   "title": "Mythic Monster Advancement",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Simple Templates",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Agile (MR 1, CR +1)",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Arcane (MR 1 or 2, CR +1)",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Divine (MR 1 or 2, CR +1)",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Invincible (MR 1 or 2, CR +1)",
+   "page": 224
+  },
+  {
+   "depth": 4,
+   "title": "Table 6–3: Invincible Template Defenses",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Savage (MR 1 or 2, CR +1)",
+   "page": 224
+  },
+  {
+   "depth": 4,
+   "title": "Table 6–4: Savage Template Defenses",
+   "page": 224
+  },
+  {
+   "depth": 2,
+   "title": "Building a Mythic Creature",
+   "page": 224
+  },
+  {
+   "depth": 3,
+   "title": "Modify an Existing Monster",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Create a New Monster",
+   "page": 225
+  },
+  {
+   "depth": 3,
+   "title": "Sidebar: Mythic Bonus Hit Points",
+   "page": 225
+  },
+  {
+   "depth": 2,
+   "title": "Mythic Subtype",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–5: Mythic Subtype Abilities",
+   "page": 226
+  },
+  {
+   "depth": 2,
+   "title": "New Universal Monster Rules",
+   "page": 226
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–6: Dragon Blood Damage",
+   "page": 227
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–7: Lingering Breath Damage",
+   "page": 227
+  },
+  {
+   "depth": 2,
+   "title": "Evaluating Monster Statistics",
+   "page": 228
+  },
+  {
+   "depth": 3,
+   "title": "Table 6–8: Monster Statistics by CR",
+   "page": 229
+  },
+  {
+   "depth": 0,
+   "title": "Chapter 7: Fire Over Blackcrag",
+   "page": 230
+  },
+  {
+   "depth": 1,
+   "title": "Maps: Fire Over Blackcrag",
+   "page": 235
+  },
+  {
+   "depth": 1,
+   "title": "Fire Over Blackcrag",
+   "page": 232
+  },
+  {
+   "depth": 1,
+   "title": "Adventure Background",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Adventure Summary",
+   "page": 232
+  },
+  {
+   "depth": 1,
+   "title": "Introduction",
+   "page": 232
+  },
+  {
+   "depth": 2,
+   "title": "Mayor Kostya",
+   "page": 233
+  },
+  {
+   "depth": 1,
+   "title": "Part One: Wisdom of the Waters",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Placing Blackcrag",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "The Headwaters",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Threading Stone and Water",
+   "page": 234
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Building the Myth",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Servants of Fire",
+   "page": 236
+  },
+  {
+   "depth": 2,
+   "title": "Return to Blackcrag Cove",
+   "page": 237
+  },
+  {
+   "depth": 1,
+   "title": "Part Two: The Nereid’s Kiss",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Building the Myth",
+   "page": 237
+  },
+  {
+   "depth": 2,
+   "title": "Map: Kraken’s Maw",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Trouble at Sea",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Landing at Kraken’s Maw",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Kraken’s Maw Features",
+   "page": 238
+  },
+  {
+   "depth": 1,
+   "title": "Part Three: Into The Kraken’s Maw",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Map: Kraken's Maw",
+   "page": 238
+  },
+  {
+   "depth": 2,
+   "title": "Through the Jungle",
+   "page": 239
+  },
+  {
+   "depth": 2,
+   "title": "Kraken’s Maw Encounters",
+   "page": 240
+  },
+  {
+   "depth": 3,
+   "title": "Table: Kraken’s Maw Random Encounters",
+   "page": 240
+  },
+  {
+   "depth": 2,
+   "title": "A1. Raptor’s Reach",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Building the Myth",
+   "page": 241
+  },
+  {
+   "depth": 2,
+   "title": "A2. The Demon’s Teeth",
+   "page": 241
+  },
+  {
+   "depth": 3,
+   "title": "Sentries",
+   "page": 242
+  },
+  {
+   "depth": 3,
+   "title": "The Earth Chalice",
+   "page": 242
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Teleportation",
+   "page": 243
+  },
+  {
+   "depth": 2,
+   "title": "A3. Mount Arakau",
+   "page": 244
+  },
+  {
+   "depth": 3,
+   "title": "Effects of the Tears",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Return to the Ship",
+   "page": 244
+  },
+  {
+   "depth": 1,
+   "title": "Part Four: Wrath’s End",
+   "page": 244
+  },
+  {
+   "depth": 2,
+   "title": "Ascending the Inferno",
+   "page": 245
+  },
+  {
+   "depth": 2,
+   "title": "The Queen’s Hand",
+   "page": 246
+  },
+  {
+   "depth": 2,
+   "title": "Calming the Volcano",
+   "page": 247
+  },
+  {
+   "depth": 2,
+   "title": "Sidebar: Building the Myth",
+   "page": 247
+  },
+  {
+   "depth": 1,
+   "title": "Concluding the Adventure",
+   "page": 247
+  },
+  {
+   "depth": 0,
+   "title": "Mythic Character Sheet",
+   "page": 248
+  },
+  {
+   "depth": 0,
+   "title": "Index",
+   "page": 250
+  },
+  {
+   "depth": 0,
+   "title": "Special Thanks / OGL",
+   "page": 253
+  },
+  {
+   "depth": 0,
+   "title": "Rear Cover",
+   "page": 254
+  }
+ ]
+}
