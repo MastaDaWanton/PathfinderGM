@@ -140,6 +140,32 @@ def _book(slug):
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def test_two_files_that_look_alike_are_told_apart():
+    """`Advanced Race Guide.pdf` is the book; `pathfinder advanced race guide pdf.pdf`
+    is a four-page errata sheet for its first printing. Both filenames contain "advanced
+    race guide", so the catalogue must test the more specific fragment first — otherwise
+    the errata claims the book's identity and every race option becomes unfindable,
+    which is what happened before the book was added.
+    """
+    import sys
+    sys.path.insert(0, str(REF))
+    from books import identify
+
+    assert identify("Advanced Race Guide.pdf")["slug"] == "advanced-race-guide"
+    assert identify("pathfinder advanced race guide pdf.pdf")["slug"] == (
+        "advanced-race-guide-errata"
+    )
+
+
+def test_the_real_advanced_race_guide_is_indexed():
+    arg = _book("advanced-race-guide")
+    assert arg["pdf_pages"] > 200
+    assert arg["counts"]["entries"] > 400
+    titles = {s["title"].lower() for s in arg["sections"]}
+    assert "elf racial traits" in titles
+    assert "racial archetypes" in titles
+
+
 def test_the_index_covers_the_library(index):
     """Every PDF in the library should be recognised. A book that is present but not in
     `reference/books.py` is silently absent from every lookup, which is the kind of gap

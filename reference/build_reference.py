@@ -632,6 +632,16 @@ def main() -> None:
             write(args.out / "encounter-design.json",
                   extract_encounter_tables(reader, entries))
 
+    # Drop book files whose PDF is no longer in the library. Without this the reference
+    # keeps a ghost of every book that was ever removed or renamed — the Advanced Race
+    # Guide errata left one behind the moment it was replaced by the actual book — and a
+    # lookup would happily return pages from a source nobody can open.
+    built = {b["slug"] for b in catalogue}
+    for stale in sorted(books_dir.glob("*.json")):
+        if stale.stem not in built:
+            stale.unlink()
+            print(f"  removed {stale.name} (its PDF is no longer in the library)")
+
     write(args.out / "index.json", {
         "books": catalogue,
         "totals": {

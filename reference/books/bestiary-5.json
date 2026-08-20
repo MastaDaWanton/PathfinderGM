@@ -9,7 +9,8 @@
   "sections": 443,
   "tables": 3,
   "entries": 405,
-  "creatures": 194
+  "creatures": 194,
+  "carried_over": true
  },
  "tables": [
   {
@@ -3216,5 +3217,6 @@
    "page": 286,
    "cr": "1"
   }
- ]
+ ],
+ "headings": []
 }

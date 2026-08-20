@@ -1,8 +1,8 @@
 {
- "slug": "advanced-race-guide-errata",
- "abbr": "ARG-errata",
- "kind": "errata",
- "title": "Advanced Race Guide — first printing errata",
+ "slug": "advanced-race-guide",
+ "abbr": "ARG",
+ "kind": "player",
+ "title": "Advanced Race Guide",
  "source_file": "Advanced Race Guide.pdf",
  "pdf_pages": 256,
  "counts": {

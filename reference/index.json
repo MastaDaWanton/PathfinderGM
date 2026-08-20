@@ -1,10 +1,10 @@
 {
  "books": [
   {
-   "slug": "advanced-race-guide-errata",
-   "title": "Advanced Race Guide — first printing errata",
-   "abbr": "ARG-errata",
-   "kind": "errata",
+   "slug": "advanced-race-guide",
+   "title": "Advanced Race Guide",
+   "abbr": "ARG",
+   "kind": "player",
    "source_file": "Advanced Race Guide.pdf",
    "pdf_pages": 256,
    "counts": {
@@ -39,7 +39,8 @@
     "sections": 443,
     "tables": 3,
     "entries": 405,
-    "creatures": 194
+    "creatures": 194,
+    "carried_over": true
    }
   },
   {
@@ -53,7 +54,8 @@
     "sections": 371,
     "tables": 2,
     "entries": 335,
-    "creatures": 125
+    "creatures": 125,
+    "carried_over": true
    }
   },
   {
@@ -162,7 +164,8 @@
     "sections": 446,
     "tables": 0,
     "entries": 411,
-    "creatures": 41
+    "creatures": 41,
+    "carried_over": true
    }
   },
   {

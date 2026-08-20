@@ -68,9 +68,19 @@ The Codex Monstrueux is indexed but not creature-scanned: its outline is 26 entr
 258 pages, and at 131 MB its text layer is so slow to extract that a scan was still on
 that one book after twenty minutes while every other bestiary finished in twenty seconds.
 
-One more thing the library turned up: `pathfinder advanced race guide pdf.pdf` is **not**
-the Advanced Race Guide. It is the four-page errata sheet for its first printing, so no
-race option can be looked up from it. The book itself is not in the library.
+A note on the Advanced Race Guide, because the trap is still live. The library briefly
+held `pathfinder advanced race guide pdf.pdf`, which is *not* the book — it is the
+four-page errata sheet for the first printing — and it was indexed as though it were,
+so no race option could be found. It has since been replaced by the real
+`Advanced Race Guide.pdf` (256 pages, 619 sections, 588 named entries).
+
+Both filenames contain "advanced race guide", so `books.py` still tests the more specific
+errata fragment first and a test pins that ordering. If the errata is ever put back
+alongside the book, the two will be told apart rather than one silently shadowing the
+other.
+
+Removing a PDF from the library also removes its JSON on the next build. A stale book file
+would otherwise let a lookup return pages from a source nobody can open.
 
 ## Creature CR, and why it was hard to get right
 

@@ -8,7 +8,7 @@ wants. They do not match the printed numbers in the books' own footers.
 
 | Book | | Kind | PDF pages | Sections | Tables | Named entries | Creatures |
 |---|---|---|---:|---:|---:|---:|---:|
-| Advanced Race Guide — first printing errata | `ARG-errata` | errata | 256 | 619 | 19 | 588 | — |
+| Advanced Race Guide | `ARG` | player | 256 | 619 | 19 | 588 | — |
 | Bestiary 3 | `B3` | bestiary | 321 | 587 | 2 | 552 | 195 |
 | Bestiary 5 | `B5` | bestiary | 322 | 443 | 3 | 405 | 194 |
 | Bestiary 6 | `B6` | bestiary | 322 | 371 | 2 | 335 | 125 |

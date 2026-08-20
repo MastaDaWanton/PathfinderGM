@@ -33,12 +33,19 @@ CATALOGUE: dict[str, dict] = {
         "slug": "advanced-class-guide", "abbr": "ACG", "kind": "player",
         "title": "Advanced Class Guide",
     },
-    # Despite the filename this is *not* the Advanced Race Guide: it is the four-page
-    # errata sheet for its first printing. The book itself is not in the library, so
-    # nothing can look up a race option from it.
-    "advanced race guide": {
+    # These two must stay in this order. Both filenames contain "advanced race guide",
+    # so the more specific errata fragment has to be tested first or the four-page errata
+    # sheet claims the identity of the 759-page book.
+    #
+    # `pathfinder advanced race guide pdf.pdf` is the errata for the first printing, not
+    # the book — a genuinely confusing filename that cost a wrong entry once already.
+    "advanced race guide pdf": {
         "slug": "advanced-race-guide-errata", "abbr": "ARG-errata", "kind": "errata",
         "title": "Advanced Race Guide — first printing errata",
+    },
+    "advanced race guide": {
+        "slug": "advanced-race-guide", "abbr": "ARG", "kind": "player",
+        "title": "Advanced Race Guide",
     },
     "ultimate campaign": {
         "slug": "ultimate-campaign", "abbr": "UCam", "kind": "gm",
