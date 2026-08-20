@@ -14,7 +14,7 @@ from django.conf import settings
 
 from rules.intents import Intent, IntentError, find_outcome_claims
 
-from . import client, prompts
+from . import client, judgement, prompts
 
 
 @dataclass
@@ -93,13 +93,40 @@ class GMAgent:
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
 
+            # Check 5: not "is this legal" but "is this what the player asked for".
+            # Corrections are applied in place; an objection sends the turn back once,
+            # because we can tell the GM is wrong without being able to tell it what it
+            # should have done.
+            verdict = judgement.review(player_input, intents, self.engine.scene)
+            repairs = list(verdict.as_log())
+            if not verdict.ok and n < max_attempts - 1:
+                complaint = " ".join(o.message for o in verdict.objections)
+                rejections.append(f"attempt {n + 1} [judgement]: {complaint}")
+                messages = _with_correction(base, reply.text, complaint)
+                continue
+
+            if verdict.corrections:
+                # A correction can invalidate what was already checked, and did: cutting
+                # a spawn of two down to one left a later `attack c3` pointing at a
+                # creature that would now never exist, and the engine raised KeyError
+                # mid-resolution. Anything corrected is validated again.
+                try:
+                    intents = self.engine.validate([i.as_dict() for i in intents])
+                except IntentError as exc:
+                    rejections.append(f"attempt {n + 1} [after-correction]: {exc}")
+                    if n < max_attempts - 1:
+                        messages = _with_correction(base, reply.text, str(exc))
+                        continue
+                    raise
+
             # Check 4 is the only one that gets a targeted repair, because the narration
             # around the claim is worth keeping.
-            narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
+            narration = judgement.name_refs(narration, self.engine.scene)
+            narration, claim_repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
 
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
-                            repairs=repairs, rejections=rejections)
+                            repairs=repairs + claim_repairs, rejections=rejections)
 
         raise IntentError(
             "the GM could not produce a valid turn in "
@@ -136,7 +163,8 @@ class GMAgent:
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
 
-            narration = str(data.get("narration", "")).strip()
+            narration = judgement.name_refs(
+                str(data.get("narration", "")).strip(), self.engine.scene)
             narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
@@ -202,7 +230,7 @@ class GMAgent:
             prompts.call_two_messages(narration, tells, because, player_input),
             self.model, self.host, temperature=0.7, num_predict=250,
         )
-        text = reply.text.strip()
+        text = judgement.name_refs(reply.text.strip(), self.engine.scene)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
 
 

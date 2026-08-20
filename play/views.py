@@ -14,6 +14,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from gm import judgement
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules.intents import IntentError
@@ -346,13 +347,27 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         try:
             plan = agent.npc_turn(ref, location=location, recent_events=events)
         except (ModelUnavailable, IntentError) as exc:
-            # A creature the GM could not speak for holds its ground. Losing one NPC's
-            # turn is a worse fight; losing the whole request is a broken game.
-            c.transcript.append({
-                "who": "gm", "kind": "consequence",
-                "text": f"{actor.name} hesitates.",
-            })
+            # A creature the GM could not speak for still acts. It used to "hesitate",
+            # which reads as a bug even when it is a fallback: the player was attacked by
+            # nobody while a thug stood there. A creature in a fight with an enemy in
+            # front of it swings, and the fallback goes through the same validation as
+            # anything else.
             c.turn_log.append({"kind": "npc-turn", "ref": ref, "error": str(exc)[:400]})
+            fallback = judgement.default_npc_action(scene, ref)
+            if not fallback:
+                c.transcript.append({"who": "gm", "kind": "consequence",
+                                     "text": f"{actor.name} holds back."})
+                continue
+            try:
+                intents = engine.validate(fallback)
+                resolution = engine.run(intents)
+            except (IntentError, ValueError):
+                c.transcript.append({"who": "gm", "kind": "consequence",
+                                     "text": f"{actor.name} holds back."})
+                continue
+            for o in resolution.outcomes:
+                if o.tell:
+                    c.transcript.append({"who": "gm", "kind": "consequence", "text": o.tell})
             continue
 
         resolution = engine.run(plan.intents)

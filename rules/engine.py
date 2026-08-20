@@ -562,6 +562,14 @@ class Engine:
         targets = intent.targets()
         if not targets:
             raise IntentError("attack: needs a target", "schema")
+        if targets[0] not in self.scene.actors:
+            # Defensive: resolution should never meet a ref that validation passed, but a
+            # correction applied after validation once made that untrue and the engine
+            # raised KeyError as a 500. An IntentError is recoverable; a KeyError is not.
+            raise IntentError(
+                f"attack: {targets[0]!r} is not on the board at resolution time",
+                "refs",
+            )
         defender = self.scene.actors[targets[0]]
         self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
