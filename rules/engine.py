@@ -17,7 +17,7 @@ from . import dc as dc_mod
 from .dice import Dice, Modifier, Roll
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
-from .tables import SAVES, WEAPONS
+from .tables import MANEUVERS, SAVES, SIZE_ORDER, WEAPONS
 
 
 # --- Scene state -------------------------------------------------------------------
@@ -229,17 +229,35 @@ class Engine:
                 why = actor.can_power_attack()
                 if why:
                     raise IntentError(f"attack: {why}", "legality", index)
-            if intent.params.get("manoeuvre"):
-                # Accepted by the schema but not yet resolved. Saying so is the only
-                # honest option: silently resolving a trip as an ordinary sword swing
-                # would be a mechanic the GM believes it applied, which is precisely
-                # what the four checks exist to prevent.
-                raise IntentError(
-                    f"attack: combat manoeuvres ({intent.params['manoeuvre']}) are not "
-                    "resolved yet. Narrate the attempt and use an ordinary attack, or a "
-                    "check, until CMB/CMD lands.",
-                    "legality", index,
-                )
+            man = intent.params.get("manoeuvre")
+            if man:
+                m = MANEUVERS[man]
+                targets = intent.targets()
+                defender = self.scene.get(targets[0]) if targets else None
+                if defender is None:
+                    raise IntentError(
+                        f"attack: a {man} needs a target", "legality", index
+                    )
+                # "You can only X an opponent who is no more than one size category
+                # larger than you."
+                limit = m.get("size_limit")
+                if limit is not None:
+                    try:
+                        gap = SIZE_ORDER.index(defender.size) - SIZE_ORDER.index(actor.size)
+                    except ValueError:
+                        gap = 0
+                    if gap > limit:
+                        raise IntentError(
+                            f"attack: {defender.name} is {defender.size} and "
+                            f"{actor.name} is {actor.size} — a {man} only works on a "
+                            f"target at most one size category larger.",
+                            "legality", index,
+                        )
+                if m.get("condition") and defender.has_condition(m["condition"]):
+                    raise IntentError(
+                        f"attack: {defender.name} is already "
+                        f"{m['condition']}", "legality", index,
+                    )
 
     # --- Running --------------------------------------------------------------------
 
@@ -447,6 +465,9 @@ class Engine:
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
 
+        if intent.params.get("manoeuvre"):
+            return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
+
         # Flat-footed: a defender who has not acted yet loses Dex to AC. Outside an
         # encounter nobody has acted, so the first blow of a fight lands against a
         # flat-footed target — which is the common ambush case and is worth getting
@@ -531,6 +552,109 @@ class Engine:
             dc={"value": target_ac, "explain": ac_note, "flat_footed": flat_footed},
             verdict="hit" if any_hit else "miss",
             effects=effects, tell=" ".join(state["tells"]), because=intent.because,
+        )
+
+    def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
+                          weapon_key: str, partial: dict) -> Outcome:
+        """A combat manoeuvre: the same attack roll, with CMB instead of the attack
+        bonus, against the target's CMD instead of its AC.
+
+        Core Rulebook p.198-201. Every manoeuvre shares this resolution; only the
+        consequence differs, which is why they live in one table and one code path.
+        """
+        key = intent.params["manoeuvre"]
+        m = MANEUVERS[key]
+
+        mods = list(actor.cmb_modifiers(key))
+
+        # Attempting to disarm while unarmed is -4; so is grappling without two hands.
+        if m.get("unarmed_penalty") and weapon_key == "unarmed":
+            mods.append(Modifier(m["unarmed_penalty"], "unarmed"))
+        # A stunned target is easier to manhandle; an incapacitated one cannot resist
+        # at all.
+        if defender.has_condition("stunned"):
+            mods.append(Modifier(4, "target is stunned"))
+
+        flat_footed = (
+            defender.has_condition("flat-footed")
+            or not self.scene.initiative
+            or not self._has_acted(defender.ref)
+        )
+        cmd_mods = defender.cmd_modifiers(flat_footed)
+        cmd = sum(x.value for x in cmd_mods)
+        cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
+
+        automatic = not defender.can_act()
+        if automatic:
+            # "If your target is immobilized, unconscious, or otherwise incapacitated,
+            # your maneuver automatically succeeds."
+            roll = None
+            margin = 0
+            verdict = "success"
+        else:
+            roll = self._roll_or_suspend_stage(
+                intent, actor, mods, f"{m['name'].title()} (CMB)", cmd, partial,
+                partial.get("attack_state") or {}, "1d20",
+            )
+            natural = roll.natural
+            margin = roll.total - cmd
+            # A natural 20 always succeeds and a natural 1 always fails, whatever the
+            # arithmetic says.
+            if natural == 20:
+                verdict, margin = "success", max(margin, 0)
+            elif natural == 1:
+                verdict, margin = "failure", min(margin, -1)
+            else:
+                verdict = "success" if margin >= 0 else "failure"
+
+        effects: list[dict] = []
+        bits: list[str] = []
+
+        if verdict == "success":
+            bits.append(
+                f"{actor.name} {m['name']}s {defender.name}"
+                + (" automatically — it cannot resist" if automatic else f" by {margin}")
+                + f": {m['effect']}."
+            )
+            cond = m.get("condition")
+            if cond:
+                defender.add_condition(cond, source=f"{m['name']} by {actor.name}")
+                effects.append({"ref": defender.ref, "kind": "condition",
+                                "condition": cond, "from": m["name"]})
+            if m.get("also_grapples_attacker"):
+                actor.add_condition("grappled", source=f"grappling {defender.name}")
+                effects.append({"ref": actor.ref, "kind": "condition",
+                                "condition": "grappled", "from": m["name"]})
+            for over, extra in sorted((m.get("degrees") or {}).items()):
+                if margin >= over:
+                    bits.append(extra.capitalize().rstrip(".") + ".")
+                    dc_cond = (m.get("degree_condition") or {}).get(over)
+                    if dc_cond:
+                        defender.add_condition(dc_cond, source=m["name"])
+                        effects.append({"ref": defender.ref, "kind": "condition",
+                                        "condition": dc_cond, "from": m["name"]})
+            if m.get("per_5_over") and margin >= 5:
+                bits.append(f"{margin // 5} x {m['per_5_over']}.")
+        else:
+            bits.append(
+                f"{actor.name}'s {m['name']} fails against {defender.name} by {-margin}."
+            )
+            # Failing by 10 or more can turn the manoeuvre back on you.
+            if m.get("backfire") and margin <= -10:
+                bits.append(m["backfire"].capitalize() + ".")
+                back = m.get("backfire_condition")
+                if back:
+                    actor.add_condition(back, source=f"failed {m['name']}")
+                    effects.append({"ref": actor.ref, "kind": "condition",
+                                    "condition": back, "from": f"failed {m['name']}"})
+
+        effects.extend(self._hp_state_effects(defender))
+        return Outcome(
+            intent_id=intent.id, op="attack", rolls=[roll] if roll else [],
+            dc={"value": cmd, "explain": cmd_note, "flat_footed": flat_footed,
+                "breakdown": [x.as_dict() for x in cmd_mods]},
+            verdict=verdict, margin=margin, effects=effects,
+            tell=" ".join(bits), because=intent.because,
         )
 
     def _has_acted(self, ref: str) -> bool:

@@ -19,9 +19,9 @@ import re
 
 from .dice import Modifier
 from .tables import (
-    ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS, NON_PROFICIENT_PENALTY,
-    SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS, WEAPONS, ability_modifier, bab_for,
-    iterative_attacks, power_attack_terms, save_for,
+    ABILITIES, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
+    MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
+    WEAPONS, ability_modifier, bab_for, iterative_attacks, power_attack_terms, save_for,
 )
 
 
@@ -412,18 +412,62 @@ class Actor:
     def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed))
 
-    def cmd(self) -> int:
-        if self.flat_cmd is not None:
-            return self.flat_cmd
-        return (10 + self.bab + self.ability_mod("str") + self.ability_mod("dex")
-                + SIZES.get(self.size, SIZES["medium"])["cmb_cmd"])
+    # --- combat manoeuvres ---------------------------------------------------------
+    #
+    # CMB  = BAB + Str modifier + special size modifier
+    # CMD  = 10 + BAB + Str modifier + Dex modifier + special size modifier
+    #
+    # The *special* size modifier runs the opposite way from the one that applies to
+    # attack rolls and AC: Small is -1 here and +1 there. That is why SIZES carries two
+    # separate columns, and getting them crossed makes every small creature better at
+    # grappling than it should be.
 
-    def cmb_modifiers(self) -> list[Modifier]:
-        mods = [Modifier(self.bab, "BAB"), Modifier(self.ability_mod("str"), "Str")]
-        size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
-        if size_mod:
-            mods.append(Modifier(size_mod, f"{self.size} size"))
+    def cmb_modifiers(self, maneuver: str | None = None) -> list[Modifier]:
+        if self.flat_attack is not None:
+            # An NPC stat block prints CMB directly; when it does not, the attack bonus
+            # is the closest honest stand-in.
+            mods = [Modifier(self.flat_attack, "CMB")]
+        else:
+            mods = [Modifier(self.bab, "BAB")]
+            # Tiny or smaller creatures use Dex in place of Str for CMB.
+            uses_dex = self.size in ("fine", "diminutive", "tiny")
+            ab = "dex" if uses_dex else "str"
+            mods.append(Modifier(self.ability_mod(ab), ab.title()))
+            size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
+            if size_mod:
+                mods.append(Modifier(size_mod, f"{self.size} size"))
+            if maneuver and self.has_feat(f"improved {maneuver}"):
+                mods.append(Modifier(2, f"Improved {maneuver.title()}"))
+            if maneuver and self.has_feat(f"greater {maneuver}"):
+                mods.append(Modifier(2, f"Greater {maneuver.title()}"))
+
+        mods.extend(self._condition_mods("attack"))
         return [m for m in mods if m.value]
+
+    def cmd_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
+        if self.flat_cmd is not None:
+            mods = [Modifier(self.flat_cmd, "CMD")]
+            if flat_footed and self.ability_mod("dex") > 0:
+                # A printed CMD includes Dex; a flat-footed creature does not add it.
+                mods.append(Modifier(-self.ability_mod("dex"), "flat-footed (no Dex)"))
+        else:
+            mods = [Modifier(10, "base"), Modifier(self.bab, "BAB"),
+                    Modifier(self.ability_mod("str"), "Str")]
+            loses_dex = flat_footed or any(
+                c.data.get("lose_dex_to_ac") for c in self.conditions
+            )
+            if not loses_dex:
+                mods.append(Modifier(self.ability_mod("dex"), "Dex"))
+            size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
+            if size_mod:
+                mods.append(Modifier(size_mod, f"{self.size} size"))
+
+        # "Any penalties to a creature's AC also apply to its CMD."
+        mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
+        return [m for m in mods if m.value]
+
+    def cmd(self, flat_footed: bool = False) -> int:
+        return sum(m.value for m in self.cmd_modifiers(flat_footed))
 
     # --- state ------------------------------------------------------------------------
 
@@ -499,6 +543,165 @@ class Actor:
                             for f in self.feats]
             out["weapon"] = self.weapon()["name"]
         return out
+
+
+def _terms(mods: list[Modifier]) -> dict:
+    return {"total": sum(m.value for m in mods),
+            "terms": [m.as_dict() for m in mods]}
+
+
+def full_sheet(actor: Actor) -> dict:
+    """Everything on the character, with every number's provenance attached.
+
+    This is the app's whole proposition made literal: not "Stealth +9" but "+1 ranks,
+    +3 class skill, +3 Dex, +2 Stealthy". The section names match the Pathfinder Player
+    Character Folio, so a player who knows the paper sheet knows where to look.
+    """
+    cls = actor.class_data
+    weapons = actor.weapons or ([actor.equipped] if actor.equipped else ["unarmed"])
+
+    attacks = []
+    for key in dict.fromkeys(w.lower() for w in weapons if w):
+        if key not in WEAPONS:
+            continue
+        w = WEAPONS[key]
+        attacks.append({
+            "key": key,
+            "name": w["name"],
+            "equipped": key == (actor.equipped or "").lower(),
+            "category": w["category"],
+            "hands": w.get("hands", 1),
+            "proficient": actor.is_proficient(key),
+            "attack": _terms(actor.attack_modifiers(key)),
+            "damage": _terms(actor.damage_modifiers(key)),
+            "damage_dice": actor.damage_dice(key),
+            "crit": (f"{w['crit_range']}-20" if w["crit_range"] < 20 else "20")
+                    + f"/x{w['crit_mult']}",
+            "type": w["type"],
+            "sequence": len(actor.attack_sequence(key, full_attack=True)),
+        })
+
+    skills = []
+    for name in sorted(SKILLS):
+        ability, trained_only, acp = SKILLS[name]
+        rank = actor.ranks.get(name, 0)
+        if trained_only and rank == 0 and name not in actor.flat_skills:
+            # Cannot be attempted at all; listed so the absence is visible, not silent.
+            skills.append({"name": name, "ability": ability, "rank": 0,
+                           "class_skill": name in cls.get("class_skills", ()),
+                           "trained_only": True, "usable": False,
+                           "total": None, "terms": []})
+            continue
+        t = _terms(actor.skill_modifiers(name))
+        skills.append({
+            "name": name, "ability": ability, "rank": rank,
+            "class_skill": name in cls.get("class_skills", ()),
+            "trained_only": trained_only, "armour_check": acp, "usable": True,
+            **t,
+        })
+
+    feats = []
+    for f in actor.feats:
+        base = Actor._feat_name(f)
+        known = FEATS.get(base)
+        feats.append({
+            "name": known["name"] + (f" ({Actor._feat_target(f)})"
+                                     if Actor._feat_target(f) else "") if known else f,
+            "applied": known is not None,
+            "effect": _feat_effect_text(known) if known else
+                      "carried as flavour — the engine applies nothing",
+        })
+
+    maneuvers = []
+    for key, m in sorted(MANEUVERS.items()):
+        maneuvers.append({
+            "name": m["name"],
+            "cmb": _terms(actor.cmb_modifiers(key)),
+            "effect": m["effect"],
+            "size_limit": m.get("size_limit"),
+        })
+
+    armour = ARMOUR.get(actor.armour, ARMOUR["none"])
+    shield = SHIELDS.get(actor.shield, SHIELDS["none"])
+
+    return {
+        "identity": {
+            "name": actor.name,
+            "class": f"{cls.get('name', '')} {actor.level}".strip(),
+            "race": actor.race,
+            "heritage": actor.heritage,
+            "size": actor.size,
+            "world_people_id": actor.world_people_id,
+            "world_entity_id": actor.world_entity_id,
+        },
+        "abilities": [
+            {"key": a, "name": ABILITY_NAMES[a], "score": actor.ability_score(a),
+             "modifier": actor.ability_mod(a),
+             "base": actor.abilities.get(a, 10)}
+            for a in ABILITIES
+        ],
+        "defense": {
+            "hp": {"current": actor.hp, "max": actor.hp_max},
+            "ac": _terms(actor.ac_modifiers("melee")),
+            "ac_flat_footed": _terms(actor.ac_modifiers("melee", flat_footed=True)),
+            "ac_touch": {"total": actor.ac() - armour["ac"] - shield["ac"]
+                                  - actor.natural_armour,
+                         "terms": [{"value": actor.ac() - armour["ac"] - shield["ac"]
+                                             - actor.natural_armour,
+                                    "source": "touch AC (no armour, shield or natural)"}]},
+            "saves": [
+                {"key": k, "name": SAVES[k], **_terms(actor.save_modifiers(k))}
+                for k in SAVES
+            ],
+            "cmd": _terms(actor.cmd_modifiers()),
+            "cmd_flat_footed": _terms(actor.cmd_modifiers(flat_footed=True)),
+            "conditions": [
+                {"name": c.name, "rounds_left": c.rounds_left,
+                 "note": c.data.get("note", ""), "source": c.source}
+                for c in actor.conditions
+            ],
+        },
+        "offense": {
+            "bab": actor.bab,
+            "initiative": _terms(actor.initiative_modifiers()),
+            "cmb": _terms(actor.cmb_modifiers()),
+            "attacks": attacks,
+            "maneuvers": maneuvers,
+        },
+        "skills": skills,
+        "feats": feats,
+        "equipment": {
+            "armour": {"name": armour["name"], "ac": armour["ac"],
+                       "max_dex": armour["max_dex"], "acp": armour["acp"]},
+            "shield": {"name": shield["name"], "ac": shield["ac"], "acp": shield["acp"]},
+            "armour_check_penalty": actor.armour_check_penalty,
+            "weapons": [WEAPONS[w.lower()]["name"] for w in weapons
+                        if w and w.lower() in WEAPONS],
+        },
+        "background": {
+            "heritage": actor.heritage,
+            "notes": actor.notes.strip(),
+        },
+    }
+
+
+def _feat_effect_text(feat: dict) -> str:
+    bits = []
+    if feat.get("finesse"):
+        bits.append("Dex in place of Str on attack rolls with finessable weapons")
+    for label, key in (("skills", "skills"), ("saves", "saves")):
+        for what, v in (feat.get(key) or {}).items():
+            bits.append(f"{v:+d} {what}")
+    for key, label in (("initiative", "initiative"), ("ac", "AC"),
+                       ("weapon_attack", "attack with the chosen weapon"),
+                       ("weapon_damage", "damage with the chosen weapon")):
+        if feat.get(key):
+            bits.append(f"{feat[key]:+d} {label}")
+    if feat.get("power_attack"):
+        bits.append("trade attack bonus for damage, scaling with BAB")
+    if feat.get("hp_bonus"):
+        bits.append("bonus hit points")
+    return "; ".join(bits) or "no mechanical effect recorded"
 
 
 def to_dict(actor: Actor) -> dict:

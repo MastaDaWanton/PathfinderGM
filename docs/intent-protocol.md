@@ -159,7 +159,7 @@ and gets a real id.
 |---|---|---|
 | `check` | `skill`, `dc`, `opposed_by?`, `circumstance?`, `aid?` | Skill and ability checks. `opposed_by` makes it a contest; the engine rolls both sides. |
 | `save` | `save`, `dc`, `on_success?`, `on_failure?` | Fort / Ref / Will. |
-| `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` is rejected until CMB/CMD lands, rather than silently resolving as an ordinary swing. |
+| `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` resolves as CMB against the target's CMD — see below. |
 | `cast` | `spell`, `at?` | Engine checks the slot exists, computes DC and caster level, and **emits the derived saves and attacks itself** — the GM does not get to also declare them. |
 | `damage` | `amount`, `type`, `to` | Environmental and untyped sources only; weapon damage rides on `attack`. |
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
@@ -221,6 +221,35 @@ What resolution produces, and what call 2 is handed.
 - **Hidden rolls produce a `tell` with the numbers stripped.** The guard's Perception 22
   becomes "the guard's head comes up — he's heard something." The GM never receives the
   number it might leak.
+
+### 3.3 Combat manoeuvres
+
+A manoeuvre is resolved exactly like a to-hit roll, with two substitutions: **CMB in
+place of the attack bonus, and the target's CMD in place of its AC** (CRB pp. 198–201).
+So it rides on the `attack` op rather than getting one of its own, and the player rolls
+it like any other attack.
+
+```json
+{ "op": "attack", "actor": "pc", "target": "c1",
+  "because": "she goes for his legs",
+  "params": { "manoeuvre": "trip" } }
+```
+
+The GM names the manoeuvre and nothing else. The engine owns:
+
+- **CMB** = BAB + Str + *special* size modifier — Dex instead of Str for Tiny or smaller.
+- **CMD** = 10 + BAB + Str + Dex + special size modifier, with no Dex when flat-footed,
+  and any penalty to AC carried across.
+- The special size modifier runs **opposite** to the one for attack and AC: Small is −1
+  here and +1 there.
+- A natural 20 always succeeds and a natural 1 always fails.
+- An incapacitated target is manoeuvred automatically, with no roll at all; a stunned one
+  gives +4.
+- The consequence, including degrees — trip that fails by 10 puts *you* on the ground,
+  overrun by 5 knocks the target down, grapple grapples you both.
+
+Legality is checked before anything is rolled: most manoeuvres only work on a target at
+most one size category larger, and you cannot trip someone already prone.
 
 ### 4.1 What the player rolls
 

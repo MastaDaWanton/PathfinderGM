@@ -267,6 +267,66 @@ CONDITIONS: dict[str, dict] = {
         "attack": -2, "ability_penalty": {"dex": -4},
         "note": "-2 attack, -4 Dex, cannot move",
     },
+    # Added from Appendix 2 once the books were machine-readable. Before that the table
+    # was written from memory and covered barely half the conditions in the game; a
+    # condition the engine does not know is one it silently ignores when a GM applies it.
+    "dazed": {
+        "name": "Dazed", "can_act": False,
+        "note": "can take no actions, but has no penalty to AC",
+    },
+    "deafened": {
+        "name": "Deafened", "initiative": -4,
+        "note": "-4 on initiative, and a 20% chance to miscast spells with verbal components",
+    },
+    "cowering": {
+        "name": "Cowering", "ac": -2, "lose_dex_to_ac": True, "can_act": False,
+        "note": "-2 AC, loses Dex to AC, and takes no actions",
+    },
+    "helpless": {
+        "name": "Helpless", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "note": "treated as Dex 0; melee attackers gain +4 to hit",
+    },
+    "pinned": {
+        "name": "Pinned", "ac": -4, "lose_dex_to_ac": True, "attack": -4,
+        "note": "-4 AC, loses Dex to AC, tightly bound and barely able to act",
+    },
+    "paralyzed": {
+        "name": "Paralyzed", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "note": "Str and Dex reduced to 0, helpless, cannot move or act",
+    },
+    "nauseated": {
+        "name": "Nauseated", "can_act": False,
+        "note": "can take only a single move action; cannot attack or cast",
+    },
+    "panicked": {
+        "name": "Panicked",
+        "attack": -2, "saves": -2, "skills": -2, "ability_checks": -2,
+        "note": "-2 as shaken, drops what it holds, and must flee",
+    },
+    "fascinated": {
+        "name": "Fascinated", "skills": -4,
+        "note": "-4 on skill checks made as reactions; takes no other actions",
+    },
+    "disabled": {
+        "name": "Disabled",
+        "note": "at 0 hp; a standard action costs 1 hp and may start it dying",
+    },
+    "dying": {
+        "name": "Dying", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "note": "unconscious and losing 1 hp a round until stabilised or dead",
+    },
+    "stable": {
+        "name": "Stable", "can_act": False,
+        "note": "below 0 hp but no longer losing hit points",
+    },
+    "petrified": {
+        "name": "Petrified", "can_act": False, "helpless": True,
+        "note": "turned to stone: unconscious and unaware",
+    },
+    "confused": {
+        "name": "Confused",
+        "note": "acts randomly each round; roll on the confusion table",
+    },
 }
 
 # --- Difficulty bands ------------------------------------------------------------
@@ -347,6 +407,102 @@ SHIELDS: dict[str, dict] = {
     "light shield": {"name": "light shield", "ac": 1, "acp": -1},
     "heavy shield": {"name": "heavy shield", "ac": 2, "acp": -2},
 }
+
+# --- Combat manoeuvres ------------------------------------------------------------
+
+# All resolved identically: an attack roll with CMB in place of the attack bonus,
+# against the target's CMD. Only the consequences differ.
+#
+# `size_limit` — the manoeuvre only works on a target at most one size category larger.
+# `degrees`    — extra effects keyed on how far the roll exceeded CMD.
+# `backfire`   — what happens to the attacker on failing by 10 or more.
+MANEUVERS: dict[str, dict] = {
+    "bull rush": {
+        "name": "bull rush",
+        "size_limit": 1,
+        "provokes": True,
+        "effect": "pushes the target back 5 feet",
+        "per_5_over": "another 5 feet",
+    },
+    "disarm": {
+        "name": "disarm",
+        "provokes": True,
+        "effect": "the target drops one carried item",
+        "degrees": {10: "the target drops what it holds in both hands"},
+        "backfire": "you drop the weapon you were using",
+        "unarmed_penalty": -4,
+    },
+    "grapple": {
+        "name": "grapple",
+        "size_limit": None,
+        "provokes": True,
+        "effect": "both of you gain the grappled condition",
+        "condition": "grappled",
+        "also_grapples_attacker": True,
+        "needs_two_hands": True,
+    },
+    "overrun": {
+        "name": "overrun",
+        "size_limit": 1,
+        "provokes": True,
+        "effect": "you move through the target's space",
+        "degrees": {5: "and the target is knocked prone"},
+        "degree_condition": {5: "prone"},
+        "extra_legs_penalty": True,
+    },
+    "sunder": {
+        "name": "sunder",
+        "provokes": True,
+        "effect": "you damage an item the target is holding or wearing",
+        "damages_item": True,
+    },
+    "trip": {
+        "name": "trip",
+        "size_limit": 1,
+        "provokes": True,
+        "effect": "the target is knocked prone",
+        "condition": "prone",
+        "backfire": "you are knocked prone instead",
+        "backfire_condition": "prone",
+        "extra_legs_penalty": True,
+    },
+    "reposition": {
+        "name": "reposition",
+        "size_limit": 1,
+        "provokes": True,
+        "effect": "you move the target to another square within your reach",
+    },
+    "dirty trick": {
+        "name": "dirty trick",
+        "provokes": True,
+        "effect": "the target is blinded, dazzled, deafened, entangled, shaken or sickened for 1 round",
+        "condition": "dazzled",
+    },
+    "steal": {
+        "name": "steal",
+        "provokes": True,
+        "effect": "you take an object the target is carrying",
+    },
+    "drag": {
+        "name": "drag",
+        "size_limit": 1,
+        "provokes": True,
+        "effect": "you drag the target 5 feet",
+        "per_5_over": "another 5 feet",
+    },
+}
+
+MANEUVER_ALIASES = {
+    "bullrush": "bull rush", "bull-rush": "bull rush", "push": "bull rush",
+    "shove": "bull rush", "knock down": "trip", "knockdown": "trip",
+    "tackle": "grapple", "wrestle": "grapple", "grab": "grapple",
+    "break weapon": "sunder", "smash": "sunder", "run through": "overrun",
+    "run over": "overrun", "trip attack": "trip", "disarm attack": "disarm",
+}
+
+# Order of size categories, for the "no more than one size category larger" limit.
+SIZE_ORDER = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
+              "gargantuan", "colossal")
 
 # Size modifiers: (AC and attack, CMB and CMD, Stealth)
 SIZES: dict[str, dict] = {

@@ -19,7 +19,9 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
-from .tables import CIRCUMSTANCE, DC_BANDS, SAVES, SKILLS, WEAPONS
+from .tables import (
+    CIRCUMSTANCE, DC_BANDS, MANEUVER_ALIASES, MANEUVERS, SAVES, SKILLS, WEAPONS,
+)
 
 # Skill names from other editions, mapped to the 1e name they unambiguously mean.
 #
@@ -139,6 +141,21 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
 
 VISIBILITIES = ("player", "hidden")
 
+# Spellings of a param that mean the param. Normalised before the unknown-param check so
+# the op table stays a list of real params rather than a list of spellings — otherwise a
+# rejection helpfully lists both "manoeuvre" and "maneuver" as though they were different
+# things.
+PARAM_ALIASES = {
+    "maneuver": "manoeuvre",
+    "full attack": "full_attack",
+    "fullattack": "full_attack",
+    "powerattack": "power_attack",
+    "power attack": "power_attack",
+    "opposed": "opposed_by",
+    "against": "opposed_by",
+    "difficulty": "dc",
+}
+
 # Params the GM keeps supplying that the *engine* owns. docs/intent-protocol.md §1 is
 # explicit about these: "the engine ignores it and logs the discrepancy... a turn that
 # dies because the model said '+7' is worse than one that overrides it." Hard-rejecting
@@ -222,6 +239,10 @@ def parse(raw: dict, index: int = 0) -> Intent:
     params = raw.get("params") or {}
     if not isinstance(params, dict):
         raise IntentError(f"{op}: params must be an object", "schema", index)
+
+    for said, means in PARAM_ALIASES.items():
+        if said in params and means not in params:
+            params[means] = params.pop(said)
 
     missing = [p for p in required if params.get(p) in (None, "")]
     if missing:
@@ -333,10 +354,27 @@ def _check_params(intent: Intent, index: int) -> None:
     elif op == "attack":
         w = p.get("weapon")
         if w and str(w).strip().lower() not in WEAPONS:
-            raise IntentError(f"attack: no such weapon {w!r}", "schema", index)
+            raise IntentError(
+                f"attack: no such weapon {w!r}." + _suggest(str(w), WEAPONS)
+                + f" Carried weapons are named on the sheet; the list is "
+                f"{', '.join(sorted(WEAPONS))}.",
+                "schema", index,
+            )
         if w:
             p["weapon"] = str(w).strip().lower()
         p["full_attack"] = bool(p.get("full_attack", False))
+        man = p.get("manoeuvre")
+        if man:
+            key = str(man).strip().lower()
+            key = MANEUVER_ALIASES.get(key, key)
+            if key not in MANEUVERS:
+                raise IntentError(
+                    f"attack: {man!r} is not a combat manoeuvre."
+                    + _suggest(key, MANEUVERS)
+                    + f" The manoeuvres are: {', '.join(sorted(MANEUVERS))}.",
+                    "schema", index,
+                )
+            p["manoeuvre"] = key
 
     elif op == "move":
         zone = str(p["zone"]).strip().lower()

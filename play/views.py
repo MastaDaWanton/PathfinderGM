@@ -105,6 +105,21 @@ def state(request):
     return JsonResponse(_state(campaign_mod.current()))
 
 
+@require_GET
+def sheet(request):
+    """The full character sheet, every number with its provenance.
+
+    Fetched on demand rather than shipped with every turn: it is a few kilobytes of
+    itemised modifiers that only matter when the player opens the sheet.
+    """
+    from rules.sheet import full_sheet
+
+    pc = campaign_mod.current().scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    return JsonResponse(full_sheet(pc))
+
+
 @require_POST
 def say(request):
     """A player turn: GM call 1, validation, resolution."""

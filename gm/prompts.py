@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 
-from rules.tables import DC_BANDS
+from rules.tables import DC_BANDS, MANEUVERS
 
 # One example per shape the GM actually needs. Demonstration, not description.
 EXAMPLES = [
@@ -66,6 +66,20 @@ EXAMPLES = [
             ],
         },
     },
+    # Without this one the model resolved "I sweep his legs out from under him" as an
+    # ordinary rapier attack: it had no way to know a manoeuvre was available, because
+    # nothing had shown it one. Demonstration, not another paragraph of instruction.
+    {
+        "player": "I sweep his legs out from under him.",
+        "reply": {
+            "narration": "She drops her weight and hooks a boot behind his ankle.",
+            "intents": [{
+                "op": "attack", "actor": "pc", "target": "c1",
+                "because": "she wants him on the ground, not dead",
+                "params": {"manoeuvre": "trip"},
+            }],
+        },
+    },
 ]
 
 
@@ -86,8 +100,10 @@ below; there are no others. If you want someone new in the scene, use the spawn 
 
 Difficulty is a word from this list, not a number: %s.
 A circumstance is "favorable" or "unfavorable", nothing else.
+To grab, shove, trip, disarm or break something rather than wound it, use an attack with
+a manoeuvre: %s.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
-""" % ", ".join(DC_BANDS)
+""" % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 
 
 def scene_brief(world, scene, location, recent_events=None) -> str:
