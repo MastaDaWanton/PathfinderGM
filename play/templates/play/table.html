@@ -104,6 +104,9 @@
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
+  .who.up { color: var(--gold); }
+  .who.up small { color: var(--accent); }
+  .who.out { opacity: .45; text-decoration: line-through; }
 
   #veil {
     position: fixed; inset: 0; background: rgba(6,5,4,.86);
@@ -378,6 +381,7 @@
 
 <aside>
   <div id="sheet"></div>
+  <div id="order"></div>
   <h2>In the scene</h2>
   <div id="board"></div>
   <h2>Rolls</h2>
@@ -472,6 +476,17 @@ function render(s) {
       <button class="opensheet" id="opensheet">Full character sheet</button>`;
     $("#opensheet").onclick = openSheet;
   }
+
+  // Turn order, only while a fight is on. Without it the player cannot tell whose turn
+  // it is or who is still standing, which makes combat unplayable however correct the
+  // maths underneath is.
+  $("#order").innerHTML = s.scene.in_encounter ? `
+    <h2>Round ${s.scene.round}</h2>
+    ${s.scene.initiative.map(i => `
+      <div class="who${i.up ? " up" : ""}${i.out ? " out" : ""}">
+        <span>${i.up ? "▸ " : ""}${esc(i.name)}</span>
+        <small>${i.out ? "down" : i.score}</small>
+      </div>`).join("")}` : "";
 
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${a.ref}</small></span>

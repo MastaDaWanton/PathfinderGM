@@ -38,6 +38,15 @@ def _state(c) -> dict:
         "scene": {
             "location": c.location.name if c.location else "",
             "round": c.scene.round,
+            "in_encounter": c.scene.in_encounter,
+            "turn_ref": c.scene.current_ref(),
+            "initiative": [
+                {"ref": r, "score": v,
+                 "name": c.scene.actors[r].name if r in c.scene.actors else r,
+                 "up": c.scene.current_ref() == r,
+                 "out": not c.scene.conscious(r)}
+                for r, v in c.scene.initiative
+            ],
             "clock_minutes": c.scene.clock_minutes,
             "actors": [
                 {"ref": r, "name": a.name, "hp": a.hp, "hp_max": a.hp_max,
@@ -278,8 +287,75 @@ def _finish(c, agent, resolution, narration, player_input, plan):
     else:
         c.turn_log.append({"kind": "resolution",
                            "outcomes": [o.as_dict() for o in resolution.outcomes]})
+
+    _run_npc_turns(c, agent)
     c.save()
     return JsonResponse(_state(c))
+
+
+def _run_npc_turns(c, agent, limit: int = 12) -> None:
+    """Let every creature between the player's turns act.
+
+    Initiative used to be rolled and then never consulted: the player could swing, and
+    nothing ever swung back. This walks the order, asks the GM to act for each NPC in
+    turn, and stops when it comes back round to the player.
+
+    `limit` is a guard against a fight that cannot end — a stalled loop here would hang
+    the player's request rather than merely playing badly.
+    """
+    scene = c.scene
+    if not scene.in_encounter or scene.awaiting:
+        return
+
+    world = c.world
+    location = c.location
+    events = _recent_events(world, location)
+
+    for _ in range(limit):
+        # A side with nobody standing means the fight is over.
+        if scene.sides and scene.sides_standing() <= 1:
+            c.transcript.append({"who": "gm", "text": "The fight is over.",
+                                 "kind": "consequence"})
+            scene.end_encounter()
+            return
+
+        ref = scene.advance_turn()
+        if ref is None:
+            scene.end_encounter()
+            return
+        actor = scene.get(ref)
+        if actor is None or actor.is_pc:
+            return                       # back to the player; stop and wait for input
+
+        engine = c.engine()
+        agent.engine = engine
+        try:
+            plan = agent.npc_turn(ref, location=location, recent_events=events)
+        except (ModelUnavailable, IntentError) as exc:
+            # A creature the GM could not speak for holds its ground. Losing one NPC's
+            # turn is a worse fight; losing the whole request is a broken game.
+            c.transcript.append({
+                "who": "gm", "kind": "consequence",
+                "text": f"{actor.name} hesitates.",
+            })
+            c.turn_log.append({"kind": "npc-turn", "ref": ref, "error": str(exc)[:400]})
+            continue
+
+        resolution = engine.run(plan.intents)
+        if plan.narration:
+            c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
+
+        tells = [o for o in resolution.outcomes if o.tell]
+        if tells:
+            try:
+                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts")
+            except ModelUnavailable:
+                text = ""
+            c.transcript.append({
+                "who": "gm", "kind": "consequence",
+                "text": text or " ".join(o.tell for o in tells),
+            })
+        _log_turn(c, plan, resolution)
 
 
 def _log_turn(c, plan, resolution, replace: bool = False):

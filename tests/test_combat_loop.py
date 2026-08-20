@@ -1,0 +1,184 @@
+"""Turn order, and a campaign that survives the app closing.
+
+Both of these are "can you actually run a game" problems rather than rules problems, and
+both were found by trying to play rather than by testing.
+"""
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from rules.bestiary import instantiate
+from rules.dice import Dice
+from rules.engine import Engine, Scene
+from rules.sheet import load_pc
+
+
+@pytest.fixture
+def scene():
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.add(instantiate("thug", scene=s, name="the thug"))
+    s.add(instantiate("watchman", scene=s, name="the watchman"))
+    return s
+
+
+@pytest.fixture
+def engine(scene):
+    return Engine(scene, Dice(seed=99))
+
+
+def begin(engine, scene):
+    return engine.run(engine.validate([{
+        "op": "begin_encounter",
+        "params": {"sides": {"pc": ["pc"], "them": ["c1", "c2"]}},
+    }]))
+
+
+# --- Turn order ------------------------------------------------------------------
+
+def test_initiative_sets_a_turn_pointer(engine, scene):
+    """Initiative used to be rolled and then never consulted: the player could swing and
+    nothing ever swung back, because nothing tracked whose turn it was."""
+    assert not scene.in_encounter
+    begin(engine, scene)
+    assert scene.in_encounter
+    assert scene.round == 1
+    assert scene.current_ref() == scene.initiative[0][0]
+
+
+def test_the_order_cycles_and_counts_rounds(engine, scene):
+    begin(engine, scene)
+    seen = [scene.current_ref()]
+    for _ in range(len(scene.initiative) - 1):
+        seen.append(scene.advance_turn())
+    assert sorted(seen) == ["c1", "c2", "pc"]
+    assert scene.round == 1
+
+    scene.advance_turn()               # wraps to the top
+    assert scene.round == 2
+    assert scene.current_ref() == scene.initiative[0][0]
+
+
+def test_the_unconscious_are_skipped_rather_than_stalled_on(engine, scene):
+    """A fight that stops on a downed combatant never reaches the player again."""
+    begin(engine, scene)
+    scene.get("c1").hp = -3
+    scene.get("c1").apply_hp_state()
+
+    visited = {scene.advance_turn() for _ in range(6)}
+    assert "c1" not in visited
+    assert {"pc", "c2"} <= visited
+
+
+def test_timed_conditions_expire_as_rounds_pass(engine, scene):
+    """A round is the unit durations are measured in, so advancing one has to tick them
+    or a two-round condition lasts the whole fight."""
+    begin(engine, scene)
+    scene.get("c2").add_condition("shaken", 2)
+    for _ in range(len(scene.initiative) * 2):
+        scene.advance_turn()
+    assert not scene.get("c2").has_condition("shaken")
+
+
+def test_a_side_with_nobody_standing_ends_the_fight(engine, scene):
+    begin(engine, scene)
+    assert scene.sides_standing() == 2
+    for ref in ("c1", "c2"):
+        scene.get(ref).hp = -5
+        scene.get(ref).apply_hp_state()
+    assert scene.sides_standing() == 1
+
+
+def test_ending_an_encounter_clears_the_order(engine, scene):
+    begin(engine, scene)
+    scene.end_encounter()
+    assert not scene.in_encounter
+    assert scene.initiative == [] and scene.turn == -1 and scene.round == 0
+
+
+def test_advance_returns_none_when_nobody_can_act(engine, scene):
+    begin(engine, scene)
+    for ref in ("pc", "c1", "c2"):
+        scene.get(ref).add_condition("unconscious")
+    assert scene.advance_turn() is None
+
+
+# --- The campaign save ----------------------------------------------------------------
+
+def test_a_campaign_resumes_instead_of_being_overwritten(tmp_path, settings=None):
+    """Found by trying to play across a restart. `current()` never read the save, and
+    because it then called `save()` on the fresh campaign, restarting the server did not
+    merely forget the game — it destroyed the file.
+    """
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        first = cm.current("resume-test")
+        first.transcript.append({"who": "player", "text": "a line that must survive"})
+        first.scene.pc().hp = 3
+        first.save()
+
+        cm._LIVE.clear()               # as if the server had restarted
+        again = cm.current("resume-test")
+
+    assert any(b["text"] == "a line that must survive" for b in again.transcript)
+    assert again.scene.pc().hp == 3
+
+
+def test_starting_a_new_game_archives_the_old_one(tmp_path):
+    """`?new=1` is one keystroke from a campaign nobody meant to end."""
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        cm.current("archive-test").transcript.append({"who": "player", "text": "old game"})
+        cm.current("archive-test").save()
+
+        cm._LIVE.clear()
+        cm.current("archive-test", reset=True)
+
+        archived = [p for p in tmp_path.glob("archive-test-*.json")]
+        assert len(archived) == 1
+        kept = json.loads(archived[0].read_text(encoding="utf-8"))
+        assert any(b["text"] == "old game" for b in kept["transcript"])
+
+
+def test_an_unreadable_save_is_set_aside_not_clobbered(tmp_path):
+    """A save this build cannot parse is the player's only copy of their game."""
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        (tmp_path / "broken-test.json").write_text("{not json", encoding="utf-8")
+        c = cm.current("broken-test")
+        assert c is not None                       # play continues
+        assert list(tmp_path.glob("broken-test-unreadable-*.json"))
+
+
+def test_turn_order_survives_the_save(tmp_path):
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        c = cm.current("turn-save")
+        e = c.engine()
+        thug = instantiate("thug", scene=c.scene, name="the thug")
+        c.scene.add(thug)
+        e.run(e.validate([{"op": "begin_encounter",
+                           "params": {"sides": {"pc": ["pc"], "them": [thug.ref]}}}]))
+        expected = (c.scene.turn, c.scene.round, c.scene.current_ref(), c.scene.sides)
+        c.save()
+
+        cm._LIVE.clear()
+        back = cm.current("turn-save")
+
+    assert (back.scene.turn, back.scene.round, back.scene.current_ref(),
+            back.scene.sides) == expected
+    assert back.scene.in_encounter

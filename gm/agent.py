@@ -106,6 +106,47 @@ class GMAgent:
             f"{max_attempts} attempts:\n" + "\n".join(rejections)
         )
 
+    # --- An NPC's turn -------------------------------------------------------------------
+
+    def npc_turn(self, ref: str, location=None, recent_events=None,
+                 max_attempts: int = 3) -> TurnPlan:
+        """Act for one creature on its own initiative.
+
+        Same validation as a player turn, so an NPC cannot be talked into a mechanic
+        either. Fewer attempts than a player turn: a stalled NPC costs the fight far less
+        than a stalled player turn costs the scene, and the caller falls back to the
+        creature simply holding its ground.
+        """
+        actor = self.engine.scene.actors[ref]
+        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
+        base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round)
+        messages = base
+        attempts: list[Attempt] = []
+        rejections: list[str] = []
+
+        for n in range(max_attempts):
+            reply = client.chat(messages, self.model, self.host, as_json=True,
+                                temperature=0.7, num_predict=400)
+            attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
+            try:
+                data = reply.json()
+                intents = self.engine.validate(data.get("intents"))
+            except (ValueError, IntentError) as exc:
+                rejections.append(f"attempt {n + 1}: {exc}")
+                messages = _with_correction(base, reply.text, str(exc))
+                continue
+
+            narration = str(data.get("narration", "")).strip()
+            narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
+            attempts.extend(repair_attempts)
+            return TurnPlan(narration=narration, intents=intents, attempts=attempts,
+                            repairs=repairs, rejections=rejections)
+
+        raise IntentError(
+            f"the GM could not act for {ref} in {max_attempts} attempts:\n"
+            + "\n".join(rejections)
+        )
+
     # --- Check 4's repair ---------------------------------------------------------------
 
     def _repair_outcome_claims(self, narration: str) -> tuple[str, list[str], list[Attempt]]:

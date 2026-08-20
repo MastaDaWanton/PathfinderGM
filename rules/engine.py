@@ -37,6 +37,12 @@ class Scene:
     clock_minutes: int = 0
     log: list[dict] = field(default_factory=list)
 
+    # Whose turn it is: an index into `initiative`. -1 outside an encounter.
+    turn: int = -1
+    # side name -> refs, as `begin_encounter` declared them. Kept so the engine can tell
+    # when a fight is over without guessing who was fighting whom.
+    sides: dict[str, list[str]] = field(default_factory=dict)
+
     # Suspended-resolution state. Non-empty only between a dice prompt and the player's
     # answer.
     pending_intents: list[dict] = field(default_factory=list)
@@ -57,6 +63,57 @@ class Scene:
 
     def pc(self) -> Actor | None:
         return next((a for a in self.actors.values() if a.is_pc), None)
+
+    # --- turn order -------------------------------------------------------------------
+
+    @property
+    def in_encounter(self) -> bool:
+        return bool(self.initiative) and self.turn >= 0
+
+    def current_ref(self) -> str | None:
+        if not self.in_encounter:
+            return None
+        return self.initiative[self.turn % len(self.initiative)][0]
+
+    def conscious(self, ref: str) -> bool:
+        a = self.actors.get(ref)
+        return bool(a) and a.can_act() and a.hp > 0
+
+    def advance_turn(self) -> str | None:
+        """Move to the next combatant who can still act, and return their ref.
+
+        Skips the dead and unconscious rather than stalling on them, and ends the
+        encounter when only one side is left standing. Without this a fight had no way
+        to proceed past the player's first swing: initiative was rolled and then nothing
+        ever consulted it.
+        """
+        if not self.initiative:
+            return None
+        for step in range(1, len(self.initiative) + 1):
+            nxt = (self.turn + step) % len(self.initiative)
+            if nxt <= self.turn:
+                self.round += 1
+                for a in self.actors.values():
+                    a.tick_conditions(1)
+            if self.conscious(self.initiative[nxt][0]):
+                self.turn = nxt
+                self.acted.add(self.initiative[nxt][0])
+                return self.initiative[nxt][0]
+        return None                      # nobody left standing
+
+    def sides_standing(self) -> int:
+        """How many of the recorded sides still have someone up."""
+        return sum(
+            1 for refs in self.sides.values()
+            if any(self.conscious(r) for r in refs)
+        )
+
+    def end_encounter(self) -> None:
+        self.initiative = []
+        self.turn = -1
+        self.round = 0
+        self.acted = set()
+        self.sides = {}
 
 
 # --- Results -----------------------------------------------------------------------
@@ -750,6 +807,11 @@ class Engine:
         # Nobody has acted at the top of round one, so everyone is flat-footed until
         # their first turn comes round.
         self.scene.acted = set()
+        self.scene.sides = {k: list(v) for k, v in intent.params["sides"].items()}
+        # The turn pointer starts before the first combatant so the first advance lands
+        # on whoever won initiative.
+        self.scene.turn = -1
+        self.scene.advance_turn()
         names = ", ".join(self.scene.actors[r].name for r, _ in order)
         return Outcome(
             intent_id=intent.id, op="begin_encounter", rolls=rolls,

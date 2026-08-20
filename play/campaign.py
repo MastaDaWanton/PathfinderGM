@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
@@ -71,6 +72,8 @@ class Campaign:
                 "zones": self.scene.zones,
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
+                "turn": self.scene.turn,
+                "sides": self.scene.sides,
                 "round": self.scene.round,
                 "clock_minutes": self.scene.clock_minutes,
                 "pending_intents": self.scene.pending_intents,
@@ -100,6 +103,8 @@ class Campaign:
             zones=s.get("zones", {}),
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
+            turn=s.get("turn", -1),
+            sides={k: list(v) for k, v in (s.get("sides") or {}).items()},
             round=s.get("round", 0),
             clock_minutes=s.get("clock_minutes", 0),
             pending_intents=s.get("pending_intents", []),
@@ -161,11 +166,46 @@ _LIVE: dict[str, Campaign] = {}
 
 
 def current(campaign_id: str = "slice", reset: bool = False) -> Campaign:
+    """The campaign in play, resumed from disk if it is not already in memory.
+
+    Reading the save back was missing, and the consequence was not merely that a restart
+    forgot the game: `new_campaign` immediately called `save()`, so restarting the server
+    *overwrote* the campaign with a fresh one. A session could not survive the app being
+    closed, which is not a game anyone can run.
+    """
     if reset:
         _LIVE.pop(campaign_id, None)
+        path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
+        if path.exists():
+            # An explicit new game archives the old one rather than deleting it. Saves
+            # are cheap and losing a campaign to a stray ?new=1 is not recoverable.
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            path.rename(path.with_name(f"{campaign_id}-{stamp}.json"))
+
     if campaign_id not in _LIVE:
-        c = new_campaign(campaign_id)
-        c.transcript.append({"who": "gm", "text": opening_text(c)})
-        c.save()
+        c = _resume(campaign_id) or _begin(campaign_id)
         _LIVE[campaign_id] = c
     return _LIVE[campaign_id]
+
+
+def _resume(campaign_id: str) -> Campaign | None:
+    path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
+    if not path.exists():
+        return None
+    try:
+        return Campaign.load(path)
+    except Exception as exc:
+        # A save this build cannot read is set aside rather than overwritten. The player
+        # keeps the file; the app keeps working.
+        broken = path.with_name(f"{campaign_id}-unreadable-"
+                                f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+        path.rename(broken)
+        print(f"[campaign] could not read {path.name}: {exc}; moved to {broken.name}")
+        return None
+
+
+def _begin(campaign_id: str) -> Campaign:
+    c = new_campaign(campaign_id)
+    c.transcript.append({"who": "gm", "text": opening_text(c)})
+    c.save()
+    return c

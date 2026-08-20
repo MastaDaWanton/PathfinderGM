@@ -208,6 +208,35 @@ def call_two_messages(narration: str, tells: list[str], because: list[str],
     ]
 
 
+NPC_TURN_BRIEFING = """It is this creature's turn in the fight. Act for it.
+
+Decide what it does from what it is and what has just happened to it — a frightened
+commoner runs, a paid guard fights, a wounded animal bolts. Then say it as intent.
+
+Reply with a JSON object: {"narration": "...", "intents": [...]}, exactly as before.
+Your narration is the wind-up only; the engine decides whether anything lands.
+
+If the creature does something with no mechanics — surrenders, flees, shouts for help —
+say so with a single {"op": "narrate_only"} intent."""
+
+
+def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
+                      actor, round_no: int) -> list[dict]:
+    hp_note = "unhurt"
+    if actor.hp < actor.hp_max:
+        share = actor.hp / max(1, actor.hp_max)
+        hp_note = ("badly hurt" if share <= .34 else
+                   "bloodied" if share <= .67 else "lightly hurt")
+    conditions = ", ".join(c.name.lower() for c in actor.conditions) or "none"
+    return [
+        {"role": "system", "content": NPC_TURN_BRIEFING + "\n\n" + briefing_scene},
+        {"role": "user", "content":
+            f"Round {round_no}. It is {ref} ({actor.name}) turn.\n"
+            f"They are {hp_note} and their conditions are: {conditions}.\n"
+            f"What does {ref} do?"},
+    ]
+
+
 REPAIR_BRIEFING = """Rewrite the sentence you are given so that it no longer states how a
 roll turned out. Keep everything else about it — the voice, the detail, the length.
 
