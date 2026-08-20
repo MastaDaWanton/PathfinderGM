@@ -50,6 +50,13 @@ class Scene:
     pending_partial: dict = field(default_factory=dict)
     awaiting: dict | None = None
 
+    # What the dying did at the top of this round, for the GM to narrate.
+    bleeding: list[dict] = field(default_factory=list)
+    # The scene owns no randomness of its own; the engine lends it one for the
+    # round tick, so stabilisation rolls come from the same seeded stream as
+    # everything else and a scene stays reproducible.
+    _dice: Any = None
+
     def add(self, actor: Actor, zone: str = "near") -> Actor:
         self.actors[actor.ref] = actor
         self.zones[actor.ref] = zone
@@ -95,6 +102,9 @@ class Scene:
                 self.round += 1
                 for a in self.actors.values():
                     a.tick_conditions(1)
+                self.bleeding = [r for r in (
+                    a.bleed_out(self._dice) for a in self.actors.values()
+                ) if r]
             if self.conscious(self.initiative[nxt][0]):
                 self.turn = nxt
                 self.acted.add(self.initiative[nxt][0])
@@ -176,6 +186,17 @@ class Resolution:
         }
 
 
+# Appended to every unknown-ref rejection. Measured in play: told that two bravos step
+# out of the dark, the GM tried to name them, was refused, and never thought to create
+# them — it spent five attempts guessing at refs that could not exist. A rejection that
+# names the way out turns a lost turn into a repair.
+_SPAWN_HINT = (
+    ' If someone new should be in the scene, create them first with '
+    '{"op": "spawn", "params": {"template": "thug", "count": 2}} — the templates are '
+    "guildhand, watchman, thug and guard dog — and use the refs it returns."
+)
+
+
 class _NeedsPlayerRoll(Exception):
     """Raised inside an op handler to suspend the whole intent list."""
 
@@ -191,6 +212,7 @@ class Engine:
     def __init__(self, scene: Scene, dice: Dice | None = None):
         self.scene = scene
         self.dice = dice or Dice()
+        self.scene._dice = self.dice
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -198,11 +220,33 @@ class Engine:
         """Schema, then refs, then legality. Raises IntentError carrying which check
         failed so the caller can choose between regenerating and repairing."""
         intents = parse_all(raw_intents)
+        # Refs an earlier intent in this same list will have created by the time a later
+        # one runs. Without this, "two bravos step out of the dark and I fight them" is
+        # impossible to express: the whole list is validated before any of it runs, so a
+        # spawn followed by an attack on what it spawned was always rejected, and the GM
+        # burned every attempt guessing at refs that could not exist yet.
+        pending = self._projected_refs(intents)
         for i, intent in enumerate(intents):
-            self._check_refs(intent, i)
+            self._check_refs(intent, i, extra=pending)
             self._check_legality(intent, i)
             self._force_visibility(intent)
         return intents
+
+    def _projected_refs(self, intents: list[Intent]) -> set[str]:
+        """The refs `spawn` intents in this list are going to mint."""
+        from .bestiary import _next_ref
+
+        taken = set(self.scene.actors)
+        projected: set[str] = set()
+        for intent in intents:
+            if intent.op != "spawn":
+                continue
+            for _ in range(int(intent.params.get("count", 1) or 1)):
+                n = 1
+                while f"c{n}" in taken or f"c{n}" in projected:
+                    n += 1
+                projected.add(f"c{n}")
+        return projected
 
     def _force_visibility(self, intent: Intent) -> None:
         """Only the PC can roll on the popup, so only the PC's rolls can be player-visible.
@@ -220,44 +264,46 @@ class Engine:
         if intent.visibility == "player" and (actor is None or not actor.is_pc):
             intent.visibility = "hidden"
 
-    def _known(self, ref: str | None) -> bool:
-        return bool(ref) and ref in self.scene.actors
+    def _known(self, ref: str | None, extra: set[str] | None = None) -> bool:
+        return bool(ref) and (ref in self.scene.actors or ref in (extra or set()))
 
-    def _check_refs(self, intent: Intent, index: int) -> None:
+    def _check_refs(self, intent: Intent, index: int,
+                    extra: set[str] | None = None) -> None:
         if intent.op in ("narrate_only", "advance_time", "spawn", "begin_encounter"):
             if intent.op == "begin_encounter":
                 for side, refs in intent.params["sides"].items():
                     for r in refs:
-                        if not self._known(r):
+                        if not self._known(r, extra):
                             raise IntentError(
                                 f"begin_encounter: side {side!r} names unknown ref {r!r}; "
-                                f"known refs are {sorted(self.scene.actors)}",
+                                f"known refs are {sorted(set(self.scene.actors) | (extra or set()))}",
                                 "refs", index,
                             )
             return
 
         needs_actor = intent.op in ("check", "save", "attack", "move")
-        if needs_actor and not self._known(intent.actor):
+        if needs_actor and not self._known(intent.actor, extra):
             raise IntentError(
                 f"{intent.op}: unknown actor {intent.actor!r}; known refs are "
-                f"{sorted(self.scene.actors)}. Refer to people by ref, never by name.",
+                f"{sorted(set(self.scene.actors) | (extra or set()))}. Refer to people by ref, never by name."
+                + _SPAWN_HINT,
                 "refs", index,
             )
         for t in intent.targets():
-            if not self._known(t):
+            if not self._known(t, extra):
                 raise IntentError(
                     f"{intent.op}: unknown target {t!r}; known refs are "
-                    f"{sorted(self.scene.actors)}",
+                    f"{sorted(set(self.scene.actors) | (extra or set()))}." + _SPAWN_HINT,
                     "refs", index,
                 )
         opposed = intent.params.get("opposed_by")
-        if opposed and not self._known(opposed.get("ref")):
+        if opposed and not self._known(opposed.get("ref"), extra):
             raise IntentError(
                 f"check: opposed_by names unknown ref {opposed.get('ref')!r}",
                 "refs", index,
             )
         to = intent.params.get("to")
-        if to and not self._known(to):
+        if to and not self._known(to, extra):
             raise IntentError(
                 f"{intent.op}: unknown ref {to!r} in params.to", "refs", index
             )
@@ -517,6 +563,7 @@ class Engine:
         if not targets:
             raise IntentError("attack: needs a target", "schema")
         defender = self.scene.actors[targets[0]]
+        self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         full = bool(intent.params.get("full_attack"))
@@ -621,6 +668,7 @@ class Engine:
         """
         key = intent.params["manoeuvre"]
         m = MANEUVERS[key]
+        self._ensure_encounter(intent.actor)
 
         mods = list(actor.cmb_modifiers(key))
 
@@ -712,6 +760,44 @@ class Engine:
                 "breakdown": [x.as_dict() for x in cmd_mods]},
             verdict=verdict, margin=margin, effects=effects,
             tell=" ".join(bits), because=intent.because,
+        )
+
+    def _ensure_encounter(self, initiator: str) -> None:
+        """Start a fight the moment someone swings, if one is not already running.
+
+        Measured in play: asked to attack, the GM emitted a bare `attack` intent and no
+        `begin_encounter`. Initiative was never rolled, so nothing tracked turns and the
+        NPC loop never ran — the guildhand took a rapier through the arm and the fight
+        simply stopped. Relying on the GM to *remember* a bookkeeping step is the pattern
+        this whole architecture exists to avoid, so the engine does it.
+
+        The initiator keeps the turn they just took: they are the one who started it, and
+        re-rolling them to the back of the order would take away the action they have
+        already declared.
+        """
+        if self.scene.in_encounter:
+            return
+        combatants = [r for r, a in self.scene.actors.items() if a.hp > 0]
+        if len(combatants) < 2:
+            return
+
+        rolls = []
+        for ref in combatants:
+            a = self.scene.actors[ref]
+            r = self.dice.d20(a.initiative_modifiers(), label=f"{a.name} initiative",
+                              visibility="hidden")
+            rolls.append((ref, r.total))
+        rolls.sort(key=lambda t: -t[1])
+
+        self.scene.initiative = rolls
+        self.scene.round = 1
+        self.scene.sides = {
+            "pc": [r for r in combatants if self.scene.actors[r].is_pc],
+            "them": [r for r in combatants if not self.scene.actors[r].is_pc],
+        }
+        self.scene.acted = {initiator}
+        self.scene.turn = next(
+            (i for i, (ref, _) in enumerate(rolls) if ref == initiator), 0
         )
 
     def _has_acted(self, ref: str) -> bool:
@@ -834,6 +920,21 @@ class Engine:
             )
             self.scene.add(actor)
             made.append({"ref": actor.ref, "name": actor.name})
+            # Someone who arrives mid-fight rolls in. Without this they were on the
+            # board but not in the order, so they never took a turn and the fight could
+            # not end — `sides_standing` never counted them either.
+            if self.scene.in_encounter:
+                init = self.dice.d20(actor.initiative_modifiers(),
+                                     label=f"{actor.name} initiative", visibility="hidden")
+                self.scene.initiative.append((actor.ref, init.total))
+                self.scene.initiative.sort(key=lambda t: -t[1])
+                self.scene.turn = next(
+                    (i for i, (r, _) in enumerate(self.scene.initiative)
+                     if r == self.scene.current_ref()), self.scene.turn
+                )
+                self.scene.sides.setdefault(
+                    "pc" if actor.is_pc else "them", []
+                ).append(actor.ref)
         return Outcome(
             intent_id=intent.id, op="spawn",
             effects=[{"kind": "spawn", "actors": made}],

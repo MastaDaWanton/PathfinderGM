@@ -171,7 +171,22 @@ ENGINE_OWNED_PARAMS = {
     "attack_bonus", "attack_roll", "to_hit", "bonus", "modifier", "modifiers",
     "ac", "target_ac", "hit", "crit", "critical", "result", "outcome", "total",
     "skill", "roll", "dc_value", "save_bonus", "initiative",
+    "melee_attack_roll", "ranged_attack_roll", "attack_modifier", "damage_modifier",
+    "hit_points", "hp", "armor_class", "defense", "cmb", "cmd", "save", "save_dc",
 }
+
+# A ref, however the model has decorated it. Observed in play: "[ref: c1]", "<c1>",
+# "c1 (the thug)". The registry is strict about *which* refs exist and there is no
+# reason for it to also be strict about punctuation.
+_REF_RE = re.compile(r"\b(pc|c\d+|[0-9a-f]{12})\b", re.I)
+
+
+def normalise_ref(value):
+    """Pull the ref out of whatever the model wrapped it in."""
+    if not isinstance(value, str):
+        return value
+    m = _REF_RE.search(value.strip())
+    return m.group(1).lower() if m else value.strip()
 
 # The model keeps reaching for a third word meaning "the engine rolls this one, not the
 # player" — observed as "gm" and "game" on separate live turns. That is exactly what
@@ -271,10 +286,16 @@ def parse(raw: dict, index: int = 0) -> Intent:
             "schema", index,
         )
 
+    target = raw.get("target")
+    if isinstance(target, list):
+        target = [normalise_ref(t) for t in target]
+    else:
+        target = normalise_ref(target)
+
     intent = Intent(
         op=op,
-        actor=raw.get("actor"),
-        target=raw.get("target"),
+        actor=normalise_ref(raw.get("actor")),
+        target=target,
         because=str(raw.get("because") or "").strip(),
         params=params,
         visibility=visibility,
@@ -334,6 +355,7 @@ def _check_params(intent: Intent, index: int) -> None:
                     "schema", index,
                 )
             ob["skill"] = os_
+            ob["ref"] = normalise_ref(ob.get("ref"))
         if not p.get("dc") and not p.get("opposed_by"):
             raise IntentError(
                 "check: a check needs something to beat. Add either "
@@ -409,6 +431,12 @@ def _check_params(intent: Intent, index: int) -> None:
     if p.get("dc") is not None:
         p["dc"] = normalise_dc(p["dc"], op, index)
 
+    for key in ("to", "who"):
+        if p.get(key):
+            p[key] = normalise_ref(p[key])
+    if op == "begin_encounter" and isinstance(p.get("sides"), dict):
+        p["sides"] = {k: [normalise_ref(r) for r in v] for k, v in p["sides"].items()}
+
     circ = p.get("circumstance")
     if circ:
         if isinstance(circ, str):
@@ -464,6 +492,16 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
      "states a perception result"),
     (r"\bnever (?:sees|hears|notices|spots)\b", "states a perception result"),
     (r"\bfails? to (?:see|hear|notice|spot)\b", "states a perception result"),
+    # "You squirm and twist, managing to slip free of the grapple" — produced in a live
+    # fight, in setup narration, while the engine still had her grappled. Escaping a
+    # grapple is a combat manoeuvre check like any other, and the GM does not get to
+    # decide it any more than it gets to decide a sword swing.
+    (r"\b(?:slip|break|pull|wriggle|squirm|twist|tear)(?:s|ing)?\s+(?:free|loose|away|out)\b",
+     "states an escape"),
+    (r"\bmanag(?:e|es|ing) to\b", "states an action succeeding"),
+    (r"\b(?:escapes?|escaped|escaping)\s+(?:the|his|her|their|its)\b", "states an escape"),
+    (r"\bshakes? (?:him|her|it|them)self free\b", "states an escape"),
+    (r"\bgets? (?:free|loose|away)\b", "states an escape"),
     (r"\bdc\s*\d+", "states a DC in prose; the DC belongs in the intent"),
     (r"\broll(?:s|ed)? a\s*\d+", "states a die result"),
     (r"\bnatural (?:20|one|1)\b", "states a die result"),

@@ -320,6 +320,20 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             return
 
         ref = scene.advance_turn()
+        # Anyone bleeding out at the top of the round gets said out loud. A character
+        # losing a hit point a round towards death, silently, is the sort of thing a
+        # player finds out about only when they are dead.
+        for b in scene.bleeding:
+            who = scene.get(b["ref"])
+            name = who.name if who else b["ref"]
+            line = {
+                "dead": f"{name} stops moving.",
+                "stable": f"{name} is still down, but the bleeding has stopped.",
+                "dying": f"{name} is bleeding out.",
+            }[b["outcome"]]
+            c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+        scene.bleeding = []
+
         if ref is None:
             scene.end_encounter()
             return

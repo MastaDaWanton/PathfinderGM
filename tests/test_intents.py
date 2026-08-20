@@ -293,6 +293,12 @@ def test_attacking_with_a_weapon_the_actor_is_not_carrying_is_rejected(engine):
     ("The guildhand blinks once, rubs his eye, and goes back to his cup, unaware.",
      "unaware"),
     ("He is oblivious to the shape on the wall.", "oblivious"),
+    # Produced in a live fight, in setup narration, while the engine still had her
+    # grappled. Escaping a grapple is a combat manoeuvre check like any other.
+    ("You squirm and twist, managing to slip free of the grapple.", "slips free"),
+    ("She breaks loose and puts the post between them.", "breaks loose"),
+    ("He manages to get his shield up in time.", "manages to"),
+    ("She shakes herself free of his grip.", "shakes free"),
     ("He never sees you cross the yard.", "never sees"),
     ("The guildhand fails to notice the movement above him.", "fails to notice"),
     ("You're hit before you can move.", "being hit"),

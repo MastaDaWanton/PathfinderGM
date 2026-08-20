@@ -80,6 +80,19 @@ EXAMPLES = [
             }],
         },
     },
+    # Measured in play: told that two bravos step out of the dark, the GM tried to name
+    # them, was refused by the ref registry, and burned five attempts guessing at refs
+    # that could not exist. It never occurred to it to create them first.
+    {
+        "player": "Two guild bravos step out of the dark behind me. I turn and fight.",
+        "reply": {
+            "narration": "Two of them, come round the corner of the wall with saps out.",
+            "intents": [
+                {"op": "spawn", "because": "the guild does not send one man",
+                 "params": {"template": "thug", "count": 2}},
+            ],
+        },
+    },
 ]
 
 
@@ -220,6 +233,34 @@ If the creature does something with no mechanics — surrenders, flees, shouts f
 say so with a single {"op": "narrate_only"} intent."""
 
 
+# The player-turn prompt carries five worked examples; this one carried none, and the
+# model answered with intents that were strings rather than objects on nearly every NPC
+# turn — "intent 0 is not an object", three attempts in a row, so the creature stood
+# there hesitating while the player was attacked by nobody. Same lesson, second place it
+# had to be learned: demonstration, not instruction.
+NPC_EXAMPLES = [
+    {
+        "ask": "Round 2. It is c1 (a thug) turn.\nThey are unhurt and their conditions "
+               "are: none.\nWhat does c1 do?",
+        "reply": {
+            "narration": "The nearer one shifts his grip on the sap and comes in low.",
+            "intents": [{"op": "attack", "actor": "c1", "target": "pc",
+                         "because": "he is paid to put her down, not to kill her"}],
+        },
+    },
+    {
+        "ask": "Round 4. It is c2 (a guildhand) turn.\nThey are badly hurt and their "
+               "conditions are: shaken.\nWhat does c2 do?",
+        "reply": {
+            "narration": "He looks at the blood on his sleeve, and at the gate, and "
+                         "decides the gate is closer.",
+            "intents": [{"op": "narrate_only",
+                         "because": "he is not paid enough to die on a gate"}],
+        },
+    },
+]
+
+
 def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
                       actor, round_no: int) -> list[dict]:
     hp_note = "unhurt"
@@ -228,13 +269,15 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
         hp_note = ("badly hurt" if share <= .34 else
                    "bloodied" if share <= .67 else "lightly hurt")
     conditions = ", ".join(c.name.lower() for c in actor.conditions) or "none"
-    return [
-        {"role": "system", "content": NPC_TURN_BRIEFING + "\n\n" + briefing_scene},
-        {"role": "user", "content":
-            f"Round {round_no}. It is {ref} ({actor.name}) turn.\n"
-            f"They are {hp_note} and their conditions are: {conditions}.\n"
-            f"What does {ref} do?"},
-    ]
+    messages = [{"role": "system", "content": NPC_TURN_BRIEFING + "\n\n" + briefing_scene}]
+    for ex in NPC_EXAMPLES:
+        messages.append({"role": "user", "content": ex["ask"]})
+        messages.append({"role": "assistant", "content": json.dumps(ex["reply"])})
+    messages.append({"role": "user", "content":
+        f"Round {round_no}. It is {ref} ({actor.name}) turn.\n"
+        f"They are {hp_note} and their conditions are: {conditions}.\n"
+        f"What does {ref} do?"})
+    return messages
 
 
 REPAIR_BRIEFING = """Rewrite the sentence you are given so that it no longer states how a

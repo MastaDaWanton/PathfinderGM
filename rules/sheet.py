@@ -546,15 +546,59 @@ class Actor:
 
     def apply_hp_state(self) -> list[str]:
         """1e's death and unconsciousness thresholds, applied by code so nobody has to
-        remember them mid-scene."""
+        remember them mid-scene.
+
+        Below 0 and above -Con you are unconscious *and dying*: losing a hit point each
+        round until you stabilise or die. That last part was missing, so a downed
+        character simply lay there indefinitely and the fight quietly ended — which is
+        not what the rules say and not what a player would expect to happen to them.
+        """
         changed = []
-        if self.hp <= -self.ability_score("con") and not self.has_condition("dead"):
+        con = self.ability_score("con")
+        if self.hp <= -con and not self.has_condition("dead"):
+            for gone in ("dying", "stable", "unconscious"):
+                self.remove_condition(gone)
             self.add_condition("dead", source="hit points")
             changed.append("dead")
-        elif 0 >= self.hp > -self.ability_score("con") and not self.has_condition("unconscious"):
-            self.add_condition("unconscious", source="hit points")
-            changed.append("unconscious")
+        elif self.hp < 0 and not self.has_condition("dead"):
+            if not self.has_condition("unconscious"):
+                self.add_condition("unconscious", source="hit points")
+                changed.append("unconscious")
+            # Stabilising once keeps you stable; fresh damage starts it again.
+            if not self.has_condition("stable") and not self.has_condition("dying"):
+                self.add_condition("dying", source="hit points")
+                changed.append("dying")
+        elif self.hp == 0 and not self.has_condition("disabled"):
+            # Exactly 0 is disabled, not dying: conscious, but a standard action costs
+            # a hit point and starts it.
+            self.add_condition("disabled", source="hit points")
+            changed.append("disabled")
         return changed
+
+    def bleed_out(self, dice) -> dict | None:
+        """One round of dying: lose a hit point, then try to stabilise.
+
+        PF1e: a Constitution check against DC 10 + the negative hit point total. Success
+        makes you stable; failure takes you a point closer to dead.
+        """
+        if not self.has_condition("dying") or self.has_condition("dead"):
+            return None
+        self.hp -= 1
+        con = self.ability_score("con")
+        if self.hp <= -con:
+            self.apply_hp_state()
+            return {"ref": self.ref, "outcome": "dead", "hp": self.hp}
+
+        dc = 10 + abs(self.hp)
+        roll = dice.d20([Modifier(self.ability_mod("con"), "Con")],
+                        label=f"{self.name} stabilise", visibility="hidden")
+        if roll.total >= dc:
+            self.remove_condition("dying")
+            self.add_condition("stable", source="stabilised")
+            return {"ref": self.ref, "outcome": "stable", "hp": self.hp,
+                    "roll": roll.total, "dc": dc}
+        return {"ref": self.ref, "outcome": "dying", "hp": self.hp,
+                "roll": roll.total, "dc": dc}
 
     # --- serialisation ------------------------------------------------------------------
 
