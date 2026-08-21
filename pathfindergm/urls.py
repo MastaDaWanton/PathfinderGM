@@ -17,4 +17,7 @@ urlpatterns = [
     path("api/craft/preview", craft_views.craft_preview, name="craft_preview"),
     path("api/craft/do", craft_views.craft_do, name="craft_do"),
     path("api/craft/recipes", craft_views.craft_recipes, name="craft_recipes"),
+    path("api/forage/table", craft_views.forage_table, name="forage_table"),
+    path("api/forage", craft_views.forage_do, name="forage_do"),
+    path("api/travel", craft_views.travel_to, name="travel_to"),
 ]

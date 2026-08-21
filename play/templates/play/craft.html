@@ -143,6 +143,28 @@
   .mini:hover:not(:disabled) { border-color: var(--brew); color: var(--brew); }
   .mini:disabled { opacity: .35; cursor: not-allowed; }
   .none { color: var(--dim); font-style: italic; font-size: 13px; }
+  /* The ground you are standing on, which is what the forage table is built from. */
+  .ground {
+    background: rgba(111,207,143,.06); border: 1px solid var(--brew-dim);
+    border-radius: 3px; padding: 9px 11px; margin-bottom: 11px;
+  }
+  .ground b { color: var(--brew); font: 400 15px/1.2 var(--display);
+              letter-spacing: .06em; font-variant: small-caps; }
+  .ground em { display: block; color: var(--dim); font: italic 12px/1.4 var(--body);
+               margin: 2px 0 8px; }
+  .ground select {
+    width: 100%; margin-bottom: 7px; padding: 6px 8px; font: 13px var(--body);
+    color: var(--ink); background: var(--sunk); border: 1px solid var(--edge);
+    border-radius: 2px;
+  }
+  .ground .row2 { display: flex; gap: 6px; }
+  .ground .row2 > button { flex: 1; }
+  #tablewrap { max-height: 176px; overflow-y: auto; margin-top: 8px; }
+  #tablewrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #tablewrap td { padding: 2px 4px; border-bottom: 1px solid #241d15; }
+  #tablewrap td:first-child { color: var(--dim); white-space: nowrap; width: 1%; }
+  #tablewrap td:last-child { text-align: right; color: var(--dim); }
+  .jar .held { font: 600 9px/1.2 var(--body); color: var(--brew); }
   .t1 { background: #6b6b6b; } .t2 { background: #4f8a52; } .t3 { background: #3f6fa8; }
   .t4 { background: #8154a8; } .t5 { background: #b8863a; }
 
@@ -268,6 +290,11 @@ let USING = {};                // stock id -> how many of it are in the pot
 let CHAIN = [];                // methods, in order
 let PREVIEW = null;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
+let HERE = "";                 // the biome underfoot
+let BIOMES = [];               // everywhere the party could be
+let TABLE = null;              // the d100 forage table for HERE
+let ATTEMPTS = 1;              // how many things one session turns up
+let SHOWTABLE = false;
 const PREVIEW_COST = () => CONC_COST;
 
 const $ = s => document.querySelector(s);
@@ -299,10 +326,17 @@ async function selectCraft(id) {
   tabs();
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
-  const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
+  const [r, ft] = await Promise.all([
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
+    fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
+  ]);
   const d = await r.json();
+  const f = await ft.json();
+  BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
   SHELF = d.ingredients;
   STOCK = d.stock || [];
+  HERE = d.biome || "";
+  TABLE = d.table || null;
   if (STOCK.length) CONC_COST = STOCK[0].concentrates_to.cost;
   STATE.tracks[CRAFT] = d.track;
   renderBench();
@@ -324,6 +358,7 @@ function renderBench() {
     <section class="panel">
       <h2>Ingredients</h2>
       <div class="inner">
+        <div id="ground"></div>
         <input id="filter" type="text" placeholder="Search the shelf…" autocomplete="off">
         <div id="stockwrap"></div>
         <h4 class="sect">Raw</h4>
@@ -350,6 +385,28 @@ function renderBench() {
   $("#filter").addEventListener("input", renderShelf);
   renderStations();
   renderShelf();
+}
+
+function renderGround() {
+  const g = $("#ground");
+  if (!g) return;
+  const t = TABLE || { rows: [], nothing_chance: 100 };
+  const opts = (BIOMES || []).map(b =>
+    `<option value="${esc(b.id)}" ${b.id === HERE ? "selected" : ""}>${esc(b.id)}</option>`).join("");
+  g.innerHTML = `<div class="ground">
+    <b>${esc(HERE || "nowhere in particular")}</b>
+    <em>${esc(t.describe || "")}</em>
+    <select id="biomepick">${opts}</select>
+    <div class="row2">
+      <button class="mini" id="forage">Forage (${ATTEMPTS}×)</button>
+      <button class="mini" id="showtable">${SHOWTABLE ? "hide" : "roll table"}</button>
+    </div>
+    ${SHOWTABLE ? `<div id="tablewrap">${
+      t.rows.length ? `<table>${t.rows.map(r =>
+        `<tr><td>${esc(r.roll)}</td><td>${esc(r.name)}</td><td>${esc(r.tier)}</td></tr>`).join("")}
+        <tr><td>${t.nothing_from}-100</td><td><em>nothing</em></td><td>—</td></tr></table>`
+      : `<div class="none">Nothing you know of grows here.</div>`}</div>` : ""}
+  </div>`;
 }
 
 function renderStock() {
@@ -385,6 +442,7 @@ ${s.can_concentrate ? `Concentrating ${s.concentrates_to.cost} makes ${esc(s.con
 }
 
 function renderShelf() {
+  renderGround();
   renderStock();
   const q = ($("#filter")?.value || "").trim().toLowerCase();
   const list = SHELF.filter(i => !q
@@ -398,6 +456,7 @@ function renderShelf() {
               i.usable ? "" : ", beyond your tier"}\n\n${esc(i.text).slice(0, 400)}">
       <span class="glyph">${KIND_GLYPH[i.kind] || "🌿"}</span>
       <b>${esc(i.name)}</b>
+      ${i.held ? `<span class="held">×${i.held}</span>` : ""}
       <span class="tier t${i.rank}"></span>
     </button>`).join("")
     || `<div class="problems">Nothing on the shelf matches that.</div>`;
@@ -503,6 +562,20 @@ document.addEventListener("click", async e => {
     CHOSEN = CHOSEN.includes(id) ? CHOSEN.filter(x => x !== id) : [...CHOSEN, id];
     renderShelf(); await refresh(); return;
   }
+  if (e.target.closest("#showtable")) {
+    SHOWTABLE = !SHOWTABLE; renderGround(); return;
+  }
+  if (e.target.closest("#forage")) {
+    const btn = e.target.closest("#forage");
+    btn.disabled = true;
+    try {
+      const d = await post("/api/forage", { biome: HERE });
+      $("#err").innerHTML = `<span style="color:var(--brew)">${esc(d.tell)}</span>`;
+      await reloadShelf();
+    } catch (err) { $("#err").textContent = err.message; }
+    btn.disabled = false;
+    return;
+  }
   const made = e.target.closest("[data-stock]");
   if (made && !made.disabled) {
     const s = STOCK.find(x => x.id === made.dataset.stock);
@@ -550,10 +623,7 @@ $("#craft").addEventListener("click", async () => {
     renderStations();
     // Levelling can unlock methods and tiers, so the shelf is re-fetched rather than
     // left showing the ceiling the character had a moment ago.
-    const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
-    const j = await r.json();
-    SHELF = j.ingredients; STOCK = j.stock || [];
-    renderShelf();
+    await reloadShelf();
     $("#err").innerHTML = `<span style="color:${d.succeeded ? "var(--brew)" : "var(--alarm)"}">
       d20 ${d.roll} against ${d.chance}% — ${d.succeeded ? "made" : "spoiled"}.</span>
       <span style="color:var(--dim)"> ${esc(d.tell)}</span>`;
@@ -571,6 +641,30 @@ $("#save").addEventListener("click", async () => {
     $("#err").innerHTML = `<span style="color:var(--brew)">Saved “${esc(name)}”.</span>`;
   } catch (e) { $("#err").textContent = e.message; }
 });
+
+document.addEventListener("change", async e => {
+  if (!e.target.closest("#biomepick")) return;
+  try {
+    const d = await post("/api/travel", { biome: e.target.value });
+    HERE = d.biome;
+    $("#err").innerHTML = `<span style="color:var(--dim)">${esc(d.describe)}</span>`;
+    await reloadShelf();
+  } catch (err) { $("#err").textContent = err.message; }
+});
+
+async function reloadShelf() {
+  const [r, ft] = await Promise.all([
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
+    fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
+  ]);
+  const d = await r.json();
+  const f = await ft.json();
+  SHELF = d.ingredients; STOCK = d.stock || []; HERE = d.biome || "";
+  TABLE = d.table || null; BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
+  STATE.tracks[CRAFT] = d.track;
+  renderShelf();
+  await refresh();
+}
 
 async function post(url, body) {
   const r = await fetch(url, {

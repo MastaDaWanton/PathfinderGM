@@ -204,6 +204,10 @@ class Actor:
     # by base name and concentration, holding a count: three identical teas are a count
     # of three rather than three objects.
     stock: dict[str, "Stock"] = field(default_factory=dict)
+    # Raw materials carried, by ingredient id. Foraging fills it; crafting empties it.
+    # A plain count rather than an object: a handful of woundwort is a number, and
+    # nothing about a raw herb differs from the next one of its kind.
+    inventory: dict[str, int] = field(default_factory=dict)
 
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
@@ -948,6 +952,29 @@ class Actor:
 
     # --- what they have made ------------------------------------------------------------
 
+    def carry(self, ingredient_id: str, count: int = 1) -> int:
+        """Put raw material in the satchel. Returns the new count."""
+        key = (ingredient_id or "").strip().lower()
+        self.inventory[key] = self.inventory.get(key, 0) + max(0, int(count))
+        return self.inventory[key]
+
+    def spend(self, ingredient_id: str, count: int = 1) -> int:
+        """Take raw material out. Returns how many were actually taken.
+
+        An entry that reaches zero is removed rather than left at 0, for the same reason
+        an emptied jar leaves the shelf: a count of nothing is something the page offers
+        and the next preview refuses.
+        """
+        key = (ingredient_id or "").strip().lower()
+        have = self.inventory.get(key, 0)
+        took = min(have, max(0, int(count)))
+        if not took:
+            return 0
+        self.inventory[key] = have - took
+        if self.inventory[key] <= 0:
+            del self.inventory[key]
+        return took
+
     def add_stock(self, item, count: int = 1) -> None:
         """Put a crafted thing on the shelf, stacking with its own kind."""
         have = self.stock.get(item.id)
@@ -1142,6 +1169,7 @@ class Actor:
                                if self.ability_damage.get(a) or self.ability_drain.get(a)},
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "world_classes": _world_class_summary(self),
+            "satchel": _satchel_summary(self),
             "ac": self.ac(),
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
@@ -1411,6 +1439,7 @@ def to_dict(actor: Actor) -> dict:
                       "drawbacks": v.drawbacks,
                       "from_ingredients": v.from_ingredients}
                   for k, v in actor.stock.items()},
+        "inventory": dict(actor.inventory),
         "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
                               "mishaps": p.mishaps, "milestones": p.milestones}
                           for k, p in actor.world_classes.items()},
@@ -1425,6 +1454,22 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _satchel_summary(actor: Actor) -> list[dict]:
+    """Raw material carried, with real names. The sheet stores ids because that is what
+    everything else keys on; a player should never be shown `adder-s-tongue`."""
+    from . import ingredients as ing_mod
+
+    out = []
+    for iid, n in sorted(actor.inventory.items()):
+        try:
+            ing = ing_mod.get(iid)
+            out.append({"id": iid, "name": ing.name, "count": n, "tier": ing.tier})
+        except KeyError:
+            out.append({"id": iid, "name": iid.replace("-", " ").title(), "count": n,
+                        "tier": "common"})
+    return out
 
 
 def _world_class_summary(actor: Actor) -> list[dict]:
@@ -1536,6 +1581,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         world_classes={k: _progress(k, v)
                        for k, v in (data.get("world_classes") or {}).items()},
         stock=_stock(data.get("stock") or {}),
+        inventory={k: int(v) for k, v in (data.get("inventory") or {}).items()
+                   if int(v) > 0},
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),

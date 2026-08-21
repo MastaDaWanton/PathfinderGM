@@ -16,7 +16,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, ingredients, worldclass
+from rules import biomes, crafting, foraging, ingredients, worldclass
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -141,6 +141,11 @@ def craft_ingredients(request):
         d["usable"] = bool(ceiling) and d["rank"] <= ceiling
         out.append(d)
 
+    pc = c.scene.pc()
+    satchel = dict(pc.inventory) if pc else {}
+    for d in out:
+        d["held"] = satchel.get(d["id"], 0)
+
     stock = []
     for item in sorted(_stock_of(c, disc["id"]).values(),
                        key=lambda s: (s.base.lower(), s.concentration)):
@@ -152,7 +157,13 @@ def craft_ingredients(request):
                                 "potency": round(out_of.potency, 2),
                                 "cost": crafting.CONCENTRATE_COST}
         stock.append(d)
-    return JsonResponse({"ingredients": out, "stock": stock, "track": state})
+    return JsonResponse({
+        "ingredients": out, "stock": stock, "track": state,
+        "biome": c.biome,
+        "biome_describe": biomes.describe(c.biome),
+        "table": foraging.table_for(c.biome,
+                                    state.get("max_rank", 1)).as_dict(),
+    })
 
 
 @require_POST
@@ -171,8 +182,10 @@ def craft_preview(request):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
     chain = _chain_from(body, state["track"])
+    pc = c.scene.pc()
     result = crafting.preview(state["track"], state["level"], chain,
-                              stock=_stock_of(c, disc["id"]))
+                              stock=_stock_of(c, disc["id"]),
+                              satchel=dict(pc.inventory) if pc else {})
     return JsonResponse(result.as_dict())
 
 
@@ -197,8 +210,10 @@ def craft_do(request):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
     chain = _chain_from(body, state["track"])
+    pc = c.scene.pc()
     result = crafting.preview(state["track"], state["level"], chain,
-                              stock=_stock_of(c, disc["id"]))
+                              stock=_stock_of(c, disc["id"]),
+                              satchel=dict(pc.inventory) if pc else {})
     if result.problems:
         return JsonResponse({"error": " ".join(result.problems)}, status=400)
 
@@ -232,6 +247,11 @@ def craft_do(request):
         took = pc.take_stock(sid, n)
         if took:
             spent[sid] = took
+
+    for iid, n in result.consumes_raw.items():
+        took = pc.spend(iid, n)
+        if took:
+            spent[iid] = spent.get(iid, 0) + took
 
     made = None
     if succeeded and result.output:
@@ -286,3 +306,78 @@ def craft_recipes(request):
     c.recipes.append(entry)
     c.save()
     return JsonResponse({"recipes": c.recipes})
+
+
+# --- foraging -------------------------------------------------------------------------------
+
+@require_GET
+def forage_table(request):
+    """The roll table for where the party is standing, and the biomes they could be in.
+
+    Returned as the table itself rather than only its results, because a player who can
+    see the d100 spread can decide whether this ground is worth an afternoon — which is
+    the whole point of knowing what biome you are in.
+    """
+    c = campaign_mod.current()
+    disc = _discipline(request.GET.get("craft", "herbalism"))
+    state = _track_state(c, disc)
+    biome = biomes.canonical(request.GET.get("biome", "") or c.biome)
+    ceiling = state.get("max_rank", 1)
+    return JsonResponse({
+        "here": c.biome,
+        "biome": biome,
+        "biomes": [{"id": b, "describe": d} for b, d in biomes.BIOMES.items()],
+        "table": foraging.table_for(biome, ceiling).as_dict(),
+        "attempts": foraging.attempts_for(state.get("level", 1)),
+        "track": state,
+    })
+
+
+@require_POST
+def forage_do(request):
+    """Walk the ground and see what turns up. Routed through the engine's `forage` op so
+    the bench and the table roll on exactly the same machinery."""
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    params = {}
+    if body.get("biome"):
+        params["biome"] = str(body["biome"])
+    try:
+        resolution = c.engine().run(c.engine().validate([{
+            "op": "forage", "actor": "pc", "because": "an hour spent looking",
+            "params": params,
+        }]))
+    except IntentError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    effects = [e for o in resolution.outcomes for e in o.effects
+               if e.get("kind") == "forage"]
+    pc = c.scene.pc()
+    return JsonResponse({
+        "tell": tell,
+        "result": effects[0] if effects else {},
+        "inventory": dict(pc.inventory) if pc else {},
+    })
+
+
+@require_POST
+def travel_to(request):
+    """Change the ground underfoot from the bench, without going through the GM."""
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    try:
+        resolution = c.engine().run(c.engine().validate([{
+            "op": "travel", "because": "the party moves on",
+            "params": {"biome": str(body.get("biome", ""))},
+        }]))
+    except IntentError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    c.save()
+    return JsonResponse({
+        "biome": c.scene.biome,
+        "describe": biomes.describe(c.scene.biome),
+        "tell": " ".join(o.tell for o in resolution.outcomes if o.tell),
+    })

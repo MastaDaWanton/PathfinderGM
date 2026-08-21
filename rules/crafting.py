@@ -158,6 +158,7 @@ class Result:
     # What the successful craft puts on the shelf, and what it takes off.
     output: dict | None = None
     consumes: dict[str, int] = field(default_factory=dict)
+    consumes_raw: dict[str, int] = field(default_factory=dict)
     concentrating: bool = False
 
     def as_dict(self) -> dict:
@@ -168,7 +169,8 @@ class Result:
             "chance": self.chance, "ingredients": self.ingredients,
             "effects": self.effects, "drawbacks": self.drawbacks,
             "problems": self.problems, "output": self.output,
-            "consumes": self.consumes, "concentrating": self.concentrating,
+            "consumes": self.consumes, "consumes_raw": self.consumes_raw,
+            "concentrating": self.concentrating,
         }
 
 
@@ -186,7 +188,7 @@ def scale(text: str, potency: float) -> str:
 
 
 def preview(track_id: str, level: int, chain: Chain,
-            stock: dict | None = None) -> Result:
+            stock: dict | None = None, satchel: dict | None = None) -> Result:
     """What this chain would make, and how likely it is to work.
 
     Never raises for a chain that is merely bad — an empty pot, a method the character
@@ -194,7 +196,11 @@ def preview(track_id: str, level: int, chain: Chain,
     page can grey the button and say why. `CraftError` is for chains that cannot be
     described at all.
 
-    `stock` is what the character has already made, so an output can go back in the pot.
+    `stock` is what the character has already made, so an output can go back in the pot;
+    `satchel` is the raw material they are carrying. Raw ingredients are checked against
+    the satchel only when one is supplied — passing None means "assume they have it",
+    which is what every caller wanted before foraging existed and what the tests of the
+    chain rules still want.
     """
     track = wc.get(track_id)
     level = max(1, min(int(level), track.max_level))
@@ -204,11 +210,21 @@ def preview(track_id: str, level: int, chain: Chain,
 
     problems: list[str] = []
     items = []
+    wanted: dict[str, int] = {}
     for iid in chain.ingredient_ids:
         try:
             items.append(ing_mod.get(iid))
+            wanted[iid] = wanted.get(iid, 0) + 1
         except KeyError:
             problems.append(f"No such ingredient: {iid}.")
+
+    if satchel is not None:
+        for iid, n in wanted.items():
+            have = int(satchel.get(iid, 0))
+            if have < n:
+                name = ing_mod.get(iid).name
+                problems.append(f"{name}: you are carrying {have}, the chain wants {n}."
+                                if have else f"You have no {name}. Forage for it.")
 
     used: list[tuple[Stock, int]] = []
     for sid, n in chain.stock_used.items():
@@ -299,6 +315,7 @@ def preview(track_id: str, level: int, chain: Chain,
         effects=effects, drawbacks=drawbacks, problems=problems,
         output=out.as_dict(),
         consumes={h.id: n for h, n in used},
+        consumes_raw=dict(wanted),
     )
 
 

@@ -183,6 +183,13 @@ the character walks away as hurt as they arrived and the player will see it on t
 Poison, disease, or anything that saps a body rather than wounding it damages a score:
 {"op": "ability_damage", "params": {"ability": "con", "amount": "1d4"}}. Add
 "drain": true only when the loss is permanent.
+When the party moves onto different ground, say so: {"op": "travel", "params":
+{"biome": "forest"}}. The biomes are urban, grassland, farmland, forest, jungle, swamp,
+hills, mountain, desert, tundra, coast, underground, ruins, planar. What can be found by
+searching depends entirely on it, so it has to be right before anyone looks.
+When the player searches the ground for herbs or useful growing things:
+{"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
+puts what turns up in their satchel — do not decide what they find.
 Foraging, harvesting or brewing at a world class — a craft the character works at rather
 than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe":
 "woundwort styptic", "tier": "common", "stages": 2, "risky": false}}. `stages` is how many

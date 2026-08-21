@@ -87,6 +87,14 @@
   .name { color: var(--gold); font: 400 24px/1.15 var(--display);
           letter-spacing: .04em; font-variant: small-caps; }
   .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
+  /* Where the party is standing. Load-bearing rather than decorative: it decides what
+     the forage tables can offer, so the player has to be able to see it. */
+  .biome {
+    margin: -6px 0 12px; padding: 5px 9px; border-radius: 2px; cursor: default;
+    background: rgba(111,207,143,.07); border: 1px solid #2f5f42; color: #a9d9bb;
+    font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: .07em;
+    text-transform: uppercase;
+  }
   .bar { height: 7px; background: #221c14; border-radius: 2px; overflow: hidden;
          margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7);
          display: flex; }
@@ -607,6 +615,8 @@ function render(s) {
     $("#sheet").innerHTML = `
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
+      ${s.scene.biome ? `<div class="biome" title="${esc(s.scene.biome_describe)}">
+        ${esc(s.scene.location)} · ${esc(s.scene.biome)}</div>` : ""}
       <div class="bar"><i style="width:${pct}%"></i>${
         temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
       <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
@@ -623,6 +633,9 @@ function render(s) {
           sign(Math.floor((v-10)/2))})</small></span>${
           hurt ? `<em>-${hurt}</em>` : ""}</div>`;
       }).join("")}</div>
+      ${(pc.satchel && pc.satchel.length) ? `<h2>Satchel</h2>${
+        pc.satchel.map(i => `<div class="row"><span>${esc(i.name)}</span><span>${
+          i.count}</span></div>`).join("")}` : ""}
       ${(pc.world_classes && pc.world_classes.length) ? `<h2>World classes</h2>${
         pc.world_classes.map(w => `
           <div class="row"><span>${esc(w.name)} ${w.level}</span><span>${

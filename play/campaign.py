@@ -16,6 +16,7 @@ from pathlib import Path
 
 from django.conf import settings
 
+from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -62,6 +63,19 @@ class Campaign:
     def location(self):
         return self.world.get(self.scene.location_id)
 
+    @property
+    def biome(self) -> str:
+        """The ground underfoot, filled in from the world if the save predates it.
+
+        Healed on read rather than migrated: every campaign written before biomes existed
+        has an empty one, and a save that needs a migration step to be playable is a save
+        that breaks the moment somebody opens an old one.
+        """
+        if not self.scene.biome:
+            found = biomes.from_world(self.world, self.location)
+            self.scene.biome = found[0] if found else "grassland"
+        return self.scene.biome
+
     def engine(self) -> Engine:
         return Engine(self.scene, Dice(self.seed))
 
@@ -91,6 +105,7 @@ class Campaign:
                 "sides": self.scene.sides,
                 "round": self.scene.round,
                 "clock_minutes": self.scene.clock_minutes,
+                "biome": self.scene.biome,
                 "pending_intents": self.scene.pending_intents,
                 "pending_outcomes": self.scene.pending_outcomes,
                 "pending_partial": self.scene.pending_partial,
@@ -137,6 +152,7 @@ class Campaign:
             sides={k: list(v) for k, v in (s.get("sides") or {}).items()},
             round=s.get("round", 0),
             clock_minutes=s.get("clock_minutes", 0),
+            biome=s.get("biome", ""),
             pending_intents=s.get("pending_intents", []),
             pending_outcomes=s.get("pending_outcomes", []),
             pending_partial=s.get("pending_partial", {}),
@@ -172,6 +188,11 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # name lookup returns the planet and the opening scene is set nowhere.
     town = world.get(PANGRELLA_TOWN) or world.by_name("Pangrella", kind="CITY")
     scene = Scene(location_id=town.id if town else None)
+    # The ground underfoot, read from the world's own facts rather than assumed. The
+    # export carries `Biomes`, `Terrain` and `Climate` — Kaelinora's reads "Pangrellan
+    # grasslands, Kyropticus deserts" — and they live on the continent, not the town.
+    found = biomes.from_world(world, town)
+    scene.biome = found[0] if found else "grassland"
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     scene.add(
         instantiate("guildhand", scene=scene, name="the guildhand on the gate"),

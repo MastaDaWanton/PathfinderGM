@@ -167,6 +167,17 @@ def client(tmp_path):
         cm._LIVE.clear()
 
 
+def _carry(ids):
+    """Put raw material in the satchel. Crafting spends what the character is carrying,
+    so a bench test has to forage — or be handed the herbs — before it can brew."""
+    from play import campaign as cm
+
+    c = cm.current()
+    for i in ids:
+        c.scene.pc().carry(i, 1)
+    c.save()
+
+
 def test_the_bench_opens(client):
     assert client.get("/craft/").status_code == 200
 
@@ -193,6 +204,7 @@ def test_a_discipline_with_no_rules_says_so(client):
 
 
 def test_crafting_advances_the_track(client):
+    _carry(["woundwort", "comfrey"])
     r = client.post("/api/craft/do", data=json.dumps({
         "craft": "herbalism", "ingredients": ["woundwort", "comfrey"],
         "methods": ["grind", "brew"]}), content_type="application/json")
@@ -351,6 +363,7 @@ def test_an_emptied_jar_leaves_the_shelf():
 # --- the ladder, through the page ----------------------------------------------------------
 
 def test_a_craft_lands_on_the_shelf(client):
+    _carry(["woundwort"])
     d = client.post("/api/craft/do", data=json.dumps({
         "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"],
         "name": "Woundwort Tea"}), content_type="application/json").json()

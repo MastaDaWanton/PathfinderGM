@@ -13,7 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import biomes
 from . import dc as dc_mod
+from . import foraging
+from . import ingredients as ing_mod
 from . import worldclass
 from .dice import Dice, Modifier, Roll
 from .intents import Intent, IntentError, parse_all
@@ -37,6 +40,10 @@ class Scene:
     round: int = 0
     clock_minutes: int = 0
     log: list[dict] = field(default_factory=list)
+    # The ground underfoot, which decides what can be foraged here. Defaults from the
+    # world's own Biomes/Terrain facts when a campaign starts, and the GM moves it as the
+    # party travels.
+    biome: str = ""
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
     turn: int = -1
@@ -1088,6 +1095,73 @@ class Engine:
             intent_id=intent.id, op="craft",
             effects=[{"ref": actor.ref, "kind": "craft", **result, "was": was}],
             tell=" ".join(bits), because=intent.because,
+        )
+
+    def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
+        """Move the ground underfoot. What grows here follows from it."""
+        want = str(intent.params["biome"]).strip().lower()
+        biome = biomes.canonical(want)
+        if biome is None:
+            raise IntentError(
+                f"travel: {want!r} is not a biome. The biomes are: "
+                f"{', '.join(sorted(biomes.BIOMES))}.",
+                "schema")
+        was, self.scene.biome = self.scene.biome, biome
+        note = str(intent.params.get("note") or "").strip()
+        return Outcome(
+            intent_id=intent.id, op="travel",
+            effects=[{"kind": "biome", "biome": biome, "was": was}],
+            tell=(f"The ground changes: {biomes.describe(biome).lower()}."
+                  if biome != was else "") + (f" {note}" if note else ""),
+            because=intent.because,
+        )
+
+    def _op_forage(self, intent: Intent, partial: dict) -> Outcome:
+        """Search the ground here for what grows on it.
+
+        The table is assembled from the ingredient list rather than authored per biome:
+        thirteen biomes across a hundred and sixty ingredients is two thousand rows nobody
+        would keep current, and a herb added tomorrow should appear on every table it
+        belongs to without anyone editing one.
+        """
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("forage: nobody here to look", "refs")
+
+        biome = biomes.canonical(str(intent.params.get("biome") or self.scene.biome or ""))
+        if biome is None:
+            raise IntentError(
+                "forage: nowhere in particular. Set the ground first with "
+                "{\"op\": \"travel\", \"params\": {\"biome\": \"forest\"}}.",
+                "legality")
+
+        track_id = str(intent.params.get("track") or "herbalist").strip().lower()
+        try:
+            track = worldclass.get(track_id)
+        except KeyError as exc:
+            raise IntentError(f"forage: {exc}", "refs") from exc
+        level = actor.track(track.id).level
+        ceiling = worldclass.tier_rank(track.at(level).max_tier)
+
+        result = foraging.forage(biome, level, ceiling, self.dice)
+        for iid, n in result["found"].items():
+            actor.carry(iid, n)
+
+        if result["empty"]:
+            tell = (f"{actor.name} knows nothing that grows in "
+                    f"{biomes.describe(biome).lower()}.")
+        elif result["found"]:
+            got = ", ".join(f"{n}× {ing_mod.get(i).name}"
+                            for i, n in result["found"].items())
+            tell = f"{actor.name} comes back with {got}."
+        else:
+            tell = f"{actor.name} finds nothing worth carrying."
+
+        return Outcome(
+            intent_id=intent.id, op="forage",
+            effects=[{"ref": actor.ref, "kind": "forage", **result}],
+            tell=tell, because=intent.because,
         )
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:

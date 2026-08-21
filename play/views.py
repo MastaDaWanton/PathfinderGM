@@ -18,6 +18,7 @@ from django.views.decorators.http import require_GET, require_POST
 from gm import judgement
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
+from rules import biomes, ingredients as ing_mod
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -40,6 +41,8 @@ def _state(c) -> dict:
         "pc": pc.summary() if pc else None,
         "scene": {
             "location": c.location.name if c.location else "",
+            "biome": c.biome,
+            "biome_describe": biomes.describe(c.biome),
             "round": c.scene.round,
             "in_encounter": c.scene.in_encounter,
             "turn_ref": c.scene.current_ref(),

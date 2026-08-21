@@ -145,6 +145,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # levels on what the character does rather than on their experience total.
     "craft": (("track", "recipe"), ("actor", "tier", "stages", "risky", "failed",
                                     "milestone"), "hidden"),
+    # Where the party is standing, which decides what grows here.
+    "travel": (("biome",), ("note",), "hidden"),
+    # Searching the ground. The roll is the player's: it is their afternoon.
+    "forage": ((), ("actor", "track", "biome"), "player"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
     # A fight ends when the fighting stops, which is a call about the fiction:

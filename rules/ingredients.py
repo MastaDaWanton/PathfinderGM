@@ -41,6 +41,11 @@ class Ingredient:
     harvesting: str = ""
     text: str = ""
     risky: bool = False
+    # Where it grows, read from the entry's own description. `forageable` is False for
+    # monster parts and finished poisons: those are cut off a corpse or brewed, not picked.
+    biomes: list[str] = field(default_factory=list)
+    biomes_inferred: bool = False
+    forageable: bool = True
 
     @property
     def rank(self) -> int:
@@ -56,7 +61,8 @@ class Ingredient:
             "rank": self.rank, "tier_inferred": self.tier_inferred, "aka": self.aka,
             "craft_dc": self.craft_dc, "source": self.source,
             "harvesting": self.harvesting, "text": self.text, "risky": self.risky,
-            "world_gated": self.world_gated,
+            "world_gated": self.world_gated, "biomes": self.biomes,
+            "biomes_inferred": self.biomes_inferred, "forageable": self.forageable,
         }
 
 
@@ -67,6 +73,9 @@ def from_dict(d: dict) -> Ingredient:
         aka=d.get("aka", ""), craft_dc=d.get("craft_dc"), source=d.get("source", ""),
         harvesting=d.get("harvesting", ""), text=d.get("text", ""),
         risky=bool(d.get("risky")),
+        biomes=list(d.get("biomes") or []),
+        biomes_inferred=bool(d.get("biomes_inferred")),
+        forageable=bool(d.get("forageable", True)),
     )
 
 
