@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import dc as dc_mod
+from . import worldclass
 from .dice import Dice, Modifier, Roll
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
@@ -334,6 +335,9 @@ class Engine:
                     f"stabilised first.",
                     "legality", index,
                 )
+
+        if intent.op == "craft":
+            self._check_craft(intent, index)
 
         actor = self.scene.get(intent.actor) if intent.actor else None
         if actor and intent.op in ("attack", "move", "check") and not actor.can_act():
@@ -997,6 +1001,92 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="item_damage", rolls=[roll] if roll else [],
             effects=[{"ref": target.ref, "kind": "item_damage", **r} for r in results],
+            tell=" ".join(bits), because=intent.because,
+        )
+
+    def _check_craft(self, intent: Intent, index: int) -> None:
+        """Refuse work the character cannot do, before any of it is scored.
+
+        Both of these have to happen in validation rather than resolution. An unknown
+        track resolved is a `KeyError` out of the engine's middle; a recipe above the
+        character's level *scored* is a track levelling itself on work it has neither the
+        tools nor the methods to attempt.
+        """
+        try:
+            track = worldclass.get(str(intent.params.get("track", "")))
+        except KeyError as exc:
+            raise IntentError(f"craft: {exc}", "refs", index) from exc
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("craft: nobody here to do the work", "refs", index)
+
+        tier = intent.params.get("tier")
+        if not tier:
+            return
+        level = actor.track(track.id).level
+        ceiling = track.at(level).max_tier
+        if worldclass.tier_rank(str(tier)) > worldclass.tier_rank(ceiling):
+            needed = next(l.level for l in sorted(track.levels, key=lambda x: x.level)
+                          if worldclass.tier_rank(l.max_tier)
+                          >= worldclass.tier_rank(str(tier)))
+            raise IntentError(
+                f"craft: {track.name} {level} works {ceiling} at best, and "
+                f"{intent.params.get('recipe', 'this')} is {tier}. "
+                f"Reach {track.name} {needed} first.",
+                "legality", index,
+            )
+
+    def _op_craft(self, intent: Intent, partial: dict) -> Outcome:
+        """A session at a world class. Scores it, and advances the track if it is earned.
+
+        The GM says what was attempted and how hard it was; the engine owns the mastery
+        arithmetic and the level. Same line as everywhere else — the GM supplies what the
+        fiction determines, the engine supplies what the sheet determines.
+        """
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("craft: nobody here to do the work", "refs")
+
+        track_id = str(intent.params["track"]).strip().lower()
+        track = worldclass.get(track_id)
+        progress = actor.track(track_id)
+        was = progress.level
+        recipe = str(intent.params["recipe"]).strip()
+        tier = str(intent.params.get("tier") or track.at(progress.level).max_tier)
+
+        result = worldclass.award(
+            track, progress, recipe_id=recipe.lower(), tier=tier,
+            success=not intent.params.get("failed"),
+            risky=bool(intent.params.get("risky")),
+            stages=int(intent.params.get("stages", 1) or 1),
+            milestone=str(intent.params.get("milestone") or ""),
+        )
+
+        bits = []
+        if intent.params.get("failed"):
+            bits.append(f"The {recipe} is spoiled.")
+        if result["mp"]:
+            terms = ", ".join(f"{r['mp']} {r['why']}" for r in result["reasons"])
+            bits.append(f"{actor.name} gains {result['mp']} mastery ({terms}).")
+        elif not intent.params.get("failed"):
+            bits.append(f"{recipe} is beneath a {track.name} of {was} now; "
+                        f"there is nothing left in it to learn.")
+        for lvl in result["levelled"]:
+            gained = track.at(lvl)
+            bits.append(f"{actor.name} is {track.name} {lvl}. "
+                        f"Unlocked: {', '.join(gained.methods)}"
+                        + (f"; tools: {', '.join(gained.tools)}" if gained.tools else "")
+                        + f". Now works up to {gained.max_tier}.")
+        if result["to_next"] and result["to_next"].get("milestone"):
+            bits.append(f"{track.name} {progress.level + 1} also waits on "
+                        f"{result['to_next']['milestone']}.")
+
+        return Outcome(
+            intent_id=intent.id, op="craft",
+            effects=[{"ref": actor.ref, "kind": "craft", **result, "was": was}],
             tell=" ".join(bits), because=intent.because,
         )
 

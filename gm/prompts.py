@@ -183,6 +183,12 @@ the character walks away as hurt as they arrived and the player will see it on t
 Poison, disease, or anything that saps a body rather than wounding it damages a score:
 {"op": "ability_damage", "params": {"ability": "con", "amount": "1d4"}}. Add
 "drain": true only when the loss is permanent.
+Foraging, harvesting or brewing at a world class — a craft the character works at rather
+than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe":
+"woundwort styptic", "tier": "common", "stages": 2, "risky": false}}. `stages` is how many
+methods the work passed through, `risky` if the harvesting was dangerous, and
+"failed": true when it spoils — a ruined batch still teaches something. The character does
+not need to have chosen the class; doing the work is how they take it up.
 Acid, and anything that eats what a person is carrying:
 {"op": "item_damage", "params": {"amount": "2d6", "type": "acid"}} — name an "item" for
 one thing, or leave it out and everything they carry takes it.

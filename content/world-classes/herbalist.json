@@ -1,0 +1,68 @@
+{
+  "id": "herbalist",
+  "name": "Herbalist",
+  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — foraging, harvesting and crafting — unlocking tools, methods and higher tiers of ingredient, from woodland herbs to planar flora and monster parts.",
+  "grantable_at_creation": true,
+
+  "_thresholds_note": "Mastery to reach levels 2, 3, 4 and 5. The author's table read 10/25/50/100; the top two are kept and the bottom two raised, because 10 and 25 did not reach the author's own stated pacing. A qualifying level-1 craft is worth about 5 MP (3 first-time, +2 for a second stage), so 10 MP is two crafts against a target of 3-5; a level-2 craft is about 9 MP, so 25 is under three against a target of 6-8. At 25 and 65 those become 5 and 7.  The DIP AT LEVEL 4 IS DELIBERATE — do not 'fix' it. The author's craft counts fall from 6-8 to 4-5 at that step because each high-tier recipe is a larger undertaking, and 50 MP is 4.5 crafts at 11 MP each, which is exactly the target.",
+  "thresholds": [25, 65, 50, 100],
+
+  "milestones": {
+    "5": "legendary-catalyst"
+  },
+
+  "levels": [
+    {
+      "level": 1,
+      "tools": ["bowl or pot", "mortar and pestle"],
+      "methods": ["grind", "mix", "brew"],
+      "max_tier": "common / mundane",
+      "note": "Basic poultices, teas and crushed powders."
+    },
+    {
+      "level": 2,
+      "tools": ["specialized tongs", "specialized knives"],
+      "methods": ["preserve", "extract"],
+      "max_tier": "uncommon / volatile",
+      "note": "Field harvesting of monster parts and delicate flora."
+    },
+    {
+      "level": 3,
+      "tools": ["alchemical still"],
+      "methods": ["distill", "purify"],
+      "max_tier": "rare / magical",
+      "note": "Concentration of liquids into potent tinctures, oils and tonics."
+    },
+    {
+      "level": 4,
+      "tools": ["glass syringes", "fire-resistant tongs"],
+      "methods": ["infuse", "neutralize"],
+      "max_tier": "exotic / planar",
+      "note": "Safe handling of hazardous, toxic or planar substances."
+    },
+    {
+      "level": 5,
+      "tools": ["master herbalist workbench"],
+      "methods": ["refine", "catalyst crafting"],
+      "max_tier": "legendary / mythic",
+      "note": "Masterwork concoctions, permanent elixirs and maximum efficiency."
+    }
+  ],
+
+  "method_descriptions": {
+    "grind": "Pulverises solid ingredients into fine powders, preparing them for poultices, additives or inhalants.",
+    "mix": "Combines two distinct ingredients. The mixture keeps the primary effects of both at 80% of base strength and duration.",
+    "brew": "Steeps or boils ingredients in liquid to create teas, broths and washes. Unlocks full duration and secondary effects for liquid remedies.",
+    "preserve": "Waxes, drying or solvents to extend the shelf life of perishable ingredients.",
+    "extract": "Harvests organ meats, venoms and delicate plant nodes without destroying their magical properties.",
+    "distill": "Concentrates a liquid mixture: +25% to the primary effect, or turns a raw ingredient into an indefinite tincture.",
+    "purify": "Removes negative side effects, penalties and secondary toxicities while keeping the beneficial traits.",
+    "infuse": "Imbues liquids or powders with planar energy or monster essence, combining up to three components into one dose.",
+    "neutralize": "Disarms contact toxins and environmental side effects during harvesting.",
+    "refine": "Raises a crafted item to 125% of base strength, or extends its duration by 50%.",
+    "catalyst crafting": "Uses legendary components to craft permanent stat-altering elixirs and grand alchemical catalysts."
+  },
+
+  "_portable_note": "The workbench is furniture. Whether a recipe can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state.",
+  "fixed_tools": ["master herbalist workbench", "alchemical still"]
+}

@@ -620,6 +620,15 @@ function render(s) {
           sign(Math.floor((v-10)/2))})</small></span>${
           hurt ? `<em>-${hurt}</em>` : ""}</div>`;
       }).join("")}</div>
+      ${(pc.world_classes && pc.world_classes.length) ? `<h2>World classes</h2>${
+        pc.world_classes.map(w => `
+          <div class="row"><span>${esc(w.name)} ${w.level}</span><span>${
+            w.missing ? "<small>unknown track</small>"
+            : w.to_next ? `<small>${w.to_next.need} to next</small>`
+            : "<small>mastered</small>"}</span></div>
+          ${w.missing ? "" : `<div class="sub" style="margin:-4px 0 8px">${
+            esc(w.max_tier)} · ${w.known} recipe${w.known === 1 ? "" : "s"}</div>`}
+        `).join("")}` : ""}
       <h2>Saves</h2>
       ${Object.entries(pc.saves).map(([k, v]) =>
         `<div class="row"><span>${{fort:"Fortitude",ref:"Reflex",will:"Will"}[k]}</span><span>${sign(v)}</span></div>`

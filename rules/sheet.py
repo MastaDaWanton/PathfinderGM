@@ -196,6 +196,10 @@ class Actor:
     # an undamaged sword needs no record, and creating one for every item a character owns
     # would put a hardness and a hit point total beside every rope and every torch.
     gear: dict[str, Item] = field(default_factory=dict)
+    # World classes run alongside the character class rather than instead of it, and
+    # level on what the character does rather than on their experience total. Keyed by
+    # track id: {"herbalist": Progress(level=2, mp=7, ...)}.
+    world_classes: dict[str, "Progress"] = field(default_factory=dict)
 
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
@@ -922,6 +926,22 @@ class Actor:
         """Acid in a blood pool does not pick a target. Everything carried takes it."""
         return [self.damage_item(n, amount, dtype) for n in self.carried()]
 
+    # --- world classes ------------------------------------------------------------------
+
+    def track(self, track_id: str) -> "Progress":
+        """This character's standing in one world class, begun on first use.
+
+        Begun rather than chosen: the class levels by doing, so anyone who forages is an
+        Herbalist. Choosing it at character creation is a head start with the tools in
+        hand, not permission — which is why nothing here requires it.
+        """
+        from .worldclass import Progress
+
+        track_id = (track_id or "").strip().lower()
+        if track_id not in self.world_classes:
+            self.world_classes[track_id] = Progress(track=track_id)
+        return self.world_classes[track_id]
+
     def add_condition(self, key: str, rounds: int | None = None, source: str = "") -> Condition:
         key = key.strip().lower()
         existing = next((c for c in self.conditions if c.key == key), None)
@@ -1091,6 +1111,7 @@ class Actor:
                                for a in ABILITIES
                                if self.ability_damage.get(a) or self.ability_drain.get(a)},
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
+            "world_classes": _world_class_summary(self),
             "ac": self.ac(),
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
@@ -1354,6 +1375,9 @@ def to_dict(actor: Actor) -> dict:
         "overrides": dict(actor.overrides),
         "gear": {k: {"name": i.name, "material": i.material, "hardness": i.hardness,
                      "hp": i.hp, "hp_max": i.hp_max} for k, i in actor.gear.items()},
+        "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
+                              "mishaps": p.mishaps, "milestones": p.milestones}
+                          for k, p in actor.world_classes.items()},
         "reductions": [{"amount": r.amount, "bypass": r.bypass, "source": r.source}
                        for r in actor.reductions],
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
@@ -1365,6 +1389,44 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _world_class_summary(actor: Actor) -> list[dict]:
+    """What the character has taken up, and how far off the next step is.
+
+    Tolerates a track the build no longer ships: a save naming a homebrew world class the
+    user has since removed shows what it can rather than refusing to load the character.
+    """
+    from . import worldclass
+
+    out = []
+    for track_id, p in actor.world_classes.items():
+        try:
+            track = worldclass.get(track_id)
+        except KeyError:
+            out.append({"id": track_id, "name": track_id.title(), "level": p.level,
+                        "mp": p.mp, "missing": True})
+            continue
+        level = track.at(p.level)
+        out.append({
+            "id": track.id, "name": track.name, "level": p.level,
+            "mp": p.mp, "to_next": worldclass._remaining(track, p),
+            "max_tier": level.max_tier, "methods": track.unlocked_methods(p.level),
+            "tools": track.unlocked_tools(p.level),
+            "known": len(p.crafted),
+        })
+    return out
+
+
+def _progress(track_id: str, v: dict):
+    from .worldclass import Progress
+
+    return Progress(
+        track=track_id, level=int(v.get("level", 1)), mp=int(v.get("mp", 0)),
+        crafted={k: int(n) for k, n in (v.get("crafted") or {}).items()},
+        mishaps={k: int(n) for k, n in (v.get("mishaps") or {}).items()},
+        milestones=list(v.get("milestones") or []),
+    )
 
 
 def _temp_pools(data: dict) -> list[TempPool]:
@@ -1429,6 +1491,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
                       hardness=v.get("hardness"), hp=v.get("hp"),
                       hp_max=v.get("hp_max"))
               for k, v in (data.get("gear") or {}).items()},
+        world_classes={k: _progress(k, v)
+                       for k, v in (data.get("world_classes") or {}).items()},
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),

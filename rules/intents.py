@@ -141,6 +141,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Acid on a scabbard, a sundered blade. Objects have hardness and hit points of their
     # own, and neither is on anybody's character sheet.
     "item_damage": (("amount",), ("to", "item", "type"), "hidden"),
+    # Working at a world class — foraging, harvesting, brewing. Advances the track, which
+    # levels on what the character does rather than on their experience total.
+    "craft": (("track", "recipe"), ("actor", "tier", "stages", "risky", "failed",
+                                    "milestone"), "hidden"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
     # A fight ends when the fighting stops, which is a call about the fiction:
