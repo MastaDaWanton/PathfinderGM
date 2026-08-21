@@ -7,6 +7,7 @@ cosmetic prompt: the engine is genuinely stopped mid-list until the player answe
 from __future__ import annotations
 
 import json
+import re
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -61,6 +62,23 @@ def _state(c) -> dict:
         # the browser cannot be read out of the page source either.
         "log": [_player_visible_entry(e) for e in c.turn_log[-30:]],
     }
+
+
+_TELL_NUMBERS = re.compile(r"\s*\((?=[^)]*\d)[^()]*(?:\([^()]*\)[^()]*)*\)")
+_TELL_MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
+
+
+def plain_tell(tell: str) -> str:
+    """A tell rendered for the player rather than for the log.
+
+    Tells are written by the engine for the GM to narrate, so they carry the arithmetic:
+    "the guildhand's attack misses Kesst Vayr (5 against AC 12 (flat-footed))". When the
+    narrator is unavailable the tell is shown raw, and that put an NPC's hidden roll in
+    front of the player — the one thing the whole hidden/player split exists to prevent.
+    """
+    text = _TELL_NUMBERS.sub("", tell or "")
+    text = _TELL_MARGIN.sub("", text)
+    return " ".join(text.split())
 
 
 def _player_visible_entry(entry: dict) -> dict:
@@ -189,6 +207,8 @@ def say(request):
         plan = agent.plan_turn(
             text, c.history, location=c.location,
             recent_events=_recent_events(world, c.location),
+            previous_intents=c.last_intent_signature,
+            recent_narration=[b["text"] for b in c.transcript[-8:] if b["who"] == "gm"],
         )
     except ModelUnavailable as exc:
         c.transcript.pop()
@@ -279,7 +299,7 @@ def _finish(c, agent, resolution, narration, player_input, plan):
             # game that works without it.
             text, attempt = "", None
         if not text:
-            text = " ".join(o.tell for o in outcomes)
+            text = " ".join(plain_tell(o.tell) for o in outcomes)
         c.transcript.append({"who": "gm", "text": text, "kind": "consequence"})
         c.history.append({"role": "assistant", "content": text})
 
@@ -290,6 +310,8 @@ def _finish(c, agent, resolution, narration, player_input, plan):
                            "outcomes": [o.as_dict() for o in resolution.outcomes]})
 
     _run_npc_turns(c, agent)
+    if plan is not None:
+        c.last_intent_signature = judgement._signature(plan.intents)
     c.save()
     return JsonResponse(_state(c))
 
@@ -367,7 +389,8 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 continue
             for o in resolution.outcomes:
                 if o.tell:
-                    c.transcript.append({"who": "gm", "kind": "consequence", "text": o.tell})
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                     "text": plain_tell(o.tell)})
             continue
 
         resolution = engine.run(plan.intents)
@@ -382,7 +405,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 text = ""
             c.transcript.append({
                 "who": "gm", "kind": "consequence",
-                "text": text or " ".join(o.tell for o in tells),
+                "text": text or " ".join(plain_tell(o.tell) for o in tells),
             })
         _log_turn(c, plan, resolution)
 

@@ -38,6 +38,10 @@ class Campaign:
     transcript: list[dict] = field(default_factory=list)  # what the player sees
     turn_log: list[dict] = field(default_factory=list)   # every roll, auditable
     seed: int | None = None
+    # What the GM proposed last turn, so a turn that simply replays the previous
+    # one can be spotted. Stored as a signature rather than the intents themselves:
+    # it is only ever compared, never resolved.
+    last_intent_signature: list = field(default_factory=list)
 
     @property
     def world(self):
@@ -84,6 +88,7 @@ class Campaign:
             "history": self.history,
             "transcript": self.transcript,
             "turn_log": self.turn_log,
+            "last_intent_signature": self.last_intent_signature,
         }
         p = self.path()
         p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
@@ -118,6 +123,8 @@ class Campaign:
             id=data["id"], world_source=data["world_source"], scene=scene,
             history=data.get("history", []), transcript=data.get("transcript", []),
             turn_log=data.get("turn_log", []), seed=data.get("seed"),
+            last_intent_signature=[tuple(t) for t in
+                                   data.get("last_intent_signature", [])],
         )
 
 

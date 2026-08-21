@@ -14,7 +14,7 @@ from django.conf import settings
 
 from rules.intents import Intent, IntentError, find_outcome_claims
 
-from . import client, judgement, prompts
+from . import client, judgement, narration as narration_mod, prompts
 
 
 @dataclass
@@ -48,12 +48,14 @@ class GMAgent:
         cfg = settings.MODELS[role]
         self.model = cfg["model"]
         self.host = cfg["host"]
+        self._echoes = None
 
     # --- Call 1 ---------------------------------------------------------------------
 
     def plan_turn(
         self, player_input: str, history: list[dict], location=None,
-        recent_events=None, max_attempts: int = 5,
+        recent_events=None, max_attempts: int = 5, previous_intents=None,
+        recent_narration=None,
     ) -> TurnPlan:
         """
         Five attempts, not three. Measured across live turns: the model makes a
@@ -89,15 +91,36 @@ class GMAgent:
                 # a repair.
                 intents = self.engine.validate(data.get("intents"))
             except IntentError as exc:
-                rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
-                messages = _with_correction(base, reply.text, str(exc))
-                continue
+                # The GM naming people it wanted to exist — "attack thug1" — is the one
+                # rejection it will not learn from, hint and example notwithstanding. It
+                # is repaired in code instead of asked about again.
+                if exc.check == "refs":
+                    amended = judgement.repair_unknown_refs(
+                        data.get("intents"), player_input, self.engine.scene)
+                    if amended:
+                        try:
+                            intents = self.engine.validate(amended)
+                            rejections.append(
+                                f"attempt {n + 1} [refs, repaired]: created the people "
+                                f"the GM had already described")
+                            data = dict(data, intents=amended)
+                        except IntentError:
+                            amended = None
+                    if not amended:
+                        rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
+                        messages = _with_correction(base, reply.text, str(exc))
+                        continue
+                else:
+                    rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
+                    messages = _with_correction(base, reply.text, str(exc))
+                    continue
 
             # Check 5: not "is this legal" but "is this what the player asked for".
             # Corrections are applied in place; an objection sends the turn back once,
             # because we can tell the GM is wrong without being able to tell it what it
             # should have done.
-            verdict = judgement.review(player_input, intents, self.engine.scene)
+            verdict = judgement.review(player_input, intents, self.engine.scene,
+                                        previous=previous_intents)
             repairs = list(verdict.as_log())
             if not verdict.ok and n < max_attempts - 1:
                 complaint = " ".join(o.message for o in verdict.objections)
@@ -124,9 +147,13 @@ class GMAgent:
             narration = judgement.name_refs(narration, self.engine.scene)
             narration, claim_repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
+            narration, prose_repairs, prose_attempts = self.polish(
+                narration, earlier=recent_narration or [])
+            attempts.extend(prose_attempts)
 
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
-                            repairs=repairs + claim_repairs, rejections=rejections)
+                            repairs=repairs + claim_repairs + prose_repairs,
+                            rejections=rejections)
 
         raise IntentError(
             "the GM could not produce a valid turn in "
@@ -174,6 +201,76 @@ class GMAgent:
             f"the GM could not act for {ref} in {max_attempts} attempts:\n"
             + "\n".join(rejections)
         )
+
+    # --- The prose itself ------------------------------------------------------------
+
+    def _echo_index(self):
+        if getattr(self, "_echoes", None) is None:
+            self._echoes = narration_mod.build_echo_index(
+                *[e["reply"]["narration"] for e in prompts.EXAMPLES],
+                *[e["reply"]["narration"] for e in prompts.NPC_EXAMPLES],
+                prompts.CONSEQUENCE_EXAMPLE["assistant"],
+            )
+        return self._echoes
+
+    def _known_names(self) -> set[str]:
+        """Every name the GM is entitled to use.
+
+        The scene's people, the place and everything containing it, and the world's own
+        entities. Anything else in the prose is invented, which is the failure "ground
+        every name" exists to catch.
+        """
+        names = {a.name for a in self.engine.scene.actors.values()}
+        names |= {a.heritage for a in self.engine.scene.actors.values() if a.heritage}
+        try:
+            world = self.world
+            names |= {e.name for e in world.entities.values()}
+            names |= {u["name"] for u in world.unwritten}
+            names |= {f["name"] for c in world.chronology for f in c.figures}
+            names |= {c["name"] for c in world.chronology}
+            names |= {f["name"] for f in world.factions}
+            names.add(world.name)
+        except Exception:
+            pass
+        return {n for n in names if n}
+
+    def polish(self, text: str, earlier: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+        """One targeted rewrite when the prose breaks a rule about prose.
+
+        Same shape as every fix that has held here: detect mechanically, then ask the
+        model to repair only what was found. If the rewrite is no better the original is
+        kept — blander prose is worth less than a lost turn.
+        """
+        review = narration_mod.review(
+            text, pc_name=self._pc_name(), echo_index=self._echo_index(),
+            known_names=self._known_names(), earlier=earlier,
+        )
+        if review.ok:
+            return text, [], []
+
+        try:
+            reply = client.chat(
+                prompts.narration_repair_messages(text, review.complaint()),
+                self.model, self.host, as_json=True, temperature=0.6, num_predict=320,
+            )
+            attempt = Attempt("polish", reply.seconds, reply.model, reply.text,
+                              note="; ".join(review.as_log()))
+            fixed = str(reply.json().get("narration", "")).strip()
+        except Exception as exc:
+            return text, [f"polish failed: {exc}"], [
+                Attempt("polish", 0.0, self.model, note=str(exc)[:120])]
+
+        after = narration_mod.review(
+            fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
+            known_names=self._known_names(), earlier=earlier,
+        )
+        if fixed and len(after.findings) < len(review.findings):
+            return fixed, review.as_log(), [attempt]
+        return text, [f"unrepaired: {', '.join(review.as_log())}"], [attempt]
+
+    def _pc_name(self) -> str:
+        pc = self.engine.scene.pc()
+        return pc.name if pc else ""
 
     # --- Check 4's repair ---------------------------------------------------------------
 

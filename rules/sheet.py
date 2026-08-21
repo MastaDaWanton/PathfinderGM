@@ -76,6 +76,9 @@ class Actor:
     world_people_id: str | None = None
     heritage: str = ""
     race: str = "human"
+    # Stated, never guessed. The model called Kesst "him" in one sentence and "her" in
+    # the next because nothing on the sheet said, so it invented one each time.
+    pronouns: str = "they/them"
 
     # NPC stat-block shortcuts. When present these replace *derivation*, not conditions.
     flat_skills: dict[str, int] = field(default_factory=dict)
@@ -764,6 +767,7 @@ def full_sheet(actor: Actor) -> dict:
             "class": f"{cls.get('name', '')} {actor.level}".strip(),
             "race": actor.race,
             "heritage": actor.heritage,
+            "pronouns": actor.pronouns,
             "size": actor.size,
             "world_people_id": actor.world_people_id,
             "world_entity_id": actor.world_entity_id,
@@ -851,7 +855,7 @@ def to_dict(actor: Actor) -> dict:
         "hp": actor.hp, "hp_max": actor.hp_max,
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
-        "heritage": actor.heritage, "race": actor.race,
+        "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "flat_skills": actor.flat_skills, "flat_saves": actor.flat_saves,
         "flat_ac": actor.flat_ac, "flat_attack": actor.flat_attack,
         "flat_damage": actor.flat_damage, "flat_initiative": actor.flat_initiative,
@@ -882,6 +886,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         world_people_id=data.get("world_people_id"),
         heritage=data.get("heritage", ""),
         race=data.get("race", "human"),
+        pronouns=data.get("pronouns", "they/them"),
         flat_skills={k.lower(): v for k, v in (data.get("flat_skills") or {}).items()},
         flat_saves=data.get("flat_saves") or {},
         flat_ac=data.get("flat_ac"),

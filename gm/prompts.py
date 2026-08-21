@@ -106,6 +106,10 @@ You then narrate the result you are handed.
 Your narration covers the wind-up only: what is true no matter how the dice land. Never
 the landing.
 
+Write to the player as "you". Name only the people and places listed below; if you need
+someone new, describe them without a name. The examples show you the shape of a reply,
+not its words — never repeat a phrase from them.
+
 Reply with a JSON object: {"narration": "...", "intents": [...]}.
 
 People and creatures are named by ref, never by name. The refs that exist are listed
@@ -143,7 +147,8 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
     for ref, actor in scene.actors.items():
         if actor.is_pc:
             lines.append(
-                f"  {ref} — {actor.name}, the player's character. "
+                f"  {ref} — {actor.name}, the player's character. Narrate to them as "
+                f"'you'; when someone speaks about them, {actor.pronouns}. "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
                 f"{actor.hp}/{actor.hp_max} hp."
             )
@@ -180,6 +185,8 @@ CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.
 The rules engine has resolved it. Below is what it decided. Narrate exactly that in two or
 three sentences of prose — no more. Do not add a further roll, do not contradict it, and
 do not give any numbers.
+
+Carry on from what you already narrated; do not restate it. Write to the player as "you".
 
 Write it as fiction, not as a report."""
 
@@ -290,4 +297,17 @@ def repair_messages(sentence: str, why: str) -> list[dict]:
     return [
         {"role": "system", "content": REPAIR_BRIEFING},
         {"role": "user", "content": f"This sentence {why}:\n\n{sentence}"},
+    ]
+
+
+NARRATION_REPAIR_BRIEFING = """Rewrite the passage you are given so that it no longer has
+the problem described. Keep everything else — the events, the voice, the length.
+
+Reply with a JSON object: {"narration": "..."}."""
+
+
+def narration_repair_messages(text: str, complaint: str) -> list[dict]:
+    return [
+        {"role": "system", "content": NARRATION_REPAIR_BRIEFING},
+        {"role": "user", "content": complaint + "\n\nThe passage:\n" + text},
     ]

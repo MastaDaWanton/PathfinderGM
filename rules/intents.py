@@ -419,6 +419,25 @@ def _check_params(intent: Intent, index: int) -> None:
         except (TypeError, ValueError):
             raise IntentError("advance_time: amount must be a number", "schema", index)
 
+    elif op == "spawn":
+        # Validation has to cover everything resolution accepts. It did not here, and an
+        # invented template ("bravo") reached the bestiary and raised UnknownTemplate as
+        # a 500 — the same shape of gap as the bare-string DC.
+        from .bestiary import TEMPLATES
+
+        raw_t = str(p["template"]).strip().lower()
+        if raw_t not in TEMPLATES:
+            raise IntentError(
+                f"spawn: no template {p['template']!r}." + _suggest(raw_t, TEMPLATES)
+                + f" The templates are: {', '.join(sorted(TEMPLATES))}.",
+                "schema", index,
+            )
+        p["template"] = raw_t
+        try:
+            p["count"] = max(1, min(12, int(p.get("count", 1) or 1)))
+        except (TypeError, ValueError):
+            raise IntentError("spawn: count must be a number", "schema", index)
+
     elif op == "begin_encounter":
         if not isinstance(p["sides"], dict):
             raise IntentError(

@@ -45,6 +45,34 @@ def played():
     }
 
 
+@pytest.mark.parametrize("tell,expected", [
+    # Produced in a live fight, shown raw to the player when the narrator was skipped.
+    ("the guildhand on the gate's attack misses Kesst Vayr (5 against AC 12 (flat-footed)).",
+     "the guildhand on the gate's attack misses Kesst Vayr."),
+    ("Kesst Vayr beats the guildhand on the gate's perception by 6.",
+     "Kesst Vayr beats the guildhand on the gate's perception."),
+    ("Kesst Vayr trips the thug by 7: the target is knocked prone.",
+     "Kesst Vayr trips the thug: the target is knocked prone."),
+    ("Kesst Vayr fails the Reflex save by 6.", "Kesst Vayr fails the Reflex save."),
+])
+def test_a_raw_tell_shown_to_the_player_loses_its_arithmetic(tell, expected):
+    """Tells are written for the GM to narrate and carry the maths. When the narrator is
+    unavailable the tell is shown raw, and that put an NPC's hidden roll in front of the
+    player — the one thing the hidden/player split exists to prevent.
+    """
+    from play.views import plain_tell
+
+    assert plain_tell(tell) == expected
+
+
+def test_the_players_own_damage_survives():
+    """They rolled it themselves; hiding it would be absurd."""
+    from play.views import plain_tell
+
+    assert plain_tell("Kesst Vayr hits the thug for 6 piercing.") == (
+        "Kesst Vayr hits the thug for 6 piercing.")
+
+
 def test_hidden_rolls_do_not_reach_the_browser(played):
     visible = _player_visible_entry(played)
     blob = json.dumps(visible)

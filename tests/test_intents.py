@@ -145,6 +145,26 @@ def test_save_aliases_are_accepted_because_models_write_them_out():
                   "params": {"save": "Fortitude", "dc": 15}}).params["save"] == "fort"
 
 
+def test_an_invented_creature_template_is_rejected_with_the_list():
+    """Validation has to cover everything resolution accepts. `spawn` required a
+    `template` but never checked it, so an invented one reached the bestiary and raised
+    UnknownTemplate as a 500 mid-turn — the same shape of gap as the bare-string DC.
+    """
+    with pytest.raises(IntentError) as e:
+        parse({"op": "spawn", "params": {"template": "guild bravo", "count": 2}})
+    msg = str(e.value)
+    assert "no template" in msg
+    assert "thug" in msg and "watchman" in msg
+
+
+def test_a_real_template_survives_and_the_count_is_bounded():
+    got = parse({"op": "spawn", "params": {"template": "Thug", "count": "3"}})
+    assert got.params["template"] == "thug"
+    assert got.params["count"] == 3
+    assert parse({"op": "spawn",
+                  "params": {"template": "thug", "count": 99}}).params["count"] == 12
+
+
 def test_every_shape_the_resolver_accepts_is_also_validated():
     """Measured on the second live turn: the model sent `"dc": "DC 15"` as a bare
     string. `rules.dc.resolve` accepted strings, `_check_params` only validated the dict

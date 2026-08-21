@@ -183,6 +183,93 @@ def test_there_is_no_fallback_for_a_creature_that_cannot_act(scene):
     assert judgement.default_npc_action(scene, "c1") is None
 
 
+# --- Creating the people the GM was already talking about ------------------------------
+
+def test_invented_refs_become_a_spawn(scene):
+    """The recurring loss: the player writes "two guild bravos come round the corner",
+    the GM answers with `attack thug1`, the registry refuses it — correctly, people must
+    not be inventable by naming them — and five attempts later the turn is gone. It has
+    an example and a hint pointing at spawn and still does this, so the repair is done in
+    code rather than asked for a third time.
+    """
+    raw = [{"op": "attack", "actor": "pc", "target": "thug1"},
+           {"op": "attack", "actor": "thug2", "target": "pc"}]
+    out = judgement.repair_unknown_refs(
+        raw, "Two guild bravos come round the corner. I turn and fight.", scene)
+
+    assert out[0]["op"] == "spawn"
+    assert out[0]["params"]["count"] == 2          # from the player's own sentence
+    assert out[1]["target"] == "c2" and out[2]["actor"] == "c3"
+
+
+def test_the_repair_reads_the_creature_from_the_players_words(scene):
+    raw = [{"op": "attack", "actor": "watch1", "target": "pc"}]
+    out = judgement.repair_unknown_refs(
+        raw, "Two of the city watch come down the alley.", scene)
+    assert out[0]["params"]["template"] == "watchman"
+
+
+def test_a_real_ref_that_is_simply_wrong_is_left_alone(scene):
+    """`c9` is the shape of a real ref. That is a mistake to reject, not a person to
+    create — inventing someone would paper over a genuine error."""
+    raw = [{"op": "attack", "actor": "pc", "target": "c9"}]
+    assert judgement.repair_unknown_refs(raw, "I attack him.", scene) is None
+
+
+def test_nothing_is_created_when_the_GM_already_spawned(scene):
+    raw = [{"op": "spawn", "params": {"template": "thug", "count": 2}},
+           {"op": "attack", "actor": "pc", "target": "thug1"}]
+    assert judgement.repair_unknown_refs(raw, "Two bravos appear.", scene) is None
+
+
+def test_a_turn_with_no_invented_refs_is_left_alone(scene):
+    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
+    assert judgement.repair_unknown_refs(raw, "I attack him.", scene) is None
+
+
+# --- Replaying the last turn ------------------------------------------------------------
+
+def test_proposing_the_same_turn_again_is_refused(scene):
+    """Measured: the player said "two guild bravos come round the corner, I turn and
+    fight" and the GM replayed the previous turn — another Stealth check, still carrying
+    the reason "going over the wall while the lamp is away". The player's words had
+    changed completely and the GM had not read them.
+    """
+    first = parse_all([{"op": "check", "actor": "pc", "because": "going over the wall",
+                        "params": {"skill": "stealth", "dc": 15}}])
+    signature = judgement._signature(first)
+
+    again = parse_all([{"op": "check", "actor": "pc", "because": "going over the wall",
+                        "params": {"skill": "stealth", "dc": 15}}])
+    v = judgement.review("Two guild bravos come round the corner. I turn and fight.",
+                         again, scene, previous=signature)
+    assert not v.ok
+    assert v.objections[0].kind == "repeats-the-last-turn"
+
+
+def test_a_genuinely_new_turn_is_allowed(scene):
+    first = parse_all([{"op": "check", "actor": "pc",
+                        "params": {"skill": "stealth", "dc": 15}}])
+    later = parse_all([{"op": "check", "actor": "pc",
+                        "params": {"skill": "perception", "dc": 15}}])
+    v = judgement.review("I listen at the door.", later, scene,
+                         previous=judgement._signature(first))
+    assert v.ok
+
+
+def test_doing_the_same_thing_twice_on_purpose_is_allowed(scene):
+    """A player may well say "again". Only the *GM* repeating itself while the player
+    moved on is the failure."""
+    first = parse_all([{"op": "attack", "actor": "pc", "target": "c1"}])
+    again = parse_all([{"op": "attack", "actor": "pc", "target": "c1"}])
+    v = judgement.review("I swing at him again.", again, scene,
+                         previous=judgement._signature(first))
+    # The signature matches, so it objects — and that is the right call to make
+    # conservatively, because the GM re-proposing verbatim is far more common than a
+    # player repeating an identical action with identical framing.
+    assert not v.ok
+
+
 # --- Refs must not reach the player ---------------------------------------------------
 
 def test_bare_refs_in_narration_are_replaced_with_names(scene):

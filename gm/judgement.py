@@ -129,12 +129,41 @@ def stated_count(text: str, near: str = "") -> int | None:
     return None
 
 
-def review(player_text: str, intents, scene=None) -> Review:
+# The params that say what a turn *is*. `dc` is deliberately excluded: the GM re-rolls a
+# difficulty band every turn, so comparing full params never matched and the repeat went
+# undetected even when the reason clause was word for word identical.
+_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone")
+
+
+def _signature(intents) -> list[tuple]:
+    """What a turn's intents amount to, for comparing one turn against the last."""
+    return [
+        (i.op, i.actor, str(i.target), (i.because or "").strip().lower(),
+         tuple(str(i.params.get(k, "")).lower() for k in _IDENTIFYING))
+        for i in intents
+    ]
+
+
+def review(player_text: str, intents, scene=None, previous=None) -> Review:
     """Compare what the GM decided against what the player asked for."""
     out = Review()
     text = player_text or ""
     violent = bool(VIOLENCE.search(text))
     peaceful = bool(PEACEFUL.search(text))
+
+    # 0. The same turn over again. Measured: the player said "two guild bravos come round
+    #    the corner, I turn and fight" and the GM replayed the previous turn — another
+    #    Stealth check, carrying the previous turn's reason, "going over the wall while
+    #    the lamp is away". The player's words had changed completely and the GM had not
+    #    read them.
+    if previous and _signature(intents) == list(previous):
+        out.objections.append(Finding(
+            "repeats-the-last-turn",
+            f"you have proposed exactly the same thing as last turn, but the player "
+            f"has said something new: {_quote(text)}. Read what they just did and "
+            f"respond to that.",
+        ))
+        return out
 
     for intent in intents:
         if intent.op == "attack":
@@ -224,6 +253,77 @@ def name_refs(text: str, scene) -> str:
         return "you" if actor.is_pc else actor.name
 
     return _BARE_REF.sub(swap, text)
+
+
+# A ref the GM invented for someone it wanted to exist: "thug1", "bravo_2", "guard1".
+_INVENTED_REF = re.compile(r"^[a-z][a-z_]{2,}[ _-]?\d*$", re.I)
+
+# What the player's words suggest the newcomers are.
+_TEMPLATE_CUES = (
+    (re.compile(r"\b(watch|watchman|watchmen|guard|guards|soldier)\b", re.I), "watchman"),
+    (re.compile(r"\b(dog|hound|mastiff)\b", re.I), "guard dog"),
+    (re.compile(r"\b(guildhand|clerk|servant|porter)\b", re.I), "guildhand"),
+)
+
+
+def repair_unknown_refs(raw_intents, player_text: str, scene):
+    """Create the people the GM was already talking about, instead of losing the turn.
+
+    The recurring failure: the player writes "two guild bravos come round the corner",
+    the GM answers with `attack thug1`, the ref registry refuses it — correctly, it must
+    not be possible to invent people by naming them — and five attempts later the turn is
+    gone. It has an example and a hint pointing at `spawn` and it still does this.
+
+    So the repair is done in code rather than asked for again. This is narrow on purpose:
+    it fires only when the unknown refs look like invented names rather than typos, the
+    count comes from the *player's* sentence, and the result goes through the ordinary
+    validation. Nothing is created that the player did not describe arriving.
+
+    Returns amended raw intents, or None if this is not that problem.
+    """
+    known = set(getattr(scene, "actors", {}) or {})
+    invented: list[str] = []
+    for raw in raw_intents or []:
+        if not isinstance(raw, dict):
+            return None
+        targets = raw.get("target")
+        targets = targets if isinstance(targets, list) else [targets]
+        for ref in [raw.get("actor"), *targets]:
+            if not isinstance(ref, str) or ref in known or ref in invented:
+                continue
+            if not _INVENTED_REF.match(ref) or re.fullmatch(r"c\d+|pc", ref, re.I):
+                return None            # a real ref that is simply wrong: not our business
+            invented.append(ref)
+
+    if not invented or any(r.get("op") == "spawn" for r in raw_intents):
+        return None
+
+    template = "thug"
+    for cue, name in _TEMPLATE_CUES:
+        if cue.search(player_text or ""):
+            template = name
+            break
+
+    count = min(len(invented), stated_count(player_text) or len(invented))
+    minted = [f"c{i}" for i in range(1, count + len(known) + 2)
+              if f"c{i}" not in known][:count]
+    if len(minted) < count:
+        return None
+
+    swap = dict(zip(invented, minted))
+    amended = [{"op": "spawn", "because": "they are already in the scene the GM described",
+                "params": {"template": template, "count": count}}]
+    for raw in raw_intents:
+        raw = dict(raw)
+        if isinstance(raw.get("actor"), str):
+            raw["actor"] = swap.get(raw["actor"], raw["actor"])
+        tgt = raw.get("target")
+        if isinstance(tgt, str):
+            raw["target"] = swap.get(tgt, tgt)
+        elif isinstance(tgt, list):
+            raw["target"] = [swap.get(t, t) for t in tgt]
+        amended.append(raw)
+    return amended
 
 
 def _refs_depend_on_spawn(intents, scene) -> bool:

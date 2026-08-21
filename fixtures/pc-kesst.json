@@ -4,14 +4,19 @@
   "level": 1,
   "class": "rogue",
   "race": "human",
+  "pronouns": "she/her",
   "size": "medium",
-
   "heritage": "Zhilakai",
   "world_people_id": "2aca2b7d6467",
   "world_entity_id": null,
-
-  "abilities": { "str": 12, "dex": 17, "con": 12, "int": 13, "wis": 10, "cha": 14 },
-
+  "abilities": {
+    "str": 12,
+    "dex": 17,
+    "con": 12,
+    "int": 13,
+    "wis": 10,
+    "cha": 14
+  },
   "ranks": {
     "stealth": 1,
     "perception": 1,
@@ -24,15 +29,17 @@
     "knowledge (local)": 1,
     "appraise": 1
   },
-
-  "feats": ["weapon finesse", "stealthy"],
-
+  "feats": [
+    "weapon finesse",
+    "stealthy"
+  ],
   "armour": "leather",
   "shield": "none",
-  "weapons": ["rapier", "dagger"],
+  "weapons": [
+    "rapier",
+    "dagger"
+  ],
   "equipped": "rapier",
-
   "hp": 9,
-
-  "notes": "Zhilakai — flightless, in a city whose nobility is winged. Pangrella's own facts name the Zhilakai as its shadow power and its standing tension as 'winged nobility against merchant castes'; Kesst works the seam between the two. Rules race is human (PF1e); Zhilakai is her people in the world, not a game race. The two are tracked separately on purpose."
+  "notes": "Zhilakai \u2014 flightless, in a city whose nobility is winged. Pangrella's own facts name the Zhilakai as its shadow power and its standing tension as 'winged nobility against merchant castes'; Kesst works the seam between the two. Rules race is human (PF1e); Zhilakai is her people in the world, not a game race. The two are tracked separately on purpose."
 }
