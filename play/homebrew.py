@@ -62,6 +62,9 @@ class Bench:
     # Set when the app can hold the content but nothing has been authored, so the card
     # can say what is missing rather than looking broken.
     waiting: str = ""
+    # Which authoring form this bench opens, if any. `effects` is the structured builder
+    # in rules/effectspec.py; a bench without one is a listing.
+    builder: str = ""
     rows: list = field(default_factory=list)
 
     @property
@@ -73,7 +76,7 @@ class Bench:
             "id": self.id, "name": self.name, "blurb": self.blurb, "ready": self.ready,
             "yours": self.yours, "shipped": self.shipped,
             "shipped_label": self.shipped_label or "shipped",
-            "waiting": self.waiting,
+            "waiting": self.waiting, "builder": self.builder,
             "path": str(folder(self.dir)),
         }
 
@@ -95,6 +98,13 @@ def benches() -> list[Bench]:
             shipped=len(worldclass.tracks()), shipped_label="shipped",
             blurb="Tracks that run alongside a character class and level on use. Not a "
                   "class: no BAB, no saves, no hit dice. Herbalism is the one that ships.",
+        ),
+        Bench(
+            id="consumables", name="Materials & consumables", dir="consumables",
+            shipped=0, shipped_label="shipped", builder="effects",
+            blurb="Anything with an effect: potions, poultices, poisons, oils, reagents. "
+                  "Built from a description and a list of effects rather than typed as "
+                  "prose, so what a thing does is data the engine can read.",
         ),
         Bench(
             id="ingredients", name="Ingredients", dir="ingredients",
@@ -181,7 +191,9 @@ def rows_for(bench_id: str) -> list[dict]:
                 "mine": True,
             })
 
-    if bench_id == "classes":
+    if bench_id == "consumables":
+        pass                      # nothing ships; the bench exists to be authored into
+    elif bench_id == "classes":
         rows += [{"name": v["name"], "kind": "class", "mine": False,
                   "note": f"d{v['hit_die']} · {v['bab'].replace('_', ' ')} BAB · "
                           f"{v['skill_ranks']}+Int skills · good "

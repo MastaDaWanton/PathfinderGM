@@ -143,6 +143,49 @@
     font: italic 12px/1.5 var(--body);
   }
   code { color: var(--dim); font: 12px/1.4 ui-monospace, monospace; }
+
+  /* --- the effect builder --- */
+  .build { background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
+           border-radius: 3px; padding: 18px 20px; margin-bottom: 20px; }
+  .build label { display: block; color: var(--dim); font: 12px/1.6 var(--body);
+                 letter-spacing: .04em; margin-bottom: 3px; }
+  .build input[type=text], .build textarea, .build select {
+    width: 100%; padding: 8px 10px; font: 14px var(--body); color: var(--ink);
+    background: var(--sunk); border: 1px solid var(--edge); border-radius: 2px;
+    margin-bottom: 11px;
+  }
+  .build textarea { min-height: 74px; resize: vertical; line-height: 1.55; }
+  .build input:focus, .build select:focus, .build textarea:focus {
+    outline: none; border-color: var(--gold-dim); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .fx-card {
+    border: 1px solid var(--edge); border-left: 2px solid var(--gold-dim);
+    border-radius: 2px; padding: 12px 14px; margin-bottom: 11px;
+    background: rgba(0,0,0,.22);
+  }
+  .fx-card > header {
+    display: flex; align-items: baseline; gap: 10px; padding: 0; border: none;
+    background: none; margin-bottom: 10px;
+  }
+  .fx-card .line {
+    flex: 1; color: var(--brew); font: 14px/1.4 var(--body);
+  }
+  .fx-card .line.bad { color: #cf9d95; }
+  .fx-card .drop { cursor: pointer; background: none; border: none; color: var(--dim);
+                   font: 16px/1 var(--body); padding: 0 4px; }
+  .fx-card .drop:hover { color: var(--alarm); }
+  .fx-card.nested { margin-left: 18px; border-left-color: var(--brew-dim); }
+  .addfx {
+    cursor: pointer; width: 100%; padding: 11px; border-radius: 2px;
+    color: var(--gold); background: linear-gradient(#221a10, #15100a);
+    border: 1px dashed var(--gold-dim); font: 400 14px/1 var(--display);
+    letter-spacing: .1em; font-variant: small-caps;
+  }
+  .addfx:hover { border-color: var(--accent); border-style: solid; }
+  .warn { color: #cfc4ab; font: italic 12px/1.5 var(--body); margin: -6px 0 10px; }
+  .ok { color: var(--brew); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -161,6 +204,9 @@ let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
 let PICKED = null;       // pregen chosen when starting a new game
+let CAT = null;          // the effect catalogue, fetched once
+let DRAFT = { name: "", kind: "consumable", description: "", effects: [] };
+let LINES = [];          // rendered preview of each effect, from the server
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
@@ -257,6 +303,147 @@ function paneOneWorld() {
     <div id="err"></div>`;
 }
 
+
+// --- the effect builder ------------------------------------------------------------------
+//
+// Every form here is generated from the catalogue in rules/effectspec.py. Nothing about a
+// field is written in this file, so adding an effect type is one entry in that module and
+// the form for it appears — the editor and the engine cannot drift, because they read the
+// same definition.
+
+function typeOf(id) {
+  for (const c of CAT.categories) for (const t of c.types) if (t.id === id) return [c, t];
+  return [null, null];
+}
+
+function optionsFor(f) {
+  return (CAT.vocab[f.vocab] || []).map(o =>
+    `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("");
+}
+
+function fieldHtml(f, spec, path) {
+  const v = spec[f.id];
+  const at = `data-fx="${path}" data-field="${esc(f.id)}"`;
+  const lbl = `<label>${esc(f.label)}${f.required ? "" : " <em>(optional)</em>"}</label>`;
+
+  if (f.kind === "choice") {
+    return `${lbl}<select ${at}><option value="">—</option>${
+      (CAT.vocab[f.vocab] || []).map(o =>
+        `<option value="${esc(o.id)}" ${String(v) === o.id ? "selected" : ""}>${
+          esc(o.name)}</option>`).join("")}</select>`;
+  }
+  if (f.kind === "duration") {
+    const d = v || {};
+    return `${lbl}<div class="row2">
+      <input type="text" ${at} data-part="amount" value="${esc(d.amount ?? "")}"
+             placeholder="1d4, 8">
+      <select ${at} data-part="unit">
+        <option value="">—</option>${(CAT.vocab.duration_unit || []).map(o =>
+          `<option value="${esc(o.id)}" ${d.unit === o.id ? "selected" : ""}>${
+            esc(o.name)}</option>`).join("")}</select></div>`;
+  }
+  if (f.kind === "effects") {
+    const list = v || [];
+    return `${lbl}
+      ${list.map((child, i) => effectHtml(child, `${path}.${f.id}.${i}`, true)).join("")}
+      <button class="addfx" data-add="${path}.${f.id}" style="padding:7px;margin-bottom:11px">
+        + ${esc(f.label)}</button>`;
+  }
+  const ph = f.hint ? ` placeholder="${esc(f.hint)}"` : "";
+  return `${lbl}<input type="text" ${at} value="${esc(v ?? "")}"${ph}>`;
+}
+
+function effectHtml(spec, path, nested) {
+  const [cat, type] = typeOf(spec.type);
+  const info = LINES.find(l => l.path === path);
+  return `<div class="fx-card ${nested ? "nested" : ""}">
+    <header>
+      <span class="line ${info && info.problems.length ? "bad" : ""}">${
+        info ? esc(info.problems.length ? info.problems[0] : info.line) : "…"}</span>
+      <button class="drop" data-remove="${path}" title="Remove">×</button>
+    </header>
+    <div class="row2">
+      <div><label>Kind</label>
+        <select data-cat="${path}">${CAT.categories.map(c =>
+          `<option value="${esc(c.id)}" ${cat && c.id === cat.id ? "selected" : ""}>${
+            esc(c.name)}</option>`).join("")}</select></div>
+      <div><label>Type</label>
+        <select data-type="${path}">${(cat ? cat.types : []).map(t =>
+          `<option value="${esc(t.id)}" ${t.id === spec.type ? "selected" : ""}>${
+            esc(t.name)}</option>`).join("")}</select></div>
+    </div>
+    ${type && !type.engine
+      ? `<div class="warn">${esc(type.blocked)}</div>` : ""}
+    ${type ? type.fields.map(f => fieldHtml(f, spec, path)).join("") : ""}
+  </div>`;
+}
+
+function at(path) {
+  // "0.on_failure.1" -> the nested spec, and its containing array.
+  const bits = String(path).split(".");
+  let list = DRAFT.effects, spec = null;
+  for (let i = 0; i < bits.length; i++) {
+    if (/^\d+$/.test(bits[i])) { spec = list[Number(bits[i])]; }
+    else { spec[bits[i]] = spec[bits[i]] || []; list = spec[bits[i]]; }
+  }
+  return { list, spec, index: Number(bits[bits.length - 1]) };
+}
+
+function listAt(path) {
+  if (path === "") return DRAFT.effects;
+  const bits = String(path).split(".");
+  let list = DRAFT.effects, spec = null;
+  for (const b of bits) {
+    if (/^\d+$/.test(b)) spec = list[Number(b)];
+    else { spec[b] = spec[b] || []; list = spec[b]; }
+  }
+  return list;
+}
+
+function paneBuild(b) {
+  return `<div class="build">
+    <div class="row2">
+      <div><label>Name</label>
+        <input type="text" id="d-name" value="${esc(DRAFT.name)}"
+               placeholder="Leechwort Wound Powder"></div>
+      <div><label>Kind</label>
+        <input type="text" id="d-kind" value="${esc(DRAFT.kind)}"
+               placeholder="poultice, potion, poison, oil"></div>
+    </div>
+    <label>Description</label>
+    <textarea id="d-desc" placeholder="What it is, how it is made, how it looks.">${
+      esc(DRAFT.description)}</textarea>
+
+    <label>Effects</label>
+    ${DRAFT.effects.map((e, i) => effectHtml(e, String(i), false)).join("")}
+    <button class="addfx" data-add="">+ Add an effect</button>
+
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
+      <button class="go" id="d-save">Save</button>
+      <span id="d-msg" class="ok"></span>
+    </div>
+  </div>`;
+}
+
+async function repreview() {
+  // The server validates and renders, so the card line here is the card line there.
+  const flat = [];
+  const walk = (list, prefix) => list.forEach((e, i) => {
+    const path = prefix === "" ? String(i) : `${prefix}.${i}`;
+    flat.push({ path, spec: e });
+    for (const key of ["on_failure", "on_success"]) {
+      if (Array.isArray(e[key])) walk(e[key], `${path}.${key}`);
+    }
+  });
+  walk(DRAFT.effects, "");
+  if (!flat.length) { LINES = []; render(); return; }
+  try {
+    const d = await post("/api/effects/preview", { effects: flat.map(f => f.spec) });
+    LINES = d.effects.map((r, i) => ({ ...r, path: flat[i].path }));
+  } catch (e) { LINES = []; }
+  render();
+}
+
 function paneHomebrew() {
   if (BENCH) {
     const b = BENCH.bench;
@@ -267,6 +454,7 @@ function paneHomebrew() {
       <p class="note"><b style="color:var(--ink)">${b.yours || "nothing"}</b> authored by
         you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
+      ${b.builder === "effects" ? paneBuild(b) : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""}"><td>${esc(r.name)}</td>
              <td>${r.mine ? "yours" : esc(r.kind)}</td>
@@ -360,10 +548,97 @@ document.addEventListener("click", async e => {
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {
     BENCH = await (await fetch(`/api/bench/${encodeURIComponent(bench.dataset.bench)}`)).json();
+    if (BENCH.bench.builder === "effects" && !CAT) {
+      CAT = await (await fetch("/api/effects/catalogue")).json();
+    }
     render();
     return;
   }
+
+  const add = e.target.closest("[data-add]");
+  if (add) {
+    // A new effect starts as the first type of the first category, so the form is never
+    // empty and the player sees what a filled-in effect looks like immediately.
+    const first = CAT.categories[0].types[0].id;
+    listAt(add.dataset.add).push({ type: first });
+    await repreview();
+    return;
+  }
+  const gone = e.target.closest("[data-remove]");
+  if (gone) {
+    const { list, index } = at(gone.dataset.remove);
+    list.splice(index, 1);
+    await repreview();
+    return;
+  }
+  if (e.target.closest("#d-save")) {
+    try {
+      const d = await post("/api/consumables", {
+        name: $("#d-name").value, kind: $("#d-kind").value,
+        description: $("#d-desc").value, effects: DRAFT.effects,
+      });
+      DRAFT = { name: "", kind: "consumable", description: "", effects: [] };
+      LINES = [];
+      BENCH = await (await fetch("/api/bench/consumables")).json();
+      STATE.benches = (await (await fetch("/api/bench/consumables")).json()) && STATE.benches;
+      render();
+      $("#d-msg").textContent = `Saved: ${d.lines.join(" · ")}`;
+    } catch (err) { $("#d-msg").innerHTML =
+      `<span style="color:var(--alarm)">${esc(err.message)}</span>`; }
+    return;
+  }
   if (e.target.closest("[data-backbench]")) { BENCH = null; render(); return; }
+});
+
+// The draft is edited in place and re-previewed; the server owns validation and the
+// rendered line, so what the builder shows is what a card will show.
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "d-name") { DRAFT.name = t.value; return; }
+  if (t.id === "d-kind") { DRAFT.kind = t.value; return; }
+  if (t.id === "d-desc") { DRAFT.description = t.value; return; }
+  if (!t.dataset || !t.dataset.fx) return;
+  const { spec } = at(t.dataset.fx);
+  const key = t.dataset.field;
+  if (t.dataset.part) {
+    spec[key] = spec[key] || {};
+    spec[key][t.dataset.part] = t.value;
+  } else {
+    spec[key] = t.value;
+  }
+  clearTimeout(window._fxTimer);
+  window._fxTimer = setTimeout(repreview, 350);
+});
+
+document.addEventListener("change", async e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.cat !== undefined && t.dataset.cat !== "") {
+    // Changing the kind resets the type, because the fields are different — carrying the
+    // old values over would leave a form half-filled with values that no longer apply.
+    const { spec } = at(t.dataset.cat);
+    const cat = CAT.categories.find(c => c.id === t.value);
+    Object.keys(spec).forEach(k => delete spec[k]);
+    spec.type = cat.types[0].id;
+    await repreview();
+    return;
+  }
+  if (t.dataset && t.dataset.type !== undefined && t.dataset.type !== "") {
+    const { spec } = at(t.dataset.type);
+    Object.keys(spec).forEach(k => delete spec[k]);
+    spec.type = t.value;
+    await repreview();
+    return;
+  }
+  if (t.dataset && t.dataset.fx) {
+    const { spec } = at(t.dataset.fx);
+    if (t.dataset.part) {
+      spec[t.dataset.field] = spec[t.dataset.field] || {};
+      spec[t.dataset.field][t.dataset.part] = t.value;
+    } else {
+      spec[t.dataset.field] = t.value;
+    }
+    await repreview();
+  }
 });
 
 async function post(url, body) {

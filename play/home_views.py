@@ -10,13 +10,14 @@ first thing a user stops trusting when it does.
 from __future__ import annotations
 
 import json
+import re
 
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes
+from rules import biomes, effectspec
 
 from . import campaign as campaign_mod
 from . import homebrew, library, roster
@@ -134,6 +135,63 @@ def bench(request, bench_id: str):
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
     return JsonResponse({"bench": found.as_dict(), "rows": homebrew.rows_for(bench_id)})
+
+
+@require_GET
+def effect_catalogue(request):
+    """The taxonomy the editor builds its forms from.
+
+    Served rather than duplicated in the page, so a new effect type is one entry in
+    rules/effectspec.py and the form for it appears without a line of template changing.
+    """
+    return JsonResponse(effectspec.catalogue())
+
+
+@require_POST
+def effect_preview(request):
+    """Validate a draft and show the line it would put on a card.
+
+    All the problems at once: a builder that reports them one at a time is one nobody
+    finishes a complex effect in.
+    """
+    body = json.loads(request.body or "{}")
+    out = []
+    for i, spec in enumerate(body.get("effects") or []):
+        out.append({
+            "index": i,
+            "problems": effectspec.validate(spec, f"effect {i + 1}"),
+            "line": effectspec.render(spec),
+            "engine": effectspec.executable(spec),
+        })
+    return JsonResponse({"effects": out,
+                         "problems": [p for e in out for p in e["problems"]]})
+
+
+@require_POST
+def save_consumable(request):
+    """Keep an authored thing. Refused if any effect is malformed — a file that cannot be
+    read back is worse than a form the user has to finish."""
+    body = json.loads(request.body or "{}")
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return JsonResponse({"error": "It needs a name."}, status=400)
+
+    specs = body.get("effects") or []
+    problems = [p for i, s in enumerate(specs)
+                for p in effectspec.validate(s, f"effect {i + 1}")]
+    if problems:
+        return JsonResponse({"error": " ".join(problems)}, status=400)
+
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "thing"
+    path = homebrew.folder("consumables") / f"{slug}.json"
+    path.write_text(json.dumps({
+        "id": slug, "name": name,
+        "kind": str(body.get("kind", "consumable")),
+        "description": str(body.get("description", "")),
+        "effects": specs,
+    }, indent=1), encoding="utf-8")
+    return JsonResponse({"ok": True, "id": slug, "path": str(path),
+                         "lines": [effectspec.render(s) for s in specs]})
 
 
 @require_GET
