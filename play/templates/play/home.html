@@ -133,6 +133,16 @@
   .rows td { padding: 4px 6px; border-bottom: 1px solid #241d15; }
   .rows td:nth-child(2) { color: var(--dim); width: 22%; }
   .rows td:last-child { color: var(--dim); text-align: right; }
+  /* Yours reads green, the shipped tables read plain, so nothing on this page can be
+     mistaken for something you wrote. */
+  .rows tr.mine td { color: var(--brew); }
+  .rows tr.mine td:nth-child(2) { color: var(--brew-dim); }
+  .waiting {
+    margin-top: 9px; padding: 8px 10px; border-radius: 2px; color: #cfc4ab;
+    background: rgba(217,192,138,.05); border-left: 2px solid var(--gold-dim);
+    font: italic 12px/1.5 var(--body);
+  }
+  code { color: var(--dim); font: 12px/1.4 ui-monospace, monospace; }
 </style>
 </head>
 <body>
@@ -158,7 +168,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
 
 const TABS = [
   { id: "worlds", name: "Available worlds", count: () => STATE.worlds.length },
-  { id: "homebrew", name: "Homebrew", count: () => STATE.benches.filter(b => b.ready).length },
+  { id: "homebrew", name: "Homebrew", count: () => STATE.authored },
   { id: "characters", name: "Recent characters", count: () => STATE.recent.length },
 ];
 
@@ -253,12 +263,14 @@ function paneHomebrew() {
     return `<button class="quiet" data-backbench="1">← all benches</button>
       <h2 class="sect">${esc(b.name)}</h2>
       <p class="note">${esc(b.blurb)}</p>
+      ${b.waiting ? `<div class="waiting" style="margin-bottom:14px">${esc(b.waiting)}</div>` : ""}
+      <p class="note"><b style="color:var(--ink)">${b.yours || "nothing"}</b> authored by
+        you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
+        : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
-        `<tr><td>${esc(r.name)}</td><td>${esc(r.kind)}</td>
-             <td>${esc(r.note)}</td></tr>`).join("")}</table></div>
-        <p class="note" style="margin-top:12px">These are what the app ships with. An
-          editor writes alongside them — never over them, so a corrected table in a later
-          build is not shadowed by a stale copy in your data folder.</p>`
+        `<tr class="${r.mine ? "mine" : ""}"><td>${esc(r.name)}</td>
+             <td>${r.mine ? "yours" : esc(r.kind)}</td>
+             <td>${esc(r.note)}</td></tr>`).join("")}</table></div>`
         : `<p class="note">Nothing here yet.</p>`}`;
   }
   return `<h2 class="sect">Workbenches</h2>
@@ -269,8 +281,12 @@ function paneHomebrew() {
               ${b.ready ? "" : "disabled"} style="${b.ready ? "" : "opacity:.45"}">
         <h3>${esc(b.name)}</h3>
         <em>${esc(b.blurb)}</em>
-        ${b.ready ? `<span class="pill">${b.count} already</span>`
-                  : `<span class="pill soon">not built yet</span>`}
+        ${b.ready
+          ? `<span class="pill ${b.yours ? "now" : ""}">${
+               b.yours ? `${b.yours} yours` : "nothing authored yet"}</span>
+             ${b.shipped ? `<span class="pill">${b.shipped} ${esc(b.shipped_label)}</span>` : ""}`
+          : `<span class="pill soon">not built yet</span>`}
+        ${b.waiting ? `<div class="waiting">${esc(b.waiting)}</div>` : ""}
       </button>`).join("")}</div>`;
 }
 

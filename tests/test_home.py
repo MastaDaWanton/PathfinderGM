@@ -188,15 +188,60 @@ def test_the_dead_stay_on_the_roster(client):
 
 # --- homebrew benches -----------------------------------------------------------------------
 
-def test_a_bench_counts_what_actually_exists(client):
-    """Read from the tables rather than typed into the page, so a bench cannot claim
-    content the app does not have."""
+def test_shipped_content_is_not_counted_as_homebrew(client):
+    """The first thing anyone disbelieved on this page: 23 Core Rulebook weapons and four
+    bestiary creatures reported as things the user had made. Shipped and authored are two
+    numbers, and a fresh install has authored nothing."""
     from rules import ingredients
 
     d = client.get("/api/bench/ingredients").json()
     assert d["bench"]["ready"]
-    assert d["bench"]["count"] == len(ingredients.all_ingredients())
-    assert len(d["rows"]) == d["bench"]["count"]
+    assert d["bench"]["shipped"] == len(ingredients.all_ingredients())
+    assert d["bench"]["yours"] == 0
+    assert all(r["mine"] is False for r in d["rows"])
+
+
+def test_there_is_a_bench_for_character_classes(client):
+    """Blood Bending is a 1e class — hit dice, BAB, saves — and had nowhere to live. The
+    world-class bench is a different thing: no BAB, no saves, levels on use."""
+    d = client.get("/api/bench/classes").json()
+    assert d["bench"]["ready"]
+    assert d["bench"]["shipped"] == 4                # the Core Rulebook four
+    assert "Blood Bending" in d["bench"]["waiting"]
+    assert {r["name"] for r in d["rows"]} >= {"Rogue", "Fighter", "Wizard", "Cleric"}
+
+
+def test_authored_content_is_counted_and_marked(client, tmp_path):
+    from play import homebrew
+
+    (homebrew.folder("classes") / "blood-bending.json").write_text(
+        json.dumps({"name": "Blood Bending", "summary": "hit points as a resource"}),
+        encoding="utf-8")
+
+    d = client.get("/api/bench/classes").json()
+    assert d["bench"]["yours"] == 1
+    mine = [r for r in d["rows"] if r["mine"]]
+    assert len(mine) == 1 and mine[0]["name"] == "Blood Bending"
+    # Yours come first, so a long shipped table never buries what you wrote.
+    assert d["rows"][0]["mine"]
+
+
+def test_the_tab_counts_what_you_wrote(client, tmp_path):
+    from play import homebrew
+
+    assert homebrew.authored_total() == 0
+    (homebrew.folder("creatures") / "mine.json").write_text(
+        json.dumps({"name": "Yard dog"}), encoding="utf-8")
+    assert homebrew.authored_total() == 1
+
+
+def test_every_bench_names_a_real_folder(client):
+    from pathlib import Path
+
+    from play import homebrew
+
+    for b in homebrew.benches():
+        assert Path(b.as_dict()["path"]).is_dir()
 
 
 def test_a_bench_lists_what_it_holds(client):
@@ -223,5 +268,6 @@ def test_the_page_carries_everything_it_draws(client):
     """The whole front page is rendered from one embedded payload; a missing key is a
     blank panel with no error anywhere."""
     html = client.get("/").content.decode()
-    for key in ('"worlds"', '"recent"', '"benches"', '"continue"', '"pregens"'):
+    for key in ('"worlds"', '"recent"', '"benches"', '"continue"', '"pregens"',
+                '"authored"'):
         assert key in html
