@@ -545,17 +545,20 @@ class Engine:
                 if base:
                     dmg_roll = self.dice.roll(str(base), label="damage", visibility="hidden")
                     amount = max(0, dmg_roll.total // 2)
-                    effects.append(self._apply_damage(actor, amount,
-                                                      branch.get("type", "untyped")))
+                    hit = self._apply_damage(actor, amount, branch.get("type", "untyped"))
+                    effects.append(hit)
                     tell_bits.append(
-                        f"{actor.name} takes {amount} ({branch.get('type', 'untyped')}, halved)."
+                        f"{actor.name} takes {hit['amount']} ({hit['type']}, halved)"
+                        + (f" — {hit['note']}." if hit["note"] else ".")
                     )
             else:
                 dmg_roll = self.dice.roll(str(dmg), label="damage", visibility="hidden")
-                effects.append(self._apply_damage(actor, dmg_roll.total,
-                                                  branch.get("type", "untyped")))
+                hit = self._apply_damage(actor, dmg_roll.total,
+                                         branch.get("type", "untyped"))
+                effects.append(hit)
                 tell_bits.append(
-                    f"{actor.name} takes {dmg_roll.total} {branch.get('type', 'untyped')} damage."
+                    f"{actor.name} takes {hit['amount']} {hit['type']} damage"
+                    + (f" ({hit['note']})." if hit["note"] else ".")
                 )
 
         cond = branch.get("condition")
@@ -674,11 +677,15 @@ class Engine:
                 )
                 state["rolls"].append(dmg.as_dict())
                 amount = max(1, dmg.total)
-                state["effects"].append(
-                    self._apply_damage(defender, amount, weapon["type"]))
+                hit = self._apply_damage(defender, amount, weapon["type"])
+                state["effects"].append(hit)
+                # What the *defender* lost, not what the die said. A hit for 12 against
+                # DR 5 is a hit for 7, and the GM must be told the second number or it
+                # will narrate a wound nobody took.
                 state["tells"].append(
                     f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
-                    f"{defender.name} for {amount} {weapon['type']}.")
+                    f"{defender.name} for {hit['amount']} {weapon['type']}"
+                    + (f" ({hit['note']})." if hit["note"] else "."))
                 state["i"] += 1
                 state["stage"] = "attack"
 
@@ -852,13 +859,73 @@ class Engine:
             value = roll.total
         else:
             value = int(amount)
-        effects = [self._apply_damage(target, value, intent.params["type"])]
+        hit = self._apply_damage(target, value, intent.params["type"])
+        effects = [hit]
         effects.extend(self._hp_state_effects(target))
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=f"{target.name} takes {value} {intent.params['type']} damage.",
+            tell=f"{target.name} takes {hit['amount']} {hit['type']} damage"
+                 + (f" ({hit['note']})." if hit["note"] else "."),
             because=intent.because,
+        )
+
+    def _op_heal(self, intent: Intent, partial: dict) -> Outcome:
+        """Restore hit points. Not damage with the sign flipped.
+
+        Two 1e rules live here and both are easy to lose: healing never restores
+        temporary hit points, and it stops at your maximum rather than banking the
+        overflow. `Actor.heal` owns both so nothing else has to remember them.
+        """
+        ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
+        if not ref:
+            raise IntentError("heal: needs somebody to heal", "schema")
+        target = self.scene.actors[ref]
+        amount = intent.params["amount"]
+        roll = None
+        if isinstance(amount, str):
+            roll = self.dice.roll(amount, label="healing", visibility="hidden")
+            amount = roll.total
+
+        healed = target.heal(amount)
+        # The dying stop dying when they are back above zero; nothing else clears it.
+        for gone in ("dying", "stable", "unconscious", "disabled"):
+            if target.hp > 0 and target.has_condition(gone):
+                target.remove_condition(gone)
+
+        return Outcome(
+            intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
+            effects=[{"ref": target.ref, "kind": "heal", "amount": healed,
+                      "hp_after": target.hp, "hp_max": target.hp_max}],
+            tell=(f"{target.name} recovers {healed} hit points "
+                  f"({target.hp}/{target.hp_max})." if healed
+                  else f"{target.name} is already unhurt."),
+            because=intent.because,
+        )
+
+    def _op_temp_hp(self, intent: Intent, partial: dict) -> Outcome:
+        """Grant temporary hit points, which do not stack — the best source wins."""
+        ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
+        if not ref:
+            raise IntentError("temp_hp: needs somebody to grant them to", "schema")
+        target = self.scene.actors[ref]
+        amount = intent.params["amount"]
+        roll = None
+        if isinstance(amount, str):
+            roll = self.dice.roll(amount, label="temporary hit points", visibility="hidden")
+            amount = roll.total
+
+        source = str(intent.params.get("source") or intent.because or "").strip()
+        result = target.gain_temp_hp(amount, source)
+        if "ignored" in result:
+            tell = (f"{target.name} already has {result['temp_hp']} temporary hit points "
+                    f"from {result['source'] or 'another source'}; these do not stack.")
+        else:
+            tell = f"{target.name} gains {result['temp_hp']} temporary hit points."
+        return Outcome(
+            intent_id=intent.id, op="temp_hp", rolls=[roll] if roll else [],
+            effects=[{"ref": target.ref, "kind": "temp_hp", "temp_hp": target.temp_hp}],
+            tell=tell, because=intent.because,
         )
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
@@ -1090,11 +1157,24 @@ class Engine:
             raise _NeedsPlayerRoll(prompt, dict(extra_partial or {}))
         return self.dice.d20(mods, label=label, visibility=intent.visibility)
 
-    def _apply_damage(self, target: Actor, amount: int, dtype: str) -> dict:
-        target.take_damage(amount)
+    def _apply_damage(self, target: Actor, amount: int, dtype: str,
+                      traits: tuple[str, ...] = ()) -> dict:
+        """One funnel for every point of damage in the game.
+
+        Everything — weapon hits, the `damage` op, hazards — arrives here, which is what
+        makes damage reduction and temporary hit points a single change rather than one
+        per damage source.
+        """
+        d = target.take_damage(amount, dtype, traits)
         return {
-            "ref": target.ref, "kind": "damage", "amount": amount, "type": dtype,
-            "hp_after": target.hp, "hp_max": target.hp_max,
+            "ref": target.ref, "kind": "damage",
+            # `amount` stays the number that actually came off hit points, because that is
+            # what every existing reader of this effect means by it.
+            "amount": d["taken"], "rolled": d["rolled"], "type": d["type"],
+            "reduced": d["reduced"], "reduced_by": d["reduced_by"],
+            "absorbed": d["absorbed"],
+            "hp_after": target.hp, "hp_max": target.hp_max, "temp_hp": target.temp_hp,
+            "note": _damage_note(d),
         }
 
     def _hp_state_effects(self, target: Actor) -> list[dict]:
@@ -1129,6 +1209,21 @@ def _rehydrate(d: dict) -> Outcome:
         dc=d.get("dc"), verdict=d.get("verdict"), margin=d.get("margin"),
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
     )
+
+
+def _damage_note(d: dict) -> str:
+    """"12, less DR 5/—, 4 off temporary" — the sentence a player needs.
+
+    Empty when nothing interesting happened, so the ordinary hit stays quiet and the two
+    mechanics that can make damage vanish always say so. Damage disappearing without
+    explanation is the failure this exists to prevent.
+    """
+    bits = []
+    if d["reduced"]:
+        bits.append(f"less {d['reduced_by']} ({d['reduced']})")
+    if d["absorbed"]:
+        bits.append(f"{d['absorbed']} off temporary")
+    return f"{d['rolled']}, " + ", ".join(bits) if bits else ""
 
 
 def _multiply_dice(notation: str, mult: int) -> str:

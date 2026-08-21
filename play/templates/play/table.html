@@ -88,9 +88,13 @@
           letter-spacing: .04em; font-variant: small-caps; }
   .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
   .bar { height: 7px; background: #221c14; border-radius: 2px; overflow: hidden;
-         margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7); }
+         margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7);
+         display: flex; }
   .bar > i { display: block; height: 100%;
              background: linear-gradient(90deg, #8a6f3e, var(--accent)); }
+  /* Temporary hit points sit on top of the maximum rather than inside it, so they get
+     their own segment past the end of the real bar instead of colouring part of it. */
+  .bar > i.temp { background: linear-gradient(90deg, #4a6b7a, #7fb0c4); }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
   .cell {
     background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
@@ -589,12 +593,21 @@ function render(s) {
 
   const pc = s.pc;
   if (pc) {
+    // Temporary hit points scale against hp_max, so 6 temp on a 9 hp character reads as
+    // two thirds of a bar again — which is what they are worth.
+    const temp = pc.temp_hp || 0;
     const pct = Math.max(0, Math.round(100 * pc.hp / pc.hp_max));
+    const tpct = Math.max(0, Math.round(100 * temp / pc.hp_max));
     $("#sheet").innerHTML = `
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i>${
+        temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
+      <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
+        temp ? ` <small>+${temp} temp</small>` : ""}</span></div>
+      ${(pc.dr && pc.dr.length)
+        ? `<div class="row"><span>Damage reduction</span><span>${
+             pc.dr.map(esc).join(", ")}</span></div>` : ""}
       <div class="row"><span>Armour class</span><span>${pc.ac}</span></div>
       <h2>Abilities</h2>
       <div class="grid">${Object.entries(pc.abilities).map(([k, v]) =>
@@ -898,6 +911,11 @@ function tabDefense(s) {
       <h3>Hit points</h3>
       <div class="bignum">${d.hp.current} <small>of ${d.hp.max}</small></div>
       <div class="terms">
+        ${d.hp.temp ? `<div class="t"><span>Temporary${
+            d.hp.temp_source ? ` — ${esc(d.hp.temp_source)}` : ""
+          }</span><b>+${d.hp.temp}</b></div>` : ""}
+        ${(d.dr || []).map(r => `<div class="t"><span>Reduction${
+            r.source ? ` — ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`).join("")}
         <div class="t"><span>Unconscious at</span><b>0</b></div>
         <div class="t"><span>Dead at</span><b>-${s.abilities.find(a => a.key === "con").score}</b></div>
       </div>

@@ -390,6 +390,47 @@ WEAPONS: dict[str, dict] = {
 # Using a weapon you are not proficient with.
 NON_PROFICIENT_PENALTY = -4
 
+# --- damage types -----------------------------------------------------------------------
+#
+# The distinction earns its keep in exactly one place, and it is not cosmetic: **damage
+# reduction applies to physical damage and not to energy.** A creature with DR 10/— still
+# takes a fireball in full. Without a vocabulary here, DR would silently soak acid and
+# fire, and nothing in the numbers on screen would reveal it.
+
+PHYSICAL_DAMAGE = ("bludgeoning", "piercing", "slashing")
+ENERGY_DAMAGE = ("acid", "cold", "electricity", "fire", "sonic")
+
+# The words a narrator reaches for instead of the book's. Left alone, "lightning" reads as
+# an unknown type, and an unknown type is treated as physical — which would hand DR a
+# reduction it should never get.
+DAMAGE_TYPE_ALIASES = {
+    "b": "bludgeoning", "blunt": "bludgeoning", "bludgeon": "bludgeoning",
+    "crushing": "bludgeoning", "impact": "bludgeoning",
+    "p": "piercing", "pierce": "piercing", "stabbing": "piercing",
+    "s": "slashing", "slash": "slashing", "cutting": "slashing",
+    "lightning": "electricity", "shock": "electricity", "electric": "electricity",
+    "flame": "fire", "burning": "fire", "heat": "fire",
+    "frost": "cold", "ice": "cold", "freezing": "cold",
+    "thunder": "sonic", "force": "untyped", "untyped": "untyped",
+}
+
+
+def normalise_damage_type(dtype: str | None) -> str:
+    d = (dtype or "untyped").strip().lower()
+    return DAMAGE_TYPE_ALIASES.get(d, d)
+
+
+def is_physical(dtype: str | None) -> bool:
+    """Unknown types count as physical.
+
+    Deliberately the cautious direction: an unrecognised type that DR ignores is a
+    creature taking damage it should have shrugged off, which a player can see and query.
+    An unrecognised type that DR *soaks* is damage silently vanishing, which nobody
+    catches.
+    """
+    d = normalise_damage_type(dtype)
+    return d not in ENERGY_DAMAGE
+
 ARMOUR: dict[str, dict] = {
     "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0},
     "padded": {"name": "padded armour", "ac": 1, "max_dex": 8, "acp": 0},

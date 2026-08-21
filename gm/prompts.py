@@ -127,6 +127,20 @@ EXAMPLES = [
             ],
         },
     },
+    # Healing that is not sleeping. Without an example the GM narrates a potion working
+    # and emits nothing, so the character walks away from the scene as hurt as they
+    # entered it — the same failure `rest` was added to fix, in a different costume.
+    {
+        "player": "I dig the flask out of my coat and drink whatever is left in it.",
+        "reply": {
+            "narration": "It goes down like a mouthful of hot coins, and the ache under "
+                         "your ribs loosens its grip.",
+            "intents": [
+                {"op": "heal", "actor": "pc", "because": "the last of the draught",
+                 "params": {"amount": "1d8+1"}},
+            ],
+        },
+    },
 ]
 
 
@@ -161,6 +175,11 @@ When the fighting stops — they run, they yield, the player gets clear — end 
 {"op": "end_encounter"}. Nobody can rest while a fight is still running.
 When the player sleeps or makes camp, use {"op": "rest", "params": {"kind": "night"}}
 — that is how wounds heal. "bed rest" is a full day and night and heals twice as much.
+A potion, a poultice, a spell that mends: {"op": "heal", "params": {"amount": "1d8+1"}}.
+Something that wards a person rather than mending them — a blessing, a shield of force —
+grants temporary hit points: {"op": "temp_hp", "params": {"amount": "2d6",
+"source": "the ward"}}. Never narrate a wound closing without one of these; if you do,
+the character walks away as hurt as they arrived and the player will see it on the sheet.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 

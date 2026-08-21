@@ -22,7 +22,8 @@ from .tables import (
     ABILITIES, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
-    WEAPONS, ability_modifier, bab_for, iterative_attacks, power_attack_terms, save_for,
+    WEAPONS, ability_modifier, bab_for, is_physical, iterative_attacks,
+    normalise_damage_type, power_attack_terms, save_for,
 )
 
 
@@ -47,6 +48,29 @@ class Condition:
 
 
 @dataclass
+class Reduction:
+    """Damage reduction: `DR 5/silver`, `DR 2/—`.
+
+    `bypass` is what defeats it — a material, an alignment, a damage type — or `""` for
+    the `/—` that nothing bypasses. Attacks declare what they are made of through
+    `traits`; nothing in the app produces silvered weapons yet, so today every DR either
+    applies or is bypassed by a trait the GM stated.
+    """
+    amount: int
+    bypass: str = ""
+    source: str = ""
+
+    @property
+    def label(self) -> str:
+        return f"DR {self.amount}/{self.bypass or '—'}"
+
+    def bypassed_by(self, traits: tuple[str, ...]) -> bool:
+        if not self.bypass:
+            return False
+        return any(self.bypass.lower() == t.strip().lower() for t in traits)
+
+
+@dataclass
 class Actor:
     ref: str
     name: str
@@ -67,6 +91,13 @@ class Actor:
 
     hp_max: int = 1
     hp: int = 1
+    # Temporary hit points sit *on top of* hp_max rather than inside it, are spent before
+    # real hit points, and are not restored by healing. Kept as one number with its source
+    # because 1e does not let them stack: a second source replaces the first or is
+    # ignored, and the source is how the sheet says which.
+    temp_hp: int = 0
+    temp_hp_source: str = ""
+    reductions: list[Reduction] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
 
     # World Bible provenance. The rules race and the world's people are different things:
@@ -516,9 +547,86 @@ class Actor:
 
     # --- state ------------------------------------------------------------------------
 
-    def take_damage(self, amount: int) -> int:
-        self.hp -= amount
-        return self.hp
+    # --- temporary hit points ---------------------------------------------------------
+
+    def gain_temp_hp(self, amount: int, source: str = "") -> dict:
+        """1e: temporary hit points from different sources do not stack — the best applies.
+
+        Adding them would be the obvious implementation and it is wrong in a way that
+        compounds: two 10-point sources would read as 20, survive a hit that should have
+        dropped the character, and nothing on the sheet would show why.
+
+        Refreshing the *same* source is not stacking, so re-entering a rage sets the pool
+        back to its own value rather than being ignored for being equal.
+        """
+        amount = max(0, int(amount))
+        same = source and source == self.temp_hp_source
+        if amount > self.temp_hp or same:
+            was, self.temp_hp, self.temp_hp_source = self.temp_hp, amount, source
+            return {"temp_hp": amount, "replaced": was, "source": source}
+        return {"temp_hp": self.temp_hp, "ignored": amount, "source": self.temp_hp_source}
+
+    def clear_temp_hp(self) -> int:
+        gone, self.temp_hp, self.temp_hp_source = self.temp_hp, 0, ""
+        return gone
+
+    def heal(self, amount: int) -> int:
+        """Healing restores real hit points only, and never past your maximum.
+
+        Temporary hit points are explicitly not restored by healing — they are not damage
+        you have taken, so there is nothing there to cure.
+        """
+        amount = max(0, int(amount))
+        before = self.hp
+        self.hp = min(self.hp_max, self.hp + amount)
+        return self.hp - before
+
+    # --- damage reduction -------------------------------------------------------------
+
+    def damage_reduction(self, dtype: str = "untyped",
+                         traits: tuple[str, ...] = ()) -> Reduction | None:
+        """The one DR that applies to this attack, or None.
+
+        1e is specific on both counts, and both are easy to get wrong in the generous
+        direction: DR does not touch energy damage, and when a creature has several kinds
+        of DR **only the best applicable one applies** — they do not add up.
+        """
+        if not is_physical(dtype):
+            return None
+        usable = [r for r in self.reductions if r.amount > 0 and not r.bypassed_by(traits)]
+        return max(usable, key=lambda r: r.amount) if usable else None
+
+    def take_damage(self, amount: int, dtype: str = "untyped",
+                    traits: tuple[str, ...] = ()) -> dict:
+        """Resolve one packet of damage, returning what happened to it at each stage.
+
+        The order is 1e's and it matters: reduce, then spend temporary hit points, then
+        real ones. Applying DR after temp HP would let a DR 5 creature lose 5 temp HP to
+        an attack that never hurt it.
+
+        Returns a breakdown rather than the remaining hit points because the whole
+        proposition of the app is that the bookkeeping is visible — "12, less DR 5, 4 off
+        temporary" is the sentence a player needs, and a bare total cannot produce it.
+        """
+        rolled = max(0, int(amount))
+        dr = self.damage_reduction(dtype, traits)
+        # DR reduces to zero, never below: it cannot heal you.
+        reduced = min(rolled, dr.amount) if dr else 0
+        after_dr = rolled - reduced
+
+        absorbed = min(self.temp_hp, after_dr)
+        self.temp_hp -= absorbed
+        if self.temp_hp == 0:
+            self.temp_hp_source = ""
+
+        taken = after_dr - absorbed
+        self.hp -= taken
+        return {
+            "rolled": rolled, "type": normalise_damage_type(dtype),
+            "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
+            "absorbed": absorbed, "taken": taken,
+            "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
+        }
 
     def add_condition(self, key: str, rounds: int | None = None, source: str = "") -> Condition:
         key = key.strip().lower()
@@ -658,6 +766,8 @@ class Actor:
             "kind": self.kind,
             "hp": self.hp,
             "hp_max": self.hp_max,
+            "temp_hp": self.temp_hp,
+            "dr": [r.label for r in self.reductions],
             "ac": self.ac(),
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
@@ -825,7 +935,10 @@ def full_sheet(actor: Actor) -> dict:
             for a in ABILITIES
         ],
         "defense": {
-            "hp": {"current": actor.hp, "max": actor.hp_max},
+            "hp": {"current": actor.hp, "max": actor.hp_max,
+                   "temp": actor.temp_hp, "temp_source": actor.temp_hp_source},
+            "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
+                    "source": r.source} for r in actor.reductions],
             "ac": _terms(actor.ac_modifiers("melee")),
             "ac_flat_footed": _terms(actor.ac_modifiers("melee", flat_footed=True)),
             "ac_touch": {"total": actor.ac() - armour["ac"] - shield["ac"]
@@ -899,6 +1012,9 @@ def to_dict(actor: Actor) -> dict:
         "shield": actor.shield, "natural_armour": actor.natural_armour,
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
+        "temp_hp": actor.temp_hp, "temp_hp_source": actor.temp_hp_source,
+        "reductions": [{"amount": r.amount, "bypass": r.bypass, "source": r.source}
+                       for r in actor.reductions],
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
@@ -908,6 +1024,18 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _reduction(r) -> Reduction:
+    """A stat block writes `DR 5/silver`; a save writes the parts. Both must load, because
+    the bestiary is authored by hand and the save is written by code."""
+    if isinstance(r, str):
+        text = r.strip().lstrip("Dd").lstrip("Rr").strip()
+        amount, _, bypass = text.partition("/")
+        return Reduction(amount=int(re.sub(r"\D", "", amount) or 0),
+                         bypass="" if bypass.strip() in ("-", "—", "") else bypass.strip())
+    return Reduction(amount=int(r.get("amount", 0)), bypass=r.get("bypass", ""),
+                     source=r.get("source", ""))
 
 
 def from_dict(data: dict, ref: str | None = None) -> Actor:
@@ -928,6 +1056,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         equipped=data.get("equipped"),
         hp_max=data.get("hp_max", data.get("hp", 1)),
         hp=data.get("hp", 1),
+        temp_hp=data.get("temp_hp", 0),
+        temp_hp_source=data.get("temp_hp_source", ""),
+        reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
         heritage=data.get("heritage", ""),

@@ -131,6 +131,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # hidden — `Engine._force_visibility` demotes any non-PC actor.
     "attack": ((), ("weapon", "full_attack", "manoeuvre", "power_attack"), "player"),
     "damage": (("amount", "type"), ("to",), "hidden"),
+    # Healing is not negative damage: it never restores temporary hit points and never
+    # carries a character up from below zero the way `damage` carries them down.
+    "heal": (("amount",), ("to",), "hidden"),
+    "temp_hp": (("amount",), ("to", "source"), "hidden"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
     # A fight ends when the fighting stops, which is a call about the fiction:
