@@ -84,7 +84,22 @@ def _chain_from(body: dict, track_id: str) -> crafting.Chain:
         methods=[str(m).strip().lower() for m in body.get("methods", [])],
         ingredient_ids=[str(i).strip().lower() for i in body.get("ingredients", [])],
         name=str(body.get("name", "")).strip(),
+        stock_used={str(k): int(v) for k, v in (body.get("stock") or {}).items()
+                    if int(v) > 0},
     )
+
+
+def _stock_of(campaign, craft_id: str) -> dict:
+    """What the character has made in this discipline, and can craft with again.
+
+    Filtered by discipline because a bench should offer what belongs on it: a jar of tea
+    is not a thing you reach for at a forge.
+    """
+    pc = campaign.scene.pc()
+    if pc is None:
+        return {}
+    track = next((d["track"] for d in DISCIPLINES if d["id"] == craft_id), None)
+    return {k: v for k, v in pc.stock.items() if not track or v.craft == track}
 
 
 @ensure_csrf_cookie
@@ -125,7 +140,19 @@ def craft_ingredients(request):
         d = ing.as_dict()
         d["usable"] = bool(ceiling) and d["rank"] <= ceiling
         out.append(d)
-    return JsonResponse({"ingredients": out, "track": state})
+
+    stock = []
+    for item in sorted(_stock_of(c, disc["id"]).values(),
+                       key=lambda s: (s.base.lower(), s.concentration)):
+        d = item.as_dict()
+        d["usable"] = bool(ceiling) and d["rank"] <= ceiling
+        d["can_concentrate"] = item.count >= crafting.CONCENTRATE_COST
+        out_of = crafting.concentrate(item)
+        d["concentrates_to"] = {"name": out_of.name, "tier": out_of.tier,
+                                "potency": round(out_of.potency, 2),
+                                "cost": crafting.CONCENTRATE_COST}
+        stock.append(d)
+    return JsonResponse({"ingredients": out, "stock": stock, "track": state})
 
 
 @require_POST
@@ -144,7 +171,8 @@ def craft_preview(request):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
     chain = _chain_from(body, state["track"])
-    result = crafting.preview(state["track"], state["level"], chain)
+    result = crafting.preview(state["track"], state["level"], chain,
+                              stock=_stock_of(c, disc["id"]))
     return JsonResponse(result.as_dict())
 
 
@@ -169,7 +197,8 @@ def craft_do(request):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
     chain = _chain_from(body, state["track"])
-    result = crafting.preview(state["track"], state["level"], chain)
+    result = crafting.preview(state["track"], state["level"], chain,
+                              stock=_stock_of(c, disc["id"]))
     if result.problems:
         return JsonResponse({"error": " ".join(result.problems)}, status=400)
 
@@ -194,6 +223,22 @@ def craft_do(request):
     except IntentError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
+    # The inputs are spent either way. A spoiled batch that hands the ingredients back
+    # would make failure free, and the author's own note is that failure matters because
+    # "rare ingredients spoil".
+    pc = c.scene.pc()
+    spent = {}
+    for sid, n in result.consumes.items():
+        took = pc.take_stock(sid, n)
+        if took:
+            spent[sid] = took
+
+    made = None
+    if succeeded and result.output:
+        item = crafting.from_stock_dict(result.output)
+        pc.add_stock(item, 1)
+        made = item.as_dict()
+
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
     c.transcript.append({
         "who": "gm", "kind": "consequence",
@@ -203,7 +248,7 @@ def craft_do(request):
     c.save()
     return JsonResponse({
         "succeeded": succeeded, "roll": face, "chance": result.chance,
-        "result": result.as_dict(), "tell": tell,
+        "result": result.as_dict(), "tell": tell, "made": made, "spent": spent,
         "track": _track_state(c, disc),
     })
 

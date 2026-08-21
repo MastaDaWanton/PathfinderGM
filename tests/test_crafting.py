@@ -235,3 +235,160 @@ def test_a_nameless_recipe_is_refused(client):
                     data=json.dumps({"ingredients": ["woundwort"]}),
                     content_type="application/json")
     assert r.status_code == 400
+
+
+# --- crafted output as an ingredient -------------------------------------------------------
+
+def _tea(concentration=1, tier="common", potency=1.0, count=1):
+    return crafting.Stock(base="Woundwort Tea", concentration=concentration, tier=tier,
+                          potency=potency, count=count, craft="herbalist",
+                          effects=["stops bleeding"])
+
+
+def test_two_doses_make_one_of_twice_the_strength():
+    """The trade is quantity for density, not a gain: nothing is created, and the pair is
+    spent."""
+    made = crafting.concentrate(_tea())
+    assert made.concentration == 2
+    assert made.potency == 2.0
+    assert made.count == 1
+    assert made.name == "Woundwort Tea (Tier 2)"
+
+
+def test_concentrating_again_compounds():
+    once = crafting.concentrate(_tea())
+    twice = crafting.concentrate(once)
+    assert twice.name == "Woundwort Tea (Tier 3)"
+    assert twice.potency == 4.0
+
+
+def test_each_step_is_a_band_rarer():
+    """What makes it a ladder rather than a loop: Tier 3 is rare material, and working
+    rare material is Herbalist 3."""
+    assert crafting.concentrate(_tea()).tier == "uncommon"
+    assert crafting.concentrate(crafting.concentrate(_tea())).tier == "rare"
+
+
+def test_concentration_spends_the_pair():
+    stock = {"woundwort-tea#1": _tea(count=4)}
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
+                         stock=stock)
+    assert r.concentrating and not r.problems
+    assert r.consumes == {"woundwort-tea#1": 2}
+    assert r.output["name"] == "Woundwort Tea (Tier 2)"
+
+
+def test_concentrating_needs_the_still():
+    """Concentrating is distilling. Requiring the method keeps the ladder behind the
+    track rather than available to anyone holding two jars."""
+    stock = {"woundwort-tea#1": _tea(count=2)}
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", [], [], stock_used={"woundwort-tea#1": 2}),
+                         stock=stock)
+    assert any("still" in p for p in r.problems)
+
+
+def test_a_first_level_herbalist_cannot_concentrate():
+    stock = {"woundwort-tea#1": _tea(count=2)}
+    r = crafting.preview("herbalist", 1,
+                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
+                         stock=stock)
+    assert any("Herbalist 3" in p for p in r.problems)
+
+
+def test_one_dose_is_not_a_concentration():
+    """A single jar with the still in the chain is an ordinary distillation, not a step
+    up the ladder."""
+    stock = {"woundwort-tea#1": _tea(count=3)}
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 1}),
+                         stock=stock)
+    assert not r.concentrating
+
+
+def test_you_cannot_spend_what_you_do_not_have():
+    stock = {"woundwort-tea#1": _tea(count=1)}
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
+                         stock=stock)
+    assert any("you have 1" in p for p in r.problems)
+
+
+def test_a_crafted_input_brings_its_potency_into_a_new_compound():
+    """A compound made from a doubled tea is stronger than one made from a plain one."""
+    stock = {"woundwort-tea#2": _tea(concentration=2, tier="uncommon", potency=2.0)}
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["mix"], ["comfrey"],
+                               stock_used={"woundwort-tea#2": 1}),
+                         stock=stock)
+    assert not r.problems
+    assert r.potency == pytest.approx(0.80 * 2.0)
+    assert r.tier == "uncommon"          # as rare as its rarest component
+
+
+def test_stock_survives_a_save():
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.add_stock(_tea(concentration=2, tier="uncommon", potency=2.0), count=3)
+    back = from_dict(to_dict(pc))
+    got = back.stock["woundwort-tea#2"]
+    assert got.count == 3 and got.potency == 2.0
+    assert got.name == "Woundwort Tea (Tier 2)"
+
+
+def test_an_emptied_jar_leaves_the_shelf():
+    """A count of zero left behind is a jar the page offers and the next preview refuses."""
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.add_stock(_tea(), count=2)
+    assert pc.take_stock("woundwort-tea#1", 2) == 2
+    assert "woundwort-tea#1" not in pc.stock
+
+
+# --- the ladder, through the page ----------------------------------------------------------
+
+def test_a_craft_lands_on_the_shelf(client):
+    d = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"],
+        "name": "Woundwort Tea"}), content_type="application/json").json()
+    if not d["succeeded"]:
+        return                                  # the dice decide; the path is the point
+    shelf = client.get("/api/craft/ingredients?craft=herbalism").json()
+    assert any(s["base"] == "Woundwort Tea" for s in shelf["stock"])
+
+
+def test_the_shelf_says_what_concentrating_would_make(client, tmp_path):
+    from play import campaign as cm
+
+    c = cm.current()
+    c.scene.pc().add_stock(_tea(), count=2)
+    c.save()
+
+    d = client.get("/api/craft/ingredients?craft=herbalism").json()
+    tea = next(s for s in d["stock"] if s["base"] == "Woundwort Tea")
+    assert tea["count"] == 2
+    assert tea["can_concentrate"]
+    assert tea["concentrates_to"]["name"] == "Woundwort Tea (Tier 2)"
+
+
+def test_a_spoiled_batch_still_spends_the_doses(client):
+    """"Rare ingredients spoil" is the author's own note, and a failure that hands them
+    back would make failing free."""
+    from play import campaign as cm
+
+    c = cm.current()
+    pc = c.scene.pc()
+    pc.track("herbalist").level = 3
+    pc.add_stock(_tea(), count=2)
+    c.save()
+
+    d = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "methods": ["distill"], "ingredients": [],
+        "stock": {"woundwort-tea#1": 2}}), content_type="application/json").json()
+    assert d["spent"] == {"woundwort-tea#1": 2}
+    assert "woundwort-tea#1" not in cm.current().scene.pc().stock
+    if d["succeeded"]:
+        assert cm.current().scene.pc().stock["woundwort-tea#2"].count == 1

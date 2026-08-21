@@ -35,9 +35,93 @@ CLEANSING = ("purify", "neutralize")
 FINISHING = ("brew", "catalyst crafting")
 
 
+# --- concentration ------------------------------------------------------------------------
+#
+# Two doses of a thing make one dose of twice the thing. It is a trade of quantity for
+# density rather than a gain: nothing is created, and the pair is spent.
+#
+# "Tier" in the request is *concentration* here, because `tier` already means rarity
+# throughout the engine and a second meaning for the same word would have been a bug
+# waiting to happen in every comparison.
+CONCENTRATE_COST = 2        # doses in, one out
+CONCENTRATE_POTENCY = 2.0   # per step
+# Each step also moves the result one band rarer, which gates the ladder on its own:
+# Tier 3 is rare material, and working rare material is Herbalist 3.
+CONCENTRATE_RARITY_STEP = 1
+
+
 class CraftError(ValueError):
     """The chain cannot be attempted. Raised before anything is scored, so a chain the
     character cannot make never advances their track."""
+
+
+@dataclass
+class Stock:
+    """A crafted item a character is carrying, and can craft with again.
+
+    Held per base name and concentration rather than as a list of individual doses:
+    three identical teas are a count of three, not three objects, and the crafting page
+    only ever asks "how many of these do I have".
+    """
+    base: str
+    concentration: int = 1
+    tier: str = "common"
+    potency: float = 1.0
+    count: int = 1
+    craft: str = "herbalism"
+    effects: list[str] = field(default_factory=list)
+    drawbacks: list[str] = field(default_factory=list)
+    from_ingredients: list[str] = field(default_factory=list)
+
+    @property
+    def id(self) -> str:
+        slug = "".join(c if c.isalnum() else "-" for c in self.base.lower()).strip("-")
+        while "--" in slug:
+            slug = slug.replace("--", "-")
+        return f"{slug}#{self.concentration}"
+
+    @property
+    def name(self) -> str:
+        return self.base if self.concentration <= 1 \
+            else f"{self.base} (Tier {self.concentration})"
+
+    @property
+    def rank(self) -> int:
+        return wc.tier_rank(self.tier)
+
+    def as_dict(self) -> dict:
+        return {
+            "id": self.id, "name": self.name, "base": self.base,
+            "concentration": self.concentration, "tier": self.tier, "rank": self.rank,
+            "potency": round(self.potency, 2), "count": self.count, "craft": self.craft,
+            "effects": self.effects, "drawbacks": self.drawbacks,
+            "from_ingredients": self.from_ingredients,
+            "kind": "crafted", "crafted": True,
+        }
+
+
+def from_stock_dict(d: dict) -> Stock:
+    return Stock(
+        base=d.get("base", d.get("name", "Preparation")),
+        concentration=int(d.get("concentration", 1)),
+        tier=d.get("tier", "common"), potency=float(d.get("potency", 1.0)),
+        count=int(d.get("count", 1)), craft=d.get("craft", "herbalism"),
+        effects=list(d.get("effects", [])), drawbacks=list(d.get("drawbacks", [])),
+        from_ingredients=list(d.get("from_ingredients", [])),
+    )
+
+
+def concentrate(item: Stock) -> Stock:
+    """What `CONCENTRATE_COST` of this makes."""
+    rank = min(len(wc.TIERS), item.rank + CONCENTRATE_RARITY_STEP)
+    return Stock(
+        base=item.base, concentration=item.concentration + 1,
+        tier=wc.TIERS[rank - 1],
+        potency=item.potency * CONCENTRATE_POTENCY,
+        count=1, craft=item.craft,
+        effects=list(item.effects), drawbacks=list(item.drawbacks),
+        from_ingredients=list(item.from_ingredients),
+    )
 
 
 @dataclass
@@ -46,6 +130,10 @@ class Chain:
     methods: list[str] = field(default_factory=list)
     ingredient_ids: list[str] = field(default_factory=list)
     name: str = ""
+    # Crafted items going back into the pot, as {stock id: how many}. Kept apart from raw
+    # ingredients because these are *spent*: the shelf of herbs is bottomless for now,
+    # a jar of tea is not, and concentration only means anything if the pair is consumed.
+    stock_used: dict[str, int] = field(default_factory=dict)
 
     @property
     def stages(self) -> int:
@@ -67,6 +155,10 @@ class Result:
     effects: list[str]
     drawbacks: list[str]
     problems: list[str] = field(default_factory=list)
+    # What the successful craft puts on the shelf, and what it takes off.
+    output: dict | None = None
+    consumes: dict[str, int] = field(default_factory=dict)
+    concentrating: bool = False
 
     def as_dict(self) -> dict:
         return {
@@ -75,7 +167,8 @@ class Result:
             "cleansed": self.cleansed, "risky": self.risky, "dc": self.dc,
             "chance": self.chance, "ingredients": self.ingredients,
             "effects": self.effects, "drawbacks": self.drawbacks,
-            "problems": self.problems,
+            "problems": self.problems, "output": self.output,
+            "consumes": self.consumes, "concentrating": self.concentrating,
         }
 
 
@@ -92,18 +185,22 @@ def scale(text: str, potency: float) -> str:
     return f"{text}  [×{potency:.2f} from the chain]"
 
 
-def preview(track_id: str, level: int, chain: Chain) -> Result:
+def preview(track_id: str, level: int, chain: Chain,
+            stock: dict | None = None) -> Result:
     """What this chain would make, and how likely it is to work.
 
     Never raises for a chain that is merely bad — an empty pot, a method the character
     has not learned, an ingredient beyond their tier all come back as `problems` so the
     page can grey the button and say why. `CraftError` is for chains that cannot be
     described at all.
+
+    `stock` is what the character has already made, so an output can go back in the pot.
     """
     track = wc.get(track_id)
     level = max(1, min(int(level), track.max_level))
     known = track.unlocked_methods(level)
     ceiling = wc.tier_rank(track.at(level).max_tier)
+    have: dict[str, Stock] = dict(stock or {})
 
     problems: list[str] = []
     items = []
@@ -112,6 +209,28 @@ def preview(track_id: str, level: int, chain: Chain) -> Result:
             items.append(ing_mod.get(iid))
         except KeyError:
             problems.append(f"No such ingredient: {iid}.")
+
+    used: list[tuple[Stock, int]] = []
+    for sid, n in chain.stock_used.items():
+        n = int(n)
+        if n <= 0:
+            continue
+        held = have.get(sid)
+        if held is None:
+            problems.append(f"You are not carrying any {sid}.")
+        elif held.count < n:
+            problems.append(f"{held.name}: you have {held.count}, the chain wants {n}.")
+        else:
+            used.append((held, n))
+
+    # Concentration: nothing but doses of one thing, at least the cost, and no raw herbs
+    # muddying it. Anything else is an ordinary chain that happens to use crafted inputs.
+    concentrating = (
+        not items and len(used) == 1 and used[0][1] >= CONCENTRATE_COST
+        and not problems
+    )
+    if concentrating:
+        return _concentration(track, level, chain, used[0], ceiling)
 
     for m in chain.methods:
         if m not in track.unlocked_methods(track.max_level):
@@ -125,8 +244,12 @@ def preview(track_id: str, level: int, chain: Chain) -> Result:
         if i.rank > ceiling:
             problems.append(f"{i.name} is {i.tier}; {track.name} {level} works "
                             f"{track.at(level).max_tier} at best.")
+    for held, _ in used:
+        if held.rank > ceiling:
+            problems.append(f"{held.name} is {held.tier}; {track.name} {level} works "
+                            f"{track.at(level).max_tier} at best.")
 
-    if not items:
+    if not items and not used:
         problems.append("Nothing in the pot.")
     if not chain.methods:
         problems.append("No method chosen.")
@@ -137,16 +260,24 @@ def preview(track_id: str, level: int, chain: Chain) -> Result:
 
     # The result is as rare as its rarest component, which is also what gates who can
     # make it — a common chain with one legendary petal in it is a legendary brew.
-    rank = max((i.rank for i in items), default=1)
+    rank = max([i.rank for i in items] + [h.rank for h, _ in used], default=1)
     tier = wc.TIERS[rank - 1]
 
     potency = 1.0
     for m in chain.methods:
         potency *= POTENCY.get(m, 1.0)
+    # A crafted input brings its own concentration with it, so a compound made from a
+    # doubled tea is stronger than one made from a plain one.
+    for held, n in used:
+        potency *= held.potency
+
     cleansed = any(m in CLEANSING for m in chain.methods)
-    risky = any(i.risky for i in items) and not cleansed
+    risky = (any(i.risky for i in items) or any(h.drawbacks for h, _ in used)) \
+        and not cleansed
 
     effects = [scale(i.text, potency) for i in items if i.text]
+    for held, _ in used:
+        effects.extend(scale(e, potency) for e in held.effects)
     drawbacks = []
     if risky:
         drawbacks.append("Untreated hazardous components: harvesting and handling risks "
@@ -155,13 +286,57 @@ def preview(track_id: str, level: int, chain: Chain) -> Result:
         effects.append("Side effects and secondary toxicities removed by the chain.")
 
     dc = _dc(items, rank, chain.stages)
+    name = chain.name or _name_for(items or [h for h, _ in used], chain.methods)
+    out = Stock(base=name, concentration=1, tier=tier, potency=potency,
+                craft=track.id, effects=effects, drawbacks=drawbacks,
+                from_ingredients=[i.id for i in items]
+                + [h.id for h, _ in used])
     return Result(
-        name=chain.name or _name_for(items, chain.methods),
-        tier=tier, rank=rank, stages=chain.stages, potency=potency,
+        name=name, tier=tier, rank=rank, stages=chain.stages, potency=potency,
         cleansed=cleansed, risky=risky, dc=dc,
         chance=_chance(dc, level, rank, problems),
-        ingredients=[i.as_dict() for i in items],
+        ingredients=[i.as_dict() for i in items] + [h.as_dict() for h, _ in used],
         effects=effects, drawbacks=drawbacks, problems=problems,
+        output=out.as_dict(),
+        consumes={h.id: n for h, n in used},
+    )
+
+
+def _concentration(track, level: int, chain: Chain,
+                   pair: tuple[Stock, int], ceiling: int) -> Result:
+    """Two doses in, one of twice the strength out.
+
+    A trade of quantity for density, not a gain — which is why the pair is spent and the
+    output count is one. The rarity step is what makes it a ladder rather than a loop:
+    each concentration is a band rarer, so Tier 3 is rare material and working rare
+    material is Herbalist 3.
+    """
+    held, want = pair
+    spend = (want // CONCENTRATE_COST) * CONCENTRATE_COST
+    made = concentrate(held)
+
+    problems = []
+    if held.rank > ceiling:
+        problems.append(f"{held.name} is {held.tier}; {track.name} {level} works "
+                        f"{track.at(level).max_tier} at best.")
+    # Concentrating is what `distill` is for. Requiring it is what keeps the ladder
+    # behind the track rather than available to anyone with two jars.
+    if "distill" not in chain.methods:
+        problems.append("Concentrating is distilling — put the still in the chain.")
+    elif "distill" not in track.unlocked_methods(level):
+        need = next(l.level for l in sorted(track.levels, key=lambda x: x.level)
+                    if "distill" in l.methods)
+        problems.append(f"Distill is learned at {track.name} {need}.")
+
+    dc = 10 + 5 * made.rank + 2 * max(0, chain.stages - 1)
+    return Result(
+        name=made.name, tier=made.tier, rank=made.rank, stages=max(1, chain.stages),
+        potency=made.potency, cleansed=False, risky=bool(made.drawbacks),
+        dc=dc, chance=_chance(dc, level, made.rank, problems),
+        ingredients=[held.as_dict()],
+        effects=[scale(e, made.potency) for e in made.effects],
+        drawbacks=made.drawbacks, problems=problems,
+        output=made.as_dict(), consumes={held.id: spend}, concentrating=True,
     )
 
 

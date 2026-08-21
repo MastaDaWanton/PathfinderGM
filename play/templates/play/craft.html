@@ -117,6 +117,32 @@
            word-break: break-word; }
   /* Tier reads as a colour on the jar's foot, so the shelf sorts by eye. */
   .jar .tier { height: 3px; width: 26px; border-radius: 2px; }
+  h4.sect {
+    margin: 14px 0 8px; color: var(--gold); font: 400 13px/1 var(--display);
+    letter-spacing: .12em; font-variant: small-caps; padding-bottom: 5px;
+    border-bottom: 1px solid #2b2319;
+  }
+  h4.sect:first-child { margin-top: 0; }
+  /* A made thing reads green, like the brew it came out of, so the shelf says at a
+     glance which half is bottomless herbs and which half is stock you can run out of. */
+  .jar.made { border-color: var(--brew-dim); background: linear-gradient(#16281d, #101a14); }
+  .jar.made b { color: #bfe8cd; }
+  .jar .count {
+    position: absolute; top: -6px; right: -6px; min-width: 17px; padding: 1px 4px;
+    border-radius: 9px; background: #1d3428; border: 1px solid var(--brew-dim);
+    color: var(--brew); font: 600 10px/1.5 var(--body);
+  }
+  .jar { position: relative; }
+  .jar .conc { font: italic 9px/1.2 var(--body); color: var(--dim); }
+  .stockrow { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .mini {
+    flex: 1; background: linear-gradient(#22190f, #150f09); border: 1px solid var(--edge);
+    border-radius: 2px; padding: 5px 9px; cursor: pointer; color: var(--gold);
+    font: 400 12px/1.3 var(--display); letter-spacing: .05em; font-variant: small-caps;
+  }
+  .mini:hover:not(:disabled) { border-color: var(--brew); color: var(--brew); }
+  .mini:disabled { opacity: .35; cursor: not-allowed; }
+  .none { color: var(--dim); font-style: italic; font-size: 13px; }
   .t1 { background: #6b6b6b; } .t2 { background: #4f8a52; } .t3 { background: #3f6fa8; }
   .t4 { background: #8154a8; } .t5 { background: #b8863a; }
 
@@ -235,10 +261,14 @@
 <script>
 const STATE = {{ state_json|safe }};
 let CRAFT = "herbalism";       // the discipline tab in front
-let SHELF = [];                // ingredients for the current discipline
-let CHOSEN = [];               // ingredient ids in the pot
+let SHELF = [];                // raw ingredients for the current discipline
+let STOCK = [];                // things already made, which can go back in the pot
+let CHOSEN = [];               // raw ingredient ids in the pot
+let USING = {};                // stock id -> how many of it are in the pot
 let CHAIN = [];                // methods, in order
 let PREVIEW = null;
+let CONC_COST = 2;             // server's rule; refreshed with the shelf
+const PREVIEW_COST = () => CONC_COST;
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
@@ -264,7 +294,7 @@ function tabs() {
 
 async function selectCraft(id) {
   CRAFT = id;
-  CHOSEN = []; CHAIN = []; PREVIEW = null;
+  CHOSEN = []; USING = {}; CHAIN = []; PREVIEW = null;
   $("#err").textContent = "";
   tabs();
   const track = STATE.tracks[CRAFT] || {};
@@ -272,6 +302,8 @@ async function selectCraft(id) {
   const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
   const d = await r.json();
   SHELF = d.ingredients;
+  STOCK = d.stock || [];
+  if (STOCK.length) CONC_COST = STOCK[0].concentrates_to.cost;
   STATE.tracks[CRAFT] = d.track;
   renderBench();
   refresh();
@@ -293,6 +325,8 @@ function renderBench() {
       <h2>Ingredients</h2>
       <div class="inner">
         <input id="filter" type="text" placeholder="Search the shelf…" autocomplete="off">
+        <div id="stockwrap"></div>
+        <h4 class="sect">Raw</h4>
         <div class="shelf" id="shelf"></div>
       </div>
     </section>
@@ -318,7 +352,40 @@ function renderBench() {
   renderShelf();
 }
 
+function renderStock() {
+  const wrap = $("#stockwrap");
+  if (!wrap) return;
+  if (!STOCK.length) {
+    wrap.innerHTML = `<h4 class="sect">Made</h4>
+      <div class="none">Nothing yet. What you craft lands here, and can go back in the pot.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<h4 class="sect">Made</h4>
+    <div class="shelf">${STOCK.map(s => {
+      const inPot = USING[s.id] || 0;
+      return `<button class="jar made ${s.usable ? "" : "locked"} ${inPot ? "chosen" : ""}"
+        data-stock="${esc(s.id)}" ${s.usable ? "" : "disabled"}
+        title="${esc(s.name)} — ${esc(s.tier)}, ×${s.potency} potency. You have ${s.count}.
+Click to add one to the pot; right-click to take one out.
+${s.can_concentrate ? `Concentrating ${s.concentrates_to.cost} makes ${esc(s.concentrates_to.name)} (×${s.concentrates_to.potency}).` : ""}">
+        <span class="count">${inPot ? `${inPot}/${s.count}` : s.count}</span>
+        <span class="glyph">🧪</span>
+        <b>${esc(s.base)}</b>
+        ${s.concentration > 1 ? `<span class="conc">Tier ${s.concentration}</span>` : ""}
+        <span class="tier t${s.rank}"></span>
+      </button>`;
+    }).join("")}</div>
+    ${STOCK.some(s => s.can_concentrate && s.usable) ? `<div class="stockrow" style="margin-top:8px">
+      ${STOCK.filter(s => s.can_concentrate && s.usable).map(s =>
+        `<button class="mini" data-conc="${esc(s.id)}"
+          title="Spend ${s.concentrates_to.cost} to make one ${esc(s.concentrates_to.name)}">
+          concentrate ${esc(s.base)}${s.concentration > 1 ? ` T${s.concentration}` : ""}
+        </button>`).join("")}
+    </div>` : ""}`;
+}
+
 function renderShelf() {
+  renderStock();
   const q = ($("#filter")?.value || "").trim().toLowerCase();
   const list = SHELF.filter(i => !q
     || i.name.toLowerCase().includes(q)
@@ -352,10 +419,16 @@ function renderChain() {
     ? CHAIN.map((m, i) => `${i ? '<span class="arrow">→</span>' : ""}
         <button class="step" data-step="${i}" title="Remove">${esc(m)}</button>`).join("")
     : `<span class="empty">No method chosen — pick stations above, in the order you work them.</span>`;
-  $("#potin").innerHTML = CHOSEN.map(id => {
+  const raw = CHOSEN.map(id => {
     const i = SHELF.find(x => x.id === id) || { name: id };
     return `<button class="chip" data-drop="${esc(id)}" title="Take out">${esc(i.name)}</button>`;
-  }).join("");
+  });
+  const mine = Object.entries(USING).map(([id, n]) => {
+    const s = STOCK.find(x => x.id === id) || { name: id };
+    return `<button class="chip" data-drop="${esc(id)}" title="Take one out">${
+      n > 1 ? `${n}× ` : ""}${esc(s.name)}</button>`;
+  });
+  $("#potin").innerHTML = raw.concat(mine).join("");
 }
 
 function renderPreview(p) {
@@ -373,6 +446,11 @@ function renderPreview(p) {
       <span>Difficulty</span><div>DC ${p.dc}</div>
       <span>Chance</span><div>${p.chance}%</div>
     </div>
+    ${Object.keys(p.consumes || {}).length ? `<h3>Spends</h3>
+      <ul class="fx">${Object.entries(p.consumes).map(([id, n]) => {
+        const s = STOCK.find(x => x.id === id) || { name: id };
+        return `<li class="bad">${n}× ${esc(s.name)}</li>`;
+      }).join("")}</ul>` : ""}
     ${p.problems.length ? `<h3>Cannot be made</h3>
       <ul class="fx problems">${p.problems.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
     ${p.effects.length ? `<h3>Effects</h3>
@@ -397,10 +475,12 @@ function renderMastery() {
 async function refresh() {
   renderChain();
   renderMastery();
-  if (!CHOSEN.length) { PREVIEW = null; renderPreview(null); buttons(); return; }
+  if (!CHOSEN.length && !Object.keys(USING).length) {
+    PREVIEW = null; renderPreview(null); buttons(); return;
+  }
   try {
     PREVIEW = await post("/api/craft/preview",
-      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN });
+      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING });
   } catch (e) { $("#err").textContent = e.message; PREVIEW = null; }
   renderPreview(PREVIEW);
   buttons();
@@ -410,7 +490,7 @@ function buttons() {
   const ok = PREVIEW && !PREVIEW.problems.length;
   $("#craft").disabled = !ok;
   $("#craft").textContent = ok ? `Craft (${PREVIEW.chance}% success)` : "Craft";
-  $("#save").disabled = !CHOSEN.length;
+  $("#save").disabled = !CHOSEN.length && !Object.keys(USING).length;
 }
 
 document.addEventListener("click", async e => {
@@ -423,9 +503,32 @@ document.addEventListener("click", async e => {
     CHOSEN = CHOSEN.includes(id) ? CHOSEN.filter(x => x !== id) : [...CHOSEN, id];
     renderShelf(); await refresh(); return;
   }
+  const made = e.target.closest("[data-stock]");
+  if (made && !made.disabled) {
+    const s = STOCK.find(x => x.id === made.dataset.stock);
+    USING[s.id] = Math.min(s.count, (USING[s.id] || 0) + 1);
+    renderShelf(); await refresh(); return;
+  }
+  // One click puts a dose in, so the way back out has to be a click too. Concentrating
+  // needs two of a thing, and a control that can only ever count up makes overshooting
+  // by one a reason to reload the page.
+  const conc = e.target.closest("[data-conc]");
+  if (conc) {
+    const s = STOCK.find(x => x.id === conc.dataset.conc);
+    USING = { [s.id]: Math.min(s.count, PREVIEW_COST()) };
+    CHOSEN = [];
+    if (!CHAIN.includes("distill")) CHAIN.push("distill");
+    renderShelf(); await refresh(); return;
+  }
   const drop = e.target.closest("[data-drop]");
   if (drop) {
-    CHOSEN = CHOSEN.filter(x => x !== drop.dataset.drop);
+    const id = drop.dataset.drop;
+    if (USING[id] !== undefined) {
+      USING[id] -= 1;
+      if (USING[id] <= 0) delete USING[id];
+    } else {
+      CHOSEN = CHOSEN.filter(x => x !== id);
+    }
     renderShelf(); await refresh(); return;
   }
   const station = e.target.closest("[data-method]");
@@ -439,13 +542,17 @@ $("#craft").addEventListener("click", async () => {
   $("#craft").disabled = true;
   try {
     const d = await post("/api/craft/do",
-      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, name: PREVIEW?.name });
+      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING, name: PREVIEW?.name });
     STATE.tracks[CRAFT] = d.track;
+    // Spent doses are gone; leaving them selected offers the player stock they no
+    // longer have and the next preview refuses it.
+    USING = {};
     renderStations();
     // Levelling can unlock methods and tiers, so the shelf is re-fetched rather than
     // left showing the ceiling the character had a moment ago.
     const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
-    SHELF = (await r.json()).ingredients;
+    const j = await r.json();
+    SHELF = j.ingredients; STOCK = j.stock || [];
     renderShelf();
     $("#err").innerHTML = `<span style="color:${d.succeeded ? "var(--brew)" : "var(--alarm)"}">
       d20 ${d.roll} against ${d.chance}% — ${d.succeeded ? "made" : "spoiled"}.</span>
@@ -459,7 +566,7 @@ $("#save").addEventListener("click", async () => {
   if (!name) return;
   try {
     const d = await post("/api/craft/recipes",
-      { craft: CRAFT, name, ingredients: CHOSEN, methods: CHAIN });
+      { craft: CRAFT, name, ingredients: CHOSEN, methods: CHAIN, stock: USING });
     STATE.recipes = d.recipes;
     $("#err").innerHTML = `<span style="color:var(--brew)">Saved “${esc(name)}”.</span>`;
   } catch (e) { $("#err").textContent = e.message; }

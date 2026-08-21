@@ -200,6 +200,10 @@ class Actor:
     # level on what the character does rather than on their experience total. Keyed by
     # track id: {"herbalist": Progress(level=2, mp=7, ...)}.
     world_classes: dict[str, "Progress"] = field(default_factory=dict)
+    # Things this character has made, which are also things they can craft *with*. Keyed
+    # by base name and concentration, holding a count: three identical teas are a count
+    # of three rather than three objects.
+    stock: dict[str, "Stock"] = field(default_factory=dict)
 
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
@@ -942,6 +946,32 @@ class Actor:
             self.world_classes[track_id] = Progress(track=track_id)
         return self.world_classes[track_id]
 
+    # --- what they have made ------------------------------------------------------------
+
+    def add_stock(self, item, count: int = 1) -> None:
+        """Put a crafted thing on the shelf, stacking with its own kind."""
+        have = self.stock.get(item.id)
+        if have is None:
+            item.count = count
+            self.stock[item.id] = item
+        else:
+            have.count += count
+
+    def take_stock(self, stock_id: str, count: int = 1) -> int:
+        """Spend some. Returns how many were actually taken.
+
+        An entry that reaches zero is removed rather than left at 0 — an empty jar on the
+        shelf is a jar the crafting page offers you and then refuses.
+        """
+        have = self.stock.get(stock_id)
+        if have is None:
+            return 0
+        took = min(have.count, max(0, int(count)))
+        have.count -= took
+        if have.count <= 0:
+            del self.stock[stock_id]
+        return took
+
     def add_condition(self, key: str, rounds: int | None = None, source: str = "") -> Condition:
         key = key.strip().lower()
         existing = next((c for c in self.conditions if c.key == key), None)
@@ -1375,6 +1405,12 @@ def to_dict(actor: Actor) -> dict:
         "overrides": dict(actor.overrides),
         "gear": {k: {"name": i.name, "material": i.material, "hardness": i.hardness,
                      "hp": i.hp, "hp_max": i.hp_max} for k, i in actor.gear.items()},
+        "stock": {k: {"base": v.base, "concentration": v.concentration,
+                      "tier": v.tier, "potency": v.potency, "count": v.count,
+                      "craft": v.craft, "effects": v.effects,
+                      "drawbacks": v.drawbacks,
+                      "from_ingredients": v.from_ingredients}
+                  for k, v in actor.stock.items()},
         "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
                               "mishaps": p.mishaps, "milestones": p.milestones}
                           for k, p in actor.world_classes.items()},
@@ -1416,6 +1452,12 @@ def _world_class_summary(actor: Actor) -> list[dict]:
             "known": len(p.crafted),
         })
     return out
+
+
+def _stock(raw: dict):
+    from .crafting import from_stock_dict
+
+    return {k: from_stock_dict(v) for k, v in raw.items()}
 
 
 def _progress(track_id: str, v: dict):
@@ -1493,6 +1535,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
               for k, v in (data.get("gear") or {}).items()},
         world_classes={k: _progress(k, v)
                        for k, v in (data.get("world_classes") or {}).items()},
+        stock=_stock(data.get("stock") or {}),
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
