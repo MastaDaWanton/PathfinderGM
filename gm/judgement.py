@@ -79,18 +79,6 @@ WOUNDING = re.compile(
     re.I,
 )
 
-NUMBER_WORDS = {
-    "a": 1, "an": 1, "one": 1, "single": 1, "lone": 1,
-    "two": 2, "pair": 2, "both": 2, "couple": 2,
-    "three": 3, "trio": 3, "four": 4, "five": 5, "six": 6,
-}
-_COUNT_RE = re.compile(
-    r"\b(a|an|one|single|lone|two|pair|both|couple|three|trio|four|five|six|\d+)\b\s+"
-    r"(?:of\s+)?(?:the\s+)?\w*\s*\w*",
-    re.I,
-)
-
-
 @dataclass
 class Finding:
     kind: str          # what was wrong
@@ -110,23 +98,6 @@ class Review:
     def as_log(self) -> list[str]:
         return ([f"corrected: {c.message}" for c in self.corrections]
                 + [f"objected: {o.message}" for o in self.objections])
-
-
-def stated_count(text: str, near: str = "") -> int | None:
-    """How many of a thing the player said there were, if they said.
-
-    Only trusted when the number sits right in front of a noun, which is why the count is
-    read from the player's sentence rather than inferred from the scene.
-    """
-    for m in _COUNT_RE.finditer(text or ""):
-        word = m.group(1).lower()
-        n = int(word) if word.isdigit() else NUMBER_WORDS.get(word)
-        if n is None or n > 12:
-            continue
-        if near and near.lower() not in m.group(0).lower():
-            continue
-        return n
-    return None
 
 
 # The params that say what a turn *is*. `dc` is deliberately excluded: the GM re-rolls a
@@ -209,24 +180,12 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
                     f"player meant to wound, GM chose {man}; resolved as a plain attack",
                     intent.id))
 
-        elif intent.op == "spawn":
-            # 3. The player named a number. Honour it — unless a later intent is already
-            #    counting on the creatures we would be removing. Cutting a spawn of two
-            #    down to one once left an `attack c3` pointing at someone who would never
-            #    exist, and the engine raised KeyError mid-resolution.
-            want = stated_count(text)
-            got = int(intent.params.get("count", 1) or 1)
-            if want is not None and want != got and want <= 8:
-                if want < got and _refs_depend_on_spawn(intents, scene):
-                    out.corrections.append(Finding(
-                        "spawn-count-kept",
-                        f"player described {want} but a later intent needs all {got}",
-                        intent.id))
-                else:
-                    intent.params["count"] = want
-                    out.corrections.append(Finding(
-                        "spawn-count",
-                        f"player described {want}, GM spawned {got}", intent.id))
+        # There is deliberately no check on how many creatures a spawn creates. An
+        # earlier version read the count out of the player's sentence and overrode the
+        # GM with it, which had the boundary backwards: the player says what their
+        # character does, and how many enemies are round the corner is the GM's to
+        # decide from the world. `play/player_input.py` now stops that shape of input
+        # reaching here at all.
 
     return out
 
@@ -288,7 +247,10 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
             return None
         targets = raw.get("target")
         targets = targets if isinstance(targets, list) else [targets]
-        for ref in [raw.get("actor"), *targets]:
+        # `opposed_by` too: a turn was lost to `opposed_by: {ref: "thug1"}` when only
+        # actor and target were being repaired.
+        opposed = (raw.get("params") or {}).get("opposed_by") or {}
+        for ref in [raw.get("actor"), *targets, opposed.get("ref")]:
             if not isinstance(ref, str) or ref in known or ref in invented:
                 continue
             if not _INVENTED_REF.match(ref) or re.fullmatch(r"c\d+|pc", ref, re.I):
@@ -304,7 +266,9 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
             template = name
             break
 
-    count = min(len(invented), stated_count(player_text) or len(invented))
+    # How many, from how many the GM itself named. Not from the player's sentence: the
+    # player does not decide how many enemies are round the corner.
+    count = len(invented)
     minted = [f"c{i}" for i in range(1, count + len(known) + 2)
               if f"c{i}" not in known][:count]
     if len(minted) < count:
@@ -322,6 +286,12 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
             raw["target"] = swap.get(tgt, tgt)
         elif isinstance(tgt, list):
             raw["target"] = [swap.get(t, t) for t in tgt]
+        params = dict(raw.get("params") or {})
+        if isinstance(params.get("opposed_by"), dict):
+            ob = dict(params["opposed_by"])
+            ob["ref"] = swap.get(ob.get("ref"), ob.get("ref"))
+            params["opposed_by"] = ob
+            raw["params"] = params
         amended.append(raw)
     return amended
 

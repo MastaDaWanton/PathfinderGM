@@ -21,6 +21,7 @@ from gm.client import ModelUnavailable, available
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
+from . import player_input
 
 
 def _recent_events(world, location, limit=4):
@@ -198,6 +199,14 @@ def say(request):
     text = (json.loads(request.body or "{}").get("text") or "").strip()
     if not text:
         return JsonResponse({"error": "say something"}, status=400)
+
+    # The player controls one character; the GM controls the world. A turn that declares
+    # what the world does is handed back rather than resolved — gently, and without
+    # consuming the turn, because the player has not done anything wrong so much as
+    # reached across the table.
+    said = player_input.check(text)
+    if not said.ok:
+        return JsonResponse({"hint": said.hint, "offending": said.offending}, status=422)
 
     c.transcript.append({"who": "player", "text": text})
     world = c.world

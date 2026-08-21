@@ -80,13 +80,18 @@ EXAMPLES = [
             }],
         },
     },
-    # Measured in play: told that two bravos step out of the dark, the GM tried to name
-    # them, was refused by the ref registry, and burned five attempts guessing at refs
-    # that could not exist. It never occurred to it to create them first.
+    # The player says what their character does; who is in the yard is the GM's to
+    # decide. An earlier version of this example had the player declaring that two
+    # bravos arrive, which taught exactly the wrong division of authority — and the app
+    # then honoured it, reading the enemy count out of the player's sentence.
+    #
+    # The example that replaced it shows the right shape: the player commits to an
+    # action, and the GM decides who is there to meet it.
     {
-        "player": "Two guild bravos step out of the dark behind me. I turn and fight.",
+        "player": "I've been followed. I put my back to the wall and draw.",
         "reply": {
-            "narration": "Two of them, come round the corner of the wall with saps out.",
+            "narration": "Two shapes detach from the dark at the mouth of the alley, "
+                         "unhurried, and one of them lets a sap swing loose on its cord.",
             "intents": [
                 {"op": "spawn", "because": "the guild does not send one man",
                  "params": {"template": "thug", "count": 2}},
@@ -109,6 +114,10 @@ the landing.
 Write to the player as "you". Name only the people and places listed below; if you need
 someone new, describe them without a name. The examples show you the shape of a reply,
 not its words — never repeat a phrase from them.
+
+The player says only what their character does. Who else is present, what they do, and
+what the world does are yours to decide — decide them from the world below, and do not
+take the player's word for what is there.
 
 Reply with a JSON object: {"narration": "...", "intents": [...]}.
 

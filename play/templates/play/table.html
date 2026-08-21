@@ -359,7 +359,8 @@
 
   #busy { color: var(--dim); font-style: italic; padding: 0 40px 12px; display: none; }
   #busy.on { display: block; }
-  #err { color: var(--alarm); padding: 0 40px 12px; }
+  #err { color: var(--alarm); padding: 0 48px 12px; max-width: 70ch; }
+  #err.hint { color: var(--dim); font-style: italic; }
   details { margin-top: 8px; }
   summary { cursor: pointer; color: var(--dim); font-size: 12px; }
   pre { font: 11px/1.4 ui-monospace, monospace; color: var(--dim); overflow-x: auto;
@@ -440,6 +441,10 @@ async function post(url, body) {
     body: JSON.stringify(body || {}),
   });
   const data = await r.json();
+  // 422 is the table pushing a turn back across the table rather than an error: the
+  // player said what the world does, which is the GM's half. The text they typed is
+  // deliberately left in the box so they can rewrite it.
+  if (r.status === 422) { const e = new Error(data.hint); e.hint = true; throw e; }
   if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
   return data;
 }
@@ -570,11 +575,17 @@ $("#sayform").onsubmit = async e => {
   e.preventDefault();
   const text = $("#input").value.trim();
   if (!text) return;
-  $("#input").value = "";
   $("#err").textContent = "";
+  $("#err").className = "";
   busy(true);
-  try { render(await post("/api/say", {text})); }
-  catch (err) { $("#err").textContent = err.message; }
+  try {
+    render(await post("/api/say", {text}));
+    $("#input").value = "";          // cleared only once the turn was taken
+  }
+  catch (err) {
+    $("#err").textContent = err.message;
+    if (err.hint) $("#err").className = "hint";
+  }
   finally { busy(false); }
 };
 

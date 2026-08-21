@@ -62,7 +62,7 @@ def test_peaceful_turns_never_resolve_an_attack(text, scene):
     "I have had enough of his lies. I draw my rapier and attack him.",
     "I go for him.",
     "I stab the nearest one.",
-    "Two bravos step out of the dark. I turn and fight.",
+    "I put my back to the wall and draw.",
     "I charge the watchman.",
 ])
 def test_violence_the_player_asked_for_is_allowed(text, scene):
@@ -125,26 +125,19 @@ def test_a_plain_attack_is_never_second_guessed(scene):
 
 # --- Spawn counts ---------------------------------------------------------------------
 
-def test_the_number_the_player_said_is_honoured(scene):
-    """Measured: "A guild bravo steps out of the dark" produced two thugs."""
-    intents = parse_all([{"op": "spawn", "params": {"template": "thug", "count": 2}}])
-    v = judgement.review("A guild bravo steps out of the dark. I draw and go for him.",
-                         intents, scene)
-    assert intents[0].params["count"] == 1
-    assert v.corrections[0].kind == "spawn-count"
+def test_how_many_enemies_there_are_is_the_GMs_to_decide(scene):
+    """This once worked the other way round, and that was the boundary backwards.
 
-
-def test_two_means_two(scene):
-    intents = parse_all([{"op": "spawn", "params": {"template": "thug", "count": 5}}])
-    judgement.review("Two guild bravos step out of the dark.", intents, scene)
-    assert intents[0].params["count"] == 2
-
-
-def test_a_count_the_player_never_gave_is_left_to_the_GM(scene):
-    """The player does not have to say how many; when they do not, the GM decides."""
+    An earlier version read a number out of the player's sentence and overrode the GM
+    with it — so "a guild bravo steps out of the dark" forced the spawn down to one. But
+    the player says what their character *does*; who is round the corner comes from the
+    world. `play/player_input.py` now refuses that shape of input outright, and nothing
+    here second-guesses the count.
+    """
     intents = parse_all([{"op": "spawn", "params": {"template": "thug", "count": 3}}])
-    judgement.review("Guild bravos come out of the dark at me.", intents, scene)
+    v = judgement.review("I put my back to the wall and draw.", intents, scene)
     assert intents[0].params["count"] == 3
+    assert not any(c.kind.startswith("spawn-count") for c in v.corrections)
 
 
 # --- The NPC fallback -------------------------------------------------------------------
@@ -195,17 +188,31 @@ def test_invented_refs_become_a_spawn(scene):
     raw = [{"op": "attack", "actor": "pc", "target": "thug1"},
            {"op": "attack", "actor": "thug2", "target": "pc"}]
     out = judgement.repair_unknown_refs(
-        raw, "Two guild bravos come round the corner. I turn and fight.", scene)
+        raw, "I put my back to the wall and draw.", scene)
 
     assert out[0]["op"] == "spawn"
-    assert out[0]["params"]["count"] == 2          # from the player's own sentence
+    # Two, because the GM named two — not because the player said a number. How many
+    # enemies there are is the GM's to decide.
+    assert out[0]["params"]["count"] == 2
     assert out[1]["target"] == "c2" and out[2]["actor"] == "c3"
+
+
+def test_the_repair_reaches_opposed_by_as_well(scene):
+    """A turn was lost to `opposed_by: {ref: "thug1"}` while only actor and target were
+    being repaired — the ref registry refuses every place a ref can appear, so the repair
+    has to reach every one of them too."""
+    raw = [{"op": "check", "actor": "pc",
+            "params": {"skill": "stealth",
+                       "opposed_by": {"ref": "thug1", "skill": "perception"}}}]
+    out = judgement.repair_unknown_refs(raw, "I keep to the shadows.", scene)
+    assert out[0]["op"] == "spawn"
+    assert out[1]["params"]["opposed_by"]["ref"] == "c2"
 
 
 def test_the_repair_reads_the_creature_from_the_players_words(scene):
     raw = [{"op": "attack", "actor": "watch1", "target": "pc"}]
     out = judgement.repair_unknown_refs(
-        raw, "Two of the city watch come down the alley.", scene)
+        raw, "I back away from the watchman coming down the alley.", scene)
     assert out[0]["params"]["template"] == "watchman"
 
 
@@ -241,7 +248,7 @@ def test_proposing_the_same_turn_again_is_refused(scene):
 
     again = parse_all([{"op": "check", "actor": "pc", "because": "going over the wall",
                         "params": {"skill": "stealth", "dc": 15}}])
-    v = judgement.review("Two guild bravos come round the corner. I turn and fight.",
+    v = judgement.review("I spin round and go for whoever is behind me.",
                          again, scene, previous=signature)
     assert not v.ok
     assert v.objections[0].kind == "repeats-the-last-turn"

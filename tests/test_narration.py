@@ -31,8 +31,9 @@ def test_a_sentence_lifted_from_the_examples_is_caught(echoes):
     across two campaigns. The demonstrations that teach the model the shape of a reply
     were teaching it the words as well.
     """
-    r = narration.review("Two of them, come round the corner of the wall with saps out.",
-                         echo_index=echoes)
+    r = narration.review(
+        "Two shapes detach from the dark at the mouth of the alley, unhurried, and one "
+        "of them lets a sap swing loose on its cord.", echo_index=echoes)
     assert not r.ok
     assert r.findings[0].kind == "echoes-the-examples"
 
@@ -142,8 +143,8 @@ def test_carrying_the_scene_forward_passes():
 
 def test_the_complaint_says_what_to_do(echoes):
     r = narration.review(
-        "Two of them, come round the corner of the wall with saps out. Kesst Vayr waits.",
-        pc_name="Kesst Vayr", echo_index=echoes)
+        "Two shapes detach from the dark at the mouth of the alley, unhurried. "
+        "Kesst Vayr waits.", pc_name="Kesst Vayr", echo_index=echoes)
     complaint = r.complaint()
     assert "own words" in complaint
     assert "'you'" in complaint
