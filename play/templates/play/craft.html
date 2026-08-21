@@ -227,6 +227,11 @@
   .fx { margin: 0; padding-left: 18px; }
   .fx li { margin-bottom: 8px; font-size: 14px; line-height: 1.55; }
   .fx li.bad { color: #cf9d95; }
+  /* Which ingredient a line came from, quiet enough not to compete with the mechanic. */
+  .fx .from { color: var(--dim); font-size: 12px; }
+  .fx .from::after { content: " ·"; }
+  .prose { color: var(--dim); font: italic 12.5px/1.55 var(--body); margin: 0 0 9px; }
+  .prose b { color: var(--ink); font-style: normal; font-weight: 600; }
   .problems { color: #cf9d95; font-size: 14px; }
   .problems li { margin-bottom: 5px; }
   .inferred { color: var(--dim); font-style: italic; font-size: 12px; }
@@ -296,6 +301,7 @@ let BIOMES = [];               // everywhere the party could be
 let TABLE = null;              // the d100 forage table for HERE
 let ATTEMPTS = 1;              // how many things one session turns up
 let SHOWTABLE = false;
+let SHOWPROSE = false;
 const PREVIEW_COST = () => CONC_COST;
 
 const $ = s => document.querySelector(s);
@@ -514,9 +520,23 @@ function renderPreview(p) {
     ${p.problems.length ? `<h3>Cannot be made</h3>
       <ul class="fx problems">${p.problems.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
     ${p.effects.length ? `<h3>Effects</h3>
-      <ul class="fx">${p.effects.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <ul class="fx">${p.effects.map(x => {
+        // "Leechwort: +2 Heal checks to staunch bleeding" — the source in front, the
+        // mechanic after, so a card with six lines still says where each came from.
+        const cut = x.indexOf(": ");
+        return cut > 0
+          ? `<li><span class="from">${esc(x.slice(0, cut))}</span> ${esc(x.slice(cut + 2))}</li>`
+          : `<li>${esc(x)}</li>`;
+      }).join("")}</ul>` : `<h3>Effects</h3>
+      <p class="none">No mechanical effect could be read out of these. What they say is
+        below.</p>`}
     ${p.drawbacks.length ? `<h3>Drawbacks</h3>
       <ul class="fx">${p.drawbacks.map(x => `<li class="bad">${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${(p.described && p.described.length) ? `<h3>
+        <button class="mini" id="showprose" style="width:auto;padding:2px 8px">
+          ${SHOWPROSE ? "hide" : "what the source says"}</button></h3>
+      ${SHOWPROSE ? p.described.map(d =>
+        `<p class="prose"><b>${esc(d.name)}</b> ${esc(d.text)}</p>`).join("") : ""}` : ""}
     ${inferred ? `<p class="inferred">Rarity is inferred from each ingredient's crafting
       DC — the source document never states one.</p>` : ""}`;
 }
@@ -562,6 +582,9 @@ document.addEventListener("click", async e => {
     const id = jar.dataset.ing;
     CHOSEN = CHOSEN.includes(id) ? CHOSEN.filter(x => x !== id) : [...CHOSEN, id];
     renderShelf(); await refresh(); return;
+  }
+  if (e.target.closest("#showprose")) {
+    SHOWPROSE = !SHOWPROSE; renderPreview(PREVIEW); return;
   }
   if (e.target.closest("#showtable")) {
     SHOWTABLE = !SHOWTABLE; renderGround(); return;

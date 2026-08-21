@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import effects as fx
 from . import ingredients as ing_mod
 from . import worldclass as wc
 
@@ -155,6 +156,8 @@ class Result:
     effects: list[str]
     drawbacks: list[str]
     problems: list[str] = field(default_factory=list)
+    # The prose the effects were read out of, kept so nothing is lost to the summary.
+    described: list[dict] = field(default_factory=list)
     # What the successful craft puts on the shelf, and what it takes off.
     output: dict | None = None
     consumes: dict[str, int] = field(default_factory=dict)
@@ -168,23 +171,46 @@ class Result:
             "cleansed": self.cleansed, "risky": self.risky, "dc": self.dc,
             "chance": self.chance, "ingredients": self.ingredients,
             "effects": self.effects, "drawbacks": self.drawbacks,
-            "problems": self.problems, "output": self.output,
+            "problems": self.problems, "described": self.described,
+            "output": self.output,
             "consumes": self.consumes, "consumes_raw": self.consumes_raw,
             "concentrating": self.concentrating,
         }
 
 
-def scale(text: str, potency: float) -> str:
-    """Say what a multiplier did, without pretending to rewrite the prose.
+def mechanics(items, used) -> list[str]:
+    """The card's effect list: what each component actually does, mechanically.
 
-    Parsing "+2 alchemical bonus on saves for 8 hours" into a structure and scaling every
-    number in it is a much larger job than this page needs, and doing it badly would put
-    wrong numbers on screen with an authoritative face. The multiplier is stated instead,
-    and the player applies it — which is what a table does anyway.
+    Sifted out of the descriptions rather than printed whole. The source is written for a
+    person — "When dried and ground into a powder, the mottled red and gray bark of this
+    shrub is a boon to healers. When applied to a wound, leechwort grants a +1 alchemical
+    bonus on all Heal checks..." — and a recipe card that prints both sentences buries the
+    only two numbers in it.
+
+    The chain's potency multiplier is *not* stamped on every line. It is one property of
+    the result and is stated once, beside the rarity and the DC; repeating it on each
+    effect was noise on every card in the app.
     """
-    if abs(potency - 1.0) < 0.01:
-        return text
-    return f"{text}  [×{potency:.2f} from the chain]"
+    out: list[str] = []
+    for i in items:
+        for e in fx.extract(i.text):
+            line = f"{i.name}: {e.text}"
+            if line not in out:
+                out.append(line)
+    for held, _ in used:
+        for e in held.effects:
+            if e not in out:
+                out.append(e)
+    return out
+
+
+def descriptions(items) -> list[dict]:
+    """The prose the mechanics were read out of, kept for whoever wants it.
+
+    Nothing is thrown away — a pattern that cannot claim a clause leaves it here rather
+    than dropping it, so the card can be short without the detail being lost.
+    """
+    return [{"name": i.name, "text": i.text} for i in items if i.text]
 
 
 def preview(track_id: str, level: int, chain: Chain,
@@ -291,9 +317,7 @@ def preview(track_id: str, level: int, chain: Chain,
     risky = (any(i.risky for i in items) or any(h.drawbacks for h, _ in used)) \
         and not cleansed
 
-    effects = [scale(i.text, potency) for i in items if i.text]
-    for held, _ in used:
-        effects.extend(scale(e, potency) for e in held.effects)
+    effects = mechanics(items, used)
     drawbacks = []
     if risky:
         drawbacks.append("Untreated hazardous components: harvesting and handling risks "
@@ -313,6 +337,7 @@ def preview(track_id: str, level: int, chain: Chain,
         chance=_chance(dc, level, rank, problems),
         ingredients=[i.as_dict() for i in items] + [h.as_dict() for h, _ in used],
         effects=effects, drawbacks=drawbacks, problems=problems,
+        described=descriptions(items),
         output=out.as_dict(),
         consumes={h.id: n for h, n in used},
         consumes_raw=dict(wanted),
@@ -351,8 +376,8 @@ def _concentration(track, level: int, chain: Chain,
         potency=made.potency, cleansed=False, risky=bool(made.drawbacks),
         dc=dc, chance=_chance(dc, level, made.rank, problems),
         ingredients=[held.as_dict()],
-        effects=[scale(e, made.potency) for e in made.effects],
-        drawbacks=made.drawbacks, problems=problems,
+        effects=list(made.effects),
+        drawbacks=made.drawbacks, problems=problems, described=[],
         output=made.as_dict(), consumes={held.id: spend}, concentrating=True,
     )
 

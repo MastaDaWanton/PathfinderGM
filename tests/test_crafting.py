@@ -70,7 +70,10 @@ def test_a_simple_chain_previews(shelf):
                          Chain("herbalist", ["grind", "brew"], ["woundwort", "comfrey"]))
     assert not r.problems
     assert r.stages == 2 and r.tier == "common"
-    assert len(r.effects) == 2
+    # The mechanic, not the paragraph: Woundwort's bleed reduction and Comfrey's healing.
+    assert r.effects == ["Woundwort: Bleeding damage 20% less",
+                         "Comfrey: Heals 1-4 hit points"]
+    assert len(r.described) == 2
 
 
 def test_mix_costs_potency_and_distil_returns_it():
