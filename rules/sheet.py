@@ -578,6 +578,52 @@ class Actor:
             changed.append("disabled")
         return changed
 
+    def rest(self, kind: str = "night") -> dict:
+        """Natural healing (CRB p.191).
+
+        "With a full night's rest (8 hours of sleep or more), you recover 1 hit point per
+        character level... If you undergo complete bed rest for an entire day and night,
+        you recover twice your character level in hit points."
+
+        Nobody heals from below zero by sleeping it off — a dying character needs
+        stabilising first, which is `bleed_out`'s business, not this one.
+        """
+        if kind not in ("night", "bed rest"):
+            raise ValueError(f"rest must be a night or bed rest, not {kind!r}")
+        if self.has_condition("dead"):
+            return {"healed": 0, "hours": 0, "woke": False, "note": "the dead do not rest"}
+
+        per_level = 2 if kind == "bed rest" else 1
+        hours = 24 if kind == "bed rest" else 8
+
+        before = self.hp
+        # Below zero you are not resting, you are bleeding. Healing starts from 0 so a
+        # night's sleep cannot carry someone from -6 to a comfortable 4.
+        floor = max(self.hp, 0)
+        self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
+
+        woke = False
+        for gone in ("unconscious", "stable", "disabled", "dying"):
+            if self.has_condition(gone) and self.hp > 0:
+                self.remove_condition(gone)
+                woke = True
+        # You stand up in the morning. Waking still prone, shaken and entangled from a
+        # fight the night before is the sort of stale state that quietly poisons every
+        # roll for the rest of the campaign.
+        for over in ("prone", "flat-footed", "shaken", "frightened", "panicked",
+                     "dazzled", "entangled", "grappled", "pinned", "staggered",
+                     "sickened", "nauseated", "dazed", "cowering", "fascinated"):
+            self.remove_condition(over)
+        # A night's sleep is what fatigue is for. Exhaustion becomes fatigue instead.
+        if self.has_condition("exhausted"):
+            self.remove_condition("exhausted")
+            self.add_condition("fatigued", source="slept off exhaustion")
+        elif self.has_condition("fatigued"):
+            self.remove_condition("fatigued")
+
+        return {"healed": self.hp - before, "hours": hours, "woke": woke,
+                "per_level": per_level, "kind": kind}
+
     def bleed_out(self, dice) -> dict | None:
         """One round of dying: lose a hit point, then try to stabilise.
 

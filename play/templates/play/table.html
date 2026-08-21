@@ -135,7 +135,9 @@
     padding: 13px 16px; cursor: pointer; border-radius: 2px;
     background: linear-gradient(#1d1811, #141009); border: 1px solid var(--gold-dim);
   }
-  .pick:hover { border-color: var(--accent); }
+  .pick:hover:not(:disabled) { border-color: var(--accent); }
+  .pick:disabled { opacity: .5; cursor: default; }
+  .pick.current { border-color: var(--accent); }
   .pick b { display: block; color: var(--gold); font: 400 21px/1.2 var(--display);
             letter-spacing: .03em; font-variant: small-caps; }
   .pick small { color: var(--dim); font: 13px/1.5 var(--body); }
@@ -475,13 +477,68 @@
 </div>
 
 <script>
-const STATE = {{ state_json|safe }};
+// The state last drawn. `render` keeps it current: it was `const`, set once at page load
+// and never updated, so after switching characters the death panel still announced the
+// character you had started the page as — and anything else reading STATE was reading a
+// snapshot of a game that had moved on.
+let STATE = {{ state_json|safe }};
 const $ = s => document.querySelector(s);
 
 function csrf() {
   const m = document.cookie.match(/csrftoken=([^;]+)/);
   return m ? m[1] : "";
 }
+
+// --- The roster ----------------------------------------------------------------
+// Switching is switching campaigns: one per character, so somebody you come back to is
+// where you left them rather than at the start of a new game.
+async function openRoster() {
+  let d;
+  try { d = await (await fetch("/api/characters")).json(); }
+  catch (e) { $("#err").textContent = e.message; return; }
+
+  $("#deathtitle").textContent = "Who is playing";
+  $("#deathtext").textContent =
+    "Switching picks up that character's game where it stopped. The dead stay on the "
+    + "roster; they are the reason the next game went the way it did.";
+  $("#deathchoices").innerHTML = (d.roster || []).map(e => `
+    <button class="pick ${e.current ? "current" : ""}" data-switch="${esc(e.id)}"
+            ${e.playable && !e.current ? "" : "disabled"}>
+      <b>${esc(e.name)}</b>
+      <small>${esc(e.line)} · ${esc(e.hp)} hp${
+        e.current ? " · playing now" : e.status === "dead" ? " · dead" : ""}</small>
+      ${e.epitaph ? `<em>${esc(e.epitaph)}</em>` : ""}
+    </button>`).join("");
+  $("#deathroster").innerHTML = `<h3>Somebody new</h3>` + (d.choices || []).map(ch => `
+    <button class="pick" data-source="${esc(ch.source)}">
+      <b>${esc(ch.name)}</b><small>${esc(ch.line)} · ${ch.hp} hp</small>
+    </button>`).join("")
+    + `<button class="pick" id="closeroster"><b>Never mind</b>
+       <small>carry on with the game in front of you</small></button>`;
+  $("#deathveil").classList.add("on");
+}
+
+// One listener for every button in the panel. Two of them — one for switching, one for
+// starting somebody new — both matched `.pick`, so a click on a roster row fired both:
+// it switched campaigns *and* posted /api/character/new with an undefined source, and
+// "Never mind" quietly rolled a new character instead of closing the panel.
+document.addEventListener("click", async e => {
+  const pick = e.target.closest(".pick");
+  if (!pick || pick.disabled) return;
+
+  if (pick.id === "closeroster") {
+    $("#deathveil").classList.remove("on");
+    return;
+  }
+  const switching = pick.dataset.switch !== undefined;
+  pick.disabled = true;
+  try {
+    render(switching
+      ? await post("/api/character/switch", {id: pick.dataset.switch})
+      : await post("/api/character/new", {source: pick.dataset.source}));
+    $("#deathveil").classList.remove("on");
+  } catch (err) { $("#err").textContent = err.message; pick.disabled = false; }
+});
 
 // --- Death, and who plays next -------------------------------------------------
 function showDeath(d) {
@@ -502,16 +559,10 @@ function showDeath(d) {
   $("#deathveil").classList.add("on");
 }
 
-document.addEventListener("click", async e => {
-  const pick = e.target.closest(".pick");
-  if (!pick) return;
-  pick.disabled = true;
-  try {
-    const s = await post("/api/character/new", {source: pick.dataset.source});
-    $("#deathveil").classList.remove("on");
-    render(s);
-  } catch (err) { $("#err").textContent = err.message; pick.disabled = false; }
-});
+// The death panel's choices are `.pick` buttons too, and the one listener above already
+// handles them. This file used to declare a second one here; both fired on every click,
+// so picking a character to switch to also posted /api/character/new with an undefined
+// source, and the 404 from that was the error the player saw.
 
 async function post(url, body) {
   const r = await fetch(url, {
@@ -530,6 +581,7 @@ async function post(url, body) {
 }
 
 function render(s) {
+  STATE = s;
   $("#story").innerHTML = s.transcript.map(b =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}">${esc(b.text)}</p>`
   ).join("");
@@ -558,8 +610,10 @@ function render(s) {
       ).join("")}
       <h2>Feats</h2>
       <div class="sub">${pc.feats.map(esc).join(", ")}</div>
-      <button class="opensheet" id="opensheet">Full character sheet</button>`;
+      <button class="opensheet" id="opensheet">Full character sheet</button>
+      <button class="opensheet" id="openroster">Who is playing</button>`;
     $("#opensheet").onclick = openSheet;
+    $("#openroster").onclick = openRoster;
   }
 
   // Turn order, only while a fight is on. Without it the player cannot tell whose turn

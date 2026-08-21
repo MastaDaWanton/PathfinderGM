@@ -98,6 +98,35 @@ EXAMPLES = [
             ],
         },
     },
+    # Measured: the player broke off and ran, the GM narrated them getting clear — and
+    # left the encounter running, so the thug went on hitting a character who was
+    # supposed to be three streets away. Then the rest that followed was refused because
+    # a fight was still going on. Getting away has to actually end the fight.
+    {
+        "player": "I break off and run for the lower quarter until nobody is following me.",
+        "reply": {
+            "narration": "You go over the low wall at the end of the yard and keep going, "
+                         "and by the third turning there is nothing behind you but rain.",
+            "intents": [
+                {"op": "end_encounter", "because": "she is away and they have lost her"},
+                {"op": "advance_time", "because": "the run across the quarter",
+                 "params": {"amount": 20, "unit": "minute"}},
+            ],
+        },
+    },
+    # And the other half: rest is what puts hit points back, and the GM has to reach for
+    # it when the player sleeps rather than narrating a night and healing nobody.
+    {
+        "player": "I find a doorway out of the wind and sleep until morning.",
+        "reply": {
+            "narration": "The doorway is dry, more or less, and the city goes quiet in the "
+                         "hour before dawn.",
+            "intents": [
+                {"op": "rest", "actor": "pc", "because": "a night out of the weather",
+                 "params": {"kind": "night"}},
+            ],
+        },
+    },
 ]
 
 
@@ -128,6 +157,10 @@ Difficulty is a word from this list, not a number: %s.
 A circumstance is "favorable" or "unfavorable", nothing else.
 To grab, shove, trip, disarm or break something rather than wound it, use an attack with
 a manoeuvre: %s.
+When the fighting stops — they run, they yield, the player gets clear — end it with
+{"op": "end_encounter"}. Nobody can rest while a fight is still running.
+When the player sleeps or makes camp, use {"op": "rest", "params": {"kind": "night"}}
+— that is how wounds heal. "bed rest" is a full day and night and heals twice as much.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 

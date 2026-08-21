@@ -139,9 +139,29 @@ def characters(request):
     return JsonResponse({
         "playing": c.character_id,
         "ended": c.ended,
-        "roster": [e.summary() for e in roster.everyone()],
+        "roster": [{**e.summary(), "playable": e.status != roster.DEAD,
+                    "current": e.id == c.character_id}
+                   for e in roster.everyone()],
         "choices": roster.pregens(),
     })
+
+
+@require_POST
+def switch_character(request):
+    """Play somebody else who is already on the roster.
+
+    Their campaign resumes where it stopped rather than starting over — one campaign per
+    character is what makes that possible.
+    """
+    body = json.loads(request.body or "{}")
+    character_id = str(body.get("id", "")).strip()
+    try:
+        c = campaign_mod.switch_to(character_id)
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=409)
+    return JsonResponse(_state(c))
 
 
 @require_POST

@@ -133,9 +133,15 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "damage": (("amount", "type"), ("to",), "hidden"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
+    # A fight ends when the fighting stops, which is a call about the fiction:
+    # they flee, they surrender, you get away. Without this the only way out of an
+    # encounter was for one side to be wiped out, so a character could never
+    # disengage — or rest afterwards, since resting is refused mid-fight.
+    "end_encounter": ((), (), "hidden"),
     "move": (("zone",), ("who",), "hidden"),
     "spawn": (("template",), ("from_entity_id", "count", "name"), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
+    "rest": ((), ("kind",), "hidden"),
     "narrate_only": ((), (), "hidden"),
 }
 
@@ -418,6 +424,22 @@ def _check_params(intent: Intent, index: int) -> None:
             p["amount"] = int(p["amount"])
         except (TypeError, ValueError):
             raise IntentError("advance_time: amount must be a number", "schema", index)
+
+    elif op == "rest":
+        kind = str(p.get("kind", "night")).strip().lower()
+        aliases = {"sleep": "night", "night's rest": "night", "full night": "night",
+                   "long rest": "night", "overnight": "night", "camp": "night",
+                   "bed": "bed rest", "bedrest": "bed rest", "full day": "bed rest",
+                   "day": "bed rest", "complete bed rest": "bed rest"}
+        kind = aliases.get(kind, kind)
+        if kind not in ("night", "bed rest"):
+            raise IntentError(
+                f"rest: {p.get('kind')!r} is not a kind of rest. A night is eight hours "
+                f"and heals your level in hit points; bed rest is a full day and night "
+                f"and heals twice that.",
+                "schema", index,
+            )
+        p["kind"] = kind
 
     elif op == "spawn":
         # Validation has to cover everything resolution accepts. It did not here, and an

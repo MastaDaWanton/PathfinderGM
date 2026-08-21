@@ -318,6 +318,23 @@ class Engine:
             )
 
     def _check_legality(self, intent: Intent, index: int) -> None:
+        if intent.op == "rest" and self.scene.in_encounter:
+            # "Any significant interruption during your rest prevents you from healing
+            # that night." Being in a fight is the significant interruption.
+            raise IntentError(
+                "rest: there is a fight going on. Nobody sleeps through a fight, and a "
+                "night's rest cannot be taken mid-encounter.",
+                "legality", index,
+            )
+        if intent.op == "rest":
+            pc = self.scene.pc()
+            if pc is not None and pc.hp < 0:
+                raise IntentError(
+                    f"rest: {pc.name} is bleeding out, not sleeping. They have to be "
+                    f"stabilised first.",
+                    "legality", index,
+                )
+
         actor = self.scene.get(intent.actor) if intent.actor else None
         if actor and intent.op in ("attack", "move", "check") and not actor.can_act():
             raise IntentError(
@@ -920,6 +937,59 @@ class Engine:
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
             effects=[{"kind": "initiative", "order": order}],
             tell=f"Initiative: {names}.", because=intent.because,
+        )
+
+    def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:
+        """Stop the fight. The GM's call: they run, they yield, you get clear."""
+        if not self.scene.in_encounter:
+            return Outcome(intent_id=intent.id, op="end_encounter",
+                           tell="", because=intent.because)
+        standing = [self.scene.actors[r].name for r, _ in self.scene.initiative
+                    if self.scene.conscious(r)]
+        self.scene.end_encounter()
+        return Outcome(
+            intent_id=intent.id, op="end_encounter",
+            effects=[{"kind": "encounter", "ended": True}],
+            tell="The fighting stops." + (f" Still standing: {', '.join(standing)}."
+                                          if standing else ""),
+            because=intent.because,
+        )
+
+    def _op_rest(self, intent: Intent, partial: dict) -> Outcome:
+        """Sleep it off. Natural healing, CRB p.191.
+
+        Everyone in the scene who is not hostile rests — in practice the PC, since the
+        GM's people are not on the sheet. The clock moves, conditions expire, and the
+        wounded wake up better than they went to bed, which is the only way a campaign
+        survives its first real fight.
+        """
+        kind = intent.params.get("kind", "night")
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("rest: nobody here to rest", "refs")
+
+        result = actor.rest(kind)
+        hours = result["hours"]
+        self.scene.clock_minutes += hours * 60
+        ended = actor.tick_conditions(hours * 600)      # ten rounds to the minute
+
+        bits = [f"{actor.name} rests for {hours} hours."]
+        if result["healed"]:
+            bits.append(f"{actor.name} recovers {result['healed']} hit points "
+                        f"({actor.hp}/{actor.hp_max}).")
+        elif actor.hp >= actor.hp_max:
+            bits.append(f"{actor.name} was already unhurt.")
+        if result["woke"]:
+            bits.append(f"{actor.name} is on their feet again.")
+        if ended:
+            bits.append("Ended: " + ", ".join(ended) + ".")
+
+        return Outcome(
+            intent_id=intent.id, op="rest",
+            effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
+                      "hours": hours, "hp_after": actor.hp}],
+            tell=" ".join(bits), because=intent.because,
         )
 
     def _op_spawn(self, intent: Intent, partial: dict) -> Outcome:

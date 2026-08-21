@@ -24,6 +24,9 @@ from world.loader import load_cached
 
 SAVE_VERSION = 1
 
+# The campaign a fresh install starts in, before anyone has been enrolled.
+DEFAULT_CAMPAIGN = "slice"
+
 # The town of Pangrella in the shipped export, by durable id. Not by name: the world is
 # also called Pangrella.
 PANGRELLA_TOWN = "5bbd0c40345f"
@@ -98,6 +101,17 @@ class Campaign:
         }
         p = self.path()
         p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+
+        # Keep the roster's copy of the sheet level with the game. Nothing called
+        # `roster.record`, so the roster showed every character at the hit points they
+        # were created with: Kesst read 9/9 in the "who is playing" list while her save
+        # had her at 3, which is exactly the number you are choosing on.
+        if self.character_id:
+            from . import roster
+
+            pc = self.scene.pc()
+            if pc is not None:
+                roster.record(self.character_id, pc, turns_played=len(self.turn_log))
         return p
 
     @classmethod
@@ -169,9 +183,29 @@ def opening_text(campaign: Campaign) -> str:
         f"{loc.name}, after dark. {loc.fact('Architecture')} "
         f"The guild yard is shut for the night, and there is a lamp on a chain over the "
         f"wall.\n\n"
-        f"You are {pc.name} — {pc.heritage}, flightless, in a city whose nobility is not. "
+        f"You are {pc.name} — {_standing(campaign.world, pc)}. "
         f"What do you do?"
     )
+
+
+def _standing(world, pc) -> str:
+    """Who this character is in this city, in a line.
+
+    Read from the export's own facts rather than written once and left. The opening used
+    to say "flightless, in a city whose nobility is not" for everybody, which is true of
+    Kesst and flatly wrong for a winged Korvu — the app shipped two more characters and
+    kept telling them they could not fly.
+    """
+    people = world.get(pc.world_people_id) if pc.world_people_id else None
+    if people is None:
+        return f"{pc.heritage or pc.race}, a long way from anyone who knows you"
+
+    origin = people.fact("Origin", "")
+    if "flightless" in origin.lower():
+        return f"{people.name} — flightless, in a city whose nobility is not"
+    if "wing" in people.fact("Anatomy", "").lower():
+        return f"{people.name} — winged, in a city that expects you to act like it"
+    return f"{people.name} — {origin.rstrip('.').lower()}, and a stranger here"
 
 
 # --- Live store ---------------------------------------------------------------------------
@@ -181,7 +215,76 @@ def opening_text(campaign: Campaign) -> str:
 _LIVE: dict[str, Campaign] = {}
 
 
-def current(campaign_id: str = "slice", reset: bool = False) -> Campaign:
+def _pointer() -> Path:
+    d = Path(settings.CAMPAIGN_DIR)
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "active.txt"
+
+
+def active_id() -> str:
+    """Which campaign is being played.
+
+    One campaign per character, named for them, so switching characters is switching
+    campaigns and each one keeps its own scene, transcript and world state. A character
+    you come back to is where you left them rather than at the start of a new game.
+    """
+    try:
+        name = _pointer().read_text(encoding="utf-8").strip()
+    except OSError:
+        name = ""
+    return name or DEFAULT_CAMPAIGN
+
+
+def set_active(campaign_id: str) -> None:
+    _pointer().write_text(campaign_id, encoding="utf-8")
+
+
+def switch_to(character_id: str) -> Campaign:
+    """Play somebody else. Their campaign resumes where it stopped."""
+    from . import roster
+
+    entry = roster.load(character_id)
+    if entry is None:
+        raise LookupError(f"no character {character_id!r}")
+    if entry.status == roster.DEAD:
+        raise ValueError(f"{entry.name} is dead")
+
+    # A character's campaign is the one their roster entry names. Assuming it was named
+    # after them was very nearly true and quietly wrong: Kesst's real game lived in
+    # `slice.json` from before campaigns were per-character, so switching to her opened a
+    # brand new `kesst-vayr` campaign at full hit points and left the played one behind.
+    # `campaign_id` is the record of which campaign is hers; the id is not.
+    campaign_id = entry.campaign_id or character_id
+    set_active(campaign_id)
+    if campaign_id not in _LIVE and not _save_path(campaign_id).exists():
+        # Enrolled but never played — begin their campaign now, without enrolling them
+        # a second time.
+        c = new_campaign(campaign_id, character=entry.actor)
+        c.character_id = character_id
+        c.transcript.append({"who": "gm", "text": opening_text(c)})
+        c.save()
+        _LIVE[campaign_id] = c
+        if not entry.campaign_id:
+            entry.campaign_id = campaign_id
+            roster.save(entry)
+    if entry.status == roster.RETIRED:
+        entry.status = roster.ALIVE
+        roster.save(entry)
+
+    c = current(campaign_id)
+    # Saving on the way in is what brings the roster's copy of the sheet up to date (see
+    # `Campaign.save`). Without it a character carried on being listed at the hit points
+    # they were created with until they next took a turn — so the list you pick from was
+    # wrong at exactly the moment you were reading it.
+    c.save()
+    return c
+
+
+def _save_path(campaign_id: str) -> Path:
+    return Campaign(id=campaign_id, world_source="", scene=Scene()).path()
+
+
+def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
     """The campaign in play, resumed from disk if it is not already in memory.
 
     Reading the save back was missing, and the consequence was not merely that a restart
@@ -189,6 +292,7 @@ def current(campaign_id: str = "slice", reset: bool = False) -> Campaign:
     *overwrote* the campaign with a fresh one. A session could not survive the app being
     closed, which is not a game anyone can run.
     """
+    campaign_id = campaign_id or active_id()
     if reset:
         _LIVE.pop(campaign_id, None)
         path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
@@ -254,10 +358,22 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     return c
 
 
-def begin_with(character, campaign_id: str = "slice") -> Campaign:
-    """Start a fresh campaign for a new character, archiving whatever went before."""
-    current(campaign_id, reset=True)          # archives the old save
-    _LIVE.pop(campaign_id, None)
-    c = _begin(campaign_id, character=character)
-    _LIVE[campaign_id] = c
+def begin_with(character) -> Campaign:
+    """Start a campaign for a new character.
+
+    Named for them, so it sits alongside everyone else's rather than replacing whoever
+    was in the one shared slot. Nothing is archived and nothing is lost: the character
+    you were playing keeps their campaign, and you can go back to it.
+    """
+    from . import roster
+
+    entry = roster.enrol(character)
+    c = new_campaign(entry.id, character=character)
+    c.character_id = entry.id
+    entry.campaign_id = entry.id
+    roster.save(entry)
+    c.transcript.append({"who": "gm", "text": opening_text(c)})
+    c.save()
+    _LIVE[entry.id] = c
+    set_active(entry.id)
     return c
