@@ -101,7 +101,7 @@ Tier 1. A table, plus references into the shapes below.
 id: homebrew:blood-bending
 kind: class
 hit_die: 2d8                 # a dice expression, not an int — 1e assumes one die
-hit_dice_per_level: 1        # see §6: "per Hit Die" effects need a count, not a size
+hit_dice_per_level: 2        # see §6: "per Hit Die" effects need a count, not a size
 bab: three_quarters          # named progression, so iteratives are derived not typed
 saves: {fort: good_plus_1, ref: good, will: good_minus_1}
 skill_ranks: 4
@@ -210,12 +210,21 @@ the engine's arithmetic.** Nothing in the maths stops an enemy attacking whoever
 compels:
   - id: aggressive_draw
     save: {kind: will, dc: standard}
-    on_fail: {must_target: source, else: {attack: -4}, rounds: 1}
+    on_fail: {prefer_target: source, else: {attack: -4}, rounds: 1}
+    binding: false                       # a penalty, not a prohibition
 ```
 
 This is fed to *both* writers: into the scene brief so the GM knows, and into the legality
-check so the engine verifies. The two-writers model already assumes the GM will sometimes
-ignore what it was told, and this is exactly that case.
+check so the engine applies the penalty. The two-writers model already assumes the GM will
+sometimes ignore what it was told, and this is exactly that case.
+
+**Compulsions penalise; they do not prohibit.** The engine never refuses an intent for
+targeting the wrong creature — it attaches the −4 and lets the attack through. This is the
+author's decision and the reasoning is sound on its own terms: an enemy that eats −4 to
+swing at somebody else will usually miss, and if it connects, Crimson Guard lets the
+Coagulator take the hit anyway. The path pulls aggro through consequences rather than
+through a rule that overrides the fiction, which is also the only reading that leaves the
+GM free to have a desperate enemy do the desperate thing.
 
 ### 4.7 Composed action and judgement bands
 
@@ -321,15 +330,39 @@ is derivable, and a derived column cannot arrive shuffled.
 `hit_die: 2d8` is the *size* of a level's roll. But 1e also uses "Hit Die" as a **count** —
 and Blood Bending does too: all three Rage tiers grant *"2/3/4 temporary hit points per Hit
 Die"*. In every other class the two are interchangeable, because one level is one die. Here
-they are not, and the class is the first thing in the app to make the distinction matter.
+they are not, and this class is the first thing in the app to make the distinction matter.
 
-If 2d8 per level means **one** Hit Die of unusual size, a 20th-level Blood Bender under
-Mighty Blood Rage gains +80 temporary hit points. If it means **two** Hit Dice, the same
-character gains +160. Nothing in either source settles it, so `hit_dice_per_level` is
-explicit in §4.1 and defaults to 1 — and the difference is large enough that it should be
-the author's decision, not a default nobody looked at.
+**Two Hit Dice per level**, per the author. A 20th-level Blood Bender therefore has 40 HD:
+Mighty Blood Rage grants +160 temporary hit points, and the character sits outside the HD
+caps on effects like *sleep* and *colour spray* far earlier than their level suggests.
+`hit_dice_per_level` is explicit in §4.1 because any effect keyed to HD reads it, and a
+class that silently used level would be wrong in both directions.
 
-The same ambiguity reaches anything else keyed to HD, so it wants answering once.
+### Designed for a party of one
+
+The author's stated intent: *this class is designed to take on solo what a four-person
+party would normally take on.* That is not a footnote — it resolves a mismatch the app
+already has.
+
+Pathfinder's encounter maths assumes a group. The Core Rulebook says so in as many words:
+*"these encounter creation guidelines assume a group of four or five PCs."* This app runs
+**one** PC. Every CR and APL number in `reference/encounter-design.json` is therefore
+calibrated for a party this app does not have, and that is true today, for Kesst, with no
+homebrew involved.
+
+So Blood Bending is not merely a class the overlay has to survive. It is a class built to
+close exactly the gap between what 1e's encounter tables assume and what a single-player 1e
+app actually is. Its hit dice, its three near-good saves, its DR, its temp HP economy and
+its self-healing all read differently in that light: not overtuned, but tuned for a party
+of one.
+
+Two consequences for the engine, both outside this document's scope but recorded here
+because this is where the reasoning lives:
+
+- CR budgeting needs a party-size input, and for this app it is 1 unless a class declares
+  otherwise. A class may want to advertise `party_equivalent: 4`.
+- Encounter difficulty is one of the few places the GM agent reaches for a number without
+  the engine owning it. That is a protocol gap, not a homebrew one.
 
 Values supplied by the author after both files were read:
 
@@ -358,13 +391,12 @@ crit confirmation off, massive damage off. It may not replace how attacks resolv
 
 ## 8. Open
 
-- **Do compulsions bind the GM, or only penalise it?** The engine can refuse an intent that
-  targets the wrong creature, or it can let it through at −4 as written. The text says −4,
-  which suggests the softer reading, but a GM that ignores aggro entirely makes the whole
-  Coagulator path inert.
 - **How does an overlay written against an older registry heal?** Reporting at load is the
   floor. Offering the closest current check by name is better, and is the same
   nearest-match machinery the editor already needs for typos.
 - **Does a homebrew class need its own GM guidance?** A class whose entire economy is
   self-inflicted non-lethal damage will read as suicidal to a narrator that has not been
-  told otherwise.
+  told otherwise. Blood Bending's own answer — *"take on solo what a four-person party
+  would"* — is a sentence the GM needs, and there is nowhere in the format to put it yet.
+- **Where does party size live?** It is not a class fact, a campaign fact or a world fact
+  cleanly; it is a property of the table. But nothing can budget an encounter without it.
