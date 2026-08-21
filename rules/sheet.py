@@ -19,11 +19,12 @@ import re
 
 from .dice import Modifier
 from .tables import (
-    ABILITIES, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
+    ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
-    WEAPONS, ability_modifier, bab_for, is_physical, iterative_attacks,
-    normalise_damage_type, power_attack_terms, save_for,
+    WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
+    is_physical, iterative_attacks, material_for, normalise_damage_type,
+    power_attack_terms, save_for,
 )
 
 
@@ -45,6 +46,86 @@ class Condition:
     @property
     def data(self) -> dict:
         return CONDITIONS.get(self.key, {})
+
+
+# Rules an actor may be exempted from, by a class feature or a homebrew ruleset. Named
+# and listed so an override can be checked at load: a typo in `temp_hp.stacks` would
+# otherwise be a feature that simply never happens, with nothing anywhere saying why.
+ACTOR_RULES = {
+    "temp_hp.stacks": (
+        "Temporary hit points from different sources add up instead of the best one "
+        "applying. Blood Bending needs this from 1st level: its whole economy is hit "
+        "points as a resource, and a Coagulator stacking Blood Sponge over a ward is the "
+        "path working as written."
+    ),
+}
+
+
+@dataclass
+class Item:
+    """A thing that can be broken.
+
+    Objects were strings on the sheet — "ring of protection +1" in a slot — which is
+    enough to wear something and not enough for anything to happen to it. Acid on a
+    scabbard, a sundered blade and a shield that splinters all need the same two numbers
+    the Core Rulebook gives every object: hardness, and hit points of its own.
+    """
+    name: str
+    material: str = ""
+    hardness: int | None = None
+    hp: int | None = None
+    hp_max: int | None = None
+
+    def __post_init__(self):
+        self.material = self.material or material_for(self.name)
+        spec = MATERIALS.get(self.material, MATERIALS["steel"])
+        if self.hardness is None:
+            self.hardness = spec["hardness"]
+        if self.hp_max is None:
+            # An inch is the Core Rulebook's unit and most carried gear is about that.
+            self.hp_max = max(1, spec["hp_per_inch"])
+        if self.hp is None:
+            self.hp = self.hp_max
+
+    @property
+    def broken(self) -> bool:
+        """Half hit points or less is the *broken* condition, which is not destroyed."""
+        return 0 < self.hp <= self.hp_max // 2
+
+    @property
+    def destroyed(self) -> bool:
+        return self.hp <= 0
+
+    def take_damage(self, amount: int, dtype: str = "untyped") -> dict:
+        """Hardness first, then the object's hit points.
+
+        Energy is halved against objects before hardness, per the Core Rulebook — except
+        acid, which this app needs to bite: an ability whose whole point is ruining
+        equipment would otherwise read as a rounding error.
+        """
+        rolled = max(0, int(amount))
+        d = normalise_damage_type(dtype)
+        halved = d in ENERGY_VS_OBJECTS_HALVED
+        after_energy = rolled // 2 if halved else rolled
+
+        reduced = min(after_energy, self.hardness)
+        taken = after_energy - reduced
+        was_broken = self.broken
+        self.hp = max(0, self.hp - taken)
+        return {
+            "item": self.name, "rolled": rolled, "type": d, "halved": halved,
+            "hardness": self.hardness, "reduced": reduced, "taken": taken,
+            "hp": self.hp, "hp_max": self.hp_max,
+            "broken": self.broken and not was_broken, "destroyed": self.destroyed,
+        }
+
+
+@dataclass
+class TempPool:
+    """One source's worth of temporary hit points."""
+    amount: int
+    source: str = ""
+    rounds_left: int | None = None      # None = until spent or dismissed
 
 
 @dataclass
@@ -80,8 +161,16 @@ class Actor:
     size: str = "medium"
 
     abilities: dict[str, int] = field(default_factory=dict)
+    # Kept apart from the scores and from each other because they are undone separately:
+    # damage heals back over days, drain does not heal at all.
+    ability_damage: dict[str, int] = field(default_factory=dict)
+    ability_drain: dict[str, int] = field(default_factory=dict)
     ranks: dict[str, int] = field(default_factory=dict)
     feats: list[str] = field(default_factory=list)
+    # Every class in the book has one Hit Die per level, so nothing has ever needed to
+    # tell HD and level apart. Blood Bending has two, and every "per Hit Die" effect is
+    # wrong by a factor of two without this.
+    hit_dice_per_level: int = 1
 
     armour: str = "none"
     shield: str = "none"
@@ -92,13 +181,21 @@ class Actor:
     hp_max: int = 1
     hp: int = 1
     # Temporary hit points sit *on top of* hp_max rather than inside it, are spent before
-    # real hit points, and are not restored by healing. Kept as one number with its source
-    # because 1e does not let them stack: a second source replaces the first or is
-    # ignored, and the source is how the sheet says which.
-    temp_hp: int = 0
-    temp_hp_source: str = ""
+    # real hit points, and are not restored by healing.
+    #
+    # A list rather than a number even though 1e keeps only the best, because the pools
+    # expire independently: rage temporary hit points end with the rage while a ward's
+    # last the minute. One number could hold the total or the duration, never both.
+    temp_pools: list["TempPool"] = field(default_factory=list)
     reductions: list[Reduction] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
+    # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
+    # misspelled override fails loudly instead of silently never applying.
+    overrides: dict[str, bool] = field(default_factory=dict)
+    # Gear that has been hurt, keyed by item name. Slots and `weapons` stay plain strings:
+    # an undamaged sword needs no record, and creating one for every item a character owns
+    # would put a hardness and a hit point total beside every rope and every torch.
+    gear: dict[str, Item] = field(default_factory=dict)
 
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
@@ -174,13 +271,126 @@ class Actor:
         return CLASSES.get(self.char_class or "", {})
 
     def ability_score(self, ab: str) -> int:
+        """The score as it stands, after everything that has happened to it.
+
+        Three different things reduce an ability and 1e keeps them apart on purpose:
+        a *penalty* from a condition lifts when the condition does, *damage* heals back
+        over days, and *drain* is a real loss of the score. They are stored separately
+        because they are undone separately — folding them into one number would make
+        "you got better" impossible to compute.
+
+        The floor is 0, not negative: a score at 0 is already the worst thing that
+        happens to it (see `ability_zero_effects`), and letting it go to -3 would quietly
+        deepen every modifier derived from it.
+        """
         score = self.abilities.get(ab, 10)
         for c in self.conditions:
             score += c.data.get("ability_penalty", {}).get(ab, 0)
-        return score
+        score -= self.ability_damage.get(ab, 0)
+        score -= self.ability_drain.get(ab, 0)
+        return max(0, score)
+
+    def base_ability_score(self, ab: str) -> int:
+        """Before damage and drain — what it heals back towards."""
+        return self.abilities.get(ab, 10)
 
     def ability_mod(self, ab: str) -> int:
         return ability_modifier(self.ability_score(ab))
+
+    # --- ability damage ---------------------------------------------------------------
+
+    def damage_ability(self, ab: str, amount: int, drain: bool = False) -> dict:
+        """Reduce an ability score. `drain` for the permanent kind.
+
+        Constitution is the one with a second effect: losing Con modifier costs hit
+        points, one per Hit Die per point of modifier. Skipping that is the single
+        easiest way for Con damage to look like it worked while doing nothing — the score
+        drops, the Fortitude save drops, and the character's hit points sit there
+        unchanged as though a poison had never touched them.
+        """
+        ab = ab.strip().lower()
+        if ab not in ABILITIES:
+            raise KeyError(f"no such ability {ab!r}")
+        amount = max(0, int(amount))
+        before_mod = self.ability_mod("con")
+
+        book = self.ability_drain if drain else self.ability_damage
+        book[ab] = book.get(ab, 0) + amount
+
+        hp_change = 0
+        if ab == "con":
+            hp_change = self._apply_con_change(before_mod)
+        return {
+            "ability": ab, "amount": amount, "kind": "drain" if drain else "damage",
+            "score": self.ability_score(ab), "hp_change": hp_change,
+            "zero": self.ability_score(ab) == 0,
+        }
+
+    def heal_ability(self, ab: str, amount: int) -> int:
+        """Ability *damage* heals; drain does not. Returns how much came back."""
+        ab = ab.strip().lower()
+        have = self.ability_damage.get(ab, 0)
+        back = min(have, max(0, int(amount)))
+        if not back:
+            return 0
+        before_mod = self.ability_mod("con")
+        self.ability_damage[ab] = have - back
+        if not self.ability_damage[ab]:
+            del self.ability_damage[ab]
+        if ab == "con":
+            self._apply_con_change(before_mod)
+        return back
+
+    def _apply_con_change(self, before_mod: int) -> int:
+        """Move hit points to match a changed Constitution modifier.
+
+        1e: hit points change by your Hit Dice times the change in modifier. Current hit
+        points move with the maximum, so a character at full stays at full and a wounded
+        one keeps their wound.
+        """
+        delta = (self.ability_mod("con") - before_mod) * max(1, self.hit_dice)
+        if not delta:
+            return 0
+        self.hp_max = max(1, self.hp_max + delta)
+        self.hp = min(self.hp + delta, self.hp_max)
+        return delta
+
+    def ability_zero_effects(self) -> list[str]:
+        """What a score of 0 does. 1e names a different consequence for each.
+
+        Constitution is death, and it is death *by a different route than hit points* —
+        a character killed by Con damage may be at full health, so nothing in
+        `apply_hp_state` would ever notice.
+        """
+        out = []
+        for ab in ABILITIES:
+            if self.ability_score(ab) > 0:
+                continue
+            if ab == "con" and not self.has_condition("dead"):
+                self.add_condition("dead", source="Constitution reduced to 0")
+                out.append("dead")
+            elif ab == "str" and not self.has_condition("helpless"):
+                self.add_condition("helpless", source="Strength reduced to 0")
+                out.append("helpless")
+            elif ab == "dex" and not self.has_condition("paralyzed"):
+                self.add_condition("paralyzed", source="Dexterity reduced to 0")
+                out.append("paralyzed")
+            elif ab in ("int", "wis", "cha") and not self.has_condition("unconscious"):
+                self.add_condition("unconscious",
+                                   source=f"{ABILITY_FULL[ab]} reduced to 0")
+                out.append("unconscious")
+        return out
+
+    @property
+    def hit_dice(self) -> int:
+        """Hit Dice, which is not always level.
+
+        Every class in the book has one die per level, so nothing has ever had to tell
+        them apart. Blood Bending has two, and anything counted "per Hit Die" — its own
+        Rage temporary hit points, the Constitution arithmetic above — is wrong by a
+        factor of two if this returns level.
+        """
+        return max(1, self.level * max(1, self.hit_dice_per_level))
 
     @property
     def bab(self) -> int:
@@ -549,25 +759,84 @@ class Actor:
 
     # --- temporary hit points ---------------------------------------------------------
 
-    def gain_temp_hp(self, amount: int, source: str = "") -> dict:
+    @property
+    def temp_hp(self) -> int:
+        return sum(p.amount for p in self.temp_pools)
+
+    @property
+    def temp_hp_source(self) -> str:
+        return ", ".join(p.source for p in self.temp_pools if p.source)
+
+    def allows(self, rule: str) -> bool:
+        if rule not in ACTOR_RULES:
+            raise KeyError(f"no such rule {rule!r}")
+        return bool(self.overrides.get(rule, False))
+
+    def gain_temp_hp(self, amount: int, source: str = "",
+                     rounds: int | None = None) -> dict:
         """1e: temporary hit points from different sources do not stack — the best applies.
 
         Adding them would be the obvious implementation and it is wrong in a way that
         compounds: two 10-point sources would read as 20, survive a hit that should have
         dropped the character, and nothing on the sheet would show why.
 
-        Refreshing the *same* source is not stacking, so re-entering a rage sets the pool
+        Refreshing the *same* source is not stacking, so re-entering a rage sets that pool
         back to its own value rather than being ignored for being equal.
+
+        A class may be exempted through `temp_hp.stacks`, and Blood Bending is: hit points
+        are its resource, and a Coagulator layering Blood Sponge over a ward is the path
+        working as written rather than a rule being broken.
         """
         amount = max(0, int(amount))
-        same = source and source == self.temp_hp_source
-        if amount > self.temp_hp or same:
-            was, self.temp_hp, self.temp_hp_source = self.temp_hp, amount, source
-            return {"temp_hp": amount, "replaced": was, "source": source}
-        return {"temp_hp": self.temp_hp, "ignored": amount, "source": self.temp_hp_source}
+        existing = next((p for p in self.temp_pools if p.source == source), None)
 
-    def clear_temp_hp(self) -> int:
-        gone, self.temp_hp, self.temp_hp_source = self.temp_hp, 0, ""
+        if self.allows("temp_hp.stacks"):
+            if existing:
+                existing.amount += amount
+                existing.rounds_left = rounds
+            else:
+                self.temp_pools.append(TempPool(amount, source, rounds))
+            return {"temp_hp": self.temp_hp, "added": amount, "source": source,
+                    "stacked": True}
+
+        if existing:
+            existing.amount, existing.rounds_left = amount, rounds
+            self.temp_pools = [existing]
+            return {"temp_hp": amount, "refreshed": True, "source": source}
+
+        if amount > self.temp_hp:
+            was = self.temp_hp
+            self.temp_pools = [TempPool(amount, source, rounds)]
+            return {"temp_hp": amount, "replaced": was, "source": source}
+        return {"temp_hp": self.temp_hp, "ignored": amount,
+                "source": self.temp_hp_source}
+
+    def _spend_temp_hp(self, amount: int) -> int:
+        """Drain the pools that expire soonest first.
+
+        The alternative — draining the largest, or whatever happens to be first — throws
+        away the longest-lasting protection to soak a hit the short-lived pool could have
+        taken, which is never what a player wants and is invisible when it happens.
+        """
+        spent = 0
+        order = sorted(self.temp_pools,
+                       key=lambda p: (p.rounds_left is None, p.rounds_left or 0))
+        for pool in order:
+            if spent >= amount:
+                break
+            take = min(pool.amount, amount - spent)
+            pool.amount -= take
+            spent += take
+        self.temp_pools = [p for p in self.temp_pools if p.amount > 0]
+        return spent
+
+    def clear_temp_hp(self, source: str | None = None) -> int:
+        """Drop temporary hit points — all of them, or one source's when a buff ends."""
+        if source is None:
+            gone, self.temp_pools = self.temp_hp, []
+            return gone
+        gone = sum(p.amount for p in self.temp_pools if p.source == source)
+        self.temp_pools = [p for p in self.temp_pools if p.source != source]
         return gone
 
     def heal(self, amount: int) -> int:
@@ -614,11 +883,7 @@ class Actor:
         reduced = min(rolled, dr.amount) if dr else 0
         after_dr = rolled - reduced
 
-        absorbed = min(self.temp_hp, after_dr)
-        self.temp_hp -= absorbed
-        if self.temp_hp == 0:
-            self.temp_hp_source = ""
-
+        absorbed = self._spend_temp_hp(min(self.temp_hp, after_dr))
         taken = after_dr - absorbed
         self.hp -= taken
         return {
@@ -627,6 +892,35 @@ class Actor:
             "absorbed": absorbed, "taken": taken,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
         }
+
+    # --- gear -------------------------------------------------------------------------
+
+    def carried(self) -> list[str]:
+        """Everything on this character that could plausibly be damaged."""
+        out = list(self.weapons)
+        if self.equipped and self.equipped not in out:
+            out.append(self.equipped)
+        if self.armour and self.armour != "none":
+            out.append(self.armour)
+        if self.shield and self.shield != "none":
+            out.append(self.shield)
+        for worn in self.slots.values():
+            out.extend(w for w in worn if w)
+        return list(dict.fromkeys(out))
+
+    def item(self, name: str) -> Item:
+        """The record for one item, created the first time anything happens to it."""
+        key = (name or "").strip().lower()
+        if key not in self.gear:
+            self.gear[key] = Item(name=name.strip())
+        return self.gear[key]
+
+    def damage_item(self, name: str, amount: int, dtype: str = "untyped") -> dict:
+        return self.item(name).take_damage(amount, dtype)
+
+    def damage_all_gear(self, amount: int, dtype: str = "untyped") -> list[dict]:
+        """Acid in a blood pool does not pick a target. Everything carried takes it."""
+        return [self.damage_item(n, amount, dtype) for n in self.carried()]
 
     def add_condition(self, key: str, rounds: int | None = None, source: str = "") -> Condition:
         key = key.strip().lower()
@@ -644,7 +938,12 @@ class Actor:
         self.conditions = [c for c in self.conditions if c.key != key.strip().lower()]
 
     def tick_conditions(self, rounds: int = 1) -> list[str]:
-        """Expire timed conditions. Returns what ended, so it can be narrated."""
+        """Expire timed conditions and temporary hit points. Returns what ended.
+
+        Temporary hit points tick here too because they expire on the same clock, and a
+        ward that outlives its minute is a character walking around with defences the
+        rules ended several scenes ago.
+        """
         ended = []
         for c in list(self.conditions):
             if c.rounds_left is None:
@@ -653,6 +952,13 @@ class Actor:
             if c.rounds_left <= 0:
                 ended.append(c.name)
                 self.conditions.remove(c)
+        for p in list(self.temp_pools):
+            if p.rounds_left is None:
+                continue
+            p.rounds_left -= rounds
+            if p.rounds_left <= 0:
+                ended.append(f"{p.source or 'temporary hit points'} ({p.amount} temp)")
+                self.temp_pools.remove(p)
         return ended
 
     def apply_hp_state(self) -> list[str]:
@@ -729,8 +1035,18 @@ class Actor:
         elif self.has_condition("fatigued"):
             self.remove_condition("fatigued")
 
+        # "Ability damage returns at a rate of 1 point per day, or 2 points per day of
+        # complete bed rest, for each affected ability score." Per ability, not shared
+        # between them — a poison that hit both Strength and Constitution heals both at
+        # the same rate rather than taking twice as long.
+        restored = {}
+        for ab in list(self.ability_damage):
+            back = self.heal_ability(ab, per_level)
+            if back:
+                restored[ab] = back
+
         return {"healed": self.hp - before, "hours": hours, "woke": woke,
-                "per_level": per_level, "kind": kind}
+                "per_level": per_level, "kind": kind, "ability": restored}
 
     def bleed_out(self, dice) -> dict | None:
         """One round of dying: lose a hit point, then try to stabilise.
@@ -768,6 +1084,13 @@ class Actor:
             "hp_max": self.hp_max,
             "temp_hp": self.temp_hp,
             "dr": [r.label for r in self.reductions],
+            # A 10 that used to be a 14 is not the same as a 10, and the grid shows only
+            # the score. Without this the player sees a number and no reason for it.
+            "ability_damage": {a: self.ability_damage.get(a, 0)
+                               + self.ability_drain.get(a, 0)
+                               for a in ABILITIES
+                               if self.ability_damage.get(a) or self.ability_drain.get(a)},
+            "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "ac": self.ac(),
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
@@ -931,7 +1254,10 @@ def full_sheet(actor: Actor) -> dict:
         "abilities": [
             {"key": a, "name": ABILITY_NAMES[a], "score": actor.ability_score(a),
              "modifier": actor.ability_mod(a),
-             "base": actor.abilities.get(a, 10)}
+             "base": actor.abilities.get(a, 10),
+             # Shown apart, because a 10 that used to be a 14 is not the same as a 10.
+             "damage": actor.ability_damage.get(a, 0),
+             "drain": actor.ability_drain.get(a, 0)}
             for a in ABILITIES
         ],
         "defense": {
@@ -939,6 +1265,14 @@ def full_sheet(actor: Actor) -> dict:
                    "temp": actor.temp_hp, "temp_source": actor.temp_hp_source},
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
                     "source": r.source} for r in actor.reductions],
+            "temp_pools": [{"amount": p.amount, "source": p.source,
+                            "rounds_left": p.rounds_left} for p in actor.temp_pools],
+            # Only gear something has happened to. An undamaged sword has no record.
+            "gear": [{"name": i.name, "material": i.material, "hardness": i.hardness,
+                      "hp": i.hp, "hp_max": i.hp_max,
+                      "state": "destroyed" if i.destroyed
+                               else "broken" if i.broken else "worn"}
+                     for i in actor.gear.values() if i.hp < i.hp_max],
             "ac": _terms(actor.ac_modifiers("melee")),
             "ac_flat_footed": _terms(actor.ac_modifiers("melee", flat_footed=True)),
             "ac_touch": {"total": actor.ac() - armour["ac"] - shield["ac"]
@@ -1012,7 +1346,14 @@ def to_dict(actor: Actor) -> dict:
         "shield": actor.shield, "natural_armour": actor.natural_armour,
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
-        "temp_hp": actor.temp_hp, "temp_hp_source": actor.temp_hp_source,
+        "temp_pools": [{"amount": p.amount, "source": p.source,
+                        "rounds_left": p.rounds_left} for p in actor.temp_pools],
+        "ability_damage": dict(actor.ability_damage),
+        "ability_drain": dict(actor.ability_drain),
+        "hit_dice_per_level": actor.hit_dice_per_level,
+        "overrides": dict(actor.overrides),
+        "gear": {k: {"name": i.name, "material": i.material, "hardness": i.hardness,
+                     "hp": i.hp, "hp_max": i.hp_max} for k, i in actor.gear.items()},
         "reductions": [{"amount": r.amount, "bypass": r.bypass, "source": r.source}
                        for r in actor.reductions],
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
@@ -1024,6 +1365,29 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _temp_pools(data: dict) -> list[TempPool]:
+    """Saves written before temporary hit points were pooled hold a bare `temp_hp`."""
+    if data.get("temp_pools") is not None:
+        return [TempPool(amount=int(p.get("amount", 0)), source=p.get("source", ""),
+                         rounds_left=p.get("rounds_left"))
+                for p in data["temp_pools"] if int(p.get("amount", 0)) > 0]
+    if data.get("temp_hp"):
+        return [TempPool(int(data["temp_hp"]), data.get("temp_hp_source", ""))]
+    return []
+
+
+def _overrides(raw: dict) -> dict[str, bool]:
+    """A misspelled rule is a feature that never happens with nothing saying why, so it
+    is caught at load rather than never noticed."""
+    unknown = [k for k in raw if k not in ACTOR_RULES]
+    if unknown:
+        raise IllegalSheet(
+            f"no such rule to override: {', '.join(sorted(unknown))}. "
+            f"Known rules: {', '.join(sorted(ACTOR_RULES))}"
+        )
+    return {k: bool(v) for k, v in raw.items()}
 
 
 def _reduction(r) -> Reduction:
@@ -1056,8 +1420,15 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         equipped=data.get("equipped"),
         hp_max=data.get("hp_max", data.get("hp", 1)),
         hp=data.get("hp", 1),
-        temp_hp=data.get("temp_hp", 0),
-        temp_hp_source=data.get("temp_hp_source", ""),
+        temp_pools=_temp_pools(data),
+        ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
+        ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},
+        hit_dice_per_level=int(data.get("hit_dice_per_level", 1) or 1),
+        overrides=_overrides(data.get("overrides") or {}),
+        gear={k: Item(name=v.get("name", k), material=v.get("material", ""),
+                      hardness=v.get("hardness"), hp=v.get("hp"),
+                      hp_max=v.get("hp_max"))
+              for k, v in (data.get("gear") or {}).items()},
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),

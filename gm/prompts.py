@@ -180,6 +180,12 @@ Something that wards a person rather than mending them — a blessing, a shield 
 grants temporary hit points: {"op": "temp_hp", "params": {"amount": "2d6",
 "source": "the ward"}}. Never narrate a wound closing without one of these; if you do,
 the character walks away as hurt as they arrived and the player will see it on the sheet.
+Poison, disease, or anything that saps a body rather than wounding it damages a score:
+{"op": "ability_damage", "params": {"ability": "con", "amount": "1d4"}}. Add
+"drain": true only when the loss is permanent.
+Acid, and anything that eats what a person is carrying:
+{"op": "item_damage", "params": {"amount": "2d6", "type": "acid"}} — name an "item" for
+one thing, or leave it out and everything they carry takes it.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 

@@ -19,6 +19,13 @@ ABILITY_NAMES = {
     "int": "Int", "wis": "Wis", "cha": "Cha",
 }
 
+# The short forms above are what the sheet's ability grid wants. Prose wants the word:
+# "2 Con damage" reads as a spreadsheet, and the GM narrates from these strings.
+ABILITY_FULL = {
+    "str": "Strength", "dex": "Dexterity", "con": "Constitution",
+    "int": "Intelligence", "wis": "Wisdom", "cha": "Charisma",
+}
+
 
 def ability_modifier(score: int) -> int:
     """PF1e: (score - 10) // 2, floored toward negative infinity.
@@ -397,6 +404,50 @@ NON_PROFICIENT_PENALTY = -4
 # takes a fireball in full. Without a vocabulary here, DR would silently soak acid and
 # fire, and nothing in the numbers on screen would reveal it.
 
+# --- objects ------------------------------------------------------------------------------
+#
+# Core Rulebook, "Smashing an Object" (p.173-175). Hardness subtracts from every hit
+# before the object's own hit points are touched — the same shape as damage reduction,
+# and for the same reason: an object with hardness 10 is not scratched by a knife.
+
+MATERIALS: dict[str, dict] = {
+    "paper":      {"hardness": 0,  "hp_per_inch": 2},
+    "cloth":      {"hardness": 0,  "hp_per_inch": 2},
+    "rope":       {"hardness": 0,  "hp_per_inch": 2},
+    "ice":        {"hardness": 0,  "hp_per_inch": 3},
+    "glass":      {"hardness": 1,  "hp_per_inch": 1},
+    "leather":    {"hardness": 2,  "hp_per_inch": 5},
+    "hide":       {"hardness": 2,  "hp_per_inch": 5},
+    "wood":       {"hardness": 5,  "hp_per_inch": 10},
+    "bone":       {"hardness": 6,  "hp_per_inch": 10},
+    "stone":      {"hardness": 8,  "hp_per_inch": 15},
+    "iron":       {"hardness": 10, "hp_per_inch": 30},
+    "steel":      {"hardness": 10, "hp_per_inch": 30},
+    "mithral":    {"hardness": 15, "hp_per_inch": 30},
+    "adamantine": {"hardness": 20, "hp_per_inch": 40},
+}
+
+# What a thing is made of, when nobody said. Guessed from the name because the alternative
+# is asking the GM, and a GM asked for a material will invent one.
+MATERIAL_HINTS = (
+    ("adamantine", "adamantine"), ("mithral", "mithral"), ("mithril", "mithral"),
+    ("silk", "cloth"), ("cloak", "cloth"), ("robe", "cloth"), ("tunic", "cloth"),
+    ("boots", "leather"), ("gloves", "leather"), ("belt", "leather"),
+    ("scabbard", "leather"), ("pouch", "leather"), ("hide", "hide"),
+    ("bow", "wood"), ("staff", "wood"), ("club", "wood"), ("haft", "wood"),
+    ("shield", "wood"), ("scroll", "paper"), ("book", "paper"),
+    ("vial", "glass"), ("bottle", "glass"), ("flask", "glass"), ("potion", "glass"),
+    ("rope", "rope"), ("amulet", "stone"), ("ring", "iron"),
+    # The armour table's own names, which mostly say what they are but not always.
+    ("padded", "cloth"), ("quilted", "cloth"), ("chain", "steel"), ("scale", "steel"),
+    ("plate", "steel"), ("banded", "steel"), ("splint", "steel"), ("buckler", "steel"),
+)
+
+# Energy attacks deal half damage to objects (CRB p.174). Acid is the exception this app
+# needs first: Blood Bending's Caustic Blood eats equipment, and halving it would make a
+# defining ability read as a rounding error.
+ENERGY_VS_OBJECTS_HALVED = ("cold", "electricity", "fire", "sonic")
+
 PHYSICAL_DAMAGE = ("bludgeoning", "piercing", "slashing")
 ENERGY_DAMAGE = ("acid", "cold", "electricity", "fire", "sonic")
 
@@ -413,6 +464,27 @@ DAMAGE_TYPE_ALIASES = {
     "frost": "cold", "ice": "cold", "freezing": "cold",
     "thunder": "sonic", "force": "untyped", "untyped": "untyped",
 }
+
+
+def material_for(name: str) -> str:
+    """Guess what an item is made of from its name. Steel when nothing suggests otherwise
+    — most adventuring gear is, and it is the middle of the range rather than the
+    forgiving end.
+
+    Materials are checked before hints because half of them are also ordinary words for
+    the things made from them. Found in the app: `leather` armour came back *steel,
+    hardness 10*, since the hints knew about leather boots and leather belts and nothing
+    knew that "leather" is itself leather. Acid would have run off a jerkin like a
+    breastplate.
+    """
+    low = (name or "").lower()
+    for material in MATERIALS:
+        if material in low:
+            return material
+    for hint, material in MATERIAL_HINTS:
+        if hint in low:
+            return material
+    return "steel"
 
 
 def normalise_damage_type(dtype: str | None) -> str:

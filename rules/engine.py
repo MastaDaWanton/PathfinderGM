@@ -17,7 +17,7 @@ from . import dc as dc_mod
 from .dice import Dice, Modifier, Roll
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
-from .tables import MANEUVERS, SAVES, SIZE_ORDER, WEAPONS
+from .tables import ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS
 
 
 # --- Scene state -------------------------------------------------------------------
@@ -926,6 +926,78 @@ class Engine:
             intent_id=intent.id, op="temp_hp", rolls=[roll] if roll else [],
             effects=[{"ref": target.ref, "kind": "temp_hp", "temp_hp": target.temp_hp}],
             tell=tell, because=intent.because,
+        )
+
+    def _op_ability_damage(self, intent: Intent, partial: dict) -> Outcome:
+        """Damage to a score rather than to hit points.
+
+        Constitution carries hit points with it, and a score reduced to 0 has its own
+        consequence — which for Constitution is death by a route `apply_hp_state` cannot
+        see, since the character may be at full health when it happens.
+        """
+        ref = intent.params.get("to") or intent.target or intent.actor
+        if not ref:
+            raise IntentError("ability_damage: needs a target", "schema")
+        target = self.scene.actors[ref]
+        ab = str(intent.params["ability"]).strip().lower()[:3]
+        amount = intent.params["amount"]
+        roll = None
+        if isinstance(amount, str):
+            roll = self.dice.roll(amount, label=f"{ab.upper()} damage", visibility="hidden")
+            amount = roll.total
+
+        drain = bool(intent.params.get("drain"))
+        try:
+            res = target.damage_ability(ab, amount, drain=drain)
+        except KeyError as exc:
+            raise IntentError(f"ability_damage: {exc}", "schema") from exc
+
+        effects = [{"ref": target.ref, "kind": "ability_damage", **res}]
+        bits = [f"{target.name} takes {res['amount']} {ABILITY_FULL[ab]} "
+                f"{'drain' if drain else 'damage'} (now {res['score']})."]
+        if res["hp_change"]:
+            bits.append(f"Hit points {res['hp_change']:+d} "
+                        f"({target.hp}/{target.hp_max}).")
+        for c in target.ability_zero_effects():
+            effects.append({"ref": target.ref, "kind": "condition", "condition": c,
+                            "from": f"{ABILITY_FULL[ab]} 0"})
+            bits.append(f"{target.name} is {c}.")
+        return Outcome(
+            intent_id=intent.id, op="ability_damage", rolls=[roll] if roll else [],
+            effects=effects, tell=" ".join(bits), because=intent.because,
+        )
+
+    def _op_item_damage(self, intent: Intent, partial: dict) -> Outcome:
+        """Damage to gear. Named item, or everything carried when none is named."""
+        ref = intent.params.get("to") or intent.target or intent.actor
+        if not ref:
+            raise IntentError("item_damage: needs whose gear", "schema")
+        target = self.scene.actors[ref]
+        amount = intent.params["amount"]
+        roll = None
+        if isinstance(amount, str):
+            roll = self.dice.roll(amount, label="item damage", visibility="hidden")
+            amount = roll.total
+        dtype = intent.params.get("type", "untyped")
+
+        named = intent.params.get("item")
+        results = ([target.damage_item(str(named), amount, dtype)] if named
+                   else target.damage_all_gear(amount, dtype))
+        # Only say something about the gear that actually changed. A list of eleven items
+        # that all shrugged it off buries the one that did not.
+        notable = [r for r in results if r["taken"]]
+        bits = []
+        for r in notable:
+            state = ("destroyed" if r["destroyed"] else
+                     "broken" if r["broken"] else f"{r['hp']}/{r['hp_max']}")
+            bits.append(f"{target.name}'s {r['item']}: {r['taken']} through hardness "
+                        f"{r['hardness']} — {state}.")
+        if not bits:
+            bits.append(f"Nothing {target.name} carries is marked by it.")
+        return Outcome(
+            intent_id=intent.id, op="item_damage", rolls=[roll] if roll else [],
+            effects=[{"ref": target.ref, "kind": "item_damage", **r} for r in results],
+            tell=" ".join(bits), because=intent.because,
         )
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:

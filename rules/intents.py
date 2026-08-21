@@ -134,7 +134,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),
-    "temp_hp": (("amount",), ("to", "source"), "hidden"),
+    "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
+    # Poison, disease, a spell that withers: damage to a score rather than to hit points.
+    # `drain` for the permanent kind, which no amount of resting brings back.
+    "ability_damage": (("ability", "amount"), ("to", "drain"), "hidden"),
+    # Acid on a scabbard, a sundered blade. Objects have hardness and hit points of their
+    # own, and neither is on anybody's character sheet.
+    "item_damage": (("amount",), ("to", "item", "type"), "hidden"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
     # A fight ends when the fighting stops, which is a call about the fiction:
