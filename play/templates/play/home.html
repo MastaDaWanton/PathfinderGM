@@ -1,0 +1,370 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pathfinder GM</title>
+<style>
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
+  }
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
+    src: local("Cinzel SemiBold"), url("{% static 'fonts/Cinzel-SemiBold.woff2' %}") format("woff2");
+  }
+  :root {
+    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --bg: #0f0d0b; --panel: #17130f; --edge: #3a2f22; --ink: #e6dcc6;
+    --dim: #8e816a; --accent: #c9a86a; --alarm: #a8443a;
+    --gold: #d9c08a; --gold-dim: #7a6543; --sunk: #0c0a08;
+    --brew: #6fcf8f; --brew-dim: #2f5f42;
+  }
+  * { box-sizing: border-box; }
+  body {
+    /* Fixed frame, scrolling panes — the same rule the table and the bench needed.
+       A grid or flex child will not shrink below its content without `min-height: 0`. */
+    margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+    background:
+      radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
+      repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
+  }
+
+  header {
+    border-bottom: 1px solid var(--gold-dim); padding: 0 30px;
+    background: linear-gradient(#1b1510, #120e0a);
+    display: flex; align-items: flex-end; gap: 26px; flex-wrap: wrap;
+  }
+  h1 {
+    margin: 20px 0; color: var(--gold); white-space: nowrap;
+    font: 400 30px/1 var(--display); letter-spacing: .1em; font-variant: small-caps;
+  }
+  h1 small { display: block; margin-top: 6px; color: var(--dim);
+             font: italic 12px/1 var(--body); letter-spacing: .02em;
+             font-variant: normal; }
+  nav { display: flex; gap: 2px; align-self: flex-end; flex-wrap: wrap; }
+  .tab {
+    background: linear-gradient(#171209, #100d08); color: var(--dim); cursor: pointer;
+    border: 1px solid var(--edge); border-bottom: none; padding: 11px 22px 10px;
+    border-radius: 3px 3px 0 0; font: 400 16px/1 var(--display);
+    letter-spacing: .07em; font-variant: small-caps; position: relative; top: 1px;
+  }
+  .tab:hover:not(.on) { color: var(--ink); }
+  .tab.on {
+    color: var(--gold); background: linear-gradient(#241c12, var(--panel));
+    border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
+  }
+  .tab b { display: inline-block; margin-left: 7px; color: var(--dim);
+           font: 600 11px/1 var(--body); }
+
+  main { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 30px 40px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* --- continue --- */
+  .continue {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    background: linear-gradient(#1d2a22, #141c17); border: 1px solid var(--brew-dim);
+    border-radius: 3px; padding: 18px 22px; margin-bottom: 26px;
+  }
+  .continue .who { flex: 1; min-width: 220px; }
+  .continue .who b { display: block; color: var(--brew);
+    font: 400 24px/1.2 var(--display); letter-spacing: .04em; font-variant: small-caps; }
+  .continue .who span { color: var(--dim); font-size: 14px; }
+  a.go, button.go {
+    display: inline-block; text-decoration: none; cursor: pointer;
+    font: 400 17px/1 var(--display); letter-spacing: .1em; font-variant: small-caps;
+    padding: 14px 30px; border-radius: 2px; color: var(--brew);
+    background: linear-gradient(#1f3327, #16241c); border: 1px solid var(--brew-dim);
+  }
+  a.go:hover, button.go:hover { border-color: var(--brew); color: #b6f0ca; }
+  button.quiet {
+    cursor: pointer; font: 400 14px/1 var(--display); letter-spacing: .08em;
+    font-variant: small-caps; padding: 10px 18px; border-radius: 2px;
+    color: var(--gold); background: linear-gradient(#2a2114, #1a140c);
+    border: 1px solid var(--gold-dim);
+  }
+  button.quiet:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  button.quiet:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* --- cards --- */
+  .cards { display: grid; gap: 14px;
+           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card {
+    background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
+    border-radius: 3px; padding: 16px 18px; text-align: left;
+    box-shadow: inset 0 0 40px rgba(0,0,0,.5);
+  }
+  .card.pick { cursor: pointer; }
+  .card.pick:hover { border-color: var(--accent); }
+  .card.on { border-color: var(--gold); }
+  .card.bad { border-color: #5a2f2a; }
+  .card h3 {
+    margin: 0 0 4px; color: var(--gold); font: 400 21px/1.2 var(--display);
+    letter-spacing: .04em; font-variant: small-caps;
+  }
+  .card em { display: block; color: var(--dim); font: italic 13px/1.5 var(--body);
+             margin-bottom: 9px; }
+  .card .stat { color: var(--dim); font: 13px/1.6 var(--body); }
+  .card .stat b { color: var(--ink); font-weight: 600; }
+  .pill {
+    display: inline-block; margin: 0 5px 5px 0; padding: 3px 9px; border-radius: 10px;
+    background: rgba(217,192,138,.07); border: 1px solid var(--gold-dim);
+    color: var(--dim); font: 12px/1.4 var(--body);
+  }
+  .pill.now { border-color: var(--brew-dim); color: var(--brew); }
+  .pill.dead { border-color: #5a2f2a; color: #cf9d95; }
+  .pill.soon { opacity: .5; }
+
+  h2.sect {
+    margin: 28px 0 12px; color: var(--gold); font: 400 16px/1 var(--display);
+    letter-spacing: .12em; font-variant: small-caps; padding-bottom: 6px;
+    border-bottom: 1px solid #2b2319;
+  }
+  h2.sect:first-child { margin-top: 0; }
+  .note { color: var(--dim); font: italic 14px/1.6 var(--body); margin: 0 0 14px; }
+  .bad-note { color: #cf9d95; font-size: 13px; }
+  #err { color: var(--alarm); min-height: 1.4em; margin-top: 12px; font-size: 14px; }
+
+  .rows { max-height: 340px; overflow-y: auto; margin-top: 10px; }
+  .rows table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rows td { padding: 4px 6px; border-bottom: 1px solid #241d15; }
+  .rows td:nth-child(2) { color: var(--dim); width: 22%; }
+  .rows td:last-child { color: var(--dim); text-align: right; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pathfinder GM<small>a world by World Bible, played here</small></h1>
+  <nav id="tabs"></nav>
+</header>
+
+<main><div class="wrap" id="pane"></div></main>
+
+<script>
+const STATE = {{ state_json|safe }};
+let TAB = "worlds";
+let WORLD = null;        // the world card opened, if any
+let DETAIL = null;       // its campaigns and characters
+let BENCH = null;        // the homebrew bench opened, if any
+let PICKED = null;       // pregen chosen when starting a new game
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const TABS = [
+  { id: "worlds", name: "Available worlds", count: () => STATE.worlds.length },
+  { id: "homebrew", name: "Homebrew", count: () => STATE.benches.filter(b => b.ready).length },
+  { id: "characters", name: "Recent characters", count: () => STATE.recent.length },
+];
+
+function tabs() {
+  $("#tabs").innerHTML = TABS.map(t =>
+    `<button class="tab ${t.id === TAB ? "on" : ""}" data-tab="${t.id}">
+       ${esc(t.name)}<b>${t.count()}</b></button>`).join("");
+}
+
+function continueBlock() {
+  const c = STATE.continue;
+  if (!c) return "";
+  return `<div class="continue">
+    <div class="who">
+      <b>${esc(c.character)}</b>
+      <span>${esc(c.world)}${c.location ? ` · ${esc(c.location)}` : ""}${
+        c.biome ? ` · ${esc(c.biome)}` : ""} — ${esc(c.hp)} hp,
+        ${c.turns} turn${c.turns === 1 ? "" : "s"} played</span>
+    </div>
+    ${c.ended ? `<span class="pill dead">this game has ended</span>`
+              : `<a class="go" href="/play/">Continue</a>`}
+    <a class="go" style="color:var(--gold);border-color:var(--gold-dim);
+       background:linear-gradient(#2a2114,#1a140c)" href="/craft/">Crafting bench</a>
+  </div>`;
+}
+
+function paneWorlds() {
+  if (WORLD) return paneOneWorld();
+  return continueBlock() + `
+    <h2 class="sect">Worlds on the shelf</h2>
+    <p class="note">World Bible writes these; this app plays in them. Drop an export into
+      your worlds folder and it appears here.</p>
+    <div class="cards">${STATE.worlds.map(w => `
+      <button class="card pick ${w.playable ? "" : "bad"}" data-world="${esc(w.id)}">
+        <h3>${esc(w.name)}</h3>
+        <em>${esc(w.premise || "no premise recorded")}</em>
+        ${w.playable ? `<div class="stat">
+            <b>${w.entities}</b> entities · <b>${w.events}</b> events</div>
+          <div style="margin-top:8px">${w.settlements.slice(0, 4).map(s =>
+            `<span class="pill">${esc(s)}</span>`).join("")}</div>`
+          : `<div class="bad-note">${esc(w.problem)}</div>`}
+        ${w.shipped ? `<div class="stat" style="margin-top:8px">ships with the app</div>` : ""}
+      </button>`).join("")}
+    </div>`;
+}
+
+function paneOneWorld() {
+  const w = WORLD, d = DETAIL || { campaigns: [], characters: [], pregens: [] };
+  return `<button class="quiet" data-back="1">← all worlds</button>
+    <h2 class="sect">${esc(w.name)}</h2>
+    <p class="note">${esc(w.premise || "")} — ${w.entities} entities, ${w.events} events.
+      ${w.peoples.length ? "Peoples: " + w.peoples.map(esc).join(", ") + "." : ""}</p>
+
+    <h2 class="sect">Games</h2>
+    ${d.campaigns.length ? `<div class="cards">${d.campaigns.map(c => `
+      <div class="card">
+        <h3>${esc(c.character)}</h3>
+        <em>${esc(c.kind)}${c.ended ? " · ended" : ""}</em>
+        <div class="stat"><b>${c.turns}</b> turns · <b>${c.lines}</b> lines ·
+          ${esc(c.hp)} hp</div>
+        <div style="margin-top:9px">
+          ${c.active ? `<span class="pill now">in play</span>` : ""}
+          ${c.status === "dead" ? `<span class="pill dead">dead</span>` : ""}
+          ${c.character_id && c.status !== "dead"
+            ? `<button class="quiet" data-resume="${esc(c.character_id)}">${
+                c.active ? "Go to the table" : "Resume"}</button>` : ""}
+        </div>
+      </div>`).join("")}</div>`
+      : `<p class="note">Nothing has been played here yet.</p>`}
+
+    <h2 class="sect">Start something new</h2>
+    <p class="note">Sandbox play: no plot, no ending — the world goes on and the GM
+      answers what you do. Authored campaigns are not built yet.</p>
+    <div class="cards">${(d.pregens || []).map(p => `
+      <button class="card pick ${PICKED === p.source ? "on" : ""}"
+              data-pregen="${esc(p.source)}">
+        <h3>${esc(p.name)}</h3>
+        <em>${esc(p.line)} · ${p.hp} hp</em>
+        ${p.notes ? `<div class="stat">${esc(p.notes)}</div>` : ""}
+      </button>`).join("")}</div>
+    <p class="note" style="margin-top:14px">Full 1st-edition character creation is the
+      next piece; until it lands these are who there is to play.</p>
+    <button class="go" data-start="${esc(w.id)}" ${PICKED ? "" : "disabled"}
+            style="${PICKED ? "" : "opacity:.4;cursor:not-allowed"}">
+      Begin a sandbox${PICKED ? "" : " — pick somebody first"}</button>
+    <div id="err"></div>`;
+}
+
+function paneHomebrew() {
+  if (BENCH) {
+    const b = BENCH.bench;
+    return `<button class="quiet" data-backbench="1">← all benches</button>
+      <h2 class="sect">${esc(b.name)}</h2>
+      <p class="note">${esc(b.blurb)}</p>
+      ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
+        `<tr><td>${esc(r.name)}</td><td>${esc(r.kind)}</td>
+             <td>${esc(r.note)}</td></tr>`).join("")}</table></div>
+        <p class="note" style="margin-top:12px">These are what the app ships with. An
+          editor writes alongside them — never over them, so a corrected table in a later
+          build is not shadowed by a stale copy in your data folder.</p>`
+        : `<p class="note">Nothing here yet.</p>`}`;
+  }
+  return `<h2 class="sect">Workbenches</h2>
+    <p class="note">Content you author sits over what ships, never replacing it. The rules
+      a homebrew class brings with it are specified in docs/homebrew-rules.md.</p>
+    <div class="cards">${STATE.benches.map(b => `
+      <button class="card ${b.ready ? "pick" : ""}" data-bench="${esc(b.id)}"
+              ${b.ready ? "" : "disabled"} style="${b.ready ? "" : "opacity:.45"}">
+        <h3>${esc(b.name)}</h3>
+        <em>${esc(b.blurb)}</em>
+        ${b.ready ? `<span class="pill">${b.count} already</span>`
+                  : `<span class="pill soon">not built yet</span>`}
+      </button>`).join("")}</div>`;
+}
+
+function paneCharacters() {
+  if (!STATE.recent.length) return `<p class="note">Nobody has been played yet.</p>`;
+  return continueBlock() + `
+    <h2 class="sect">Everyone played</h2>
+    <p class="note">The dead stay on the roster — they are the reason the next game went
+      the way it did.</p>
+    <div class="cards">${STATE.recent.map(c => `
+      <div class="card">
+        <h3>${esc(c.name)}</h3>
+        <em>${esc(c.line)}${c.world ? ` · ${esc(c.world)}` : ""}</em>
+        <div class="stat">${esc(c.hp)} hp · <b>${c.turns_played}</b> turns played</div>
+        <div style="margin-top:9px">
+          ${c.active ? `<span class="pill now">in play</span>` : ""}
+          ${c.status === "dead" ? `<span class="pill dead">died${
+            c.epitaph ? " — " + esc(c.epitaph) : ""}</span>` : ""}
+          ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}">${
+            c.active ? "Go to the table" : "Play as " + esc(c.name)
+          }</button>` : ""}
+        </div>
+      </div>`).join("")}</div>
+    <div id="err"></div>`;
+}
+
+function render() {
+  tabs();
+  $("#pane").innerHTML =
+    TAB === "worlds" ? paneWorlds()
+    : TAB === "homebrew" ? paneHomebrew()
+    : paneCharacters();
+}
+
+document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { TAB = tab.dataset.tab; WORLD = null; BENCH = null; render(); return; }
+
+  const world = e.target.closest("[data-world]");
+  if (world) {
+    const card = STATE.worlds.find(w => w.id === world.dataset.world);
+    if (!card.playable) { return; }
+    WORLD = card; DETAIL = null; PICKED = null; render();
+    DETAIL = await (await fetch(`/api/world/${encodeURIComponent(card.id)}`)).json();
+    render();
+    return;
+  }
+  if (e.target.closest("[data-back]")) { WORLD = null; render(); return; }
+
+  const pregen = e.target.closest("[data-pregen]");
+  if (pregen) { PICKED = pregen.dataset.pregen; render(); return; }
+
+  const start = e.target.closest("[data-start]");
+  if (start && !start.disabled) {
+    try {
+      await post("/api/start", { world: start.dataset.start, source: PICKED });
+      location.href = "/play/";
+    } catch (err) { $("#err").textContent = err.message; }
+    return;
+  }
+
+  const resume = e.target.closest("[data-resume]");
+  if (resume) {
+    try {
+      await post("/api/resume", { id: resume.dataset.resume });
+      location.href = "/play/";
+    } catch (err) { const el = $("#err"); if (el) el.textContent = err.message; }
+    return;
+  }
+
+  const bench = e.target.closest("[data-bench]");
+  if (bench && !bench.disabled) {
+    BENCH = await (await fetch(`/api/bench/${encodeURIComponent(bench.dataset.bench)}`)).json();
+    render();
+    return;
+  }
+  if (e.target.closest("[data-backbench]")) { BENCH = null; render(); return; }
+});
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,9 +1,10 @@
 from django.urls import path
 
-from play import craft_views, views
+from play import craft_views, home_views, views
 
 urlpatterns = [
-    path("", views.table, name="table"),
+    path("", home_views.home, name="home"),
+    path("play/", views.table, name="table"),
     path("api/state", views.state, name="state"),
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
@@ -13,6 +14,10 @@ urlpatterns = [
     path("api/say", views.say, name="say"),
     path("api/roll", views.roll, name="roll"),
     path("craft/", craft_views.craft_page, name="craft"),
+    path("api/world/<str:world_id>", home_views.world_detail, name="world_detail"),
+    path("api/bench/<str:bench_id>", home_views.bench, name="bench"),
+    path("api/start", home_views.start_in_world, name="start_in_world"),
+    path("api/resume", home_views.resume, name="resume"),
     path("api/craft/ingredients", craft_views.craft_ingredients, name="craft_ingredients"),
     path("api/craft/preview", craft_views.craft_preview, name="craft_preview"),
     path("api/craft/do", craft_views.craft_do, name="craft_do"),
