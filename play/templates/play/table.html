@@ -40,12 +40,24 @@
   body {
     margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
     display: grid; grid-template-columns: 1fr 350px; height: 100vh;
+    /* The window is the frame; the panes inside it scroll. Without this the page itself
+       scrolls once the transcript is long, and reading the newest line means scrolling
+       the character sheet off the top of the screen. */
+    overflow: hidden;
     background:
       radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
       repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
   }
-  main { display: flex; flex-direction: column; min-width: 0; position: relative; }
-  #story { flex: 1; overflow-y: auto; padding: 40px 48px; }
+  /* `min-height: 0` on both columns is what actually makes the scrolling work, and it is
+     invisible by its absence: a grid item defaults to `min-height: auto`, which refuses
+     to shrink below its content. Measured with a 26-line transcript — the body was a
+     correct 1222px while main and aside were both 2672px, so `overflow-y: auto` on the
+     panes inside them had nothing to overflow and the whole document scrolled instead. */
+  main {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    position: relative;
+  }
+  #story { flex: 1; min-height: 0; overflow-y: auto; padding: 40px 48px; }
   .beat { margin: 0 0 22px; max-width: 64ch; white-space: pre-wrap; }
   .beat.player { color: var(--player); font-style: italic; }
   .beat.player::before { content: "❧ "; opacity: .55; font-style: normal; }
@@ -74,7 +86,7 @@
 
   aside {
     border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
-    font: 14px/1.55 var(--body);
+    min-height: 0; font: 14px/1.55 var(--body);
     background: linear-gradient(#16120e, #100d0a);
     box-shadow: inset 1px 0 0 rgba(217,192,138,.08);
   }
