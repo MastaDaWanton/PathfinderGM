@@ -21,7 +21,7 @@ from gm.client import ModelUnavailable, available
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
-from . import player_input
+from . import downed, player_input, roster
 
 
 def _recent_events(world, location, limit=4):
@@ -109,6 +109,58 @@ def _player_visible_entry(entry: dict) -> dict:
             "rolls": rolls,
         })
     return {"kind": entry.get("kind"), "outcomes": outcomes}
+
+
+
+def _end_campaign(c, pc) -> None:
+    """The campaign is over for this character. The character is not deleted."""
+    epitaph = next((b["text"] for b in reversed(c.transcript)
+                    if b["who"] == "gm" and b.get("kind") == "consequence"), "")
+    if c.character_id:
+        roster.bury(c.character_id, pc, epitaph=epitaph[:300])
+    c.ended = "died"
+    c.scene.end_encounter()
+
+
+def _ended_payload(c) -> dict:
+    pc = c.scene.pc()
+    return {
+        "ended": c.ended,
+        "death": downed.death_notice(pc) if pc else "",
+        "choices": roster.pregens(),
+        "roster": [e.summary() for e in roster.everyone()],
+    }
+
+
+@require_GET
+def characters(request):
+    """Everyone who has been played, and everyone available to play."""
+    c = campaign_mod.current()
+    return JsonResponse({
+        "playing": c.character_id,
+        "ended": c.ended,
+        "roster": [e.summary() for e in roster.everyone()],
+        "choices": roster.pregens(),
+    })
+
+
+@require_POST
+def new_character(request):
+    """Retire the campaign and begin again with somebody else.
+
+    The old campaign is archived rather than deleted, and the dead character stays on
+    the roster — a character who died in the second session is the reason the third one
+    went the way it did.
+    """
+    body = json.loads(request.body or "{}")
+    source = str(body.get("source", "")).strip()
+    try:
+        character = roster.from_pregen(source)
+    except FileNotFoundError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+
+    c = campaign_mod.begin_with(character)
+    return JsonResponse(_state(c))
 
 
 @ensure_csrf_cookie
@@ -207,6 +259,26 @@ def say(request):
     said = player_input.check(text)
     if not said.ok:
         return JsonResponse({"hint": said.hint, "offending": said.offending}, status=422)
+
+    # A character at or below 0 hit points does not get a turn. Nothing used to ask:
+    # Kesst was dying at -3, the player typed "now what", and the GM cheerfully narrated
+    # her dodging and stumbling while a thug attacked her and a second encounter began.
+    # What happens to the downed is the rules' business, not the GM's.
+    if c.ended:
+        return JsonResponse(_ended_payload(c), status=410)
+
+    pc = c.scene.pc()
+    if downed.state_of(pc) not in ("fine", "disabled"):
+        c.transcript.append({"who": "player", "text": text})
+        outcome = downed.resolve(c)
+        for line in outcome.lines:
+            c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+        if outcome.died:
+            _end_campaign(c, pc)
+            c.save()
+            return JsonResponse({**_state(c), **_ended_payload(c)}, status=200)
+        c.save()
+        return JsonResponse(_state(c))
 
     c.transcript.append({"who": "player", "text": text})
     world = c.world

@@ -1,0 +1,32 @@
+{
+  "name": "Borin Achereth",
+  "kind": "pc",
+  "level": 1,
+  "class": "fighter",
+  "race": "human",
+  "pronouns": "he/him",
+  "size": "medium",
+
+  "heritage": "Nahyrin",
+  "world_people_id": "fa4c64db4d99",
+  "world_entity_id": null,
+
+  "abilities": { "str": 17, "dex": 13, "con": 14, "int": 10, "wis": 12, "cha": 8 },
+
+  "ranks": {
+    "climb": 1,
+    "intimidate": 1,
+    "survival": 1
+  },
+
+  "feats": ["power attack", "weapon focus (longsword)"],
+
+  "armour": "chain shirt",
+  "shield": "heavy shield",
+  "weapons": ["longsword", "dagger", "shortbow"],
+  "equipped": "longsword",
+
+  "hp": 12,
+
+  "notes": "Nahyrin — seasonal nomads off the Kaelinoran grasslands, in a city that buys their wool and mistrusts their manners. Took the High King's coin as a caravan guard and stayed when the caravan did not. Rules race is human (PF1e); Nahyrin is his people in the world."
+}

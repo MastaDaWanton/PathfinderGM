@@ -42,6 +42,10 @@ class Campaign:
     # one can be spotted. Stored as a signature rather than the intents themselves:
     # it is only ever compared, never resolved.
     last_intent_signature: list = field(default_factory=list)
+    # Which character on the roster is playing this campaign, and whether the
+    # campaign has ended with them. A death ends the campaign, not the app.
+    character_id: str = ""
+    ended: str = ""
 
     @property
     def world(self):
@@ -89,6 +93,8 @@ class Campaign:
             "transcript": self.transcript,
             "turn_log": self.turn_log,
             "last_intent_signature": self.last_intent_signature,
+            "character_id": self.character_id,
+            "ended": self.ended,
         }
         p = self.path()
         p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
@@ -125,12 +131,15 @@ class Campaign:
             turn_log=data.get("turn_log", []), seed=data.get("seed"),
             last_intent_signature=[tuple(t) for t in
                                    data.get("last_intent_signature", [])],
+            character_id=data.get("character_id", ""),
+            ended=data.get("ended", ""),
         )
 
 
 # --- The slice's starting situation -------------------------------------------------------
 
-def new_campaign(campaign_id: str = "slice", seed: int | None = None) -> Campaign:
+def new_campaign(campaign_id: str = "slice", seed: int | None = None,
+                 character=None) -> Campaign:
     """One scene in Pangrella, built from the world's own material.
 
     Nothing here is invented: Pangrella is the export's home town, its `Shadow Power`
@@ -143,7 +152,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None) -> Campaig
     # name lookup returns the planet and the opening scene is set nowhere.
     town = world.get(PANGRELLA_TOWN) or world.by_name("Pangrella", kind="CITY")
     scene = Scene(location_id=town.id if town else None)
-    scene.add(load_pc(settings.PREGEN_PC), zone="near")
+    scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     scene.add(
         instantiate("guildhand", scene=scene, name="the guildhand on the gate"),
         zone="near",
@@ -184,6 +193,7 @@ def current(campaign_id: str = "slice", reset: bool = False) -> Campaign:
         _LIVE.pop(campaign_id, None)
         path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
         if path.exists():
+            _retire_outgoing(path)
             # An explicit new game archives the old one rather than deleting it. Saves
             # are cheap and losing a campaign to a stray ?new=1 is not recoverable.
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -193,6 +203,28 @@ def current(campaign_id: str = "slice", reset: bool = False) -> Campaign:
         c = _resume(campaign_id) or _begin(campaign_id)
         _LIVE[campaign_id] = c
     return _LIVE[campaign_id]
+
+
+def _retire_outgoing(path: Path) -> None:
+    """Mark the character of a campaign being replaced as retired.
+
+    Without this every `?new=1` left another living copy on the roster — three identical
+    Kessts, all alive, none being played. The dead are kept because they are a record;
+    an abandoned character is not the same thing, and saying so keeps the roster honest.
+    """
+    from . import roster
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    cid = data.get("character_id")
+    if not cid:
+        return
+    entry = roster.load(cid)
+    if entry and entry.status == roster.ALIVE:
+        entry.status = roster.RETIRED
+        roster.save(entry)
 
 
 def _resume(campaign_id: str) -> Campaign | None:
@@ -211,8 +243,21 @@ def _resume(campaign_id: str) -> Campaign | None:
         return None
 
 
-def _begin(campaign_id: str) -> Campaign:
-    c = new_campaign(campaign_id)
+def _begin(campaign_id: str, character=None) -> Campaign:
+    from . import roster
+
+    c = new_campaign(campaign_id, character=character)
+    entry = roster.enrol(c.scene.pc(), campaign_id)
+    c.character_id = entry.id
     c.transcript.append({"who": "gm", "text": opening_text(c)})
     c.save()
+    return c
+
+
+def begin_with(character, campaign_id: str = "slice") -> Campaign:
+    """Start a fresh campaign for a new character, archiving whatever went before."""
+    current(campaign_id, reset=True)          # archives the old save
+    _LIVE.pop(campaign_id, None)
+    c = _begin(campaign_id, character=character)
+    _LIVE[campaign_id] = c
     return c

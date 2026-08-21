@@ -83,8 +83,17 @@ class Scene:
         return self.initiative[self.turn % len(self.initiative)][0]
 
     def conscious(self, ref: str) -> bool:
+        """Still up, and still in the fight.
+
+        Exactly 0 hit points is *disabled*, not unconscious: you are on your feet and
+        may take a single action, at the cost of a hit point. Requiring `hp > 0` here
+        dropped a disabled character out of the initiative order and ended the fight
+        around them while they were still standing.
+        """
         a = self.actors.get(ref)
-        return bool(a) and a.can_act() and a.hp > 0
+        if not a or not a.can_act():
+            return False
+        return a.hp > 0 or (a.hp == 0 and not a.has_condition("unconscious"))
 
     def advance_turn(self) -> str | None:
         """Move to the next combatant who can still act, and return their ref.

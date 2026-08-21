@@ -1,0 +1,33 @@
+{
+  "name": "Thessaly Corr",
+  "kind": "pc",
+  "level": 1,
+  "class": "wizard",
+  "race": "human",
+  "pronouns": "they/them",
+  "size": "medium",
+
+  "heritage": "Korvu",
+  "world_people_id": "fd4449bc9a64",
+  "world_entity_id": null,
+
+  "abilities": { "str": 9, "dex": 14, "con": 12, "int": 17, "wis": 12, "cha": 11 },
+
+  "ranks": {
+    "knowledge (arcana)": 1,
+    "knowledge (local)": 1,
+    "spellcraft": 1,
+    "linguistics": 1
+  },
+
+  "feats": ["iron will"],
+
+  "armour": "none",
+  "shield": "none",
+  "weapons": ["quarterstaff", "dagger", "light crossbow"],
+  "equipped": "quarterstaff",
+
+  "hp": 7,
+
+  "notes": "Korvu — winged, and one of the few who came down into the flightless quarters to study rather than to collect rents. Spellcasting is not modelled yet, so Thessaly currently fights with a stick and an unreasonable amount of confidence. Rules race is human (PF1e); Korvu is their people in the world."
+}

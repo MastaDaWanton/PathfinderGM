@@ -108,6 +108,45 @@
   .who.up small { color: var(--accent); }
   .who.out { opacity: .45; text-decoration: line-through; }
 
+  #deathveil {
+    position: fixed; inset: 0; z-index: 40; display: none; place-items: center;
+    background: radial-gradient(60% 50% at 50% 40%, rgba(40,10,10,.55), rgba(4,3,3,.96));
+  }
+  #deathveil.on { display: grid; }
+  .deathpanel {
+    width: min(620px, 92vw); max-height: 86vh; overflow-y: auto; padding: 34px 38px;
+    background: linear-gradient(#171210, #0d0a08) padding-box,
+                linear-gradient(#6b2020, #2a1512) border-box;
+    border: 1px solid transparent; border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(217,192,138,.08), 0 24px 80px rgba(0,0,0,.9);
+  }
+  .deathpanel h2 {
+    margin: 0 0 14px; color: #c96a5a; font: 400 42px/1 var(--display);
+    letter-spacing: .08em; font-variant: small-caps;
+  }
+  .deathpanel h3 {
+    margin: 26px 0 12px; color: var(--gold); font: 400 18px/1 var(--display);
+    letter-spacing: .12em; font-variant: small-caps;
+    border-bottom: 1px solid #2b2319; padding-bottom: 7px;
+  }
+  .deathpanel p { margin: 0; white-space: pre-wrap; color: var(--ink); }
+  .pick {
+    display: block; width: 100%; text-align: left; margin-bottom: 9px;
+    padding: 13px 16px; cursor: pointer; border-radius: 2px;
+    background: linear-gradient(#1d1811, #141009); border: 1px solid var(--gold-dim);
+  }
+  .pick:hover { border-color: var(--accent); }
+  .pick b { display: block; color: var(--gold); font: 400 21px/1.2 var(--display);
+            letter-spacing: .03em; font-variant: small-caps; }
+  .pick small { color: var(--dim); font: 13px/1.5 var(--body); }
+  .pick em { display: block; color: var(--dim); font: italic 13px/1.5 var(--body);
+             margin-top: 5px; }
+  .grave { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0;
+           border-bottom: 1px solid #241d15; font: 14px/1.5 var(--body); }
+  .grave.dead { color: var(--dim); }
+  .grave b { color: var(--ink); font-weight: 400; }
+  .grave.dead b { text-decoration: line-through; }
+
   #veil {
     position: fixed; inset: 0; background: rgba(6,5,4,.86);
     display: none; place-items: center; z-index: 20;
@@ -391,6 +430,16 @@
 
 <div id="veil"><div class="popup" id="popup"></div></div>
 
+<div id="deathveil">
+  <div class="deathpanel">
+    <h2 id="deathtitle">Dead</h2>
+    <p id="deathtext"></p>
+    <h3>Who plays next?</h3>
+    <div id="deathchoices"></div>
+    <div id="deathroster"></div>
+  </div>
+</div>
+
 <div id="sheetpanel" aria-hidden="true">
   <svg class="corner tl" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
     <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
@@ -434,6 +483,36 @@ function csrf() {
   return m ? m[1] : "";
 }
 
+// --- Death, and who plays next -------------------------------------------------
+function showDeath(d) {
+  $("#deathtitle").textContent = (STATE.pc && STATE.pc.name) ? STATE.pc.name : "Dead";
+  $("#deathtext").textContent = d.death || "";
+  $("#deathchoices").innerHTML = (d.choices || []).map(ch => `
+    <button class="pick" data-source="${esc(ch.source)}">
+      <b>${esc(ch.name)}</b>
+      <small>${esc(ch.line)} · ${ch.hp} hp</small>
+      ${ch.notes ? `<em>${esc(ch.notes)}</em>` : ""}
+    </button>`).join("");
+  const played = (d.roster || []);
+  $("#deathroster").innerHTML = played.length ? `<h3>Played before</h3>` + played.map(e => `
+    <div class="grave ${e.status === "dead" ? "dead" : ""}">
+      <span><b>${esc(e.name)}</b> — ${esc(e.line)}</span>
+      <small>${e.status === "dead" ? "died" : e.status}</small>
+    </div>`).join("") : "";
+  $("#deathveil").classList.add("on");
+}
+
+document.addEventListener("click", async e => {
+  const pick = e.target.closest(".pick");
+  if (!pick) return;
+  pick.disabled = true;
+  try {
+    const s = await post("/api/character/new", {source: pick.dataset.source});
+    $("#deathveil").classList.remove("on");
+    render(s);
+  } catch (err) { $("#err").textContent = err.message; pick.disabled = false; }
+});
+
 async function post(url, body) {
   const r = await fetch(url, {
     method: "POST",
@@ -445,6 +524,7 @@ async function post(url, body) {
   // player said what the world does, which is the GM's half. The text they typed is
   // deliberately left in the box so they can rewrite it.
   if (r.status === 422) { const e = new Error(data.hint); e.hint = true; throw e; }
+  if (r.status === 410) { showDeath(data); const e = new Error(""); e.handled = true; throw e; }
   if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
   return data;
 }
@@ -579,11 +659,13 @@ $("#sayform").onsubmit = async e => {
   $("#err").className = "";
   busy(true);
   try {
-    render(await post("/api/say", {text}));
+    const s = await post("/api/say", {text});
+    render(s);
     $("#input").value = "";          // cleared only once the turn was taken
+    if (s.ended) showDeath(s);
   }
   catch (err) {
-    $("#err").textContent = err.message;
+    if (!err.handled) $("#err").textContent = err.message;
     if (err.hint) $("#err").className = "hint";
   }
   finally { busy(false); }
