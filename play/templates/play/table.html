@@ -402,6 +402,9 @@
     border: 1px solid var(--edge); padding: 10px; border-radius: 3px; cursor: pointer;
     font: 600 12px/1 system-ui, sans-serif; letter-spacing: .08em;
     text-transform: uppercase;
+    /* Also used on the anchor to the crafting bench, which needs these to sit level
+       with the buttons above it rather than reading as a link in a stack of controls. */
+    display: block; text-align: center; text-decoration: none; box-sizing: border-box;
   }
   .opensheet:hover { border-color: var(--accent); }
 
@@ -640,6 +643,7 @@ function render(s) {
       <h2>Feats</h2>
       <div class="sub">${pc.feats.map(esc).join(", ")}</div>
       <button class="opensheet" id="opensheet">Full character sheet</button>
+      <a class="opensheet" href="/craft/">Crafting bench</a>
       <button class="opensheet" id="openroster">Who is playing</button>`;
     $("#opensheet").onclick = openSheet;
     $("#openroster").onclick = openRoster;

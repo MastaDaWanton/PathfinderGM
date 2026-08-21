@@ -49,6 +49,10 @@ class Campaign:
     # campaign has ended with them. A death ends the campaign, not the app.
     character_id: str = ""
     ended: str = ""
+    # Chains the player has named and kept, so a working recipe is a thing you build once.
+    # Per campaign rather than per character: a recipe is knowledge about the world's
+    # ingredients, and it should outlive the herbalist who wrote it down.
+    recipes: list[dict] = field(default_factory=list)
 
     @property
     def world(self):
@@ -97,6 +101,7 @@ class Campaign:
             "turn_log": self.turn_log,
             "last_intent_signature": self.last_intent_signature,
             "character_id": self.character_id,
+            "recipes": self.recipes,
             "ended": self.ended,
         }
         p = self.path()
@@ -146,6 +151,7 @@ class Campaign:
             last_intent_signature=[tuple(t) for t in
                                    data.get("last_intent_signature", [])],
             character_id=data.get("character_id", ""),
+            recipes=data.get("recipes", []),
             ended=data.get("ended", ""),
         )
 

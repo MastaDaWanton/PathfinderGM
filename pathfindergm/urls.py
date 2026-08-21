@@ -1,6 +1,6 @@
 from django.urls import path
 
-from play import views
+from play import craft_views, views
 
 urlpatterns = [
     path("", views.table, name="table"),
@@ -12,4 +12,9 @@ urlpatterns = [
     path("api/character/switch", views.switch_character, name="switch_character"),
     path("api/say", views.say, name="say"),
     path("api/roll", views.roll, name="roll"),
+    path("craft/", craft_views.craft_page, name="craft"),
+    path("api/craft/ingredients", craft_views.craft_ingredients, name="craft_ingredients"),
+    path("api/craft/preview", craft_views.craft_preview, name="craft_preview"),
+    path("api/craft/do", craft_views.craft_do, name="craft_do"),
+    path("api/craft/recipes", craft_views.craft_recipes, name="craft_recipes"),
 ]

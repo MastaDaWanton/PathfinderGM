@@ -1,0 +1,485 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crafting — Pathfinder GM</title>
+<style>
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
+  }
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
+    src: local("Cinzel SemiBold"), url("{% static 'fonts/Cinzel-SemiBold.woff2' %}") format("woff2");
+  }
+  :root {
+    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --bg: #0f0d0b; --panel: #17130f; --edge: #3a2f22; --ink: #e6dcc6;
+    --dim: #8e816a; --accent: #c9a86a; --alarm: #a8443a;
+    --gold: #d9c08a; --gold-dim: #7a6543; --blood: #6e1f1f; --sunk: #0c0a08;
+    /* The brew's own colour, used for the cauldron glow and the output card. */
+    --brew: #6fcf8f; --brew-dim: #2f5f42;
+  }
+  * { box-sizing: border-box; }
+  body {
+    /* A fixed height, not a minimum. With `min-height` the grid row was free to grow to
+       the shelf's full 3000px and the whole page scrolled; the panels have to be bounded
+       before `overflow-y` on `.inner` can do anything. */
+    margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
+    height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
+      repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
+  }
+
+  /* --- banner and discipline tabs --- */
+  header {
+    border-bottom: 1px solid var(--gold-dim);
+    background: linear-gradient(#1b1510, #120e0a);
+    padding: 0 26px; display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap;
+  }
+  h1 {
+    font: 400 27px/1 var(--display); letter-spacing: .09em; font-variant: small-caps;
+    color: var(--gold); margin: 16px 0; white-space: nowrap;
+  }
+  .back {
+    margin-left: auto; margin-bottom: 15px; color: var(--dim); text-decoration: none;
+    font: 14px/1 var(--body); border-bottom: 1px solid transparent;
+  }
+  .back:hover { color: var(--accent); border-bottom-color: var(--gold-dim); }
+  nav { display: flex; gap: 2px; align-self: flex-end; flex-wrap: wrap; }
+  .tab {
+    background: linear-gradient(#171209, #100d08); color: var(--dim); cursor: pointer;
+    border: 1px solid var(--edge); border-bottom: none; padding: 10px 18px 9px;
+    border-radius: 3px 3px 0 0; font: 400 15px/1 var(--display);
+    letter-spacing: .07em; font-variant: small-caps; position: relative; top: 1px;
+  }
+  .tab:hover:not(.on) { color: var(--ink); }
+  .tab.on {
+    color: var(--gold); background: linear-gradient(#241c12, var(--panel));
+    border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
+  }
+  .tab small { display: block; font: italic 11px/1 var(--body); letter-spacing: 0;
+               font-variant: normal; margin-top: 4px; opacity: .7; }
+
+  /* --- three columns, per the reference layout --- */
+  main {
+    flex: 1; display: grid; gap: 16px; padding: 18px 22px 0;
+    grid-template-columns: minmax(280px, 380px) minmax(360px, 1fr) minmax(300px, 380px);
+    /* Stretch, not start: with `start` the three columns ended up 650, 423 and 509 tall
+       and the bench read as three unrelated boxes rather than one workspace. */
+    align-items: stretch; min-height: 0;
+  }
+  /* Narrow enough for one column, the bench is taller than the screen, so the page
+     scrolls as a whole instead of three panels scrolling inside a fixed frame. */
+  @media (max-width: 1180px) {
+    body { height: auto; min-height: 100vh; overflow: visible; }
+    main { grid-template-columns: 1fr; }
+    .panel > .inner { overflow-y: visible; }
+  }
+
+  .panel {
+    background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
+    border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.55);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 {
+    margin: 0; padding: 12px 16px 10px; color: var(--gold);
+    font: 400 17px/1 var(--display); letter-spacing: .11em; font-variant: small-caps;
+    text-align: center; border-bottom: 1px solid var(--gold-dim);
+  }
+  .panel > .inner { padding: 14px 16px; overflow-y: auto; }
+
+  /* --- the shelf --- */
+  #filter {
+    width: 100%; margin-bottom: 10px; padding: 9px 11px; font: 15px var(--body);
+    color: var(--ink); background: var(--sunk); border: 1px solid var(--edge);
+    border-radius: 2px;
+  }
+  #filter:focus { outline: none; border-color: var(--gold-dim); }
+  .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+           gap: 7px; }
+  .jar {
+    background: linear-gradient(#231a10, #14100a); border: 1px solid var(--edge);
+    border-radius: 3px; padding: 7px 5px 6px; cursor: pointer; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .jar:hover { border-color: var(--accent); }
+  .jar.locked { opacity: .34; cursor: not-allowed; }
+  .jar.locked:hover { border-color: var(--edge); }
+  .jar.chosen { border-color: var(--brew); box-shadow: 0 0 9px rgba(111,207,143,.28); }
+  .jar .glyph { font-size: 21px; line-height: 1; filter: saturate(.75); }
+  .jar b { font: 600 10px/1.2 var(--body); color: var(--ink); letter-spacing: .01em;
+           word-break: break-word; }
+  /* Tier reads as a colour on the jar's foot, so the shelf sorts by eye. */
+  .jar .tier { height: 3px; width: 26px; border-radius: 2px; }
+  .t1 { background: #6b6b6b; } .t2 { background: #4f8a52; } .t3 { background: #3f6fa8; }
+  .t4 { background: #8154a8; } .t5 { background: #b8863a; }
+
+  /* --- the chain --- */
+  .stations { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 4px; }
+  .station {
+    background: linear-gradient(#221a10, #15100a); border: 1px solid var(--edge);
+    border-radius: 3px; padding: 9px 12px; cursor: pointer; text-align: center;
+    font: 400 13px/1.2 var(--display); letter-spacing: .05em; font-variant: small-caps;
+    color: var(--ink); min-width: 84px;
+  }
+  .station:hover:not(.locked) { border-color: var(--accent); }
+  .station.locked { opacity: .35; cursor: not-allowed; }
+  .station .glyph { display: block; font-size: 19px; margin-bottom: 3px; }
+  .station em { display: block; font: italic 10px/1.2 var(--body); color: var(--dim);
+                font-variant: normal; letter-spacing: 0; margin-top: 3px; }
+
+  .chain {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 62px;
+    padding: 11px; margin: 10px 0 4px; border: 1px dashed var(--gold-dim);
+    border-radius: 3px; background: rgba(0,0,0,.28);
+  }
+  .chain .empty { color: var(--dim); font-style: italic; font-size: 14px; }
+  .step {
+    background: linear-gradient(#2a2114, #1a140c); border: 1px solid var(--gold-dim);
+    border-radius: 3px; padding: 7px 12px; cursor: pointer; color: var(--gold);
+    font: 400 13px/1 var(--display); letter-spacing: .06em; font-variant: small-caps;
+  }
+  .step:hover { border-color: var(--alarm); color: #d9a49c; }
+  .arrow { color: var(--gold-dim); }
+
+  /* --- the pot --- */
+  .pot { text-align: center; padding: 16px 0 10px; }
+  .cauldron { font-size: 54px; line-height: 1; filter: drop-shadow(0 0 14px rgba(111,207,143,.30)); }
+  .pot .in {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px;
+  }
+  .chip {
+    background: rgba(111,207,143,.09); border: 1px solid var(--brew-dim);
+    border-radius: 2px; padding: 4px 9px; font-size: 13px; cursor: pointer;
+    color: #bfe8cd;
+  }
+  .chip:hover { border-color: var(--alarm); color: #d9a49c; }
+
+  /* --- preview --- */
+  .out-title {
+    background: linear-gradient(#1d3428, #14231b); border: 1px solid var(--brew-dim);
+    border-radius: 3px; padding: 11px 13px; text-align: center; margin-bottom: 12px;
+  }
+  .out-title b { display: block; color: var(--brew); font: 400 19px/1.25 var(--display);
+                 letter-spacing: .04em; font-variant: small-caps; }
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 14px;
+          margin-bottom: 12px; }
+  .meta span { color: var(--dim); }
+  h3 {
+    color: var(--gold); font: 400 14px/1 var(--display); letter-spacing: .1em;
+    font-variant: small-caps; margin: 14px 0 7px; padding-bottom: 5px;
+    border-bottom: 1px solid #2b2319;
+  }
+  .fx { margin: 0; padding-left: 18px; }
+  .fx li { margin-bottom: 8px; font-size: 14px; line-height: 1.55; }
+  .fx li.bad { color: #cf9d95; }
+  .problems { color: #cf9d95; font-size: 14px; }
+  .problems li { margin-bottom: 5px; }
+  .inferred { color: var(--dim); font-style: italic; font-size: 12px; }
+
+  /* --- action bar --- */
+  footer {
+    border-top: 1px solid var(--gold-dim); margin-top: 16px; padding: 14px 22px 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: linear-gradient(#100d09, #0b0907);
+  }
+  button.act {
+    font: 400 16px/1 var(--display); letter-spacing: .09em; font-variant: small-caps;
+    padding: 13px 26px; border-radius: 2px; cursor: pointer; color: var(--gold);
+    background: linear-gradient(#2a2114, #1a140c); border: 1px solid var(--gold-dim);
+  }
+  button.act:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  button.act:disabled { opacity: .4; cursor: not-allowed; }
+  button.act.go { border-color: var(--brew-dim); color: var(--brew); }
+  button.act.go:hover:not(:disabled) { border-color: var(--brew); color: #b6f0ca; }
+  .mastery { margin-left: auto; display: flex; align-items: center; gap: 12px;
+             font-size: 14px; color: var(--dim); }
+  .mbar { width: 190px; height: 9px; border-radius: 2px; background: #221c14;
+          overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,.7); }
+  .mbar > i { display: block; height: 100%;
+              background: linear-gradient(90deg, #8a6f3e, var(--accent)); }
+  #err { color: var(--alarm); font-size: 14px; min-height: 1em; }
+
+  .locked-note {
+    padding: 40px 26px; text-align: center; color: var(--dim); font-style: italic;
+    grid-column: 1 / -1;
+  }
+  .locked-note b { display: block; color: var(--gold); font-style: normal;
+    font: 400 21px/1.3 var(--display); letter-spacing: .06em; font-variant: small-caps;
+    margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Crafting</h1>
+  <nav id="tabs"></nav>
+  <a class="back" href="/">← back to the table</a>
+</header>
+
+<main id="main"></main>
+
+<footer>
+  <button class="act go" id="craft" disabled>Craft</button>
+  <button class="act" id="save" disabled>Save recipe</button>
+  <span id="err"></span>
+  <span class="mastery" id="mastery"></span>
+</footer>
+
+<script>
+const STATE = {{ state_json|safe }};
+let CRAFT = "herbalism";       // the discipline tab in front
+let SHELF = [];                // ingredients for the current discipline
+let CHOSEN = [];               // ingredient ids in the pot
+let CHAIN = [];                // methods, in order
+let PREVIEW = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// A glyph per kind and per method. Deliberately emoji rather than image files: the app
+// ships as one executable and must work offline, so anything fetched is a liability.
+const KIND_GLYPH = { "herb": "🌿", "fungus": "🍄", "monster part": "🦴", "poison": "☠️" };
+const METHOD_GLYPH = {
+  "grind": "⚗️", "mix": "🥣", "brew": "🫖", "preserve": "🧊", "extract": "🔪",
+  "distill": "⚱️", "purify": "💧", "infuse": "✨", "neutralize": "🧪",
+  "refine": "💎", "catalyst crafting": "🌟",
+};
+
+function tabs() {
+  $("#tabs").innerHTML = STATE.disciplines.map(d => {
+    const t = STATE.tracks[d.id] || {};
+    const sub = t.available ? `${esc(t.name)} ${t.level}` : "not yet";
+    return `<button class="tab ${d.id === CRAFT ? "on" : ""}" data-craft="${d.id}">
+      ${esc(d.name)}<small>${sub}</small></button>`;
+  }).join("");
+}
+
+async function selectCraft(id) {
+  CRAFT = id;
+  CHOSEN = []; CHAIN = []; PREVIEW = null;
+  $("#err").textContent = "";
+  tabs();
+  const track = STATE.tracks[CRAFT] || {};
+  if (!track.available) { renderLocked(); return; }
+  const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
+  const d = await r.json();
+  SHELF = d.ingredients;
+  STATE.tracks[CRAFT] = d.track;
+  renderBench();
+  refresh();
+}
+
+function renderLocked() {
+  const d = STATE.disciplines.find(x => x.id === CRAFT);
+  $("#main").innerHTML = `<div class="locked-note">
+    <b>${esc(d.name)}</b>${esc(d.blurb)}<br><br>
+    No world class has been written for this yet, so there is nothing here to work with.
+    Herbalism is the one that is finished.</div>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
+  $("#mastery").innerHTML = "";
+}
+
+function renderBench() {
+  $("#main").innerHTML = `
+    <section class="panel">
+      <h2>Ingredients</h2>
+      <div class="inner">
+        <input id="filter" type="text" placeholder="Search the shelf…" autocomplete="off">
+        <div class="shelf" id="shelf"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Crafting Chain</h2>
+      <div class="inner">
+        <div class="stations" id="stations"></div>
+        <div class="chain" id="chainrow"></div>
+        <div class="pot">
+          <div class="cauldron">🍲</div>
+          <div class="in" id="potin"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Preview</h2>
+      <div class="inner" id="preview"></div>
+    </section>`;
+  $("#filter").addEventListener("input", renderShelf);
+  renderStations();
+  renderShelf();
+}
+
+function renderShelf() {
+  const q = ($("#filter")?.value || "").trim().toLowerCase();
+  const list = SHELF.filter(i => !q
+    || i.name.toLowerCase().includes(q)
+    || (i.aka || "").toLowerCase().includes(q)
+    || i.kind.includes(q) || i.tier.includes(q));
+  $("#shelf").innerHTML = list.map(i => `
+    <button class="jar ${i.usable ? "" : "locked"} ${CHOSEN.includes(i.id) ? "chosen" : ""}"
+            data-ing="${esc(i.id)}" ${i.usable ? "" : "disabled"}
+            title="${esc(i.name)}${i.aka ? ` (${esc(i.aka)})` : ""} — ${esc(i.tier)}${
+              i.usable ? "" : ", beyond your tier"}\n\n${esc(i.text).slice(0, 400)}">
+      <span class="glyph">${KIND_GLYPH[i.kind] || "🌿"}</span>
+      <b>${esc(i.name)}</b>
+      <span class="tier t${i.rank}"></span>
+    </button>`).join("")
+    || `<div class="problems">Nothing on the shelf matches that.</div>`;
+}
+
+function renderStations() {
+  const t = STATE.tracks[CRAFT];
+  $("#stations").innerHTML = (t.all_methods || []).map(m => `
+    <button class="station ${m.known ? "" : "locked"}" data-method="${esc(m.method)}"
+            ${m.known ? "" : "disabled"}>
+      <span class="glyph">${METHOD_GLYPH[m.method] || "⚗️"}</span>
+      ${esc(m.method)}
+      ${m.known ? "" : `<em>${esc(t.name)} ${m.level}</em>`}
+    </button>`).join("");
+}
+
+function renderChain() {
+  $("#chainrow").innerHTML = CHAIN.length
+    ? CHAIN.map((m, i) => `${i ? '<span class="arrow">→</span>' : ""}
+        <button class="step" data-step="${i}" title="Remove">${esc(m)}</button>`).join("")
+    : `<span class="empty">No method chosen — pick stations above, in the order you work them.</span>`;
+  $("#potin").innerHTML = CHOSEN.map(id => {
+    const i = SHELF.find(x => x.id === id) || { name: id };
+    return `<button class="chip" data-drop="${esc(id)}" title="Take out">${esc(i.name)}</button>`;
+  }).join("");
+}
+
+function renderPreview(p) {
+  const el = $("#preview");
+  if (!el) return;
+  if (!p) { el.innerHTML = `<div class="problems">Put something in the pot.</div>`; return; }
+
+  const inferred = p.ingredients.some(i => i.tier_inferred);
+  el.innerHTML = `
+    <div class="out-title"><b>${esc(p.name)}</b></div>
+    <div class="meta">
+      <span>Rarity</span><div>${esc(p.tier)}</div>
+      <span>Stages</span><div>${p.stages}</div>
+      <span>Potency</span><div>×${p.potency.toFixed(2)}</div>
+      <span>Difficulty</span><div>DC ${p.dc}</div>
+      <span>Chance</span><div>${p.chance}%</div>
+    </div>
+    ${p.problems.length ? `<h3>Cannot be made</h3>
+      <ul class="fx problems">${p.problems.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${p.effects.length ? `<h3>Effects</h3>
+      <ul class="fx">${p.effects.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${p.drawbacks.length ? `<h3>Drawbacks</h3>
+      <ul class="fx">${p.drawbacks.map(x => `<li class="bad">${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${inferred ? `<p class="inferred">Rarity is inferred from each ingredient's crafting
+      DC — the source document never states one.</p>` : ""}`;
+}
+
+function renderMastery() {
+  const t = STATE.tracks[CRAFT];
+  if (!t || !t.available) { $("#mastery").innerHTML = ""; return; }
+  const need = t.to_next ? t.to_next.of : 0;
+  const pct = need ? Math.min(100, Math.round(100 * t.mp / need)) : 100;
+  $("#mastery").innerHTML = `
+    <span>${esc(t.name)} ${t.level} · ${esc(t.max_tier)}</span>
+    <span class="mbar"><i style="width:${pct}%"></i></span>
+    <span>${t.to_next ? `${t.mp} / ${need} MP` : "mastered"}</span>`;
+}
+
+async function refresh() {
+  renderChain();
+  renderMastery();
+  if (!CHOSEN.length) { PREVIEW = null; renderPreview(null); buttons(); return; }
+  try {
+    PREVIEW = await post("/api/craft/preview",
+      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN });
+  } catch (e) { $("#err").textContent = e.message; PREVIEW = null; }
+  renderPreview(PREVIEW);
+  buttons();
+}
+
+function buttons() {
+  const ok = PREVIEW && !PREVIEW.problems.length;
+  $("#craft").disabled = !ok;
+  $("#craft").textContent = ok ? `Craft (${PREVIEW.chance}% success)` : "Craft";
+  $("#save").disabled = !CHOSEN.length;
+}
+
+document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-craft]");
+  if (tab) { await selectCraft(tab.dataset.craft); return; }
+
+  const jar = e.target.closest("[data-ing]");
+  if (jar && !jar.disabled) {
+    const id = jar.dataset.ing;
+    CHOSEN = CHOSEN.includes(id) ? CHOSEN.filter(x => x !== id) : [...CHOSEN, id];
+    renderShelf(); await refresh(); return;
+  }
+  const drop = e.target.closest("[data-drop]");
+  if (drop) {
+    CHOSEN = CHOSEN.filter(x => x !== drop.dataset.drop);
+    renderShelf(); await refresh(); return;
+  }
+  const station = e.target.closest("[data-method]");
+  if (station && !station.disabled) { CHAIN.push(station.dataset.method); await refresh(); return; }
+  const step = e.target.closest("[data-step]");
+  if (step) { CHAIN.splice(Number(step.dataset.step), 1); await refresh(); return; }
+});
+
+$("#craft").addEventListener("click", async () => {
+  $("#err").textContent = "";
+  $("#craft").disabled = true;
+  try {
+    const d = await post("/api/craft/do",
+      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, name: PREVIEW?.name });
+    STATE.tracks[CRAFT] = d.track;
+    renderStations();
+    // Levelling can unlock methods and tiers, so the shelf is re-fetched rather than
+    // left showing the ceiling the character had a moment ago.
+    const r = await fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`);
+    SHELF = (await r.json()).ingredients;
+    renderShelf();
+    $("#err").innerHTML = `<span style="color:${d.succeeded ? "var(--brew)" : "var(--alarm)"}">
+      d20 ${d.roll} against ${d.chance}% — ${d.succeeded ? "made" : "spoiled"}.</span>
+      <span style="color:var(--dim)"> ${esc(d.tell)}</span>`;
+  } catch (e) { $("#err").textContent = e.message; }
+  await refresh();
+});
+
+$("#save").addEventListener("click", async () => {
+  const name = prompt("Name this recipe", PREVIEW?.name || "");
+  if (!name) return;
+  try {
+    const d = await post("/api/craft/recipes",
+      { craft: CRAFT, name, ingredients: CHOSEN, methods: CHAIN });
+    STATE.recipes = d.recipes;
+    $("#err").innerHTML = `<span style="color:var(--brew)">Saved “${esc(name)}”.</span>`;
+  } catch (e) { $("#err").textContent = e.message; }
+});
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+
+selectCraft(CRAFT);
+</script>
+</body>
+</html>
