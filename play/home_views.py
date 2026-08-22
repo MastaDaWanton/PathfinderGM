@@ -345,3 +345,47 @@ def spell_detail(request, spell_id: str):
 @require_GET
 def to_table(request):
     return redirect("table")
+
+
+@require_GET
+def creation_options(request):
+    """Everything the character-creation wizard draws its forms from.
+
+    One payload rather than four endpoints, because the wizard needs all of it before the
+    first click and a form that assembles itself from stale halves is how a race dropdown
+    and a class list disagree about what exists.
+    """
+    from rules import creation
+
+    return JsonResponse(creation.options())
+
+
+@require_POST
+def create_character(request):
+    """Make a character, or say everything wrong with the attempt at once.
+
+    The build is validated end to end — the assembled sheet must load as an Actor before
+    anything touches disk — and the finished character goes onto the roster exactly the
+    way a pregen does, so everything downstream cannot tell them apart. `begin` starts a
+    campaign with them on the spot; without it they wait on the shelf.
+    """
+    from rules import creation
+
+    from . import roster
+    from .roster import enrol
+
+    body = json.loads(request.body or "{}")
+    built, problems = creation.build(body)
+    if problems:
+        return JsonResponse({"problems": problems}, status=400)
+
+    from rules.sheet import from_dict
+
+    actor = from_dict(built["sheet"], ref="pc")
+    entry = enrol(actor)
+    out = {"ok": True, "id": entry.id, "name": actor.name,
+           "warnings": built["warnings"]}
+    if body.get("begin"):
+        campaign_mod.begin_with(actor)
+        out["begun"] = True
+    return JsonResponse(out)
