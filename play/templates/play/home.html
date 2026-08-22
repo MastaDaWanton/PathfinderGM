@@ -54,7 +54,11 @@
   }
   .tab:hover:not(.on) { color: var(--ink); }
   .tab.on {
-    color: var(--gold); background: linear-gradient(#241c12, var(--panel));
+    color: var(--gold);
+    background:
+      linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 340px auto;
     border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
   }
   .tab b { display: inline-block; margin-left: 7px; color: var(--dim);
@@ -306,9 +310,12 @@
     box-shadow: 0 0 22px rgba(201, 162, 39, .18),
                 inset 0 1px 0 rgba(255, 230, 150, .12);
   }
-  header { background: rgba(20, 16, 12, .72);
-           -webkit-backdrop-filter: blur(14px) saturate(130%);
-           backdrop-filter: blur(14px) saturate(130%); }
+  header {
+    background:
+      linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
+      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+    background-size: auto, 340px auto;
+  }
   /* 4. Embers, third generation: thicker and deeper. Four layers now — a new
      nearest sheet of big soft coals drifting fast in front, then the bright
      motes, the mid-field, and the far dust behind its half-pixel blur. Every
