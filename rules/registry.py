@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
 
+from . import biomes as _biomes
+
 
 @dataclass
 class Field:
@@ -75,9 +77,14 @@ def _named(*, kinds: tuple = ()) -> list[Field]:
 
 
 TIERS = ("common", "uncommon", "rare", "exotic", "legendary")
-BIOME_CHOICES = ("urban", "grassland", "farmland", "forest", "jungle", "swamp", "hills",
-                 "mountain", "desert", "tundra", "coast", "underground", "ruins",
-                 "planar")
+
+# Derived, not retyped. The first version of this line was the fourteen biome names
+# written out again, which is a second copy of `biomes.BIOMES` that agrees with it today
+# and drifts the first time somebody adds a biome to one and not the other — the exact
+# shape CLAUDE.md warns about. `rules.biomes` pulls in nothing, so importing it here is
+# free.
+BIOME_CHOICES = tuple(_biomes.BIOMES)
+CLIMATE_CHOICES = tuple(_biomes.CLIMATES)
 
 KINDS: dict[str, Kind] = {
     "ingredients": Kind(
@@ -109,7 +116,16 @@ KINDS: dict[str, Kind] = {
                   choices=("fine", "diminutive", "tiny", "small", "medium", "large",
                            "huge", "gargantuan", "colossal")),
             Field("creature_type", "Type"),
-            Field("environment", "Environment", type="list", choices=BIOME_CHOICES),
+            # Three fields, not one, because the bestiary keeps three things. The
+            # first version of this declared a *list* editor over `environment`, which
+            # is prose — "temperate or cold hills" — so saving a creature would have
+            # written a biome list on top of the sentence it was parsed from and thrown
+            # the original away.
+            Field("environment", "Environment (as printed)", type="textarea",
+                  help="The book's own line. The lists below are read out of it."),
+            Field("biomes", "Terrain", type="list", choices=BIOME_CHOICES),
+            Field("climates", "Climate", type="list", choices=CLIMATE_CHOICES,
+                  help="Empty means unrestricted, which is not the same as all three."),
             Field("hp", "Hit points", type="number"),
             Field("flat_ac", "Armour class", type="number"),
             Field("effects", "Effects", type="effects"),
@@ -121,7 +137,10 @@ KINDS: dict[str, Kind] = {
             Field("creature", "Stat block", help="A creature id this NPC uses."),
             Field("wants", "What they want", type="textarea"),
             Field("knows", "Who they know", type="textarea"),
-            Field("environment", "Found in", type="list", choices=BIOME_CHOICES),
+            # `biomes`, not `environment`, so it means the same thing here as it does on a
+            # creature. One name for a list and the same name for prose two kinds apart is
+            # how the creature field went wrong in the first place.
+            Field("biomes", "Found in", type="list", choices=BIOME_CHOICES),
         ],
     ),
     "items": Kind(

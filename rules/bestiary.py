@@ -15,6 +15,11 @@ imported creature is not reference material; it is a thing that can hit the play
 Precedence runs hand-written, then core, then spreadsheet. The town NPCs are tuned for the
 opening scene and must not be replaced; the printed Bestiary block is the canonical one
 where a variant shares its name.
+
+Environment is prose and only the core blocks have it, so every creature also carries
+`biomes` and `climates` — the same line read into the canonical vocabulary, or, for the
+6,406 that never had a line, guessed from the species in the name or from the creature
+type. `tools/tag_creature_biomes.py` writes them and `biomes_inferred` marks every guess.
 """
 from __future__ import annotations
 
@@ -138,6 +143,7 @@ _NOT_ON_THE_SHEET = (
     "base_attack", "speed", "speed_note", "immune", "resist", "sr", "weaknesses",
     "senses", "languages", "special_attacks", "special_abilities", "spell_like",
     "environment", "organization", "treasure", "source", "playable", "id", "feats",
+    "biomes", "climates", "biomes_any", "biomes_inferred", "biomes_from",
 )
 
 
@@ -232,8 +238,26 @@ def suggestion(key: str) -> str:
 
 def search(text: str = "", creature_type: str = "", size: str = "",
            cr_min: float | None = None, cr_max: float | None = None,
+           biome: str = "", climate: str = "", specialists: bool = False,
            limit: int = 120) -> list[dict]:
-    """Filter the bestiary. Every argument narrows; none widens."""
+    """Filter the bestiary. Every argument narrows; none widens.
+
+    `biome` and `climate` are the two axes a Bestiary Environment line carries, and they
+    are separate arguments because the line separates them: "warm deserts" is one of each,
+    and folding them together would make a frost giant and a fire giant the same query.
+
+    A creature whose climate list is empty is unrestricted and matches every climate —
+    absent is not the same as none, and reading it as none would empty the results for
+    two thirds of the book.
+
+    `specialists` drops the creatures whose biome list is an expansion of "any". 4,636 of
+    the 7,133 are found anywhere, so a swamp asked without it answers mostly with ghosts
+    and NPCs who merely could be there: 4,761 hits without it and 125 with.
+
+    (7,133, not the 7,188 the two source files hold between them — 55 names appear in both
+    and the printed block wins. Counting the sum is the mistake that made the first three
+    figures in this module disagree with each other.)
+    """
     out = []
     needle = (text or "").strip().lower()
     for c in imported().values():
@@ -246,6 +270,12 @@ def search(text: str = "", creature_type: str = "", size: str = "",
             continue
         if cr_max is not None and (cr is None or cr > cr_max):
             continue
+        if biome and biome not in (c.get("biomes") or ()):
+            continue
+        if climate and c.get("climates") and climate not in c["climates"]:
+            continue
+        if specialists and c.get("biomes_any"):
+            continue
         if needle and needle not in c["name"].lower():
             continue
         out.append(c)
@@ -255,11 +285,22 @@ def search(text: str = "", creature_type: str = "", size: str = "",
 
 
 def vocabularies() -> dict:
-    """What a filter can be built from, counted so an empty option is visible first."""
-    counts: dict[str, dict[str, int]] = {"types": {}, "sizes": {}}
+    """What a filter can be built from, counted so an empty option is visible first.
+
+    Biomes and climates count only the creatures that belong there specifically. Counting
+    the "any" expansions too would have shown every biome with roughly the same 4,700 and
+    told a reader nothing about which ground is thin.
+    """
+    counts: dict[str, dict[str, int]] = {"types": {}, "sizes": {}, "biomes": {},
+                                         "climates": {}}
     for c in imported().values():
         for field, key in (("types", "creature_type"), ("sizes", "size")):
             v = c.get(key)
             if v:
+                counts[field][v] = counts[field].get(v, 0) + 1
+        if c.get("biomes_any"):
+            continue
+        for field, key in (("biomes", "biomes"), ("climates", "climates")):
+            for v in c.get(key) or ():
                 counts[field][v] = counts[field].get(v, 0) + 1
     return {k: dict(sorted(v.items(), key=lambda kv: -kv[1])) for k, v in counts.items()}

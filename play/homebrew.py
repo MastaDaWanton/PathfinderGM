@@ -130,7 +130,10 @@ def benches() -> list[Bench]:
                   "reduction and an attack the engine rolls against.",
             waiting="Two sources, and only one of them carries Environment: the 782 "
                     "Bestiary blocks parsed from the PDFs do, and the 6,406 from the "
-                    "spreadsheet do not. Where two share a name the printed block wins.",
+                    "spreadsheet do not. Where two share a name the printed block wins. "
+                    "Every creature carries biomes and a climate all the same — read from "
+                    "that line where there is one, and guessed from the species in the "
+                    "name or from the creature type where there is not. A guess says so.",
         ),
         Bench(
             id="feats", name="Feats", dir="feats",
@@ -175,6 +178,23 @@ def get(bench_id: str) -> Bench:
 
 def authored_total() -> int:
     return sum(b.yours for b in benches())
+
+
+def _where(creature: dict) -> str:
+    """Where a creature lives, for a bench row.
+
+    The list itself is no use here: 4,636 of the 7,133 expand "any" into eleven or thirteen
+    biomes, and printing those would be a paragraph per row that says nothing. So the ones
+    found anywhere say so in a word, and only a real habitat is named. A guess is marked,
+    because 6,406 of these were guessed and a row that reads like a fact from the book on a
+    page about authoring content is exactly the wrong impression to leave.
+    """
+    if not creature.get("biomes"):
+        return "no environment given"
+    where = "anywhere" if creature.get("biomes_any") else ", ".join(creature["biomes"])
+    climate = " ".join(creature.get("climates") or [])
+    return f"{climate} {where}".strip() + (" (guess)" if creature.get("biomes_inferred")
+                                           else "")
 
 
 def rows_for(bench_id: str) -> list[dict]:
@@ -254,7 +274,8 @@ def rows_for(bench_id: str) -> list[dict]:
         rows += [{"name": c["name"], "kind": c.get("creature_type") or "creature",
                   "mine": False, "id": c["id"],
                   "note": f"CR {c.get('cr', '?')} · {c.get('hp', '?')} hp · "
-                          f"AC {c.get('flat_ac', '?')} · {c.get('size', '')}"}
+                          f"AC {c.get('flat_ac', '?')} · {c.get('size', '')} · "
+                          f"{_where(c)}"}
                  for c in bestiary.search(limit=200)]
     elif bench_id == "feats":
         rows += [{"name": v.get("name", k), "kind": "feat", "mine": False,

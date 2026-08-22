@@ -176,3 +176,36 @@ def test_every_bench_opens_over_http(client, bench, thing):
     assert d["source"] == "shipped"
     assert d["name"]
     assert "effects" in d and "description" in d
+
+
+# --- the two that a concurrent change caught -------------------------------------------------
+
+def test_the_biome_choices_are_derived_rather_than_retyped():
+    """They were the fourteen names written out again — a second copy that agreed on the
+    day it was written and drifts the first time somebody adds a biome to one and not the
+    other."""
+    from rules import biomes
+
+    assert tuple(registry.BIOME_CHOICES) == tuple(biomes.BIOMES)
+    assert tuple(registry.CLIMATE_CHOICES) == tuple(biomes.CLIMATES)
+
+
+def test_a_creature_edits_its_lists_without_overwriting_the_printed_line():
+    """`environment` is the book's own prose — "temperate or cold hills" — and `biomes` is
+    what was read out of it. Declaring a *list* editor over `environment` would have
+    written a biome list on top of the sentence and thrown the original away."""
+    fields = {f.name: f for f in registry.get("creatures").fields}
+    assert fields["environment"].type == "textarea"
+    assert fields["biomes"].type == "list"
+    assert fields["climates"].type == "list"
+
+
+def test_one_field_name_means_one_thing_across_kinds():
+    """A list called `environment` on an NPC and prose called `environment` on a creature
+    is how the creature field went wrong to begin with."""
+    for kind in registry.KINDS.values():
+        for f in kind.fields:
+            if f.name == "environment":
+                assert f.type == "textarea", f"{kind.id}.environment is a {f.type}"
+            if f.name == "biomes":
+                assert f.type == "list", f"{kind.id}.biomes is a {f.type}"
