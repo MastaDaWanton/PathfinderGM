@@ -48,7 +48,89 @@ FULL_CASTER = [
     [4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
 ]
 
-PROGRESSIONS = {"full": FULL_CASTER}
+# The sorcerer's slots (Core Table 3-14), which are not the wizard's with a delay: more
+# of them, arriving later, and a new spell level every even level rather than every odd.
+# The 0-level column follows the same convention the wizard table set — the book says a
+# spontaneous caster's cantrips are at will, the engine models slots, and four is the
+# compromise the wizard column already made. Typed out for the same reason FULL_CASTER
+# is: every attempt to generate these tables is right for eight levels and wrong after.
+SPONTANEOUS_FULL = [
+    [4, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 4, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 6, 3, 0, 0, 0, 0, 0, 0, 0],
+    [4, 6, 4, 0, 0, 0, 0, 0, 0, 0],
+    [4, 6, 5, 3, 0, 0, 0, 0, 0, 0],
+    [4, 6, 6, 4, 0, 0, 0, 0, 0, 0],
+    [4, 6, 6, 5, 3, 0, 0, 0, 0, 0],
+    [4, 6, 6, 6, 4, 0, 0, 0, 0, 0],
+    [4, 6, 6, 6, 5, 3, 0, 0, 0, 0],
+    [4, 6, 6, 6, 6, 4, 0, 0, 0, 0],
+    [4, 6, 6, 6, 6, 5, 3, 0, 0, 0],
+    [4, 6, 6, 6, 6, 6, 4, 0, 0, 0],
+    [4, 6, 6, 6, 6, 6, 5, 3, 0, 0],
+    [4, 6, 6, 6, 6, 6, 6, 4, 0, 0],
+    [4, 6, 6, 6, 6, 6, 6, 5, 3, 0],
+    [4, 6, 6, 6, 6, 6, 6, 6, 4, 0],
+    [4, 6, 6, 6, 6, 6, 6, 6, 5, 3],
+    [4, 6, 6, 6, 6, 6, 6, 6, 6, 4],
+    [4, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+]
+
+# The bard's six levels (Core Table 3-4). Spell levels 7-9 stay zero: the columns exist
+# so every progression is the same shape and nothing indexes past the end.
+SIX_LEVEL = [
+    [4, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    [4, 3, 1, 0, 0, 0, 0, 0, 0, 0],
+    [4, 4, 2, 0, 0, 0, 0, 0, 0, 0],
+    [4, 4, 3, 0, 0, 0, 0, 0, 0, 0],
+    [4, 4, 3, 1, 0, 0, 0, 0, 0, 0],
+    [4, 4, 4, 2, 0, 0, 0, 0, 0, 0],
+    [4, 5, 4, 3, 0, 0, 0, 0, 0, 0],
+    [4, 5, 4, 3, 1, 0, 0, 0, 0, 0],
+    [4, 5, 4, 4, 2, 0, 0, 0, 0, 0],
+    [4, 5, 5, 4, 3, 0, 0, 0, 0, 0],
+    [4, 5, 5, 4, 3, 1, 0, 0, 0, 0],
+    [4, 5, 5, 4, 4, 2, 0, 0, 0, 0],
+    [4, 5, 5, 5, 4, 3, 0, 0, 0, 0],
+    [4, 5, 5, 5, 4, 3, 1, 0, 0, 0],
+    [4, 5, 5, 5, 4, 4, 2, 0, 0, 0],
+    [4, 5, 5, 5, 5, 4, 3, 0, 0, 0],
+    [4, 5, 5, 5, 5, 5, 4, 0, 0, 0],
+    [4, 5, 5, 5, 5, 5, 5, 0, 0, 0],
+]
+
+# Paladins and rangers (Core Tables 3-12 and 3-13): four spell levels, nothing at all
+# before class level 4. The book's "0" rows at levels 4-6 mean bonus-spells-only; the
+# engine skips a zero base, so those rows are a slot conservative here — the honest
+# alternative was teaching `slots_for` a special case for two rows of two classes.
+FOUR_LEVEL = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+    [0, 2, 1, 1, 0, 0, 0, 0, 0, 0],
+    [0, 2, 2, 1, 0, 0, 0, 0, 0, 0],
+    [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
+    [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
+    [0, 3, 2, 2, 1, 0, 0, 0, 0, 0],
+    [0, 3, 3, 2, 1, 0, 0, 0, 0, 0],
+    [0, 4, 3, 2, 1, 0, 0, 0, 0, 0],
+    [0, 4, 3, 2, 2, 0, 0, 0, 0, 0],
+    [0, 4, 3, 3, 2, 0, 0, 0, 0, 0],
+    [0, 4, 4, 3, 3, 0, 0, 0, 0, 0],
+]
+
+PROGRESSIONS = {"full": FULL_CASTER, "spontaneous_full": SPONTANEOUS_FULL,
+                "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL}
 
 # Which classes cast, off what, and from whose list.
 #
@@ -66,6 +148,35 @@ CASTERS: dict[str, dict] = {
         "ability": "wis", "kind": "prepared", "progression": "full",
         "list": "cleric", "prepare_from": "list",
         "note": "A cleric prepares from the whole cleric list — their god is the book.",
+    },
+    "druid": {
+        "ability": "wis", "kind": "prepared", "progression": "full",
+        "list": "druid", "prepare_from": "list",
+        "note": "A druid prepares from the whole druid list — the wild is the book.",
+    },
+    # `prepare_from: "known"`: the spellbook field holds the spells *known*, there is no
+    # preparing, and any slot casts any of them. That reuse is deliberate — a sorcerer's
+    # repertoire and a wizard's book are the same data with a different verb — and it is
+    # what keeps `spellbook` meaning one thing in the save file.
+    "sorcerer": {
+        "ability": "cha", "kind": "spontaneous", "progression": "spontaneous_full",
+        "list": "sorcerer", "prepare_from": "known",
+        "note": "A sorcerer knows few spells and casts any of them from any slot.",
+    },
+    "bard": {
+        "ability": "cha", "kind": "spontaneous", "progression": "six_level",
+        "list": "bard", "prepare_from": "known",
+        "note": "Six spell levels, known rather than prepared, off Charisma.",
+    },
+    "paladin": {
+        "ability": "cha", "kind": "prepared", "progression": "four_level",
+        "list": "paladin", "prepare_from": "list",
+        "note": "Four spell levels, nothing before class level 4 (5, as modelled).",
+    },
+    "ranger": {
+        "ability": "wis", "kind": "prepared", "progression": "four_level",
+        "list": "ranger", "prepare_from": "list",
+        "note": "Four spell levels, nothing before class level 4 (5, as modelled).",
     },
 }
 
@@ -196,7 +307,10 @@ def knows(actor, spell) -> bool:
         return False
     if spell_level_for(actor, spell) is None:
         return False
-    if data.get("prepare_from") == "spellbook":
+    # "spellbook" and "known" both read `actor.spellbook`; the difference is what casting
+    # then asks. A wizard must also have prepared the spell today; a sorcerer casts
+    # anything known from any slot, and the prepared check never fires for them.
+    if data.get("prepare_from") in ("spellbook", "known"):
         return spell.id in actor.spellbook
     return True
 

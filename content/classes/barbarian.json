@@ -1,0 +1,172 @@
+{
+ "id": "barbarian",
+ "name": "Barbarian",
+ "hit_die": 12,
+ "bab": "full",
+ "good_saves": [
+  "fort"
+ ],
+ "skill_ranks": 4,
+ "proficiencies": [
+  "simple",
+  "martial",
+  "light armour",
+  "medium armour",
+  "shields"
+ ],
+ "class_skills": [
+  "acrobatics",
+  "climb",
+  "craft",
+  "handle animal",
+  "intimidate",
+  "knowledge (nature)",
+  "perception",
+  "ride",
+  "survival",
+  "swim"
+ ],
+ "summary": "A d12 and a temper. Rage is rounds per day, spent one at a time.",
+ "starting_wealth": "3d6 x 10 gp",
+ "pools": [
+  {
+   "id": "rage",
+   "from_level": 1,
+   "max": "4 + con_mod + 2*(level - 1)",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Rounds per day, Core p.31: 4 + Con mod at 1st, +2 per level after."
+  }
+ ],
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "rage",
+    "fast movement"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "rage power",
+    "uncanny dodge"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "trap sense +1"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": [
+    "rage power"
+   ]
+  },
+  {
+   "level": 5,
+   "grants": [
+    "improved uncanny dodge"
+   ]
+  },
+  {
+   "level": 6,
+   "grants": [
+    "rage power",
+    "trap sense +2"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": [
+    "damage reduction 1/-"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": [
+    "rage power"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "trap sense +3"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "rage power",
+    "damage reduction 2/-"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": [
+    "greater rage"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": [
+    "rage power",
+    "trap sense +4"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": [
+    "damage reduction 3/-"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": [
+    "rage power",
+    "indomitable will"
+   ]
+  },
+  {
+   "level": 15,
+   "grants": [
+    "trap sense +5"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": [
+    "rage power",
+    "damage reduction 4/-"
+   ]
+  },
+  {
+   "level": 17,
+   "grants": [
+    "tireless rage"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": [
+    "rage power",
+    "trap sense +6"
+   ]
+  },
+  {
+   "level": 19,
+   "grants": [
+    "damage reduction 5/-"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "rage power",
+    "mighty rage"
+   ]
+  }
+ ]
+}

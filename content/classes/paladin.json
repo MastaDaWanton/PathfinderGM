@@ -1,0 +1,179 @@
+{
+ "id": "paladin",
+ "name": "Paladin",
+ "hit_die": 10,
+ "bab": "full",
+ "good_saves": [
+  "fort",
+  "will"
+ ],
+ "skill_ranks": 2,
+ "proficiencies": [
+  "simple",
+  "martial",
+  "light armour",
+  "medium armour",
+  "heavy armour",
+  "shields"
+ ],
+ "class_skills": [
+  "craft",
+  "diplomacy",
+  "handle animal",
+  "heal",
+  "knowledge (nobility)",
+  "knowledge (religion)",
+  "profession",
+  "ride",
+  "sense motive",
+  "spellcraft"
+ ],
+ "summary": "Full BAB in full plate, Charisma behind every save, and a smite that counts uses.",
+ "alignment": "lawful good",
+ "starting_wealth": "5d6 x 10 gp",
+ "pools": [
+  {
+   "id": "smite evil",
+   "from_level": 1,
+   "max": "1 + floor((level - 1) / 3)",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Core p.60: 1/day, +1 at 4th and every three after."
+  },
+  {
+   "id": "lay on hands",
+   "from_level": 2,
+   "max": "floor(level / 2) + cha_mod",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Core p.61: half level + Cha mod uses; heals level/2 d6."
+  }
+ ],
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "aura of good",
+    "detect evil",
+    "smite evil 1/day"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "divine grace",
+    "lay on hands"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "aura of courage",
+    "divine health",
+    "mercy"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": [
+    "channel positive energy",
+    "smite evil 2/day"
+   ]
+  },
+  {
+   "level": 5,
+   "grants": []
+  },
+  {
+   "level": 6,
+   "grants": [
+    "mercy"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": [
+    "smite evil 3/day"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": [
+    "aura of resolve"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "mercy"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "smite evil 4/day"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": [
+    "aura of justice"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": [
+    "mercy"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": [
+    "smite evil 5/day"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": [
+    "aura of faith"
+   ]
+  },
+  {
+   "level": 15,
+   "grants": [
+    "mercy"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": [
+    "smite evil 6/day"
+   ]
+  },
+  {
+   "level": 17,
+   "grants": [
+    "aura of righteousness",
+    "damage reduction 5/evil"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": [
+    "mercy"
+   ]
+  },
+  {
+   "level": 19,
+   "grants": [
+    "smite evil 7/day"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "holy champion"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,139 @@
+{
+ "id": "sorcerer",
+ "name": "Sorcerer",
+ "hit_die": 6,
+ "bab": "half",
+ "good_saves": [
+  "will"
+ ],
+ "skill_ranks": 2,
+ "proficiencies": [
+  "simple"
+ ],
+ "class_skills": [
+  "appraise",
+  "bluff",
+  "craft",
+  "fly",
+  "intimidate",
+  "knowledge (arcana)",
+  "profession",
+  "spellcraft",
+  "use magic device"
+ ],
+ "summary": "Magic as blood rather than study: few spells known, any slot casts any of them, and a bloodline that grows with the levels.",
+ "starting_wealth": "2d6 x 10 gp",
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "bloodline",
+    "bloodline power",
+    "cantrips",
+    "eschew materials"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": []
+  },
+  {
+   "level": 3,
+   "grants": [
+    "bloodline power",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": []
+  },
+  {
+   "level": 5,
+   "grants": [
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 6,
+   "grants": []
+  },
+  {
+   "level": 7,
+   "grants": [
+    "bloodline feat",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": []
+  },
+  {
+   "level": 9,
+   "grants": [
+    "bloodline power",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": []
+  },
+  {
+   "level": 11,
+   "grants": [
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": []
+  },
+  {
+   "level": 13,
+   "grants": [
+    "bloodline feat",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": []
+  },
+  {
+   "level": 15,
+   "grants": [
+    "bloodline power",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": []
+  },
+  {
+   "level": 17,
+   "grants": [
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": []
+  },
+  {
+   "level": 19,
+   "grants": [
+    "bloodline feat",
+    "bloodline spell"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "bloodline power"
+   ]
+  }
+ ]
+}

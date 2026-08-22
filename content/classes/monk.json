@@ -1,0 +1,198 @@
+{
+ "id": "monk",
+ "name": "Monk",
+ "hit_die": 8,
+ "bab": "three_quarter",
+ "good_saves": [
+  "fort",
+  "ref",
+  "will"
+ ],
+ "skill_ranks": 4,
+ "proficiencies": [
+  "brass knuckles",
+  "club",
+  "crossbow",
+  "dagger",
+  "handaxe",
+  "javelin",
+  "kama",
+  "nunchaku",
+  "quarterstaff",
+  "sai",
+  "shortspear",
+  "shortsword",
+  "shuriken",
+  "siangham",
+  "sling",
+  "spear",
+  "no armour"
+ ],
+ "class_skills": [
+  "acrobatics",
+  "climb",
+  "craft",
+  "escape artist",
+  "intimidate",
+  "knowledge (history)",
+  "knowledge (religion)",
+  "perception",
+  "perform",
+  "profession",
+  "ride",
+  "sense motive",
+  "stealth",
+  "swim"
+ ],
+ "summary": "Unarmed and unarmoured: Wisdom to AC, a flurry of blows, and from 4th a ki pool that buys extra attacks and speed.",
+ "starting_wealth": "1d6 x 10 gp",
+ "pools": [
+  {
+   "id": "ki",
+   "from_level": 4,
+   "max": "floor(level / 2) + wis_mod",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Core p.58: half monk level + Wis mod, from 4th."
+  }
+ ],
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "flurry of blows",
+    "stunning fist",
+    "unarmed strike (1d6)",
+    "AC bonus (Wis)"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "bonus feat",
+    "evasion"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "fast movement +10 ft",
+    "maneuver training",
+    "still mind"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": [
+    "ki pool",
+    "slow fall 20 ft",
+    "unarmed strike 1d8"
+   ]
+  },
+  {
+   "level": 5,
+   "grants": [
+    "high jump",
+    "purity of body"
+   ]
+  },
+  {
+   "level": 6,
+   "grants": [
+    "bonus feat",
+    "slow fall 30 ft"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": [
+    "wholeness of body"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": [
+    "slow fall 40 ft"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "improved evasion"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "bonus feat",
+    "slow fall 50 ft"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": [
+    "diamond body"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": [
+    "abundant step",
+    "unarmed strike 2d6"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": [
+    "diamond soul"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": [
+    "bonus feat",
+    "slow fall 70 ft"
+   ]
+  },
+  {
+   "level": 15,
+   "grants": [
+    "quivering palm"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": [
+    "slow fall 80 ft",
+    "unarmed strike 2d8"
+   ]
+  },
+  {
+   "level": 17,
+   "grants": [
+    "timeless body",
+    "tongue of the sun and moon"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": [
+    "bonus feat",
+    "slow fall 90 ft"
+   ]
+  },
+  {
+   "level": 19,
+   "grants": [
+    "empty body"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "perfect self",
+    "unarmed strike 2d10"
+   ]
+  }
+ ]
+}

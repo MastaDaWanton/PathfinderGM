@@ -1,0 +1,164 @@
+{
+ "id": "druid",
+ "name": "Druid",
+ "hit_die": 8,
+ "bab": "three_quarter",
+ "good_saves": [
+  "fort",
+  "will"
+ ],
+ "skill_ranks": 4,
+ "proficiencies": [
+  "club",
+  "dagger",
+  "dart",
+  "quarterstaff",
+  "scimitar",
+  "scythe",
+  "sickle",
+  "shortspear",
+  "sling",
+  "spear",
+  "light armour",
+  "medium armour",
+  "shields",
+  "no metal armour"
+ ],
+ "class_skills": [
+  "climb",
+  "craft",
+  "fly",
+  "handle animal",
+  "heal",
+  "knowledge (geography)",
+  "knowledge (nature)",
+  "perception",
+  "profession",
+  "ride",
+  "spellcraft",
+  "survival",
+  "swim"
+ ],
+ "summary": "A full prepared caster off Wisdom whose list is the wild, with a companion and, from 4th, another shape.",
+ "starting_wealth": "2d6 x 10 gp",
+ "pools": [
+  {
+   "id": "wild shape",
+   "from_level": 4,
+   "max": "1 + floor((level - 4) / 2)",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Uses per day, Core p.51: 1 at 4th, +1 every two levels after."
+  }
+ ],
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "nature bond",
+    "nature sense",
+    "orisons",
+    "wild empathy"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "woodland stride"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "trackless step"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": [
+    "wild shape 1/day",
+    "resist nature's lure"
+   ]
+  },
+  {
+   "level": 5,
+   "grants": []
+  },
+  {
+   "level": 6,
+   "grants": [
+    "wild shape (Large, Tiny)"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": []
+  },
+  {
+   "level": 8,
+   "grants": [
+    "wild shape (Huge, Diminutive, elemental)"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "venom immunity"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "wild shape (plant)"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": []
+  },
+  {
+   "level": 12,
+   "grants": [
+    "wild shape (Huge elemental)"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": [
+    "a thousand faces"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": []
+  },
+  {
+   "level": 15,
+   "grants": [
+    "timeless body"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": []
+  },
+  {
+   "level": 17,
+   "grants": []
+  },
+  {
+   "level": 18,
+   "grants": []
+  },
+  {
+   "level": 19,
+   "grants": []
+  },
+  {
+   "level": 20,
+   "grants": [
+    "wild shape at will"
+   ]
+  }
+ ]
+}

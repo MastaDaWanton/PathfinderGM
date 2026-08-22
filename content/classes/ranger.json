@@ -1,0 +1,162 @@
+{
+ "id": "ranger",
+ "name": "Ranger",
+ "hit_die": 10,
+ "bab": "full",
+ "good_saves": [
+  "fort",
+  "ref"
+ ],
+ "skill_ranks": 6,
+ "proficiencies": [
+  "simple",
+  "martial",
+  "light armour",
+  "medium armour",
+  "shields"
+ ],
+ "class_skills": [
+  "climb",
+  "craft",
+  "handle animal",
+  "heal",
+  "intimidate",
+  "knowledge (dungeoneering)",
+  "knowledge (geography)",
+  "knowledge (nature)",
+  "perception",
+  "profession",
+  "ride",
+  "spellcraft",
+  "stealth",
+  "survival",
+  "swim"
+ ],
+ "summary": "The wild as a profession: favoured enemies and ground, a combat style, and four spell levels off Wisdom from 4th.",
+ "starting_wealth": "5d6 x 10 gp",
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "favored enemy",
+    "track",
+    "wild empathy"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "combat style feat"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "endurance",
+    "favored terrain"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": [
+    "hunter's bond"
+   ]
+  },
+  {
+   "level": 5,
+   "grants": [
+    "favored enemy (2nd)"
+   ]
+  },
+  {
+   "level": 6,
+   "grants": [
+    "combat style feat"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": [
+    "woodland stride"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": [
+    "favored terrain (2nd)",
+    "swift tracker"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "evasion"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "favored enemy (3rd)"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": [
+    "quarry"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": [
+    "camouflage"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": [
+    "combat style feat"
+   ]
+  },
+  {
+   "level": 14,
+   "grants": []
+  },
+  {
+   "level": 15,
+   "grants": [
+    "favored enemy (4th)"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": [
+    "improved evasion"
+   ]
+  },
+  {
+   "level": 17,
+   "grants": [
+    "hide in plain sight"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": [
+    "favored terrain (4th)"
+   ]
+  },
+  {
+   "level": 19,
+   "grants": [
+    "improved quarry"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "favored enemy (5th)",
+    "master hunter"
+   ]
+  }
+ ]
+}

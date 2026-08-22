@@ -1,0 +1,188 @@
+{
+ "id": "bard",
+ "name": "Bard",
+ "hit_die": 8,
+ "bab": "three_quarter",
+ "good_saves": [
+  "ref",
+  "will"
+ ],
+ "skill_ranks": 6,
+ "proficiencies": [
+  "simple",
+  "longsword",
+  "rapier",
+  "sap",
+  "shortsword",
+  "shortbow",
+  "whip",
+  "light armour",
+  "shields"
+ ],
+ "class_skills": [
+  "acrobatics",
+  "appraise",
+  "bluff",
+  "climb",
+  "craft",
+  "diplomacy",
+  "disguise",
+  "escape artist",
+  "intimidate",
+  "knowledge (arcana)",
+  "knowledge (dungeoneering)",
+  "knowledge (engineering)",
+  "knowledge (geography)",
+  "knowledge (history)",
+  "knowledge (local)",
+  "knowledge (nature)",
+  "knowledge (nobility)",
+  "knowledge (planes)",
+  "knowledge (religion)",
+  "linguistics",
+  "perception",
+  "perform",
+  "profession",
+  "sense motive",
+  "sleight of hand",
+  "spellcraft",
+  "stealth",
+  "use magic device"
+ ],
+ "summary": "Six spell levels off Charisma, known rather than prepared, and a performance measured in rounds.",
+ "starting_wealth": "3d6 x 10 gp",
+ "pools": [
+  {
+   "id": "bardic performance",
+   "from_level": 1,
+   "max": "4 + cha_mod + 2*(level - 1)",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Rounds per day, Core p.36: 4 + Cha mod at 1st, +2 per level."
+  }
+ ],
+ "levels": [
+  {
+   "level": 1,
+   "grants": [
+    "bardic knowledge",
+    "bardic performance",
+    "countersong",
+    "distraction",
+    "fascinate",
+    "inspire courage +1"
+   ]
+  },
+  {
+   "level": 2,
+   "grants": [
+    "versatile performance",
+    "well-versed"
+   ]
+  },
+  {
+   "level": 3,
+   "grants": [
+    "inspire competence +2"
+   ]
+  },
+  {
+   "level": 4,
+   "grants": []
+  },
+  {
+   "level": 5,
+   "grants": [
+    "lore master 1/day"
+   ]
+  },
+  {
+   "level": 6,
+   "grants": [
+    "suggestion"
+   ]
+  },
+  {
+   "level": 7,
+   "grants": [
+    "inspire competence +3"
+   ]
+  },
+  {
+   "level": 8,
+   "grants": [
+    "dirge of doom"
+   ]
+  },
+  {
+   "level": 9,
+   "grants": [
+    "inspire greatness"
+   ]
+  },
+  {
+   "level": 10,
+   "grants": [
+    "jack-of-all-trades"
+   ]
+  },
+  {
+   "level": 11,
+   "grants": [
+    "inspire competence +4",
+    "inspire courage +2"
+   ]
+  },
+  {
+   "level": 12,
+   "grants": [
+    "soothing performance"
+   ]
+  },
+  {
+   "level": 13,
+   "grants": []
+  },
+  {
+   "level": 14,
+   "grants": [
+    "frightening tune"
+   ]
+  },
+  {
+   "level": 15,
+   "grants": [
+    "inspire competence +5",
+    "inspire heroics"
+   ]
+  },
+  {
+   "level": 16,
+   "grants": []
+  },
+  {
+   "level": 17,
+   "grants": [
+    "inspire courage +3"
+   ]
+  },
+  {
+   "level": 18,
+   "grants": [
+    "mass suggestion"
+   ]
+  },
+  {
+   "level": 19,
+   "grants": [
+    "inspire competence +6"
+   ]
+  },
+  {
+   "level": 20,
+   "grants": [
+    "deadly performance"
+   ]
+  }
+ ]
+}
