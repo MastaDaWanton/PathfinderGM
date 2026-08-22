@@ -110,23 +110,49 @@ def threatens(scene, watcher_ref: str, square) -> bool:
     reach = _reach_of(watcher)
     if reach <= 0:
         return False
-    return tuple(square) in gridmod.threatened_squares(anchor, watcher.size, reach=reach)
+    threatened = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
+    if reach_gap(watcher):
+        # A reach weapon cannot strike what is right beside you. Subtracting the adjacent
+        # ring here rather than in `grid` keeps geometry ignorant of inventory.
+        threatened -= gridmod.threatened_squares(anchor, watcher.size,
+                                                 reach=gridmod.SQUARE_FT)
+    return tuple(square) in threatened
 
 
 def _reach_of(actor) -> int:
-    """Reach in feet.
+    """Reach in feet, weapon included.
 
-    Natural reach only, and deliberately so for now: `tables.WEAPONS` has no reach weapons
-    in it — no glaive, no longspear, no trait field at all — so a weapon branch here would
-    be dead code pretending to be a rule. When they arrive, a reach weapon doubles this
-    *and* stops the wielder threatening adjacent squares, and both halves have to land
-    together or the weapon is strictly better in the app than at a table.
+    This was natural reach only for as long as `tables.WEAPONS` held eleven weapons and
+    none of them had a trait field. The weapons import brought 40 reach weapons with it,
+    so the branch is real now — and both halves of the rule land together, because the
+    half that is easy to forget is the one that costs the player: a reach weapon doubles
+    the threatened area *and* stops the wielder threatening adjacent squares. Implementing
+    only the first would make a glaive strictly better in the app than at a table.
 
-    Also missing: 1e says an unarmed creature without Improved Unarmed Strike does not
+    The adjacent hole is the caller's to apply — `threatened_squares` is geometry and does
+    not know what anybody is holding — so `reach_gap` says whether there is one.
+
+    Still missing: 1e says an unarmed creature without Improved Unarmed Strike does not
     threaten at all. Left out because it would silently disarm every monster in the
     bestiary, none of which carry the feat.
     """
-    return gridmod.natural_reach(actor.size)
+    from . import weapons as weapons_mod
+
+    natural = gridmod.natural_reach(actor.size)
+    if weapons_mod.has_trait(actor.equipped or "", "reach"):
+        return natural * 2
+    return natural
+
+
+def reach_gap(actor) -> bool:
+    """Does this creature's weapon leave the squares next to it unthreatened?
+
+    True only for a reach weapon. A creature with natural reach — an ogre — threatens
+    everything out to ten feet including what is under its nose.
+    """
+    from . import weapons as weapons_mod
+
+    return weapons_mod.has_trait(actor.equipped or "", "reach")
 
 
 def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, Reaction]]:

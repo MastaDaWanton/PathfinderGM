@@ -43,10 +43,18 @@ Game Content, and each entry records the sourcebook it came from. The typed
 `prerequisites` array is this app's own machine-readable restatement of the prerequisite
 text, which is also carried verbatim beside it.
 
-`content/weapons/weapons.json` — Pathfinder 1st Edition weapon statistics. Cost, damage,
+`content/weapons/weapons.json` — 456 Pathfinder 1st Edition weapons. Cost, damage,
 critical, range, weight, damage type and special qualities are Open Game Content. The
 component columns (head, haft, grip, guard) are the author's own additions for the
 crafting system and are not Open Game Content.
+
+**This file records no per-weapon source.** The workbook it came from has no source
+column, so unlike the spells, creatures and feats there is nothing saying which book each
+weapon is from. All 456 therefore appear in `tools/ogl_sources.py` as unattributed, and
+they are the bulk of the 597 such entries. Weapon statistics are among the most widely
+reprinted Open Game Content in Pathfinder and the great majority will be Core Rulebook,
+Ultimate Combat and Ultimate Equipment — but "will be" is not an attribution, and the
+gap is recorded here rather than guessed at.
 
 ## Before shipping a build
 
@@ -65,9 +73,10 @@ crafting system and are not Open Game Content.
    python tools/ogl_sources.py --full
    ```
 
-   As measured on the current content: **11,863 entries across 682 distinct sources**, and
-   **141 entries record no source at all**. Those 141 cannot be attributed and must either
-   gain a source or be dropped before a build ships. The 682 also span more than one
+   As measured on the current content: **12,319 entries across 682 distinct sources**, and
+   **597 entries record no source at all** — 456 of them the weapons, which arrived with
+   no source column. Those cannot be attributed and must either gain a source or be
+   dropped before a build ships. The 682 also span more than one
    publisher — Rappan Athuk, Sword of Air and The Lost City of Barakus are Frog God
    Games, not Paizo — so this is not one boilerplate block.
 

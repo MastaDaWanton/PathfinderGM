@@ -25,6 +25,7 @@ from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
 from . import spells as spells_mod
+from . import weapons as weapons_mod
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
@@ -452,7 +453,7 @@ class Engine:
             )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.equipped or "unarmed"
-            if key not in WEAPONS:
+            if not weapons_mod.has(key):
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
                 )

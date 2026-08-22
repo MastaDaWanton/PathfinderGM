@@ -136,6 +136,14 @@ def _square(raw, op: str, index: int) -> tuple[int, int]:
         ) from None
 
 
+def _known_weapon(name) -> bool:
+    """Imported lazily: `rules.weapons` reads Django settings, and this module is imported
+    before settings are configured in some entry points."""
+    from .weapons import has
+
+    return has(str(name))
+
+
 def _suggest(name: str, candidates) -> str:
     """A rejection the model cannot act on costs a whole regeneration.
 
@@ -454,11 +462,16 @@ def _check_params(intent: Intent, index: int) -> None:
 
     elif op == "attack":
         w = p.get("weapon")
-        if w and str(w).strip().lower() not in WEAPONS:
+        if w and not _known_weapon(w):
+            # The list used to be printed in full, which was reasonable at eleven weapons
+            # and is 456 names of noise now. A near-miss suggestion is what the model can
+            # actually act on.
+            from .weapons import all_weapons
+
             raise IntentError(
-                f"attack: no such weapon {w!r}." + _suggest(str(w), WEAPONS)
-                + f" Carried weapons are named on the sheet; the list is "
-                f"{', '.join(sorted(WEAPONS))}.",
+                f"attack: no such weapon {w!r}."
+                + _suggest(str(w), all_weapons())
+                + " Carried weapons are named on the sheet.",
                 "schema", index,
             )
         if w:

@@ -585,10 +585,15 @@ class Actor:
     # --- attack and damage --------------------------------------------------------------
 
     def weapon(self, key: str | None = None) -> dict:
-        key = (key or self.equipped or "unarmed").strip().lower()
-        if key not in WEAPONS:
-            raise KeyError(f"no such weapon {key!r}")
-        return WEAPONS[key]
+        """The weapon's statistics.
+
+        Goes through `rules.weapons` rather than reading `tables.WEAPONS` directly: the
+        table holds eleven, the content file holds 456, and a player reaching for a glaive
+        used to get `KeyError: no such weapon`.
+        """
+        from . import weapons as weapons_mod
+
+        return weapons_mod.get(key or self.equipped or "unarmed")
 
     def _uses_finesse(self, weapon: dict) -> bool:
         return (
@@ -620,8 +625,10 @@ class Actor:
     def is_proficient(self, weapon_key: str | None = None) -> bool:
         """Proficiency comes from the class, or from a Martial/Simple Weapon Proficiency
         feat, or from the weapon being named specifically."""
+        from . import weapons as weapons_mod
+
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
-        w = WEAPONS.get(key, {})
+        w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
         granted = {p.lower() for p in self.class_data.get("proficiencies", ())}
@@ -1485,11 +1492,13 @@ def full_sheet(actor: Actor) -> dict:
     cls = actor.class_data
     weapons = actor.weapons or ([actor.equipped] if actor.equipped else ["unarmed"])
 
+    from . import weapons as weapons_mod
+
     attacks = []
     for key in dict.fromkeys(w.lower() for w in weapons if w):
-        if key not in WEAPONS:
+        if not weapons_mod.has(key):
             continue
-        w = WEAPONS[key]
+        w = weapons_mod.get(key)
         attacks.append({
             "key": key,
             "name": w["name"],
@@ -1646,8 +1655,8 @@ def full_sheet(actor: Actor) -> dict:
                        "max_dex": armour["max_dex"], "acp": armour["acp"]},
             "shield": {"name": shield["name"], "ac": shield["ac"], "acp": shield["acp"]},
             "armour_check_penalty": actor.armour_check_penalty,
-            "weapons": [WEAPONS[w.lower()]["name"] for w in weapons
-                        if w and w.lower() in WEAPONS],
+            "weapons": [weapons_mod.get(w)["name"] for w in weapons
+                        if w and weapons_mod.has(w)],
             "slots": body_slots(actor),
         },
         "background": {
