@@ -494,6 +494,28 @@
   }
   input[type=text], textarea, .dieface { cursor: text; }
 
+
+  /* The materials answer the flame. Shadows lean away from the carried light
+     and swell with --flicks, the slow channel — the fast one would repaint
+     every card sixty times a second. The desk's own candle pool breathes on
+     the fast channel, because opacity is free. */
+  .card {
+    box-shadow:
+      var(--sdx, 0px) var(--sdy, 6px) calc(22px * var(--flicks, .8))
+        rgba(0, 0, 0, calc(.62 * var(--flicks, .8) + .18)),
+      inset 0 1px 0 rgba(255, 230, 150, .08),
+      inset 0 0 42px rgba(0, 0, 0, .40);
+    transition: box-shadow .12s ease-out;
+  }
+  /* The struck numbers soak up the passing light: their glow flares with the
+     slow channel on top of the engraved shadows, which stay put. */
+  .abrow .val, .budget b {
+    text-shadow:
+      0 -1px 1px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 225, 175, .2),
+      0 0 calc(9px * var(--flicks, .8)) rgba(255, 176, 84, calc(.30 * var(--flicks, .8)));
+    transition: text-shadow .1s ease-out;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -559,10 +581,22 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
   document.addEventListener("pointermove", e => {
     root.setProperty("--cx", `${e.clientX}px`);
     root.setProperty("--cy", `${e.clientY}px`);
+    // Shadow direction: away from the light. One global vector — the panels
+    // to the candle's right lean their shadows right — which is the cheap
+    // approximation of per-panel geometry, and at room scale it reads true.
+    const dx = (innerWidth / 2 - e.clientX) / innerWidth;
+    const dy = (innerHeight / 2 - e.clientY) / innerHeight;
+    root.setProperty("--sdx", `${(dx * 10).toFixed(1)}px`);
+    root.setProperty("--sdy", `${(4 + dy * 8).toFixed(1)}px`);
   }, { passive: true });
 
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    let walk = 0;
+    // Two channels from one flame. --flick updates every frame and feeds only
+    // compositor-cheap properties (opacity, transform). --flicks is the same
+    // signal quantised to ~10Hz and a minimum step, and it feeds the expensive
+    // consumers — box-shadows and text-shadows repaint what they touch, and
+    // sixty repaints a second of every card is how a laptop grows a fan noise.
+    let walk = 0, slow = 0.8, slowAt = 0;
     const tick = now => {
       const t = now / 1000;
       walk = Math.max(-0.5, Math.min(0.5, walk + (Math.random() - 0.5) * 0.04));
@@ -574,6 +608,10 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
       root.setProperty("--flick", flick.toFixed(3));
       root.setProperty("--jx", `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`);
       root.setProperty("--jy", `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px`);
+      if (now - slowAt > 100 && Math.abs(flick - slow) > 0.04) {
+        slow = flick; slowAt = now;
+        root.setProperty("--flicks", flick.toFixed(3));
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

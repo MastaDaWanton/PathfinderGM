@@ -83,15 +83,12 @@
     left: -10%; right: 20%; bottom: -30%; height: 90%;
     background: radial-gradient(55% 60% at 38% 100%,
                 rgba(var(--ember), .10), rgba(var(--ember), .035) 45%, transparent 72%);
-    animation: candle 7s ease-in-out infinite;
+    opacity: calc(.45 + .55 * var(--flick, .8));
   }
   /* And the vignette: the edges of the room fall away into the dark. */
   body::after {
     content: ""; position: fixed; inset: 0; z-index: 5; pointer-events: none;
     box-shadow: inset 0 0 190px 40px rgba(0, 0, 0, .78);
-  }
-  @keyframes candle {
-    0%, 100% { opacity: .75; } 38% { opacity: 1; } 61% { opacity: .82; }
   }
 
   main {
@@ -1018,6 +1015,40 @@
     cursor: url("{% static 'img/cursor-candle.png' %}") 24 0, auto;
   }
   input[type=text], textarea, .dieface { cursor: text; }
+
+
+  /* The materials answer the flame. Shadows lean away from the carried light
+     and swell with --flicks, the slow channel — the fast one would repaint
+     every card sixty times a second. The desk's own candle pool breathes on
+     the fast channel, because opacity is free. */
+  .framed, .card, .slot {
+    box-shadow:
+      var(--sdx, 0px) var(--sdy, 6px) calc(22px * var(--flicks, .8))
+        rgba(0, 0, 0, calc(.62 * var(--flicks, .8) + .18)),
+      inset 0 1px 0 rgba(255, 230, 150, .08),
+      inset 0 0 42px rgba(0, 0, 0, .40);
+    transition: box-shadow .12s ease-out;
+  }
+  .popup, .deathpanel {
+    box-shadow:
+      var(--sdx, 0px) var(--sdy, 10px) calc(48px * var(--flicks, .8))
+        rgba(0, 0, 0, calc(.7 * var(--flicks, .8) + .2)),
+      inset 0 0 0 1px rgba(221, 196, 142, .08),
+      0 0 46px rgba(var(--ember), .07);
+    transition: box-shadow .12s ease-out;
+  }
+  /* The struck numbers soak up the passing light: their glow flares with the
+     slow channel on top of the engraved shadows, which stay put. */
+  .bignum, .cell span, .dieface {
+    text-shadow:
+      0 -1px 1px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 225, 175, .2),
+      0 0 calc(9px * var(--flicks, .8)) rgba(var(--ember), calc(.30 * var(--flicks, .8)));
+    transition: text-shadow .1s ease-out;
+  }
+  .row.danger span:last-child {
+    text-shadow: 0 0 calc(14px * var(--flicks, .8))
+      rgba(var(--bloodglow), calc(.6 * var(--flicks, .8) + .15));
+  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -2067,10 +2098,22 @@ const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
   document.addEventListener("pointermove", e => {
     root.setProperty("--cx", `${e.clientX}px`);
     root.setProperty("--cy", `${e.clientY}px`);
+    // Shadow direction: away from the light. One global vector — the panels
+    // to the candle's right lean their shadows right — which is the cheap
+    // approximation of per-panel geometry, and at room scale it reads true.
+    const dx = (innerWidth / 2 - e.clientX) / innerWidth;
+    const dy = (innerHeight / 2 - e.clientY) / innerHeight;
+    root.setProperty("--sdx", `${(dx * 10).toFixed(1)}px`);
+    root.setProperty("--sdy", `${(4 + dy * 8).toFixed(1)}px`);
   }, { passive: true });
 
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    let walk = 0;
+    // Two channels from one flame. --flick updates every frame and feeds only
+    // compositor-cheap properties (opacity, transform). --flicks is the same
+    // signal quantised to ~10Hz and a minimum step, and it feeds the expensive
+    // consumers — box-shadows and text-shadows repaint what they touch, and
+    // sixty repaints a second of every card is how a laptop grows a fan noise.
+    let walk = 0, slow = 0.8, slowAt = 0;
     const tick = now => {
       const t = now / 1000;
       walk = Math.max(-0.5, Math.min(0.5, walk + (Math.random() - 0.5) * 0.04));
@@ -2082,6 +2125,10 @@ const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
       root.setProperty("--flick", flick.toFixed(3));
       root.setProperty("--jx", `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`);
       root.setProperty("--jy", `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px`);
+      if (now - slowAt > 100 && Math.abs(flick - slow) > 0.04) {
+        slow = flick; slowAt = now;
+        root.setProperty("--flicks", flick.toFixed(3));
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
