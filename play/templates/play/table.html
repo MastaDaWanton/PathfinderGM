@@ -974,9 +974,13 @@
     margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 55;
     transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
                scale(calc(.94 + .10 * var(--flick, .8)));
+    /* Taken well down from the first cut (.13/.30/.34): the illusion of
+       illumination needs only a gentle differential, and a veil dark enough
+       to be atmospheric was dark enough to make the far side of the page a
+       strain to read. Cool is not a reason to make somebody squint. */
     background: radial-gradient(circle,
-      transparent 0 70px, rgba(4, 3, 2, .13) 170px,
-      rgba(4, 3, 2, .30) 380px, rgba(4, 3, 2, .34) 100%);
+      transparent 0 130px, rgba(4, 3, 2, .05) 240px,
+      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 100%);
   }
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;
