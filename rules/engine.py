@@ -17,6 +17,7 @@ from . import biomes
 from . import dc as dc_mod
 from . import foraging
 from . import ingredients as ing_mod
+from . import resources
 from . import worldclass
 from .dice import Dice, Modifier, Roll
 from .intents import Intent, IntentError, parse_all
@@ -119,6 +120,7 @@ class Scene:
                 self.round += 1
                 for a in self.actors.values():
                     a.tick_conditions(1)
+                    a.tick_pools(1)
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
                 ) if r]
@@ -1097,6 +1099,53 @@ class Engine:
             tell=" ".join(bits), because=intent.because,
         )
 
+    def _op_resource(self, intent: Intent, partial: dict) -> Outcome:
+        """Spend or grant a pool.
+
+        `to` rather than `actor` when it lands on somebody else, because a blood stack
+        sits on the creature it was applied to and is spent by whoever put it there — the
+        resource does not belong to its owner.
+        """
+        ref = intent.params.get("to") or intent.actor \
+            or (self.scene.pc().ref if self.scene.pc() else None)
+        target = self.scene.actors.get(ref) if ref else None
+        if target is None:
+            raise IntentError("resource: nobody to spend it from", "refs")
+
+        pool_id = str(intent.params["pool"]).strip().lower()
+        amount = intent.params.get("amount", 1)
+        roll = None
+        if isinstance(amount, str) and not amount.lstrip("-").isdigit():
+            roll = self.dice.roll(amount, label=pool_id, visibility="hidden")
+            amount = roll.total
+        amount = int(amount)
+
+        if intent.params.get("spend"):
+            result = target.spend_pool(pool_id, amount)
+            if not result["ok"]:
+                # Refused, not silently ignored: an ability that fires with an empty pool
+                # is one the player thinks they still have.
+                raise IntentError(f"resource: {result['why']}.", "legality")
+            cooldown = intent.params.get("cooldown")
+            if cooldown:
+                rolled = self.dice.roll(str(cooldown), label=f"{pool_id} cooldown",
+                                        visibility="hidden")
+                target.start_cooldown(pool_id, rolled.total)
+                roll = roll or rolled
+            tell = (f"{target.name} spends {amount} {pool_id} "
+                    f"({result['current']} left).")
+        else:
+            now = target.gain_pool(pool_id, amount, source=intent.because)
+            tell = f"{target.name} gains {amount} {pool_id} ({now})."
+
+        pool = target.pool(pool_id)
+        return Outcome(
+            intent_id=intent.id, op="resource", rolls=[roll] if roll else [],
+            effects=[{"ref": target.ref, "kind": "resource",
+                      **(pool.as_dict() if pool else {"id": pool_id})}],
+            tell=tell, because=intent.because,
+        )
+
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot. What grows here follows from it."""
         want = str(intent.params["biome"]).strip().lower()
@@ -1273,6 +1322,7 @@ class Engine:
             raise IntentError("rest: nobody here to rest", "refs")
 
         result = actor.rest(kind)
+        refilled = actor.refresh_pools("rest.night", self.dice)
         hours = result["hours"]
         self.scene.clock_minutes += hours * 60
         ended = actor.tick_conditions(hours * 600)      # ten rounds to the minute
@@ -1285,6 +1335,8 @@ class Engine:
             bits.append(f"{actor.name} was already unhurt.")
         if result["woke"]:
             bits.append(f"{actor.name} is on their feet again.")
+        if refilled:
+            bits.append("Recovered: " + ", ".join(refilled) + ".")
         if ended:
             bits.append("Ended: " + ", ".join(ended) + ".")
 

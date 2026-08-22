@@ -145,6 +145,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # levels on what the character does rather than on their experience total.
     "craft": (("track", "recipe"), ("actor", "tier", "stages", "risky", "failed",
                                     "milestone"), "hidden"),
+    # Spending or granting a pool: ki, rage rounds, a use per day, a stack on an enemy.
+    # `to` because a stack lives on the creature it was applied to, not on whoever
+    # applied it.
+    "resource": (("pool",), ("actor", "to", "amount", "spend", "cooldown"), "hidden"),
     # Where the party is standing, which decides what grows here.
     "travel": (("biome",), ("note",), "hidden"),
     # Searching the ground. The roll is the player's: it is their afternoon.

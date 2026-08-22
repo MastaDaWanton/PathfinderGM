@@ -208,6 +208,10 @@ class Actor:
     # A plain count rather than an object: a handful of woundwort is a number, and
     # nothing about a raw herb differs from the next one of its kind.
     inventory: dict[str, int] = field(default_factory=dict)
+    # Spendable pools: ki, rage rounds, uses per day, and stacks somebody else put here.
+    # A pool with `scope: target` sits on the creature it was applied to, which is why
+    # these live on the Actor rather than on whoever created them.
+    pools: dict[str, "Pool"] = field(default_factory=dict)
 
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
@@ -952,6 +956,81 @@ class Actor:
 
     # --- what they have made ------------------------------------------------------------
 
+    # --- spendable pools ----------------------------------------------------------------
+
+    def pool(self, pool_id: str):
+        return self.pools.get((pool_id or "").strip().lower())
+
+    def spend_pool(self, pool_id: str, count: int = 1) -> dict:
+        """Take from a pool. Returns what happened rather than a bare success flag.
+
+        A pool that is merely on cooldown is a different refusal from one that is empty,
+        and the player is owed the difference: "not yet" and "not any more" lead to
+        different next moves.
+        """
+        pool = self.pool(pool_id)
+        if pool is None:
+            return {"ok": False, "why": f"no {pool_id} to spend"}
+        if not pool.ready:
+            return {"ok": False, "why": f"{pool_id} recharges in {pool.cooldown_left} "
+                                        f"round{'' if pool.cooldown_left == 1 else 's'}",
+                    "cooldown_left": pool.cooldown_left}
+        count = max(0, int(count))
+        if pool.current < count:
+            return {"ok": False, "why": f"{pool_id}: {pool.current} left, {count} needed",
+                    "current": pool.current}
+        pool.current -= count
+        return {"ok": True, "spent": count, "current": pool.current, "id": pool.id}
+
+    def gain_pool(self, pool_id: str, count: int = 1, source: str = "") -> int:
+        """Add to a pool, creating it if the character has never had one.
+
+        Created on demand because a blood stack arrives on an enemy who has no notion of
+        blood stacks until somebody puts one there.
+        """
+        from .resources import Pool
+
+        pid = (pool_id or "").strip().lower()
+        pool = self.pools.get(pid)
+        if pool is None:
+            pool = Pool(id=pid, capped=False, source=source, refresh="never")
+            self.pools[pid] = pool
+        pool.current += max(0, int(count))
+        if pool.capped:
+            pool.current = min(pool.current, pool.maximum)
+        return pool.current
+
+    def start_cooldown(self, pool_id: str, rounds: int) -> None:
+        pool = self.pool(pool_id)
+        if pool is not None:
+            pool.cooldown_left = max(pool.cooldown_left, int(rounds))
+
+    def refresh_pools(self, event: str, dice=None) -> list[str]:
+        """Refill whatever this event refills. Returns what came back, to be narrated.
+
+        `rest.night` also satisfies `rest.any`, because a night's sleep is a rest and a
+        pool that only refilled on the exact word would quietly never come back.
+        """
+        satisfied = {event}
+        if event == "rest.night":
+            satisfied.add("rest.any")
+        back = []
+        for pool in self.pools.values():
+            if pool.refresh in satisfied and pool.current < pool.maximum:
+                pool.current = pool.maximum
+                back.append(pool.id)
+        return back
+
+    def tick_pools(self, rounds: int = 1) -> list[str]:
+        """Count cooldowns down. Returns what became available again."""
+        ready = []
+        for pool in self.pools.values():
+            if pool.cooldown_left > 0:
+                pool.cooldown_left = max(0, pool.cooldown_left - rounds)
+                if pool.cooldown_left == 0:
+                    ready.append(pool.id)
+        return ready
+
     def carry(self, ingredient_id: str, count: int = 1) -> int:
         """Put raw material in the satchel. Returns the new count."""
         key = (ingredient_id or "").strip().lower()
@@ -1170,6 +1249,9 @@ class Actor:
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "world_classes": _world_class_summary(self),
             "satchel": _satchel_summary(self),
+            "pools": [{"id": p.id, "current": p.current, "max": p.maximum,
+                       "ready": p.ready, "cooldown_left": p.cooldown_left}
+                      for p in self.pools.values()],
             "ac": self.ac(),
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
@@ -1440,6 +1522,7 @@ def to_dict(actor: Actor) -> dict:
                       "from_ingredients": v.from_ingredients}
                   for k, v in actor.stock.items()},
         "inventory": dict(actor.inventory),
+        "pools": {k: v.as_dict() for k, v in actor.pools.items()},
         "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
                               "mishaps": p.mishaps, "milestones": p.milestones}
                           for k, p in actor.world_classes.items()},
@@ -1497,6 +1580,12 @@ def _world_class_summary(actor: Actor) -> list[dict]:
             "known": len(p.crafted),
         })
     return out
+
+
+def _pools(raw: dict):
+    from .resources import from_dict as pool_from_dict
+
+    return {k: pool_from_dict({**v, "id": v.get("id", k)}) for k, v in raw.items()}
 
 
 def _stock(raw: dict):
@@ -1583,6 +1672,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         stock=_stock(data.get("stock") or {}),
         inventory={k: int(v) for k, v in (data.get("inventory") or {}).items()
                    if int(v) > 0},
+        pools=_pools(data.get("pools") or {}),
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
