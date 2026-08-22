@@ -365,10 +365,9 @@ for the favourable circumstance.) Player rolls 13 → 22. Verdict `success`, mar
 
 - **No readied actions or held actions.** They need an interrupt model in the state machine
   and there is no cheap version.
-- **No attacks of opportunity.** The geometry they need now exists —
-  `grid.threatened_squares` is the definition an AoO is built on — but the *interrupt* does
-  not: a reaction fires in the middle of somebody else's action, and `run()` has no way to
-  suspend one intent to resolve another. That is the reactions work, not the grid work.
+- ~~**No attacks of opportunity.**~~ **Implemented.** See §9. The interrupt turned out to
+  already exist: `_drive` works a queue, so a reaction is intents spliced in *front* of the
+  one that provoked them.
 - **No multi-intent atomicity.** If intent 3 of 5 fails validation, intents 1–2 have already
   applied. Acceptable now; will need a transaction when combat gets long.
 - **No GM-authored damage on `attack`.** Weapon damage comes from the sheet, always.
@@ -391,3 +390,38 @@ No field has two writers. The world agent never touches a hit point; the engine 
 touches a faction's standing. When play should shift a faction — a burned bridge — the
 engine emits an *event* to the world agent's queue and the world agent decides what it
 means.
+
+---
+
+## 9. Reactions
+
+Everything else in this protocol is somebody's own action, taken in their own turn,
+proposed by the GM. A reaction is none of those. It belongs to one creature, fires during
+another creature's action, and **nobody proposes it** — it is owed, by the rules, the
+moment its trigger happens. The GM does not get a say in whether an attack of opportunity
+occurs, which is exactly why it lives in `rules/reactions.py` and not in a prompt.
+
+**The interrupt.** `Engine._drive` works a queue of intents. A reaction is intents spliced
+in *front* of the one that provoked them, and they then resolve through the ordinary
+machinery — including suspending for a player roll. When the PC takes the attack of
+opportunity, the PC rolls it, with no special handling anywhere.
+
+**Order is load-bearing.** An attack of opportunity provoked by movement lands as the
+creature leaves the square, not after it arrives. If the blow drops them, they never get
+there and the `move` outcome comes back `status: "prevented"`. Resolving reactions *after*
+the triggering intent looks identical in every case except that one.
+
+| Trigger | Fires when |
+|---|---|
+| `leaves_threatened_square` | A creature moves out of a square another one threatens. Entering does not provoke; a five-foot step does not provoke, and that is measured from the distance rather than declared by the GM. |
+
+**The allowance** is not a pool on the sheet. 1e gives everyone one attack of opportunity
+per round, and Combat Reflexes raises it to 1 + Dexterity modifier. It refills at the top
+of the round rather than on rest, and it belongs to the encounter (`Scene.reacted`) rather
+than to the character. An exhausted allowance is **silence, not an error** — it is not
+something the GM can repair, and raising would abort the mover's whole intent list over
+somebody else's spent resource.
+
+**Requires a map.** Nothing provokes on a scene with no grid: zones do not carry enough to
+say whether a threatened square was left, and inventing the geometry would be the engine
+making up a rule. Nothing provokes outside an encounter either.

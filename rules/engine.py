@@ -20,6 +20,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import worldclass
 from . import grid as gridmod
+from . import reactions
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
 from .intents import Intent, IntentError, parse_all
@@ -41,6 +42,11 @@ class Scene:
     # without changing a line of the intent protocol.
     grid: Grid | None = None
     positions: dict[str, tuple[int, int]] = field(default_factory=dict)
+    # Reactions spent this round, by "<ref>:<budget>". Not a pool on the sheet: an attack
+    # of opportunity is an allowance for other people's turns, it refills at the top of
+    # the round rather than on rest, and it belongs to the encounter rather than the
+    # character — a scene that ends takes it with it.
+    reacted: dict[str, int] = field(default_factory=dict)
     initiative: list[tuple[str, int]] = field(default_factory=list)
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
@@ -185,6 +191,9 @@ class Scene:
             nxt = (self.turn + step) % len(self.initiative)
             if nxt <= self.turn:
                 self.round += 1
+                # Attacks of opportunity refill at the top of the round, not on your own
+                # turn: the allowance is what you may do while other people act.
+                self.reacted = {}
                 for a in self.actors.values():
                     a.tick_conditions(1)
                     a.tick_pools(1)
@@ -495,6 +504,18 @@ class Engine:
         queue = list(remaining)
         while queue:
             raw = queue[0]
+            # Reactions are owed by the rules, not proposed by anyone, and they happen
+            # *before* the action that provoked them completes: an attack of opportunity
+            # lands as the creature leaves the square, so if it drops them they never
+            # arrive. The flag is what stops the spliced reaction from provoking itself
+            # forever — it is stripped before anything else sees the intent.
+            if not raw.pop("_reacted", False):
+                fired = self._reactions_before(raw)
+                if fired:
+                    queue[0:0] = fired
+                    raw["_reacted"] = True
+                    continue
+
             intent = _intent_from_dict(raw)
             try:
                 outcome = self._resolve_one(intent, partial)
@@ -513,6 +534,64 @@ class Engine:
                 self.scene.acted.add(intent.actor)
             self.scene.log.append(outcome.as_dict())
         return Resolution(outcomes=outcomes)
+
+    # --- Reactions ---------------------------------------------------------------------
+
+    def _reactions_before(self, raw: dict) -> list[dict]:
+        """Intents owed to other creatures because of the one about to resolve.
+
+        Returned as raw intent dicts so they go through `_drive` exactly like anything
+        else — which is what makes a player-taken attack of opportunity suspend for a dice
+        roll without a single line of special handling.
+
+        Only movement provokes today. The shape is a dispatch rather than an `if` because
+        the next triggers (casting in a threatened square, standing up from prone) are the
+        same machinery with a different question.
+        """
+        if raw.get("op") != "move" or not self.scene.in_encounter:
+            return []
+
+        ref = (raw.get("params") or {}).get("who") or raw.get("actor")
+        square = (raw.get("params") or {}).get("square")
+        if not ref or square is None or not self.scene.has_grid:
+            return []
+
+        start = self.scene.positions.get(ref)
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_move(
+                self.scene, ref, start, tuple(square)):
+            if not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op,
+                "actor": watcher,
+                "target": ref,
+                "because": reaction.because,
+                # Never a full attack: an attack of opportunity is a single swing, and
+                # letting it inherit the attacker's iteratives would turn a fighter's
+                # threatened square into four free attacks a round.
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        return out
+
+    def _spend_reaction(self, ref: str, budget: str) -> bool:
+        """Take one from this creature's allowance, or refuse.
+
+        Refusing silently is right here and is not right anywhere else in the engine: an
+        exhausted allowance is not an error the GM can repair, it is simply a swing that
+        does not happen, and surfacing it as a rejection would abort the mover's whole
+        intent list over somebody else's spent resource.
+        """
+        actor = self.scene.actors.get(ref)
+        if actor is None:
+            return False
+        key = f"{ref}:{budget}"
+        used = self.scene.reacted.get(key, 0)
+        if used >= reactions.budget_for(actor, budget):
+            return False
+        self.scene.reacted[key] = used + 1
+        return True
 
     # --- Op handlers -------------------------------------------------------------------
 
@@ -1371,6 +1450,19 @@ class Engine:
         zone = intent.params["zone"]
         was = self.scene.zones.get(ref, "near")
         square = intent.params.get("square")
+
+        # An attack of opportunity has already resolved by the time we get here — it was
+        # spliced in front of this intent precisely so it could land before the move did.
+        # If it dropped them, they do not arrive: the whole reason for that ordering.
+        if not actor.can_act():
+            return Outcome(
+                intent_id=intent.id, op="move", status="prevented",
+                effects=[{"ref": ref, "kind": "move_stopped",
+                          "why": actor.blocking_condition().lower()}],
+                tell=f"{actor.name} is {actor.blocking_condition().lower()} and does not "
+                     f"get there.",
+                because=intent.because,
+            )
 
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)

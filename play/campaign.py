@@ -131,6 +131,9 @@ class Campaign:
                     "obscuring": sorted(self.scene.grid.obscuring),
                 },
                 "positions": {r: list(p) for r, p in self.scene.positions.items()},
+                # Saved because a fight can be put down mid-round. Losing it would hand
+                # everybody a fresh attack of opportunity for reloading.
+                "reacted": self.scene.reacted,
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
                 "turn": self.scene.turn,
@@ -180,6 +183,7 @@ class Campaign:
             zones=s.get("zones", {}),
             grid=_grid(s.get("grid")),
             positions={r: tuple(p) for r, p in (s.get("positions") or {}).items()},
+            reacted={k: int(v) for k, v in (s.get("reacted") or {}).items()},
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             turn=s.get("turn", -1),
