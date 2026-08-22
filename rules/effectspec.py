@@ -38,8 +38,13 @@ VOCAB: dict[str, list[dict]] = {
     "save": [{"id": k, "name": v} for k, v in SAVES.items()],
     "condition": [{"id": k, "name": v.get("name", k.title())}
                   for k, v in sorted(CONDITIONS.items())],
+    # Poison, negative and force are damage descriptors 1e uses and the corpus writes;
+    # leaving them out sent Wyrmfang Venom's "1d8 poison damage" to the reject pile.
+    # Subdual is deliberately absent: it is a *lethality*, not a type, and has its own
+    # field — carrying it in both places is how the same fact ends up disagreeing.
     "damage_type": [{"id": d, "name": d.title()} for d in
-                    tuple(PHYSICAL_DAMAGE) + tuple(ENERGY_DAMAGE) + ("untyped",)],
+                    tuple(PHYSICAL_DAMAGE) + tuple(ENERGY_DAMAGE)
+                    + ("poison", "negative", "positive", "force", "untyped")],
     "bonus_type": [{"id": b, "name": b.title()} for b in (
         "alchemical", "circumstance", "competence", "deflection", "dodge", "enhancement",
         "inherent", "insight", "luck", "morale", "natural armour", "profane", "racial",
@@ -186,6 +191,9 @@ CATEGORIES: list[Category] = [
         [
             EffectType("heal", "Heal", "Restores 1d4 hit points", [
                 Field("dice", "How much", "dice", hint="1d4, 2d6+2, 10."),
+                Field("lethality", "Heals which", "choice", vocab="lethality",
+                      required=False, default="lethal",
+                      hint="Non-lethal healing does not touch real hit points."),
             ]),
             EffectType("damage", "Damage", "1d6 fire damage", [
                 Field("dice", "How much", "dice"),
@@ -306,7 +314,10 @@ CATEGORIES: list[Category] = [
         [
             EffectType("save_gate", "Saving throw",
                        "Fortitude DC 18; on a failure 1d6 Con, on a success half", [
-                Field("target", "Save", "choice", vocab="save"),
+                # Optional, because the corpus states a bare "DC 18" in twenty places and
+                # picking a save for it would be inventing a fact the source never gave.
+                Field("target", "Save", "choice", vocab="save", required=False,
+                      hint="Leave empty if the source only gives a DC."),
                 Field("dc", "DC", "formula",
                       hint="A number, or a formula: 10 + level/2 + con_mod."),
                 Field("on_failure", "If they fail", "effects", required=False),
@@ -392,9 +403,16 @@ def validate(spec: dict, path: str = "effect") -> list[str]:
 
 
 def _is_dice(s: str) -> bool:
+    """`1d4`, `2d6+2`, a flat number, or the corpus's own `1-4`.
+
+    The herb document writes healing as "roll 1-4 to see how many hit points", which is a
+    d4 by another name. Refusing the notation would have rejected four real entries for a
+    difference in spelling.
+    """
     import re
 
-    return bool(re.fullmatch(r"\s*\d*\s*d\s*\d+\s*(?:[+-]\s*\d+)?\s*|\s*\d+\s*", s, re.I))
+    return bool(re.fullmatch(
+        r"\s*\d*\s*d\s*\d+\s*(?:[+-]\s*\d+)?\s*|\s*\d+\s*|\s*\d+\s*-\s*\d+\s*", s, re.I))
 
 
 def executable(spec: dict) -> bool:
@@ -424,9 +442,16 @@ def render(spec: dict) -> str:
 
     if t in ("ability_mod", "skill_mod", "save_mod", "combat_mod", "situational_mod"):
         sign = f"{int(amount):+d}" if amount is not None else "?"
+        # The note carries the qualifier a dropdown cannot hold — "to staunch bleeding" —
+        # without which two bonuses on the same skill read as the same effect twice.
+        qualifier = str(spec.get("note") or "").strip()
         body = f"{sign} {_label(etype, target)}"
+        if qualifier:
+            body += f" {qualifier}"
     elif t == "heal":
-        body = f"Heals {dice} hit points"
+        what = ("non-lethal damage"
+                if spec.get("lethality") == "nonlethal" else "hit points")
+        body = f"Heals {dice} {what}"
     elif t == "damage":
         kind = spec.get("damage_type", "untyped")
         lethal = "" if spec.get("lethality", "lethal") == "lethal" else " non-lethal"
@@ -449,7 +474,10 @@ def render(spec: dict) -> str:
     elif t == "suppress_condition":
         body = f"Holds off {_label(etype, target).lower()}"
     elif t == "resistance":
-        body = f"Resist {target} {amount}"
+        # "Resist fire 0" is not a rating, it is a missing one. The source often says
+        # "resistance to fire damage" without a number, and a zero on the card reads as
+        # a value somebody chose.
+        body = f"Resist {target}" + (f" {amount}" if amount else "")
     elif t == "damage_reduction":
         body = f"DR {amount}/{spec.get('bypass') or '—'}"
     elif t == "immunity":
@@ -464,7 +492,7 @@ def render(spec: dict) -> str:
         body = f"Acts as {target}{cl}"
     elif t == "save_gate":
         save = _label(etype, target)
-        parts = [f"{save} DC {spec.get('dc', '?')}"]
+        parts = [f"{save} DC {spec.get('dc', '?')}".strip()]
         fail = [render(e) for e in spec.get("on_failure") or []]
         ok = [render(e) for e in spec.get("on_success") or []]
         if fail:
@@ -474,8 +502,13 @@ def render(spec: dict) -> str:
         body = " · ".join(parts)
     else:
         body = str(target or spec.get("note") or etype.name)
+        body = body[:1].upper() + body[1:]
 
-    if dur:
+    if dur == "permanent":
+        # "for permanent" is not English. Found in an authored entry: a +10 Strength with
+        # no expiry read "+10 Strength for permanent".
+        body += " (permanent)"
+    elif dur:
         body += f" for {dur}"
     limit = _uses(spec)
     if limit:

@@ -19,7 +19,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "aconite",
@@ -38,7 +40,23 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated",
+     "duration": {
+      "amount": "1d4",
+      "unit": "round"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "adder-s-tongue",
@@ -57,7 +75,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1-2"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "aelfengrape",
@@ -76,7 +101,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "allnight",
@@ -95,7 +128,24 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -2,
+     "target": "skill checks until its effects wear off",
+     "bonus_type": "untyped"
+    },
+    {
+     "type": "remove_condition",
+     "target": "fatigued"
+    },
+    {
+     "type": "apply_condition",
+     "target": "exhausted"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "althaea",
@@ -114,7 +164,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "amaranth",
@@ -133,7 +185,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "angelica",
@@ -152,7 +206,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "anise",
@@ -170,7 +226,9 @@
    "biomes": [
     "swamp"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "banshee-wail-essence",
@@ -188,7 +246,20 @@
    "biomes": [
     "coast"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "target": "intimidate",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "barbarian-chew",
@@ -206,7 +277,14 @@
    "biomes": [
     "tundra"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "stunned"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "barley",
@@ -225,7 +303,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1",
+     "lethality": "nonlethal"
+    },
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "untyped",
+     "lethality": "nonlethal"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "basil",
@@ -244,7 +336,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "permission",
+     "target": "another Fortitude save against poison"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "basilisk-eye",
@@ -263,7 +362,28 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": -4,
+     "target": "perception",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "6",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "immunity",
+     "target": "gaze attacks",
+     "duration": {
+      "amount": "6",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "behemoth-hide",
@@ -282,7 +402,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "belladonna",
@@ -301,7 +423,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "betony",
@@ -320,7 +454,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "birthwort",
@@ -339,7 +475,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "bitterroot",
@@ -358,7 +496,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 17,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "blackthorn",
@@ -377,7 +523,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "bloodroot",
@@ -395,7 +543,28 @@
    "biomes": [
     "ruins"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -4,
+     "target": "int",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "8",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "temp_hp",
+     "dice": "10",
+     "duration": {
+      "amount": "8",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "blueweed",
@@ -414,7 +583,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "borage",
@@ -433,7 +604,18 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "permission",
+     "target": "another Fortitude save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "unconscious"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "breeam",
@@ -452,7 +634,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "bryony",
@@ -471,7 +655,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 14,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "calendula",
@@ -490,7 +686,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "caranator",
@@ -509,7 +707,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "permission",
+     "target": "another Will save against charms or enchantments immediately"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "cave-star",
@@ -527,7 +732,15 @@
    "biomes": [
     "underground"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "chasmyre-leaf",
@@ -545,7 +758,9 @@
    "biomes": [
     "swamp"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "chimera-horn",
@@ -564,7 +779,38 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 3,
+     "target": "saves against chaotic magic",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "ability_mod",
+     "amount": -3,
+     "target": "wis",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "apply_condition",
+     "target": "prone",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "cloth-of-gold",
@@ -583,7 +829,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "cockatrice-beak",
@@ -602,7 +850,18 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "difficult terrain",
+     "duration": {
+      "amount": "6",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "coldwood",
@@ -621,7 +880,9 @@
     "farmland",
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "comfrey",
@@ -640,7 +901,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1-4"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "cotsbalm",
@@ -659,7 +927,22 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 8,
+     "target": "fort",
+     "bonus_type": "alchemical",
+     "note": "to resist the secondary effects"
+    },
+    {
+     "type": "save_gate",
+     "dc": 35,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "cowslip",
@@ -678,7 +961,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "remove_condition",
+     "target": "paralyzed"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "damiana",
@@ -697,7 +987,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "darkroot",
@@ -716,7 +1008,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dawnpetal",
@@ -735,7 +1035,25 @@
     "mountain",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "target": "str",
+     "bonus_type": "untyped",
+     "note": "for 2 hours"
+    },
+    {
+     "type": "remove_condition",
+     "target": "fatigued"
+    },
+    {
+     "type": "apply_condition",
+     "target": "exhausted"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dire-boar-tusk",
@@ -754,7 +1072,17 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 3,
+     "target": "str",
+     "bonus_type": "untyped",
+     "note": "for 1 hour, but the user becomes…"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dittany",
@@ -773,7 +1101,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1d3"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "djinn-blossoms",
@@ -792,7 +1127,36 @@
     "planar",
     "farmland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "target": "saves to resist inhaled poisons, gases, and spells",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "24",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "target": "cha",
+     "bonus_type": "untyped",
+     "note": "skill",
+     "duration": {
+      "amount": "24",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dracolisk-scale",
@@ -811,7 +1175,20 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -2,
+     "target": "dex",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "8",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dragon-flower",
@@ -830,7 +1207,40 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -2,
+     "target": "actions while in the area",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "1d4",
+      "unit": "week"
+     }
+    },
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "target": "save vs poison for 10 rounds",
+     "bonus_type": "untyped"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "1d6"
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 25
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dragon-s-blood",
@@ -848,7 +1258,9 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "dreamcap",
@@ -866,7 +1278,28 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 3,
+     "target": "knowledge checks related to future events",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "6",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "apply_condition",
+     "target": "dazed",
+     "duration": {
+      "amount": "1",
+      "unit": "minute"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "dreamer-s-star",
@@ -885,7 +1318,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "dryad-s-tears",
@@ -904,7 +1339,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "dwarven-oak",
@@ -923,7 +1360,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 25,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "elven-willow",
@@ -942,7 +1387,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "elysium",
@@ -960,7 +1413,9 @@
    "biomes": [
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "euphorbia",
@@ -979,7 +1434,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 12,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "faerie-grass",
@@ -997,7 +1464,15 @@
    "biomes": [
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "fainne-mushroom",
@@ -1016,7 +1491,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "fey-cherry",
@@ -1034,7 +1511,15 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "firesnap",
@@ -1053,7 +1538,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "unconscious"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "flame-clove",
@@ -1072,7 +1564,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "flayleaf",
@@ -1091,7 +1591,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": -5,
+     "target": "perception",
+     "bonus_type": "untyped",
+     "note": "and against mind altering…",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "fleshshiver",
@@ -1109,7 +1623,22 @@
    "biomes": [
     "jungle"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "target": "fort",
+     "bonus_type": "alchemical",
+     "note": "made to resist non magical diseases"
+    },
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "fool-s-weed",
@@ -1128,7 +1657,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "permission",
+     "target": "another Will save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "frostbloom",
@@ -1146,7 +1682,29 @@
    "biomes": [
     "tundra"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -3,
+     "target": "dex",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 0,
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "frostgiant-marrow",
@@ -1165,7 +1723,29 @@
     "tundra",
     "forest"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "target": "initiative",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "12",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 10,
+     "duration": {
+      "amount": "12",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "garlic",
@@ -1184,7 +1764,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "2"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "gloomwraith-tendril",
@@ -1203,7 +1790,20 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -3,
+     "target": "saves against fear effects due to lingering dread",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "4",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "glowvine",
@@ -1221,7 +1821,15 @@
    "biomes": [
     "farmland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "goblin-rouge",
@@ -1240,7 +1848,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "goblinvine",
@@ -1259,7 +1875,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "golden-embrace",
@@ -1278,7 +1896,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 22,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "golden-maple-leaves",
@@ -1298,7 +1924,15 @@
     "urban",
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "goldencup",
@@ -1317,7 +1951,25 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "target": "saves vs fear and compulsion effects for 30 minutes",
+     "bonus_type": "alchemical"
+    },
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "confused"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "goldenrod",
@@ -1336,7 +1988,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "grave-mold",
@@ -1354,7 +2008,9 @@
    "biomes": [
     "ruins"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "griffon-talon",
@@ -1373,7 +2029,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "target": "attack",
+     "bonus_type": "untyped",
+     "note": "with melee weapons",
+     "duration": {
+      "amount": "2",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "halfling-thistle",
@@ -1392,7 +2062,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 5,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "harpy-vocal-cord",
@@ -1411,7 +2089,22 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": -2,
+     "target": "diplomacy",
+     "bonus_type": "untyped",
+     "note": "for 24 hours"
+    },
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "hawthorn",
@@ -1429,7 +2122,9 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "heart-fire",
@@ -1448,7 +2143,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "hemlock",
@@ -1467,7 +2170,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 15
+    },
+    {
+     "type": "apply_condition",
+     "target": "paralyzed"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "henbane",
@@ -1486,7 +2201,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1-6"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "henna",
@@ -1505,7 +2227,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "herb-true-love",
@@ -1524,7 +2248,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "horsetail",
@@ -1543,7 +2269,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "hrondis-tears",
@@ -1561,7 +2289,9 @@
    "biomes": [
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "hydra-gall",
@@ -1580,7 +2310,25 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -3,
+     "target": "con",
+     "bonus_type": "untyped",
+     "note": "for 1 hour"
+    },
+    {
+     "type": "heal",
+     "dice": "1d4"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "hypericum",
@@ -1599,7 +2347,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "ice-lotus",
@@ -1617,7 +2367,15 @@
    "biomes": [
     "tundra"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 35,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "imperial-willow",
@@ -1635,7 +2393,20 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "4",
+     "lethality": "nonlethal"
+    },
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "ironbark-moss",
@@ -1653,7 +2424,9 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "juniper",
@@ -1672,7 +2445,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "juniper-berry",
@@ -1691,7 +2466,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "unconscious"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "kraken-ink",
@@ -1710,7 +2492,20 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -2,
+     "target": "cha",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "8",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "lakeleaf",
@@ -1729,7 +2524,15 @@
     "planar",
     "coast"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "leechwort",
@@ -1748,7 +2551,23 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 1,
+     "target": "heal",
+     "bonus_type": "alchemical"
+    },
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "target": "heal",
+     "bonus_type": "alchemical",
+     "note": "to staunch bleeding"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "levisticum",
@@ -1767,7 +2586,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "lish-nut",
@@ -1786,7 +2607,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 11,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "sickened"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "mad-cap",
@@ -1805,7 +2638,27 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 18,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "exhausted"
+    },
+    {
+     "type": "apply_condition",
+     "target": "unconscious"
+    },
+    {
+     "type": "apply_condition",
+     "target": "confused"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "mallow",
@@ -1824,7 +2677,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "mandrake",
@@ -1843,7 +2698,24 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "2",
+     "lethality": "nonlethal"
+    },
+    {
+     "type": "save_gate",
+     "dc": 17,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "unconscious"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "manticore-spine",
@@ -1862,7 +2734,26 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -4,
+     "target": "attack",
+     "bonus_type": "untyped",
+     "note": "on struck targets",
+     "duration": {
+      "amount": "1",
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "save_gate",
+     "dc": 12,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "marsh-mallow",
@@ -1880,7 +2771,9 @@
    "biomes": [
     "swamp"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "meadow-giant",
@@ -1898,7 +2791,15 @@
    "biomes": [
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "menhirite",
@@ -1917,7 +2818,18 @@
     "planar",
     "ruins"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "6"
+    },
+    {
+     "type": "apply_condition",
+     "target": "dead"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "mind-hammer",
@@ -1936,7 +2848,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "mistletoe",
@@ -1954,7 +2874,31 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 3,
+     "target": "saves against any transformation process, whether…",
+     "bonus_type": "untyped"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "1d4"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "1"
+    },
+    {
+     "type": "save_gate",
+     "dc": 19,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "mistveil-fern",
@@ -1972,7 +2916,20 @@
    "biomes": [
     "underground"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -3,
+     "target": "physical damage dealt due to their reduced solidity",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "10",
+      "unit": "minute"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "monkshood",
@@ -1991,7 +2948,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "musk-muddle",
@@ -2010,7 +2969,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1d6"
+    },
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "myrtle",
@@ -2029,7 +3000,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "nahre-lotus",
@@ -2048,7 +3021,24 @@
     "planar",
     "farmland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "2d6"
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 12
+    },
+    {
+     "type": "apply_condition",
+     "target": "dead"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "nightshade",
@@ -2067,7 +3057,37 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -2,
+     "target": "actions - any d20 roll- for 30 minutes",
+     "bonus_type": "circumstance"
+    },
+    {
+     "type": "save_mod",
+     "amount": 4,
+     "target": "ref",
+     "bonus_type": "untyped",
+     "note": "for nine hours"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "1d6"
+    },
+    {
+     "type": "save_gate",
+     "dc": 18,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "paralyzed"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "nura-stalk",
@@ -2085,7 +3105,14 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1d4"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "oak",
@@ -2103,7 +3130,14 @@
    "biomes": [
     "coast"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "old-man-s-friend",
@@ -2121,7 +3155,19 @@
    "biomes": [
     "coast"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "dying"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "orevine",
@@ -2139,7 +3185,15 @@
    "biomes": [
     "planar"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 20,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "orticusp",
@@ -2158,7 +3212,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 35,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "pennyroyal",
@@ -2177,7 +3239,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "phoenix-feather",
@@ -2196,7 +3260,28 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -3,
+     "target": "concentration-based checks",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "2",
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "immunity",
+     "target": "fire damage",
+     "duration": {
+      "amount": "2",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "pomegranate",
@@ -2215,7 +3300,17 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "target": "fort",
+     "bonus_type": "untyped",
+     "note": "to resist extreme heat and hot…"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "poppy-tears",
@@ -2234,7 +3329,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "prickly-tea",
@@ -2253,7 +3350,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 1,
+     "target": "Spot and Listen checks",
+     "bonus_type": "alchemical"
+    },
+    {
+     "type": "save_gate",
+     "dc": 25,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "rowan",
@@ -2271,7 +3382,9 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "rue",
@@ -2290,7 +3403,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "salamander-ember-gland",
@@ -2309,7 +3424,22 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal"
+    },
+    {
+     "type": "damage",
+     "dice": "1d4",
+     "damage_type": "fire",
+     "lethality": "lethal"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "salamander-orchids",
@@ -2327,7 +3457,21 @@
    "biomes": [
     "planar"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal"
+    },
+    {
+     "type": "save_gate",
+     "dc": 30,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sand-vine",
@@ -2346,7 +3490,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "scorpion",
@@ -2365,7 +3517,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "sealwort",
@@ -2383,7 +3537,9 @@
    "biomes": [
     "coast"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "selpeme-blossom",
@@ -2401,7 +3557,9 @@
    "biomes": [
     "jungle"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "shadowvine",
@@ -2420,7 +3578,17 @@
     "forest",
     "ruins"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "target": "stealth",
+     "bonus_type": "untyped",
+     "note": "for 3 hours"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sherpa-s-friend",
@@ -2438,7 +3606,14 @@
    "biomes": [
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "remove_condition",
+     "target": "sickened"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "skull-orchid",
@@ -2456,7 +3631,34 @@
    "biomes": [
     "hills"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_damage",
+     "target": "int",
+     "dice": "1d4"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "1d4"
+    },
+    {
+     "type": "ability_damage",
+     "target": "con",
+     "dice": "2d6"
+    },
+    {
+     "type": "save_gate",
+     "dc": 17,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "remove_condition",
+     "target": "dead"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sphagnum-moss",
@@ -2475,7 +3677,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "character will heal 25% more"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sphinx-whisker",
@@ -2494,7 +3703,20 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "target": "int",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "3",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "spriggan-tree",
@@ -2512,7 +3734,15 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "st-john-s-wort",
@@ -2531,7 +3761,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "starbloom",
@@ -2549,7 +3781,20 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -4,
+     "target": "checks in bright environments",
+     "bonus_type": "untyped",
+     "duration": {
+      "amount": "6",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sukake",
@@ -2567,7 +3812,15 @@
    "biomes": [
     "forest"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 13,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "sweetspire",
@@ -2586,7 +3839,14 @@
     "forest",
     "hills"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "paralyzed"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "tahtoalehti",
@@ -2604,7 +3864,15 @@
    "biomes": [
     "farmland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 40,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "tamarisk",
@@ -2623,7 +3891,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "tereeka-root",
@@ -2642,7 +3912,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 30,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "tobacco",
@@ -2661,7 +3939,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 10
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "trollheart-sap",
@@ -2680,7 +3966,22 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "2"
+    },
+    {
+     "type": "fast_healing",
+     "amount": 2,
+     "duration": {
+      "amount": "10",
+      "unit": "minute"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "tugwort",
@@ -2699,7 +4000,19 @@
     "mountain",
     "hills"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "slashing",
+     "amount": 3,
+     "duration": {
+      "amount": "8",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "twilight-dagger",
@@ -2718,7 +4031,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "tyrant-s-sword",
@@ -2736,7 +4051,19 @@
    "biomes": [
     "tundra"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1d6"
+    },
+    {
+     "type": "save_gate",
+     "dc": 10,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "vervain",
@@ -2755,7 +4082,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "visma-paste",
@@ -2774,7 +4103,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "target": "the next save to resist further environmental heat…",
+     "bonus_type": "alchemical"
+    },
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wendigo-antler",
@@ -2793,7 +4136,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": -2,
+     "target": "con",
+     "bonus_type": "untyped",
+     "note": "due to the antler’s lingering curse",
+     "duration": {
+      "amount": "1",
+      "unit": "hour"
+     }
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wild-fireclover",
@@ -2812,7 +4169,22 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": -2,
+     "target": "will",
+     "bonus_type": "alchemical",
+     "note": "if either of the poison are failed"
+    },
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "winterbite",
@@ -2831,7 +4203,17 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "target": "perception",
+     "bonus_type": "alchemical",
+     "note": "scent"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wispweed",
@@ -2851,7 +4233,15 @@
     "grassland",
     "swamp"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wittlewort",
@@ -2870,7 +4260,15 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "woad",
@@ -2889,7 +4287,14 @@
     "forest",
     "coast"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "2"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wolfsbane",
@@ -2908,7 +4313,9 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   },
   {
    "id": "wolfweed",
@@ -2927,7 +4334,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "target": "con",
+     "bonus_type": "alchemical"
+    },
+    {
+     "type": "save_gate",
+     "dc": 5,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wordwood",
@@ -2946,7 +4367,19 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "save_gate",
+     "dc": 11,
+     "note": "the source names a DC without saying which save"
+    },
+    {
+     "type": "apply_condition",
+     "target": "nauseated"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "woundwort",
@@ -2965,7 +4398,14 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Bleeding damage 20% less"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "wyrmfang-venom",
@@ -2984,7 +4424,21 @@
     "forest",
     "grassland"
    ],
-   "forageable": false
+   "forageable": false,
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d8",
+     "damage_type": "poison",
+     "lethality": "lethal"
+    },
+    {
+     "type": "save_gate",
+     "dc": 15,
+     "note": "the source names a DC without saying which save"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "xian-tao",
@@ -3004,7 +4458,14 @@
     "forest",
     "tundra"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "poison and disease, large bonuses to saving t"
+    }
+   ],
+   "effects_converted": true
   },
   {
    "id": "yarow",
@@ -3023,7 +4484,10 @@
     "forest",
     "grassland"
    ],
-   "forageable": true
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true
   }
- ]
+ ],
+ "effects_note": "Effects were converted from each entry's description by rules/effects.py and are stored here rather than re-derived, so an edit is not overwritten by the next parse. `effects_converted` is true until a person has reviewed them."
 }

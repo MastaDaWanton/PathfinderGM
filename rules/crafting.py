@@ -193,8 +193,8 @@ def mechanics(items, used) -> list[str]:
     """
     out: list[str] = []
     for i in items:
-        for e in fx.extract(i.text):
-            line = f"{i.name}: {e.text}"
+        for line_text in i.lines:
+            line = f"{i.name}: {line_text}"
             if line not in out:
                 out.append(line)
     for held, _ in used:

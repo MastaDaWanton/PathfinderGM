@@ -46,10 +46,36 @@ class Ingredient:
     biomes: list[str] = field(default_factory=list)
     biomes_inferred: bool = False
     forageable: bool = True
+    # Authored effects (rules/effectspec.py), stored rather than re-derived. Deriving is
+    # right while the parse is the only source of truth and wrong the moment a person may
+    # correct one: the next parse would silently overwrite the edit.
+    effects: list = field(default_factory=list)
+    effects_converted: bool = False
 
     @property
     def rank(self) -> int:
         return tier_rank(self.tier)
+
+    @property
+    def lines(self) -> list[str]:
+        """What this ingredient does, as card lines.
+
+        Read from the stored effects when there are any, and parsed from the description
+        only when there are not — so an authored correction wins over the extractor,
+        which is the whole point of storing them.
+        """
+        from . import effectspec
+
+        if self.effects:
+            return [effectspec.render(e) for e in self.effects]
+
+        # The fallback renders through the same function, so a parsed entry and a stored
+        # one cannot read differently. Going through `Effect.text` here meant the card
+        # changed the moment somebody pressed save without altering anything.
+        from . import effects as fx
+
+        return [effectspec.render(e.spec) if e.spec else e.text
+                for e in fx.extract(self.text)]
 
     @property
     def world_gated(self) -> bool:
@@ -63,6 +89,8 @@ class Ingredient:
             "harvesting": self.harvesting, "text": self.text, "risky": self.risky,
             "world_gated": self.world_gated, "biomes": self.biomes,
             "biomes_inferred": self.biomes_inferred, "forageable": self.forageable,
+            "effects": self.effects, "effects_converted": self.effects_converted,
+            "lines": self.lines,
         }
 
 
@@ -73,19 +101,34 @@ def from_dict(d: dict) -> Ingredient:
         aka=d.get("aka", ""), craft_dc=d.get("craft_dc"), source=d.get("source", ""),
         harvesting=d.get("harvesting", ""), text=d.get("text", ""),
         risky=bool(d.get("risky")),
+        effects=list(d.get("effects") or []),
+        effects_converted=bool(d.get("effects_converted")),
         biomes=list(d.get("biomes") or []),
         biomes_inferred=bool(d.get("biomes_inferred")),
         forageable=bool(d.get("forageable", True)),
     )
 
 
-def load_dir(path: str | Path) -> dict[str, Ingredient]:
-    out: dict[str, Ingredient] = {}
+def load_dir(path: str | Path) -> dict[str, dict]:
+    """Raw entries from a directory, as dicts so they can be merged before they are built.
+
+    Two shapes are accepted, because two things write here: the shipped corpus is one file
+    holding a list, and the editor writes one file per thing it edits. Reading only the
+    first shape meant an edit saved successfully, appeared in the editor when reopened, and
+    never reached play — the worst of both, because nothing reported a problem.
+    """
+    out: dict[str, dict] = {}
     for p in sorted(Path(path).glob("*.json")):
-        data = json.loads(p.read_text(encoding="utf-8"))
-        for raw in data.get("ingredients", []):
-            ing = from_dict(raw)
-            out[ing.id] = ing
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        entries = data.get("ingredients") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            entries = [data] if isinstance(data, dict) and data.get("id") else []
+        for raw in entries:
+            if raw.get("id"):
+                out[raw["id"]] = raw
     return out
 
 
@@ -97,10 +140,19 @@ def all_ingredients() -> dict[str, Ingredient]:
     if _ALL is None:
         from django.conf import settings
 
-        _ALL = load_dir(Path(settings.BASE_DIR) / "content" / "ingredients")
+        raw = load_dir(Path(settings.BASE_DIR) / "content" / "ingredients")
         user = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "ingredients"
         if user.is_dir():
-            _ALL.update(load_dir(user))
+            # Merged field by field, not replaced wholesale. The editor saves a name, a
+            # description and a list of effects; replacing would have silently dropped the
+            # tier, the biomes and the harvesting notes it never asked about, so correcting
+            # one bonus would delete everything else the entry knew.
+            for key, entry in load_dir(user).items():
+                base = dict(raw.get(key, {}))
+                base.update({k: v for k, v in entry.items() if v not in (None, "")})
+                base["id"] = key
+                raw[key] = base
+        _ALL = {k: from_dict(v) for k, v in raw.items()}
     return _ALL
 
 

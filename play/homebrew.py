@@ -109,6 +109,7 @@ def benches() -> list[Bench]:
         Bench(
             id="ingredients", name="Ingredients", dir="ingredients",
             shipped=len(ingredients.all_ingredients()), shipped_label="shipped",
+            builder="effects",
             blurb="What a crafter works with, the biomes each grows in, and the "
                   "mechanics read out of its description.",
         ),
@@ -184,11 +185,15 @@ def rows_for(bench_id: str) -> list[dict]:
             continue
         entries = data.get(bench_id) if isinstance(data, dict) else None
         for e in (entries if isinstance(entries, list) else [data]):
+            from rules import effectspec
+
+            lines = [effectspec.render(x) for x in (e.get("effects") or [])]                 if isinstance(e, dict) else []
             rows.append({
                 "name": (e.get("name") if isinstance(e, dict) else None) or path.stem,
-                "kind": "yours",
-                "note": (e.get("summary") if isinstance(e, dict) else "") or path.name,
-                "mine": True,
+                "kind": "yours", "id": path.stem, "mine": True,
+                "note": "; ".join(lines)
+                        or (e.get("summary") if isinstance(e, dict) else "")
+                        or path.name,
             })
 
     if bench_id == "consumables":
@@ -205,8 +210,11 @@ def rows_for(bench_id: str) -> list[dict]:
                           f"{len(t.unlocked_methods(t.max_level))} methods"}
                  for t in worldclass.tracks().values()]
     elif bench_id == "ingredients":
-        rows += [{"name": i.name, "kind": i.kind, "mine": False,
-                  "note": f"{i.tier} · {', '.join(i.biomes) or 'nowhere'}"}
+        rows += [{"name": i.name, "kind": i.kind, "mine": False, "id": i.id,
+                  # What it does, not where it grows: the effects are the reason to open
+                  # one, and 161 of them were converted mechanically and never read.
+                  "note": "; ".join(i.lines) or "no mechanical effect stated",
+                  "unreviewed": i.effects_converted and bool(i.effects)}
                  for i in sorted(ingredients.all_ingredients().values(),
                                  key=lambda x: x.name)]
     elif bench_id == "items":

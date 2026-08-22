@@ -12,6 +12,8 @@ the engine expects — and these tests assert that property directly.
 from __future__ import annotations
 
 import json
+import re
+from pathlib import Path
 
 import pytest
 from django.test import Client, override_settings
@@ -245,3 +247,176 @@ def test_the_bench_offers_the_builder(client):
     d = client.get("/api/bench/consumables").json()
     assert d["bench"]["builder"] == "effects"
     assert d["bench"]["shipped"] == 0
+
+
+# --- the converted corpus ----------------------------------------------------------------
+
+def test_every_shipped_ingredient_carries_authored_effects():
+    """All 161 were converted from their descriptions and stored, rather than re-derived
+    on every read. Deriving is right while the parse is the only source of truth and wrong
+    the moment a person may correct one: the next parse would overwrite the edit."""
+    from rules import ingredients
+
+    shelf = ingredients.all_ingredients()
+    with_effects = [i for i in shelf.values() if i.effects]
+    assert len(with_effects) > 100
+    assert all(i.effects_converted or not i.effects
+               for i in shelf.values() if i.id not in ("aelfengrape", "poppy-log"))
+
+
+def test_every_converted_effect_is_valid():
+    """A stored effect the schema rejects is a card that cannot be edited."""
+    from rules import ingredients
+
+    for ing in ingredients.all_ingredients().values():
+        for i, spec in enumerate(ing.effects):
+            assert es.validate(spec, f"{ing.id} {i}") == [], (ing.id, spec)
+
+
+def test_a_stored_effect_beats_the_parser():
+    """The whole reason for storing them. An edit has to win, or correcting one is
+    pointless."""
+    from rules import effects as fx
+    from rules.ingredients import Ingredient
+
+    ing = Ingredient(id="x", name="X", text="grants a +1 alchemical bonus on Climb checks",
+                     effects=[{"type": "skill_mod", "amount": 9,
+                               "bonus_type": "alchemical", "target": "climb"}])
+    assert ing.lines == ["+9 Climb"]
+    assert fx.summarise(ing.text) == ["+1 Climb checks"]
+
+
+def test_an_entry_with_no_effects_still_falls_back_to_the_parser():
+    from rules.ingredients import Ingredient
+
+    ing = Ingredient(id="y", name="Y",
+                     text="grants a +1 alchemical bonus on Climb checks")
+    # Through the same renderer as a stored effect, so pressing save without changing
+    # anything cannot change what the card says.
+    assert ing.lines == ["+1 Climb"]
+
+
+def test_a_bonus_qualifier_survives_conversion():
+    """Leechwort's two bonuses both target the Heal skill; "to staunch bleeding" is the
+    entire difference. Matching the skill and dropping the rest made them the same effect
+    twice."""
+    from rules import ingredients
+
+    assert ingredients.get("leechwort").lines == [
+        "+1 Heal", "+2 Heal to staunch bleeding"]
+
+
+def test_a_bare_dc_does_not_invent_a_save():
+    """Twenty entries state a DC without saying which save. Naming one puts a fact on the
+    card that nobody wrote."""
+    from rules import ingredients
+
+    mad = ingredients.get("mad-cap")
+    gate = next(e for e in mad.effects if e["type"] == "save_gate")
+    assert "target" not in gate
+    assert es.render(gate) == "DC 18"
+
+
+def test_no_line_states_its_duration_twice():
+    from rules import ingredients
+
+    for ing in ingredients.all_ingredients().values():
+        for line in ing.lines:
+            assert len(re.findall(r"\bfor \S+ (?:round|minute|hour|day)", line)) <= 1, line
+
+
+def test_permanent_does_not_read_as_a_duration():
+    """Found in an authored entry: "+10 Strength for permanent"."""
+    assert es.render({"type": "ability_mod", "amount": 10, "bonus_type": "alchemical",
+                      "target": "str", "duration": {"unit": "permanent"}}) \
+        == "+10 Strength (permanent)"
+
+
+# --- editing --------------------------------------------------------------------------------
+
+def test_a_shipped_entry_opens_for_editing(client):
+    d = client.get("/api/bench/ingredients/open/leechwort").json()
+    assert d["source"] == "shipped"
+    assert d["converted"] is True
+    assert d["effects"][0]["type"] == "skill_mod"
+
+
+def test_an_edit_is_saved_as_an_overlay_and_wins(client):
+    """The shipped file is never written to — a corrected table in a later build must not
+    be shadowed by a stale copy in the user's data directory."""
+    from rules import ingredients
+
+    original = Path("content/ingredients/herbs-and-parts.json").read_text(encoding="utf-8")
+
+    r = client.post("/api/bench/ingredients/save", data=json.dumps({
+        "id": "leechwort", "name": "Leechwort", "kind": "herb",
+        "description": "unchanged",
+        "effects": [{"type": "skill_mod", "amount": 5, "bonus_type": "alchemical",
+                     "target": "heal"}]}), content_type="application/json")
+    assert r.status_code == 200
+
+    ingredients._ALL = None
+    assert ingredients.get("leechwort").lines == ["+5 Heal"]
+    assert Path("content/ingredients/herbs-and-parts.json").read_text(
+        encoding="utf-8") == original
+    ingredients._ALL = None
+
+
+def test_an_overlay_merges_rather_than_replacing(client):
+    """The editor saves a name, a description and effects. Replacing would silently drop
+    the tier, the biomes and the harvesting notes it never asked about, so correcting one
+    bonus would delete everything else the entry knew."""
+    from rules import ingredients
+
+    before = ingredients.get("leechwort")
+    tier, biomes = before.tier, list(before.biomes)
+
+    client.post("/api/bench/ingredients/save", data=json.dumps({
+        "id": "leechwort", "name": "Leechwort", "description": "unchanged",
+        "effects": [{"type": "heal", "dice": "1d4"}]}),
+        content_type="application/json")
+
+    ingredients._ALL = None
+    after = ingredients.get("leechwort")
+    assert after.lines == ["Heals 1d4 hit points"]
+    assert after.tier == tier and after.biomes == biomes
+    ingredients._ALL = None
+
+
+def test_an_edit_clears_the_unreviewed_flag(client):
+    """Parsed-and-unread is a different state from looked-at-by-a-person."""
+    from rules import ingredients
+
+    client.post("/api/bench/ingredients/save", data=json.dumps({
+        "id": "leechwort", "name": "Leechwort",
+        "effects": [{"type": "heal", "dice": "1d4"}]}),
+        content_type="application/json")
+    ingredients._ALL = None
+    assert ingredients.get("leechwort").effects_converted is False
+    ingredients._ALL = None
+
+
+def test_a_malformed_edit_never_reaches_disk(client):
+    from play import homebrew
+
+    r = client.post("/api/bench/ingredients/save", data=json.dumps({
+        "id": "leechwort", "name": "Leechwort",
+        "effects": [{"type": "heal", "dice": "lots"}]}),
+        content_type="application/json")
+    assert r.status_code == 400
+    assert not (homebrew.folder("ingredients") / "leechwort.json").exists()
+
+
+def test_a_single_entry_overlay_is_read_at_all(client):
+    """The editor writes one file per thing; the shipped corpus is one file holding a
+    list. Reading only the second shape meant an edit saved successfully, reappeared in
+    the editor when reopened, and never reached play — with nothing reporting a problem."""
+    from play import homebrew
+    from rules import ingredients
+
+    (homebrew.folder("ingredients") / "brand-new.json").write_text(json.dumps({
+        "id": "brand-new", "name": "Brand New", "kind": "herb", "description": "x",
+        "effects": [{"type": "heal", "dice": "2d4"}]}), encoding="utf-8")
+    ingredients._ALL = None
+    assert ingredients.get("brand-new").lines == ["Heals 2d4 hit points"]
+    ingredients._ALL = None

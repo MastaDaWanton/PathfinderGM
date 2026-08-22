@@ -18,9 +18,9 @@ guessed at — a paraphrase that quietly drops a clause is worse than a paragrap
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from .tables import ABILITY_FULL, CONDITIONS
+from .tables import ABILITY_FULL, CONDITIONS, SKILLS
 
 # 1e's bonus types. Named so "+2 alchemical bonus on Heal checks" collapses to "+2 Heal"
 # without the type being mistaken for the thing bonused.
@@ -46,9 +46,14 @@ class Effect:
     kind: str          # bonus | penalty | heal | damage | ability | save | condition | ...
     text: str          # what the card shows
     scales: bool = False   # whether a chain's potency multiplier applies to it
+    # The same finding as an authored effect (rules/effectspec.py). One parse, two
+    # outputs: the line a card shows and the record an editor can open and correct.
+    # Empty when the pattern found something no authored type can hold.
+    spec: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
-        return {"kind": self.kind, "text": self.text, "scales": self.scales}
+        return {"kind": self.kind, "text": self.text, "scales": self.scales,
+                "spec": self.spec}
 
 
 # Where a card line may end. Longer than this and it is a sentence, not a label.
@@ -161,17 +166,81 @@ def _condition_pattern(key: str) -> str:
     return rf"\b(?:{stem})"
 
 
+def _save_id(word: str) -> str:
+    """"Fortitude" -> "fort", which is what the save dropdown stores."""
+    w = (word or "").strip().lower()
+    return {"fortitude": "fort", "reflex": "ref"}.get(w, w)
+
+
+def _duration_spec(text: str) -> dict:
+    """The duration as the editor stores it, rather than as a phrase."""
+    m = re.search(r"\bfor\s+(" + _DIE + r")\s*"
+                  r"(round|minute|hour|day|week|month)s?\b", text, re.I)
+    if not m:
+        return {}
+    return {"amount": re.sub(r"\s+", "", m.group(1)), "unit": m.group(2).lower()}
+
+
+def _qualifier(target: str, matched: str) -> str:
+    """What is left of a bonus target once the thing it names is removed.
+
+    "Heal checks to staunch bleeding" minus the Heal skill is "to staunch bleeding" —
+    which is the entire difference between one entry's two bonuses.
+
+    Both the stored id and the word a person writes are stripped. Removing only the id
+    left "Constitution" behind when the match was `con`, and the line read
+    "+2 Constitution Constitution".
+    """
+    words = {matched, ABILITY_FULL.get(matched, ""),
+             {"fort": "fortitude", "ref": "reflex"}.get(matched, "")}
+    rest = target
+    for w in sorted((w for w in words if w), key=len, reverse=True):
+        rest = re.sub(rf"\b{re.escape(w)}\w*", "", rest, flags=re.I)
+    rest = re.sub(r"\b(?:checks?|rolls?|saves?|based)\b", "", rest, flags=re.I)
+    rest = re.sub(r"[-–]\s*", " ", rest)
+    rest = re.sub(r"\s+", " ", rest).strip(" .,;:")
+    return rest if len(rest) > 2 else ""
+
+
+def _modifier_type(target: str) -> tuple[str, str]:
+    """Which modifier form a bonus belongs in, and the id its target dropdown wants.
+
+    The corpus writes targets in words — "Heal checks", "saves vs fear", "attack rolls" —
+    and each maps to a different vocabulary. Anything unrecognised becomes a situational
+    modifier, which is the honest home for "checks to resist a forced march": a real
+    effect the engine cannot compute, kept rather than dropped.
+    """
+    low = (target or "").lower()
+    for key in SKILLS:
+        if re.search(rf"\b{re.escape(key)}\b", low):
+            return "skill_mod", key
+    for key, name in ABILITY_FULL.items():
+        if re.search(rf"\b(?:{key}|{name.lower()})\b", low):
+            return "ability_mod", key
+    for key, name in (("fort", "fortitude"), ("ref", "reflex"), ("will", "will")):
+        if re.search(rf"\b(?:{key}|{name})\b", low):
+            return "save_mod", key
+    for key, words in (("attack", r"attack|to.hit"), ("damage", r"damage roll"),
+                       ("ac", r"\bac\b|armou?r class"), ("cmb", r"\bcmb\b"),
+                       ("cmd", r"\bcmd\b"), ("initiative", r"initiative"),
+                       ("caster_level", r"caster level"),
+                       ("spell_resistance", r"spell resistance")):
+        if re.search(words, low):
+            return "combat_mod", key
+    return "situational_mod", target
+
+
 def extract(text: str) -> list[Effect]:
     """The mechanical claims in a description, in the order they are made."""
     out: list[Effect] = []
     seen: set[str] = set()
 
-    def add(kind: str, body: str, scales: bool = False):
+    def add(kind: str, body: str, scales: bool = False, spec: dict | None = None):
         body = _tidy(body)
         if not body or body.lower() in seen:
             return
         seen.add(body.lower())
-        out.append(Effect(kind, body, scales))
+        out.append(Effect(kind, body, scales, spec=spec or {}))
 
     if not text:
         return out
@@ -181,6 +250,7 @@ def extract(text: str) -> list[Effect]:
     text = re.sub(r"\bvs\.", "vs", text)
     duration = _dur(text)
     tail = f" for {duration}" if duration else ""
+    dspec = _duration_spec(text)
 
     # Bonuses and penalties: "+2 alchemical bonus on Heal checks to staunch bleeding".
     for m in re.finditer(
@@ -191,8 +261,29 @@ def extract(text: str) -> list[Effect]:
         sign = m.group(1).replace(" ", "").replace("–", "-").replace("−", "-")
         if m.group(2).lower() == "penalty" and not sign.startswith("-"):
             sign = "-" + sign.lstrip("+")
-        add("penalty" if sign.startswith("-") else "bonus",
-            f"{sign} {_target(m.group(3))}")
+        # Clipped before it reaches the spec, not only before the card line. A situational
+        # target keeps its raw words, and one of them ran on into the next clause —
+        # "+3 saves against chaotic magic, but the user becomes prone to erratic behavior"
+        # — then had the duration appended to that.
+        target = _clip(_target(m.group(3)))
+        mtype, mtarget = _modifier_type(target)
+        # "Heal checks to staunch bleeding" matches the Heal skill, and the qualifier is
+        # the whole difference between Leechwort's two bonuses. Matching the skill and
+        # dropping the rest turned them into the same effect twice.
+        qualifier = _qualifier(target, mtarget) if mtype != "situational_mod" else ""
+        btype = re.search(rf"({_TYPES})", m.group(0), re.I)
+        # A duration already spelled out in the target must not be added a second time.
+        # Word numbers too: Nightshade grants "+4 bonus to all Reflex saves for nine
+        # hours", and a digits-only guard appended the sentence's other duration on top
+        # of it — "+4 Reflex for nine hours for 30 minutes".
+        carries_own = bool(re.search(
+            r"\bfor\s+(?:\d|one|two|three|four|five|six|seven|eight|nine|ten|twelve|"
+            r"twenty|thirty|sixty)", target, re.I))
+        add("penalty" if sign.startswith("-") else "bonus", f"{sign} {target}",
+            spec={"type": mtype, "amount": int(sign), "target": mtarget,
+                  "bonus_type": (btype.group(1).lower() if btype else "untyped"),
+                  **({"note": qualifier} if qualifier else {}),
+                  **({"duration": dspec} if dspec and not carries_own else {})})
 
     # Healing. "restores 1d4 hit points", "heals 1d6 points of fire damage".
     for m in re.finditer(
@@ -203,25 +294,38 @@ def extract(text: str) -> list[Effect]:
     ):
         kind = (m.group(2) or "").lower()
         what = f"{kind} damage" if kind in DAMAGE_KINDS else "hit points"
-        add("heal", f"Heals {m.group(1)} {what}", scales=True)
+        nonlethal = kind in ("subdual", "nonlethal", "non-lethal")
+        add("heal", f"Heals {m.group(1)} {what}", scales=True,
+            spec={"type": "heal", "dice": m.group(1),
+                  **({"lethality": "nonlethal"} if nonlethal else {})})
 
     # "roll 1-4 to see how many hit points were never done in the first place" — this
     # corpus states a good deal of its healing as an instruction to roll rather than as a
     # verb, and Comfrey and St John's-Wort say nothing else mechanical at all.
     for m in re.finditer(rf"\broll\s+({_DIE})\b[^.;]{{0,60}}?hit points?", text, re.I):
-        add("heal", f"Heals {m.group(1)} hit points", scales=True)
+        add("heal", f"Heals {m.group(1)} hit points", scales=True,
+            spec={"type": "heal", "dice": m.group(1)})
 
     # Percentages, which 1e does not use and this document does: "Bleeding damage is
     # considered 20% less", "heal 25% more quickly".
     for m in re.finditer(r"([^.;,]{3,44}?)\s+(?:is|are)?\s*(?:considered\s+)?"
                          r"(\d+)%\s+(less|more|faster|quicker|longer)", text, re.I):
-        add("percent", f"{_target(m.group(1))} {m.group(2)}% {m.group(3).lower()}")
+        # No authored type holds a percentage; 1e has none. Kept as narrative so the
+        # claim survives conversion instead of being dropped for want of a slot.
+        add("percent", f"{_target(m.group(1))} {m.group(2)}% {m.group(3).lower()}",
+            spec={"type": "narrative",
+                  "target": f"{_target(m.group(1))} {m.group(2)}% "
+                            f"{m.group(3).lower()}"})
 
     # Temporary hit points, fast healing — named mechanics the engine has.
     for m in re.finditer(rf"({_DIE})\s+temporary hit points?", text, re.I):
-        add("temp_hp", f"{m.group(1)} temporary hit points{tail}", scales=True)
+        add("temp_hp", f"{m.group(1)} temporary hit points{tail}", scales=True,
+            spec={"type": "temp_hp", "dice": m.group(1),
+                  **({"duration": dspec} if dspec else {})})
     for m in re.finditer(r"fast healing\s+(\d+)", text, re.I):
-        add("fast_healing", f"Fast healing {m.group(1)}{tail}", scales=True)
+        add("fast_healing", f"Fast healing {m.group(1)}{tail}", scales=True,
+            spec={"type": "fast_healing", "amount": int(m.group(1)),
+                  **({"duration": dspec} if dspec else {})})
 
     # Ability score damage, which is not hit point damage and must not read like it.
     for m in re.finditer(
@@ -233,7 +337,10 @@ def extract(text: str) -> list[Effect]:
         add("ability", f"{m.group(1)} {ABILITY_FULL[word]} "
                        f"{'drain' if m.group(4).lower() == 'drain' else 'damage'}"
                        + (" (permanent)" if (m.group(2) or "").lower() == "permanent" else ""),
-            scales=True)
+            scales=True,
+            spec={"type": "ability_drain" if m.group(4).lower() == "drain"
+                          else "ability_damage",
+                  "target": word, "dice": m.group(1)})
 
     # Damage dealt, when it is not healing and not an ability score.
     for m in re.finditer(rf"\b({_DIE})\s*(?:points? of\s+)?({'|'.join(DAMAGE_KINDS)})\s+damage",
@@ -241,36 +348,63 @@ def extract(text: str) -> list[Effect]:
         if re.search(rf"(?:heals?|restores?|regains?|recovers?|cures?)\s+{re.escape(m.group(1))}",
                      text, re.I):
             continue
-        add("damage", f"{m.group(1)} {m.group(2).lower()} damage", scales=True)
+        add("damage", f"{m.group(1)} {m.group(2).lower()} damage", scales=True,
+            # Subdual is a lethality, not a damage type. Recording it in both places is
+            # how one fact ends up disagreeing with itself.
+            spec={"type": "damage", "dice": m.group(1),
+                  "damage_type": "untyped"
+                  if m.group(2).lower() in ("subdual", "nonlethal", "non-lethal")
+                  else m.group(2).lower(),
+                  "lethality": "nonlethal"
+                  if m.group(2).lower() in ("subdual", "nonlethal", "non-lethal")
+                  else "lethal"})
 
     # Saves the effect calls for, and their DCs.
     for m in re.finditer(r"\b(Fort(?:itude)?|Ref(?:lex)?|Will)\s*(?:save)?\s*"
                          r"(?:\(\s*)?DC:?\s*(\d+)", text, re.I):
-        add("save", f"{SAVES[m.group(1).lower()]} DC {m.group(2)}")
+        add("save", f"{SAVES[m.group(1).lower()]} DC {m.group(2)}",
+            spec={"type": "save_gate", "target": _save_id(m.group(1)),
+                  "dc": int(m.group(2))})
     if not any(e.kind == "save" for e in out):
         m = re.search(r"\bDC:?\s*(\d+)", text)
         if m:
-            add("save", f"DC {m.group(1)}")
+            add("save", f"DC {m.group(1)}",
+                # No `target`: the source gives a DC and never says which save, and
+                # choosing one would put a fact on the card that nobody wrote.
+                spec={"type": "save_gate", "dc": int(m.group(1)),
+                      "note": "the source names a DC without saying which save"})
 
     # An extra saving throw granted, which is a real and easily-missed effect.
     for m in re.finditer(r"\b(?:gain|grant|allow)\w*\s+(?:a|an|another)\s+"
                          r"(?:immediate\s+)?(Fort(?:itude)?|Ref(?:lex)?|Will)\s+save"
                          r"(?:\s+(?:vs\.?|against)\s+([^.;)]{2,45}))?", text, re.I):
         against = _tidy(m.group(2) or "")
+        # An extra save is a permission, not a roll the engine makes on its own.
         add("save", f"Another {SAVES[m.group(1).lower()]} save"
-                    + (f" vs. {against}" if against else ""))
+                    + (f" vs. {against}" if against else ""),
+            spec={"type": "permission",
+                  "target": f"another {SAVES[m.group(1).lower()]} save"
+                            + (f" against {against}" if against else "")})
 
     # Resistance and immunity, both of which 1e states as flat numbers or absolutes.
     for m in re.finditer(r"resistance to (\w+) damage(?:\s*\((\d+)\s*points?\))?", text, re.I):
         add("resistance", f"Resist {m.group(1).lower()}"
-                          + (f" {m.group(2)}" if m.group(2) else "") + tail)
+                          + (f" {m.group(2)}" if m.group(2) else "") + tail,
+            spec={"type": "resistance", "target": m.group(1).lower(),
+                  "amount": int(m.group(2)) if m.group(2) else 0,
+                  **({"duration": dspec} if dspec else {})})
     for m in re.finditer(r"(\d+)\s+points? of resistance (?:to|against) (\w+)", text, re.I):
-        add("resistance", f"Resist {m.group(2).lower()} {m.group(1)}{tail}")
+        add("resistance", f"Resist {m.group(2).lower()} {m.group(1)}{tail}",
+            spec={"type": "resistance", "target": m.group(2).lower(),
+                  "amount": int(m.group(1)),
+                  **({"duration": dspec} if dspec else {})})
     for m in re.finditer(r"immunit(?:y|ies) to ([^.;)]{2,45})", text, re.I):
         # The capture usually swallows the duration, so appending the tail as well gave
         # "Immune to fire damage for 2 hours for 2 hours".
         what = re.sub(r"\s+for\s+.*$", "", _tidy(m.group(1)), flags=re.I)
-        add("immunity", f"Immune to {what}{tail}")
+        add("immunity", f"Immune to {what}{tail}",
+            spec={"type": "immunity", "target": what,
+                  **({"duration": dspec} if dspec else {})})
 
     # Conditions the effect inflicts or removes, matched on the stem so the document's
     # nouns find the engine's adjectives.
@@ -294,9 +428,13 @@ def extract(text: str) -> list[Effect]:
             if not re.search(stem, sentence, re.I):
                 continue
             if re.search(rf"\b(?:{_CURES})\w*[^.;]{{0,40}}{stem}", sentence, re.I):
-                add("condition", f"Ends {name.lower()}")
+                add("condition", f"Ends {name.lower()}",
+                    spec={"type": "remove_condition", "target": key})
             else:
-                add("condition", f"Causes {name.lower()}{local_tail}")
+                add("condition", f"Causes {name.lower()}{local_tail}",
+                    spec={"type": "apply_condition", "target": key,
+                          **({"duration": _duration_spec(sentence)}
+                             if local else {})})
 
     return out
 

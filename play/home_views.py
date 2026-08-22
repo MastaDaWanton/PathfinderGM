@@ -195,5 +195,75 @@ def save_consumable(request):
 
 
 @require_GET
+def open_thing(request, bench_id: str, thing_id: str):
+    """Load something into the builder so it can be corrected.
+
+    Anything on a bench opens, shipped or authored. The parse that produced the shipped
+    effects is a starting point, not an answer — 161 entries were converted mechanically
+    and nobody has read them, so being able to fix one is the difference between a
+    conversion and a guess nobody can undo.
+    """
+    from rules import ingredients
+
+    mine = homebrew.folder(homebrew.get(bench_id).dir) / f"{thing_id}.json"
+    if mine.exists():
+        d = json.loads(mine.read_text(encoding="utf-8"))
+        d["source"] = "yours"
+        return JsonResponse(d)
+
+    if bench_id in ("ingredients", "consumables"):
+        try:
+            ing = ingredients.get(thing_id)
+        except KeyError as exc:
+            return JsonResponse({"error": str(exc)}, status=404)
+        return JsonResponse({
+            "id": ing.id, "name": ing.name, "kind": ing.kind,
+            "description": ing.text, "effects": ing.effects,
+            "converted": ing.effects_converted,
+            "source": "shipped",
+        })
+    return JsonResponse({"error": f"{thing_id!r} cannot be opened yet"}, status=404)
+
+
+@require_POST
+def save_thing(request, bench_id: str):
+    """Keep an edit as an overlay. The shipped file is never written to.
+
+    That is the rule from CLAUDE.md made concrete: a corrected table in a later build must
+    not be shadowed by a stale copy in the user's data directory, so yours layers over what
+    ships and both remain readable.
+    """
+    body = json.loads(request.body or "{}")
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return JsonResponse({"error": "It needs a name."}, status=400)
+
+    specs = body.get("effects") or []
+    problems = [p for i, sp in enumerate(specs)
+                for p in effectspec.validate(sp, f"effect {i + 1}")]
+    if problems:
+        return JsonResponse({"error": " ".join(problems)}, status=400)
+
+    try:
+        bench = homebrew.get(bench_id)
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+
+    slug = str(body.get("id") or "").strip() or         re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "thing"
+    path = homebrew.folder(bench.dir) / f"{slug}.json"
+    path.write_text(json.dumps({
+        "id": slug, "name": name,
+        "kind": str(body.get("kind", "")) or bench_id,
+        "description": str(body.get("description", "")),
+        "effects": specs,
+        # Cleared on save: these have now been looked at by a person, which is a different
+        # state from "the converter produced them and nobody has checked".
+        "effects_converted": False,
+    }, indent=1, ensure_ascii=False), encoding="utf-8")
+    return JsonResponse({"ok": True, "id": slug, "path": str(path),
+                         "lines": [effectspec.render(sp) for sp in specs]})
+
+
+@require_GET
 def to_table(request):
     return redirect("table")

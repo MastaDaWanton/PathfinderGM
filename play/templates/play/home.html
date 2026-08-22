@@ -137,6 +137,12 @@
      mistaken for something you wrote. */
   .rows tr.mine td { color: var(--brew); }
   .rows tr.mine td:nth-child(2) { color: var(--brew-dim); }
+  .rows tr.open { cursor: pointer; }
+  .rows tr.open:hover td { background: rgba(217,192,138,.05); color: var(--ink); }
+  /* Converted mechanically and never read by a person. Worth saying: 161 entries were
+     turned into effects by a parser, and the parse is a starting point, not an answer. */
+  .unread { color: var(--gold-dim); font: italic 10px/1 var(--body);
+            border: 1px solid var(--gold-dim); border-radius: 8px; padding: 1px 6px; }
   .waiting {
     margin-top: 9px; padding: 8px 10px; border-radius: 2px; color: #cfc4ab;
     background: rgba(217,192,138,.05); border-left: 2px solid var(--gold-dim);
@@ -205,7 +211,8 @@ let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
 let PICKED = null;       // pregen chosen when starting a new game
 let CAT = null;          // the effect catalogue, fetched once
-let DRAFT = { name: "", kind: "consumable", description: "", effects: [] };
+let DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+let EDITING = "";        // what was opened, so a save replaces rather than duplicates
 let LINES = [];          // rendered preview of each effect, from the server
 
 const $ = s => document.querySelector(s);
@@ -402,6 +409,11 @@ function listAt(path) {
 
 function paneBuild(b) {
   return `<div class="build">
+    ${EDITING ? `<p class="note" style="margin-top:0">Editing <b style="color:var(--ink)">${
+      esc(DRAFT.name)}</b>${DRAFT.source === "shipped"
+        ? " — a shipped entry. Saving writes your version alongside it."
+        : ""}  <button class="quiet" id="d-new" style="padding:4px 10px">start fresh</button></p>`
+      : ""}
     <div class="row2">
       <div><label>Name</label>
         <input type="text" id="d-name" value="${esc(DRAFT.name)}"
@@ -456,9 +468,15 @@ function paneHomebrew() {
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
       ${b.builder === "effects" ? paneBuild(b) : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
-        `<tr class="${r.mine ? "mine" : ""}"><td>${esc(r.name)}</td>
-             <td>${r.mine ? "yours" : esc(r.kind)}</td>
-             <td>${esc(r.note)}</td></tr>`).join("")}</table></div>`
+        `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
+             ${r.id ? `data-open="${esc(r.id)}"` : ""}>
+           <td>${esc(r.name)}${r.unreviewed ? ` <span class="unread">unreviewed</span>` : ""}</td>
+           <td>${r.mine ? "yours" : esc(r.kind)}</td>
+           <td>${esc(r.note)}</td></tr>`).join("")}</table></div>
+        ${b.builder ? `<p class="note" style="margin-top:10px">Click a row to open it.
+          Editing something that ships writes your version alongside it — the shipped file
+          is never changed, so a corrected table in a later build is not shadowed by a
+          stale copy of yours.</p>` : ""}`
         : `<p class="note">Nothing here yet.</p>`}`;
   }
   return `<h2 class="sect">Workbenches</h2>
@@ -571,13 +589,32 @@ document.addEventListener("click", async e => {
     await repreview();
     return;
   }
+  const open = e.target.closest("[data-open]");
+  if (open && BENCH && BENCH.bench.builder) {
+    const d = await (await fetch(
+      `/api/bench/${encodeURIComponent(BENCH.bench.id)}/open/${
+        encodeURIComponent(open.dataset.open)}`)).json();
+    if (d.error) { render(); return; }
+    DRAFT = { id: d.id, name: d.name, kind: d.kind || "",
+              description: d.description || "", effects: d.effects || [],
+              source: d.source };
+    EDITING = d.id;
+    await repreview();
+    return;
+  }
+  if (e.target.closest("#d-new")) {
+    DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+    EDITING = ""; LINES = []; render();
+    return;
+  }
   if (e.target.closest("#d-save")) {
     try {
-      const d = await post("/api/consumables", {
-        name: $("#d-name").value, kind: $("#d-kind").value,
+      const d = await post(`/api/bench/${encodeURIComponent(BENCH.bench.id)}/save`, {
+        id: DRAFT.id, name: $("#d-name").value, kind: $("#d-kind").value,
         description: $("#d-desc").value, effects: DRAFT.effects,
       });
-      DRAFT = { name: "", kind: "consumable", description: "", effects: [] };
+      DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+      EDITING = "";
       LINES = [];
       BENCH = await (await fetch("/api/bench/consumables")).json();
       STATE.benches = (await (await fetch("/api/bench/consumables")).json()) && STATE.benches;
