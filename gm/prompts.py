@@ -264,6 +264,227 @@ EXAMPLES = [
             ],
         },
     },
+    # --- Variety, which is the point ---------------------------------------------------
+    #
+    # Eight examples covering eight situations gives every situation exactly one template,
+    # and a model inclined to copy has nothing else to do with it. Measured on
+    # qwen3-8b-heretic: three turns in five came back as whole example paragraphs, and not
+    # even the paragraph belonging to the turn it was asked about — it reached for the
+    # nearest one it had. Reframing them as foreign illustrations rather than as its own
+    # prior replies changed nothing at all.
+    #
+    # So the fix is more of them, further apart. Several shapes per situation means no
+    # single paragraph is "the answer" to anything, and the only thing left to generalise
+    # from is the shape.
+    {
+        "player": "I follow the steps down and see where they come out.",
+        "reply": {
+            "narration": (
+                "Eleven steps, and the eleventh is not there — your boot goes down through "
+                "wet air and you catch yourself on the wall with your palm flat against "
+                "something that gives slightly, like sacking. The stair opens into a cellar "
+                "that smells of standing water and, under it, sweetly of rot. Light comes "
+                "from a grating somewhere off to the right, enough to show you the floor is "
+                "not floor: it is packed earth, and it has been dug over recently, and not "
+                "carefully. Something has been buried here in a hurry. Behind you, up the "
+                "steps, the door you came through swings a hand's width on its hinge and "
+                "stops. Where do you look first?"
+            ),
+            "suggestions": [
+                "Dig where the earth is freshest",
+                "Get the door open again before it shuts",
+                "Feel along the wall for what your hand touched",
+            ],
+            "intents": [{"op": "narrate_only", "because": "nothing has forced a roll yet"}],
+        },
+    },
+    {
+        "player": "I go through his desk while he's out of the room.",
+        "reply": {
+            "narration": "You have about as long as it takes a man to cross a yard and "
+                         "come back. The top drawer is unlocked and holds nothing worth "
+                         "locking; the second one sticks, and when it comes it comes with "
+                         "a crack that you feel in your teeth. Inside: three sticks of "
+                         "sealing wax, a purse with almost nothing in it, and a bundle of "
+                         "letters tied with a bootlace, the top one addressed in a hand "
+                         "you have seen before and cannot place. Out in the yard, the "
+                         "talking has stopped. How much do you take?",
+            "suggestions": [
+                "Take the letters and shut the drawer",
+                "Read the top one where you stand",
+                "Put it all back and get away from the desk",
+            ],
+            "intents": [{
+                "op": "check", "actor": "pc",
+                "because": "going through a man's desk with him a yard away",
+                "params": {"skill": "sleight of hand",
+                           "circumstance": {"value": "unfavorable",
+                                            "why": "he is coming back"}},
+                "visibility": "player",
+            }],
+        },
+    },
+    {
+        "player": "I tell her I can get it for her, but I want the name first.",
+        "reply": {
+            "narration": (
+                "She lets that sit. The fire has burned down to the point where it is more "
+                "sound than light, and she does not look at you while she thinks — she "
+                "looks at the shutter, which is closed, and at the door, which is not. "
+                "'A name,' she says. 'You understand that a name is the only thing in this "
+                "room that cannot be given back.' Her rings go round once on her finger. "
+                "'I will give you one. And if I hear it anywhere but from your mouth to "
+                "mine, I will not need to send anyone after you — I will simply say where "
+                "you were on the night of the fire, and let the guild do it.' She waits, "
+                "and the offer is on the table between you, and it has a price on it. Do "
+                "you take it?"
+            ),
+            "suggestions": [
+                "Take the name and the risk with it",
+                "Ask what she wants in return, exactly",
+                "Walk away from this one",
+            ],
+            "intents": [{"op": "narrate_only", "because": "the pressure is hers, not the dice"}],
+        },
+    },
+    {
+        "player": "I put my shoulder to the door and force it.",
+        "reply": {
+            "narration": "The frame is swollen with damp and the door is older than the "
+                         "frame. First shove, nothing but a shower of grit out of the "
+                         "lintel and a jarring all the way up into your shoulder. Second "
+                         "shove and you can feel where it will go — the top hinge is "
+                         "rusted almost through, and the whole thing is holding on the "
+                         "bottom two and a bolt you cannot see. Somewhere on the other "
+                         "side, something heavy shifts and settles, the way a thing does "
+                         "when it has been leaning against a door for a long time. You "
+                         "have got one good go at this before whatever is behind it knows "
+                         "you are coming. Do you take it?",
+            "suggestions": [
+                "Put everything into one more shove",
+                "Work the top hinge loose instead",
+                "Back off and find another way in",
+            ],
+            "intents": [{
+                "op": "check", "actor": "pc", "because": "forcing a swollen door",
+                "params": {"skill": "climb", "dc": {"band": "tough"}},
+                "visibility": "player",
+            }],
+        },
+    },
+]
+
+# --- Combat ---------------------------------------------------------------------------
+#
+# A fight is a different job and gets a different prompt. Nine hundred characters of
+# scene-setting is right when somebody opens a door onto a cellar and badly wrong when
+# there is a sap coming at their head: the pace of the prose is the pace of the fight,
+# and a turn that takes four sentences to arrive at the threat has already lost it.
+#
+# So combat gets its own briefing, its own examples, and its own much lower floor. One
+# formula, and it is short on purpose.
+COMBAT_FORMULA = """A fight is fast and the writing is fast with it. One formula, every
+round:
+
+  LANDED   what the last beat did — a clause, not a sentence
+  THREAT   what is coming at them right now, and from where
+  OPENING  one concrete thing they could use: ground, a rail, a lamp, somebody's blind
+           side, the fact that he has to step over a body to reach you
+  ASK      short
+
+Three or four sentences. No scene-setting, no weather, no recap of how the fight began.
+The player is looking for the next thing to do and everything else is in the way.
+
+You still never say how a roll turned out. "His sap comes round at your head" is the
+wind-up; whether it lands is the engine's."""
+
+COMBAT_BRIEFING_EXTRA = """
+
+IT IS A FIGHT. Everything above still holds — refs, ops, the wind-up only — but the shape
+of the writing changes.
+
+""" + COMBAT_FORMULA
+
+
+COMBAT_EXAMPLES = [
+    {
+        "player": "I go for the one with the sap.",
+        "reply": {
+            "narration": "You come inside his reach before he can get the swing going. "
+                         "The other one is already moving round the crates on your blind "
+                         "side, quick for his size. There is a lamp bracket at head height "
+                         "between you and him, and it is not fixed to anything much. Which "
+                         "of them do you deal with?",
+            "suggestions": ["Finish the one in front of you",
+                            "Bring the bracket down on the other",
+                            "Get the crates between you and both of them"],
+            "intents": [{"op": "attack", "actor": "pc", "target": "c1",
+                         "because": "the sap is the thing that will put her down"}],
+        },
+    },
+    {
+        "player": "I get my back to the wall and wait for him.",
+        "reply": {
+            "narration": "You give ground and the wall comes up behind your shoulders, "
+                         "cold through the coat. He does not rush it — he comes on flat "
+                         "feet with the blade low, taking the angle away from you a step "
+                         "at a time. There is broken crockery underfoot on his side of the "
+                         "floor and he has not looked down once. What do you do?",
+            "suggestions": ["Wait for him to step on it",
+                            "Go at him before he sets himself",
+                            "Look for a way along the wall"],
+            "intents": [{"op": "narrate_only", "because": "she is waiting, not acting"}],
+        },
+    },
+    {
+        "player": "I kick the table into him.",
+        "reply": {
+            "narration": "The table is heavier than it looks and it goes over rather than "
+                         "across, but it goes at him. He gets a hand down and the whole "
+                         "thing catches him at the hip, and for a moment he is tangled and "
+                         "the doorway behind him is clear. His friend is still coming, and "
+                         "closer than he was. Do you take the door?",
+            "suggestions": ["Go through the door while he is tangled",
+                            "Put him down while he cannot move",
+                            "Turn and meet the other one"],
+            "intents": [{"op": "attack", "actor": "pc", "target": "c1",
+                         "because": "she wants him off his feet, not dead",
+                         "params": {"manoeuvre": "bull rush"}}],
+        },
+    },
+    {
+        "player": "I stay on him and keep hitting.",
+        "reply": {
+            "narration": "He is not blocking any more, just covering, and the arm he is "
+                         "covering with is the one that is bleeding. Behind you the door "
+                         "you came in by bangs once against its frame — somebody has come "
+                         "through it. He sees them before you do, and it puts something "
+                         "back into his face. Do you finish him or turn round?",
+            "suggestions": ["Finish him now", "Turn and see who came in",
+                            "Get where you can see both"],
+            "intents": [{"op": "attack", "actor": "pc", "target": "c1",
+                         "because": "she is not giving him the room to recover"}],
+        },
+    },
+    {
+        "player": "I've had enough. I'm going out the window.",
+        "reply": {
+            "narration": "You break contact and the window is four running steps away, "
+                         "shutters open on a drop you have not measured. Behind you he "
+                         "comes after you rather than letting you go, and he is faster over "
+                         "open floor than he was in the press. Below the sill there is a "
+                         "cart, or something the shape of a cart, in the dark. Do you go?",
+            "suggestions": ["Go through and take the drop",
+                            "Turn at the sill and meet him",
+                            "Shutter it in his face and find another way"],
+            "intents": [
+                {"op": "end_encounter", "because": "she is breaking off and going out"},
+                {"op": "check", "actor": "pc", "because": "a drop she has not measured",
+                 "params": {"skill": "acrobatics", "dc": {"band": "tough"}},
+                 "visibility": "player"},
+            ],
+        },
+    },
 ]
 
 
@@ -277,9 +498,25 @@ You then narrate the result you are handed.
 Your narration covers the wind-up only: what is true no matter how the dice land. Never
 the landing.
 
-Put the player in the place. Pick up from what just happened, give them something to see
-and hear and feel, let the world act back at them, and hand the turn over. A single line
-of scene-setting is not a turn — look at how long the examples are, and match them.
+Build the turn out of four moves. They are not paragraphs and not an order to follow
+slavishly — they are what a turn is made of:
+
+  ANCHOR   pick up from what just happened, in a clause, not a recap
+  SENSE    two or three concrete things: what is heard, smelt, felt underfoot, not seen
+  PUSH     somebody or something acts — an NPC moves, the weather turns, a door closes
+  TURN     hand it back with a real question
+
+Which of them carries the weight depends on the situation. Some shapes that work:
+
+  ARRIVING SOMEWHERE     heavy SENSE, one detail that is wrong or unexpected, then TURN
+  SEARCHING              what they find first, what it implies, what they have not
+                         reached yet
+  TALKING                what the body does before the mouth does; the answer; the thing
+                         the answer avoided
+  A DEAL OR A THREAT     what it costs them, what the other side wants, the clock on it
+  DISCOVERY              the thing itself, then the detail that makes it worse
+  A HAZARD GOING WRONG   the mechanism failing, the change spreading, how long they have
+  AFTERMATH              the quiet, the damage, what it cost, what is still out there
 
 End by giving the player a real choice to make, and offer two or three things they might
 do. They are suggestions, not a menu: the player may do anything they like.
@@ -381,9 +618,23 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
     return "\n".join(lines)
 
 
-def call_one_messages(briefing_scene: str, history: list[dict], player_input: str) -> list[dict]:
-    messages = [{"role": "system", "content": BRIEFING + "\n\n" + briefing_scene}]
-    for ex in EXAMPLES:
+def call_one_messages(briefing_scene: str, history: list[dict], player_input: str,
+                      in_combat: bool = False) -> list[dict]:
+    """The turn prompt, in one of two modes.
+
+    Out of a fight the model is shown long examples and asked to build a scene. In one it
+    is shown short ones and asked to keep up. Same protocol, same ops, same refs — only
+    the pace of the prose and the examples that teach it change.
+
+    The combat examples *replace* rather than extend, deliberately. Showing both sets in a
+    fight would put nine hundred characters of cellar-and-weather in front of a model
+    being asked for three sentences, and demonstration volume is what wins.
+    """
+    briefing = BRIEFING + (COMBAT_BRIEFING_EXTRA if in_combat else "")
+    examples = COMBAT_EXAMPLES if in_combat else EXAMPLES
+
+    messages = [{"role": "system", "content": briefing + "\n\n" + briefing_scene}]
+    for ex in examples:
         messages.append({"role": "user", "content": ex["player"]})
         messages.append({"role": "assistant", "content": json.dumps(ex["reply"])})
     messages.extend(history)

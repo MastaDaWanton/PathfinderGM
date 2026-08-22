@@ -10,10 +10,36 @@ always be sufficient.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+
+# Reasoning models emit their working before their answer. Qwen3 and its tunes do it by
+# default, and DeepSeek-R1 always does — both are in the user's Ollama already.
+#
+# Measured on R4C3R/qwen3-8b-heretic: every consequence call came back as a thousand
+# characters of "Okay, let me break down what's happening here" and never reached the
+# prose at all, because 250 tokens of budget were spent thinking. Call 1 looked fine only
+# because `format=json` forces the model out of that mode.
+#
+# Written with chr(92) rather than through a heredoc. The first version of these two
+# lines went in through a shell heredoc and the backreference arrived as a literal
+# 0x01 byte, so the closed-block pattern never matched, the open-block pattern ate the
+# whole reply, and every answer came back empty. CLAUDE.md warns about exactly this.
+#
+# Stripped here rather than at the call sites, so nothing downstream has to know which
+# models think. An unterminated block — thinking that ran out of budget mid-thought — is
+# treated as thinking all the way to the end, which is exactly what it was.
+_THINK = re.compile(r"<(think|thinking|reasoning)>.*?</\1>", re.S | re.I)
+_THINK_OPEN = re.compile(r"<(think|thinking|reasoning)>.*\Z", re.S | re.I)
+
+
+def strip_thinking(text: str) -> str:
+    out = _THINK.sub("", text or "")
+    out = _THINK_OPEN.sub("", out)
+    return out.strip()
 
 
 class ModelUnavailable(RuntimeError):
@@ -91,7 +117,7 @@ def chat(
         ) from exc
 
     return Reply(
-        text=body.get("message", {}).get("content", ""),
+        text=strip_thinking(body.get("message", {}).get("content", "")),
         seconds=time.monotonic() - started,
         model=model,
     )

@@ -69,7 +69,19 @@ CAMPAIGN_DIR = user_data_root() / "campaigns"
 
 # Per-role model config, mirroring World Bible's generator/proofreader split. Local is the
 # default and must always be sufficient; hosted stays possible and is never required.
+# `narrator` plans the turn: JSON, refs, ops, a closed vocabulary. `prose` only writes the
+# consequence sentence, which has no schema to get wrong at all.
+#
+# They are split because the two jobs want opposite things from a model, and measured on
+# identical turns they get them from different ones. R4C3R/qwen3-8b-heretic is roughly
+# three times faster than llama3.1:8b and reads better line by line, and it lost half the
+# turns it was given — 5 of 10 against llama's 10 of 10 — because an 8B creative-writing
+# tune is poor at emitting constrained JSON. On call 2 there is no JSON, so none of that
+# applies and the speed and the prose are free.
+#
+# Anyone who prefers one model everywhere can set both to the same thing.
 MODELS = {
     "narrator": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
+    "prose": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
     "watcher": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
 }

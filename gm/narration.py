@@ -118,10 +118,21 @@ def unquoted(text: str) -> str:
 # wrong answers about quality.
 MIN_SCENE_CHARS = 320
 
+# In a fight the pace of the prose is the pace of the fight. Three or four sentences is
+# the right answer and 900 characters of weather is not, so the floor drops and there is a
+# ceiling as well — the only place in this module where prose is capped, because a turn
+# that takes four sentences to reach the threat has already lost it.
+MIN_COMBAT_CHARS = 140
+# Double the length the combat examples actually demonstrate (they average 299), which is
+# generous for a turn that needs an extra clause and still catches a scene-setter that has
+# wandered into a fight. The first value was 700, which was above every example in the
+# file and therefore caught nothing at all.
+MAX_COMBAT_CHARS = 600
+
 
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
-           min_chars: int = 0) -> Review:
+           min_chars: int = 0, max_chars: int = 0) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -136,6 +147,15 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             "carry it on: put them somewhere they can see and hear and feel, let the "
             "people and the place act back at them, and finish by giving them a real "
             "choice to make. Do not summarise — write it.",
+        ))
+
+    # 5b. A fight that stopped to describe the weather.
+    if max_chars and len(text.strip()) > max_chars:
+        out.findings.append(Finding(
+            "too-long-for-a-fight", f"{len(text.strip())} characters, over {max_chars}",
+            "This is a fight and it is running too long. Three or four sentences: what "
+            "the last beat did, what is coming at them now, one thing they could use, "
+            "and the question. Cut the scene-setting.",
         ))
 
     # 6. The turn is not handed back. Every example ends by asking the player something,

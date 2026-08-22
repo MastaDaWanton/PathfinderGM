@@ -51,6 +51,13 @@ class GMAgent:
         cfg = settings.MODELS[role]
         self.model = cfg["model"]
         self.host = cfg["host"]
+        # Call 2 may run on a different model. It writes one or two sentences of prose
+        # with no schema to satisfy, which is the half of the job a creative-writing tune
+        # is good at and the half where its trouble with structured output cannot bite.
+        # Falls back to the narrator, so a config that never heard of this still works.
+        prose = settings.MODELS.get("prose") or cfg
+        self.prose_model = prose.get("model", self.model)
+        self.prose_host = prose.get("host", self.host)
         self._echoes = None
 
     # --- Call 1 ---------------------------------------------------------------------
@@ -68,7 +75,10 @@ class GMAgent:
         losing the turn.
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
-        base = prompts.call_one_messages(brief, history, player_input)
+        # A fight is a different job, and gets a different prompt and a different floor.
+        fighting = self.engine.scene.in_encounter
+        base = prompts.call_one_messages(brief, history, player_input,
+                                         in_combat=fighting)
         messages = base
 
         attempts: list[Attempt] = []
@@ -158,7 +168,9 @@ class GMAgent:
             attempts.extend(repair_attempts)
             narration, prose_repairs, prose_attempts = self.polish(
                 narration, earlier=recent_narration or [],
-                min_chars=narration_mod.MIN_SCENE_CHARS,
+                min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
+                           else narration_mod.MIN_SCENE_CHARS),
+                max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
                 player_input=player_input, scene_brief=brief)
             attempts.extend(prose_attempts)
 
@@ -248,7 +260,7 @@ class GMAgent:
         return {n for n in names if n}
 
     def polish(self, text: str, earlier: list[str] | None = None,
-               min_chars: int = 0, player_input: str = "",
+               min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                scene_brief: str = "") -> tuple[str, list[str], list[Attempt]]:
         """One targeted rewrite when the prose breaks a rule about prose.
 
@@ -258,7 +270,8 @@ class GMAgent:
         """
         review = narration_mod.review(
             text, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier, min_chars=min_chars,
+            known_names=self._known_names(), earlier=earlier,
+            min_chars=min_chars, max_chars=max_chars,
         )
         if review.ok:
             return text, [], []
@@ -278,7 +291,8 @@ class GMAgent:
 
         after = narration_mod.review(
             fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier, min_chars=min_chars,
+            known_names=self._known_names(), earlier=earlier,
+            min_chars=min_chars, max_chars=max_chars,
         )
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
         # that had removed twenty of twenty-one borrowed phrases, and the plagiarised
@@ -346,11 +360,18 @@ class GMAgent:
         tells = [o.tell for o in outcomes if o.tell]
         because = [o.because for o in outcomes if o.because]
         if not tells:
-            return "", Attempt("consequence", 0.0, self.model, note="nothing to narrate")
+            return "", Attempt("consequence", 0.0, self.prose_model,
+                              note="nothing to narrate")
 
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input),
-            self.model, self.host, temperature=0.7, num_predict=250,
+            # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
+            # target: llama3.1 writes its two sentences and stops either way. A reasoning
+            # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call
+            # spent the whole 250-token budget on its `<think>` block and returned an
+            # empty string once the thinking was stripped. Ollama's `think: false` is
+            # accepted by the API and ignored by this tune, so headroom is the fix.
+            self.prose_model, self.prose_host, temperature=0.7, num_predict=700,
         )
         text = judgement.name_refs(reply.text.strip(), self.engine.scene)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
