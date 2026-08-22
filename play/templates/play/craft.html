@@ -83,8 +83,13 @@
   }
 
   .panel {
-    background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
-    border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.55);
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+    border: 1px solid rgba(201, 162, 39, .25);
+    border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.45),
+    0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
     display: flex; flex-direction: column; min-height: 0;
   }
   .panel > h2 {

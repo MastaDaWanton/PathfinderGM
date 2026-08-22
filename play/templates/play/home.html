@@ -66,8 +66,13 @@
   /* --- continue --- */
   .continue {
     display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-    background: linear-gradient(#1d2a22, #141c17); border: 1px solid var(--brew-dim);
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+    border: 1px solid var(--brew-dim);
     border-radius: 3px; padding: 18px 22px; margin-bottom: 26px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
   }
   .continue .who { flex: 1; min-width: 220px; }
   .continue .who b { display: block; color: var(--brew);
@@ -201,6 +206,20 @@
   .addfx:hover { border-color: var(--accent); border-style: solid; }
   .warn { color: #cfc4ab; font: italic 12px/1.5 var(--body); margin: -6px 0 10px; }
   .ok { color: var(--brew); font-size: 14px; }
+
+
+  /* The writing surfaces — the bench editor and the forge — are leather panels
+     like everything else that holds content. No fittings: a form is a page in
+     the book, not a bound cover. */
+  .build, .forge {
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    padding: 22px 26px; box-shadow: 0 8px 32px rgba(0, 0, 0, .5),
+    inset 0 1px 0 rgba(255, 230, 150, .06);
+  }
 
   /* --- The forge: character creation ------------------------------------------- */
   .forge h2.sect { margin-top: 26px; }
