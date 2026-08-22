@@ -20,6 +20,7 @@ from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
+from rules.guards import from_dict as guard_from_dict
 from rules.sheet import from_dict, load_pc, to_dict
 from world.loader import load_cached
 
@@ -134,6 +135,7 @@ class Campaign:
                 # Saved because a fight can be put down mid-round. Losing it would hand
                 # everybody a fresh attack of opportunity for reloading.
                 "reacted": self.scene.reacted,
+                "guards": [g.as_dict() for g in self.scene.guards],
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
                 "turn": self.scene.turn,
@@ -184,6 +186,7 @@ class Campaign:
             grid=_grid(s.get("grid")),
             positions={r: tuple(p) for r, p in (s.get("positions") or {}).items()},
             reacted={k: int(v) for k, v in (s.get("reacted") or {}).items()},
+            guards=[guard_from_dict(g) for g in (s.get("guards") or [])],
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             turn=s.get("turn", -1),

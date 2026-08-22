@@ -165,6 +165,8 @@ and gets a real id.
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
 | `begin_encounter` | `sides`, `surprise?` | Rolls initiative for everyone, establishes the turn order. |
 | `move` | `who`, `zone`, `square?` | `engaged` / `near` / `far`, always. On a scene that has a map, `square` is `[col, row]` and it is what decides where somebody ends up — the zone is then re-derived from measured distance. Where the two disagree, the square wins: it is checkable and the word is not. The engine refuses a square that is off the map, solid, occupied, unreachable, or further than the mover's speed *inside an encounter* — and every refusal carries the number. |
+| `compel` | `to`, `penalty?`, `duration?`, `why?` | Pull `to` towards the actor. **Penalises, never prohibits** — see §10. Defaults to −4 on attacks against anyone else. |
+| `guard` | `to`, `kind?`, `amount?`, `range_ft?`, `uses?`, `pool?` | The actor gets between damage and `to`. `kind` is `redirect` / `share` / `absorb` / `convert` — see §10. |
 | `spawn` | `from_entity_id?`, `template`, `count` | Puts a creature on the board and returns its ref. |
 | `advance_time` | `amount`, `unit` | Ticks durations, rest, and the world clock. |
 | `narrate_only` | — | **Explicit.** Says "this turn had no mechanics." |
@@ -425,3 +427,64 @@ somebody else's spent resource.
 **Requires a map.** Nothing provokes on a scene with no grid: zones do not carry enough to
 say whether a threatened square was left, and inventing the geometry would be the engine
 making up a rule. Nothing provokes outside an encounter either.
+
+---
+
+## 10. Interception and compulsion
+
+Two problems this app has that a table does not.
+
+### 10.1 Interception — getting between a blow and its target
+
+Damage used to be a straight line: roll it, subtract damage reduction, spend temporary hit
+points, take the rest. Nothing in that line can *change the blow* — and a Coagulator
+throwing themselves in front of a companion, a ward that turns a cut into a bruise, and a
+bloodlink that makes two creatures share what one suffers are all exactly that. None of the
+three is expressible as a modifier on the attacker or a subtraction on the defender.
+
+`Engine._apply_damage` was already the one place every point of damage passes through, so
+the hook goes there and covers weapon hits, hazards and the `damage` op at once.
+
+| `kind` | Effect |
+|---|---|
+| `redirect` | The guardian takes the blow instead, in full. |
+| `share` | `amount` is a percentage; the guardian takes that share, rounded **down**, and the target takes the rest. |
+| `absorb` | A ward eats up to `amount` and nobody takes that part. |
+| `convert` | The damage becomes non-lethal. |
+
+**Order is a rule, not an implementation detail.** Interception runs *before* damage
+reduction and temporary hit points: a blow redirected to somebody else has to meet **that
+creature's** armour, and resolving DR first would apply the wrong person's. Within
+interception, the cheapest intervention goes first (`convert`, `absorb`, `share`,
+`redirect`) so a ward that can simply eat a blow does, rather than a companion needlessly
+interposing against something harmless.
+
+Guards do not each get a fresh packet — two absorbs of 10 against a 12-point hit consume 10
+and 2. Each guard gets exactly one go at a given packet, which is what stops two guardians
+protecting each other from passing a blow back and forth forever.
+
+`intercept` may return **more than one packet or none at all**, and callers must handle
+both. Everything a guard does is reported and named in the `tell`: damage that quietly
+became something else is the most confusing thing that can happen to a player.
+
+### 10.2 Compulsion — being pulled towards a target you did not choose
+
+With one player character, nothing on the board makes a monster attack the *right* person,
+because there is only one person.
+
+> **A compulsion penalises. It never prohibits.**
+
+A design decision, not a reading of 1e, and load-bearing. An aggro mechanic that forbids
+attacking anyone else takes the decision away from the creature and hands the fight to a
+number. Worse, in this engine a prohibition would surface as an `IntentError` — the GM's
+whole intent list dying because a monster wanted to do something reasonable. A penalty
+leaves the choice on the board and prices it.
+
+Obeying is free: no penalty applies against anyone who is compelling you. Rival compulsions
+**sum** when all are defied, because three creatures demanding your attention and being
+ignored by all three is worse than one; attacking one of them satisfies that one and still
+charges the others. Re-compelling from the same source refreshes rather than stacks, and
+keeps the stronger pull.
+
+The penalty is applied in the engine rather than in `Actor.attack_modifiers`, because it
+depends on **who is being attacked** and the sheet does not know that.

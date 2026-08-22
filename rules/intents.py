@@ -184,6 +184,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Searching the ground. The roll is the player's: it is their afternoon.
     "forage": ((), ("actor", "track", "biome"), "player"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
+    # Being pulled towards a target you did not choose. `to` is who is compelled; the
+    # actor is who they are pulled towards. It penalises and never prohibits — see the
+    # header of rules/compulsion.py, which is where that decision is argued.
+    "compel": (("to",), ("penalty", "duration", "why"), "hidden"),
+    # Standing between a blow and the person it was aimed at. The actor is the guardian.
+    "guard": (("to",), ("kind", "amount", "range_ft", "uses", "pool"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),
     # A fight ends when the fighting stops, which is a call about the fiction:
     # they flee, they surrender, you get away. Without this the only way out of an
@@ -261,6 +267,11 @@ VISIBILITY_ALIASES = {
     "visible": "player",
 }
 ZONES = ("engaged", "near", "far")
+
+# Imported by name rather than by module so a kind the engine cannot resolve is rejected at
+# validation. The two lists going out of step is exactly the failure `ACTOR_RULES` exists
+# to prevent, one layer up.
+from .guards import KINDS as GUARD_KINDS  # noqa: E402
 TIME_UNITS = ("round", "minute", "hour", "day")
 
 
@@ -469,6 +480,16 @@ def _check_params(intent: Intent, index: int) -> None:
         p["zone"] = zone
         if p.get("square") not in (None, ""):
             p["square"] = _square(p["square"], "move", index)
+
+    elif op == "guard":
+        kind = str(p.get("kind", "redirect")).strip().lower()
+        if kind not in GUARD_KINDS:
+            raise IntentError(
+                f"guard: kind must be one of {sorted(GUARD_KINDS)}, got {kind!r}."
+                + _suggest(kind, GUARD_KINDS),
+                "schema", index,
+            )
+        p["kind"] = kind
 
     elif op == "advance_time":
         unit = str(p["unit"]).strip().lower().rstrip("s")

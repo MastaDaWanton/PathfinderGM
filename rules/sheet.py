@@ -208,6 +208,10 @@ class Actor:
     speed: int = 30
     reductions: list[Reduction] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
+    # Who this creature is being pulled towards, and what defying them costs. Not a
+    # condition: a condition is a state the creature is in, while a compulsion is a
+    # relationship to a *particular other creature*, and it has to be able to name them.
+    compulsions: list["Compulsion"] = field(default_factory=list)
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
     # misspelled override fails loudly instead of silently never applying.
     overrides: dict[str, bool] = field(default_factory=dict)
@@ -1648,6 +1652,7 @@ def to_dict(actor: Actor) -> dict:
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
         "nonlethal": actor.nonlethal, "speed": actor.speed,
+        "compulsions": [c.as_dict() for c in actor.compulsions],
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -1781,6 +1786,12 @@ def _reduction(r) -> Reduction:
                      source=r.get("source", ""))
 
 
+def _compulsion(raw: dict):
+    from .compulsion import from_dict as compulsion_from_dict
+
+    return compulsion_from_dict(raw)
+
+
 def from_dict(data: dict, ref: str | None = None) -> Actor:
     a = Actor(
         ref=ref or data.get("ref") or data["name"].lower().replace(" ", "-"),
@@ -1801,6 +1812,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
+        compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
         temp_pools=_temp_pools(data),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},

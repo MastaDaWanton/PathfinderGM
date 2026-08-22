@@ -14,18 +14,23 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import biomes
+from . import compulsion
 from . import dc as dc_mod
 from . import foraging
 from . import ingredients as ing_mod
 from . import resources
 from . import worldclass
 from . import grid as gridmod
+from . import guards as guards_mod
 from . import reactions
+from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
-from .tables import ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS
+from .tables import (
+    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, normalise_damage_type,
+)
 
 
 # --- Scene state -------------------------------------------------------------------
@@ -47,6 +52,11 @@ class Scene:
     # the round rather than on rest, and it belongs to the encounter rather than the
     # character — a scene that ends takes it with it.
     reacted: dict[str, int] = field(default_factory=dict)
+    # Standing arrangements about damage aimed at somebody: who interposes for whom. On
+    # the scene rather than on either actor, because a guard is a *relationship* — stored
+    # on the guardian it is lost when you look up the protected creature, and stored on
+    # both it is two copies to keep level.
+    guards: list["Guard"] = field(default_factory=list)
     initiative: list[tuple[str, int]] = field(default_factory=list)
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
@@ -197,6 +207,7 @@ class Scene:
                 for a in self.actors.values():
                     a.tick_conditions(1)
                     a.tick_pools(1)
+                    compulsion.tick(a, 1)
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
                 ) if r]
@@ -790,6 +801,10 @@ class Engine:
         while state["i"] < len(sequence):
             iteration = sequence[state["i"]]
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
+            # Compulsions are charged here rather than in `attack_modifiers` because the
+            # penalty depends on *who is being attacked*, which the sheet does not know.
+            # It penalises and never prohibits: see the header of rules/compulsion.py.
+            atk_mods = atk_mods + compulsion.penalty_against(actor, defender.ref)
 
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(
@@ -1024,15 +1039,44 @@ class Engine:
         hit = self._apply_damage(target, value, intent.params["type"],
                                  lethality=str(intent.params.get("lethality", "lethal")))
         effects = [hit]
-        effects.extend(self._hp_state_effects(target))
+        # Every creature the blow actually reached, which after interception is not always
+        # the one it was aimed at. Keyed off the effects rather than off `target`, because
+        # a redirected blow that drops the guardian has to knock *them* out.
+        for ref in self._hurt_refs(hit):
+            effects.extend(self._hp_state_effects(self.scene.actors[ref]))
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=f"{target.name} takes {hit['amount']} {hit['type']}"
-                 + (" non-lethal" if hit["lethality"] == "nonlethal" else "")
-                 + " damage" + (f" ({hit['note']})." if hit["note"] else "."),
+            tell=self._damage_tell(hit),
             because=intent.because,
         )
+
+    def _hurt_refs(self, head: dict) -> list[str]:
+        refs = [head["ref"]]
+        for extra in head.get("also", []):
+            if extra["ref"] not in refs:
+                refs.append(extra["ref"])
+        return refs
+
+    def _damage_tell(self, head: dict) -> str:
+        """Who took what — naming whoever actually took it.
+
+        Built from the effects rather than from the intent's target. Saying "the companion
+        takes 12" when a guardian threw themselves in front of it is a lie the player has
+        no way to catch, and it was the first thing interception broke.
+        """
+        def one(e: dict) -> str:
+            who = self.scene.actors[e["ref"]].name
+            note = f" ({e['note']})" if e["note"] else ""
+            # "hits for 0" is technically true and reads as a miss. A ward that ate the
+            # blow whole is a thing that happened, and the player paid for it.
+            if e["amount"] == 0 and e.get("intercepted"):
+                return f"nothing reaches {who}{note}"
+            kind = e["type"] + (" non-lethal" if e["lethality"] == "nonlethal" else "")
+            return f"{who} takes {e['amount']} {kind} damage{note}"
+
+        parts = [one(head)] + [one(e) for e in head.get("also", [])]
+        return "; ".join(parts) + "."
 
     def _op_heal(self, intent: Intent, partial: dict) -> Outcome:
         """Restore hit points. Not damage with the sign flipped.
@@ -1444,6 +1488,72 @@ class Engine:
             because=intent.because,
         )
 
+    def _op_compel(self, intent: Intent, partial: dict) -> Outcome:
+        """Pull somebody towards the actor.
+
+        The tell says what defying it costs rather than that it happened, because "the
+        thug is compelled" tells a player nothing they can act on and "−4 to attack anyone
+        else" tells them everything.
+        """
+        ref = intent.params["to"]
+        target = self.scene.actors[ref]
+        towards = intent.actor or (intent.targets() or [None])[0]
+        penalty = abs(int(intent.params.get("penalty", 4) or 0))
+
+        duration = intent.params.get("duration")
+        rounds = None
+        if isinstance(duration, dict):
+            rounds = _to_rounds(duration.get("amount", 0), duration.get("unit", "round"))
+        elif isinstance(duration, int):
+            rounds = duration
+
+        made = compulsion.add(target, by=towards, penalty=penalty, rounds=rounds,
+                              source=intent.because or "compelled",
+                              why=str(intent.params.get("why", "")))
+        puller = self.scene.actors.get(towards)
+        name = puller.name if puller else towards
+        return Outcome(
+            intent_id=intent.id, op="compel",
+            effects=[{"ref": ref, "kind": "compulsion", "by": towards,
+                      "penalty": made.penalty, "rounds_left": made.rounds_left}],
+            tell=f"{target.name} is pulled towards {name}: −{made.penalty} to attack "
+                 f"anyone else"
+                 + (f" for {made.rounds_left} rounds." if made.rounds_left else "."),
+            because=intent.because,
+        )
+
+    def _op_guard(self, intent: Intent, partial: dict) -> Outcome:
+        """Stand between a blow and somebody else."""
+        protects = intent.params["to"]
+        guardian_ref = intent.actor or ""
+        guardian = self.scene.actors[guardian_ref]
+        kind = str(intent.params.get("kind", "redirect"))
+        uses = intent.params.get("uses")
+
+        made = Guard(
+            guardian=guardian_ref, protects=protects, kind=kind,
+            amount=int(intent.params.get("amount", 0) or 0),
+            range_ft=int(intent.params.get("range_ft", 5) or 0),
+            pool=str(intent.params.get("pool", "") or ""),
+            uses_left=None if uses in (None, "") else int(uses),
+            source=intent.because or "interposed",
+        )
+        # Replacing rather than appending: re-declaring the same arrangement is the
+        # guardian renewing it, and stacking two copies would double every absorb.
+        self.scene.guards = [g for g in self.scene.guards
+                             if not (g.guardian == guardian_ref and g.protects == protects
+                                     and g.kind == kind)]
+        self.scene.guards.append(made)
+
+        protected = self.scene.actors[protects]
+        return Outcome(
+            intent_id=intent.id, op="guard",
+            effects=[{"ref": guardian_ref, "kind": "guard", **made.as_dict()}],
+            tell=f"{guardian.name} steps in front of {protected.name} "
+                 f"{guards_mod.PHRASE[kind]}.",
+            because=intent.because,
+        )
+
     def _op_move(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("who") or intent.actor
         actor = self.scene.actors[ref]
@@ -1709,10 +1819,53 @@ class Engine:
         """One funnel for every point of damage in the game.
 
         Everything — weapon hits, the `damage` op, hazards — arrives here, which is what
-        makes damage reduction and temporary hit points a single change rather than one
-        per damage source.
+        makes damage reduction, temporary hit points and now interception a single change
+        rather than one per damage source.
+
+        Returns the effect for whoever ended up taking the *largest* share, and hangs the
+        rest off it. Every caller of this has always read one effect back, and a blow that
+        split in two must not silently become invisible to the ones that did not change.
         """
-        d = target.take_damage(amount, dtype, traits, lethality)
+        landed = self._intercept(target, amount, dtype, traits, lethality)
+        if not landed:
+            return {"ref": target.ref, "kind": "damage", "amount": 0, "rolled": amount,
+                    "type": normalise_damage_type(dtype), "reduced": 0, "reduced_by": "",
+                    "absorbed": 0, "hp_after": target.hp, "hp_max": target.hp_max,
+                    "temp_hp": target.temp_hp, "lethality": lethality,
+                    "nonlethal": target.nonlethal, "note": "stopped before it landed"}
+
+        effects = [self._land(pk) for pk in landed]
+        effects.sort(key=lambda e: e["amount"], reverse=True)
+        head, rest = effects[0], effects[1:]
+        if rest:
+            head["also"] = rest
+        return head
+
+    def _intercept(self, target: Actor, amount: int, dtype: str,
+                   traits: tuple[str, ...], lethality: str) -> list[Packet]:
+        """Offer a blow to anybody standing in front of it, before anything else touches it.
+
+        Before damage reduction and temporary hit points, deliberately: a blow redirected
+        to somebody else has to meet *that* creature's armour, and resolving DR first would
+        apply the wrong person's.
+        """
+        packet = Packet(amount=max(0, int(amount)), dtype=dtype, traits=tuple(traits),
+                        lethality=lethality, target=target.ref)
+        if not self.scene.guards:
+            return [packet]
+        return guards_mod.intercept(self.scene, packet)
+
+    def _land(self, pk: Packet) -> dict:
+        target = self.scene.actors[pk.target]
+        d = target.take_damage(pk.amount, pk.dtype, pk.traits, pk.lethality)
+        effect = self._describe_damage(target, d, pk.lethality)
+        if pk.notes:
+            effect["intercepted"] = pk.notes
+            through = guards_mod.describe(pk.notes)
+            effect["note"] = f"{effect['note']}, {through}" if effect["note"] else through
+        return effect
+
+    def _describe_damage(self, target: Actor, d: dict, lethality: str) -> dict:
         return {
             "ref": target.ref, "kind": "damage",
             # `amount` stays the number that actually came off hit points, because that is
