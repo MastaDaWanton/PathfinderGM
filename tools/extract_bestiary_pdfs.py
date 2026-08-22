@@ -30,6 +30,10 @@ from pypdf import PdfReader  # noqa: E402
 
 import build_reference as ref  # noqa: E402
 
+sys.path.insert(0, str(ROOT))
+
+from rules.statblock import RESISTANCE, trim  # noqa: E402
+
 SIZES = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
          "gargantuan", "colossal")
 ALIGNMENTS = ("LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE")
@@ -138,17 +142,22 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "base_attack": sign(bab),
         "speed": _num(speed),
         "reductions": dr,
-        "immune": [x.strip() for x in _between(t, "Immune", "Resist", "SR",
-                                               "Weaknesses", "OFFENSE").split(",")
-                   if x.strip()],
-        "resist": [x.strip() for x in _between(t, "Resist", "SR", "Weaknesses",
-                                               "OFFENSE").split(",") if x.strip()],
+        # `trim` on all three, because these are the only fields that split on commas and
+        # so the only ones a runaway `_between` turns into a list of plausible short terms
+        # rather than one visibly wrong long one. Every other field below is capped by a
+        # slice for the same reason. See rules/statblock.py.
+        "immune": trim([x.strip() for x in _between(t, "Immune", "Resist", "SR",
+                                                    "Weaknesses", "OFFENSE").split(",")
+                        if x.strip()]),
+        "resist": trim([x.strip() for x in _between(t, "Resist", "SR", "Weaknesses",
+                                                    "OFFENSE").split(",") if x.strip()],
+                       shape=RESISTANCE),
         "sr": _num(sr),
         "senses": _between(t, "Senses", "DEFENSE", "Aura")[:160],
         "special_attacks": _between(t, "Special Attacks", "STATISTICS", "TACTICS")[:300],
-        "languages": [x.strip() for x in
-                      _between(t, "Languages", "SQ", "ECOLOGY", "SPECIAL").split(",")
-                      if x.strip()],
+        "languages": trim([x.strip() for x in
+                           _between(t, "Languages", "SQ", "ECOLOGY", "SPECIAL").split(",")
+                           if x.strip()]),
         # The gap the spreadsheet could not fill: this is what ties a creature to a biome.
         "environment": _between(t, "Environment", "Organization", "Treasure")[:120],
         "organization": _between(t, "Organization", "Treasure", "SPECIAL")[:160],
