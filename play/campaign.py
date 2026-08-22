@@ -441,6 +441,17 @@ def begin_with(character) -> Campaign:
     """
     from . import roster
 
+    # An abandoned start is not a life lived. Beginning a game and thinking better of
+    # it before taking a single turn used to leave a permanent living row, and a shelf
+    # of identical unplayed characters is what made a roster of seven Kessts unreadable.
+    # Retired rather than deleted, which is the answer this module already gives for the
+    # character a reset replaces — nothing is lost, and the record stops pretending
+    # somebody is waiting to be played.
+    for stale in roster.everyone():
+        if stale.status == roster.ALIVE and not stale.turns_played:
+            stale.status = roster.RETIRED
+            roster.save(stale)
+
     entry = roster.enrol(character)
     c = new_campaign(entry.id, character=character)
     c.character_id = entry.id

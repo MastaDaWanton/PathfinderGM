@@ -661,6 +661,11 @@ function continueBlock() {
 function paneWorlds() {
   if (WORLD) return paneOneWorld();
   return continueBlock() + `
+    <div style="margin:-14px 0 26px">
+      <button class="go" data-forge>Create a character</button>
+      <span class="note" style="margin-left:12px">Point buy, all eleven classes,
+        seven races — validated by the rules as you go.</span>
+    </div>
     <h2 class="sect">Worlds on the shelf</h2>
     <p class="note">World Bible writes these; this app plays in them. Drop an export into
       your worlds folder and it appears here.</p>
@@ -711,9 +716,12 @@ function paneOneWorld() {
         <h3>${esc(p.name)}</h3>
         <em>${esc(p.line)} · ${p.hp} hp</em>
         ${p.notes ? `<div class="stat">${esc(p.notes)}</div>` : ""}
-      </button>`).join("")}</div>
-    <p class="note" style="margin-top:14px">Full 1st-edition character creation is the
-      next piece; until it lands these are who there is to play.</p>
+      </button>`).join("")}
+      <button class="card pick" data-forge style="border-style:dashed">
+        <h3>Someone new</h3>
+        <em>Build a character from nothing — point buy, class, skills, feats.</em>
+        <div class="stat">All eleven classes · seven races</div>
+      </button></div>
     <button class="go" data-start="${esc(w.id)}" ${PICKED ? "" : "disabled"}
             style="${PICKED ? "" : "opacity:.4;cursor:not-allowed"}">
       Begin a sandbox${PICKED ? "" : " — pick somebody first"}</button>
@@ -1086,7 +1094,7 @@ function paneForge() {
     return v;
   };
   return `<div class="forge">
-    <button class="quiet" data-unforge>← the roster</button>
+    <button class="quiet" data-unforge>← back</button>
     <h2 class="sect">Who are they?</h2>
     <div class="two">
       <div><input type="text" data-cr="name" value="${esc(f.name)}"
@@ -1188,10 +1196,12 @@ async function forgeSubmit(begin) {
 
 function render() {
   tabs();
+  // The forge wins over the tab: it is reachable from the shelf, from a world and
+  // from the roster, and wherever it was opened is where closing it returns you.
   $("#pane").innerHTML =
-    TAB === "worlds" ? paneWorlds()
+    FORGE ? paneForge()
+    : TAB === "worlds" ? paneWorlds()
     : TAB === "homebrew" ? paneHomebrew()
-    : FORGE ? paneForge()
     : paneCharacters();
 }
 

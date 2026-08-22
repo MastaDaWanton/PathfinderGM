@@ -162,3 +162,64 @@ def test_a_broken_character_reports_every_problem(client):
                     content_type="application/json")
     assert r.status_code == 400
     assert len(r.json()["problems"]) >= 3
+
+
+# --- the roster stops multiplying (found in use, 2026-08-22) ---------------------------
+
+def test_an_abandoned_start_is_retired_when_the_next_game_begins(tmp_path):
+    """Seven identical "Kesst Vayr · Rogue 1 · 9/9 hp" rows accumulated in one afternoon
+    of playtesting, and a roster nobody can read is a roster nobody uses.
+
+    The first fix tried was recycling the entry inside `enrol` — and
+    `test_two_characters_of_the_same_name_do_not_collide` caught it immediately, which
+    is the test doing its job: two characters who merely share a name must never
+    overwrite each other, however empty one of them looks. So the narrower rule stands
+    instead, and it is the one this module already applies to the character a reset
+    replaces: a start with no turns in it is retired, not deleted and not reused.
+    """
+    from django.test import override_settings
+
+    from play import campaign as cm, roster
+    from rules.sheet import load_pc
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        first = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        assert roster.load(first.character_id).status == roster.ALIVE
+
+        second = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        assert roster.load(first.character_id).status == roster.RETIRED
+        living = [e for e in roster.everyone() if e.status == roster.ALIVE]
+        assert [e.id for e in living] == [second.character_id]
+
+
+def test_a_character_who_played_is_never_retired_behind_your_back(tmp_path):
+    """The dead and the played stay on the roster: they are the reason the next game
+    went the way it did. Only an empty start is swept up."""
+    from django.test import override_settings
+
+    from play import campaign as cm, roster
+    from rules.sheet import load_pc
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        first = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        played = roster.load(first.character_id)
+        played.turns_played = 12
+        roster.save(played)
+
+        cm.begin_with(load_pc("fixtures/pc-borin.json"))
+        assert roster.load(first.character_id).status == roster.ALIVE
+
+
+def test_the_forge_is_reachable_from_the_shelf_and_from_a_world():
+    """Creation shipped and stayed behind one button on the roster tab, while a world's
+    own "Start something new" still said full creation was "the next piece" — the exact
+    drift this page's module docstring warns about."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert page.count("data-forge") >= 3, "shelf, world and roster each need a door"
+    assert "next piece; until it lands" not in page
+    # And the forge outranks the tab, so it can open from any of them.
+    assert "FORGE ? paneForge()\n    : TAB === \"worlds\"" in page
