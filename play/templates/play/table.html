@@ -959,25 +959,37 @@
      what is under it instead of painting over it; transform-only follow, fed
      by one pointermove writing --cx/--cy. Gone on touch screens (no cursor to
      carry it) and under prefers-reduced-motion with everything else. */
-  /* The carried light, in three layers on one element, because one flat disc
-     flickering on a step curve read as a strobing sprite rather than fire:
-     - the element is the steady pool, breathing slowly on a smooth curve;
-     - ::before is the dapple — the same light masked by a repeating field of
-       soft blotches whose mask pans in a slow diagonal drift, which is what
-       makes the pool's interior *move* the way firelight on a wall moves;
-     - ::after is the faintest set of lantern rays, a conic mask turning very
-       slowly. Rays and dapple drift against each other, so the light never
-       repeats itself in any period a person would notice. */
+  /* The illumination, done the way light actually works on a page: not a
+     bright disc painted over the content, but a veil of darkness with a hole
+     in it. #cursorshade is a huge gradient — clear at the centre, dusk at the
+     rim — positioned by transform alone, so the room visibly dims everywhere
+     the candle is not, and whatever stands in the pool is brighter than its
+     surroundings because it is the only thing not veiled. The warm tint and
+     the panning dapple ride inside the hole. The ray wheel is gone: lantern
+     spokes read as a novelty spiral, and a candle casts none.
+
+     The flicker itself moved to script: three summed sine waves at
+     irrational frequency ratios plus a bounded random walk, written each
+     frame to --flick (and a sub-pixel --jx/--jy sway), because a step-curve
+     keyframe is a strobe and real fire is noise. See the pointer block. */
+  #cursorshade {
+    position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
+    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 55;
+    transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
+               scale(calc(.94 + .10 * var(--flick, .8)));
+    background: radial-gradient(circle,
+      transparent 0 70px, rgba(4, 3, 2, .13) 170px,
+      rgba(4, 3, 2, .30) 380px, rgba(4, 3, 2, .34) 100%);
+  }
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;
     margin: -85px 0 0 -85px; pointer-events: none; z-index: 60;
-    /* +5px down from the hotspot: the pointer's point is the flame's tip, and
-       a lamp glows from the body of its flame, not the very top of it. */
-    transform: translate(var(--cx, -600px), calc(var(--cy, -600px) + 5px));
+    opacity: calc(.5 + .5 * var(--flick, .8));
+    transform: translate(calc(var(--cx, -9000px) + var(--jx, 0px)),
+                         calc(var(--cy, -9000px) + 5px + var(--jy, 0px)));
     background: radial-gradient(circle,
       rgba(255, 190, 100, .15), rgba(232, 170, 80, .06) 45%, transparent 70%);
     mix-blend-mode: screen;
-    animation: poolbreathe 3.7s ease-in-out infinite;
   }
   #cursorlight::before {
     content: ""; position: absolute; inset: 0;
@@ -988,40 +1000,11 @@
     mask-image: repeating-radial-gradient(circle at 30% 30%,
       #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
     -webkit-mask-size: 190px 190px; mask-size: 190px 190px;
-    animation: dapplepan 7.3s ease-in-out infinite alternate,
-               carriedflame 2.8s steps(1, end) infinite;
-  }
-  #cursorlight::after {
-    content: ""; position: absolute; inset: -18%;
-    background: radial-gradient(circle,
-      rgba(255, 190, 100, .10), transparent 62%);
-    -webkit-mask-image: repeating-conic-gradient(from 0deg,
-      #000 0 11deg, rgba(0,0,0,.3) 16deg, #000 27deg);
-    mask-image: repeating-conic-gradient(from 0deg,
-      #000 0 11deg, rgba(0,0,0,.3) 16deg, #000 27deg);
-    animation: raywheel 17s linear infinite;
-  }
-  @keyframes poolbreathe {
-    0%, 100% { opacity: .85; scale: 1; }
-    50%      { opacity: 1;   scale: 1.05; }
+    animation: dapplepan 7.3s ease-in-out infinite alternate;
   }
   @keyframes dapplepan {
     from { -webkit-mask-position: 0 0; mask-position: 0 0; }
     to   { -webkit-mask-position: 46px 34px; mask-position: 46px 34px; }
-  }
-  @keyframes raywheel {
-    to { transform: rotate(360deg); }
-  }
-  @keyframes carriedflame {
-    0%   { opacity: .8; }
-    9%   { opacity: 1; }
-    21%  { opacity: .72; }
-    33%  { opacity: .92; }
-    46%  { opacity: .78; }
-    58%  { opacity: 1; }
-    71%  { opacity: .7; }
-    84%  { opacity: .9; }
-    100% { opacity: .8; }
   }
   @media (hover: none) { #cursorlight { display: none; } }
 
@@ -1045,6 +1028,7 @@
 </head>
 <body>
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div id="cursorshade" aria-hidden="true"></div>
 <div id="cursorlight" aria-hidden="true"></div>
 <main>
   <div id="story"></div>
@@ -2072,14 +2056,38 @@ const sign = n => (n >= 0 ? "+" : "") + n;
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
 
 
-// The carried candle follows the pointer. Written as CSS variables on the light itself
-// rather than left/top, so the browser only ever composites a transform.
+// The carried flame. Position comes from the pointer; intensity comes from noise —
+// three sine waves at irrational frequency ratios plus a bounded random walk, which
+// never falls into a rhythm a person can catch. Everything lands in CSS variables on
+// the root, so the shade and the light read one source and the browser only ever
+// composites transforms and opacity. Under prefers-reduced-motion the loop never
+// starts and the flame holds a steady mid value.
 {
-  const light = document.getElementById("cursorlight");
-  if (light) document.addEventListener("pointermove", e => {
-    light.style.setProperty("--cx", `${e.clientX}px`);
-    light.style.setProperty("--cy", `${e.clientY}px`);
+  const root = document.documentElement.style;
+  document.addEventListener("pointermove", e => {
+    root.setProperty("--cx", `${e.clientX}px`);
+    root.setProperty("--cy", `${e.clientY}px`);
   }, { passive: true });
+
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    let walk = 0;
+    const tick = now => {
+      const t = now / 1000;
+      walk = Math.max(-0.5, Math.min(0.5, walk + (Math.random() - 0.5) * 0.04));
+      const flick = 0.72
+        + 0.14 * Math.sin(t * 1.7)
+        + 0.09 * Math.sin(t * 4.3 + 1.3)
+        + 0.05 * Math.sin(t * 9.1 + 4.1)
+        + 0.12 * walk;
+      root.setProperty("--flick", flick.toFixed(3));
+      root.setProperty("--jx", `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`);
+      root.setProperty("--jy", `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px`);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  } else {
+    root.setProperty("--flick", "0.8");
+  }
 }
 
 // The ember under the cursor. One delegated listener feeds --mx/--my to whatever
