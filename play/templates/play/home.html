@@ -242,7 +242,7 @@
   .card {
     isolation: isolate; position: relative;
     background:
-      linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .38)),
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
     background-size: auto, 400px auto;
     border-color: rgba(201, 162, 39, .25);
@@ -374,10 +374,16 @@
       url("{% static 'img/clasp-tl.png' %}"),
       url("{% static 'img/clasp-tr.png' %}"),
       url("{% static 'img/clasp-bl.png' %}"),
-      url("{% static 'img/clasp-br.png' %}");
-    background-position: top left, top right, bottom left, bottom right;
+      url("{% static 'img/clasp-br.png' %}"),
+      url("{% static 'img/strap-top.png' %}"),
+      url("{% static 'img/strap-bottom.png' %}"),
+      url("{% static 'img/strap-left.png' %}"),
+      url("{% static 'img/strap-right.png' %}");
+    background-position: top left, top right, bottom left, bottom right,
+                         top center, bottom center, left center, right center;
     background-repeat: no-repeat;
-    background-size: 96px auto;
+    background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+                     150px 26px, 150px 26px, 26px 150px, 26px 150px;
     filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
   }
 
