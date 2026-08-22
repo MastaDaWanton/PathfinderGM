@@ -254,10 +254,10 @@ def test_a_bench_lists_what_it_holds(client):
 
 
 def test_a_bench_with_nothing_behind_it_says_so(client):
-    d = client.get("/api/bench/spells").json()
+    d = client.get("/api/bench/campaigns").json()
     assert d["bench"]["ready"] is False
     assert d["rows"] == []
-    assert "no spell system" in d["bench"]["blurb"]
+    assert "campaign format" in d["bench"]["blurb"]
 
 
 def test_an_unknown_bench_is_a_404(client):

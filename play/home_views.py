@@ -17,7 +17,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes, effectspec
+from rules import biomes, effectspec, spells
 
 from . import campaign as campaign_mod
 from . import homebrew, library, roster
@@ -262,6 +262,39 @@ def save_thing(request, bench_id: str):
     }, indent=1, ensure_ascii=False), encoding="utf-8")
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
+
+
+@require_GET
+def spell_search(request):
+    """Filter the spell list.
+
+    Descriptors and tags are separate parameters even though both read as labels, because
+    they answer different questions: whether fire immunity stops it, and whether it is the
+    sort of thing you are looking for.
+    """
+    g = request.GET
+    level = g.get("level")
+    found = spells.search(
+        text=g.get("q", ""), school=g.get("school", ""),
+        subschool=g.get("subschool", ""), descriptor=g.get("descriptor", ""),
+        tag=g.get("tag", ""), klass=g.get("class", ""),
+        level=int(level) if level not in (None, "") and level.isdigit() else None,
+        limit=int(g.get("limit", 120)),
+    )
+    return JsonResponse({
+        "count": len(found),
+        "spells": [s.as_dict() for s in found],
+        "vocab": spells.vocabularies(),
+        "note": spells.meta().get("note", ""),
+    })
+
+
+@require_GET
+def spell_detail(request, spell_id: str):
+    try:
+        return JsonResponse(spells.get(spell_id).as_dict())
+    except KeyError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
 
 
 @require_GET

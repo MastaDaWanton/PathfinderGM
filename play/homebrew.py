@@ -17,7 +17,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from rules import ingredients, worldclass
+from rules import ingredients, spells, worldclass
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, FEATS, SHIELDS, WEAPONS
 
@@ -138,9 +138,13 @@ def benches() -> list[Bench]:
                   "who they know. Authored here, placed in a world.",
         ),
         Bench(
-            id="spells", name="Spells", dir="spells", ready=False, shipped=0,
-            blurb="Nothing behind this yet — the engine has no spell system, so a spell "
-                  "editor would write records nothing could cast.",
+            id="spells", name="Spells", dir="spells",
+            shipped=len(spells.all_spells()), shipped_label="from The Spell Codex",
+            blurb="Every 1e spell, with its school, its canonical descriptors and the "
+                  "level it sits at on each class list. Searchable by any of them.",
+            waiting="The engine has no spell system, so these are reference and "
+                    "narration: nothing here is cast by the rules yet. What they give "
+                    "you now is a real list to build against.",
         ),
         Bench(
             id="campaigns", name="Campaigns", dir="campaigns", ready=False, shipped=0,
@@ -204,6 +208,13 @@ def rows_for(bench_id: str) -> list[dict]:
                           f"{v['skill_ranks']}+Int skills · good "
                           f"{', '.join(v['good_saves'])}"}
                  for v in CLASSES.values()]
+    elif bench_id == "spells":
+        # Capped: three thousand rows is not a listing, it is a wall. The bench's own
+        # filters are how you find one, and they are the point of the tags.
+        rows += [{"name": sp.name, "kind": sp.school or "spell", "mine": False,
+                  "id": sp.id, "note": sp.line}
+                 for sp in sorted(spells.all_spells().values(),
+                                  key=lambda x: x.name.lower())[:200]]
     elif bench_id == "worldclasses":
         rows += [{"name": t.name, "kind": "track", "mine": False,
                   "note": f"{t.max_level} levels · "

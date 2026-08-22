@@ -24,6 +24,8 @@ urlpatterns = [
     path("api/bench/<str:bench_id>/open/<str:thing_id>", home_views.open_thing,
          name="open_thing"),
     path("api/bench/<str:bench_id>/save", home_views.save_thing, name="save_thing"),
+    path("api/spells", home_views.spell_search, name="spell_search"),
+    path("api/spells/<str:spell_id>", home_views.spell_detail, name="spell_detail"),
     path("api/craft/ingredients", craft_views.craft_ingredients, name="craft_ingredients"),
     path("api/craft/preview", craft_views.craft_preview, name="craft_preview"),
     path("api/craft/do", craft_views.craft_do, name="craft_do"),

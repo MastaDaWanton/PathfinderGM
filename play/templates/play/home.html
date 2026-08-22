@@ -143,6 +143,15 @@
      turned into effects by a parser, and the parse is a starting point, not an answer. */
   .unread { color: var(--gold-dim); font: italic 10px/1 var(--body);
             border: 1px solid var(--gold-dim); border-radius: 8px; padding: 1px 6px; }
+  .spellbody { padding: 12px 8px 16px !important; }
+  .spellbody p { margin: 0 0 10px; color: var(--ink); font-size: 14px; line-height: 1.6;
+                 white-space: pre-wrap; }
+  .spellbody .terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+                      gap: 3px 14px; }
+  .spellbody .t { display: flex; justify-content: space-between; gap: 10px;
+                  border-bottom: 1px solid #241d15; padding: 2px 0; font-size: 12px; }
+  .spellbody .t span { color: var(--dim); }
+  .spellbody .t b { color: var(--ink); font-weight: 600; text-align: right; }
   .waiting {
     margin-top: 9px; padding: 8px 10px; border-radius: 2px; color: #cfc4ab;
     background: rgba(217,192,138,.05); border-left: 2px solid var(--gold-dim);
@@ -214,6 +223,7 @@ let CAT = null;          // the effect catalogue, fetched once
 let DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
 let EDITING = "";        // what was opened, so a save replaces rather than duplicates
 let LINES = [];          // rendered preview of each effect, from the server
+let OPEN_SPELL = "";     // the spell whose full text is expanded
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
@@ -456,6 +466,79 @@ async function repreview() {
   render();
 }
 
+// --- spell search ------------------------------------------------------------------------
+//
+// Descriptors and tags are separate filters even though both read as labels, because they
+// answer different questions: whether fire immunity stops it, and whether it is the sort
+// of thing you are looking for.
+
+let SP = { q: "", school: "", descriptor: "", tag: "", class: "", level: "" };
+let SPELLS = null;
+
+function dropdown(id, label, counts, chosen) {
+  const opts = Object.entries(counts || {})
+    .map(([k, n]) => `<option value="${esc(k)}" ${k === chosen ? "selected" : ""}>${
+      esc(k)} (${n})</option>`).join("");
+  return `<div><label>${esc(label)}</label>
+    <select data-sp="${id}"><option value="">any</option>${opts}</select></div>`;
+}
+
+function paneSpells() {
+  const v = (SPELLS && SPELLS.vocab) || {};
+  const levels = Array.from({ length: 10 }, (_, i) => i);
+  return `<div class="build">
+    <label>Search</label>
+    <input type="text" id="sp-q" value="${esc(SP.q)}"
+           placeholder="name or description — burning, cure, teleport">
+    <div class="row3">
+      ${dropdown("school", "School", v.schools, SP.school)}
+      ${dropdown("descriptor", "Descriptor", v.descriptors, SP.descriptor)}
+      ${dropdown("tag", "Tag", v.tags, SP.tag)}
+    </div>
+    <div class="row3">
+      ${dropdown("class", "On the list of", v.classes, SP.class)}
+      <div><label>At level</label>
+        <select data-sp="level"><option value="">any</option>${levels.map(l =>
+          `<option value="${l}" ${String(l) === SP.level ? "selected" : ""}>${l}</option>`
+        ).join("")}</select></div>
+      <div><label>&nbsp;</label>
+        <button class="quiet" id="sp-clear" style="width:100%">Clear filters</button></div>
+    </div>
+    ${SP.tag && v.tag_notes && v.tag_notes[SP.tag]
+      ? `<p class="warn">${esc(SP.tag)} — ${esc(v.tag_notes[SP.tag])} A tag is ours, not
+         Pathfinder's; no rule reads it.</p>` : ""}
+    <p class="note" style="margin-bottom:0">${
+      SPELLS ? `<b style="color:var(--ink)">${SPELLS.count}</b> shown` : "…"}</p>
+  </div>
+  ${SPELLS ? `<div class="rows" style="max-height:none">
+    <table>${SPELLS.spells.map(sp => `
+      <tr class="open" data-spell="${esc(sp.id)}">
+        <td>${esc(sp.name)}</td>
+        <td>${esc(sp.school)}</td>
+        <td style="text-align:left;color:var(--dim)">${esc(sp.line)}</td>
+      </tr>
+      ${OPEN_SPELL === sp.id ? `<tr><td colspan="3" class="spellbody">
+        <p>${esc(sp.description).slice(0, 1400)}</p>
+        <div class="terms">
+          ${["casting_time","range","area","effect","targets","duration",
+             "saving_throw","spell_resistance"].map(k => sp[k]
+            ? `<div class="t"><span>${esc(k.replace("_"," "))}</span><b>${esc(sp[k])}</b></div>`
+            : "").join("")}
+          <div class="t"><span>components</span><b>${esc((sp.components||[]).join(", ") || "—")}</b></div>
+          <div class="t"><span>source</span><b>${esc(sp.source)}</b></div>
+        </div>
+        ${sp.tags.length ? `<div style="margin-top:9px">${sp.tags.map(t =>
+          `<span class="pill">${esc(t)}</span>`).join("")}</div>` : ""}
+      </td></tr>` : ""}`).join("")}</table></div>` : ""}`;
+}
+
+async function loadSpells() {
+  const qs = new URLSearchParams();
+  for (const [k, val] of Object.entries(SP)) if (val) qs.set(k === "q" ? "q" : k, val);
+  SPELLS = await (await fetch(`/api/spells?${qs}`)).json();
+  render();
+}
+
 function paneHomebrew() {
   if (BENCH) {
     const b = BENCH.bench;
@@ -466,6 +549,7 @@ function paneHomebrew() {
       <p class="note"><b style="color:var(--ink)">${b.yours || "nothing"}</b> authored by
         you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
+      ${b.id === "spells" ? paneSpells() : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
@@ -563,12 +647,25 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  const spellRow = e.target.closest("[data-spell]");
+  if (spellRow) {
+    OPEN_SPELL = OPEN_SPELL === spellRow.dataset.spell ? "" : spellRow.dataset.spell;
+    render();
+    return;
+  }
+  if (e.target.closest("#sp-clear")) {
+    SP = { q: "", school: "", descriptor: "", tag: "", class: "", level: "" };
+    await loadSpells();
+    return;
+  }
+
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {
     BENCH = await (await fetch(`/api/bench/${encodeURIComponent(bench.dataset.bench)}`)).json();
     if (BENCH.bench.builder === "effects" && !CAT) {
       CAT = await (await fetch("/api/effects/catalogue")).json();
     }
+    if (BENCH.bench.id === "spells") { OPEN_SPELL = ""; await loadSpells(); return; }
     render();
     return;
   }
@@ -631,6 +728,12 @@ document.addEventListener("click", async e => {
 // rendered line, so what the builder shows is what a card will show.
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.id === "sp-q") {
+    SP.q = t.value;
+    clearTimeout(window._spTimer);
+    window._spTimer = setTimeout(loadSpells, 300);
+    return;
+  }
   if (t.id === "d-name") { DRAFT.name = t.value; return; }
   if (t.id === "d-kind") { DRAFT.kind = t.value; return; }
   if (t.id === "d-desc") { DRAFT.description = t.value; return; }
@@ -649,6 +752,7 @@ document.addEventListener("input", e => {
 
 document.addEventListener("change", async e => {
   const t = e.target;
+  if (t.dataset && t.dataset.sp) { SP[t.dataset.sp] = t.value; await loadSpells(); return; }
   if (t.dataset && t.dataset.cat !== undefined && t.dataset.cat !== "") {
     // Changing the kind resets the type, because the fields are different — carrying the
     // old values over would leave a form half-filled with values that no longer apply.

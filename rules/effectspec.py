@@ -298,13 +298,13 @@ CATEGORIES: list[Category] = [
                 "spell_effect", "As a spell", "Acts as enlarge person, caster level 5",
                 [
                     Field("target", "Spell", "text",
-                          hint="Free text for now — there is no spell list to pick from."),
+                          hint="By name — 3,040 are on the Spells bench to look up."),
                     Field("caster_level", "Caster level", "int", required=False),
                     Field("save_dc", "Save DC", "int", required=False),
                 ],
                 engine=False,
-                blocked="The engine has no spell system, so this is recorded and "
-                        "narrated. Nothing will cast it."),
+                blocked="The spell list is imported, but the engine has no spell system: "
+                        "this is recorded and narrated, and nothing will cast it."),
         ]),
 
     Category(

@@ -6,7 +6,17 @@ copy of the licence must ship with any build.
 
 ## What in this repo is Open Game Content
 
-Currently only the small structural tables in `rules/tables.py`:
+`content/spells/spells.json` — 3,040 Pathfinder 1st Edition spells, imported from The
+Spell Codex spreadsheet. Names, schools, subschools, descriptors, class lists, components,
+ranges, durations, saving throws and descriptions are Open Game Content and each entry
+records the sourcebook it came from. The `tags` field on each spell is *not* Open Game
+Content: it is this app's own derived index for searching, defines nothing, and is read by
+no rule.
+
+`content/ingredients/herbs-and-parts.json` mixes sources: entries drawn from Pathfinder
+material are Open Game Content, and the setting-specific flora are the user's own.
+
+The structural tables in `rules/tables.py`:
 
 - ability modifier, BAB and saving-throw progressions, iterative attack rules
 - the class entries (hit die, BAB type, good saves, skill ranks, class skill lists)
