@@ -287,3 +287,56 @@ def test_a_sheet_written_before_any_of_this_still_loads():
     back = from_dict(d)
     assert back.awake_minutes == 0
     assert back.pristine == {}
+
+
+# --- plants grow in patches -----------------------------------------------------------------
+
+def test_a_find_is_a_patch_not_a_single_flower():
+    """Eight finds used to mean eight individual specimens, one of each. That is not what
+    an hour in a wood looks like: you come out with an armful of the common stuff and, if
+    you were lucky, a couple of the rare."""
+    assert foraging.batch_for(1, 0) == 10       # common, best hour
+    assert foraging.batch_for(2, 0) == 8        # uncommon
+    assert foraging.batch_for(3, 0) == 6        # rare
+    assert foraging.batch_for(4, 0) == 4        # exotic
+    assert foraging.batch_for(5, 0) == 2        # legendary
+
+
+def test_the_patch_shrinks_two_a_band():
+    assert foraging.batch_for(1, 1) == 8
+    assert foraging.batch_for(1, 2) == 6
+    assert foraging.batch_for(1, 4) == 2
+
+
+def test_you_always_hold_at_least_one_of_what_you_found():
+    """The floor is what keeps a legendary herb worth stooping for at every band rather
+    than rounding away to nothing three bands down."""
+    assert foraging.batch_for(5, 4) == 1
+    assert foraging.batch_for(1, 99) == 1
+
+
+def test_a_good_hour_finds_distinct_species(forager):
+    """Eight rolls that all landed on Woundwart is one plant found eight times, not the
+    eight kinds the band promised."""
+    best = None
+    for seed in range(200):
+        hour = foraging.forage_hour("forest", 5, 5, Dice(seed=seed), actor=forager)
+        if hour["band"] == "a garden's worth":
+            best = hour
+            break
+    assert best, "no hour in 200 reached the top band"
+    ids = [p["id"] for p in best["picks"] if p["id"]]
+    assert len(ids) == len(set(ids))
+    assert len(best["found"]) > 1
+
+
+def test_the_rarer_the_plant_the_smaller_the_patch(forager):
+    """Within one hour, so the band is held constant and only the rank varies."""
+    for seed in range(200):
+        hour = foraging.forage_hour("forest", 5, 5, Dice(seed=seed), actor=forager)
+        ranks = {p["rank"]: p["count"] for p in hour["picks"] if p["id"]}
+        if len(ranks) > 1:
+            ordered = [ranks[r] for r in sorted(ranks)]
+            assert ordered == sorted(ordered, reverse=True), ranks
+            return
+    pytest.skip("no hour in 200 turned up two different ranks")

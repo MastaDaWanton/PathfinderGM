@@ -150,11 +150,13 @@ def test_a_better_forager_comes_back_with_more():
 
 
 def test_foraging_reports_every_roll_that_produced_it():
-    """The number of picks is no longer fixed: it is whatever the hour's band earned, so
-    this asserts they are all real d100s rather than counting them."""
+    """The number of picks is no longer fixed: it is whatever the hour's band earned, and
+    a pick that landed on a species already found is rerolled rather than recorded. So
+    this asserts they are all real d100s and never more than the band promised, rather
+    than counting them exactly."""
     got = foraging.forage("forest", level=5, rank_ceiling=5, dice=Dice(seed=7))
     assert all(1 <= r["roll"] <= 100 for r in got["rolls"])
-    assert len(got["rolls"]) == sum(h["finds"] for h in got["hourly"])
+    assert len(got["rolls"]) <= sum(h["finds"] for h in got["hourly"])
 
 
 # --- the satchel ------------------------------------------------------------------------------

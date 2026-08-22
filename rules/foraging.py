@@ -168,6 +168,28 @@ BANDS = (
 RUINED = ("a ruined handful", 0, 0, False)
 RUINED_AT = -5
 
+# How many of a thing you get when you find it. The count in the bands above is how many
+# *kinds* the hour turns up; this is how many of each.
+#
+# Plants grow in patches. Finding one flower of eight different species is not what a good
+# hour in a wood looks like — you come out of it with an armful of the common stuff and,
+# if you were lucky, a couple of the rare. So the batch falls with rarity, and falls again
+# for every band the hour came in below the best:
+#
+#   common 10, uncommon 8, rare 6, exotic 4, legendary 2, minus two per band below the top
+#
+# Never below one: if the hour found it at all, the character is holding at least one of
+# it. That floor is what keeps a legendary herb worth stooping for at every band rather
+# than rounding away to nothing three bands down.
+BATCH_TOP = {1: 10, 2: 8, 3: 6, 4: 4, 5: 2}
+BATCH_STEP = 2
+
+
+def batch_for(rank: int, band_index: int) -> int:
+    """How many of a rank-`rank` plant a hour at `band_index` yields, top band being 0."""
+    top = BATCH_TOP.get(int(rank), 2)
+    return max(1, top - BATCH_STEP * max(0, int(band_index)))
+
 
 def dc_for(biome: str) -> int:
     return FORAGE_DC.get((biome or "").strip().lower(), DEFAULT_FORAGE_DC)
@@ -179,6 +201,14 @@ def band_for(margin: int) -> tuple:
         if margin >= floor:
             return (label, finds, lift, pristine)
     return RUINED
+
+
+def band_index(margin: int) -> int:
+    """Which band this is, counting from the best. Feeds `batch_for`."""
+    for i, (floor, *_rest) in enumerate(BANDS):
+        if margin >= floor:
+            return i
+    return len(BANDS)
 
 
 def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None) -> dict:
@@ -212,15 +242,30 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None) -> 
         hour_ceiling = min(len(WEIGHT), rank_ceiling + lift)
         table = table_for(biome, hour_ceiling)
 
+    # `finds` is how many *kinds* the hour turns up, and each of them comes as a patch.
+    # A distinct species per find, because eight rolls that all landed on Woundwart is one
+    # plant found eight times rather than the eight the band promised — and a table with
+    # fewer species than the band asks for simply runs out, which is the wood being poor
+    # rather than the character being bad at this.
+    index = band_index(margin)
     found: dict[str, int] = {}
     picks = []
-    for _ in range(finds):
+    seen: set[str] = set()
+    tries = 0
+    while len(picks) < finds and tries < finds * 8:
+        tries += 1
         pick = dice.roll("1d100", label=f"Foraging ({table.biome})", visibility="hidden")
         row = table.lookup(pick.total)
-        picks.append({"roll": pick.total, "found": row.name if row else None,
-                      "id": row.ingredient_id if row else None})
-        if row:
-            found[row.ingredient_id] = found.get(row.ingredient_id, 0) + 1
+        if row is None:
+            picks.append({"roll": pick.total, "found": None, "id": None, "count": 0})
+            continue
+        if row.ingredient_id in seen:
+            continue
+        seen.add(row.ingredient_id)
+        count = batch_for(row.rank, index)
+        picks.append({"roll": pick.total, "found": row.name,
+                      "id": row.ingredient_id, "count": count, "rank": row.rank})
+        found[row.ingredient_id] = found.get(row.ingredient_id, 0) + count
 
     # A botched hour still names what was destroyed. Nothing is carried, but the player is
     # told they had a Woundwart in their hand and tore the roots off it.
