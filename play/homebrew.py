@@ -128,9 +128,11 @@ def benches() -> list[Bench]:
             blurb="Stat blocks the engine can put in a scene and roll for. Unlike the "
                   "spell list these are executable: hit points, AC, saves, damage "
                   "reduction and an attack the engine rolls against.",
-            waiting="The import is a variant and NPC bestiary — it holds Ogre Boss and "
-                    "Ambro the Ogre and no plain Ogre. A core bestiary export would fill "
-                    "that gap; nothing here is invented to cover it.",
+            waiting="Three sources: the core Bestiary stat blocks parsed from the PDFs "
+                    "(which carry Environment, so a creature can be tied to a biome), a "
+                    "variant and NPC spreadsheet for the named villains, and a handful of "
+                    "hand-written town NPCs. Where two share a name the printed Bestiary "
+                    "block wins.",
         ),
         Bench(
             id="feats", name="Feats", dir="feats",

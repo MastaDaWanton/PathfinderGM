@@ -20,7 +20,44 @@ from rules.sheet import load_pc
 # --- what was imported ------------------------------------------------------------------
 
 def test_the_bestiary_loaded():
-    assert len(bestiary.imported()) > 6000
+    assert len(bestiary.imported()) > 7000
+
+
+def test_the_core_creatures_are_there():
+    """The gap the spreadsheet left: it held Ogre Boss and Ambro the Ogre and no plain
+    Ogre. These are parsed from the printed Bestiary stat blocks, and the numbers are the
+    book's — Ogre CR 3, 30 hp, AC 17; Troll CR 5, 63 hp, AC 16."""
+    ogre = bestiary.details("ogre")
+    assert ogre["cr"] == "3" and ogre["hp"] == 30 and ogre["flat_ac"] == 17
+
+    troll = bestiary.details("troll")
+    assert troll["cr"] == "5" and troll["hp"] == 63 and troll["flat_ac"] == 16
+
+    for known in ("skeleton", "goblin", "zombie", "orc"):
+        assert bestiary.details(known), known
+
+
+def test_core_creatures_carry_their_ecology():
+    """The spreadsheet's Environment column was empty, so nothing could tie a creature to
+    the ground it lives on. The printed stat blocks have it."""
+    core = [c for c in bestiary.imported().values() if c.get("environment")]
+    assert len(core) > 700
+    assert "hills" in bestiary.details("ogre")["environment"]
+
+
+def test_an_environment_maps_onto_a_biome():
+    """Which is the point of having it: encounters can be built from where the party is
+    standing rather than from a list somebody typed."""
+    from rules import biomes
+
+    assert "hills" in biomes.detect(bestiary.details("ogre")["environment"])
+    assert "mountain" in biomes.detect(bestiary.details("troll")["environment"])
+
+
+def test_the_printed_block_wins_over_a_variant():
+    """55 names appear in both sources. The Bestiary printing is the canonical one."""
+    ogre = bestiary.details("ogre")
+    assert ogre["source"].startswith("Bestiary")
 
 
 def test_every_imported_creature_has_what_combat_needs():
@@ -103,10 +140,11 @@ def test_a_short_name_still_gets_suggestions():
 
 
 def test_a_near_name_is_never_silently_substituted():
-    """This import is a variant and NPC bestiary — it holds Ogre Boss and Ambro the Ogre
-    and no plain Ogre. Asking for an ogre must not quietly produce a boss."""
+    """Asking for something that does not exist must not quietly produce something that
+    does. `ogre` resolves now that the core Bestiary is in, so this uses a name that is
+    still only a prefix of real ones."""
     with pytest.raises(bestiary.UnknownTemplate):
-        bestiary.instantiate("ogre", scene=Scene())
+        bestiary.instantiate("ogre b", scene=Scene())
 
 
 def test_spawning_an_invented_creature_is_refused_in_validation():
@@ -164,11 +202,12 @@ def test_the_creatures_bench_counts_the_whole_bestiary(client):
     assert len(d["rows"]) <= 210
 
 
-def test_the_bench_says_what_the_import_is_missing(client):
-    """A variant and NPC bestiary is not the core one, and saying so is the difference
-    between a gap somebody can fill and a gap they trip over."""
+def test_the_bench_says_where_the_creatures_came_from(client):
+    """Three sources with a precedence order is exactly the sort of thing that becomes
+    folklore if it is not written down where somebody will read it."""
     d = client.get("/api/bench/creatures").json()
-    assert "no plain Ogre" in d["bench"]["waiting"]
+    assert "Environment" in d["bench"]["waiting"]
+    assert "wins" in d["bench"]["waiting"]
 
 
 def test_hand_written_npcs_are_labelled_on_the_bench(client):

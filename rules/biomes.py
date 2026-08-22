@@ -83,6 +83,10 @@ ALIASES: dict[str, str] = {
     "graveyard": "ruins", "barrow": "ruins", "tomb": "ruins", "cursed": "ruins",
     "haunted": "ruins", "interred": "ruins", "corpse": "ruins",
 
+    # Bestiary ecology lines say "any (Plane of Fire)" and "any (Hell)" rather than
+    # naming an elemental plane in full.
+    "plane of": "planar", "hell": "planar", "heaven": "planar", "abaddon": "planar",
+    "aquatic": "coast", "underwater": "coast", "river": "coast", "lake": "coast",
     "elemental plane": "planar", "ethereal": "planar", "astral": "planar",
     "planar": "planar", "abyss": "planar", "celestial": "planar",
     "river oceanus": "planar",

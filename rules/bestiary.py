@@ -1,15 +1,20 @@
 """Creatures the engine can put in a scene and roll against.
 
-Two sources, one lookup. The hand-written town NPCs below are the people the opening scene
-actually needs — a guildhand, a watchman — and behind them sit 6,406 imported stat blocks
-covering the published bestiary.
+Three sources, one lookup:
+
+- the hand-written town NPCs below — the people the opening scene actually needs;
+- 782 core creatures parsed out of the six Bestiary PDFs, which is where the plain Ogre,
+  Skeleton and Troll live, and the only source that carries **Environment**;
+- 6,406 stat blocks from a variant and NPC spreadsheet, which is where the named
+  adventure-path villains live.
 
 Unlike the spell list, this is **executable**. `instantiate()` builds an Actor with hit
 points, an AC, saves, damage reduction and an attack, and the engine rolls against it. An
 imported creature is not reference material; it is a thing that can hit the player.
 
-The hand-written ones win on a name collision: they are tuned for the opening scene and a
-generic import must not silently replace them.
+Precedence runs hand-written, then core, then spreadsheet. The town NPCs are tuned for the
+opening scene and must not be replaced; the printed Bestiary block is the canonical one
+where a variant shares its name.
 """
 from __future__ import annotations
 
@@ -147,7 +152,11 @@ def imported() -> dict[str, dict]:
                        Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"):
             if not folder.is_dir():
                 continue
-            for path in sorted(folder.glob("*.json")):
+            # `core.json` is loaded last so it wins the 55 name collisions with the
+            # variant spreadsheet: a printed Bestiary stat block is the canonical one, and
+            # an adventure-path variant that happens to share a name must not replace it.
+            for path in sorted(folder.glob("*.json"),
+                               key=lambda q: (q.stem == "core", q.stem)):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
                 except Exception:
