@@ -107,14 +107,137 @@ class Stock:
         }
 
 
+# What the old cleansing wrote on a jar it had purified. The sentence no longer appears
+# anywhere in the code — cleansing names the poisons it removes now — but it is written
+# into every jar saved before that change, and it is the only record those jars carry of
+# having been purified at all.
+LEGACY_CLEANSED = "Side effects and secondary toxicities removed by the chain."
+
+
+def _shape_slugs() -> list[str]:
+    """The method words, as they appear inside a stock id. Longest first, so "purified
+    draught" is stripped before "draught" can take half of it."""
+    words = {w.lower().replace(" ", "-") for w in SHAPE_WORDS.values()}
+    words.add("preparation")
+    return sorted(words, key=len, reverse=True)
+
+
+def base_ingredient_id(ref: str) -> str:
+    """The raw ingredient at the bottom of a crafted item's id.
+
+    `from_ingredients` mixes raw ids with the ids of crafted things that went back into
+    the pot — `mad-cap` beside `mad-cap-tincture-tincture-tincture-tincture-infusion#2`.
+    The crafted one still carries its lead ingredient at the front, so stripping the
+    method words off the end gets back to something the shelf knows. Measured on the two
+    live campaigns: all four crafted references resolve this way, and all eighteen raw
+    ones already did.
+    """
+    slug = str(ref or "").split("#")[0].strip().lower()
+    changed = True
+    while changed:
+        changed = False
+        for word in _shape_slugs():
+            if slug.endswith("-" + word):
+                slug = slug[: -(len(word) + 1)]
+                changed = True
+    return slug
+
+
+def heal_name(base: str) -> str:
+    """Undo a name that compounded before `_name_for` stopped stacking shape words.
+
+    Saved jars carry the damage: "Dragon Flower Tincture Tincture Tincture Tincture
+    Tincture Tincture Tincture Tincture Tincture Tincture" is a real entry in a real
+    campaign. The last shape word is kept, because it is still what the thing is.
+    """
+    import re
+
+    # A concentration marker baked into the *base*. `Stock.name` appends "(Tier 2)" for
+    # display and an earlier bug crafted from the display name, so it is sitting mid-string
+    # in real saves — "Mad Cap Tincture Tincture Tincture Tincture Infusion (Tier 2)
+    # Tincture" — where it blocks the strip loop from ever reaching the words in front of
+    # it. The real concentration is a field on the jar; this is only ever a duplicate.
+    name = re.sub(r"\s*\(Tier \d+\)", "", str(base or "")).strip()
+    words = sorted(set(SHAPE_WORDS.values()) | {"Preparation"}, key=len, reverse=True)
+    tail = ""
+    for word in words:
+        if name.lower().endswith(" " + word.lower()):
+            tail = name[-len(word):]
+            break
+    if not tail:
+        return name
+    stripped = name
+    changed = True
+    while changed:
+        changed = False
+        for word in words:
+            if stripped.lower().endswith(" " + word.lower()):
+                stripped = stripped[: -(len(word) + 1)].rstrip()
+                changed = True
+    return f"{stripped} {tail}".strip()
+
+
+def backfill_specs(d: dict) -> list[dict]:
+    """Rebuild a pre-`specs` jar's structured effects from what it was made of.
+
+    Every jar saved before the field existed carries only prose, so it cannot be sorted
+    into Effects and Drawbacks, cannot be drunk, thrown or painted on a blade, and shows
+    its poisons as benefits. All fifteen in the two live campaigns are in that state.
+
+    Rebuilt from `from_ingredients`, which every one of them does have, rather than parsed
+    back out of the rendered strings — re-reading "Belladonna: DC 15" to guess at the spec
+    that produced it would be a guess, and a wrong guess here is a poison that does the
+    wrong thing when somebody drinks it.
+
+    Healed on read rather than migrated on disk, which is how `Campaign.biome` treats the
+    same problem: a save that needs a migration step before it is playable is a save that
+    breaks the moment somebody opens an old one.
+    """
+    from . import consumables, ingredients as ing_mod
+
+    refs = list(d.get("from_ingredients") or [])
+    if not refs:
+        return []
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for ref in refs:
+        try:
+            source = ing_mod.get(base_ingredient_id(ref))
+        except KeyError:
+            continue
+        for spec in source.specs:
+            marked = {**spec, "from": spec.get("from") or source.name}
+            key = repr(sorted(marked.items(), key=lambda kv: kv[0]))
+            if key not in seen:
+                seen.add(key)
+                out.append(marked)
+
+    # A jar the old chain purified says so in its effects, and that sentence is the only
+    # record it has. Honouring it matters: rebuilding a Purified Draught's specs from its
+    # ingredients would otherwise hand back every poison the purifying took out.
+    if any(LEGACY_CLEANSED in str(line) for line in (d.get("effects") or [])):
+        out = [s for s in out if not consumables.hurts(s)]
+    return out
+
+
 def from_stock_dict(d: dict) -> Stock:
+    # `specs` absent is not the same as `specs` empty. Absent means the jar predates the
+    # field and its structure has to be rebuilt; empty means a jar whose every effect was
+    # prose, or one the chain purified down to nothing, and rebuilding *that* would hand
+    # a cleansed draught its poisons back. "Empty is not the same as absent" — CLAUDE.md,
+    # about a different form, for exactly this reason.
+    specs = d.get("specs")
+    if specs is None:
+        specs = backfill_specs(d)
+
     return Stock(
-        base=d.get("base", d.get("name", "Preparation")),
+        base=heal_name(d.get("base", d.get("name", "Preparation"))),
         concentration=int(d.get("concentration", 1)),
         tier=d.get("tier", "common"), potency=float(d.get("potency", 1.0)),
         count=int(d.get("count", 1)), craft=d.get("craft", "herbalism"),
         effects=list(d.get("effects", [])), drawbacks=list(d.get("drawbacks", [])),
-        specs=[dict(x) for x in (d.get("specs") or [])],
+        specs=[dict(x) for x in specs],
         from_ingredients=list(d.get("from_ingredients", [])),
     )
 

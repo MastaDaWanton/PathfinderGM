@@ -347,3 +347,85 @@ def test_an_unknown_way_of_using_it_is_refused(board):
         engine.run(engine.validate([
             {"op": "use_item", "actor": "pc",
              "params": {"item": "tincture#1", "how": "inhale"}}]))
+
+
+# --- jars saved before any of this existed ------------------------------------------------
+
+def test_a_jar_with_no_specs_key_is_rebuilt_from_what_it_was_made_of():
+    """Measured on the two live campaigns: all 15 crafted jars predate the `specs` field
+    entirely, so they carried only prose — they could not be sorted into Effects and
+    Drawbacks, could not be drunk, thrown or painted on a blade, and showed their poisons
+    as benefits. 14 of the 15 rebuild; the fifteenth is a Wolfsbane Tincture whose source
+    herb has no anchored numbers in its description at all, so empty is the honest
+    answer rather than a failure."""
+    jar = from_stock_dict({
+        "base": "Dragon Flower Tincture", "count": 1,
+        "from_ingredients": ["dragon-flower"],
+        "effects": ["Dragon Flower: 1d6 Constitution damage"],
+    })
+    assert jar.specs
+    assert any(s["type"] == "ability_damage" for s in jar.specs)
+
+
+def test_an_empty_specs_list_is_left_alone():
+    """Absent is not empty. Absent means the jar predates the field; empty means every
+    effect was prose, or the chain purified it down to nothing — and rebuilding *that*
+    would hand a cleansed draught its poisons back."""
+    jar = from_stock_dict({
+        "base": "Purified Draught", "count": 1, "specs": [],
+        "from_ingredients": ["dragon-flower"],
+    })
+    assert jar.specs == []
+
+
+def test_a_legacy_purified_jar_keeps_its_poisons_out():
+    """The old cleansing wrote one sentence and stripped nothing, so that sentence is the
+    only record those jars carry of having been purified. Rebuilding from the ingredients
+    without honouring it would give a Purified Draught of Mad Cap back its coma."""
+    jar = from_stock_dict({
+        "base": "Mad Cap Purified Draught", "count": 1,
+        "from_ingredients": ["mad-cap"],
+        "effects": ["Mad Cap: Causes unconscious",
+                    "Side effects and secondary toxicities removed by the chain."],
+    })
+    assert con.poisons(jar.specs) == []
+
+
+def test_a_crafted_input_resolves_back_to_its_lead_ingredient():
+    """`from_ingredients` mixes raw ids with the ids of crafted things that went back into
+    the pot. All four crafted references in the live campaigns resolve this way."""
+    from rules.crafting import base_ingredient_id
+
+    assert base_ingredient_id("mad-cap") == "mad-cap"
+    assert base_ingredient_id("belladonna-tea#1") == "belladonna"
+    assert base_ingredient_id(
+        "dragon-flower-tincture-tincture-tincture#1") == "dragon-flower"
+
+
+def test_a_name_that_compounded_in_a_save_is_healed_on_load():
+    """Real entries from a real campaign: ten stacked "Tincture"s, and one with a
+    concentration marker baked mid-string where it blocked the strip from reaching the
+    words in front of it."""
+    from rules.crafting import heal_name
+
+    assert heal_name("Dragon Flower Tincture Tincture Tincture") == \
+        "Dragon Flower Tincture"
+    assert heal_name(
+        "Mad Cap Tincture Tincture Infusion (Tier 2) Tincture") == "Mad Cap Tincture"
+    assert heal_name("Woundwart Tea") == "Woundwart Tea"
+
+
+def test_a_backfilled_jar_can_actually_be_used():
+    """The point of all of it. Before this a jar from an old save was a paragraph."""
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.add(instantiate("thug", scene=scene, name="the beast"))
+    pc.stock["old#1"] = from_stock_dict({
+        "base": "Dragon Flower Tincture", "count": 1,
+        "from_ingredients": ["dragon-flower"], "effects": [],
+    })
+    engine = Engine(scene, Dice(seed=9))
+    engine.run(engine.validate([
+        {"op": "use_item", "actor": "pc", "because": "she lobs the old vial",
+         "params": {"item": "old#1", "how": "throw", "to": "c1"}}]))
+    assert scene.actors["c1"].ability_damage.get("con")
