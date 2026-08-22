@@ -179,6 +179,26 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
                     "manoeuvre-for-a-wound",
                     f"player meant to wound, GM chose {man}; resolved as a plain attack",
                     intent.id))
+            else:
+                # The player named no manoeuvre at all. A manoeuvre is a specific
+                # tactical choice with its own costs, and choosing one unasked changes
+                # what the player's action *was* — so a plain attack is what they
+                # described and a plain attack is what they get.
+                #
+                # Measured: "I attack the beast" came back as an overrun on five
+                # consecutive attempts and the turn died on "attack: a overrun needs a
+                # target". The previous rule only dropped an unrequested manoeuvre when
+                # the player used an explicitly wounding verb — "stab", "cut", "kill" —
+                # and "attack" is not one of them, so the commonest sentence in the game
+                # fell through every branch.
+                #
+                # This only ever runs on the player's turn. `npc_turn` does not go
+                # through `judgement.review`, so a thug may still choose to grapple.
+                intent.params.pop("manoeuvre")
+                out.corrections.append(Finding(
+                    "manoeuvre-nobody-asked-for",
+                    f"player did not describe a manoeuvre, GM chose {man}; resolved as "
+                    f"a plain attack", intent.id))
 
         # There is deliberately no check on how many creatures a spawn creates. An
         # earlier version read the count out of the player's sentence and overrode the
@@ -223,6 +243,40 @@ _TEMPLATE_CUES = (
     (re.compile(r"\b(dog|hound|mastiff)\b", re.I), "guard dog"),
     (re.compile(r"\b(guildhand|clerk|servant|porter)\b", re.I), "guildhand"),
 )
+
+
+def fill_obvious_targets(raw_intents, scene) -> list:
+    """Give an attack the only creature it could possibly mean, before validation sees it.
+
+    Run *before* `engine.validate`, and that placement is the whole point. The engine
+    refuses an untargeted manoeuvre — correctly, it cannot guess who — with a `legality`
+    error, and legality errors regenerate rather than repair. Measured in live play: "I
+    attack the beast" produced an untargeted overrun and died on "attack: a overrun needs
+    a target" five attempts running, with a single hostile standing in front of the
+    character. Putting the repair in `review` did nothing at all, because `review` runs
+    after the validation that had already killed the turn.
+
+    Narrow on purpose. One candidate is not a guess; two is a choice, and choosing for the
+    player is worse than asking them.
+    """
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+
+    pc = scene.pc()
+    candidates = [r for r, a in scene.actors.items()
+                  if not a.is_pc and not a.has_condition("dead")
+                  and (pc is None or r != pc.ref)]
+    if len(candidates) != 1:
+        return raw_intents
+
+    out = []
+    for raw in raw_intents:
+        if (isinstance(raw, dict) and str(raw.get("op", "")).strip().lower() == "attack"
+                and not raw.get("target")
+                and not (raw.get("params") or {}).get("to")):
+            raw = dict(raw, target=candidates[0])
+        out.append(raw)
+    return out
 
 
 def repair_unknown_refs(raw_intents, player_text: str, scene):

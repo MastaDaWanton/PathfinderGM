@@ -96,11 +96,46 @@ def unquoted(text: str) -> str:
     return _QUOTED.sub(" ", text or "")
 
 
+# A turn shorter than this is not a scene. Measured: with the old prompt the model
+# returned a mean of 81 characters — "The air inside is stale, thick with the smell of
+# parchment and ink." — because the examples it was shown averaged 102. The floor is set
+# well under the length the examples now demonstrate (~600) so that a genuinely brief beat
+# is allowed and only a one-liner is caught.
+#
+# Length is used here and nowhere else, deliberately. It is the one thing about prose that
+# can be measured without lying about it: counting sensory words or scoring "vividness"
+# with a regex is exactly the kind of metric CLAUDE.md records as having given confident,
+# wrong answers about quality.
+MIN_SCENE_CHARS = 320
+
+
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
-           known_names: set[str] | None = None, earlier: list[str] | None = None) -> Review:
+           known_names: set[str] | None = None, earlier: list[str] | None = None,
+           min_chars: int = 0) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 5. A single line where a scene should be. Only asked of the turn narration —
+    #    `min_chars` is left at zero for the consequence call, which is meant to be two or
+    #    three sentences and would be made worse by padding.
+    if min_chars and len(text.strip()) < min_chars:
+        out.findings.append(Finding(
+            "too-short", f"{len(text.strip())} characters, under {min_chars}",
+            "This is one line where the player needs a scene. Take what just happened and "
+            "carry it on: put them somewhere they can see and hear and feel, let the "
+            "people and the place act back at them, and finish by giving them a real "
+            "choice to make. Do not summarise — write it.",
+        ))
+
+    # 6. The turn is not handed back. Every example ends by asking the player something,
+    #    and a turn that closes on a full stop tends to close the fiction with it.
+    if min_chars and "?" not in text:
+        out.findings.append(Finding(
+            "no-hand-back", "does not ask the player anything",
+            "End by handing the turn to the player with a real question about what they "
+            "do next.",
+        ))
 
     # 1. Lifted straight from the examples.
     if echo_index:

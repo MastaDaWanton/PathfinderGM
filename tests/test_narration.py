@@ -38,11 +38,19 @@ def test_a_sentence_lifted_from_the_examples_is_caught(echoes):
     assert r.findings[0].kind == "echoes-the-examples"
 
 
-def test_the_other_lifted_line_is_caught(echoes):
-    r = narration.review(
-        "The lamp on its chain sweeps the yard wall, pauses at the top of its arc, "
-        "and starts back.", echo_index=echoes)
-    assert not r.ok
+def test_every_example_would_be_caught_if_it_came_back(echoes):
+    """Taken from the examples rather than quoted, because the quoted version rotted the
+    moment the examples were rewritten: it named a sentence that no longer existed and
+    failed while the check itself was working perfectly.
+
+    Each example's own narration is by definition a verbatim lift, so feeding it back must
+    always be caught — whatever the examples are changed to next.
+    """
+    for example in prompts.EXAMPLES:
+        text = example["reply"]["narration"]
+        r = narration.review(text, echo_index=echoes)
+        assert not r.ok, f"an example came back unflagged: {text[:60]!r}"
+        assert any(f.kind == "echoes-the-examples" for f in r.findings)
 
 
 @pytest.mark.parametrize("text", [
@@ -148,3 +156,49 @@ def test_the_complaint_says_what_to_do(echoes):
     complaint = r.complaint()
     assert "own words" in complaint
     assert "'you'" in complaint
+
+
+# --- A line where a scene should be -------------------------------------------------------
+
+def test_a_one_liner_is_caught_when_a_scene_was_asked_for():
+    """Measured against the live model on the prompt this check arrived with: a mean
+    narration of 81 characters — "The air inside is stale, thick with the smell of
+    parchment and ink." — because the eight examples it was shown averaged 102. The prompt
+    was teaching the failure; this catches what is left of it."""
+    r = narration.review("The air inside is stale, thick with the smell of parchment "
+                         "and ink.", min_chars=narration.MIN_SCENE_CHARS)
+    assert not r.ok
+    assert r.findings[0].kind == "too-short"
+    assert "81 characters" in r.findings[0].detail or "characters" in r.findings[0].detail
+
+
+def test_length_is_only_asked_of_the_turn_narration():
+    """`min_chars` defaults to zero so the consequence call — which is meant to be two or
+    three sentences — is not padded into a scene."""
+    assert narration.review("The air inside is stale, thick with parchment.").ok
+
+
+def test_a_full_scene_passes():
+    scene = prompts.EXAMPLES[0]["reply"]["narration"]
+    r = narration.review(scene, min_chars=narration.MIN_SCENE_CHARS)
+    assert not any(f.kind in ("too-short", "no-hand-back") for f in r.findings)
+
+
+def test_a_turn_that_never_hands_back_is_caught():
+    """Every example ends by asking the player something. A turn that closes on a full
+    stop tends to close the fiction with it."""
+    text = ("You get the door open on a room full of ledgers and dust, and the clerk at "
+            "the far end does not look up from his work. Rain drums on the roof above "
+            "the stacks. The lamp beside him has burned down to a stub and nobody has "
+            "trimmed it, and the ink on his fingers is a week old at least. Somewhere "
+            "below, a door closes and a bolt goes across it.")
+    r = narration.review(text, min_chars=narration.MIN_SCENE_CHARS)
+    assert [f.kind for f in r.findings] == ["no-hand-back"]
+
+
+def test_the_complaint_tells_the_model_what_to_write_not_that_it_was_bad():
+    """A rejection the model cannot act on costs a whole regeneration."""
+    r = narration.review("The door opens.", min_chars=narration.MIN_SCENE_CHARS)
+    complaint = r.complaint().lower()
+    assert "see and hear" in complaint
+    assert "choice" in complaint

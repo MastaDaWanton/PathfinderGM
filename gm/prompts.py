@@ -20,16 +20,43 @@ import json
 
 from rules.tables import DC_BANDS, MANEUVERS
 
-# One example per shape the GM actually needs. Demonstration, not description.
+# One example per shape the GM actually needs. Demonstration, not description — and the
+# *length* is as much of the demonstration as the content.
+#
+# Measured, on the prompt these replaced. The eight narrations here used to average 102
+# characters and the longest was 158; against 3,863 characters of briefing that is an
+# instruction-to-demonstration ratio of 4.7 : 1. Live output came back at a mean of 81
+# characters — "The air inside is stale, thick with the smell of parchment and ink." — and
+# two of three turns were visibly paraphrasing these examples rather than the scene. The
+# model was not failing. It was copying what it had been shown, faithfully.
+#
+# That is the World Bible lesson in its natural habitat: instruction volume loses to
+# demonstration volume, and the fix is the ratio rather than the wording. Each narration
+# below now does four things — picks up what just happened, puts the player somewhere with
+# their senses, lets the world push back, and hands the turn over with a real question —
+# and the four are *shown* rather than listed, because a prompt that lists them produces
+# four dutiful paragraphs in that order every single time.
 EXAMPLES = [
     {
         "player": "I wait for the lamp to swing away, then go over the wall.",
         "reply": {
             "narration": (
-                "The lamp on its chain sweeps the yard wall, pauses at the top of its "
-                "arc, and starts back. Behind it a guildhand leans in the doorway, "
-                "half-asleep over a cup."
+                "You have been behind the water butt long enough that the rain has found "
+                "the seam of your collar and started working its way down. Above the yard "
+                "the watch-lamp swings out on its chain, drags a wedge of wet light across "
+                "the flagstones, and begins the slow pull back. In the doorway beneath it "
+                "a guildhand shifts his weight from one foot to the other and blows into "
+                "his cupped hands; the sap on his belt is loose on its cord, and he has "
+                "not looked up in some while. The wall is eight feet of slick masonry with "
+                "a hand's width of ledge along the top, and the light will be back across "
+                "it in about as long as it takes to breathe twice. The lamp is at the far "
+                "end of its arc now. What do you do?"
             ),
+            "suggestions": [
+                "Go now, while the lamp is away",
+                "Wait for the guildhand to turn his back as well",
+                "Follow the wall along and look for a darker stretch",
+            ],
             "intents": [{
                 "op": "check",
                 "actor": "pc",
@@ -44,20 +71,48 @@ EXAMPLES = [
             }],
         },
     },
+    # A turn with no mechanics is still a scene. This one used to be 119 characters and
+    # taught the model that conversation is where the prose stops.
     {
         "player": "I ask him who pays for the windcatchers.",
         "reply": {
             "narration": (
-                "He turns the cup in his hands. 'The guild pays,' he says, in the tone "
-                "of a man repeating something he was told to say.'"
+                "He does not answer straight away. He turns the cup in his hands instead, "
+                "twice around, and looks at the ring it has left on the counter. Somewhere "
+                "behind him a shutter is banging in the wind off the terraces and nobody "
+                "has got up to fix it. 'The guild pays,' he says at last, in the flat tone "
+                "of a man giving you a sentence he was handed. 'The guild has always paid.' "
+                "Then his eyes come up and hold yours a moment too long, and flick past "
+                "your shoulder to the door, and back. Whatever the true answer is, he has "
+                "just decided you are the kind of trouble that might make him say it. Do "
+                "you press him, or let it lie?"
             ),
+            "suggestions": [
+                "Press him on who really pays",
+                "Let it go and ask about something else",
+                "Look at whatever he glanced at by the door",
+            ],
             "intents": [{"op": "narrate_only", "because": "he is only talking"}],
         },
     },
     {
         "player": "I've had enough of this. I draw and go for him.",
         "reply": {
-            "narration": "The rapier comes free of its scabbard with a sound the whole yard hears.",
+            "narration": (
+                "The talking is over and the whole yard seems to know it a half-second "
+                "before he does. Your rapier comes out of the scabbard with a note that "
+                "carries off the wet walls, and the sound turns two heads at the far gate. "
+                "He gets a hand to his own hilt, but he is still half-turned towards the "
+                "man he was speaking to, weight on the wrong foot, and there is a crate at "
+                "his heel he has forgotten about. Rain runs off the lamp above and makes a "
+                "curtain of light between the two of you. He has not got the blade clear "
+                "yet. How do you come at him?"
+            ),
+            "suggestions": [
+                "Go straight in before he can set his feet",
+                "Drive him back over the crate",
+                "Give him one last chance to stand down",
+            ],
             "intents": [
                 {"op": "begin_encounter", "because": "she has drawn on him",
                  "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}},
@@ -72,7 +127,20 @@ EXAMPLES = [
     {
         "player": "I sweep his legs out from under him.",
         "reply": {
-            "narration": "She drops her weight and hooks a boot behind his ankle.",
+            "narration": (
+                "You drop your weight and go low, under the arc of his swing, close enough "
+                "to smell the wine on him. The flagstones are running with rain and his "
+                "boots have no more grip than yours do. Your leading foot hooks in behind "
+                "his ankle and takes his heel off the ground; he grabs for the doorframe, "
+                "misses it by the width of a hand, and his free arm comes round hard "
+                "towards the side of your head to take you down with him. Both of you are "
+                "committed now. What do you do with the moment?"
+            ),
+            "suggestions": [
+                "Put him down and step clear",
+                "Ride him to the ground and pin the arm",
+                "Twist away from the swing as he falls",
+            ],
             "intents": [{
                 "op": "attack", "actor": "pc", "target": "c1",
                 "because": "she wants him on the ground, not dead",
@@ -90,8 +158,22 @@ EXAMPLES = [
     {
         "player": "I've been followed. I put my back to the wall and draw.",
         "reply": {
-            "narration": "Two shapes detach from the dark at the mouth of the alley, "
-                         "unhurried, and one of them lets a sap swing loose on its cord.",
+            "narration": (
+                "You get the wall behind you — cold, and slick, and running with water from "
+                "the gutter above — and the footsteps that have been keeping your pace "
+                "since the bridge stop keeping it. Two shapes come away from the dark at "
+                "the mouth of the alley, unhurried, taking their time about it because "
+                "there is nowhere behind you for them to hurry towards. One of them lets a "
+                "sap swing loose on its cord and it knocks twice against his thigh as he "
+                "comes. The other says nothing at all, and fans wide to your off side "
+                "where the light does not reach. The alley is nine feet across and there is "
+                "a stack of empty barrels at your left shoulder. Which of them do you watch?"
+            ),
+            "suggestions": [
+                "Watch the quiet one going wide",
+                "Put the barrels between you and the wide man",
+                "Speak first — ask who sent them",
+            ],
             "intents": [
                 {"op": "spawn", "because": "the guild does not send one man",
                  "params": {"template": "thug", "count": 2}},
@@ -105,8 +187,22 @@ EXAMPLES = [
     {
         "player": "I break off and run for the lower quarter until nobody is following me.",
         "reply": {
-            "narration": "You go over the low wall at the end of the yard and keep going, "
-                         "and by the third turning there is nothing behind you but rain.",
+            "narration": (
+                "You break off mid-step, go over the low wall at the end of the yard, and "
+                "drop into the run of alleys behind the tannery where the ground goes down "
+                "towards the water. For a while there is shouting behind you, and then only "
+                "one voice, and then the slap of your own boots and the blood in your ears. "
+                "By the third turning the lower quarter has taken you in — washing strung "
+                "between the upper storeys, a dog barking itself hoarse behind a gate, the "
+                "river smell coming up strong. You stop under an archway with your hands on "
+                "your knees. Behind you there is nothing but rain on stone. You have lost "
+                "them, and the better part of an hour with them. Where do you go now?"
+            ),
+            "suggestions": [
+                "Find somewhere out of the wind and rest",
+                "Double back and see who came looking",
+                "Head for the water while it is still dark",
+            ],
             "intents": [
                 {"op": "end_encounter", "because": "she is away and they have lost her"},
                 {"op": "advance_time", "because": "the run across the quarter",
@@ -119,8 +215,22 @@ EXAMPLES = [
     {
         "player": "I find a doorway out of the wind and sleep until morning.",
         "reply": {
-            "narration": "The doorway is dry, more or less, and the city goes quiet in the "
-                         "hour before dawn.",
+            "narration": (
+                "The doorway is dry, more or less, and deep enough that the wind goes past "
+                "the mouth of it instead of into it. You get your back into the corner "
+                "where the two stones meet and your coat over you, and for a long time you "
+                "listen to the city doing what it does at night — a cart somewhere on the "
+                "cobbles, a woman laughing two streets over, the gutters emptying "
+                "themselves. The ache under your ribs settles into something you can sleep "
+                "through. When you open your eyes the sky over the roofline has gone the "
+                "colour of dirty milk and the bells are starting. It is morning, and "
+                "nobody found you in the night. What is the first thing you do?"
+            ),
+            "suggestions": [
+                "Check your gear before you move",
+                "Go straight to the counting house",
+                "Find something to eat and listen to the street",
+            ],
             "intents": [
                 {"op": "rest", "actor": "pc", "because": "a night out of the weather",
                  "params": {"kind": "night"}},
@@ -133,8 +243,21 @@ EXAMPLES = [
     {
         "player": "I dig the flask out of my coat and drink whatever is left in it.",
         "reply": {
-            "narration": "It goes down like a mouthful of hot coins, and the ache under "
-                         "your ribs loosens its grip.",
+            "narration": (
+                "The flask has been digging into your ribs since the yard, and there is "
+                "less in it than you hoped — a swallow and a half, gone warm from being "
+                "carried. It goes down like a mouthful of hot coins. For a moment nothing, "
+                "and then the grip under your ribs eases by degrees and the shivering in "
+                "your hands starts to settle. Out in the street somebody is going door to "
+                "door, three knocks each time, working their way along. The flask is empty "
+                "now and you are steadier than you were. Do you move, or wait and see who "
+                "is knocking?"
+            ),
+            "suggestions": [
+                "Move before they reach this door",
+                "Stay still and listen",
+                "Look for another way out of the room",
+            ],
             "intents": [
                 {"op": "heal", "actor": "pc", "because": "the last of the draught",
                  "params": {"amount": "1d8+1"}},
@@ -154,15 +277,23 @@ You then narrate the result you are handed.
 Your narration covers the wind-up only: what is true no matter how the dice land. Never
 the landing.
 
+Put the player in the place. Pick up from what just happened, give them something to see
+and hear and feel, let the world act back at them, and hand the turn over. A single line
+of scene-setting is not a turn — look at how long the examples are, and match them.
+
+End by giving the player a real choice to make, and offer two or three things they might
+do. They are suggestions, not a menu: the player may do anything they like.
+
 Write to the player as "you". Name only the people and places listed below; if you need
-someone new, describe them without a name. The examples show you the shape of a reply,
-not its words — never repeat a phrase from them.
+someone new, describe them without a name. The examples show you the shape and the length
+of a reply, not its words — never repeat a phrase from them.
 
 The player says only what their character does. Who else is present, what they do, and
 what the world does are yours to decide — decide them from the world below, and do not
 take the player's word for what is there.
 
-Reply with a JSON object: {"narration": "...", "intents": [...]}.
+Reply with a JSON object:
+{"narration": "...", "suggestions": ["...", "..."], "intents": [...]}.
 
 People and creatures are named by ref, never by name. The refs that exist are listed
 below; there are no others. If you want someone new in the scene, use the spawn op.
@@ -380,8 +511,16 @@ def repair_messages(sentence: str, why: str) -> list[dict]:
     ]
 
 
+# "Keep everything else — the events, the voice, the length" was right for every finding
+# that existed when it was written, and became wrong the moment one of the findings *was*
+# the length: it told the model to hold a one-line narration at one line while being asked
+# to turn it into a scene.
 NARRATION_REPAIR_BRIEFING = """Rewrite the passage you are given so that it no longer has
-the problem described. Keep everything else — the events, the voice, the length.
+the problem described. Keep the events and the voice. Change the length only if the
+problem is about length.
+
+You are the Game Master, writing to the player as "you". Do not say how any roll turned
+out.
 
 Reply with a JSON object: {"narration": "..."}."""
 

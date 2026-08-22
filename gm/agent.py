@@ -32,6 +32,9 @@ class Attempt:
 class TurnPlan:
     narration: str
     intents: list[Intent]
+    # Two or three things the player might do. Offered, never enforced: the engine does
+    # not read them and the player may type anything at all.
+    suggestions: list[str] = field(default_factory=list)
     attempts: list[Attempt] = field(default_factory=list)
     repairs: list[str] = field(default_factory=list)
     rejections: list[str] = field(default_factory=list)
@@ -89,7 +92,13 @@ class GMAgent:
                 # these are hard rejections that regenerate — but the rejection text
                 # names the legal refs and vocabularies, which turns a blind retry into
                 # a repair.
-                intents = self.engine.validate(data.get("intents"))
+                #
+                # The target is filled in *before* validation, because the engine refuses
+                # an untargeted attack with a `legality` error and legality errors
+                # regenerate rather than repair: five attempts, then the turn is gone.
+                intents = self.engine.validate(
+                    judgement.fill_obvious_targets(data.get("intents"),
+                                                   self.engine.scene))
             except IntentError as exc:
                 # The GM naming people it wanted to exist — "attack thug1" — is the one
                 # rejection it will not learn from, hint and example notwithstanding. It
@@ -148,10 +157,13 @@ class GMAgent:
             narration, claim_repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
             narration, prose_repairs, prose_attempts = self.polish(
-                narration, earlier=recent_narration or [])
+                narration, earlier=recent_narration or [],
+                min_chars=narration_mod.MIN_SCENE_CHARS)
             attempts.extend(prose_attempts)
 
-            return TurnPlan(narration=narration, intents=intents, attempts=attempts,
+            return TurnPlan(narration=narration, intents=intents,
+                            suggestions=_suggestions(data),
+                            attempts=attempts,
                             repairs=repairs + claim_repairs + prose_repairs,
                             rejections=rejections)
 
@@ -234,7 +246,8 @@ class GMAgent:
             pass
         return {n for n in names if n}
 
-    def polish(self, text: str, earlier: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+    def polish(self, text: str, earlier: list[str] | None = None,
+               min_chars: int = 0) -> tuple[str, list[str], list[Attempt]]:
         """One targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -243,7 +256,7 @@ class GMAgent:
         """
         review = narration_mod.review(
             text, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier,
+            known_names=self._known_names(), earlier=earlier, min_chars=min_chars,
         )
         if review.ok:
             return text, [], []
@@ -251,7 +264,7 @@ class GMAgent:
         try:
             reply = client.chat(
                 prompts.narration_repair_messages(text, review.complaint()),
-                self.model, self.host, as_json=True, temperature=0.6, num_predict=320,
+                self.model, self.host, as_json=True, temperature=0.6, num_predict=900,
             )
             attempt = Attempt("polish", reply.seconds, reply.model, reply.text,
                               note="; ".join(review.as_log()))
@@ -262,7 +275,7 @@ class GMAgent:
 
         after = narration_mod.review(
             fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier,
+            known_names=self._known_names(), earlier=earlier, min_chars=min_chars,
         )
         if fixed and len(after.findings) < len(review.findings):
             return fixed, review.as_log(), [attempt]
@@ -329,6 +342,28 @@ class GMAgent:
         )
         text = judgement.name_refs(reply.text.strip(), self.engine.scene)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
+
+
+def _suggestions(data: dict, limit: int = 3) -> list[str]:
+    """The two or three things the GM offers the player.
+
+    Tolerant, because this is the one field nothing depends on: a model that returns a
+    string instead of a list, or eight instead of three, or nothing at all, should cost
+    the turn nothing. Anything unusable becomes an empty list and the page simply does not
+    draw the row.
+    """
+    raw = data.get("suggestions")
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        text = " ".join(str(item).split()).strip(" -•*")
+        # Long enough to be an action, short enough to sit on a button.
+        if 3 <= len(text) <= 120 and text not in out:
+            out.append(text)
+    return out[:limit]
 
 
 def _with_correction(base: list[dict], bad_reply: str, problem: str) -> list[dict]:

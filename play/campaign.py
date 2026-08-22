@@ -76,6 +76,10 @@ class Campaign:
     # Per campaign rather than per character: a recipe is knowledge about the world's
     # ingredients, and it should outlive the herbalist who wrote it down.
     recipes: list[dict] = field(default_factory=list)
+    # The two or three things the GM last offered the player. Saved so that closing the
+    # app and coming back does not drop the prompts they were looking at. Replaced every
+    # turn rather than accumulating — they are a live offer, not a record of one.
+    suggestions: list[str] = field(default_factory=list)
 
     @property
     def world(self):
@@ -154,6 +158,7 @@ class Campaign:
             "last_intent_signature": self.last_intent_signature,
             "character_id": self.character_id,
             "recipes": self.recipes,
+            "suggestions": self.suggestions,
             "ended": self.ended,
         }
         p = self.path()
@@ -209,6 +214,7 @@ class Campaign:
                                    data.get("last_intent_signature", [])],
             character_id=data.get("character_id", ""),
             recipes=data.get("recipes", []),
+            suggestions=list(data.get("suggestions") or []),
             ended=data.get("ended", ""),
         )
 

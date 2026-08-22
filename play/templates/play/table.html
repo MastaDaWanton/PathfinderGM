@@ -184,6 +184,14 @@
   .verdict.maybe { color: #b08a4a; }
   .prereq { display: block; color: var(--dim); margin-left: 0; }
   .why a { color: var(--gold); }
+  /* What the GM offered. Sits above the input, and clicking fills the box rather than
+     sending — a nudge, not the only three things you may do. */
+  #suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  #suggestions:empty { display: none; }
+  .sugg { padding: 5px 11px; border-radius: 12px; cursor: pointer;
+          border: 1px solid var(--gold-dim); background: #1a1610; color: var(--gold);
+          font: inherit; font-size: 13px; text-align: left; }
+  .sugg:hover { background: #241d15; color: var(--accent); }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -500,6 +508,7 @@
   <div id="busy">the GM is thinking…</div>
   <div id="err"></div>
   <footer>
+    <div id="suggestions"></div>
     <form id="sayform" autocomplete="off">
       <input type="text" id="input" placeholder="What do you do?" autofocus>
       <button type="submit" id="send">Say</button>
@@ -755,6 +764,7 @@ function render(s) {
       </div>`).join("")}` : "";
 
   renderMap(s);
+  renderSuggestions(s);
 
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${a.ref}</small></span>
@@ -765,6 +775,29 @@ function render(s) {
 
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
 }
+
+// --- what the GM offered -----------------------------------------------------------
+//
+// Suggestions, not a menu. Clicking one puts the words in the box rather than sending
+// them, so the player can change their mind or add to it — a chip that fired the turn
+// straight off would quietly turn a nudge into the only three things you can do.
+function renderSuggestions(s) {
+  const box = $("#suggestions");
+  const offered = (s.suggestions || []);
+  // Hidden entirely while a roll is pending: the only thing to do then is answer it.
+  if (!offered.length || s.awaiting) { box.innerHTML = ""; return; }
+  box.innerHTML = offered.map(t =>
+    `<button type="button" class="sugg">${esc(t)}</button>`).join("");
+}
+
+document.addEventListener("click", e => {
+  const chip = e.target.closest(".sugg");
+  if (!chip) return;
+  const input = $("#input");
+  input.value = chip.textContent;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+});
 
 // --- the map -------------------------------------------------------------------------
 //

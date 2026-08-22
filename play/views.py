@@ -64,6 +64,7 @@ def _state(c) -> dict:
     pc = c.scene.pc()
     return {
         "transcript": c.transcript,
+        "suggestions": list(getattr(c, "suggestions", []) or []),
         "awaiting": c.scene.awaiting,
         "pc": pc.summary() if pc else None,
         "scene": {
@@ -564,6 +565,10 @@ def _advance(request, c, agent, narration, plan, player_input):
         )
 
     c.transcript.append({"who": "gm", "text": narration, "kind": "setup"})
+    # What the GM offered this turn. Held on the campaign rather than in the
+    # transcript because it is a live prompt, not a thing that was said — and it
+    # is replaced every turn rather than accumulating.
+    c.suggestions = list(getattr(plan, "suggestions", []) or [])
     c.history.append({"role": "user", "content": player_input})
     c.history.append({"role": "assistant", "content": json.dumps(
         {"narration": narration, "intents": [i.as_dict() for i in plan.intents]}

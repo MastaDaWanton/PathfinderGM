@@ -46,6 +46,14 @@ SKILL_ALIASES: dict[str, str] = {
     "history": "knowledge (history)", "nature": "knowledge (nature)",
     "religion": "knowledge (religion)", "streetwise": "knowledge (local)",
     "medicine": "heal", "animal handling": "handle animal",
+    # Measured live: "persuade" lost a turn, and `_suggest` proposed "ride" for it.
+    "persuade": "diplomacy", "persuading": "diplomacy", "convince": "diplomacy",
+    "negotiate": "diplomacy", "haggle": "diplomacy", "barter": "diplomacy",
+    "intimidation": "intimidate", "threaten": "intimidate", "demoralize": "intimidate",
+    "demoralise": "intimidate", "lie": "bluff", "feint": "bluff",
+    "sneaking around": "stealth", "climbing": "climb", "swimming": "swim",
+    "perceive": "perception", "scan": "perception", "examine": "perception",
+    "recall knowledge": "knowledge (local)",
 }
 
 
@@ -327,10 +335,64 @@ class Intent:
 
 # --- Check 1: schema ------------------------------------------------------------------
 
+# Words the GM puts in the manoeuvre slot that are part of attacking rather than a
+# manoeuvre of their own. Dropped rather than refused.
+NOT_A_MANOEUVRE = {"draw", "swing", "lunge", "strike", "slash", "stab", "thrust",
+                   "attack", "charge", "melee"}
+
+# The one word a model reaches for when it means "no circumstance applies", which is
+# exactly the case the enum has no room for.
+NO_CIRCUMSTANCE = {"neutral", "none", "normal", "average", "standard", "no"}
+
+# Ops the GM invents for a turn that has no mechanics in it. Every one of these was a
+# lost turn: the model had decided nothing needed rolling and then said so in a word the
+# protocol does not have.
+OP_ALIASES = {
+    "begin_conversation": "narrate_only", "conversation": "narrate_only",
+    "talk": "narrate_only", "speak": "narrate_only", "dialogue": "narrate_only",
+    "describe": "narrate_only", "narrate": "narrate_only", "narration": "narrate_only",
+    "roleplay": "narrate_only", "none": "narrate_only", "no_action": "narrate_only",
+    "wait": "narrate_only", "observe": "narrate_only",
+    "end_combat": "end_encounter", "end_fight": "end_encounter",
+    "start_encounter": "begin_encounter", "begin_combat": "begin_encounter",
+    "skill_check": "check", "ability_check": "check", "saving_throw": "save",
+}
+
+
+def normalise_raw(raw: dict) -> dict:
+    """Repairs that change what an intent *is*, applied before it is parsed.
+
+    The same shape as `judgement.repair_unknown_refs`: read what the GM plainly meant and
+    fix it in code, rather than spending a whole regeneration teaching it a word. Every
+    case here was measured on a live turn that died after five attempts.
+    """
+    if not isinstance(raw, dict):
+        return raw
+
+    op = str(raw.get("op", "")).strip().lower()
+    if op in OP_ALIASES:
+        raw = dict(raw, op=OP_ALIASES[op])
+        op = raw["op"]
+
+    # A skill in the manoeuvre slot: "manoeuvre": "intimidate" is the GM reaching for
+    # demoralising somebody, which in 1e is a skill check and not a manoeuvre at all.
+    if op == "attack":
+        params = raw.get("params") or {}
+        man = str(params.get("manoeuvre", "")).strip().lower()
+        if man and man not in MANEUVERS and man not in MANEUVER_ALIASES:
+            skill = normalise_skill(man)
+            if skill:
+                kept = {k: v for k, v in params.items()
+                        if k not in ("manoeuvre", "full_attack", "weapon", "power_attack")}
+                raw = dict(raw, op="check", params={**kept, "skill": skill})
+    return raw
+
+
 def parse(raw: dict, index: int = 0) -> Intent:
     if not isinstance(raw, dict):
         raise IntentError(f"intent {index} is not an object", "schema", index)
 
+    raw = normalise_raw(raw)
     op = str(raw.get("op", "")).strip().lower()
     if op not in OPS:
         raise IntentError(
@@ -481,14 +543,22 @@ def _check_params(intent: Intent, index: int) -> None:
         if man:
             key = str(man).strip().lower()
             key = MANEUVER_ALIASES.get(key, key)
-            if key not in MANEUVERS:
+            # "draw", "swing", "lunge" — things that are simply part of making an attack
+            # rather than manoeuvres. Measured live: `"manoeuvre": "draw"` was the first
+            # of five failed attempts on a turn that then died. The param is dropped; a
+            # manoeuvre that is really a *skill* is rewritten a step earlier, in
+            # `normalise_raw`.
+            if key in NOT_A_MANOEUVRE:
+                p.pop("manoeuvre", None)
+            elif key not in MANEUVERS:
                 raise IntentError(
                     f"attack: {man!r} is not a combat manoeuvre."
                     + _suggest(key, MANEUVERS)
                     + f" The manoeuvres are: {', '.join(sorted(MANEUVERS))}.",
                     "schema", index,
                 )
-            p["manoeuvre"] = key
+            else:
+                p["manoeuvre"] = key
 
     elif op == "move":
         zone = str(p["zone"]).strip().lower()
@@ -584,12 +654,20 @@ def _check_params(intent: Intent, index: int) -> None:
             circ = {"value": circ}
             p["circumstance"] = circ
         val = str(circ.get("value", "")).strip().lower()
-        if val not in CIRCUMSTANCE:
+        # "neutral" is the model saying there is no circumstance, in the one word the
+        # enum does not contain. Rejecting it cost a whole regeneration for a param that
+        # means "leave this out" — measured live, it was the first of five failed attempts
+        # on a turn that then died. Dropped rather than refused.
+        if val in NO_CIRCUMSTANCE:
+            p.pop("circumstance", None)
+        elif val not in CIRCUMSTANCE:
             raise IntentError(
                 f"{op}: circumstance must be one of {sorted(CIRCUMSTANCE)}, got "
-                f"{val!r}", "schema", index,
+                f"{val!r}. Leave it out entirely when nothing helps or hinders.",
+                "schema", index,
             )
-        circ["value"] = val
+        else:
+            circ["value"] = val
 
 
 def parse_all(raw_intents: list) -> list[Intent]:
