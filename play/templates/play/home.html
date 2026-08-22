@@ -323,7 +323,7 @@
      stop so a mote reads as a glowing coal rather than a pixel. The sway is
      still baked into the rise so the loop stays seamless, and each layer
      still flickers on its own prime-numbered clock. */
-  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 56;
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%,
                                                 transparent 96%);
@@ -471,16 +471,21 @@
     content: ""; position: absolute; inset: 0;
     background: radial-gradient(circle,
       rgba(255, 200, 110, .22), rgba(240, 175, 85, .08) 40%, transparent 65%);
-    -webkit-mask-image: repeating-radial-gradient(circle at 30% 30%,
+    /* The mask is never sized and never panned. The first version tiled it at
+       190px and slid the tiles, and the hard edge between repetitions swept
+       through the pool as a straight-sided box of brighter light. An unsized
+       gradient mask fills the layer seamlessly; the movement comes from
+       rotating the layer itself, which swings the off-centre blotches around
+       the flame — motion with no seam anywhere to expose. */
+    -webkit-mask-image: repeating-radial-gradient(circle at 32% 30%,
       #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
-    mask-image: repeating-radial-gradient(circle at 30% 30%,
+    mask-image: repeating-radial-gradient(circle at 32% 30%,
       #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
-    -webkit-mask-size: 190px 190px; mask-size: 190px 190px;
-    animation: dapplepan 7.3s ease-in-out infinite alternate;
+    animation: dappleswing 8.6s ease-in-out infinite alternate;
   }
-  @keyframes dapplepan {
-    from { -webkit-mask-position: 0 0; mask-position: 0 0; }
-    to   { -webkit-mask-position: 46px 34px; mask-position: 46px 34px; }
+  @keyframes dappleswing {
+    from { transform: rotate(-16deg) scale(1.04); }
+    to   { transform: rotate(19deg) scale(.98); }
   }
   @media (hover: none) { #cursorlight { display: none; } }
 
