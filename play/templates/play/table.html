@@ -6,11 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pathfinder GM — Pangrella</title>
 <style>
-  /* Cinzel if it has been installed (see play/static/fonts/README.md), Palatino if not.
-     `local()` first so a system install is used without a copy in the repo, and the
-     whole stack degrades quietly — the sheet is designed to look right either way,
-     because a font that has to be fetched would break the moment the machine is
-     offline, which is the one condition this app exists to survive. */
+  /* ==========================================================================
+     The grimoire. One design system, stated once:
+
+     - The window is carved dungeon stone, lit from below by candlelight and
+       from nowhere by a low blood-red ambience that only wakes when something
+       is wrong.
+     - The transcript is the book: a column of aged, darkened parchment with an
+       illuminated capital opening each of the GM's passages, and new passages
+       arriving as ink bleeding in rather than appearing.
+     - The sidebar and every overlay are obsidian glass: translucent, blurred,
+       edged in wrought iron and a gold hairline.
+     - Everything interactive is warm to the touch — an ember follows the
+       cursor inside buttons, runes glow when a field takes focus — and all of
+       it stands down under prefers-reduced-motion.
+
+     No asset is fetched. The fonts degrade to Palatino (see fonts/README.md),
+     the textures are gradients, the ornaments are inline SVG — the app has to
+     look right on a machine that has never been online, because that machine
+     is the point of it.
+     ========================================================================== */
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
     src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
@@ -21,74 +36,174 @@
   }
 
   :root {
-    /* One place to change the display face for the whole app. */
     --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua",
                Georgia, serif;
-    /* Cinzel is a display face — carved capitals, unreadable in running text.
-       Prose and values stay on a book serif. */
     --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  }
-  :root {
-    --bg: #0f0d0b; --panel: #17130f; --edge: #3a2f22; --ink: #e6dcc6;
-    --dim: #8e816a; --accent: #c9a86a; --player: #8fb0c8; --alarm: #a8443a;
-    --gold: #d9c08a;         /* headings and rules */
-    --gold-dim: #7a6543;     /* hairlines */
-    --blood: #6e1f1f;        /* the banner */
-    --sunk: #0c0a08;         /* inset fields */
+
+    /* Stone, iron, parchment. */
+    --bg: #0d0b09; --panel: #161210; --edge: #3a2f22; --sunk: #0b0908;
+    --ink: #e8ddc4; --dim: #93866e; --ash: #6d675e;
+    /* Candlelight. */
+    --accent: #cfa964; --gold: #ddc48e; --gold-dim: #7d6845;
+    --candle: #f0c070; --ember: 255, 176, 84;
+    /* Blood magic. */
+    --blood: #6e1f1f; --bloodglow: 168, 44, 40; --alarm: #b0483c;
+    --player: #8fb0c8;
+    /* Obsidian glass. */
+    --glass: rgba(16, 12, 9, .66); --glass-edge: rgba(221, 196, 142, .14);
   }
   * { box-sizing: border-box; }
+
+  /* Thin wrought-iron scrollbars, everywhere. */
+  * { scrollbar-width: thin; scrollbar-color: #3a2f22 transparent; }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(#3a2f22, #2a2118); border-radius: 4px;
+    border: 2px solid transparent; background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+
   body {
     margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
     display: grid; grid-template-columns: 1fr 350px; height: 100vh;
-    /* The window is the frame; the panes inside it scroll. Without this the page itself
-       scrolls once the transcript is long, and reading the newest line means scrolling
-       the character sheet off the top of the screen. */
-    overflow: hidden;
+    overflow: hidden; position: relative;
+    /* Carved stone: big soft shadow-form first, then two interfering strata of
+       chisel marks, then mortar courses. All gradient, nothing fetched. */
     background:
-      radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
-      repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
+      radial-gradient(130% 100% at 42% -10%, #191410 0%, #0d0b09 52%, #060504 100%),
+      repeating-linear-gradient(58deg,  rgba(255,240,200,.014) 0 2px, transparent 2px 5px),
+      repeating-linear-gradient(-31deg, rgba(0,0,0,.35) 0 3px, transparent 3px 8px),
+      repeating-linear-gradient(0deg,   transparent 0 118px, rgba(0,0,0,.28) 118px 121px),
+      repeating-linear-gradient(90deg,  transparent 0 174px, rgba(0,0,0,.22) 174px 177px);
   }
-  /* `min-height: 0` on both columns is what actually makes the scrolling work, and it is
-     invisible by its absence: a grid item defaults to `min-height: auto`, which refuses
-     to shrink below its content. Measured with a 26-line transcript — the body was a
-     correct 1222px while main and aside were both 2672px, so `overflow-y: auto` on the
-     panes inside them had nothing to overflow and the whole document scrolled instead. */
+  /* The candle. A fixed pool of warm light rising from the writing desk — the
+     input bar — that breathes very slowly. Light animates on opacity only. */
+  body::before {
+    content: ""; position: fixed; z-index: 0; pointer-events: none;
+    left: -10%; right: 20%; bottom: -30%; height: 90%;
+    background: radial-gradient(55% 60% at 38% 100%,
+                rgba(var(--ember), .10), rgba(var(--ember), .035) 45%, transparent 72%);
+    animation: candle 7s ease-in-out infinite;
+  }
+  /* And the vignette: the edges of the room fall away into the dark. */
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 5; pointer-events: none;
+    box-shadow: inset 0 0 190px 40px rgba(0, 0, 0, .78);
+  }
+  @keyframes candle {
+    0%, 100% { opacity: .75; } 38% { opacity: 1; } 61% { opacity: .82; }
+  }
+
   main {
     display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    position: relative; z-index: 1;
+  }
+
+  /* --- The book ----------------------------------------------------------- */
+  /* The transcript is a column of aged parchment: barely lighter than the
+     stone, warm, edged with a deckled shadow and a double hairline. It scrolls
+     as one long page — the scroll *is* turning the book. */
+  #story {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 44px 48px 34px;
+  }
+  #story::before {
+    /* The page under the ink, fixed to the pane rather than the text so it
+       does not scroll away: soft parchment light down the reading column. */
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 100%;
+    pointer-events: none;
+    background: radial-gradient(72% 90% at 50% 30%,
+                rgba(240, 214, 158, .045), transparent 75%);
+  }
+  .beat {
+    margin: 0 auto 24px; max-width: 64ch; white-space: pre-wrap;
     position: relative;
   }
-  #story { flex: 1; min-height: 0; overflow-y: auto; padding: 40px 48px; }
-  .beat { margin: 0 0 22px; max-width: 64ch; white-space: pre-wrap; }
+  /* Ink bleeding in. Only beats marked fresh animate — render() rebuilds the
+     whole transcript each state, and without the gate every line re-bled on
+     every turn. The JS marks the tail. */
+  .beat.fresh { animation: inkbleed .9s cubic-bezier(.22, .8, .36, 1) both; }
+  @keyframes inkbleed {
+    from { opacity: 0; filter: blur(7px); transform: translateY(9px); }
+    60%  { filter: blur(1.5px); }
+    to   { opacity: 1; filter: blur(0); transform: none; }
+  }
   .beat.player { color: var(--player); font-style: italic; }
   .beat.player::before { content: "❧ "; opacity: .55; font-style: normal; }
   .beat.consequence { color: var(--ink); }
-  .beat.setup { color: #cfc4ab; }
+  .beat.setup { color: #d2c7ad; }
+  /* The illuminated capital: each of the GM's scene passages opens the way a
+     grimoire page does. Consequences stay plain — they are the engine's voice. */
+  .beat.setup::first-letter {
+    font-family: var(--display); font-size: 2.55em; line-height: .78;
+    padding: .04em .09em 0 0; float: left; color: var(--candle);
+    text-shadow: 0 0 18px rgba(var(--ember), .35), 0 2px 6px rgba(0,0,0,.8);
+  }
+
+  /* --- The writing desk --------------------------------------------------- */
   footer {
-    border-top: 1px solid var(--gold-dim); padding: 18px 48px 26px;
-    box-shadow: 0 -1px 0 rgba(217,192,138,.08);
+    position: relative; z-index: 2;
+    border-top: 1px solid var(--gold-dim); padding: 16px 48px 24px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    box-shadow: 0 -1px 0 rgba(221,196,142,.10), 0 -18px 44px rgba(0,0,0,.45);
   }
   form { display: flex; gap: 10px; }
   input[type=text] {
     flex: 1; color: var(--ink); padding: 13px 16px; font: inherit; border-radius: 2px;
-    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a;
+    background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
     box-shadow: inset 0 2px 6px rgba(0,0,0,.6);
+    transition: border-color .25s ease, box-shadow .45s ease;
   }
-  input[type=text]:focus { outline: none; border-color: var(--accent); }
-  input[type=text]::placeholder { color: #574d3c; font-style: italic; }
+  /* The rune wakes: focus is a slow gold pulse, not a browser outline. */
+  input[type=text]:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.6), 0 0 0 1px rgba(var(--ember), .25),
+                0 0 22px rgba(var(--ember), .12);
+    animation: runewake 2.6s ease-in-out infinite;
+  }
+  @keyframes runewake {
+    50% { box-shadow: inset 0 2px 6px rgba(0,0,0,.6), 0 0 0 1px rgba(var(--ember), .4),
+                      0 0 30px rgba(var(--ember), .2); }
+  }
+  input[type=text]::placeholder { color: #5d5240; font-style: italic; }
+
+  /* Every button is cold iron with a gold face, and an ember that follows the
+     cursor inside it — the JS feeds --mx/--my from one delegated listener. */
   button {
-    background: linear-gradient(#2b2318, #1a150e); border: 1px solid var(--gold-dim);
+    background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
     color: var(--gold); padding: 12px 24px; border-radius: 2px; cursor: pointer;
     font: 400 15px/1 var(--display); letter-spacing: .16em; font-variant: small-caps;
+    position: relative; overflow: hidden;
+    transition: color .2s ease, border-color .2s ease, transform .16s ease,
+                box-shadow .25s ease;
   }
-  button:hover:not(:disabled) { color: #f0e2bd; border-color: var(--accent); }
+  button::after, .sugg::after, .pick::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(130px circle at var(--mx, 50%) var(--my, 50%),
+                rgba(var(--ember), .17), transparent 65%);
+    transition: opacity .3s ease;
+  }
+  button:hover::after, .sugg:hover::after, .pick:hover::after { opacity: 1; }
+  button:hover:not(:disabled) {
+    color: #f4e6c0; border-color: var(--accent); transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 14px rgba(var(--ember), .10);
+  }
+  button:active:not(:disabled) { transform: translateY(0); }
   button:disabled { opacity: .35; cursor: default; }
   button.ghost { background: transparent; color: var(--dim); }
+  button:focus-visible, .sugg:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(var(--ember), .35);
+  }
 
+  /* --- The obsidian pane -------------------------------------------------- */
   aside {
+    position: relative; z-index: 2;
     border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
     min-height: 0; font: 14px/1.55 var(--body);
-    background: linear-gradient(#16120e, #100d0a);
-    box-shadow: inset 1px 0 0 rgba(217,192,138,.08);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
   }
   aside h2 {
     color: var(--gold); font: 400 16px/1 var(--display); letter-spacing: .13em;
@@ -97,59 +212,68 @@
   }
   aside h2:first-child { margin-top: 0; }
   .name { color: var(--gold); font: 400 24px/1.15 var(--display);
-          letter-spacing: .04em; font-variant: small-caps; }
+          letter-spacing: .04em; font-variant: small-caps;
+          text-shadow: 0 2px 10px rgba(0,0,0,.85); }
   .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
-  /* Where the party is standing. Load-bearing rather than decorative: it decides what
-     the forage tables can offer, so the player has to be able to see it. */
   .biome {
     margin: -6px 0 12px; padding: 5px 9px; border-radius: 2px; cursor: default;
-    background: rgba(111,207,143,.07); border: 1px solid #2f5f42; color: #a9d9bb;
+    background: rgba(111,207,143,.06); border: 1px solid #2f5f42; color: #a9d9bb;
     font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: .07em;
     text-transform: uppercase;
   }
+
+  /* Life as candlelight: the bar burns, and it gutters low. */
   .bar { height: 7px; background: #221c14; border-radius: 2px; overflow: hidden;
          margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7);
          display: flex; }
-  .bar > i { display: block; height: 100%;
-             background: linear-gradient(90deg, #8a6f3e, var(--accent)); }
-  /* Temporary hit points sit on top of the maximum rather than inside it, so they get
-     their own segment past the end of the real bar instead of colouring part of it. */
-  .bar > i.temp { background: linear-gradient(90deg, #4a6b7a, #7fb0c4); }
+  .bar > i { display: block; height: 100%; position: relative;
+             background: linear-gradient(90deg, #8a6f3e, var(--accent), #e8c47c);
+             transition: width .8s cubic-bezier(.3, .9, .3, 1);
+             box-shadow: 0 0 10px rgba(var(--ember), .25); }
+  .bar > i.temp { background: linear-gradient(90deg, #4a6b7a, #7fb0c4);
+                  box-shadow: none; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  /* A damaged score is marked rather than merely lowered, so the number has a reason. */
-  .cell.hurt { border-color: #6d3a32; }
-  .cell.hurt > em { display: block; color: #c4736a; font: italic 11px/1.3 var(--body); }
   .cell {
     background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
     border-radius: 2px; padding: 7px 9px; text-align: center;
+    transition: border-color .25s ease, box-shadow .25s ease;
   }
+  .cell:hover { border-color: #43372a; box-shadow: 0 0 12px rgba(var(--ember), .06); }
+  .cell.hurt { border-color: #6d3a32;
+               box-shadow: inset 0 0 12px rgba(var(--bloodglow), .12); }
+  .cell.hurt > em { display: block; color: #c4736a; font: italic 11px/1.3 var(--body); }
   .cell b { display: block; color: var(--dim); font: 400 12px/1.3 var(--display);
             letter-spacing: .1em; font-variant: small-caps; }
   .cell span { color: var(--gold); font: 400 19px/1.35 var(--display); }
   .row { display: flex; justify-content: space-between; padding: 3px 0; }
   .row span:last-child { color: var(--accent); font-variant-numeric: tabular-nums; }
-  /* Non-lethal at or past its threshold: the next point is staggered or unconscious, and
-     that is worth seeing before the roll rather than after it. */
-  .row.danger span:last-child { color: #d9534f; }
-  /* "not yet" and "not any more" are different refusals and lead to different next
-     moves, so a pool waiting on a cooldown says how long rather than reading as empty. */
+  /* Blood magic wakes only when something is wrong. */
+  .row.danger span:last-child {
+    color: #d9534f; text-shadow: 0 0 12px rgba(var(--bloodglow), .5);
+    animation: bloodpulse 2.2s ease-in-out infinite;
+  }
+  @keyframes bloodpulse {
+    50% { text-shadow: 0 0 20px rgba(var(--bloodglow), .85); }
+  }
   .row small.cd { color: var(--dim); }
-  /* The map. Terrain is painted, the rules are hairlines, tokens sit on top. */
-  #map { width: 100%; height: auto; display: block; background: #14120f;
-         border: 1px solid #241d15; border-radius: 3px; }
+
+  /* The map: a stone relief under glass. */
+  #map { width: 100%; height: auto; display: block; background: #14110e;
+         border: 1px solid #241d15; border-radius: 3px;
+         box-shadow: inset 0 0 24px rgba(0,0,0,.55); }
   #map .rule { stroke: #241d15; stroke-width: .5; }
   #map .blocked { fill: #3a3128; }
   #map .difficult { fill: #2a2416; }
   #map .obscuring { fill: #23262b; }
-  /* Where the character can actually reach this turn — the engine's answer, painted. */
   #map .reach { fill: var(--gold); opacity: .12; }
-  #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1; }
+  #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1;
+                transition: cx .4s ease, cy .4s ease; }
   #map .token.pc { fill: var(--gold); }
   #map .token.down { opacity: .35; }
   #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
                   pointer-events: none; }
   .maplegend { margin-top: 4px; }
-  /* Spells. The book is a list of rows with a prepare stepper on the right. */
+
   .spellrow { display: flex; align-items: center; justify-content: space-between;
               gap: 12px; padding: 5px 0; border-bottom: 1px solid #1d1811; }
   .spellrow:last-child { border-bottom: 0; }
@@ -159,15 +283,13 @@
   .prep { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .prepbtn { width: 22px; height: 22px; line-height: 1; border-radius: 3px;
              border: 1px solid #2e261c; background: #1a1610; color: var(--gold);
-             cursor: pointer; }
+             cursor: pointer; padding: 0; letter-spacing: 0; }
   .prepbtn:disabled { opacity: .3; cursor: default; }
   .prepcount { min-width: 14px; text-align: center; color: var(--dim);
                font-variant-numeric: tabular-nums; }
   .prepcount.has { color: var(--accent); }
-  /* A spent slot level reads as unavailable rather than as a small number. */
   .terms b.spent { color: var(--dim); }
-  /* Feats. The browse pane colours the verdict, because "can take" and "needs Str 13"
-     are the only two things anybody reads in a list of 1,474. */
+
   #featq { width: 100%; padding: 7px 9px; margin-bottom: 10px; border-radius: 3px;
            border: 1px solid #2e261c; background: #14120f; color: var(--ink);
            font: inherit; }
@@ -184,14 +306,20 @@
   .verdict.maybe { color: #b08a4a; }
   .prereq { display: block; color: var(--dim); margin-left: 0; }
   .why a { color: var(--gold); }
-  /* What the GM offered. Sits above the input, and clicking fills the box rather than
-     sending — a nudge, not the only three things you may do. */
+
+  /* The GM's offered actions: wax seals on the desk. One click fills the pen. */
   #suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   #suggestions:empty { display: none; }
-  .sugg { padding: 5px 11px; border-radius: 12px; cursor: pointer;
-          border: 1px solid var(--gold-dim); background: #1a1610; color: var(--gold);
-          font: inherit; font-size: 13px; text-align: left; }
-  .sugg:hover { background: #241d15; color: var(--accent); }
+  .sugg { padding: 5px 12px; border-radius: 12px; cursor: pointer;
+          border: 1px solid var(--gold-dim); background: rgba(26,22,16,.82);
+          color: var(--gold); font: inherit; font-size: 13px; text-align: left;
+          position: relative; overflow: hidden;
+          transition: color .2s ease, border-color .2s ease, transform .16s ease,
+                      box-shadow .25s ease;
+          animation: inkbleed .7s cubic-bezier(.22,.8,.36,1) both; }
+  .sugg:hover { color: #f4e6c0; border-color: var(--accent);
+                transform: translateY(-1px);
+                box-shadow: 0 3px 12px rgba(0,0,0,.45), 0 0 12px rgba(var(--ember), .10); }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -199,21 +327,26 @@
   .who.up small { color: var(--accent); }
   .who.out { opacity: .45; text-decoration: line-through; }
 
+  /* --- Death -------------------------------------------------------------- */
   #deathveil {
     position: fixed; inset: 0; z-index: 40; display: none; place-items: center;
-    background: radial-gradient(60% 50% at 50% 40%, rgba(40,10,10,.55), rgba(4,3,3,.96));
+    background: radial-gradient(60% 50% at 50% 40%, rgba(46,10,10,.5), rgba(4,3,3,.94));
+    -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
   }
   #deathveil.on { display: grid; }
+  #deathveil.on .deathpanel { animation: conjure .5s cubic-bezier(.2, .9, .3, 1.04) both; }
   .deathpanel {
     width: min(620px, 92vw); max-height: 86vh; overflow-y: auto; padding: 34px 38px;
-    background: linear-gradient(#171210, #0d0a08) padding-box,
+    background: linear-gradient(rgba(24,17,15,.92), rgba(12,9,8,.94)) padding-box,
                 linear-gradient(#6b2020, #2a1512) border-box;
     border: 1px solid transparent; border-radius: 3px;
-    box-shadow: inset 0 0 0 1px rgba(217,192,138,.08), 0 24px 80px rgba(0,0,0,.9);
+    box-shadow: inset 0 0 0 1px rgba(221,196,142,.08), 0 24px 80px rgba(0,0,0,.9),
+                0 0 60px rgba(var(--bloodglow), .18);
   }
   .deathpanel h2 {
     margin: 0 0 14px; color: #c96a5a; font: 400 42px/1 var(--display);
     letter-spacing: .08em; font-variant: small-caps;
+    text-shadow: 0 0 30px rgba(var(--bloodglow), .5);
   }
   .deathpanel h3 {
     margin: 26px 0 12px; color: var(--gold); font: 400 18px/1 var(--display);
@@ -225,8 +358,11 @@
     display: block; width: 100%; text-align: left; margin-bottom: 9px;
     padding: 13px 16px; cursor: pointer; border-radius: 2px;
     background: linear-gradient(#1d1811, #141009); border: 1px solid var(--gold-dim);
+    position: relative; overflow: hidden;
+    transition: border-color .2s ease, transform .16s ease, box-shadow .25s ease;
   }
-  .pick:hover:not(:disabled) { border-color: var(--accent); }
+  .pick:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px);
+                               box-shadow: 0 4px 16px rgba(0,0,0,.5); }
   .pick:disabled { opacity: .5; cursor: default; }
   .pick.current { border-color: var(--accent); }
   .pick b { display: block; color: var(--gold); font: 400 21px/1.2 var(--display);
@@ -240,18 +376,26 @@
   .grave b { color: var(--ink); font-weight: 400; }
   .grave.dead b { text-decoration: line-through; }
 
+  /* --- The conjuring: the dice popup -------------------------------------- */
   #veil {
-    position: fixed; inset: 0; background: rgba(6,5,4,.86);
+    position: fixed; inset: 0; background: rgba(6,5,4,.72);
     display: none; place-items: center; z-index: 20;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   }
   #veil.on { display: grid; }
+  #veil.on .popup { animation: conjure .42s cubic-bezier(.2, .9, .3, 1.04) both; }
+  @keyframes conjure {
+    from { opacity: 0; transform: scale(.955) translateY(10px); filter: blur(6px); }
+    to   { opacity: 1; transform: none; filter: blur(0); }
+  }
   .popup {
     width: 420px; padding: 28px 30px; font: 15px/1.55 var(--body);
     background:
-      linear-gradient(#1b1611, #120f0b) padding-box,
+      linear-gradient(rgba(27,22,17,.93), rgba(18,15,11,.95)) padding-box,
       linear-gradient(#5a4931, #2a2219) border-box;
     border: 1px solid transparent; border-radius: 3px;
-    box-shadow: inset 0 0 0 1px rgba(217,192,138,.10), 0 18px 60px rgba(0,0,0,.8);
+    box-shadow: inset 0 0 0 1px rgba(221,196,142,.10), 0 18px 60px rgba(0,0,0,.8),
+                0 0 46px rgba(var(--ember), .07);
   }
   .popup h3 {
     margin: 0 0 4px; color: var(--gold); font: 400 26px/1.2 var(--display);
@@ -268,33 +412,32 @@
   .dieface {
     width: 100%; color: var(--gold); text-align: center; padding: 16px;
     font: 400 42px/1 var(--display); border-radius: 2px; margin-bottom: 14px;
-    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a;
+    background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
     box-shadow: inset 0 3px 10px rgba(0,0,0,.7);
+    transition: border-color .25s ease, box-shadow .3s ease, text-shadow .3s ease;
   }
-  .dieface:focus { outline: none; border-color: var(--accent); }
+  .dieface:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: inset 0 3px 10px rgba(0,0,0,.7), 0 0 20px rgba(var(--ember), .14);
+    text-shadow: 0 0 22px rgba(var(--ember), .4);
+  }
   .popup .acts { display: flex; gap: 9px; }
   .popup .acts button { flex: 1; }
   #busy, #err { font-family: var(--body); }
-  /* --- The full character sheet ------------------------------------------------
-     Unfolds from the sidebar across the whole window. The sidebar quick reference
-     stays as it was; this is the paper sheet, with the Folio's own section names as
-     tabs. */
-  /* The sheet is dressed as a page from a book: a dark leather ground, a gold rule
-     inside a darker border, and small-caps serif headings. The texture is generated
-     from gradients rather than an image so nothing has to be bundled or fetched — see
-     the note in the Equipment tab about what would need real assets. */
+
+  /* --- The full character sheet ------------------------------------------- */
   #sheetpanel {
     position: fixed; inset: 0; z-index: 30;
     display: none; grid-template-rows: auto auto 1fr;
-    transform: translateX(2%); opacity: 0;
-    transition: transform .18s ease-out, opacity .18s ease-out;
+    transform: translateX(1.5%) scale(.995); opacity: 0;
+    transition: transform .3s cubic-bezier(.2, .9, .3, 1), opacity .3s ease;
     background:
       radial-gradient(120% 90% at 50% 0%, #1a1512 0%, #0f0d0b 55%, #080706 100%),
       repeating-linear-gradient(58deg, rgba(255,240,200,.014) 0 2px, transparent 2px 5px),
       repeating-linear-gradient(-31deg, rgba(0,0,0,.30) 0 3px, transparent 3px 7px);
   }
   #sheetpanel.on { display: grid; transform: none; opacity: 1; }
-  #sheetpanel::after {          /* vignette, so the edges fall away */
+  #sheetpanel::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     box-shadow: inset 0 0 220px 60px rgba(0,0,0,.72);
   }
@@ -303,11 +446,12 @@
     display: flex; align-items: center; gap: 18px;
     padding: 20px 44px 16px; position: relative;
     border-bottom: 1px solid var(--gold-dim);
-    box-shadow: 0 1px 0 #0a0806, 0 2px 0 rgba(217,192,138,.10);
+    box-shadow: 0 1px 0 #0a0806, 0 2px 0 rgba(221,196,142,.10);
   }
   .sigil { width: 46px; height: 62px; flex: none; color: var(--blood); }
   .sheethead h1 {
-    margin: 0; color: var(--gold); font: 400 38px/1.05 var(--display); letter-spacing: .045em; font-variant: small-caps;
+    margin: 0; color: var(--gold); font: 400 38px/1.05 var(--display);
+    letter-spacing: .045em; font-variant: small-caps;
     text-shadow: 0 2px 10px rgba(0,0,0,.9);
   }
   .sheethead .meta {
@@ -321,7 +465,7 @@
     font: 400 12px/1 var(--display);
     letter-spacing: .18em; font-variant: small-caps;
   }
-  .sheethead .close:hover { color: #f0e2bd; border-color: var(--accent); }
+  .sheethead .close:hover { color: #f4e6c0; border-color: var(--accent); }
 
   .tabs {
     display: flex; gap: 4px; padding: 0 44px; overflow-x: auto;
@@ -332,13 +476,13 @@
     color: var(--dim); padding: 11px 20px 10px; cursor: pointer; white-space: nowrap;
     font: 400 15px/1 var(--display);
     letter-spacing: .14em; font-variant: small-caps; border-radius: 3px 3px 0 0;
-    position: relative; top: 1px;
+    position: relative; top: 1px; overflow: hidden;
   }
-  .tabs button:hover { color: var(--ink); }
+  .tabs button:hover { color: var(--ink); transform: none; box-shadow: none; }
   .tabs button[aria-selected="true"] {
     color: var(--gold); border-color: var(--gold-dim);
     background: linear-gradient(#1d1712, #14100c);
-    box-shadow: inset 0 1px 0 rgba(217,192,138,.16);
+    box-shadow: inset 0 1px 0 rgba(221,196,142,.16);
   }
   .sheetbody { overflow-y: auto; padding: 26px 44px 70px; position: relative; z-index: 1; }
   .cols {
@@ -346,19 +490,20 @@
     grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
     align-items: start;
   }
-  /* A framed panel: dark leather, a hairline gold rule set in from the border, and
-     small corner marks. `.framed` is the shared dressing. */
   .framed, .card, .slot {
     position: relative;
     background:
       linear-gradient(#191410, #120f0c) padding-box,
       linear-gradient(#43372a, #241d15) border-box;
     border: 1px solid transparent; border-radius: 3px;
-    box-shadow: inset 0 0 0 1px rgba(217,192,138,.07), 0 3px 14px rgba(0,0,0,.55);
+    box-shadow: inset 0 0 0 1px rgba(221,196,142,.07), 0 3px 14px rgba(0,0,0,.55);
+    transition: box-shadow .3s ease;
   }
+  .card:hover { box-shadow: inset 0 0 0 1px rgba(221,196,142,.10),
+                0 6px 22px rgba(0,0,0,.6), 0 0 22px rgba(var(--ember), .05); }
   .framed::before, .card::before, .slot::before {
     content: ""; position: absolute; inset: 4px; pointer-events: none;
-    border: 1px solid rgba(217,192,138,.11); border-radius: 2px;
+    border: 1px solid rgba(221,196,142,.11); border-radius: 2px;
   }
   .card { padding: 17px 19px; }
   .card > h3 {
@@ -405,7 +550,6 @@
   .empty { color: var(--dim); font-style: italic;
            font-family: var(--display); }
 
-  /* Corner flourishes on the sheet itself. Four rotated copies of one L-shaped mark. */
   .corner {
     position: absolute; width: 74px; height: 74px; pointer-events: none;
     color: var(--gold-dim); opacity: .85; z-index: 2;
@@ -414,7 +558,7 @@
   .corner.tr { top: 6px; right: 6px; transform: scaleX(-1); }
   .corner.bl { bottom: 6px; left: 6px; transform: scaleY(-1); }
   .corner.br { bottom: 6px; right: 6px; transform: scale(-1); }
-  /* --- Body slots -------------------------------------------------------------- */
+
   .bodylayout {
     display: grid; grid-template-columns: minmax(210px, 1fr) minmax(180px, 300px) minmax(210px, 1fr);
     gap: 22px; align-items: start;
@@ -427,17 +571,15 @@
     color: var(--gold); font: 400 14px/1 var(--display);
     letter-spacing: .13em; font-variant: small-caps;
     border-top: 1px solid var(--gold-dim); border-bottom: 1px solid var(--gold-dim);
-    background: linear-gradient(90deg, transparent, rgba(217,192,138,.06), transparent);
+    background: linear-gradient(90deg, transparent, rgba(221,196,142,.06), transparent);
   }
-
-  /* A slot is a medallion and its field, the way the reference lays them out. */
   .slot { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 11px 13px; }
   .slot.right { grid-template-columns: auto 1fr; }
   .medallion {
     grid-row: 1 / span 3; align-self: start; width: 46px; height: 46px; flex: none;
     border-radius: 50%; display: grid; place-items: center; color: var(--accent);
     background: radial-gradient(circle at 34% 28%, #3a3024, #171310 72%);
-    box-shadow: inset 0 0 0 1px rgba(217,192,138,.30),
+    box-shadow: inset 0 0 0 1px rgba(221,196,142,.30),
                 inset 0 2px 6px rgba(0,0,0,.75), 0 1px 3px rgba(0,0,0,.6);
   }
   .medallion svg { width: 26px; height: 26px; }
@@ -449,27 +591,27 @@
   .slothead button {
     background: transparent; border: 1px solid var(--gold-dim); color: var(--accent);
     width: 21px; height: 21px; line-height: 1; border-radius: 2px; padding: 0;
-    cursor: pointer; font: 400 15px/1 Georgia, serif; flex: none;
+    cursor: pointer; font: 400 15px/1 Georgia, serif; flex: none; letter-spacing: 0;
   }
-  .slothead button:hover { color: #f0e2bd; border-color: var(--accent);
-                           background: rgba(217,192,138,.10); }
+  .slothead button:hover { color: #f4e6c0; border-color: var(--accent);
+                           background: rgba(221,196,142,.10); }
   .slotrow { display: flex; gap: 6px; margin-bottom: 5px; }
   .slotinput {
     flex: 1; min-width: 0; color: var(--ink); border-radius: 2px; padding: 7px 10px;
     font: 15px/1.3 var(--body);
-    background: linear-gradient(var(--sunk), #14100c);
+    background: linear-gradient(var(--sunk), #131009);
     border: 1px solid #2e251a;
     box-shadow: inset 0 2px 5px rgba(0,0,0,.6);
   }
   .slotinput:focus { outline: none; border-color: var(--accent);
                      box-shadow: inset 0 2px 5px rgba(0,0,0,.6), 0 0 0 1px rgba(201,168,106,.35); }
   .slotinput:disabled { color: var(--gold); font-style: normal; opacity: .85; }
-  .slotinput::placeholder { color: #574d3c; font-style: italic; }
+  .slotinput::placeholder { color: #5d5240; font-style: italic; }
   .slotrow.beyond .slotinput { border-left: 2px solid var(--alarm); }
   .slotrow .delslot {
     background: transparent; border: 1px solid #2e251a; color: var(--dim);
     width: 26px; border-radius: 2px; cursor: pointer; padding: 0;
-    font: 15px/1 Georgia, serif; flex: none;
+    font: 15px/1 Georgia, serif; flex: none; letter-spacing: 0;
   }
   .slotrow .delslot:hover { color: var(--alarm); border-color: var(--alarm); }
   .slotholds {
@@ -486,20 +628,28 @@
     border: 1px solid var(--edge); padding: 10px; border-radius: 3px; cursor: pointer;
     font: 600 12px/1 system-ui, sans-serif; letter-spacing: .08em;
     text-transform: uppercase;
-    /* Also used on the anchor to the crafting bench, which needs these to sit level
-       with the buttons above it rather than reading as a link in a stack of controls. */
     display: block; text-align: center; text-decoration: none; box-sizing: border-box;
   }
   .opensheet:hover { border-color: var(--accent); }
 
-  #busy { color: var(--dim); font-style: italic; padding: 0 40px 12px; display: none; }
-  #busy.on { display: block; }
-  #err { color: var(--alarm); padding: 0 48px 12px; max-width: 70ch; }
+  #busy { color: var(--dim); font-style: italic; padding: 0 48px 12px;
+          display: none; position: relative; z-index: 2; }
+  #busy.on { display: block; animation: thinking 2.4s ease-in-out infinite; }
+  @keyframes thinking { 50% { opacity: .45; } }
+  #err { color: var(--alarm); padding: 0 48px 12px; max-width: 70ch;
+         position: relative; z-index: 2; }
   #err.hint { color: var(--dim); font-style: italic; }
   details { margin-top: 8px; }
   summary { cursor: pointer; color: var(--dim); font-size: 12px; }
   pre { font: 11px/1.4 ui-monospace, monospace; color: var(--dim); overflow-x: auto;
         background: #14120f; padding: 8px; border-radius: 3px; }
+
+  /* The whole enchantment stands down for anyone who asked motion to stop. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important; transition: none !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -678,9 +828,16 @@ async function post(url, body) {
 
 function render(s) {
   STATE = s;
-  $("#story").innerHTML = s.transcript.map(b =>
-    `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}">${esc(b.text)}</p>`
+  // `fresh` marks only the beats that were not on the page a moment ago, because this
+  // rebuilds the whole transcript each state: without the gate, every line re-ran its
+  // ink-bleed entrance on every turn, which reads as the book flickering rather than
+  // being written in.
+  const seen = window._beatsSeen || 0;
+  $("#story").innerHTML = s.transcript.map((b, i) =>
+    `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
+      i >= seen ? " fresh" : ""}">${esc(b.text)}</p>`
   ).join("");
+  window._beatsSeen = s.transcript.length;
   $("#story").scrollTop = $("#story").scrollHeight;
 
   const pc = s.pc;
@@ -1520,6 +1677,18 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sign = n => (n >= 0 ? "+" : "") + n;
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
+
+// The ember under the cursor. One delegated listener feeds --mx/--my to whatever
+// interactive surface the pointer is inside, and the CSS paints a warm radial there.
+// Delegated because the buttons are rebuilt on every render — a per-element listener
+// would be lost each time, and hundreds of listeners for one glow is the wrong trade.
+document.addEventListener("pointermove", e => {
+  const t = e.target.closest("button, .sugg, .pick");
+  if (!t) return;
+  const r = t.getBoundingClientRect();
+  t.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  t.style.setProperty("--my", `${e.clientY - r.top}px`);
+}, { passive: true });
 
 // Elapsed campaign time, from the engine's own clock. Elapsed rather than a time of day,
 // because the engine has no notion of when the campaign started — "day 2, hour 3" is a
