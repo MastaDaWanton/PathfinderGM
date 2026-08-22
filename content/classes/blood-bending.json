@@ -1,0 +1,112 @@
+{
+ "id": "blood bending",
+ "name": "Blood Bending",
+ "summary": "Hit points as a resource. The class pays for its abilities in self-inflicted non-lethal damage, and is built to take on solo what a four-person party would.",
+ "source": "Blood Bending homebrew (author's PDF and .docx)",
+
+ "_numbers_note": "Progressions come from the PDF, not the .docx. The .docx table is corrupted — columns shuffled inconsistently row by row, and by 8th level the iterative-attack notation had migrated into the Fortitude column. The PDF's BAB column is exactly standard 3/4 progression (0,1,2,3,3,4,5,6,6,7,8,9,9,10,11,12,12,13,14,15), which is why it is stored as a named progression here rather than as twenty typed integers: a derived column cannot arrive shuffled.",
+
+ "hit_die": "2d8",
+ "hit_dice_per_level": 2,
+ "_hit_dice_note": "Two Hit Dice per level, per the author. Every other 1e class has one, so 'per Hit Die' and 'per level' are the same number everywhere else and are not here: at 20th this character has 40 HD, Mighty Blood Rage grants +160 temporary hit points rather than +80, and they outgrow the HD caps on sleep and colour spray well before their level suggests.",
+
+ "bab": "three_quarter",
+ "saves": {
+  "fort": "good_plus_1",
+  "ref": "good",
+  "will": [1, 2, 2, 3, 4, 5, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11]
+ },
+ "good_saves": ["fort", "ref", "will"],
+ "_saves_note": "Three near-good saves; the author's decision, and the app runs it faithfully rather than arguing. Reflex is the textbook good progression and Fortitude is exactly good+1 at all twenty levels, so both are stored as derived tracks. Will is NOT regular: it matches good-1 at levels 1-4 and again from 8 up, but at 5th, 6th and 7th the PDF reads 4, 5, 5 where good-1 would give 3, 4, 4 — one higher, then it flattens across 6-9 to rejoin. That is either a deliberate early bump or four typos, and there is no way to tell from the table alone. Stored as the twenty numbers the PDF actually prints, because deriving this column would mean inventing three of them.",
+
+ "skill_ranks": 4,
+ "class_skills": [
+  "acrobatics", "climb", "craft", "escape artist", "intimidate",
+  "knowledge (history)", "knowledge (religion)", "perception", "perform",
+  "profession", "ride", "sense motive", "stealth", "swim"
+ ],
+ "proficiencies": ["simple", "unarmed"],
+ "alignment": "any",
+ "starting_wealth": "1d6 x 10 gp",
+
+ "overrides": [
+  {
+   "rule": "temp_hp.stacks",
+   "from_level": 1,
+   "why": "Blood Bond. The class's whole economy is hit points as a resource, and a Coagulator layering Blood Sponge over a ward is the path working as written."
+  },
+  {
+   "rule": "nonlethal.counts_temp_hp",
+   "from_level": 1,
+   "why": "Blood Bond: 'Non-Lethal damage does not knock you unconscious until it is equal to your current health + your temporary health.' The other half of the same idea."
+  }
+ ],
+
+ "pools": [
+  {
+   "id": "ki",
+   "from_level": 1,
+   "max": "floor(level/2) + con_mod",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Battle Blood Ki Pool, granted at Control Blood 2. Listed from level 1 because Control Blood levels are chosen, not fixed to character level; the engine creates it when the path is taken."
+  },
+  {
+   "id": "rage",
+   "from_level": 1,
+   "max": "4 + con_mod + 2*(level-1)",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Blood Rage: 4 + Con modifier rounds per day, +2 for each level after 1st."
+  },
+  {
+   "id": "unbalancing strike",
+   "from_level": 3,
+   "max": "floor(level/4) + con_mod",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "'once per day for every four levels you have attained + Con modifier'."
+  },
+  {
+   "id": "stunning strike",
+   "from_level": 13,
+   "max": "floor(level/4)",
+   "starts": "max",
+   "refresh": "rest.night"
+  },
+  {
+   "id": "rapid coagulation",
+   "from_level": 4,
+   "max": "1",
+   "starts": "max",
+   "refresh": "encounter.end",
+   "_note": "Once per combat, regain 1d10+Con."
+  }
+ ],
+
+ "levels": [
+  {"level": 1,  "grants": ["bonus feat", "unarmed strike", "blood bond", "control blood 1a"], "fist": "1d6",  "blood": "1d8"},
+  {"level": 2,  "grants": ["bonus feat", "evasion", "blood sense 60ft"],                       "fist": "1d6",  "blood": "1d8"},
+  {"level": 3,  "grants": ["fast movement 10ft", "unbalancing strike", "control blood 2a"],    "fist": "1d6",  "blood": "1d8"},
+  {"level": 4,  "grants": ["rapid coagulation", "combat expertise", "bonus feat"],             "fist": "1d8",  "blood": "2d8"},
+  {"level": 5,  "grants": ["control blood 3a", "blood bending style fusion"],                  "fist": "1d8",  "blood": "2d8"},
+  {"level": 6,  "grants": ["bonus feat"],                                                      "fist": "1d8",  "blood": "2d8"},
+  {"level": 7,  "grants": ["control blood 4a"],                                                "fist": "1d8",  "blood": "3d8"},
+  {"level": 8,  "grants": ["bonus feat"],                                                      "fist": "1d10", "blood": "3d8"},
+  {"level": 9,  "grants": ["improved blood sense 120ft"],                                      "fist": "1d10", "blood": "3d8"},
+  {"level": 10, "grants": ["bonus feat", "control blood 5a"],                                  "fist": "1d10", "blood": "4d8"},
+  {"level": 11, "grants": ["bonus feat", "control blood 1b"],                                  "fist": "1d10", "blood": "4d8"},
+  {"level": 12, "grants": ["bonus feat", "improved evasion"],                                  "fist": "2d6",  "blood": "4d8"},
+  {"level": 13, "grants": ["fast movement 20ft", "stunning strike", "control blood 2b"],       "fist": "2d6",  "blood": "4d10"},
+  {"level": 14, "grants": ["combat reflexes", "bonus feat"],                                   "fist": "2d6",  "blood": "4d10"},
+  {"level": 15, "grants": ["control blood 3b", "blood pool movement"],                         "fist": "2d6",  "blood": "4d10"},
+  {"level": 16, "grants": ["bonus feat"],                                                      "fist": "2d8",  "blood": "4d12"},
+  {"level": 17, "grants": ["control blood 4b", "blood teleportation"],                         "fist": "2d8",  "blood": "4d12"},
+  {"level": 18, "grants": ["bonus feat"],                                                      "fist": "2d8",  "blood": "4d12"},
+  {"level": 19, "grants": ["improved blood sense 120ft"],                                      "fist": "2d8",  "blood": "4d12"},
+  {"level": 20, "grants": ["bonus feat", "control blood 5b"],                                  "fist": "2d10", "blood": "5d12"}
+ ],
+
+ "paths": ["blood spike", "coagulator", "blood commander", "battle blood"],
+ "_paths_note": "Path abilities are not here yet. Blood Spike and Coagulator are built on spawned Blood Pools and on reactions, and the engine has neither — writing them into a file the engine silently ignores is the failure docs/homebrew-rules.md section 1 exists to prevent."
+}

@@ -52,6 +52,12 @@ class Condition:
 # and listed so an override can be checked at load: a typo in `temp_hp.stacks` would
 # otherwise be a feature that simply never happens, with nothing anywhere saying why.
 ACTOR_RULES = {
+    "nonlethal.counts_temp_hp": (
+        "Non-lethal damage does not drop this character until it passes their current hit "
+        "points *plus* their temporary hit points. Blood Bond's own wording, and the other "
+        "half of the same idea as temp_hp.stacks: the class pays for its abilities in "
+        "non-lethal damage, so where the threshold sits is where the class ends."
+    ),
     "temp_hp.stacks": (
         "Temporary hit points from different sources add up instead of the best one "
         "applying. Blood Bending needs this from 1st level: its whole economy is hit "
@@ -187,6 +193,14 @@ class Actor:
     # expire independently: rage temporary hit points end with the rage while a ward's
     # last the minute. One number could hold the total or the duration, never both.
     temp_pools: list["TempPool"] = field(default_factory=list)
+    # Non-lethal damage, tracked apart from hit points because 1e tracks it apart: it
+    # accumulates on its own, it staggers you when it reaches your current hit points and
+    # drops you when it passes them, and it heals on a different clock.
+    #
+    # Blood Bending is the reason this could not wait. Its whole economy is paying for
+    # abilities in self-inflicted non-lethal damage, and without a separate pool that
+    # payment was indistinguishable from being stabbed.
+    nonlethal: int = 0
     reductions: list[Reduction] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
@@ -284,7 +298,9 @@ class Actor:
 
     @property
     def class_data(self) -> dict:
-        return CLASSES.get(self.char_class or "", {})
+        from . import classes
+
+        return classes.get(self.char_class or "")
 
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
@@ -491,8 +507,14 @@ class Actor:
         if save in self.flat_saves:
             mods.append(Modifier(self.flat_saves[save], SAVES[save]))
         else:
-            good = save in self.class_data.get("good_saves", ())
-            base = save_for(good, self.level)
+            # A class may state each save's progression outright. `good_saves` remains the
+            # fallback because the Core four are described that way and because it is what
+            # a hand-written class file is likely to say.
+            from . import classes
+
+            base = classes.save_base(self.class_data, save, self.level)
+            if base is None:
+                base = save_for(save in self.class_data.get("good_saves", ()), self.level)
             label = f"base {SAVES[save]}"
             if self.char_class:
                 label += f" ({self.class_data.get('name', self.char_class)} {self.level})"
@@ -864,6 +886,9 @@ class Actor:
         amount = max(0, int(amount))
         before = self.hp
         self.hp = min(self.hp_max, self.hp + amount)
+        # 1e: curing hit point damage removes an equal amount of non-lethal damage. Miss
+        # this and a character healed to full still lies there unconscious from a beating.
+        self.heal_nonlethal(amount)
         return self.hp - before
 
     # --- damage reduction -------------------------------------------------------------
@@ -881,8 +906,42 @@ class Actor:
         usable = [r for r in self.reductions if r.amount > 0 and not r.bypassed_by(traits)]
         return max(usable, key=lambda r: r.amount) if usable else None
 
+    # --- non-lethal damage ---------------------------------------------------------------
+
+    @property
+    def nonlethal_threshold(self) -> int:
+        """Where non-lethal damage stops being survivable.
+
+        1e: at your current hit points you are staggered, past them you are unconscious.
+        A class may be exempted through `nonlethal.counts_temp_hp`, and Blood Bending is —
+        its abilities are bought with non-lethal damage, so where this line sits is where
+        the class ends.
+        """
+        base = max(0, self.hp)
+        if self.allows("nonlethal.counts_temp_hp"):
+            return base + self.temp_hp
+        return base
+
+    def take_nonlethal(self, amount: int) -> dict:
+        """Non-lethal damage accumulates on its own rather than coming off hit points.
+
+        Which is the whole reason it is tracked apart: a Blood Bender paying 2d10 for an
+        ability and a Blood Bender taking 2d10 from a sword are not in the same trouble,
+        and subtracting both from `hp` made them identical.
+        """
+        amount = max(0, int(amount))
+        self.nonlethal += amount
+        return {"nonlethal": self.nonlethal, "taken": amount,
+                "threshold": self.nonlethal_threshold}
+
+    def heal_nonlethal(self, amount: int) -> int:
+        back = min(self.nonlethal, max(0, int(amount)))
+        self.nonlethal -= back
+        return back
+
     def take_damage(self, amount: int, dtype: str = "untyped",
-                    traits: tuple[str, ...] = ()) -> dict:
+                    traits: tuple[str, ...] = (),
+                    lethality: str = "lethal") -> dict:
         """Resolve one packet of damage, returning what happened to it at each stage.
 
         The order is 1e's and it matters: reduce, then spend temporary hit points, then
@@ -901,12 +960,19 @@ class Actor:
 
         absorbed = self._spend_temp_hp(min(self.temp_hp, after_dr))
         taken = after_dr - absorbed
-        self.hp -= taken
+        # Non-lethal still spends temporary hit points first — they are hit points — but
+        # what gets through goes to its own pool rather than off the character's total.
+        if lethality == "nonlethal":
+            self.nonlethal += taken
+        else:
+            self.hp -= taken
         return {
             "rolled": rolled, "type": normalise_damage_type(dtype),
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
-            "absorbed": absorbed, "taken": taken,
+            "absorbed": absorbed, "taken": taken, "lethality": lethality,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
+            "nonlethal": self.nonlethal,
+            "nonlethal_threshold": self.nonlethal_threshold,
         }
 
     # --- gear -------------------------------------------------------------------------
@@ -1146,6 +1212,38 @@ class Actor:
             # a hit point and starts it.
             self.add_condition("disabled", source="hit points")
             changed.append("disabled")
+
+        changed.extend(self.apply_nonlethal_state())
+        return changed
+
+    def apply_nonlethal_state(self) -> list[str]:
+        """Non-lethal damage against its own threshold.
+
+        1e: staggered when it equals your current hit points, unconscious when it passes
+        them — and unconscious, not *dying*. Somebody beaten senseless with a sap is not
+        bleeding out, and treating the two the same would have the engine roll them a
+        stabilisation check every round for a bruise.
+        """
+        changed = []
+        limit = self.nonlethal_threshold
+        if self.has_condition("dead"):
+            return changed
+
+        if self.nonlethal > limit:
+            if not self.has_condition("unconscious"):
+                self.add_condition("unconscious", source="non-lethal damage")
+                changed.append("unconscious")
+            self.remove_condition("staggered")
+        elif self.nonlethal == limit and limit > 0:
+            if not self.has_condition("staggered"):
+                self.add_condition("staggered", source="non-lethal damage")
+                changed.append("staggered")
+        else:
+            # Healed back below the line: whichever of the two this caused, it lifts.
+            for gone in ("staggered", "unconscious"):
+                c = next((x for x in self.conditions if x.key == gone), None)
+                if c is not None and c.source == "non-lethal damage":
+                    self.remove_condition(gone)
         return changed
 
     def rest(self, kind: str = "night") -> dict:
@@ -1195,6 +1293,12 @@ class Actor:
         # complete bed rest, for each affected ability score." Per ability, not shared
         # between them — a poison that hit both Strength and Constitution heals both at
         # the same rate rather than taking twice as long.
+        # "You heal non-lethal damage at the rate of 1 hit point per hour per character
+        # level" — eight hours clears anything a level 1 character could still be standing
+        # under, so a night wipes it rather than pretending to count.
+        nonlethal_gone = self.nonlethal
+        self.nonlethal = 0
+
         restored = {}
         for ab in list(self.ability_damage):
             back = self.heal_ability(ab, per_level)
@@ -1202,7 +1306,8 @@ class Actor:
                 restored[ab] = back
 
         return {"healed": self.hp - before, "hours": hours, "woke": woke,
-                "per_level": per_level, "kind": kind, "ability": restored}
+                "per_level": per_level, "kind": kind, "ability": restored,
+                "nonlethal_healed": nonlethal_gone}
 
     def bleed_out(self, dice) -> dict | None:
         """One round of dying: lose a hit point, then try to stabilise.
@@ -1239,6 +1344,8 @@ class Actor:
             "hp": self.hp,
             "hp_max": self.hp_max,
             "temp_hp": self.temp_hp,
+            "nonlethal": self.nonlethal,
+            "nonlethal_threshold": self.nonlethal_threshold,
             "dr": [r.label for r in self.reductions],
             # A 10 that used to be a 14 is not the same as a 10, and the grid shows only
             # the score. Without this the player sees a number and no reason for it.
@@ -1423,7 +1530,12 @@ def full_sheet(actor: Actor) -> dict:
         ],
         "defense": {
             "hp": {"current": actor.hp, "max": actor.hp_max,
-                   "temp": actor.temp_hp, "temp_source": actor.temp_hp_source},
+                   "temp": actor.temp_hp, "temp_source": actor.temp_hp_source,
+                   # The threshold travels with the number, because the number alone says
+                   # nothing: 12 non-lethal is nothing at 40 hit points and is a knockout
+                   # at 11, and a Blood Bender's line moves as their wards go up and down.
+                   "nonlethal": actor.nonlethal,
+                   "nonlethal_threshold": actor.nonlethal_threshold},
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
                     "source": r.source} for r in actor.reductions],
             "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -1507,6 +1619,7 @@ def to_dict(actor: Actor) -> dict:
         "shield": actor.shield, "natural_armour": actor.natural_armour,
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
+        "nonlethal": actor.nonlethal,
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -1658,6 +1771,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         equipped=data.get("equipped"),
         hp_max=data.get("hp_max", data.get("hp", 1)),
         hp=data.get("hp", 1),
+        nonlethal=int(data.get("nonlethal", 0) or 0),
         temp_pools=_temp_pools(data),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},
@@ -1694,6 +1808,12 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         a.add_condition(c if isinstance(c, str) else c["key"],
                         None if isinstance(c, str) else c.get("rounds_left"))
     validate(a)
+
+    # After validate, so an unknown class is reported as an unknown class rather than as
+    # whatever apply() happens to do with one.
+    from . import classes
+
+    classes.apply(a)
     return a
 
 
@@ -1705,9 +1825,11 @@ def load_pc(path: str | Path) -> Actor:
 def validate(actor: Actor) -> None:
     """Legality checks that must fail loudly at load rather than quietly mid-scene."""
     if actor.is_pc:
-        if actor.char_class not in CLASSES:
+        from . import classes
+
+        if actor.char_class not in classes.all_classes():
             raise IllegalSheet(f"{actor.name}: unknown class {actor.char_class!r}")
-        cls = CLASSES[actor.char_class]
+        cls = classes.get(actor.char_class)
         # Ranks per level: class ranks + Int modifier, minimum 1, plus 1/level for humans.
         per_level = max(1, cls["skill_ranks"] + ability_modifier(actor.abilities.get("int", 10)))
         if actor.race.lower() == "human":

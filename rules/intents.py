@@ -130,7 +130,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # which contradicts the architecture decision outright. NPC attacks still resolve
     # hidden — `Engine._force_visibility` demotes any non-PC actor.
     "attack": ((), ("weapon", "full_attack", "manoeuvre", "power_attack"), "player"),
-    "damage": (("amount", "type"), ("to",), "hidden"),
+    # `lethality` because a Blood Bender paying for an ability in non-lethal
+    # damage and one taking a sword are not in the same trouble.
+    "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),

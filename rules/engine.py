@@ -872,14 +872,16 @@ class Engine:
             value = roll.total
         else:
             value = int(amount)
-        hit = self._apply_damage(target, value, intent.params["type"])
+        hit = self._apply_damage(target, value, intent.params["type"],
+                                 lethality=str(intent.params.get("lethality", "lethal")))
         effects = [hit]
         effects.extend(self._hp_state_effects(target))
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=f"{target.name} takes {hit['amount']} {hit['type']} damage"
-                 + (f" ({hit['note']})." if hit["note"] else "."),
+            tell=f"{target.name} takes {hit['amount']} {hit['type']}"
+                 + (" non-lethal" if hit["lethality"] == "nonlethal" else "")
+                 + " damage" + (f" ({hit['note']})." if hit["note"] else "."),
             because=intent.because,
         )
 
@@ -1446,14 +1448,15 @@ class Engine:
         return self.dice.d20(mods, label=label, visibility=intent.visibility)
 
     def _apply_damage(self, target: Actor, amount: int, dtype: str,
-                      traits: tuple[str, ...] = ()) -> dict:
+                      traits: tuple[str, ...] = (),
+                      lethality: str = "lethal") -> dict:
         """One funnel for every point of damage in the game.
 
         Everything — weapon hits, the `damage` op, hazards — arrives here, which is what
         makes damage reduction and temporary hit points a single change rather than one
         per damage source.
         """
-        d = target.take_damage(amount, dtype, traits)
+        d = target.take_damage(amount, dtype, traits, lethality)
         return {
             "ref": target.ref, "kind": "damage",
             # `amount` stays the number that actually came off hit points, because that is
@@ -1462,6 +1465,7 @@ class Engine:
             "reduced": d["reduced"], "reduced_by": d["reduced_by"],
             "absorbed": d["absorbed"],
             "hp_after": target.hp, "hp_max": target.hp_max, "temp_hp": target.temp_hp,
+            "lethality": lethality, "nonlethal": target.nonlethal,
             "note": _damage_note(d),
         }
 
@@ -1511,6 +1515,8 @@ def _damage_note(d: dict) -> str:
         bits.append(f"less {d['reduced_by']} ({d['reduced']})")
     if d["absorbed"]:
         bits.append(f"{d['absorbed']} off temporary")
+    if d.get("lethality") == "nonlethal" and d.get("taken"):
+        bits.append(f"non-lethal now {d.get('nonlethal')}")
     return f"{d['rolled']}, " + ", ".join(bits) if bits else ""
 
 

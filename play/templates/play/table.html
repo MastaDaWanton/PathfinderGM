@@ -128,6 +128,12 @@
   .cell span { color: var(--gold); font: 400 19px/1.35 var(--display); }
   .row { display: flex; justify-content: space-between; padding: 3px 0; }
   .row span:last-child { color: var(--accent); font-variant-numeric: tabular-nums; }
+  /* Non-lethal at or past its threshold: the next point is staggered or unconscious, and
+     that is worth seeing before the roll rather than after it. */
+  .row.danger span:last-child { color: #d9534f; }
+  /* "not yet" and "not any more" are different refusals and lead to different next
+     moves, so a pool waiting on a cooldown says how long rather than reading as empty. */
+  .row small.cd { color: var(--dim); }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -624,6 +630,12 @@ function render(s) {
     const temp = pc.temp_hp || 0;
     const pct = Math.max(0, Math.round(100 * pc.hp / pc.hp_max));
     const tpct = Math.max(0, Math.round(100 * temp / pc.hp_max));
+    // Non-lethal is shown against its own threshold rather than against hp_max. The two
+    // are not the same line and for a Blood Bender they are rarely close: the class buys
+    // its abilities with non-lethal damage and counts temporary hit points before it
+    // drops, so the number that matters moves as their wards go up and down.
+    const nl = pc.nonlethal || 0;
+    const nlLimit = pc.nonlethal_threshold ?? pc.hp;
     $("#sheet").innerHTML = `
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
@@ -633,9 +645,14 @@ function render(s) {
         temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
       <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
         temp ? ` <small>+${temp} temp</small>` : ""}</span></div>
+      ${nl ? `<div class="row${nl >= nlLimit ? " danger" : ""}"><span>Non-lethal</span>
+        <span>${nl} <small>of ${nlLimit}</small></span></div>` : ""}
       ${(pc.dr && pc.dr.length)
         ? `<div class="row"><span>Damage reduction</span><span>${
              pc.dr.map(esc).join(", ")}</span></div>` : ""}
+      ${(pc.pools || []).map(p => `<div class="row"><span>${esc(title(p.id))}</span>
+        <span>${p.current} <small>of ${p.max}</small>${
+          p.ready ? "" : ` <small class="cd">${p.cooldown_left}r</small>`}</span></div>`).join("")}
       <div class="row"><span>Armour class</span><span>${pc.ac}</span></div>
       <h2>Abilities</h2>
       <div class="grid">${Object.entries(pc.abilities).map(([k, v]) => {
@@ -962,8 +979,12 @@ function tabDefense(s) {
           }</span><b>+${d.hp.temp}</b></div>` : ""}
         ${(d.dr || []).map(r => `<div class="t"><span>Reduction${
             r.source ? ` — ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`).join("")}
+        ${d.hp.nonlethal ? `<div class="t"><span>Non-lethal</span><b>${
+            d.hp.nonlethal}</b></div>` : ""}
         <div class="t"><span>Unconscious at</span><b>0</b></div>
         <div class="t"><span>Dead at</span><b>-${s.abilities.find(a => a.key === "con").score}</b></div>
+        <div class="t"><span>Knocked out by non-lethal at</span><b>${
+            d.hp.nonlethal_threshold}</b></div>
       </div>
     </div>
     <div class="card">
