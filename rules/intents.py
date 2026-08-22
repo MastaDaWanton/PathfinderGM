@@ -463,13 +463,15 @@ def _check_params(intent: Intent, index: int) -> None:
         # Validation has to cover everything resolution accepts. It did not here, and an
         # invented template ("bravo") reached the bestiary and raised UnknownTemplate as
         # a 500 — the same shape of gap as the bare-string DC.
-        from .bestiary import TEMPLATES
+        from . import bestiary
 
         raw_t = str(p["template"]).strip().lower()
-        if raw_t not in TEMPLATES:
+        if bestiary.lookup(raw_t) is None:
+            # Nearest matches, never the whole list. Naming all four templates was the
+            # helpful thing to do; naming all 6,406 creatures is a wall of text, and a
+            # model reading it loses the turn it was in the middle of.
             raise IntentError(
-                f"spawn: no template {p['template']!r}." + _suggest(raw_t, TEMPLATES)
-                + f" The templates are: {', '.join(sorted(TEMPLATES))}.",
+                f"spawn: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                 "schema", index,
             )
         p["template"] = raw_t

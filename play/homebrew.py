@@ -18,6 +18,7 @@ from pathlib import Path
 from django.conf import settings
 
 from rules import ingredients, spells, worldclass
+from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, FEATS, SHIELDS, WEAPONS
 
@@ -122,8 +123,14 @@ def benches() -> list[Bench]:
         ),
         Bench(
             id="creatures", name="Creatures", dir="creatures",
-            shipped=len(TEMPLATES), shipped_label="in the bestiary",
-            blurb="Stat blocks the engine can put in a scene and roll for.",
+            shipped=len(TEMPLATES) + len(bestiary.imported()),
+            shipped_label="in the bestiary",
+            blurb="Stat blocks the engine can put in a scene and roll for. Unlike the "
+                  "spell list these are executable: hit points, AC, saves, damage "
+                  "reduction and an attack the engine rolls against.",
+            waiting="The import is a variant and NPC bestiary — it holds Ogre Boss and "
+                    "Ambro the Ogre and no plain Ogre. A core bestiary export would fill "
+                    "that gap; nothing here is invented to cover it.",
         ),
         Bench(
             id="feats", name="Feats", dir="feats",
@@ -239,9 +246,16 @@ def rows_for(bench_id: str) -> list[dict]:
                 "note": f"+{v['ac']} AC"} for k, v in SHIELDS.items() if k != "none"]
         )
     elif bench_id == "creatures":
-        rows += [{"name": v.get("name", k), "kind": "creature", "mine": False,
+        rows += [{"name": v.get("name", k), "kind": "hand-written", "mine": False,
+                  "id": k,
                   "note": f"{v.get('hp', '?')} hp · AC {v.get('flat_ac', '?')}"}
                  for k, v in TEMPLATES.items()]
+        # Capped for the same reason the spell bench is: six thousand rows is a wall.
+        rows += [{"name": c["name"], "kind": c.get("creature_type") or "creature",
+                  "mine": False, "id": c["id"],
+                  "note": f"CR {c.get('cr', '?')} · {c.get('hp', '?')} hp · "
+                          f"AC {c.get('flat_ac', '?')} · {c.get('size', '')}"}
+                 for c in bestiary.search(limit=200)]
     elif bench_id == "feats":
         rows += [{"name": v.get("name", k), "kind": "feat", "mine": False,
                   "note": v.get("note", "")} for k, v in FEATS.items()]

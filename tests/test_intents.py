@@ -145,16 +145,21 @@ def test_save_aliases_are_accepted_because_models_write_them_out():
                   "params": {"save": "Fortitude", "dc": 15}}).params["save"] == "fort"
 
 
-def test_an_invented_creature_template_is_rejected_with_the_list():
+def test_an_invented_creature_is_rejected_with_the_nearest_names():
     """Validation has to cover everything resolution accepts. `spawn` required a
     `template` but never checked it, so an invented one reached the bestiary and raised
     UnknownTemplate as a 500 mid-turn — the same shape of gap as the bare-string DC.
+
+    The rejection names the closest few rather than every creature there is. Listing all
+    four templates was helpful; listing all 6,406 is a wall of text, and a model reading
+    it loses the turn it was in the middle of.
     """
     with pytest.raises(IntentError) as e:
         parse({"op": "spawn", "params": {"template": "guild bravo", "count": 2}})
     msg = str(e.value)
-    assert "no template" in msg
-    assert "thug" in msg and "watchman" in msg
+    assert "no creature" in msg
+    assert "guildhand" in msg
+    assert len(msg) < 300
 
 
 def test_a_real_template_survives_and_the_count_is_bounded():

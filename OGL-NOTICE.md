@@ -13,6 +13,11 @@ records the sourcebook it came from. The `tags` field on each spell is *not* Ope
 Content: it is this app's own derived index for searching, defines nothing, and is read by
 no rule.
 
+`content/bestiary/creatures.json` — 6,406 Pathfinder 1st Edition stat blocks imported
+from a monster spreadsheet. Names, challenge ratings, ability scores, hit points, armour
+classes, saves, attacks, damage reduction, immunities, skills, feats and descriptions are
+Open Game Content, and each entry records the sourcebook it came from.
+
 `content/ingredients/herbs-and-parts.json` mixes sources: entries drawn from Pathfinder
 material are Open Game Content, and the setting-specific flora are the user's own.
 
