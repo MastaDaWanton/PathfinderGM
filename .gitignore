@@ -16,3 +16,4 @@ build/
 dist/
 *.spec
 node_modules/
+z-image-turbo_*.png

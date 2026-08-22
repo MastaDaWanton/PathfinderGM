@@ -29,8 +29,8 @@
     margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
     height: 100vh; overflow: hidden; display: flex; flex-direction: column;
     background:
-      radial-gradient(120% 90% at 40% 0%, #17120f 0%, #0f0d0b 55%, #080706 100%),
-      repeating-linear-gradient(58deg, rgba(255,240,200,.012) 0 2px, transparent 2px 5px);
+      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
+      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
 
   header {
@@ -273,20 +273,68 @@
   header { background: rgba(20, 16, 12, .72);
            -webkit-backdrop-filter: blur(14px) saturate(130%);
            backdrop-filter: blur(14px) saturate(130%); }
+  /* 4. Embers, second generation. Three depth layers as real children rather
+     than two pseudo-elements: near motes are larger, warmer and quick, far
+     ones small, dim and slow behind a static half-pixel blur. The sway is
+     baked into the rise keyframes — X wanders and returns to zero so the
+     vertical loop stays seamless against the repeating tile — and each layer
+     flickers on its own prime-numbered clock so nothing ever synchronises.
+     A mask fades the column out near the top: embers die as they climb.
+     Transform and opacity only; the one blur is static, rasterised once. */
   #embers { position: fixed; inset: 0; pointer-events: none; z-index: 0;
-            overflow: hidden; }
-  #embers::before, #embers::after {
-    content: ""; position: absolute; inset: -220px 0 0 0;
+            overflow: hidden;
+            -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%,
+                                                transparent 96%);
+            mask-image: linear-gradient(to top, #000 0%, #000 55%,
+                                        transparent 96%); }
+  #embers i { position: absolute; left: 0; right: 0; top: 0; height: 200%;
+              will-change: transform; }
+  #embers i:nth-child(1) {          /* near: bright, warm, quick */
     background-image:
-      radial-gradient(1px 1px at 20% 30%, rgba(232,197,71,.4), transparent),
-      radial-gradient(1px 1px at 40% 70%, rgba(201,162,39,.3), transparent),
-      radial-gradient(1.5px 1.5px at 90% 40%, rgba(255,220,120,.25), transparent),
-      radial-gradient(1px 1px at 65% 15%, rgba(232,197,71,.3), transparent);
-    background-size: 220px 220px;
-    animation: emberdrift 46s linear infinite; opacity: .5;
+      radial-gradient(2.4px 2.4px at 22% 12%, rgba(255,170,80,.85), transparent 60%),
+      radial-gradient(2px 2px at 68% 38%, rgba(255,195,105,.7), transparent 60%),
+      radial-gradient(2.6px 2.6px at 45% 68%, rgba(255,150,60,.75), transparent 60%),
+      radial-gradient(1.8px 1.8px at 88% 82%, rgba(255,205,120,.6), transparent 60%),
+      radial-gradient(2.2px 2.2px at 8% 90%, rgba(255,175,85,.7), transparent 60%);
+    background-size: 260px 260px;
+    animation: emberrise 26s linear infinite, emberflick 5.3s ease-in-out infinite;
   }
-  #embers::after { background-size: 340px 340px; animation-duration: 90s; opacity: .28; }
-  @keyframes emberdrift { from { transform: translateY(0); }
+  #embers i:nth-child(2) {          /* mid */
+    background-image:
+      radial-gradient(1.6px 1.6px at 15% 25%, rgba(240,180,95,.55), transparent 60%),
+      radial-gradient(1.4px 1.4px at 55% 55%, rgba(232,170,80,.45), transparent 60%),
+      radial-gradient(1.8px 1.8px at 80% 15%, rgba(250,190,100,.5), transparent 60%),
+      radial-gradient(1.3px 1.3px at 35% 85%, rgba(232,197,71,.45), transparent 60%),
+      radial-gradient(1.5px 1.5px at 95% 65%, rgba(240,180,90,.4), transparent 60%);
+    background-size: 340px 340px;
+    animation: emberrise 52s linear infinite, emberflick 7.1s ease-in-out infinite;
+    animation-delay: -13s, -2s;
+  }
+  #embers i:nth-child(3) {          /* far: dust motes behind the haze */
+    background-image:
+      radial-gradient(1px 1px at 30% 20%, rgba(220,180,110,.4), transparent 60%),
+      radial-gradient(1px 1px at 70% 45%, rgba(201,162,39,.35), transparent 60%),
+      radial-gradient(1.2px 1.2px at 10% 60%, rgba(230,190,120,.3), transparent 60%),
+      radial-gradient(1px 1px at 50% 92%, rgba(220,170,90,.3), transparent 60%),
+      radial-gradient(1.1px 1.1px at 90% 78%, rgba(210,170,100,.3), transparent 60%);
+    background-size: 460px 460px;
+    filter: blur(.5px);
+    animation: emberrise 96s linear infinite, emberflick 9.7s ease-in-out infinite;
+    animation-delay: -40s, -5s;
+  }
+  @keyframes emberrise {
+    0%   { transform: translate(0, 0); }
+    23%  { transform: translate(9px, -11.5%); }
+    47%  { transform: translate(-7px, -23.5%); }
+    74%  { transform: translate(12px, -37%); }
+    100% { transform: translate(0, -50%); }
+  }
+  @keyframes emberflick {
+    0%, 100% { opacity: .85; }
+    31%      { opacity: .55; }
+    52%      { opacity: 1; }
+    78%      { opacity: .65; }
+  }
                           to { transform: translateY(-220px); } }
   @keyframes candleGlow {
     0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(201,162,39,.25)); }
@@ -351,7 +399,7 @@
 </style>
 </head>
 <body>
-<div id="embers" aria-hidden="true"></div>
+<div id="embers" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="cursorlight" aria-hidden="true"></div>
 
 <header>
