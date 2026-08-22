@@ -119,3 +119,20 @@ def test_an_outcome_with_nothing_of_the_players_in_it_is_dropped_entirely(played
     """The hidden check's tell reaches the player through the narration. It does not
     need a blank line in the roll log announcing that something was rolled."""
     assert len(_player_visible_entry(played)["outcomes"]) == 1
+
+
+def test_history_withholds_the_because_from_the_next_turn():
+    """Both playtested models copied their own prior `because` verbatim into new turns —
+    "going over the wall while the lamp is away" on a social question, "you've got an
+    opponent down" on three attacks across two scenes. A model's own last answer is the
+    strongest template it sees, so what must be written fresh is withheld from history.
+    The full intents still reach the turn log."""
+    import re
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    m = re.search(r'c\.history\.append\(\{"role": "assistant", "content": json\.dumps\(\n'
+                  r"(.*?)\)\}\)", src, re.S)
+    assert m, "the assistant history append has moved; update this test"
+    assert "because" not in m.group(1)
+    assert '"op": i.op' in m.group(1)

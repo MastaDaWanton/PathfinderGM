@@ -362,3 +362,36 @@ def test_the_claim_reports_the_sentence_so_the_repair_can_be_targeted():
     claims = find_outcome_claims(text)
     assert claims
     assert claims[0].sentence == "You slip past him into the dark."
+
+
+# --- the outcome claims that got through in live play (2026-08-22) --------------------------
+
+@pytest.mark.parametrize("sentence,why", [
+    ("Your blade bites deep into her side, and she gasps in shock.",
+     "states an attack landing"),
+    ("His fist connects with a sickening crunch to your cheekbone.",
+     "states an attack landing"),
+    ("Your dagger still lodged in the arm of the would-be attacker.",
+     "states an attack having landed"),
+    ("He now lies clutching at the wound in agony.", "states a wound already dealt"),
+    ("You are quick and strike him in the arm.", "states an attack landing"),
+    ("He is bleeding from the arm.", "states a wound already dealt"),
+])
+def test_the_pre_resolved_attacks_from_the_playtest_are_caught(sentence, why):
+    """Every one of these printed in *setup* narration, before the attack roll was
+    offered, in the 2026-08-22 sessions. The first pattern knew "the blade" and not
+    "your blade", and knew nothing of a wound described as already there."""
+    claims = find_outcome_claims(sentence)
+    assert any(c.why == why for c in claims), sentence
+
+
+@pytest.mark.parametrize("sentence", [
+    "The thug lunges at you with his blade, trying to take advantage.",
+    "She dances past your attack, her own blade flashing in the morning sun.",
+    "He shifts his grip on the sap and comes in low.",
+    "He draws his sword and sets his feet.",
+])
+def test_a_wind_up_is_not_an_outcome(sentence):
+    """The line the detector must not cross: an attack *beginning* is exactly what setup
+    narration is for. Only the landing is the engine's to decide."""
+    assert find_outcome_claims(sentence) == [], sentence

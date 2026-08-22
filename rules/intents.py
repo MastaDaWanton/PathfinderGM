@@ -716,9 +716,25 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     (r"\byour?\s+(?:hit points?|hp)\b", "states hit points"),
     (r"\byou (?:succeed|fail|manage to|barely make|don't make)\b", "states success or failure"),
     (r"\byou(?:'re| are) (?:hit|struck|wounded|killed|dead)\b", "states being hit"),
-    (r"\b(?:the (?:blow|blade|arrow|bolt|strike)|it) (?:lands|connects|bites|sinks|finds)\b",
+    # The determiner list grew from live play: "Your blade bites deep into her side" and
+    # "His fist connects with a sickening crunch" both printed in *setup* narration,
+    # before any attack roll was offered, and the first version of this pattern only knew
+    # "the blade". The gap between noun and verb is bounded so "your blade — the one your
+    # mother gave you — is old" cannot match across half a paragraph.
+    (r"\b(?:the|your|his|her|their|its|a)\s+"
+     r"(?:blow|blade|arrow|bolt|strike|dagger|rapier|sword|knife|axe|spear|club|mace|fist)\b"
+     r"[^.!?]{0,40}?\b(?:lands|connects|bites|sinks|finds|pierces|goes in|slides in"
+     r"|tears into|slams into|drives into|opens)\b",
      "states an attack landing"),
-    (r"\b(?:misses|missed|goes wide|glances off|skitters past)\b", "states an attack missing"),
+    # "your dagger still lodged in the arm of the would-be attacker" — the wound described
+    # as already there is the hit described as already rolled.
+    (r"\b(?:lodged|buried|embedded|sunk)\s+in\b", "states an attack having landed"),
+    (r"\bstrik(?:e|es|ing)\s+(?:him|her|them|it)\s+in\s+the\b", "states an attack landing"),
+    (r"\bbleed(?:s|ing)\s+from\b", "states a wound already dealt"),
+    (r"\bclutch(?:es|ing)\s+(?:at\s+)?(?:the|his|her|their|its)\s+wound\b",
+     "states a wound already dealt"),
+    (r"\b(?:misses|missed|goes wide|glances off|skitters past|flashes past|sails wide)\b",
+     "states an attack missing"),
     (r"\byou (?:dodge|duck|roll) (?:clear|aside|away)\b", "states a save succeeding"),
     (r"\bthe (?:save|check|roll) (?:succeeds|fails)\b", "states a roll's result"),
     (r"\byou slip (?:past|by) (?:him|her|them|the guard)\b", "states a stealth result"),

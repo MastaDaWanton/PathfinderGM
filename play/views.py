@@ -574,8 +574,17 @@ def _advance(request, c, agent, narration, plan, player_input):
     # is replaced every turn rather than accumulating.
     c.suggestions = list(getattr(plan, "suggestions", []) or [])
     c.history.append({"role": "user", "content": player_input})
+    # The intents go into history stripped to what happened — op, actor, target — and
+    # never the `because`. The full record went in at first, and both playtested models
+    # copied their own prior reasons verbatim into new turns: "going over the wall while
+    # the lamp is away" attached to a social question one turn later, "you've got an
+    # opponent down" on three different attacks across two scenes. A model's own last
+    # answer is the strongest template it sees, so the parts that must be written fresh
+    # each turn are withheld from it. The full intents still reach the turn log.
     c.history.append({"role": "assistant", "content": json.dumps(
-        {"narration": narration, "intents": [i.as_dict() for i in plan.intents]}
+        {"narration": narration,
+         "intents": [{"op": i.op, "actor": i.actor, "target": i.target}
+                     for i in plan.intents]}
     )})
     _log_turn(c, plan, resolution)
 
