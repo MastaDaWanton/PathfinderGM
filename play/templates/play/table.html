@@ -73,7 +73,7 @@
        stone gave way to a real texture, under a scrim just dark enough
        that ink stays ink. Fixed, so the page scrolls over the binding. */
     background:
-      linear-gradient(rgba(9, 7, 5, .60), rgba(5, 4, 3, .76)),
+      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
       url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
   /* The candle. A fixed pool of warm light rising from the writing desk — the
@@ -438,7 +438,7 @@
     transform: translateX(1.5%) scale(.995); opacity: 0;
     transition: transform .3s cubic-bezier(.2, .9, .3, 1), opacity .3s ease;
     background:
-      linear-gradient(rgba(9, 7, 5, .60), rgba(5, 4, 3, .76)),
+      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
       url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
   #sheetpanel.on { display: grid; transform: none; opacity: 1; }
@@ -959,6 +959,15 @@
      what is under it instead of painting over it; transform-only follow, fed
      by one pointermove writing --cx/--cy. Gone on touch screens (no cursor to
      carry it) and under prefers-reduced-motion with everything else. */
+  /* The carried light, in three layers on one element, because one flat disc
+     flickering on a step curve read as a strobing sprite rather than fire:
+     - the element is the steady pool, breathing slowly on a smooth curve;
+     - ::before is the dapple — the same light masked by a repeating field of
+       soft blotches whose mask pans in a slow diagonal drift, which is what
+       makes the pool's interior *move* the way firelight on a wall moves;
+     - ::after is the faintest set of lantern rays, a conic mask turning very
+       slowly. Rays and dapple drift against each other, so the light never
+       repeats itself in any period a person would notice. */
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;
     margin: -85px 0 0 -85px; pointer-events: none; z-index: 60;
@@ -966,20 +975,53 @@
        a lamp glows from the body of its flame, not the very top of it. */
     transform: translate(var(--cx, -600px), calc(var(--cy, -600px) + 5px));
     background: radial-gradient(circle,
-      rgba(255, 190, 100, .20), rgba(232, 170, 80, .07) 45%, transparent 70%);
+      rgba(255, 190, 100, .15), rgba(232, 170, 80, .06) 45%, transparent 70%);
     mix-blend-mode: screen;
-    animation: carriedflame 2.8s steps(1, end) infinite;
+    animation: poolbreathe 3.7s ease-in-out infinite;
+  }
+  #cursorlight::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle,
+      rgba(255, 200, 110, .22), rgba(240, 175, 85, .08) 40%, transparent 65%);
+    -webkit-mask-image: repeating-radial-gradient(circle at 30% 30%,
+      #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+    mask-image: repeating-radial-gradient(circle at 30% 30%,
+      #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+    -webkit-mask-size: 190px 190px; mask-size: 190px 190px;
+    animation: dapplepan 7.3s ease-in-out infinite alternate,
+               carriedflame 2.8s steps(1, end) infinite;
+  }
+  #cursorlight::after {
+    content: ""; position: absolute; inset: -18%;
+    background: radial-gradient(circle,
+      rgba(255, 190, 100, .10), transparent 62%);
+    -webkit-mask-image: repeating-conic-gradient(from 0deg,
+      #000 0 11deg, rgba(0,0,0,.3) 16deg, #000 27deg);
+    mask-image: repeating-conic-gradient(from 0deg,
+      #000 0 11deg, rgba(0,0,0,.3) 16deg, #000 27deg);
+    animation: raywheel 17s linear infinite;
+  }
+  @keyframes poolbreathe {
+    0%, 100% { opacity: .85; scale: 1; }
+    50%      { opacity: 1;   scale: 1.05; }
+  }
+  @keyframes dapplepan {
+    from { -webkit-mask-position: 0 0; mask-position: 0 0; }
+    to   { -webkit-mask-position: 46px 34px; mask-position: 46px 34px; }
+  }
+  @keyframes raywheel {
+    to { transform: rotate(360deg); }
   }
   @keyframes carriedflame {
-    0%   { opacity: .85; scale: 1; }
-    9%   { opacity: 1;   scale: 1.05; }
-    21%  { opacity: .78; scale: .97; }
-    33%  { opacity: .95; scale: 1.02; }
-    46%  { opacity: .82; scale: .99; }
-    58%  { opacity: 1;   scale: 1.06; }
-    71%  { opacity: .75; scale: .96; }
-    84%  { opacity: .92; scale: 1.03; }
-    100% { opacity: .85; scale: 1; }
+    0%   { opacity: .8; }
+    9%   { opacity: 1; }
+    21%  { opacity: .72; }
+    33%  { opacity: .92; }
+    46%  { opacity: .78; }
+    58%  { opacity: 1; }
+    71%  { opacity: .7; }
+    84%  { opacity: .9; }
+    100% { opacity: .8; }
   }
   @media (hover: none) { #cursorlight { display: none; } }
 
