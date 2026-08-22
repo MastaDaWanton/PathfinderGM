@@ -700,7 +700,7 @@ function render(s) {
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
       ${s.scene.biome ? `<div class="biome" title="${esc(s.scene.biome_describe)}">
-        ${esc(s.scene.location)} · ${esc(s.scene.biome)}</div>` : ""}
+        ${esc(s.scene.location)} · ${esc(s.scene.biome)} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
       <div class="bar"><i style="width:${pct}%"></i>${
         temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
       <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
@@ -1520,6 +1520,19 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sign = n => (n >= 0 ? "+" : "") + n;
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
+
+// Elapsed campaign time, from the engine's own clock. Elapsed rather than a time of day,
+// because the engine has no notion of when the campaign started — "day 2, hour 3" is a
+// fact the clock can state, and "9 in the morning" would be an invention. The playtest
+// foraged for eight real hours and slept a full night and the page never showed a minute
+// of it; the number was in the payload all along and nothing rendered it.
+const fmtClock = mins => {
+  mins = mins || 0;
+  const day = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+  if (!day && !h) return m ? `${m}m in` : "the first hour";
+  const hm = m ? `${h}h ${m}m` : `${h}h`;
+  return day ? `day ${day + 1}, ${hm} in` : `${hm} in`;
+};
 
 render(STATE);
 </script>

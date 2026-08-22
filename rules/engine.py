@@ -237,6 +237,44 @@ class Scene:
         self.acted = set()
         self.sides = {}
 
+    def depart(self, ref: str) -> Actor | None:
+        """Take one creature out of the scene, and out of every structure that names it.
+
+        The structures are the point. A first version that only deleted from `actors`
+        would leave the ref in the initiative order, the sides, the zones, the guard
+        arrangements and the reaction ledger — five places for a ghost to keep acting
+        from. The 2026-08-22 playtest produced exactly that ghost by never removing
+        anybody at all: a gatekeeper wounded in the city travelled inside the scene to
+        the forest and took an NPC turn after every player turn for the rest of the
+        session.
+
+        The PC is refused: a scene without its player is not a scene, it is a bug.
+        """
+        actor = self.actors.get(ref)
+        if actor is None or actor.is_pc:
+            return None
+
+        # The initiative order shrinks, and `turn` must go on pointing at the same
+        # creature — an index into a list that just changed length is how a removal
+        # hands somebody else's turn to the wrong side of the fight.
+        current = self.initiative[self.turn][0] if 0 <= self.turn < len(self.initiative) else None
+        self.initiative = [(r, roll) for r, roll in self.initiative if r != ref]
+        if current == ref or current is None:
+            self.turn = -1 if not self.initiative else min(self.turn, len(self.initiative) - 1)
+        else:
+            self.turn = next(i for i, (r, _) in enumerate(self.initiative) if r == current)
+
+        del self.actors[ref]
+        self.zones.pop(ref, None)
+        self.positions.pop(ref, None)
+        self.acted.discard(ref)
+        self.reacted = {k: v for k, v in self.reacted.items()
+                        if not k.startswith(f"{ref}:")}
+        self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]
+        self.sides = {side: [r for r in refs if r != ref]
+                      for side, refs in self.sides.items()}
+        return actor
+
 
 # --- Results -----------------------------------------------------------------------
 
@@ -1431,7 +1469,20 @@ class Engine:
         )
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
-        """Move the ground underfoot. What grows here follows from it."""
+        """Move the ground underfoot — and leave behind everyone who is not coming.
+
+        Travel is the scene transition, and until it shed anybody it was only a biome
+        field changing: in the 2026-08-22 playtest a gatekeeper wounded in the city
+        travelled inside the scene to the forest, still in an initiative order that
+        never ended, and took a "holds back" NPC turn after every player turn for the
+        rest of the session. Every attack the fiction aimed at forest strangers then
+        landed on him, because he was the only body the engine had.
+
+        So travelling ends the encounter — walking to another biome *is* leaving the
+        fight — and drops every non-PC actor except the refs named in `with`, which is
+        how the GM says an escort comes along. The dead and the dying are not eligible
+        even there: they stay where they fell.
+        """
         want = str(intent.params["biome"]).strip().lower()
         biome = biomes.canonical(want)
         if biome is None:
@@ -1439,13 +1490,44 @@ class Engine:
                 f"travel: {want!r} is not a biome. The biomes are: "
                 f"{', '.join(sorted(biomes.BIOMES))}.",
                 "schema")
+
+        kept = {str(r) for r in (intent.params.get("with") or [])}
+        left: list[str] = []
+        if biome != self.scene.biome:
+            fight_ended = self.scene.in_encounter
+            if fight_ended:
+                self.scene.end_encounter()
+            for ref in list(self.scene.actors):
+                actor = self.scene.actors[ref]
+                if actor.is_pc:
+                    continue
+                stays = ref not in kept and str(actor.name) not in kept
+                cannot_come = (actor.hp <= 0
+                               or actor.has_condition("dead")
+                               or actor.has_condition("dying")
+                               or actor.has_condition("unconscious"))
+                if stays or cannot_come:
+                    self.scene.depart(ref)
+                    left.append(actor.name)
+        else:
+            fight_ended = False
+
         was, self.scene.biome = self.scene.biome, biome
         note = str(intent.params.get("note") or "").strip()
+        bits = []
+        if biome != was:
+            bits.append(f"The ground changes: {biomes.describe(biome).lower()}.")
+        if fight_ended:
+            bits.append("The fight is left behind.")
+        if left:
+            bits.append(f"Left behind: {', '.join(left)}.")
+        if note:
+            bits.append(note)
         return Outcome(
             intent_id=intent.id, op="travel",
-            effects=[{"kind": "biome", "biome": biome, "was": was}],
-            tell=(f"The ground changes: {biomes.describe(biome).lower()}."
-                  if biome != was else "") + (f" {note}" if note else ""),
+            effects=[{"kind": "biome", "biome": biome, "was": was, "left": left,
+                      "fight_ended": fight_ended}],
+            tell=" ".join(bits),
             because=intent.because,
         )
 

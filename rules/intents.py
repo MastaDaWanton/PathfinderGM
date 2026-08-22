@@ -199,7 +199,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # applied it.
     "resource": (("pool",), ("actor", "to", "amount", "spend", "cooldown"), "hidden"),
     # Where the party is standing, which decides what grows here.
-    "travel": (("biome",), ("note",), "hidden"),
+    # `with` names the refs who come along; everyone else stays behind, because travel
+    # is the scene transition. Before it shed anybody, a gatekeeper wounded in the city
+    # followed the player to the forest and took an NPC turn forever.
+    "travel": (("biome",), ("note", "with"), "hidden"),
     # Searching the ground. The roll is the player's: it is their afternoon.
     # `hours` because foraging is time now: a minimum of one, and as many as the player
     # wants to spend. Every hour is its own Survival check, and past a day awake every
