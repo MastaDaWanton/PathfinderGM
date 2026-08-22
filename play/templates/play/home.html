@@ -29,7 +29,7 @@
     margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
     height: 100vh; overflow: hidden; display: flex; flex-direction: column;
     background:
-      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
+      linear-gradient(rgba(9, 7, 5, .60), rgba(5, 4, 3, .76)),
       url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
 
@@ -436,11 +436,13 @@
      by one pointermove writing --cx/--cy. Gone on touch screens (no cursor to
      carry it) and under prefers-reduced-motion with everything else. */
   #cursorlight {
-    position: fixed; left: 0; top: 0; width: 360px; height: 360px;
-    margin: -180px 0 0 -180px; pointer-events: none; z-index: 60;
-    transform: translate(var(--cx, -600px), var(--cy, -600px));
+    position: fixed; left: 0; top: 0; width: 170px; height: 170px;
+    margin: -85px 0 0 -85px; pointer-events: none; z-index: 60;
+    /* +5px down from the hotspot: the pointer's point is the flame's tip, and
+       a lamp glows from the body of its flame, not the very top of it. */
+    transform: translate(var(--cx, -600px), calc(var(--cy, -600px) + 5px));
     background: radial-gradient(circle,
-      rgba(255, 190, 100, .13), rgba(232, 170, 80, .05) 42%, transparent 68%);
+      rgba(255, 190, 100, .20), rgba(232, 170, 80, .07) 45%, transparent 70%);
     mix-blend-mode: screen;
     animation: carriedflame 2.8s steps(1, end) infinite;
   }
