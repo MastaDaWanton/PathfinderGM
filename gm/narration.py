@@ -258,3 +258,70 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             if low not in found:
                 found.append(tok)
     return found
+
+
+# --- the consequence call ------------------------------------------------------------------
+
+# The scaffold headers of `prompts.call_two_messages`, as they come back when a model
+# echoes its own prompt. Measured on richardyoung/qwen3-4b-instruct-2507-abliterated,
+# first live playtest turn: the whole user message came back inside the answer — headers,
+# bullet lists, the lot — repeated four times over, 2,897 characters written straight into
+# the transcript because nothing stood between call 2 and `c.transcript.append`.
+#
+# Matched anywhere, not only at line starts: the echoed header lands mid-line whenever the
+# model glues it to the end of a sentence — "...falling. The player said: I look around" —
+# and an anchored pattern left exactly that fragment in front of the player.
+_SCAFFOLD = re.compile(
+    r"(?:the player said|you had already narrated|what the engine decided"
+    r"|why it was rolled)\b[:\s]*[^\n]*|^\s*-\s.*$", re.I | re.M)
+
+# Two or three sentences is the brief; this is far past any honest answer and exists so a
+# looping model cannot write a page. Same reasoning as MAX_COMBAT_CHARS: a cap set above
+# everything legitimate catches only the pathological.
+MAX_CONSEQUENCE_CHARS = 700
+
+
+def clean_consequence(text: str, example_answer: str = "") -> str:
+    """What survives of a call-2 reply once the prompt itself is taken back out of it.
+
+    Everything here is mechanical — no model call, following the rule that held all
+    through World Bible: detect mechanically, and only then decide whether to repair.
+    The caller treats an empty answer as "render the engine's tells raw", which is always
+    correct and never invents anything, so cutting too much is safe and cutting too
+    little puts prompt scaffolding in front of the player.
+
+    Three cuts, in the order the damage was observed:
+
+    - scaffold lines: the model returning its own prompt as prose;
+    - the worked example's answer: the 4B copied it word for word, and because the example
+      had been written about the very guildhand the fixture opens on, the plagiarism read
+      exactly like play and narrated the player over a wall they never went near;
+    - repetition: the loop that wrote the same paragraph four times. Sentences are kept
+      once, in order, and the text is capped.
+    """
+    if not text:
+        return ""
+    text = _SCAFFOLD.sub("", text)
+
+    if example_answer:
+        for sentence in _SENTENCE.findall(example_answer):
+            wanted = sentence.strip()
+            if len(wanted) > 20:
+                text = text.replace(wanted, "")
+
+    seen: set[str] = set()
+    kept: list[str] = []
+    for sentence in _SENTENCE.findall(text):
+        s = " ".join(sentence.split())
+        key = s.lower().strip(".!? ")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        kept.append(s)
+    out = " ".join(kept).strip()
+    # A residue with no letters — a lone "-", a stray bullet glyph — is not a sentence,
+    # and rendering it prints punctuation as the GM's whole reply. Observed live: the
+    # transcript line read exactly "-".
+    if not re.search(r"[a-zA-Z]", out):
+        return ""
+    return out[:MAX_CONSEQUENCE_CHARS].rstrip()

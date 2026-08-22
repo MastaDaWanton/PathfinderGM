@@ -373,7 +373,14 @@ class GMAgent:
             # accepted by the API and ignored by this tune, so headroom is the fix.
             self.prose_model, self.prose_host, temperature=0.7, num_predict=700,
         )
-        text = judgement.name_refs(reply.text.strip(), self.engine.scene)
+        # Mechanical, before anything else sees it: the 4B qwen echoed the whole call-2
+        # prompt back as prose — scaffold headers, bullet lists, the worked example's
+        # answer word for word, looped four times — and 2,897 characters of it went
+        # straight into the transcript, because nothing stood between this return and
+        # `c.transcript.append`. An empty answer is safe: the caller renders the tells.
+        cleaned = narration_mod.clean_consequence(
+            reply.text.strip(), prompts.CONSEQUENCE_EXAMPLE["assistant"])
+        text = judgement.name_refs(cleaned, self.engine.scene)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
 
 

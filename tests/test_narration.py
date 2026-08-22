@@ -233,3 +233,66 @@ def test_an_ordinary_finding_weighs_one():
 def test_a_clean_passage_scores_nothing(echoes):
     assert narration.review("The gate hangs open on one hinge.",
                             echo_index=echoes).score == 0
+
+
+# --- the consequence guard -------------------------------------------------------------
+
+def test_a_consequence_that_echoes_its_own_prompt_is_stripped_to_what_survives():
+    """Measured on richardyoung/qwen3-4b-instruct-2507-abliterated, first live playtest
+    turn: the whole call-2 user message came back inside the answer — "The player said:",
+    "You had already narrated:", "What the engine decided:", the bullet lists — repeated
+    four times, 2,897 characters written straight into the transcript. Nothing stood
+    between the model's return and `c.transcript.append`."""
+    from gm import narration
+
+    echoed = (
+        "- the player didn't go over the wall yet\n\n"
+        "What the engine decided:\n"
+        "- Kesst Vayr beats the guildhand on the gate's perception by 5.\n"
+        "The blade goes in under the guard. The player said: I stab him\n\n"
+        "What the engine decided:\n"
+        "- Kesst Vayr beats the guildhand on the gate's perception by 5.\n"
+        "The blade goes in under the guard."
+    )
+    assert narration.clean_consequence(echoed) == "The blade goes in under the guard."
+
+
+def test_the_worked_examples_answer_cannot_be_passed_off_as_play():
+    """The 4B copied the example's assistant text word for word, and because the example
+    had been written about the fixture's own guildhand, the plagiarism read exactly like
+    the game. The copied answer is now cut mechanically — and the example itself was moved
+    to a ferry nowhere in the shipped world, so a copy can never blend in again."""
+    from gm import narration, prompts
+
+    example = prompts.CONSEQUENCE_EXAMPLE["assistant"]
+    copied = "The stranger nods. " + example
+    assert narration.clean_consequence(copied, example) == "The stranger nods."
+    # And the example steers clear of the fixture's own scene, cast and furniture.
+    for word in ("Kesst", "guildhand", "guild", "lamp"):
+        assert word.lower() not in example.lower()
+
+
+def test_an_honest_consequence_passes_untouched():
+    from gm import narration
+
+    good = ("The stranger in the corner meets your eye and nods once. "
+            "The guildhand never looks up from his post.")
+    assert narration.clean_consequence(good) == good
+
+
+def test_a_looping_consequence_is_capped():
+    from gm import narration
+
+    out = narration.clean_consequence(
+        " ".join(f"Sentence number {i} happens here." for i in range(200)))
+    assert len(out) <= narration.MAX_CONSEQUENCE_CHARS
+
+
+def test_a_consequence_with_no_letters_is_nothing():
+    """Observed live: the GM's whole reply rendered as exactly "-". A residue with no
+    letters is punctuation, not a sentence, and the caller's fallback — the engine's own
+    tells — is strictly better."""
+    from gm import narration
+
+    assert narration.clean_consequence("-") == ""
+    assert narration.clean_consequence("— …") == ""

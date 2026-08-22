@@ -656,17 +656,24 @@ Write it as fiction, not as a report."""
 # "As I waited for the perfect moment... my chance arrived" — it took the player's own
 # first-person input as the voice to continue. Instruction volume loses to demonstration
 # volume, so the person is fixed by showing it once rather than by saying it twice.
+# Deliberately nowhere near the shipped world: no Kesst, no guildhand, no gate. The first
+# version of this example was written about the very yard the fixture opens on, and when
+# the 4B qwen copied its answer word for word — which it did, on the first live playtest
+# turn — the plagiarism read exactly like play and narrated the player over a wall they
+# had never gone near. An example about a ferry can be copied and still be *caught*,
+# because nothing in the campaign will ever look like it.
 CONSEQUENCE_EXAMPLE = {
     "user": (
-        "The player said: I go over the wall while he is not looking.\n\n"
-        "You had already narrated: The lamp sweeps the yard and starts back.\n\n"
+        "The player said: I grab for the mooring rope before the ferry drifts out.\n\n"
+        "You had already narrated: The current has the ferry now, and the old man is "
+        "shouting at you from the deck.\n\n"
         "What the engine decided:\n"
-        "- Kesst Vayr beats the guildhand on the gate's perception by 10.\n"
+        "- Ashka Verel makes the Reflex save by 3.\n"
     ),
     "assistant": (
-        "You are over before the lamp comes back, and the drop on the far side is "
-        "shorter than it looked. Behind you the guildhand shifts his weight and says "
-        "something to nobody, and goes on watching the light."
+        "The rope burns through your palms and then holds, and the ferry swings back "
+        "against the pilings hard enough to stagger the old man. He looks at the water, "
+        "then at you, and does not say thank you."
     ),
 }
 

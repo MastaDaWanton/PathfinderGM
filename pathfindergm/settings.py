@@ -81,8 +81,17 @@ CAMPAIGN_DIR = user_data_root() / "campaigns"
 #
 # Anyone who prefers one model everywhere can set both to the same thing.
 MODELS = {
-    "narrator": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
-    "prose": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
+    # llama3.1:8b, after a full playtest session on each (2026-08-22). The 4B abliterated
+    # qwen read well in seven-turn harnesses and failed a real session on every axis that
+    # matters: it proposed a wall-climb for "I look around", carried the stale intent into
+    # a social turn, narrated whole days on the player's behalf, recycled its own
+    # paragraphs verbatim across turns, and answered "I draw my dagger and attack" with a
+    # fight it resolved entirely in prose — no intent ever reached the engine. Speed is
+    # nothing when the model will not put the game in front of the rules.
+    "narrator": {"provider": "ollama", "model": "llama3.1:8b",
+                 "host": "http://localhost:11434"},
+    "prose": {"provider": "ollama", "model": "llama3.1:8b",
+              "host": "http://localhost:11434"},
     # RESERVED, AND CURRENTLY WIRED TO NOTHING. The world-state agent of
     # `docs/architecture.md` — the cheap model that would watch play, move factions
     # between scenes and turn a burned bridge into a hook — has not been built. There is
@@ -91,5 +100,10 @@ MODELS = {
     # loaded and never called. Kept because the role is a settled design decision and
     # deleting it would lose that; labelled because a configurable model that silently
     # does nothing reads exactly like a feature that is running.
-    "watcher": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
+    #
+    # deepseek-r1:8b by choice: a reasoning model suits a role that reads a log and
+    # decides what changed, the same split World Bible used it for (proofreader beside a
+    # generator). When the queue exists this is the model that should wake.
+    "watcher": {"provider": "ollama", "model": "deepseek-r1:8b",
+                "host": "http://localhost:11434"},
 }
