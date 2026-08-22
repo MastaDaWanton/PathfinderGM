@@ -17,6 +17,7 @@ from . import biomes
 from . import casting
 from . import compulsion
 from . import consumables
+from . import crafting
 from . import dc as dc_mod
 from . import foraging
 from . import ingredients as ing_mod
@@ -1304,10 +1305,24 @@ class Engine:
             return
         level = actor.track(track.id).level
         ceiling = track.at(level).max_tier
-        if worldclass.tier_rank(str(tier)) > worldclass.tier_rank(ceiling):
+
+        # What the ceiling governs is the material the character *works*, not the band
+        # the result comes out at. For every ordinary chain those are the same thing, so
+        # the distinction never showed — until concentration, which is the one craft
+        # designed to hand back something rarer than anything that went in. `crafting.
+        # _concentration` checks the input and lets the output climb; this checked the
+        # output. Two copies of one rule, disagreeing, and the disagreement was visible
+        # in the app: /api/craft/preview returned 200 with a real percentage and
+        # /api/craft/do answered 400 on the identical chain. That killed the ladder at
+        # every rung above the crafter's own band, including the rung that reaches
+        # legendary — which is the deed Herbalist 5 waits on.
+        worked = worldclass.tier_rank(str(tier))
+        if intent.params.get("concentrating"):
+            worked -= crafting.CONCENTRATE_RARITY_STEP
+
+        if worked > worldclass.tier_rank(ceiling):
             needed = next(l.level for l in sorted(track.levels, key=lambda x: x.level)
-                          if worldclass.tier_rank(l.max_tier)
-                          >= worldclass.tier_rank(str(tier)))
+                          if worldclass.tier_rank(l.max_tier) >= worked)
             raise IntentError(
                 f"craft: {track.name} {level} works {ceiling} at best, and "
                 f"{intent.params.get('recipe', 'this')} is {tier}. "

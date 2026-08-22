@@ -189,8 +189,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "item_damage": (("amount",), ("to", "item", "type"), "hidden"),
     # Working at a world class — foraging, harvesting, brewing. Advances the track, which
     # levels on what the character does rather than on their experience total.
+    # `concentrating` because two doses in and one of the next band out is the one craft
+    # whose output is deliberately rarer than anything that went into it: the ceiling has
+    # to be checked against the input there, not the result. See `Engine._check_craft`.
     "craft": (("track", "recipe"), ("actor", "tier", "stages", "risky", "failed",
-                                    "milestone"), "hidden"),
+                                    "milestone", "concentrating"), "hidden"),
     # Spending or granting a pool: ki, rage rounds, a use per day, a stack on an enemy.
     # `to` because a stack lives on the creature it was applied to, not on whoever
     # applied it.

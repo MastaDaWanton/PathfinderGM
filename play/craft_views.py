@@ -222,6 +222,13 @@ def craft_do(request):
     face = roll.faces[0]
     succeeded = face != 1 and (face == 20 or _hits(face, result.chance))
 
+    # The deed a milestone-locked level waits on, recorded when it is actually done.
+    # Without this the bench sent no `milestone` at all, so a character could craft the
+    # very thing Herbalist 5 asks for and the level stayed locked for good — the points
+    # were kept and nothing on the page ever explained what was missing.
+    track = worldclass.get(state["track"])
+    milestone = track.deed_done(tier=result.tier, success=succeeded)
+
     try:
         resolution = engine.run(engine.validate([{
             "op": "craft", "actor": "pc",
@@ -233,6 +240,10 @@ def craft_do(request):
                 "stages": max(1, result.stages),
                 "risky": result.risky,
                 "failed": not succeeded,
+                "milestone": milestone,
+                # Two doses in, one of the next band out: the ceiling is checked against
+                # what went in, so the engine has to be told which kind of craft this is.
+                "concentrating": result.concentrating,
             },
         }]))
     except IntentError as exc:

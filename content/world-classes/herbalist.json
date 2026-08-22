@@ -11,6 +11,14 @@
     "5": "legendary-catalyst"
   },
 
+  "_deeds_note": "The deed for Herbalist 5 was 'crafting a legendary catalyst', and read literally that gate could never open: `catalyst crafting` is a Level 5 method and legendary material is Level 5 material, so the deed required the level it was gating. Measured by brute force over every method permutation an Herbalist 1-4 knows against every legendary ingredient: 0 legal chains. Level 5 was unreachable and so was every catalyst. The deed is therefore the material, not the method — successfully working legendary material is the grand catalyst, and `catalyst crafting` is the mastery that follows it. An Herbalist 4 reaches legendary material the one way the rules already allow: the concentration ladder, two exotic doses into one legendary one, at 15%.",
+  "deeds": {
+    "legendary-catalyst": {
+      "min_tier": "legendary",
+      "note": "Any successful craft at legendary tier, however it was reached."
+    }
+  },
+
   "levels": [
     {
       "level": 1,

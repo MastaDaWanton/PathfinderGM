@@ -257,6 +257,11 @@
           overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,.7); }
   .mbar > i { display: block; height: 100%;
               background: linear-gradient(90deg, #8a6f3e, var(--accent)); }
+  /* A full bar that does not level looks broken unless the page says what is missing.
+     The deed was in the track state all along and was simply never drawn: a character
+     could sit at 110 of 100 MP with nothing on screen explaining why they were still
+     Herbalist 4. Tinted like a lock rather than an error — it is a goal, not a fault. */
+  .mwaits { color: var(--accent); font-style: italic; }
   #err { color: var(--alarm); font-size: 14px; min-height: 1em; }
 
   .locked-note {
@@ -546,10 +551,19 @@ function renderMastery() {
   if (!t || !t.available) { $("#mastery").innerHTML = ""; return; }
   const need = t.to_next ? t.to_next.of : 0;
   const pct = need ? Math.min(100, Math.round(100 * t.mp / need)) : 100;
+  // The deed, when the points are no longer what is holding the level back. Without it
+  // a paid-up track reads as a bug: the bar is full, the level does not move, and the
+  // page gives no reason. `legendary-catalyst` is a slug in the data, so it is spelled
+  // out here rather than shown raw.
+  const waits = t.to_next && t.to_next.milestone
+    ? `<span class="mwaits">${esc(t.name)} ${t.level + 1} also waits on `
+      + `${esc(t.to_next.milestone.replace(/-/g, " "))}</span>`
+    : "";
   $("#mastery").innerHTML = `
     <span>${esc(t.name)} ${t.level} · ${esc(t.max_tier)}</span>
     <span class="mbar"><i style="width:${pct}%"></i></span>
-    <span>${t.to_next ? `${t.mp} / ${need} MP` : "mastered"}</span>`;
+    <span>${t.to_next ? `${t.mp} / ${need} MP` : "mastered"}</span>
+    ${waits}`;
 }
 
 async function refresh() {

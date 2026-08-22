@@ -90,9 +90,21 @@ def table_for(biome: str, rank_ceiling: int = 5) -> Table:
         return Table(biome=biome, rank_ceiling=rank_ceiling, rows=[], nothing_from=1)
 
     found.sort(key=lambda i: (i.rank, i.name))
+    span = 100 - MIN_NOTHING
+
+    # A d100 table has room for `span` rows at one percent each, and a rich biome can
+    # field more candidates than that. Which ones get cut has to be decided here rather
+    # than left to wherever the cursor happened to run out. Laying the rows down
+    # commonest-first and breaking when the table filled up deleted the *rarest* end —
+    # the half the table exists to gate: forest fielded 105 candidates, kept 95, and lost
+    # both of its exotic herbs and six of its seven rare ones while keeping all 88
+    # commons. Trimming from the common end instead costs the player nothing they would
+    # notice, because the commons that remain still fill four fifths of the table.
+    if len(found) > span:
+        found = found[len(found) - span:]
+
     weights = [WEIGHT.get(i.rank, 1) for i in found]
     total = sum(weights)
-    span = 100 - MIN_NOTHING
 
     rows: list[Row] = []
     cursor = 1

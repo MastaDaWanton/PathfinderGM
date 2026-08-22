@@ -91,11 +91,35 @@ class Track:
     thresholds: list[int] = field(default_factory=list)
     # Levels that need something done as well as points paid.
     milestones: dict[int, str] = field(default_factory=dict)
+    # What each of those deeds actually *is*, as {milestone: {"min_tier": ...}}. The
+    # track has to say, because nothing else can: `milestones` names a deed and the
+    # engine had no way to recognise one being done, so the bench never recorded any and
+    # the milestone-locked level stayed locked whatever the character achieved.
+    deeds: dict[str, dict] = field(default_factory=dict)
     grantable_at_creation: bool = True
 
     @property
     def max_level(self) -> int:
         return max((l.level for l in self.levels), default=1)
+
+    def deed_done(self, *, tier: str, success: bool) -> str:
+        """The milestone this craft satisfies, if it satisfies one.
+
+        Only successes count, and only at or above the tier the deed names — the deed
+        for Herbalist 5 is working legendary material, so an exotic elixir is not it
+        however well it went.
+        """
+        if not success:
+            return ""
+        rank = tier_rank(tier)
+        # Most demanding first, so a track that ever declares two deeds credits the
+        # harder one rather than whichever the dict happened to yield first.
+        earned = sorted(
+            ((tier_rank(str(spec.get("min_tier", "legendary"))), name)
+             for name, spec in self.deeds.items()),
+            reverse=True,
+        )
+        return next((name for need, name in earned if rank >= need), "")
 
     def at(self, level: int) -> Level:
         level = max(1, min(int(level), self.max_level))
@@ -224,6 +248,7 @@ def from_dict(data: dict) -> Track:
                 for l in data.get("levels", [])],
         thresholds=[int(t) for t in data.get("thresholds", [])],
         milestones={int(k): v for k, v in (data.get("milestones") or {}).items()},
+        deeds=dict(data.get("deeds") or {}),
         grantable_at_creation=bool(data.get("grantable_at_creation", True)),
     )
 

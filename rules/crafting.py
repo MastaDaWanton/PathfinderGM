@@ -410,7 +410,14 @@ def _concentration(track, level: int, chain: Chain,
                     if "distill" in l.methods)
         problems.append(f"Distill is learned at {track.name} {need}.")
 
-    dc = 10 + 5 * made.rank + 2 * max(0, chain.stages - 1)
+    # Through `_dc` rather than open-coded, because this was a second copy of the same
+    # rule and the two had drifted apart: `_dc` reads `5 + 5 * rank` and this read
+    # `10 + 5 * rank`, five harder for no reason either one gave. The five mattered at
+    # exactly one place — the top rung. A crafter's whole bonus is `3 * level`, so at
+    # Herbalist 5 it is +15, and DC 35 needed a 20 on the d20: the last step of the
+    # ladder sat at the 5% floor at *every* level, master or not, while each attempt ate
+    # two doses. Aligned, the same step is 15% at Herbalist 4 and 30% at Herbalist 5.
+    dc = _dc([], made.rank, chain.stages)
     return Result(
         name=made.name, tier=made.tier, rank=made.rank, stages=max(1, chain.stages),
         potency=made.potency, cleansed=False, risky=bool(made.drawbacks),

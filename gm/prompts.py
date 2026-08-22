@@ -776,6 +776,27 @@ out.
 Reply with a JSON object: {"narration": "..."}."""
 
 
+# The repair call was the last prompt in the file with no demonstration in it, and it
+# showed. Measured on qwen3-4b-instruct-abliterated: asked to rewrite a narration, it
+# returned `{"player": "Kesst Vayr", "pc": "Kesst V. Vayr", "c1": "the guildhand", ...}` —
+# a ref table, because nothing had ever shown it what a repair reply looks like.
+#
+# Kept deliberately plain and short. This example teaches a *shape*, and the less of it
+# there is to lift the better; the scene it describes is nowhere else in the app.
+NARRATION_REPAIR_EXAMPLE = {
+    "user": (
+        "You have copied wording from the examples: 'the lamp is at the far end'. "
+        "Rewrite it completely.\n\n"
+        "The passage:\nThe lamp is at the far end of its arc. What do you do?\n\n"
+        "The player said: I wait for my moment."
+    ),
+    "assistant": json.dumps({
+        "narration": "The light has swung as far from you as it is going to get, and it "
+                     "will not stay there. What do you do?"
+    }),
+}
+
+
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
                               scene_brief: str = "") -> list[dict]:
     """The rewrite call, given something to write *about*.
@@ -793,5 +814,7 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
         body += f"\n\nWrite about this scene, and nothing else:\n{scene_brief}"
     return [
         {"role": "system", "content": NARRATION_REPAIR_BRIEFING},
+        {"role": "user", "content": NARRATION_REPAIR_EXAMPLE["user"]},
+        {"role": "assistant", "content": NARRATION_REPAIR_EXAMPLE["assistant"]},
         {"role": "user", "content": body},
     ]
