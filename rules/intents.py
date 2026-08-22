@@ -721,18 +721,37 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     # before any attack roll was offered, and the first version of this pattern only knew
     # "the blade". The gap between noun and verb is bounded so "your blade — the one your
     # mother gave you — is old" cannot match across half a paragraph.
+    # Only the verbs that are a hit with no object to weigh: "connects", "lands", "finds
+    # its mark". The bites/sinks/slices family needs to know *what* was bitten — a blade
+    # biting into the dock beside her is a narrated miss and legal — so those live in the
+    # weapon-into-possessive shape below.
     (r"\b(?:the|your|his|her|their|its|a)\s+"
      r"(?:blow|blade|arrow|bolt|strike|dagger|rapier|sword|knife|axe|spear|club|mace|fist)\b"
-     r"[^.!?]{0,40}?\b(?:lands|connects|bites|sinks|finds|pierces|goes in|slides in"
-     r"|tears into|slams into|drives into|opens)\b",
+     r"[^.!?]{0,40}?\b(?:lands|connects|finds|pierces|opens)\b",
      "states an attack landing"),
     # "your dagger still lodged in the arm of the would-be attacker" — the wound described
     # as already there is the hit described as already rolled.
     (r"\b(?:lodged|buried|embedded|sunk)\s+in\b", "states an attack having landed"),
+    # The verb list above kept losing to the model's vocabulary — "bites", then
+    # "slices into", each one new. The *shape* is stable where the verbs are not: a
+    # weapon going into a possessive is flesh, and flesh is a hit. Into *the* something
+    # is scenery — "your blade bites deep into the wooden dock beside her" was a miss,
+    # narrated correctly, and must stay legal.
+    (r"\b(?:blow|blade|dagger|rapier|sword|knife|axe|spear|arrow|bolt|fist|steel)\b"
+     r"[^.!?]{0,30}?\binto\s+(?:(?:his|her|their|its)\b"
+     # "into the joint between her shoulder and elbow" — flesh behind a definite
+     # article. Body nouns only: "into the wooden dock" must stay a narrated miss.
+     r"|the\s+(?:gut|ribs?|joint|throat|chest|skull|belly|stomach|face|neck|eye"
+     r"|heart|flesh|shoulder|thigh|arm|leg|side|back|wound))\b",
+     "states an attack landing"),
     (r"\bstrik(?:e|es|ing)\s+(?:him|her|them|it)\s+in\s+the\b", "states an attack landing"),
     (r"\bbleed(?:s|ing)\s+from\b", "states a wound already dealt"),
     (r"\bclutch(?:es|ing)\s+(?:at\s+)?(?:the|his|her|their|its)\s+wound\b",
      "states a wound already dealt"),
+    # "The cutpurse's eyes are watering from the blow" — confirmation session, in setup,
+    # about a blow that never rolled. Anything described as being *from the blow* asserts
+    # the blow happened.
+    (r"\bfrom the blow\b", "states an attack having landed"),
     (r"\b(?:misses|missed|goes wide|glances off|skitters past|flashes past|sails wide)\b",
      "states an attack missing"),
     (r"\byou (?:dodge|duck|roll) (?:clear|aside|away)\b", "states a save succeeding"),
@@ -806,3 +825,39 @@ def _sentence_around(text: str, index: int) -> str:
     end_candidates = [e for e in end_candidates if e != -1]
     end = min(end_candidates) + 1 if end_candidates else len(text)
     return text[start + 1:end].strip()
+
+
+def cut_outcome_claims(text: str) -> tuple[str, list[str]]:
+    """The text with every outcome-claiming sentence removed, by character span.
+
+    The backstop behind the targeted repair, and it exists because the repair's
+    `str.replace(sentence, fix)` is a silent no-op whenever whitespace has shifted
+    between the extracted sentence and the narration it came from — which is how "your
+    blade bites into the joint" reached a live transcript while the pattern for it sat
+    in this file, matching. Spans cannot miss: the match position is in the current
+    string by construction.
+    """
+    claims = find_outcome_claims(text or "")
+    if not claims:
+        return text, []
+
+    spans: list[tuple[int, int]] = []
+    for c in claims:
+        start = max((text.rfind(ch, 0, c.start) for ch in ".!?\n"), default=-1) + 1
+        ends = [e for e in (text.find(ch, c.start) for ch in ".!?\n") if e != -1]
+        end = min(ends) + 1 if ends else len(text)
+        spans.append((start, end))
+
+    spans.sort()
+    merged: list[list[int]] = []
+    for s, e in spans:
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+
+    cut = [text[s:e].strip() for s, e in merged]
+    out = text
+    for s, e in reversed(merged):
+        out = out[:s] + " " + out[e:]
+    return " ".join(out.split()), cut

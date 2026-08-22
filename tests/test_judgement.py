@@ -427,3 +427,54 @@ def test_a_rest_the_model_proposed_is_not_doubled(scene):
         [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}],
         "I go to sleep.", scene)
     assert [r["op"] for r in out].count("rest") == 1
+
+
+def test_an_untargeted_attack_on_a_named_stranger_creates_them(scene):
+    """Found in the confirmation session, live: "I rush the careful walker, blade out"
+    came back as an attack with no target at all. The misaim repair declined it — it only
+    read targeted attacks — and `fill_obvious_targets` then handed the blow to the only
+    body in the yard, all over again. An attack with nobody on it, on a turn where the
+    player named somebody who does not exist, is aimed at that somebody."""
+    amended = judgement.repair_misaimed_attack(
+        [{"op": "attack", "actor": "pc"}],
+        "I spin and rush the careful walker, blade out.", scene)
+    assert amended is not None
+    assert amended[0]["op"] == "spawn"
+    assert amended[0]["params"]["name"] == "careful walker"
+    assert amended[1]["target"] == "c2"
+
+
+def test_an_untargeted_attack_with_no_named_victim_is_left_for_the_fill(scene):
+    """"I attack" names nobody; the lone-conscious-candidate fill is the right reading
+    there, and the misaim repair must stay out of its way."""
+    assert judgement.repair_misaimed_attack(
+        [{"op": "attack", "actor": "pc"}], "I attack!", scene) is None
+
+
+def test_a_declared_journey_moves_the_engines_ground(scene):
+    """Playtest finding 8, reproduced verbatim in the confirmation session: "I head out
+    the gates for the treeline" was narrated as a whole journey and arrived as
+    narrate_only — the biome stayed urban, the forage tables were wrong, and the city
+    gatekeeper was still in the scene because travel is the transition and never fired."""
+    scene.biome = "urban"
+    out = judgement.inject_travel(
+        [{"op": "narrate_only"}],
+        "I head out the gates for the treeline before this city causes me more trouble.",
+        scene)
+    assert out[-1]["op"] == "travel"
+    assert out[-1]["params"]["biome"] == "forest"
+
+
+def test_mentioning_ground_without_going_there_travels_nowhere(scene):
+    scene.biome = "urban"
+    for text in ("I like these woods.", "Should we head into the woods?",
+                 "I walk across the yard to the gate."):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
+        assert all(r.get("op") != "travel" for r in out), text
+
+
+def test_travelling_to_the_ground_underfoot_is_not_a_transition(scene):
+    scene.biome = "forest"
+    out = judgement.inject_travel(
+        [{"op": "narrate_only"}], "I head deeper into the forest.", scene)
+    assert all(r.get("op") != "travel" for r in out)

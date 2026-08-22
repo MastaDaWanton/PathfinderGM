@@ -395,3 +395,33 @@ def test_a_wind_up_is_not_an_outcome(sentence):
     """The line the detector must not cross: an attack *beginning* is exactly what setup
     narration is for. Only the landing is the engine's to decide."""
     assert find_outcome_claims(sentence) == [], sentence
+
+
+def test_a_claim_the_repair_could_not_replace_is_cut_by_span():
+    """`str.replace` on a sentence whose whitespace shifted is a silent no-op, and that
+    is how "your blade bites into the joint" reached a live transcript while the pattern
+    for it sat in this file, matching. The span cut cannot miss."""
+    from rules.intents import cut_outcome_claims
+
+    text = ("You circle left. Your thrust finds its mark - the edge of your blade bites "
+            "into the joint, causing her to wince. What do you do next?")
+    out, cut = cut_outcome_claims(text)
+    assert out == "You circle left. What do you do next?"
+    assert len(cut) == 1 and "bites" in cut[0]
+
+
+def test_a_clean_narration_is_untouched_by_the_span_cut():
+    from rules.intents import cut_outcome_claims
+
+    text = "She circles warily, sword up, giving you nothing."
+    assert cut_outcome_claims(text) == (text, [])
+
+
+def test_a_blade_in_flesh_is_a_claim_and_a_blade_in_the_furniture_is_not():
+    """The verb list kept losing to the model's vocabulary — "bites", then "slices into",
+    each one new. The shape is stable where the verbs are not: a weapon going into a
+    possessive is flesh, and flesh is a hit; into *the* something is scenery, and "your
+    blade bites deep into the wooden dock beside her" was a correctly narrated miss."""
+    assert find_outcome_claims("your blade slices into her torso")
+    assert find_outcome_claims("the sword sinks into his shoulder")
+    assert not find_outcome_claims("your blade bites deep into the wooden dock beside her")

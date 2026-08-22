@@ -486,16 +486,23 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
         if victim_words & _name_words(getattr(a, "name", "")):
             return None
 
-    misaimed = False
-    for raw in raw_intents:
+    def _aims_wrong(raw) -> bool:
         if not isinstance(raw, dict) or str(raw.get("op", "")).lower() != "attack":
-            continue
+            return False
         target = raw.get("target")
+        # No target at all counts. The confirmation session found this the hard way:
+        # the player wrote "I rush the careful walker", the model emitted an untargeted
+        # attack, this function declined it — and `fill_obvious_targets` then handed it
+        # to the only body in the yard, the gatekeeper, all over again. An attack with
+        # nobody on it, on a turn where the player named somebody who does not exist,
+        # is aimed at that somebody.
+        if not target:
+            return True
         if not isinstance(target, str) or target not in actors:
-            continue
-        if not (victim_words & _name_words(getattr(actors[target], "name", ""))):
-            misaimed = True
-    if not misaimed:
+            return False
+        return not (victim_words & _name_words(getattr(actors[target], "name", "")))
+
+    if not any(_aims_wrong(raw) for raw in raw_intents):
         return None
 
     template = "thug"
@@ -514,10 +521,7 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
             "params": {"template": template, "count": 1, "name": victim_phrase}}]
     for raw in raw_intents:
         raw = dict(raw) if isinstance(raw, dict) else raw
-        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
-                and isinstance(raw.get("target"), str) and raw["target"] in actors
-                and not (victim_words & _name_words(
-                    getattr(actors[raw["target"]], "name", "")))):
+        if _aims_wrong(raw):
             raw["target"] = minted
         out.append(raw)
     return out
@@ -574,3 +578,72 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
         out.append({"op": "rest", "actor": pc.ref, "params": {"kind": "night"},
                     "because": "the player said they sleep"})
     return out
+
+
+# --- travel declared at the table --------------------------------------------------------
+
+# Ground words a player actually types, mapped onto the canonical biomes. Deliberately
+# nouns about *destination*: "the treeline", "the woods". "gate" and "road" name no ground.
+_GROUND_WORDS = (
+    (re.compile(r"\b(?:forest|woods|woodland|treeline|trees)\b", re.I), "forest"),
+    (re.compile(r"\b(?:jungle|rainforest)\b", re.I), "jungle"),
+    (re.compile(r"\b(?:swamp|marsh|bog|fen)\b", re.I), "swamp"),
+    (re.compile(r"\b(?:hills?|moor|downs|upland)\b", re.I), "hills"),
+    (re.compile(r"\b(?:mountains?|peaks?|crags?)\b", re.I), "mountain"),
+    (re.compile(r"\b(?:desert|dunes)\b", re.I), "desert"),
+    (re.compile(r"\b(?:tundra|snowfield|icefield)\b", re.I), "tundra"),
+    (re.compile(r"\b(?:coast|shore|beach|seafront)\b", re.I), "coast"),
+    (re.compile(r"\b(?:plains?|grassland|steppe|meadows?)\b", re.I), "grassland"),
+    (re.compile(r"\b(?:farmland|fields|orchards?)\b", re.I), "farmland"),
+    (re.compile(r"\b(?:underground|caves?|caverns?|tunnels)\b", re.I), "underground"),
+    (re.compile(r"\b(?:ruins?)\b", re.I), "ruins"),
+    (re.compile(r"\b(?:city|town|streets)\b", re.I), "urban"),
+)
+
+# Going somewhere, not being somewhere: "I head for the treeline" travels, "I like these
+# woods" does not, and "the forest looming ahead" is the GM's sentence rather than the
+# player's. The verb and the ground must be in the same declaration.
+_DEPARTS = re.compile(
+    r"\b(?:head|heads|heading|make|makes|making|set out|setting out|strike out|walk"
+    r"|walks|walking|travel|travels|travelling|traveling|leave|leaves|leaving|go|goes"
+    r"|going|ride|rides|riding|march|marches|marching|flee|fleeing|run|running"
+    r"|climb|climbs|climbing|descend|descends|push on|press on|make my way|slip out"
+    r"|slip away)\b[^.!?]{0,60}?\b(?:for|to|towards?|into|out to|up to|down to)\b",
+    re.I)
+
+
+def inject_travel(raw_intents, player_text: str, scene) -> list:
+    """Make a declared journey move the engine's ground.
+
+    Playtest finding 8, and the confirmation session reproduced it exactly: "I head out
+    the gates for the treeline" was narrated as a whole journey — city sounds fading,
+    forest growing denser — and arrived as narrate_only. The biome stayed urban, so the
+    forage tables were wrong and the city gatekeeper was still in the scene, because the
+    travel op is also the scene transition and it never fired.
+
+    Same shape as `inject_survival`: fire only on a declaration (movement verb and ground
+    noun in the same clause), never on a question, never when the GM already proposed
+    travel, never when the named ground is the ground already underfoot.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    if any(str(r.get("op", "")).lower() == "travel"
+           for r in raw_intents if isinstance(r, dict)):
+        return raw_intents
+
+    m = _DEPARTS.search(player_text)
+    if not m:
+        return raw_intents
+    # The ground named after the movement verb, so "I leave the city for the treeline"
+    # reads as forest rather than urban: the destination clause is what is scanned.
+    after = player_text[m.start():]
+    for rx, biome in _GROUND_WORDS:
+        if rx.search(after):
+            if biome == getattr(scene, "biome", ""):
+                return raw_intents
+            return list(raw_intents) + [{
+                "op": "travel", "because": "the player said they go",
+                "params": {"biome": biome}}]
+    return raw_intents

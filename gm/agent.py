@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from django.conf import settings
 
-from rules.intents import Intent, IntentError, find_outcome_claims
+from rules.intents import Intent, IntentError, cut_outcome_claims, find_outcome_claims
 
 from . import client, judgement, narration as narration_mod, prompts
 
@@ -121,6 +121,7 @@ class GMAgent:
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
+                raw = judgement.inject_travel(raw, player_input, self.engine.scene)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)
             except IntentError as exc:
@@ -360,6 +361,15 @@ class GMAgent:
             else:
                 narration = narration.replace(claim.sentence, "").strip()
                 repairs.append(f"{claim.why}: cut {claim.sentence!r}")
+
+        # Belt and braces, by character span. The `replace` calls above are silent no-ops
+        # whenever whitespace shifted between the extracted sentence and the narration it
+        # came from — which is how "your blade bites into the joint" reached a live
+        # transcript while the pattern for it sat in rules/intents.py, matching. Spans
+        # cannot miss: the match position is in the current string by construction.
+        narration, force_cut = cut_outcome_claims(narration)
+        for gone in force_cut:
+            repairs.append(f"still claiming an outcome after repair: cut {gone!r}")
 
         return " ".join(narration.split()), repairs, attempts
 
