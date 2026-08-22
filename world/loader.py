@@ -146,6 +146,58 @@ class World:
             if r.get("origin_id") == entity_id or r.get("destination_id") == entity_id
         ]
 
+    def events_touching(self, entity_id: str | None) -> list[Event]:
+        """History this entity would remember: its own, then its nation's, then its
+        continent's, most recent first within each and undated last.
+
+        `entity_ids` is the contract's join key (campaign-format.md, `chronology[]`) and
+        is checked first so this keeps working the day an export populates it. It is
+        empty on **all 111 events** of the shipped Pangrella export, which is why the
+        only caller — the GM's "WHAT THIS PLACE REMEMBERS" — surfaced nothing for any of
+        the world's 74 entities.
+
+        `scope` is the field that does carry the link, but it names an entity instead of
+        referencing it, so it is resolved back against the world's own names. That is the
+        `Ground every name` lesson run backwards, and it inherits the same hazard: names
+        are not unique. Where a name collides — the export's WORLD and one of its CITYs
+        are both "Pangrella" — every entity holding it is considered and the *nearest*
+        wins, so an event scoped to the ambiguous name lands on the town rather than on
+        the ringworld containing it. Both readings belong in this list; only the order
+        between them is a guess, and a town remembering its own world's founding is not
+        a wrong answer.
+
+        11 events are scoped to the literal string "World", which is nobody's name, and
+        are therefore reachable from nowhere. Left alone: every entity already draws 12
+        events against a budget of four.
+        """
+        if not entity_id:
+            return []
+
+        # The entity and everything containing it, by how far away it is. `setdefault`
+        # keeps the nearest distance when an id somehow appears twice in the chain.
+        near: dict[str, int] = {entity_id: 0}
+        for step, ancestor in enumerate(self.ancestors(entity_id), start=1):
+            near.setdefault(ancestor.id, step)
+
+        # Built once per call rather than calling `all_named` per event: that is 74
+        # comparisons instead of 111 scans of the whole entity table, and this runs on
+        # every turn and every NPC turn within it.
+        by_name: dict[str, list[str]] = {}
+        for e in self.entities.values():
+            by_name.setdefault(e.name.lower(), []).append(e.id)
+
+        found: list[tuple[int, Event]] = []
+        for event in self.chronology:
+            steps = [near[i] for i in event.entity_ids if i in near]
+            if not steps and event.scope:
+                steps = [near[i] for i in by_name.get(event.scope.strip().lower(), [])
+                         if i in near]
+            if steps:
+                found.append((min(steps), event))
+
+        found.sort(key=lambda t: (t[0], t[1].year is None, -(t[1].year or 0)))
+        return [event for _, event in found]
+
     def is_unwritten(self, name: str) -> bool:
         return any(u["name"].lower() == name.strip().lower() for u in self.unwritten)
 

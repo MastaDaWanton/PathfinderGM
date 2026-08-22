@@ -214,6 +214,11 @@ class Actor:
     compulsions: list["Compulsion"] = field(default_factory=list)
     # Spells this caster can reach: the wizard's book, or nothing for a cleric whose list
     # is their whole class list. Ids, not names — two spells share a name often enough.
+    # A harmful preparation waiting on a blade. One hit and it is gone — a 1e poison is
+    # a dose, not an enchantment. On the actor rather than the weapon entry because
+    # `weapons` is a list of plain strings, and the alternative was giving every torch
+    # and length of rope a coating field.
+    coating: dict = field(default_factory=dict)
     spellbook: list[str] = field(default_factory=list)
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
@@ -1750,6 +1755,7 @@ def to_dict(actor: Actor) -> dict:
         "hp": actor.hp, "hp_max": actor.hp_max,
         "nonlethal": actor.nonlethal, "speed": actor.speed,
         "compulsions": [c.as_dict() for c in actor.compulsions],
+        "coating": dict(actor.coating),
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -1760,12 +1766,12 @@ def to_dict(actor: Actor) -> dict:
         "overrides": dict(actor.overrides),
         "gear": {k: {"name": i.name, "material": i.material, "hardness": i.hardness,
                      "hp": i.hp, "hp_max": i.hp_max} for k, i in actor.gear.items()},
-        "stock": {k: {"base": v.base, "concentration": v.concentration,
-                      "tier": v.tier, "potency": v.potency, "count": v.count,
-                      "craft": v.craft, "effects": v.effects,
-                      "drawbacks": v.drawbacks,
-                      "from_ingredients": v.from_ingredients}
-                  for k, v in actor.stock.items()},
+        # `Stock.as_dict()` rather than a field list written out again here. The field
+        # list was a second copy of the same knowledge, and when `specs` was added to
+        # Stock it reached the crafting page and the save file and not this one — so a
+        # crafted poison survived one reload as a paragraph with no mechanics left. The
+        # extra derived keys `as_dict` carries are ignored by `from_stock_dict`.
+        "stock": {k: v.as_dict() for k, v in actor.stock.items()},
         "inventory": dict(actor.inventory),
         "pools": {k: v.as_dict() for k, v in actor.pools.items()},
         "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
@@ -1912,6 +1918,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
         compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
+        coating=dict(data.get("coating") or {}),
         spellbook=list(data.get("spellbook") or []),
         prepared={k: int(v) for k, v in (data.get("prepared") or {}).items()
                   if int(v) > 0},

@@ -78,6 +78,21 @@ class Ingredient:
                 for e in fx.extract(self.text)]
 
     @property
+    def specs(self) -> list[dict]:
+        """The same effects as `lines`, structured rather than rendered.
+
+        `lines` is what a card shows and this is what the engine can run. Same source and
+        same precedence — authored effects win over the extractor — so a card and the
+        thing that happens when you drink it can never disagree.
+        """
+        if self.effects:
+            return [dict(e) for e in self.effects]
+
+        from . import effects as fx
+
+        return [dict(e.spec) for e in fx.extract(self.text) if e.spec]
+
+    @property
     def world_gated(self) -> bool:
         return self.id in WORLD_FLORA
 

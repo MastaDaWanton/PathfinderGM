@@ -26,11 +26,15 @@ from . import downed, player_input, roster
 
 
 def _recent_events(world, location, limit=4):
-    """A few things this place remembers. Grounding, and a budget — the events that name
-    this location, most recent first, undated last."""
-    touching = [e for e in world.chronology if location and location.id in e.entity_ids]
-    touching.sort(key=lambda e: (e.year is None, -(e.year or 0)))
-    return touching[:limit]
+    """A few things this place remembers. Grounding, and a budget.
+
+    The selection and the sort live on `World.events_touching`, which is where the
+    export's own quirks belong. This used to filter on `location.id in e.entity_ids`
+    directly and returned an empty list for every one of the shipped world's 74
+    entities, because the export never fills that field in — so the whole "WHAT THIS
+    PLACE REMEMBERS" section of the brief had never once reached the model.
+    """
+    return world.events_touching(location.id if location else None)[:limit]
 
 
 def _grid_state(scene) -> dict | None:

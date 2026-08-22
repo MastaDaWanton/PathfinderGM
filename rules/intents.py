@@ -206,6 +206,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # narrates comes back as its own `damage`, `condition` or `save` intent and is
     # validated like everything else. See docs/intent-protocol.md §11.
     "cast": (("spell",), ("at", "level", "defensively"), "hidden"),
+    # Crafted potions and tinctures doing something. `how` is drink, throw or coat, and
+    # the difference is real: a splash weapon is a ranged touch attack and a coated blade
+    # waits for the next hit. Before these an item was a paragraph in a satchel.
+    "use_item": (("item",), ("how", "to", "weapon"), "player"),
     # Being pulled towards a target you did not choose. `to` is who is compelled; the
     # actor is who they are pulled towards. It penalises and never prohibits — see the
     # header of rules/compulsion.py, which is where that decision is argued.

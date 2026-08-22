@@ -16,6 +16,7 @@ from typing import Any
 from . import biomes
 from . import casting
 from . import compulsion
+from . import consumables
 from . import dc as dc_mod
 from . import foraging
 from . import ingredients as ing_mod
@@ -869,6 +870,12 @@ class Engine:
                     f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
                     f"{defender.name} for {hit['amount']} {weapon['type']}"
                     + (f" ({hit['note']})." if hit["note"] else "."))
+                # A coated blade delivers its dose on the first thing it cuts, and then it
+                # is gone. Spent on the hit rather than on the swing: a poison wiped off
+                # by a miss is a dose nobody got.
+                for extra in self._deliver_coating(actor, defender, weapon_key):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
                 state["i"] += 1
                 state["stage"] = "attack"
 
@@ -1492,6 +1499,120 @@ class Engine:
             tell=f"{target.name} is {cond.name.lower()}"
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
+        )
+
+    def _deliver_coating(self, actor: Actor, defender: Actor, weapon_key: str) -> list[dict]:
+        """Everything a coated weapon does to the thing it just cut.
+
+        Returns effect/tell pairs rather than resolving into the attack's state directly,
+        so the attack op stays readable and a coating that resolves to nothing costs it
+        nothing.
+        """
+        raw = getattr(actor, "coating", None)
+        if not raw:
+            return []
+        coat = consumables.coating_from_dict(raw)
+        if coat.uses_left < 1 or (coat.weapon and coat.weapon != weapon_key):
+            return []
+
+        # Spent before it resolves, and unconditionally. A dose that killed its target
+        # mid-resolution has still left the blade.
+        actor.coating = {}
+
+        intents = consumables.coating_intents(coat, defender.ref)
+        if not intents:
+            return [{"effect": {"ref": defender.ref, "kind": "coating_spent",
+                                "item": coat.item},
+                     "tell": f"The {coat.item} on the blade does nothing to "
+                             f"{defender.name}."}]
+        resolution = self.run(self.validate(intents))
+        out = [{"effect": {"ref": defender.ref, "kind": "coating_spent",
+                           "item": coat.item, "weapon": weapon_key},
+                "tell": f"The {coat.item} goes into the wound."}]
+        for o in resolution.outcomes:
+            for e in o.effects:
+                out.append({"effect": e, "tell": ""})
+            if o.tell:
+                out.append({"effect": {"ref": defender.ref, "kind": "coating"},
+                            "tell": o.tell})
+        return [x for x in out if x["effect"] or x["tell"]]
+
+    def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
+        """Drink it, throw it, or put it on a blade.
+
+        A crafted potion used to be a paragraph in a satchel: the player threw a tincture
+        at a beast and got narration, because narration was all there was. `Stock.specs`
+        made the effects structured and `rules.consumables` turns them into intents, so
+        this op does not resolve anything itself — it produces ordinary intents and lets
+        them go through the same validation as everything the GM proposes.
+
+        Throwing is a ranged touch attack in 1e. That attack is not emitted here: this op
+        commits the dose and hands the effects back, and whether it hits is the `attack`
+        op's business. Rolling it here would mean a second, hidden attack resolver.
+        """
+        actor = self.scene.actors[intent.actor]
+        item_id = str(intent.params["item"]).strip().lower()
+        how = str(intent.params.get("how", "drink")).strip().lower()
+        target = intent.params.get("to") or intent.actor
+
+        held = actor.stock.get(item_id)
+        if held is None or held.count < 1:
+            raise IntentError(
+                f"use_item: {actor.name} is not carrying {item_id!r}. They have: "
+                f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}", "legality")
+        if target not in self.scene.actors:
+            raise IntentError(f"use_item: unknown target {target!r}", "refs")
+
+        use = consumables.plan(held, how=how, target=target, because=intent.because)
+        if not use.ok:
+            raise IntentError(f"use_item: {'; '.join(use.problems)}", "legality")
+
+        # The dose is spent whichever way it was used, and spent before the effects
+        # resolve. A poison that kills the drinker mid-resolution has still been drunk.
+        held.count -= 1
+        if held.count <= 0:
+            actor.stock.pop(item_id, None)
+
+        effects = [{"ref": actor.ref, "kind": "used_item", "item": use.item,
+                    "how": how, "left": max(0, held.count)}]
+
+        if how == "coat":
+            weapon = str(intent.params.get("weapon") or actor.equipped or "").lower()
+            if not weapons_mod.has(weapon):
+                raise IntentError(
+                    f"use_item: {actor.name} has no weapon {weapon!r} to coat", "legality")
+            actor.coating = consumables.Coating(
+                item=use.item, weapon=weapon,
+                specs=[dict(s) for s in (held.specs or [])],
+                potency=float(held.potency or 1.0)).as_dict()
+            effects.append({"ref": actor.ref, "kind": "coated", "weapon": weapon,
+                            "item": use.item})
+            return Outcome(
+                intent_id=intent.id, op="use_item", effects=effects,
+                tell=f"{actor.name} works {use.item} along the {weapon}. It will keep "
+                     f"until the next thing it cuts.",
+                because=intent.because,
+            )
+
+        # Drink and throw both deliver now. The intents go through validation because
+        # anything reaching the engine does, including what the engine itself proposed.
+        resolution = self.run(self.validate(use.intents)) if use.intents else None
+        if resolution is not None:
+            effects.extend(e for o in resolution.outcomes for e in o.effects)
+
+        who = self.scene.actors[target].name
+        verb = "drinks" if how == "drink" else "throws"
+        at = "" if target == intent.actor else f" at {who}"
+        tell = f"{actor.name} {verb} {use.item}{at}."
+        if resolution is not None:
+            tell += " " + " ".join(o.tell for o in resolution.outcomes if o.tell)
+        if use.narrate:
+            tell += f" ({'; '.join(use.narrate)})"
+
+        return Outcome(
+            intent_id=intent.id, op="use_item",
+            rolls=[r for o in (resolution.outcomes if resolution else []) for r in o.rolls],
+            effects=effects, tell=tell.strip(), because=intent.because,
         )
 
     def _op_cast(self, intent: Intent, partial: dict) -> Outcome:

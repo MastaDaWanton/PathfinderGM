@@ -83,5 +83,13 @@ CAMPAIGN_DIR = user_data_root() / "campaigns"
 MODELS = {
     "narrator": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
     "prose": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
+    # RESERVED, AND CURRENTLY WIRED TO NOTHING. The world-state agent of
+    # `docs/architecture.md` — the cheap model that would watch play, move factions
+    # between scenes and turn a burned bridge into a hook — has not been built. There is
+    # no event queue for it to read (intent-protocol.md §8 describes one; nothing emits
+    # to it and nothing consumes it), so this row configures a model that is never
+    # loaded and never called. Kept because the role is a settled design decision and
+    # deleting it would lose that; labelled because a configurable model that silently
+    # does nothing reads exactly like a feature that is running.
     "watcher": {"provider": "ollama", "model": "llama3.1:8b", "host": "http://localhost:11434"},
 }

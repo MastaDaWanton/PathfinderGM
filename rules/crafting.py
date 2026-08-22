@@ -73,6 +73,11 @@ class Stock:
     effects: list[str] = field(default_factory=list)
     drawbacks: list[str] = field(default_factory=list)
     from_ingredients: list[str] = field(default_factory=list)
+    # The same effects as `effects`, in the structured form `rules/effectspec.py`
+    # defines. `effects` is what a card shows; this is what the engine can actually run.
+    # Without it a crafted potion is a paragraph, and drinking one could only ever be
+    # narration — which is exactly what it was.
+    specs: list[dict] = field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -96,7 +101,7 @@ class Stock:
             "concentration": self.concentration, "tier": self.tier, "rank": self.rank,
             "potency": round(self.potency, 2), "count": self.count, "craft": self.craft,
             "effects": self.effects, "drawbacks": self.drawbacks,
-            "from_ingredients": self.from_ingredients,
+            "specs": self.specs, "from_ingredients": self.from_ingredients,
             "kind": "crafted", "crafted": True,
         }
 
@@ -108,6 +113,7 @@ def from_stock_dict(d: dict) -> Stock:
         tier=d.get("tier", "common"), potency=float(d.get("potency", 1.0)),
         count=int(d.get("count", 1)), craft=d.get("craft", "herbalism"),
         effects=list(d.get("effects", [])), drawbacks=list(d.get("drawbacks", [])),
+        specs=[dict(x) for x in (d.get("specs") or [])],
         from_ingredients=list(d.get("from_ingredients", [])),
     )
 
@@ -121,6 +127,7 @@ def concentrate(item: Stock) -> Stock:
         potency=item.potency * CONCENTRATE_POTENCY,
         count=1, craft=item.craft,
         effects=list(item.effects), drawbacks=list(item.drawbacks),
+        specs=[dict(x) for x in item.specs],
         from_ingredients=list(item.from_ingredients),
     )
 
@@ -201,6 +208,38 @@ def mechanics(items, used) -> list[str]:
         for e in held.effects:
             if e not in out:
                 out.append(e)
+    return out
+
+
+def mechanical_specs(items, used) -> list[dict]:
+    """The same effects as `mechanics`, structured rather than rendered.
+
+    Kept as a second function rather than changing `mechanics`'s return type, because
+    `mechanics` feeds the card and half a dozen callers read strings from it. This feeds
+    the engine — without it a crafted potion is a paragraph, and drinking one could only
+    ever have been narration.
+
+    Deduplicated on the whole spec: two components that both cure fatigue should cure it
+    once, and an item that lists it twice reads as a bug on the card.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def add(spec: dict, source: str) -> None:
+        if not spec:
+            return
+        marked = {**spec, "from": spec.get("from") or source}
+        key = repr(sorted(marked.items(), key=lambda kv: kv[0]))
+        if key not in seen:
+            seen.add(key)
+            out.append(marked)
+
+    for i in items:
+        for spec in i.specs:
+            add(spec, i.name)
+    for held, _ in used:
+        for spec in held.specs:
+            add(spec, held.base)
     return out
 
 
@@ -329,6 +368,7 @@ def preview(track_id: str, level: int, chain: Chain,
     name = chain.name or _name_for(items or [h for h, _ in used], chain.methods)
     out = Stock(base=name, concentration=1, tier=tier, potency=potency,
                 craft=track.id, effects=effects, drawbacks=drawbacks,
+                specs=mechanical_specs(items, used),
                 from_ingredients=[i.id for i in items]
                 + [h.id for h, _ in used])
     return Result(
@@ -409,16 +449,32 @@ def _chance(dc: int, level: int, rank: int, problems: list[str]) -> int:
     return max(5, min(95, chance))
 
 
+SHAPE_WORDS = {
+    "grind": "Powder", "mix": "Compound", "brew": "Tea", "preserve": "Preserve",
+    "extract": "Extract", "distill": "Tincture", "purify": "Purified Draught",
+    "infuse": "Infusion", "neutralize": "Neutralised Draught", "refine": "Elixir",
+    "catalyst crafting": "Catalyst",
+}
+
+
 def _name_for(items, methods) -> str:
-    """A working name, so the preview is not headed "Untitled"."""
+    """A working name, so the preview is not headed "Untitled".
+
+    The shape word replaces any shape word already on the end of the lead ingredient's
+    name rather than stacking on top of it. Crafted outputs go back into the craft tree as
+    inputs — that is the whole point of keeping them in inventory — so distilling a
+    tincture used to produce a "Dragon Flower Tincture Tincture", and ten passes produced
+    exactly what you would expect. Seen in play, ten deep.
+    """
     if not items:
         return "Empty pot"
     lead = items[0].name
-    shape = {
-        "grind": "Powder", "mix": "Compound", "brew": "Tea", "preserve": "Preserve",
-        "extract": "Extract", "distill": "Tincture", "purify": "Purified Draught",
-        "infuse": "Infusion", "neutralize": "Neutralised Draught", "refine": "Elixir",
-        "catalyst crafting": "Catalyst",
-    }
+    for word in sorted(set(SHAPE_WORDS.values()) | {"Preparation"},
+                       key=len, reverse=True):
+        # Strip repeatedly: a name that already compounded before this fix should come
+        # back to something sensible the next time it is crafted with.
+        while lead.lower().endswith(" " + word.lower()):
+            lead = lead[: -(len(word) + 1)].rstrip()
     last = methods[-1] if methods else ""
-    return f"{lead} {shape.get(last, 'Preparation')}"
+    shape = SHAPE_WORDS.get(last, "Preparation")
+    return f"{lead} {shape}".strip()
