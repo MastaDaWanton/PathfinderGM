@@ -12,15 +12,23 @@ rather than a placeholder, and there is somewhere for a file to go the moment on
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from django.conf import settings
 
-from rules import ingredients, spells, worldclass
+from rules import feats as feats_mod
+from rules import ingredients, registry, spells, worldclass
 from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, FEATS, SHIELDS, WEAPONS
+
+
+def _slug(name: str) -> str:
+    """The key `rules/registry.py` resolves by. The hand-written feat table is keyed with
+    spaces and every other content module is keyed with hyphens."""
+    return re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
 
 
 def root() -> Path:
@@ -63,10 +71,22 @@ class Bench:
     # Set when the app can hold the content but nothing has been authored, so the card
     # can say what is missing rather than looking broken.
     waiting: str = ""
-    # Which authoring form this bench opens, if any. `effects` is the structured builder
-    # in rules/effectspec.py; a bench without one is a listing.
-    builder: str = ""
     rows: list = field(default_factory=list)
+
+    @property
+    def builder(self) -> str:
+        """Which authoring form this bench opens, if any.
+
+        Derived rather than set, because setting it by hand is what left seven of the nine
+        benches read-only: `consumables` and `ingredients` were flagged and the rest were
+        not, so a creature, feat, weapon or spell could be listed and never corrected —
+        even after `rules/registry.py` and `open_thing` could already handle all nine.
+
+        The registry declaration is the same one the form is now drawn from, so a bench is
+        editable when its kind says what it holds, not when somebody remembers to add it
+        here. A bench with no kind — there are none today — is still a plain listing.
+        """
+        return "effects" if registry.KINDS.get(self.id) else ""
 
     @property
     def yours(self) -> int:
@@ -102,7 +122,7 @@ def benches() -> list[Bench]:
         ),
         Bench(
             id="consumables", name="Materials & consumables", dir="consumables",
-            shipped=0, shipped_label="shipped", builder="effects",
+            shipped=0, shipped_label="shipped",
             blurb="Anything with an effect: potions, poultices, poisons, oils, reagents. "
                   "Built from a description and a list of effects rather than typed as "
                   "prose, so what a thing does is data the engine can read.",
@@ -110,7 +130,6 @@ def benches() -> list[Bench]:
         Bench(
             id="ingredients", name="Ingredients", dir="ingredients",
             shipped=len(ingredients.all_ingredients()), shipped_label="shipped",
-            builder="effects",
             blurb="What a crafter works with, the biomes each grows in, and the "
                   "mechanics read out of its description.",
         ),
@@ -230,11 +249,11 @@ def rows_for(bench_id: str) -> list[dict]:
     if bench_id == "consumables":
         pass                      # nothing ships; the bench exists to be authored into
     elif bench_id == "classes":
-        rows += [{"name": v["name"], "kind": "class", "mine": False,
+        rows += [{"name": v["name"], "kind": "class", "mine": False, "id": k,
                   "note": f"d{v['hit_die']} · {v['bab'].replace('_', ' ')} BAB · "
                           f"{v['skill_ranks']}+Int skills · good "
                           f"{', '.join(v['good_saves'])}"}
-                 for v in CLASSES.values()]
+                 for k, v in CLASSES.items()]
     elif bench_id == "spells":
         # Capped: three thousand rows is not a listing, it is a wall. The bench's own
         # filters are how you find one, and they are the point of the tags.
@@ -243,10 +262,10 @@ def rows_for(bench_id: str) -> list[dict]:
                  for sp in sorted(spells.all_spells().values(),
                                   key=lambda x: x.name.lower())[:200]]
     elif bench_id == "worldclasses":
-        rows += [{"name": t.name, "kind": "track", "mine": False,
+        rows += [{"name": t.name, "kind": "track", "mine": False, "id": k,
                   "note": f"{t.max_level} levels · "
                           f"{len(t.unlocked_methods(t.max_level))} methods"}
-                 for t in worldclass.tracks().values()]
+                 for k, t in worldclass.tracks().items()]
     elif bench_id == "ingredients":
         rows += [{"name": i.name, "kind": i.kind, "mine": False, "id": i.id,
                   # What it does, not where it grows: the effects are the reason to open
@@ -257,12 +276,12 @@ def rows_for(bench_id: str) -> list[dict]:
                                  key=lambda x: x.name)]
     elif bench_id == "items":
         rows += (
-            [{"name": v["name"], "kind": "weapon", "mine": False,
+            [{"name": v["name"], "kind": "weapon", "mine": False, "id": k,
               "note": f"{v['damage']} {v['type']} · x{v['crit_mult']}"}
-             for v in WEAPONS.values()]
-            + [{"name": v["name"], "kind": "armour", "mine": False,
+             for k, v in WEAPONS.items()]
+            + [{"name": v["name"], "kind": "armour", "mine": False, "id": k,
                 "note": f"+{v['ac']} AC"} for k, v in ARMOUR.items() if k != "none"]
-            + [{"name": v["name"], "kind": "shield", "mine": False,
+            + [{"name": v["name"], "kind": "shield", "mine": False, "id": k,
                 "note": f"+{v['ac']} AC"} for k, v in SHIELDS.items() if k != "none"]
         )
     elif bench_id == "creatures":
@@ -278,6 +297,22 @@ def rows_for(bench_id: str) -> list[dict]:
                           f"{_where(c)}"}
                  for c in bestiary.search(limit=200)]
     elif bench_id == "feats":
-        rows += [{"name": v.get("name", k), "kind": "feat", "mine": False,
-                  "note": v.get("note", "")} for k, v in FEATS.items()]
+        # The 16 the sheet applies by hand, then the rest of the imported list. Before
+        # this the bench showed only the 16 while the shipped count said 16 — accurate
+        # about itself and quietly hiding 1,474 feats the app had already imported.
+        #
+        # Ids are slugs, because that is what `rules.feats` is keyed by and what
+        # `registry.find` therefore resolves. The hand-written table is keyed "weapon
+        # finesse" with a space, so a row carrying that id drew a link to a 404. All 16
+        # have an imported twin under the slug, so nothing is lost by preferring it.
+        applied = {_slug(k): v for k, v in FEATS.items()}
+        rows += [{"name": v.get("name", k), "kind": "feat", "mine": False, "id": k,
+                  "note": v.get("note", "") or "applied by the sheet"}
+                 for k, v in applied.items()]
+        rows += [{"name": v.name, "kind": "feat", "mine": False, "id": k,
+                  "note": (v.benefit or v.line or "")[:110]}
+                 # Capped like the spell bench, and for the same reason: 1,474 rows is a
+                 # wall rather than a listing.
+                 for k, v in sorted(feats_mod.all_feats().items())[:200]
+                 if k not in applied]
     return rows

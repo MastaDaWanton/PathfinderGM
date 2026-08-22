@@ -220,7 +220,26 @@ let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
 let PICKED = null;       // pregen chosen when starting a new game
 let CAT = null;          // the effect catalogue, fetched once
-let DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+let KINDS = null;        // what each kind of content holds, from rules/registry.py
+let DRAFT = {};          // the entry being edited, keyed by declared field name
+
+// The fields this bench declares. One place to ask, so nothing has to remember whether
+// `KINDS` has loaded yet.
+function fieldsFor() {
+  const k = BENCH && KINDS ? KINDS[BENCH.bench.id] : null;
+  return k ? k.fields : [];
+}
+
+// A blank entry with every declared field present and empty. Present, not absent: a list
+// field left off the payload cannot be told from one the user cleared, and the server
+// would keep the old value — the trap CLAUDE.md names as "empty is not the same as absent".
+function emptyDraft() {
+  const out = { id: "" };
+  fieldsFor().forEach(f => {
+    out[f.name] = f.type === "effects" || f.type === "list" ? [] : "";
+  });
+  return out;
+}
 let EDITING = "";        // what was opened, so a save replaces rather than duplicates
 let LINES = [];          // rendered preview of each effect, from the server
 let OPEN_SPELL = "";     // the spell whose full text is expanded
@@ -389,7 +408,7 @@ function effectHtml(spec, path, nested) {
           `<option value="${esc(t.id)}" ${t.id === spec.type ? "selected" : ""}>${
             esc(t.name)}</option>`).join("")}</select></div>
     </div>
-    ${type && !type.engine
+    ${type && type.blocked
       ? `<div class="warn">${esc(type.blocked)}</div>` : ""}
     ${type ? type.fields.map(f => fieldHtml(f, spec, path)).join("") : ""}
   </div>`;
@@ -417,28 +436,57 @@ function listAt(path) {
   return list;
 }
 
+// One input, drawn from what rules/registry.py says the field is. Six types cover every
+// kind: text, textarea, number, choice, list and effects.
+//
+// `data-draft` carries the field name, so the input handler stores by name instead of
+// matching three hardcoded element ids. That is what made the form specific to consumables
+// in the first place — `if (t.id === "d-name")` cannot know about `cr` or `hit_die`.
+function draftField(f) {
+  const v = DRAFT[f.name];
+  const help = f.help ? `<div class="note" style="margin:-4px 0 8px">${esc(f.help)}</div>` : "";
+  const label = `<label>${esc(f.label)}${f.required ? " *" : ""}</label>`;
+
+  if (f.type === "effects") {
+    return `${label}${help}
+      ${(v || []).map((e, i) => effectHtml(e, String(i), false)).join("")}
+      <button class="addfx" data-add="">+ Add an effect</button>`;
+  }
+  if (f.type === "textarea") {
+    return `${label}${help}<textarea data-draft="${esc(f.name)}">${esc(v || "")}</textarea>`;
+  }
+  if (f.type === "choice") {
+    return `${label}${help}<select data-draft="${esc(f.name)}">
+      <option value="">—</option>
+      ${f.choices.map(c => `<option value="${esc(c)}" ${
+        c === v ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+  }
+  if (f.type === "list") {
+    // Checkboxes rather than a free-text box, because these lists are closed vocabularies
+    // — biomes, climates — and a typo in one is a filter that silently matches nothing.
+    return `${label}${help}<div class="checks">${f.choices.map(c => `
+      <label class="chk"><input type="checkbox" data-draft="${esc(f.name)}"
+        data-item="${esc(c)}" ${(v || []).includes(c) ? "checked" : ""}> ${esc(c)}</label>`
+      ).join("")}</div>`;
+  }
+  const type = f.type === "number" ? "number" : "text";
+  return `${label}${help}<input type="${type}" data-draft="${esc(f.name)}"
+    value="${esc(v === undefined || v === null ? "" : v)}">`;
+}
+
 function paneBuild(b) {
+  // The form for this bench, from the server's declaration of it. Previously four inputs
+  // written into this template, which is why only the two benches those four suited had a
+  // builder at all — a creature has a CR and a size and neither had anywhere to go.
+  const kind = (KINDS || {})[b.id];
+  const fields = kind ? kind.fields : [];
   return `<div class="build">
     ${EDITING ? `<p class="note" style="margin-top:0">Editing <b style="color:var(--ink)">${
       esc(DRAFT.name)}</b>${DRAFT.source === "shipped"
         ? " — a shipped entry. Saving writes your version alongside it."
         : ""}  <button class="quiet" id="d-new" style="padding:4px 10px">start fresh</button></p>`
       : ""}
-    <div class="row2">
-      <div><label>Name</label>
-        <input type="text" id="d-name" value="${esc(DRAFT.name)}"
-               placeholder="Leechwort Wound Powder"></div>
-      <div><label>Kind</label>
-        <input type="text" id="d-kind" value="${esc(DRAFT.kind)}"
-               placeholder="poultice, potion, poison, oil"></div>
-    </div>
-    <label>Description</label>
-    <textarea id="d-desc" placeholder="What it is, how it is made, how it looks.">${
-      esc(DRAFT.description)}</textarea>
-
-    <label>Effects</label>
-    ${DRAFT.effects.map((e, i) => effectHtml(e, String(i), false)).join("")}
-    <button class="addfx" data-add="">+ Add an effect</button>
+    ${fields.map(draftField).join("\n")}
 
     <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
       <button class="go" id="d-save">Save</button>
@@ -662,9 +710,15 @@ document.addEventListener("click", async e => {
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {
     BENCH = await (await fetch(`/api/bench/${encodeURIComponent(bench.dataset.bench)}`)).json();
-    if (BENCH.bench.builder === "effects" && !CAT) {
-      CAT = await (await fetch("/api/effects/catalogue")).json();
+    if (BENCH.bench.builder === "effects") {
+      if (!CAT) CAT = await (await fetch("/api/effects/catalogue")).json();
+      if (!KINDS) {
+        const d = await (await fetch("/api/kinds")).json();
+        KINDS = Object.fromEntries(d.kinds.map(k => [k.id, k]));
+      }
     }
+    DRAFT = emptyDraft();
+    EDITING = ""; LINES = [];
     if (BENCH.bench.id === "spells") { OPEN_SPELL = ""; await loadSpells(); return; }
     render();
     return;
@@ -692,31 +746,32 @@ document.addEventListener("click", async e => {
       `/api/bench/${encodeURIComponent(BENCH.bench.id)}/open/${
         encodeURIComponent(open.dataset.open)}`)).json();
     if (d.error) { render(); return; }
-    DRAFT = { id: d.id, name: d.name, kind: d.kind || "",
-              description: d.description || "", effects: d.effects || [],
-              source: d.source };
+    // Everything the entry carries, not four named keys. A creature opened into a draft
+    // that kept only name/kind/description/effects would save those four over a stat
+    // block and silently drop its hit points on the way through.
+    DRAFT = Object.assign({}, d);
+    DRAFT.effects = d.effects || [];
     EDITING = d.id;
     await repreview();
     return;
   }
   if (e.target.closest("#d-new")) {
-    DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+    DRAFT = emptyDraft();
     EDITING = ""; LINES = []; render();
     return;
   }
   if (e.target.closest("#d-save")) {
     try {
-      const d = await post(`/api/bench/${encodeURIComponent(BENCH.bench.id)}/save`, {
-        id: DRAFT.id, name: $("#d-name").value, kind: $("#d-kind").value,
-        description: $("#d-desc").value, effects: DRAFT.effects,
-      });
-      DRAFT = { id: "", name: "", kind: "consumable", description: "", effects: [] };
+      const d = await post(`/api/bench/${encodeURIComponent(BENCH.bench.id)}/save`,
+                           Object.assign({}, DRAFT));
+      DRAFT = emptyDraft();
       EDITING = "";
       LINES = [];
-      BENCH = await (await fetch("/api/bench/consumables")).json();
-      STATE.benches = (await (await fetch("/api/bench/consumables")).json()) && STATE.benches;
+      BENCH = await (await fetch(
+        `/api/bench/${encodeURIComponent(BENCH.bench.id)}`)).json();
       render();
-      $("#d-msg").textContent = `Saved: ${d.lines.join(" · ")}`;
+      $("#d-msg").textContent = d.lines && d.lines.length
+        ? `Saved: ${d.lines.join(" · ")}` : "Saved.";
     } catch (err) { $("#d-msg").innerHTML =
       `<span style="color:var(--alarm)">${esc(err.message)}</span>`; }
     return;
@@ -734,9 +789,23 @@ document.addEventListener("input", e => {
     window._spTimer = setTimeout(loadSpells, 300);
     return;
   }
-  if (t.id === "d-name") { DRAFT.name = t.value; return; }
-  if (t.id === "d-kind") { DRAFT.kind = t.value; return; }
-  if (t.id === "d-desc") { DRAFT.description = t.value; return; }
+  // Stored by declared field name. The three `t.id ===` lines this replaced could only
+  // ever know about the three inputs written into the template.
+  if (t.dataset && t.dataset.draft) {
+    const name = t.dataset.draft;
+    if (t.dataset.item !== undefined) {
+      const on = new Set(DRAFT[name] || []);
+      t.checked ? on.add(t.dataset.item) : on.delete(t.dataset.item);
+      // Held in the declared order rather than click order, so re-opening a saved entry
+      // shows the same list it was saved as and the file produces no diff of its own.
+      const order = fieldsFor().find(f => f.name === name);
+      DRAFT[name] = (order ? order.choices : [...on]).filter(c => on.has(c));
+      return;
+    }
+    DRAFT[name] = t.type === "number" && t.value !== ""
+      ? Number(t.value) : t.value;
+    return;
+  }
   if (!t.dataset || !t.dataset.fx) return;
   const { spec } = at(t.dataset.fx);
   const key = t.dataset.field;

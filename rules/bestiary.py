@@ -27,6 +27,7 @@ import json
 from difflib import get_close_matches
 from pathlib import Path
 
+from . import creature_effects
 from .sheet import Actor, from_dict
 
 TEMPLATES: dict[str, dict] = {
@@ -180,6 +181,20 @@ def imported() -> dict[str, dict]:
     return _IMPORTED
 
 
+def everything() -> dict[str, dict]:
+    """Every creature the app knows, hand-written ones included.
+
+    `imported()` is the two content files and nothing else, which is right for play — the
+    town NPCs are reached through `lookup` — and wrong for the editor. The creatures bench
+    lists the four hand-written townsfolk and the registry's loader pointed at `imported`,
+    so clicking `guildhand` asked for a creature that loader had never heard of and got a
+    404 from a row the same page had just drawn.
+    """
+    out = {k: {"id": k, **v} for k, v in TEMPLATES.items()}
+    out.update(imported())
+    return out
+
+
 def lookup(key: str) -> dict | None:
     """A creature by name, hand-written first.
 
@@ -195,6 +210,18 @@ def lookup(key: str) -> dict | None:
     data = {k: v for k, v in raw.items() if k not in _NOT_ON_THE_SHEET}
     data["name"] = raw.get("name", key)
     data["kind"] = "npc"
+    # `immune`, `resist`, `weaknesses` and `senses` are stripped by `_NOT_ON_THE_SHEET`
+    # above, and `Actor` had no field for any of them — so a frost giant took full damage
+    # from cold and 4,673 immunity terms in the content directory were read by nothing.
+    # They travel as effect specs instead, which is the same shape a potion's effects
+    # arrive in and the same shape the builder edits.
+    #
+    # Derived here rather than baked into the JSON: `immune` is the field the editor shows
+    # and the one a person corrects, so a copy of it inside `effects` would be a second
+    # answer that disagrees the moment the first is edited. An authored `effects` list is
+    # left alone, which is how a homebrew creature says something the parse cannot.
+    if not data.get("effects"):
+        data["effects"] = creature_effects.from_creature(raw)
     if not data.get("notes"):
         data["notes"] = f"CR {raw.get('cr', '?')} {raw.get('creature_type', '')}".strip()
     return data

@@ -57,6 +57,14 @@ class Kind:
     # `module:function` returning {id: object} for what ships. A string rather than the
     # function, so declaring a kind does not import the whole game.
     shipped_loader: str = ""
+    # `module:function(entry) -> dict` filling in fields the stored entry does not carry
+    # because they are read out of the fields it does. A creature's `effects` are its
+    # printed Immune, Resist and Weaknesses lines converted; storing them as well would be
+    # a second copy that disagrees the moment somebody edits the first.
+    #
+    # Declared here rather than handled in `open_thing`, because a creature-shaped `if`
+    # in the view is exactly what this module was written to delete.
+    derive: str = ""
     id_field: str = "id"
 
     def as_dict(self) -> dict:
@@ -109,7 +117,10 @@ KINDS: dict[str, Kind] = {
     ),
     "creatures": Kind(
         id="creatures", label="Creatures", folder="creatures", key="creatures",
-        shipped_loader="rules.bestiary:imported",
+        # `everything`, not `imported`: the bench lists the four hand-written townsfolk
+        # too, and a row the page drew that 404s when clicked is worse than no row.
+        shipped_loader="rules.bestiary:everything",
+        derive="rules.creature_effects:derive",
         fields=_named() + [
             Field("cr", "Challenge rating"),
             Field("size", "Size", type="choice",
@@ -286,14 +297,31 @@ def find(kind_id: str, thing_id: str) -> dict | None:
     key = (thing_id or "").strip().lower()
     mine = load_raw(kind_id).get(key)
     if mine:
-        return dict(mine)
+        return _derived(kind_id, dict(mine))
 
     found = shipped(kind_id).get(key)
     if found is None:
         return None
     if hasattr(found, "as_dict"):
-        return found.as_dict()
-    return dict(found) if isinstance(found, dict) else None
+        found = found.as_dict()
+    return _derived(kind_id, dict(found)) if isinstance(found, dict) else None
+
+
+def _derived(kind_id: str, entry: dict) -> dict:
+    """Fill in whatever this kind computes rather than stores.
+
+    Wrapped in the same try/except `shipped` uses, and for the same reason: the homebrew
+    page asks every kind at once, and one kind's derivation failing must not take the page
+    down with it.
+    """
+    target = get(kind_id).derive
+    if not target:
+        return entry
+    module_name, _, func_name = target.partition(":")
+    try:
+        return getattr(import_module(module_name), func_name)(entry)
+    except Exception:
+        return entry
 
 
 def save(kind_id: str, entry: dict) -> Path:

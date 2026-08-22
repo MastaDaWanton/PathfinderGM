@@ -256,33 +256,65 @@ CATEGORIES: list[Category] = [
     Category(
         "defence", "Defence", "Reducing or refusing damage rather than restoring it.",
         [
+            # These four say where they work, because it is not everywhere and the
+            # difference is invisible from the form. On a creature they are live: they
+            # load onto the Actor and `take_damage` applies them in 1e's order. Handed to
+            # `consumables._spec_to_intents` they produce nothing at all — a potion of
+            # fire resistance is drunk and does exactly nothing, with no error anywhere.
+            #
+            # Said here rather than left for somebody to discover, and the builder now
+            # shows `blocked` whenever it is set rather than only when `engine` is false,
+            # which is why these could not be stated before.
             EffectType("resistance", "Energy resistance", "Resist fire 10", [
                 Field("target", "Against", "choice", vocab="damage_type"),
                 Field("amount", "Points", "int"),
-            ]),
+            ], blocked="Applied when a creature has it. A consumable that grants it is "
+                       "recorded and narrated — nothing wears off yet, so nothing is "
+                       "granted temporarily."),
             EffectType("damage_reduction", "Damage reduction", "DR 3/— for 8 hours", [
                 Field("amount", "Points", "int"),
                 Field("bypass", "Bypassed by", "text", required=False,
                       hint="silver, cold iron. Empty for DR/—, which nothing bypasses."),
-            ]),
+            ], blocked="Applied when a creature has it. A consumable that grants it is "
+                       "recorded and narrated."),
             EffectType("immunity", "Immunity", "Immune to fire for 2 hours", [
                 Field("target", "To what", "text",
                       hint="fire damage, poison, gaze attacks."),
-            ]),
+            ], blocked="Damage immunity is applied when a creature has it. An immunity to "
+                       "something that is not a damage type — paralysis, a gaze — is "
+                       "recorded for the GM; the save path does not consult it yet."),
+            # The other half of resistance, and it had no way to be said. 236 of the 782
+            # printed stat blocks carry one — "vulnerable to fire" on 88, "vulnerable to
+            # cold" on 68 — and without this they could only be written as narrative,
+            # which means the fire giant takes ordinary damage from cold and the note
+            # explaining that it should not sits beside it doing nothing.
+            EffectType("vulnerability", "Vulnerability", "Vulnerable to cold", [
+                Field("target", "To what", "choice", vocab="damage_type"),
+            ], blocked="Applied when a creature has it — half again as much damage of "
+                       "that type. A consumable that inflicts it is recorded and "
+                       "narrated."),
         ]),
 
     Category(
         "capability", "Capability",
         "Something the character can now do — a sense, a speed, or a rule relaxed.",
         [
+            # Both of these claimed the engine ran them and it never has. `_spec_to_intents`
+            # returns nothing for either, and no check in the app asks whether an actor can
+            # see in the dark — so a potion of darkvision was drunk and did nothing, with
+            # no error to say why. The engine flag now matches the code.
             EffectType("sense", "Sense", "Low-light vision for 1 hour", [
                 Field("target", "Sense", "choice", vocab="sense"),
                 Field("range", "Range in feet", "int", required=False),
-            ]),
+            ], engine=False,
+                blocked="Recorded and shown to the GM. Nothing in the engine asks what a "
+                        "creature can see yet, so light and concealment are narrated."),
             EffectType("speed", "Movement", "+20 ft land speed for 1 round", [
                 Field("target", "Mode", "choice", vocab="movement", default="land"),
                 Field("amount", "Feet", "signed"),
-            ]),
+            ], engine=False,
+                blocked="Recorded and shown to the GM. The grid reads the creature's own "
+                        "speed; nothing applies a temporary change to it yet."),
             EffectType(
                 "permission", "Permission", "May feint as a swift action",
                 [Field("target", "What it allows", "text")],

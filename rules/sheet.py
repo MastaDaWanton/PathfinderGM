@@ -217,6 +217,23 @@ class Actor:
     # sheet written before this defaults rather than failing to load.
     speed: int = 30
     reductions: list[Reduction] = field(default_factory=list)
+    # The other three defences a stat block prints, which until now had nowhere to live.
+    # `reductions` above has been read since the beginning; `Immune cold` and `Resist
+    # fire 10` were dropped when a bestiary row became an Actor, so a frost giant took
+    # full damage from cold and a devil took full damage from fire.
+    #
+    # Kept as plain data next to `reductions` rather than as effect specs, for the same
+    # reason `reductions` is: `take_damage` should not be interpreting a schema in the
+    # middle of resolving a hit. `rules/creature_effects.py` does the interpreting once,
+    # at load.
+    #
+    # Immunity is by name rather than by damage type, because most immunities are not
+    # damage types — "undead traits", "paralysis", "mind-affecting effects". `immune_to`
+    # answers the damage question and the rest are there for the save and condition paths
+    # to consult when they learn to.
+    immunities: list[str] = field(default_factory=list)
+    resistances: dict[str, int] = field(default_factory=dict)
+    vulnerabilities: list[str] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
     # Who this creature is being pulled towards, and what defying them costs. Not a
     # condition: a condition is a state the creature is in, while a compulsion is a
@@ -965,6 +982,33 @@ class Actor:
         self.heal_nonlethal(amount)
         return self.hp - before
 
+    # --- immunity, resistance and vulnerability ------------------------------------------
+
+    def immune_to(self, dtype: str) -> bool:
+        """Whether damage of this type simply does not land.
+
+        Matched on the normalised damage type rather than the printed word, so `Immune
+        electricity` stops a shock and `Immune undead traits` — which names a bundle of
+        rules, not a damage type — stops nothing here and waits for the save path.
+        """
+        want = normalise_damage_type(dtype)
+        return any(normalise_damage_type(t) == want for t in self.immunities)
+
+    def resistance(self, dtype: str) -> int:
+        """Points of this energy shrugged off. 0 when none applies.
+
+        1e does not stack two resistances against the same energy — the better one
+        applies — and nothing in the data produces two, but `max` says so rather than
+        leaving it to chance.
+        """
+        want = normalise_damage_type(dtype)
+        return max((v for k, v in self.resistances.items()
+                    if normalise_damage_type(k) == want), default=0)
+
+    def vulnerable_to(self, dtype: str) -> bool:
+        want = normalise_damage_type(dtype)
+        return any(normalise_damage_type(t) == want for t in self.vulnerabilities)
+
     # --- damage reduction -------------------------------------------------------------
 
     def damage_reduction(self, dtype: str = "untyped",
@@ -1018,19 +1062,38 @@ class Actor:
                     lethality: str = "lethal") -> dict:
         """Resolve one packet of damage, returning what happened to it at each stage.
 
-        The order is 1e's and it matters: reduce, then spend temporary hit points, then
-        real ones. Applying DR after temp HP would let a DR 5 creature lose 5 temp HP to
-        an attack that never hurt it.
+        The order is 1e's and it matters: immunity, then vulnerability, then whichever of
+        resistance or reduction applies, then temporary hit points, then real ones.
+
+        Vulnerability comes before resistance because 1e multiplies the damage dealt and
+        then subtracts — a fire giant with resist fire 10 hit for 20 takes 30 - 10 = 20,
+        not (20 - 10) x 1.5 = 15. Doing it the other way round makes a resistance a better
+        deal than not being vulnerable at all.
+
+        Resistance and reduction never both apply — one is energy-only and the other
+        physical-only — so their order between themselves does not matter, but both must
+        come before temporary hit points. Applying them after would let a DR 5 creature
+        lose 5 temp HP to an attack that never hurt it.
 
         Returns a breakdown rather than the remaining hit points because the whole
         proposition of the app is that the bookkeeping is visible — "12, less DR 5, 4 off
         temporary" is the sentence a player needs, and a bare total cannot produce it.
         """
         rolled = max(0, int(amount))
+        # Immunity is the whole packet or none of it, and it is checked first so nothing
+        # below has to consider a zero it cannot explain.
+        immune = self.immune_to(dtype)
+        # 1e: half again as much, rounded down.
+        vulnerable = not immune and self.vulnerable_to(dtype)
+        after_type = 0 if immune else (rolled * 3) // 2 if vulnerable else rolled
+
+        resisted = min(after_type, self.resistance(dtype)) if not immune else 0
+        after_type -= resisted
+
         dr = self.damage_reduction(dtype, traits)
         # DR reduces to zero, never below: it cannot heal you.
-        reduced = min(rolled, dr.amount) if dr else 0
-        after_dr = rolled - reduced
+        reduced = min(after_type, dr.amount) if dr else 0
+        after_dr = after_type - reduced
 
         absorbed = self._spend_temp_hp(min(self.temp_hp, after_dr))
         taken = after_dr - absorbed
@@ -1042,6 +1105,9 @@ class Actor:
             self.hp -= taken
         return {
             "rolled": rolled, "type": normalise_damage_type(dtype),
+            # Reported even when they did nothing, because the visible bookkeeping is the
+            # point: "20 fire, half again for vulnerability, 30" has to be readable back.
+            "immune": immune, "vulnerable": vulnerable, "resisted": resisted,
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
             "absorbed": absorbed, "taken": taken, "lethality": lethality,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
@@ -1820,6 +1886,13 @@ def to_dict(actor: Actor) -> dict:
                           for k, p in actor.world_classes.items()},
         "reductions": [{"amount": r.amount, "bypass": r.bypass, "source": r.source}
                        for r in actor.reductions],
+        # Written even when empty. A save that omits an empty list cannot tell "this
+        # creature has no immunities" from "this save predates immunities", and the second
+        # would send `from_dict` back to the stat block to re-derive them — undoing an
+        # edit made since. Empty is not the same as absent.
+        "immunities": list(actor.immunities),
+        "resistances": dict(actor.resistances),
+        "vulnerabilities": list(actor.vulnerabilities),
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
@@ -1920,6 +1993,37 @@ def _overrides(raw: dict) -> dict[str, bool]:
     return {k: bool(v) for k, v in raw.items()}
 
 
+def _defences(data: dict) -> tuple[list[str], dict[str, int], list[str]]:
+    """Immunity, resistance and vulnerability, from wherever the save put them.
+
+    Two shapes have to load. A creature arriving from the bestiary carries `effects` — the
+    same spec list a potion carries, built by `rules/creature_effects.py` out of the
+    printed `Immune`/`Resist`/`Weaknesses` lines. A character saved by this app carries the
+    three plain fields, because that is what `to_dict` writes.
+
+    Reading both rather than picking one is what lets a homebrew creature state an immunity
+    the parse could not, and lets a saved game reload without re-parsing a stat block that
+    may have been edited since.
+    """
+    immunities = list(data.get("immunities") or [])
+    resistances = {k: int(v) for k, v in (data.get("resistances") or {}).items()}
+    vulnerabilities = list(data.get("vulnerabilities") or [])
+    for spec in data.get("effects") or ():
+        if not isinstance(spec, dict):
+            continue
+        target, kind = str(spec.get("target", "")), spec.get("type")
+        if kind == "immunity" and target not in immunities:
+            immunities.append(target)
+        elif kind == "vulnerability" and target not in vulnerabilities:
+            vulnerabilities.append(target)
+        elif kind == "resistance" and target:
+            # The better of the two rather than the last one read, since 1e does not stack
+            # resistances against the same energy.
+            resistances[target] = max(resistances.get(target, 0),
+                                      int(spec.get("amount", 0) or 0))
+    return immunities, resistances, vulnerabilities
+
+
 def _reduction(r) -> Reduction:
     """A stat block writes `DR 5/silver`; a save writes the parts. Both must load, because
     the bestiary is authored by hand and the save is written by code."""
@@ -1939,6 +2043,7 @@ def _compulsion(raw: dict):
 
 
 def from_dict(data: dict, ref: str | None = None) -> Actor:
+    immunities, resistances, vulnerabilities = _defences(data)
     a = Actor(
         ref=ref or data.get("ref") or data["name"].lower().replace(" ", "-"),
         name=data["name"],
@@ -1986,6 +2091,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
                    if int(v) > 0},
         pools=_pools(data.get("pools") or {}),
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
+        immunities=immunities,
+        resistances=resistances,
+        vulnerabilities=vulnerabilities,
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
         heritage=data.get("heritage", ""),

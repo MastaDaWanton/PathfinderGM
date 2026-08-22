@@ -17,7 +17,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes, effectspec, spells
+from rules import biomes, effectspec, registry, spells
 
 from . import campaign as campaign_mod
 from . import homebrew, library, roster
@@ -275,16 +275,36 @@ def save_thing(request, bench_id: str):
         return JsonResponse({"error": str(exc)}, status=404)
 
     slug = str(body.get("id") or "").strip() or         re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "thing"
+
+    # Every field this kind declares, not the five that suited a potion. A creature saved
+    # through the old shape kept its name, kind, description and effects and lost its CR,
+    # its size and its hit points — and because homebrew merges over shipped field by
+    # field, the loss was invisible until something asked for the missing one.
+    #
+    # Read from the declaration rather than from the body, so a client cannot write keys
+    # the kind does not have, and a field the form showed and the user cleared is written
+    # as empty rather than dropped. Empty is not the same as absent: dropping it would let
+    # the shipped value show through again, which reads as the edit having failed silently.
+    try:
+        kind = registry.get(bench_id)
+    except LookupError:
+        kind = None
+    entry = {"id": slug, "name": name}
+    if kind:
+        for f in kind.fields:
+            if f.name in ("name", "effects"):
+                continue
+            if f.name in body:
+                entry[f.name] = body[f.name]
+    entry["kind"] = str(body.get("kind", "")) or entry.get("kind") or bench_id
+    entry["description"] = str(body.get("description", ""))
+    entry["effects"] = specs
+    # Cleared on save: these have now been looked at by a person, which is a different
+    # state from "the converter produced them and nobody has checked".
+    entry["effects_converted"] = False
+
     path = homebrew.folder(bench.dir) / f"{slug}.json"
-    path.write_text(json.dumps({
-        "id": slug, "name": name,
-        "kind": str(body.get("kind", "")) or bench_id,
-        "description": str(body.get("description", "")),
-        "effects": specs,
-        # Cleared on save: these have now been looked at by a person, which is a different
-        # state from "the converter produced them and nobody has checked".
-        "effects_converted": False,
-    }, indent=1, ensure_ascii=False), encoding="utf-8")
+    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
 

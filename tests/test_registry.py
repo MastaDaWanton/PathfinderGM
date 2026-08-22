@@ -209,3 +209,89 @@ def test_one_field_name_means_one_thing_across_kinds():
                 assert f.type == "textarea", f"{kind.id}.environment is a {f.type}"
             if f.name == "biomes":
                 assert f.type == "list", f"{kind.id}.biomes is a {f.type}"
+
+
+# --- the bench, the form, and what a save keeps -----------------------------------------
+
+def test_every_bench_opens_a_builder_rather_than_two_of_them(client):
+    """`builder` was set by hand on `consumables` and `ingredients` and left off the other
+    seven, so a creature, feat, weapon or spell could be listed and never corrected — even
+    after `registry.find` and `open_thing` could already handle all nine. It is derived
+    from the kind declaration now, which is the same declaration the form is drawn from."""
+    for bench_id in registry.KINDS:
+        d = client.get(f"/api/bench/{bench_id}").json()
+        assert d["bench"]["builder"] == "effects", bench_id
+
+
+def test_the_form_is_drawn_from_the_declaration_and_not_written_into_the_page():
+    """Four inputs — name, kind, description, effects — were written into home.html, which
+    is why only the two benches those four suited could be edited at all: a creature has a
+    CR and a size and neither had anywhere to go."""
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "function draftField(" in page
+    assert 'KINDS' in page and '"/api/kinds"' in page
+    # The three hardcoded inputs are gone from the markup. Matched on the attribute rather
+    # than on the handler line, because the handler line is quoted in the comment that
+    # explains why it went.
+    for gone in ('id="d-name"', 'id="d-kind"', 'id="d-desc"'):
+        assert gone not in page, gone
+    assert 'data-draft=' in page
+
+
+def test_saving_a_creature_keeps_the_fields_its_kind_declares(mine, client):
+    """The old save wrote five keys. A creature through it kept its name, kind,
+    description and effects and lost its CR, its size and its terrain — and because
+    homebrew merges over shipped field by field, the loss was invisible until something
+    asked for a missing one."""
+    r = client.post("/api/bench/creatures/save", data=json.dumps({
+        "id": "grue", "name": "Grue", "cr": "3", "size": "large",
+        "creature_type": "aberration", "environment": "lightless caves",
+        "biomes": ["underground"], "climates": ["cold"], "hp": 30, "flat_ac": 15,
+        "effects": [{"type": "immunity", "target": "cold"}],
+    }), content_type="application/json")
+    assert r.status_code == 200
+
+    back = registry.find("creatures", "grue")
+    assert back["cr"] == "3" and back["size"] == "large"
+    assert back["biomes"] == ["underground"] and back["climates"] == ["cold"]
+    assert back["hp"] == 30 and back["flat_ac"] == 15
+
+
+def test_a_field_the_kind_does_not_declare_is_not_written(mine, client):
+    """Read from the declaration rather than from the body, so a client cannot put keys
+    into a content file that nothing will ever read back."""
+    client.post("/api/bench/creatures/save", data=json.dumps({
+        "id": "grue", "name": "Grue", "nonsense": "should not be stored",
+    }), content_type="application/json")
+    assert "nonsense" not in registry.find("creatures", "grue")
+
+
+def test_every_row_a_bench_draws_can_be_opened(client):
+    """Turning the builder on for all nine surfaced two ways a row could point at nothing.
+    A row that 404s when clicked is worse than no row: the page drew it a moment earlier.
+
+    The creatures bench lists the four hand-written townsfolk and the registry's loader
+    pointed at `bestiary.imported`, which is the two content files and knows nothing about
+    them. The feats bench listed `rules.tables.FEATS`, keyed "weapon finesse" with a space,
+    while `rules.feats` — what the registry resolves — is keyed by slug.
+    """
+    for bench_id in registry.KINDS:
+        rows = client.get(f"/api/bench/{bench_id}").json()["rows"]
+        for row in [r for r in rows if r.get("id")][:5]:
+            r = client.get(f"/api/bench/{bench_id}/open/{row['id']}")
+            assert r.status_code == 200, f"{bench_id}/{row['id']}: {r.json()}"
+
+
+def test_a_bench_that_lists_nothing_clickable_would_have_a_builder_nobody_can_reach(client):
+    """`classes`, `worldclasses`, `items` and `feats` emitted rows with no id at all, so
+    no `data-open` was drawn and the form could not be opened from any of them."""
+    for bench_id in ("classes", "worldclasses", "items", "feats", "creatures"):
+        rows = client.get(f"/api/bench/{bench_id}").json()["rows"]
+        assert rows and all(r.get("id") for r in rows), bench_id
+
+
+def test_the_feats_bench_stops_hiding_the_imported_list(client):
+    """It showed the 16 the sheet applies by hand and said "16 shipped" — accurate about
+    itself, and quietly sitting on 1,474 feats the app had already imported."""
+    rows = client.get("/api/bench/feats").json()["rows"]
+    assert len(rows) > 100
