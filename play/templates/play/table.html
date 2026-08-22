@@ -486,7 +486,7 @@
   }
   .sheetbody { overflow-y: auto; padding: 26px 44px 70px; position: relative; z-index: 1; }
   .cols {
-    display: grid; gap: 26px;
+    display: grid; gap: 40px;
     grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
     align-items: start;
   }
@@ -561,9 +561,9 @@
 
   .bodylayout {
     display: grid; grid-template-columns: minmax(210px, 1fr) minmax(180px, 300px) minmax(210px, 1fr);
-    gap: 22px; align-items: start;
+    gap: 32px; align-items: start;
   }
-  .slotcol { display: flex; flex-direction: column; gap: 11px; }
+  .slotcol { display: flex; flex-direction: column; gap: 18px; }
   .figure { position: sticky; top: 0; text-align: center; }
   .figure > svg { width: 100%; max-width: 300px; height: auto; color: #6a5a3c; }
   .figcap {
@@ -657,7 +657,25 @@
      hairline is replaced by an inset shadow so the pseudo-element is free to
      carry the filigree ring — a gradient that shows only at the edges, behind
      the panel's own glass. `isolation` keeps its z-index:-1 inside the card. */
-  .framed, .card, .slot, .popup, .deathpanel {
+  /* The cards are bound in the user's grey leather, taken down into the
+     palette at the asset (multiplied warm-dark, so no scrim fights the grain).
+     Opaque on purpose: a texture is a surface, and a surface is not glass —
+     the popup and the death panel keep the obsidian, because an apparition
+     should still be see-through. */
+  .framed, .card, .slot {
+    isolation: isolate;
+    background:
+      linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .38)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+    border: 1px solid rgba(201, 162, 39, .25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
+                inset 0 1px 0 rgba(255, 230, 150, .08),
+                inset 0 0 42px rgba(0, 0, 0, .40);
+    transition: transform .4s cubic-bezier(.25, .8, .25, 1),
+                border-color .3s ease, box-shadow .4s ease;
+  }
+  .popup, .deathpanel {
     isolation: isolate;
     background: rgba(18, 15, 12, .55);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
@@ -665,8 +683,6 @@
     border: 1px solid rgba(201, 162, 39, .25);
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
                 inset 0 1px 0 rgba(255, 230, 150, .08);
-    transition: transform .4s cubic-bezier(.25, .8, .25, 1),
-                border-color .3s ease, box-shadow .4s ease;
   }
   .framed::before, .card::before, .slot::before {
     inset: -1px; border: 0; border-radius: inherit; z-index: -1;
@@ -681,6 +697,19 @@
                 0 0 20px rgba(201, 162, 39, .15),
                 inset 0 1px 0 rgba(255, 230, 150, .12);
   }
+
+  /* Engraved bronze. Struck letters read as cut when their upper edge holds
+     the shadow and their lower edge catches the light; both shadows are
+     static, and the candleGlow that breathes on the numbers rides on top. */
+  .card > h3, .framed h3, table.sheet th, .cell b, .slothead, .figcap {
+    color: #b6905e;
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, .92), 0 1px 0 rgba(255, 225, 175, .16);
+  }
+  .bignum, .cell span, .dieface {
+    color: #c29a63;
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 225, 175, .2);
+  }
+
   /* 5. The lift. The tilt that was here read as seasickness once the corner
      clasps gave the panels real weight — hardware does not flex. A straight
      rise and a deeper glow carry the same "this is an object" claim. */
@@ -712,14 +741,13 @@
   /* 4. Embers. Two drifting layers on one fixed element — different speeds,
      different sizes, so the motes parallax instead of marching. transform-only
      animation; the layer is behind everything and pointer-transparent. */
-  /* 4. Embers, second generation. Three depth layers as real children rather
-     than two pseudo-elements: near motes are larger, warmer and quick, far
-     ones small, dim and slow behind a static half-pixel blur. The sway is
-     baked into the rise keyframes — X wanders and returns to zero so the
-     vertical loop stays seamless against the repeating tile — and each layer
-     flickers on its own prime-numbered clock so nothing ever synchronises.
-     A mask fades the column out near the top: embers die as they climb.
-     Transform and opacity only; the one blur is static, rasterised once. */
+  /* 4. Embers, third generation: thicker and deeper. Four layers now — a new
+     nearest sheet of big soft coals drifting fast in front, then the bright
+     motes, the mid-field, and the far dust behind its half-pixel blur. Every
+     sheet carries more particles than before, each with a soft outer halo
+     stop so a mote reads as a glowing coal rather than a pixel. The sway is
+     still baked into the rise so the loop stays seamless, and each layer
+     still flickers on its own prime-numbered clock. */
   #embers { position: fixed; inset: 0; pointer-events: none; z-index: 0;
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%,
@@ -728,34 +756,49 @@
                                         transparent 96%); }
   #embers i { position: absolute; left: 0; right: 0; top: 0; height: 200%;
               will-change: transform; }
-  #embers i:nth-child(1) {          /* near: bright, warm, quick */
+  #embers i:nth-child(1) {          /* nearest: big soft coals */
     background-image:
-      radial-gradient(2.4px 2.4px at 22% 12%, rgba(255,170,80,.85), transparent 60%),
-      radial-gradient(2px 2px at 68% 38%, rgba(255,195,105,.7), transparent 60%),
-      radial-gradient(2.6px 2.6px at 45% 68%, rgba(255,150,60,.75), transparent 60%),
-      radial-gradient(1.8px 1.8px at 88% 82%, rgba(255,205,120,.6), transparent 60%),
-      radial-gradient(2.2px 2.2px at 8% 90%, rgba(255,175,85,.7), transparent 60%);
+      radial-gradient(4.5px 4.5px at 18% 22%, rgba(255,160,70,.5), rgba(255,120,40,.14) 55%, transparent 75%),
+      radial-gradient(5px 5px at 74% 64%, rgba(255,180,90,.42), rgba(255,130,50,.12) 55%, transparent 75%),
+      radial-gradient(4px 4px at 44% 88%, rgba(255,150,60,.46), rgba(255,110,40,.12) 55%, transparent 75%);
+    background-size: 300px 300px;
+    filter: blur(.6px);
+    animation: emberrise 18s linear infinite, emberflick 4.1s ease-in-out infinite;
+  }
+  #embers i:nth-child(2) {          /* near: bright, warm, quick */
+    background-image:
+      radial-gradient(3px 3px at 22% 12%, rgba(255,170,80,.9), rgba(255,140,60,.2) 55%, transparent 75%),
+      radial-gradient(2.6px 2.6px at 68% 38%, rgba(255,195,105,.75), rgba(255,150,70,.18) 55%, transparent 75%),
+      radial-gradient(3.4px 3.4px at 45% 68%, rgba(255,150,60,.8), rgba(255,120,40,.2) 55%, transparent 75%),
+      radial-gradient(2.4px 2.4px at 88% 82%, rgba(255,205,120,.65), transparent 70%),
+      radial-gradient(2.8px 2.8px at 8% 90%, rgba(255,175,85,.75), rgba(255,140,60,.18) 55%, transparent 75%),
+      radial-gradient(2.2px 2.2px at 55% 25%, rgba(255,185,95,.6), transparent 70%),
+      radial-gradient(2.6px 2.6px at 33% 45%, rgba(255,165,75,.7), transparent 70%);
     background-size: 260px 260px;
     animation: emberrise 26s linear infinite, emberflick 5.3s ease-in-out infinite;
+    animation-delay: -6s, -1s;
   }
-  #embers i:nth-child(2) {          /* mid */
+  #embers i:nth-child(3) {          /* mid */
     background-image:
-      radial-gradient(1.6px 1.6px at 15% 25%, rgba(240,180,95,.55), transparent 60%),
-      radial-gradient(1.4px 1.4px at 55% 55%, rgba(232,170,80,.45), transparent 60%),
-      radial-gradient(1.8px 1.8px at 80% 15%, rgba(250,190,100,.5), transparent 60%),
-      radial-gradient(1.3px 1.3px at 35% 85%, rgba(232,197,71,.45), transparent 60%),
-      radial-gradient(1.5px 1.5px at 95% 65%, rgba(240,180,90,.4), transparent 60%);
+      radial-gradient(2px 2px at 15% 25%, rgba(240,180,95,.6), transparent 70%),
+      radial-gradient(1.8px 1.8px at 55% 55%, rgba(232,170,80,.5), transparent 70%),
+      radial-gradient(2.2px 2.2px at 80% 15%, rgba(250,190,100,.55), transparent 70%),
+      radial-gradient(1.7px 1.7px at 35% 85%, rgba(232,197,71,.5), transparent 70%),
+      radial-gradient(1.9px 1.9px at 95% 65%, rgba(240,180,90,.45), transparent 70%),
+      radial-gradient(1.6px 1.6px at 62% 92%, rgba(245,185,95,.45), transparent 70%),
+      radial-gradient(2px 2px at 5% 55%, rgba(238,178,88,.5), transparent 70%);
     background-size: 340px 340px;
     animation: emberrise 52s linear infinite, emberflick 7.1s ease-in-out infinite;
     animation-delay: -13s, -2s;
   }
-  #embers i:nth-child(3) {          /* far: dust motes behind the haze */
+  #embers i:nth-child(4) {          /* far: dust motes behind the haze */
     background-image:
-      radial-gradient(1px 1px at 30% 20%, rgba(220,180,110,.4), transparent 60%),
-      radial-gradient(1px 1px at 70% 45%, rgba(201,162,39,.35), transparent 60%),
-      radial-gradient(1.2px 1.2px at 10% 60%, rgba(230,190,120,.3), transparent 60%),
-      radial-gradient(1px 1px at 50% 92%, rgba(220,170,90,.3), transparent 60%),
-      radial-gradient(1.1px 1.1px at 90% 78%, rgba(210,170,100,.3), transparent 60%);
+      radial-gradient(1.2px 1.2px at 30% 20%, rgba(220,180,110,.45), transparent 70%),
+      radial-gradient(1.2px 1.2px at 70% 45%, rgba(201,162,39,.4), transparent 70%),
+      radial-gradient(1.4px 1.4px at 10% 60%, rgba(230,190,120,.35), transparent 70%),
+      radial-gradient(1.2px 1.2px at 50% 92%, rgba(220,170,90,.35), transparent 70%),
+      radial-gradient(1.3px 1.3px at 90% 78%, rgba(210,170,100,.35), transparent 70%),
+      radial-gradient(1.1px 1.1px at 42% 8%, rgba(215,175,105,.32), transparent 70%);
     background-size: 460px 460px;
     filter: blur(.5px);
     animation: emberrise 96s linear infinite, emberflick 9.7s ease-in-out infinite;
@@ -852,18 +895,20 @@
     filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .55));
   }
   .popup::before, .deathpanel::before {
-    content: ""; position: absolute; inset: -52px -12px; pointer-events: none;
+    content: ""; position: absolute; inset: -30px -12px; pointer-events: none;
     z-index: 4;
     background-image:
       url("{% static 'img/boss-top.png' %}"),
       url("{% static 'img/boss-bottom.png' %}");
     background-position: top center, bottom center;
     background-repeat: no-repeat;
-    background-size: 160px auto;
+    /* Sized to the corner pieces' own edge run — a centre fitting is jewellery
+       on the frame, not a second shield. */
+    background-size: 100px auto;
     filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .55));
   }
-  .popup { padding: 66px 30px 60px; }
-  .deathpanel { padding: 66px 38px 60px; }
+  .popup { padding: 52px 30px 48px; }
+  .deathpanel { padding: 52px 38px 48px; }
   /* The slots are small; full-size fittings would eat the medallion. */
   .slot::after { background-size: 60px auto; inset: -5px; }
 
@@ -905,7 +950,7 @@
 </style>
 </head>
 <body>
-<div id="embers" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div id="cursorlight" aria-hidden="true"></div>
 <main>
   <div id="story"></div>
