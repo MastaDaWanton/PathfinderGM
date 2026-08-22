@@ -20381,10 +20381,10 @@
     "one elemental language (Aquan",
     "Auran",
     "Ignan",
-    "or Terran)",
+    "Terran)",
     "one planar language (Abyssal",
     "Celestial",
-    "or Infernal)"
+    "Infernal)"
    ],
    "environment": "warm deserts",
    "organization": "solitary or pack (2–8)",
@@ -41580,7 +41580,7 @@
    "languages": [
     "Ce lestial",
     "Co mmon",
-    "Dr ac onic",
+    "Dr",
     "Samsaran"
    ],
    "environment": "any land",

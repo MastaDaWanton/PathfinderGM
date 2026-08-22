@@ -18,12 +18,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from rules.statblock import RESISTANCE, scrub, trim  # noqa: E402
+from rules.statblock import (MAX_LANGUAGE_TERM, MAX_LANGUAGES, MAX_TERM,  # noqa: E402
+                             MAX_TERMS, RESISTANCE, scrub, trim)
 
 # Only the three fields that split on commas. Every other stat-block field is capped by a
 # slice at the point of extraction, so a runaway there is one long wrong string — visible.
 # These three turned the same runaway into a list of short plausible ones, which is not.
-FIELDS = {"immune": None, "resist": RESISTANCE, "languages": None}
+#
+# Languages carry their own limit: a creature that speaks thirteen is unusual and real, and
+# the shared cap of twelve took Terran and Undercommon off the end of one.
+FIELDS = {
+    "immune": (None, MAX_TERMS, MAX_TERM),
+    "resist": (RESISTANCE, MAX_TERMS, MAX_TERM),
+    "languages": (None, MAX_LANGUAGES, MAX_LANGUAGE_TERM),
+}
 
 
 def repair(rows) -> dict:
@@ -37,11 +45,11 @@ def repair(rows) -> dict:
             if isinstance(value, str) and (cleaned := scrub(value)) != value:
                 row[key] = cleaned
                 counts["watermark"]["before"] += 1
-        for field, shape in FIELDS.items():
+        for field, (shape, limit, max_term) in FIELDS.items():
             was = row.get(field) or []
             if not was:
                 continue
-            now = trim(was, shape=shape)
+            now = trim(was, limit=limit, shape=shape, max_term=max_term)
             c = counts[field]
             c["before"] += len(was)
             c["after"] += len(now)

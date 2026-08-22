@@ -42,12 +42,48 @@ def by_name(name):
     "Will +0 DR 10/-; Immune cold",                     # the next creature's DEFENSE line
     "low-light vision; Perception +10 DEfEnSE AC 15",   # the next creature's header
     "and his eight archdevil tyrants",                  # prose
-    "raid caravans and humanoid settlements",
     "to the basilisk's stare",                          # `Immune` matched inside prose
     "this effect with a DC 22",
+    "very few know of the sadistic creatures' existence",
 ])
 def test_page_text_is_recognised_as_spill(term):
     assert sb.is_spill(term)
+
+
+def test_the_length_limit_is_set_where_it_costs_least_and_says_what_it_costs():
+    """45 characters, not 30. At 30 the cut was destroying real data, because it is a
+    truncation: "bludgeoning and piercing damage" is 31 and "channel energy from non-mythic
+    sources" is 38, and each took every real immunity listed after it — the whispering
+    tyrant lost cold, electricity and undead traits, and two liches lost their lists whole.
+
+    The price is that some spill of that length now survives. Measured across both shipped
+    files, six terms over 30 characters remain: four are real and two are welded spill
+    ("attacks relying on sight paralysis sleep", "channeled energy see Continuous
+    Effects"). Two junk terms against four real ones and everything that followed them.
+
+    So a mid-length prose fragment with no other tell gets through, and that is the known
+    edge of this rule rather than an oversight.
+    """
+    assert sb.MAX_TERM == 45
+    assert not sb.is_spill("raid caravans and humanoid settlements")   # 38, and spill
+    assert not sb.is_spill("bludgeoning and piercing damage")          # 31, and real
+
+    rows = []
+    for name in ("core", "creatures"):
+        d = json.loads(Path(f"content/bestiary/{name}.json").read_text(encoding="utf-8"))
+        rows += d.get("creatures") or d
+    long = {t for r in rows for t in (r.get("immune") or []) + (r.get("resist") or [])
+            if len(t) > 30}
+    assert len(long) <= 8, sorted(long)
+
+
+def test_a_conjunction_at_the_front_is_removed_rather_than_taken_as_spill():
+    """"Immune paralysis, sleep, and poison" splits into a term reading "and poison".
+    Treating that as spill truncates the list and loses poison, which is a real immunity —
+    so the conjunction comes off and what is left is judged on its own."""
+    assert sb.trim(["paralysis", "and poison"]) == ["paralysis", "poison"]
+    # And it does not become a way back in for prose: what remains still has to pass.
+    assert sb.trim(["cold", "and his eight archdevil tyrants"]) == ["cold"]
 
 
 @pytest.mark.parametrize("term", [
@@ -110,11 +146,23 @@ def test_no_purchasers_email_address_ships_with_the_app():
 
 
 def test_the_immunity_vocabulary_is_the_size_of_the_games():
-    """1,144 distinct terms before, 79 after. Pathfinder's whole immunity vocabulary is
-    energy types, conditions, a handful of "X traits" lines and a few named effects."""
+    """1,144 distinct terms in the printed blocks before the cut, 79 after. Pathfinder's
+    whole immunity vocabulary is energy types, conditions, a handful of "X traits" lines
+    and a few named effects."""
     terms = {t.lower() for r in ROWS for t in (r.get("immune") or [])}
     assert len(terms) < 100
     assert {"cold", "poison", "undead traits", "mind-affecting effects"} <= terms
+
+
+def test_a_real_immunity_after_a_long_one_is_not_lost_with_it():
+    """Both liches read `channeled energy (due to proximity to the Zombiestone)` first —
+    54 characters, over the limit at any setting — and truncation took cold, electricity,
+    polymorph and undead traits with it. The long term is still cut; what followed is not.
+    """
+    kept = sb.trim(["channel energy from non-mythic sources", "cold", "electricity",
+                    "undead traits"])
+    assert kept == ["channel energy from non-mythic sources", "cold", "electricity",
+                    "undead traits"]
 
 
 def test_every_resistance_is_an_energy_and_a_number():

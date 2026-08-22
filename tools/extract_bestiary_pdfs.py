@@ -153,6 +153,12 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
                                                     "OFFENSE").split(",") if x.strip()],
                        shape=RESISTANCE),
         "sr": _num(sr),
+        # Read, not just used as a terminator. `Weaknesses` was one of the stop keywords
+        # above from the first version and never a field of its own, so no printed stat
+        # block carried a weakness at all: a frost giant's `vulnerability to fire` reached
+        # the file only for the creatures the spreadsheet also had. 236 vulnerabilities
+        # come from the spreadsheet and none from the six Bestiaries.
+        "weaknesses": _between(t, "Weaknesses", "OFFENSE", "STATISTICS")[:160],
         "senses": _between(t, "Senses", "DEFENSE", "Aura")[:160],
         "special_attacks": _between(t, "Special Attacks", "STATISTICS", "TACTICS")[:300],
         "languages": trim([x.strip() for x in

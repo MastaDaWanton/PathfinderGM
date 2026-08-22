@@ -1649,7 +1649,7 @@
    "speed_note": "50 ft., climb 30 ft.",
    "reductions": [],
    "immune": [
-    "cold DR 10/piercing"
+    "cold"
    ],
    "resist": [],
    "sr": null,
@@ -8167,7 +8167,7 @@
    "immune": [
     "gaze attacks",
     "visual effects",
-    "and attacks relying on sight"
+    "attacks relying on sight"
    ],
    "resist": [
     "sonic 30"
@@ -35170,14 +35170,7 @@
      "source": "natural"
     }
    ],
-   "immune": [
-    "channeled energy (due to proximity to the Zombiestone)",
-    "cold",
-    "electricity",
-    "mind-affecting",
-    "polymorph",
-    "undead traits"
-   ],
+   "immune": [],
    "resist": [],
    "sr": null,
    "weaknesses": "",
@@ -49290,8 +49283,7 @@
    ],
    "resist": [
     "acid 10",
-    "cold 10",
-    "fire 10."
+    "cold 10"
    ],
    "sr": null,
    "weaknesses": "",
@@ -49875,7 +49867,7 @@
     "energy drain",
     "petrification",
     "poison",
-    "and all forms of madness"
+    "all forms of madness"
    ],
    "resist": [],
    "sr": 35,
@@ -60023,7 +60015,7 @@
     }
    ],
    "immune": [
-    "undead traits  Defensive Abilities projection"
+    "undead traits"
    ],
    "resist": [],
    "sr": null,
@@ -79444,7 +79436,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [
-    "mind-affecting effect  Defensive Abilities bravery +2"
+    "mind-affecting effect"
    ],
    "resist": [],
    "sr": null,
@@ -79536,7 +79528,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [
-    "mind-affecting effects  Defensive Abilities evasion",
+    "mind-affecting effects",
     "improved uncanny dodge",
     "trap sense +2"
    ],
@@ -82508,9 +82500,7 @@
    "immune": [
     "sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision;  Perception +3",
@@ -88408,7 +88398,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "fire 5  Immune magic missile"
+    "fire 5"
    ],
    "sr": null,
    "weaknesses": "",
@@ -88504,7 +88494,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "fire 10  Immune magic missile"
+    "fire 10"
    ],
    "sr": null,
    "weaknesses": "",
@@ -88609,9 +88599,7 @@
     "electricity",
     "petrification"
    ],
-   "resist": [
-    "cold 15 fire 15"
-   ],
+   "resist": [],
    "sr": 15,
    "weaknesses": "",
    "senses": "darkvision 60 ft., low-light vision, scent; Perception +13",
@@ -95250,9 +95238,7 @@
    "speed_note": "20 ft., fly 60 ft. (good)",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 60 ft.; Perception +14",
@@ -110507,7 +110493,7 @@
    "reductions": [],
    "immune": [
     "poison",
-    "sleep DR 10/adamantine (150 points)"
+    "sleep"
    ],
    "resist": [],
    "sr": null,
@@ -110821,9 +110807,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "undead resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "light sensitivity",
    "senses": "darkvision 60 ft., low-light vision; Perception +9",
@@ -111349,9 +111333,7 @@
    "speed_note": "20 ft., swim 30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 60 ft., low-light vision; Perception +5",
@@ -118346,9 +118328,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision;  Perception +2",
@@ -122805,14 +122785,7 @@
      "source": "natural"
     }
    ],
-   "immune": [
-    "channeled energy (due to proximity to the Zombiestone)",
-    "cold",
-    "electricity",
-    "mind-affecting",
-    "polymorph",
-    "undead traits"
-   ],
+   "immune": [],
    "resist": [],
    "sr": null,
    "weaknesses": "",
@@ -124776,9 +124749,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 8,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +8",
@@ -133321,7 +133292,7 @@
     "gaze attacks",
     "visual effects",
     "illusions",
-    "and attacks relying on sight"
+    "attacks relying on sight"
    ],
    "resist": [
     "sonic 30"
@@ -144378,9 +144349,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 7,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +2",
@@ -162378,9 +162347,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "undead resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "light sensitivity",
    "senses": "darkvision 60 ft., life sight (20 feet, 13 rounds/day), low-light vision; Perception +16",
@@ -163476,9 +163443,7 @@
     "Protean",
     "Sphinx",
     "Sylvan",
-    "Terran",
-    "Undercommon",
-    "Vudrani"
+    "Terran"
    ],
    "special_attacks": "blasphemous bile",
    "special_abilities": "",
@@ -165584,8 +165549,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "fire 5",
-    "infernal resistances"
+    "fire 5"
    ],
    "sr": null,
    "weaknesses": "",
@@ -166592,9 +166556,7 @@
    "speed_note": "30 ft., fly 60 ft. (good)",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +11",
@@ -170763,9 +170725,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "snakeskin"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +9",
@@ -171895,7 +171855,7 @@
     "death effects",
     "disease",
     "fear",
-    "and poison"
+    "poison"
    ],
    "resist": [
     "cold 10",
@@ -173710,9 +173670,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 8,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +8",
@@ -184864,10 +184822,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "demon resistances",
-    "electricity 5"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 60 ft.;  Perception +10",
@@ -195691,7 +195646,7 @@
     "cold",
     "dragon traits",
     "paralysis",
-    "and sleep"
+    "sleep"
    ],
    "resist": [],
    "sr": null,
@@ -225150,7 +225105,7 @@
    "speed_note": "",
    "reductions": [],
    "immune": [
-    "undead traits Speed 30 ft."
+    "undead traits"
    ],
    "resist": [],
    "sr": null,
@@ -229250,7 +229205,7 @@
     "Iobarian",
     "pidgin of Giant",
     "Goblin",
-    "and Orc"
+    "Orc"
    ],
    "special_attacks": "double hexes, hexes (cackle, evil eye [-2, 4 rounds], slumber [4 rounds]), superior two-weapon fighting",
    "special_abilities": "Double Hexes (Ex) Whenever Gurragurra uses a hex as a standard action, her second head can use an additional hex as a swift action.",
@@ -245224,7 +245179,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [
-    "sleep  Defensive Abilities viridian escape"
+    "sleep"
    ],
    "resist": [],
    "sr": null,
@@ -253935,7 +253890,7 @@
     "cold gaze attacks",
     "visual effects",
     "illusions",
-    "and attacks relying on sight paralysis sleep"
+    "attacks relying on sight paralysis sleep"
    ],
    "resist": [
     "sonic 30"
@@ -256722,9 +256677,7 @@
     "fire (protection from energy",
     "120 points)"
    ],
-   "resist": [
-    "electricity 30 (resist energy)"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 60 ft., see invisibility; Perception +21",
@@ -262647,9 +262600,7 @@
    "speed_note": "10 ft., swim 40 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "cold 5   light sensitivity"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "blindsense 30 ft., darkvision 60 ft.; Perception +14",
@@ -264122,9 +264073,7 @@
    "immune": [
     "construct traits"
    ],
-   "resist": [
-    "energy (all) 20"
-   ],
+   "resist": [],
    "sr": 30,
    "weaknesses": "Break DC 40 (inflicts 18 points of damage)",
    "senses": "blindsight 60ft., darkvision 60 ft., low-light vision;  Perception -5",
@@ -269217,9 +269166,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "fire 10 Immune fire",
-    "paralysis",
-    "sleep"
+    "fire 10"
    ],
    "sr": null,
    "weaknesses": "",
@@ -271301,9 +271248,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 9,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +9",
@@ -279351,9 +279296,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +14",
@@ -288317,7 +288260,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "cold 5  Immune magic missile"
+    "cold 5"
    ],
    "sr": null,
    "weaknesses": "",
@@ -290452,9 +290395,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 8,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +5",
@@ -302662,7 +302603,7 @@
    "languages": [
     "pidgin of Giant",
     "Goblin",
-    "and Orc"
+    "Orc"
    ],
    "special_attacks": "superior two-weapon fighting",
    "special_abilities": "",
@@ -307015,7 +306956,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "fire 20 DR 3/-"
+    "fire 20"
    ],
    "sr": null,
    "weaknesses": "",
@@ -308496,9 +308437,7 @@
    "immune": [
     "sleep"
    ],
-   "resist": [
-    "electricity10"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision;  Perception +8",
@@ -349110,7 +349049,7 @@
    "resist": [
     "cold 5",
     "electricity 5",
-    "fire 5 DR 10/adamantine (70 points)"
+    "fire 5"
    ],
    "sr": 17,
    "weaknesses": "",
@@ -356853,9 +356792,7 @@
     }
    ],
    "immune": [],
-   "resist": [
-    "fire 30 (or an energy type favored by the party)"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 60 ft., low-light vision, see invisibility; Perception +25",
@@ -358020,7 +357957,7 @@
    ],
    "immune": [],
    "resist": [
-    "fire 10  Immune undead traits"
+    "fire 10"
    ],
    "sr": null,
    "weaknesses": "",
@@ -366461,14 +366398,7 @@
     "fatigue",
     "fire",
     "magic",
-    "mindaffecting effects",
-    "nonlethal damage",
-    "paralysis",
-    "poison",
-    "polymorph",
-    "sleep effects",
-    "sonic",
-    "stunning"
+    "mindaffecting effects"
    ],
    "resist": [],
    "sr": null,
@@ -383026,9 +382956,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "undead resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "light sensitivity",
    "senses": "darkvision 60 ft., low-light vision; Perception +3",
@@ -384369,20 +384297,7 @@
     "Orvian",
     "Osiriani",
     "Polyglot",
-    "Senzar",
-    "Shadowtongue",
-    "Shoanti",
-    "Skald",
-    "Strix",
-    "Tengu",
-    "Terran",
-    "Thassilonian",
-    "Tien",
-    "Undercommon",
-    "Varisian",
-    "Vudrani",
-    "tongues",
-    "telepathy 100 ft."
+    "Senzar"
    ],
    "special_attacks": "binding contract, bleed (1d6), hand of the apprentice (12/day)",
    "special_abilities": "",
@@ -387208,9 +387123,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +8",
@@ -398342,9 +398255,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision;  Perception +4",
@@ -419047,9 +418958,7 @@
    "immune": [
     "sleep"
    ],
-   "resist": [
-    "5 fire"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision; Perception +11",
@@ -425011,10 +424920,7 @@
    "immune": [
     "energy drain"
    ],
-   "resist": [
-    "death",
-    "energy 5"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 120 ft., low-light vision, scent, tremorsense 60 ft.;  Perception +40",
@@ -431050,7 +430956,7 @@
     "Common",
     "Draconic",
     "Fiendish  (understands",
-    "but can't speak)"
+    "can't speak)"
    ],
    "special_attacks": "breath weapon (30 ft. cone, 5d6 fire damage, Reflex DC 27 half, usable every 2d4 rounds), fiery bite",
    "special_abilities": "Breath Weapon (Su) Each head can use Revirax's breath weapon once every 2d4 rounds.  Fiery Bite (Su) Revirax's bite attack inflicts an extra 1d10 points of fire damage. On a successful critical hit, this damage increases to 2d10 fire damage.  Heated Iron Gates of Hell: hardness 10; hp 60; Break DC 25; Disable Device DC 25. In addition, the gates are treated as if under the permanent effects of a heat metal spell, inflicting 2d4 points of fire damage per round to all who touch it- including those trying to pick the lock or break the bars. This effect cannot be dispelled.",
@@ -431523,9 +431429,7 @@
    "immune": [
     "aging"
    ],
-   "resist": [
-    "haunted eyes"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "low-light vision; Perception +21",
@@ -436186,9 +436090,7 @@
    "speed_note": "15 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "+1 vs. demoralize"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +3",
@@ -444244,9 +444146,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "poison resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +11",
@@ -448951,7 +448851,7 @@
    "immune": [
     "mind-affecting effects",
     "paralysis",
-    "poison DR 5/-"
+    "poison"
    ],
    "resist": [],
    "sr": 15,
@@ -464183,7 +464083,7 @@
    "resist": [
     "cold 15",
     "electricity 15",
-    "fire 30 DR 10/magic"
+    "fire 30"
    ],
    "sr": 18,
    "weaknesses": "",
@@ -467222,9 +467122,7 @@
     }
    ],
    "immune": [],
-   "resist": [
-    "extreme endurance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +8",
@@ -478103,9 +478001,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 12,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +7",
@@ -480004,7 +479900,7 @@
    "immune": [
     "frightened",
     "shaken",
-    "and unconscious conditions"
+    "unconscious conditions"
    ],
    "resist": [
     "cold 4"
@@ -486500,9 +486396,7 @@
    "immune": [
     "magic sleep"
    ],
-   "resist": [
-    "elven immunities"
-   ],
+   "resist": [],
    "sr": 10,
    "weaknesses": "light blindness",
    "senses": "darkvision 120 ft., low-light vision;  Perception +7",
@@ -492002,7 +491896,7 @@
    "reductions": [],
    "immune": [],
    "resist": [
-    "electricity 10 Immune construct traits"
+    "electricity 10"
    ],
    "sr": null,
    "weaknesses": "vulnerable to sonic",
@@ -497021,8 +496915,7 @@
     "Toughness"
    ],
    "languages": [
-    "Abyssal (cannot speak)",
-    "telepathy 100 ft. (limited to  Abyssal-speaking targets)"
+    "Abyssal (cannot speak)"
    ],
    "special_attacks": "",
    "special_abilities": "",
@@ -499808,7 +499701,7 @@
     }
    ],
    "immune": [
-    "construct traits (+30 hp)",
+    "construct traits (+30",
     "magic"
    ],
    "resist": [],
@@ -520795,10 +520688,7 @@
    "immune": [
     "energy drain"
    ],
-   "resist": [
-    "death",
-    "energy 20"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "darkvision 120 ft., low-light vision, scent, tremorsense 60 ft.;  Perception +45",
@@ -523356,7 +523246,7 @@
     }
    ],
    "immune": [
-    "construct traits (+30 hp)"
+    "construct traits (+30"
    ],
    "resist": [],
    "sr": 13,
@@ -523648,7 +523538,7 @@
     "energy drain",
     "mind-affecting effects",
     "paralysis",
-    "and petrification"
+    "petrification"
    ],
    "resist": [
     "acid 30",
@@ -523917,7 +523807,7 @@
     "disease",
     "paralysis",
     "poison",
-    "and sleep effects"
+    "sleep effects"
    ],
    "resist": [
     "cold 30",
@@ -524051,8 +523941,7 @@
     "Toughness"
    ],
    "languages": [
-    "Undercommon",
-    "telepathy 60 ft. (myceloid and purple pox sufferers only)"
+    "Undercommon"
    ],
    "special_attacks": "bleed (1d4), long limbs",
    "special_abilities": "Long Limbs (Ex) As a result of its faceless stalker ancestry, the Wrong One's arms are lengthier than that of normal myceloids, giving it reach of 10 feet.  Remorseful Aspect (Sp) The Wrong One can adjust its skin to crudely resemble the appearance of another creature it can see, the sight of which fills the target with profound disgust and remorse. This spell-like ability functions as terrible remorseUM. Creatures currently infected with purple pox take a -2 penalty on saving throws against this ability.",
@@ -526808,7 +526697,7 @@
    "reductions": [],
    "immune": [
     "transmutations",
-    "mind-affecting effects DR 10/-"
+    "mind-affecting effects"
    ],
    "resist": [],
    "sr": 25,
@@ -535522,9 +535411,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "fire 5 (see below)"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "",
    "senses": "Perception +9",
@@ -545157,8 +545044,7 @@
     "shaken"
    ],
    "resist": [
-    "fire 4",
-    "extreme endurance"
+    "fire 4"
    ],
    "sr": null,
    "weaknesses": "",
@@ -553937,7 +553823,7 @@
     "acid 5",
     "cold 5",
     "electricity 5",
-    "fire 5  Defensive Abilities evasion"
+    "fire 5"
    ],
    "sr": null,
    "weaknesses": "",
@@ -554033,7 +553919,7 @@
    "resist": [
     "acid 5",
     "cold 5",
-    "fire 5  Defensive Abilities evasion"
+    "fire 5"
    ],
    "sr": null,
    "weaknesses": "",
@@ -555419,9 +555305,7 @@
    "speed_note": "30 ft.",
    "reductions": [],
    "immune": [],
-   "resist": [
-    "undead resistance"
-   ],
+   "resist": [],
    "sr": null,
    "weaknesses": "light sensitivity",
    "senses": "darkvision 60 ft., low-light vision; Perception +7",
@@ -568617,8 +568501,7 @@
    ],
    "immune": [],
    "resist": [
-    "cold 10",
-    "draconic resistances"
+    "cold 10"
    ],
    "sr": null,
    "weaknesses": "",
@@ -576904,9 +576787,7 @@
     "electricity",
     "undead traits"
    ],
-   "resist": [
-    "half damage from positive energy"
-   ],
+   "resist": [],
    "sr": 42,
    "weaknesses": "",
    "senses": "darkvision 60 ft., see in darkness, spell perception; Perception +33",
@@ -582233,8 +582114,7 @@
     "Toughness"
    ],
    "languages": [
-    "Undercommon",
-    "telepathy 60 ft. (myceloid and purple pox sufferers only)"
+    "Undercommon"
    ],
    "special_attacks": "bleed (1d4), long limbs",
    "special_abilities": "Long Limbs (Ex) As a result of its faceless stalker ancestry, the Wrong One's arms are lengthier than that of normal myceloids, giving it reach of 10 feet.  Remorseful Aspect (Sp) The Wrong One can adjust its skin to crudely resemble the appearance of another creature it can see, the sight of which fills the target with profound disgust and remorse. This spell-like ability functions as terrible remorseUM. Creatures currently infected with purple pox take a -2 penalty on saving throws against this ability.",
