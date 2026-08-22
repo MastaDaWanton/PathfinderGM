@@ -149,6 +149,23 @@
   #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
                   pointer-events: none; }
   .maplegend { margin-top: 4px; }
+  /* Spells. The book is a list of rows with a prepare stepper on the right. */
+  .spellrow { display: flex; align-items: center; justify-content: space-between;
+              gap: 12px; padding: 5px 0; border-bottom: 1px solid #1d1811; }
+  .spellrow:last-child { border-bottom: 0; }
+  .spellname b { display: block; }
+  .spellname small { color: var(--dim); }
+  .spellrow.missing { opacity: .5; }
+  .prep { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .prepbtn { width: 22px; height: 22px; line-height: 1; border-radius: 3px;
+             border: 1px solid #2e261c; background: #1a1610; color: var(--gold);
+             cursor: pointer; }
+  .prepbtn:disabled { opacity: .3; cursor: default; }
+  .prepcount { min-width: 14px; text-align: center; color: var(--dim);
+               font-variant-numeric: tabular-nums; }
+  .prepcount.has { color: var(--accent); }
+  /* A spent slot level reads as unavailable rather than as a small number. */
+  .terms b.spent { color: var(--dim); }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -1180,10 +1197,67 @@ function tabFeats(s) {
 }
 
 // --- Spells ---
+// --- Spells ---
+// Slots across the top, the book underneath. The DC sits on the slot row rather than on
+// each spell, because it is a property of the level and repeating it against forty spells
+// is forty chances to read the wrong one.
 function tabSpells(s) {
-  return tabEmpty(`${SHEET.identity.name} is not a spellcaster. `
-    + `Spellcasting is not implemented yet — when it is, prepared spells, slots and `
-    + `save DCs will appear here.`);
+  const sp = s.spells;
+  if (!sp) {
+    return tabEmpty(`${esc(s.identity.name)} does not cast spells.`);
+  }
+
+  const byLevel = new Map();
+  for (const k of sp.known) {
+    const lvl = k.level === null || k.level === undefined ? "?" : k.level;
+    if (!byLevel.has(lvl)) byLevel.set(lvl, []);
+    byLevel.get(lvl).push(k);
+  }
+
+  const slots = sp.slots.map(sl => `
+    <div class="t"><span>Level ${sl.level}${
+      sl.level > 0 ? ` <small>DC ${sl.dc}</small>` : ""}</span>
+      <b class="${sl.left ? "" : "spent"}">${sl.left} <small>of ${sl.max}</small></b></div>`
+  ).join("");
+
+  const book = [...byLevel.entries()].sort((a, b) => (a[0] === "?") - (b[0] === "?")
+                                                     || a[0] - b[0]).map(([lvl, list]) => `
+    <h3>Level ${lvl}</h3>
+    ${list.map(k => `
+      <div class="spellrow${k.missing ? " missing" : ""}">
+        <div class="spellname">
+          <b>${esc(k.name)}</b>
+          ${k.missing
+            ? `<small>not in this build</small>`
+            : `<small>${esc([k.school, k.range, k.duration].filter(Boolean).join(" · "))}${
+                 k.save ? ` · ${esc(k.save)}` : ""}</small>`}
+        </div>
+        ${k.missing ? "" : `
+          <div class="prep">
+            <button class="prepbtn" data-spell="${esc(k.id)}" data-action="unprepare"
+                    ${k.prepared ? "" : "disabled"} title="Unprepare">−</button>
+            <span class="prepcount${k.prepared ? " has" : ""}">${k.prepared}</span>
+            <button class="prepbtn" data-spell="${esc(k.id)}" data-action="prepare"
+                    title="Prepare">+</button>
+          </div>`}
+      </div>`).join("")}`).join("");
+
+  return `<div class="cols">
+    <div class="card">
+      <h3>Slots</h3>
+      <div class="terms">${slots || tabEmpty("No slots at this level.")}</div>
+      <div class="terms" style="margin-top:10px">
+        <div class="t"><span>Caster level</span><b>${sp.caster_level}</b></div>
+        <div class="t"><span>Casting ability</span><b>${esc(sp.ability.toUpperCase())}</b></div>
+        <div class="t"><span>Highest spell</span><b>Level ${sp.highest}</b></div>
+      </div>
+      ${sp.note ? `<div class="sub" style="margin-top:10px">${esc(sp.note)}</div>` : ""}
+    </div>
+    <div class="card">
+      <h3>${sp.kind === "prepared" ? "Prepared today" : "Known"}</h3>
+      ${book || tabEmpty("Nothing in the book yet.")}
+    </div>
+  </div>`;
 }
 
 // --- Equipment ---
@@ -1272,7 +1346,21 @@ document.addEventListener("click", e => {
   const del = e.target.closest(".delslot");
   if (del) return slotAction({action: "remove", slot: del.dataset.slot,
                               index: Number(del.dataset.index)});
+  const prep = e.target.closest(".prepbtn");
+  if (prep) return prepareSpell(prep.dataset.spell, prep.dataset.action);
 });
+
+// The server refuses over-preparing and casting what was never prepared; the page only
+// asks. Checking the slot arithmetic here as well would be a second implementation of a
+// rule, and the one on screen is the one the player would believe.
+async function prepareSpell(spell, action) {
+  try {
+    SHEET = await post("/api/spells/prepare", {action, spell});
+    drawSheet();
+  } catch (e) {
+    alert(e.message);
+  }
+}
 document.addEventListener("change", e => {
   const input = e.target.closest(".slotinput");
   if (input) slotAction({action: "set", slot: input.dataset.slot,

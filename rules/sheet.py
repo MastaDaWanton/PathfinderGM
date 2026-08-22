@@ -212,6 +212,12 @@ class Actor:
     # condition: a condition is a state the creature is in, while a compulsion is a
     # relationship to a *particular other creature*, and it has to be able to name them.
     compulsions: list["Compulsion"] = field(default_factory=list)
+    # Spells this caster can reach: the wizard's book, or nothing for a cleric whose list
+    # is their whole class list. Ids, not names — two spells share a name often enough.
+    spellbook: list[str] = field(default_factory=list)
+    # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
+    # in several slots, which is why this counts rather than being a set.
+    prepared: dict[str, int] = field(default_factory=dict)
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
     # misspelled override fails loudly instead of silently never applying.
     overrides: dict[str, bool] = field(default_factory=dict)
@@ -1328,6 +1334,10 @@ class Actor:
         # under, so a night wipes it rather than pretending to count.
         nonlethal_gone = self.nonlethal
         self.nonlethal = 0
+        # A night undoes the morning's preparation as well as the day's wounds. Leaving
+        # them prepared would let a wizard sleep off their slot spending and keep the
+        # spells they had already cast — the slots refill and the preparation does not.
+        self.prepared = {}
 
         restored = {}
         for ab in list(self.ability_damage):
@@ -1568,6 +1578,7 @@ def full_sheet(actor: Actor) -> dict:
                    "nonlethal": actor.nonlethal,
                    "nonlethal_threshold": actor.nonlethal_threshold},
             "speed": {"base": actor.speed, "current": actor.speed_feet},
+            "compulsions": [c.as_dict() for c in actor.compulsions],
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
                     "source": r.source} for r in actor.reductions],
             "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -1619,7 +1630,60 @@ def full_sheet(actor: Actor) -> dict:
             "heritage": actor.heritage,
             "notes": actor.notes.strip(),
         },
+        # None rather than an empty structure for a fighter, so the page can tell "does
+        # not cast" from "casts nothing today" — they look identical and are not.
+        "spells": _spell_sheet(actor),
     }
+
+
+def _spell_sheet(actor: Actor) -> dict | None:
+    """The spellcasting half of the sheet, or None for everybody who does not cast."""
+    from . import casting, spells as spells_mod
+
+    if not casting.is_caster(actor):
+        return None
+    data = casting.caster_data(actor)
+
+    def entry(spell_id: str) -> dict:
+        try:
+            spell = spells_mod.get(spell_id)
+        except KeyError:
+            # A book naming a spell this build does not ship is worth showing as a gap
+            # rather than dropping: a silently shorter list is not a thing anyone notices.
+            return {"id": spell_id, "name": spell_id, "missing": True}
+        return {"id": spell.id, "name": spell.name, "line": spell.line,
+                "level": casting.spell_level_for(actor, spell),
+                "school": spell.school, "range": spell.range,
+                "duration": spell.duration, "save": spell.saving_throw,
+                "components": spell.components,
+                "prepared": casting.prepared_count(actor, spell.id)}
+
+    known = sorted(
+        (entry(sid) for sid in _reachable_spells(actor, data)),
+        key=lambda e: (e.get("level") if e.get("level") is not None else 99,
+                       e["name"]),
+    )
+    return {
+        "ability": data.get("ability", ""),
+        "kind": data.get("kind", ""),
+        "list": data.get("list", ""),
+        "caster_level": casting.caster_level(actor),
+        "highest": casting.highest_spell_level(actor),
+        "note": data.get("note", ""),
+        "slots": [{"level": lvl, "max": total,
+                   "left": casting.slots_left(actor, lvl),
+                   "dc": casting.save_dc(actor, lvl)}
+                  for lvl, total in sorted(casting.slots_for(actor).items())],
+        "known": known,
+    }
+
+
+def _reachable_spells(actor: Actor, data: dict) -> list[str]:
+    """What to list. A wizard's book is a handful of ids; a cleric's list is hundreds, so
+    for them the sheet shows what is prepared rather than the entire class list."""
+    if data.get("prepare_from") == "spellbook":
+        return list(dict.fromkeys(list(actor.spellbook) + list(actor.prepared)))
+    return list(actor.prepared)
 
 
 def _feat_effect_text(feat: dict) -> str:
@@ -1653,6 +1717,8 @@ def to_dict(actor: Actor) -> dict:
         "hp": actor.hp, "hp_max": actor.hp_max,
         "nonlethal": actor.nonlethal, "speed": actor.speed,
         "compulsions": [c.as_dict() for c in actor.compulsions],
+        "spellbook": list(actor.spellbook),
+        "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -1813,6 +1879,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
         compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
+        spellbook=list(data.get("spellbook") or []),
+        prepared={k: int(v) for k, v in (data.get("prepared") or {}).items()
+                  if int(v) > 0},
         temp_pools=_temp_pools(data),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},

@@ -160,7 +160,7 @@ and gets a real id.
 | `check` | `skill`, `dc`, `opposed_by?`, `circumstance?`, `aid?` | Skill and ability checks. `opposed_by` makes it a contest; the engine rolls both sides. |
 | `save` | `save`, `dc`, `on_success?`, `on_failure?` | Fort / Ref / Will. |
 | `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` resolves as CMB against the target's CMD — see below. |
-| `cast` | `spell`, `at?` | Engine checks the slot exists, computes DC and caster level, and **emits the derived saves and attacks itself** — the GM does not get to also declare them. |
+| `cast` | `spell`, `at?`, `level?`, `defensively?` | Engine owns the slot, the caster level and the save DC, and refuses a spell the caster cannot reach. It does **not** derive what the spell does — see §11, which corrects what this row used to promise. |
 | `damage` | `amount`, `type`, `to` | Environmental and untyped sources only; weapon damage rides on `attack`. |
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
 | `begin_encounter` | `sides`, `surprise?` | Rolls initiative for everyone, establishes the turn order. |
@@ -488,3 +488,65 @@ keeps the stronger pull.
 
 The penalty is applied in the engine rather than in `Actor.attack_modifiers`, because it
 depends on **who is being attacked** and the sheet does not know that.
+
+---
+
+## 11. Casting
+
+3,040 spells sat in `content/spells/` as data nothing could use, and the wizard and cleric
+shipped as a d6 and a d8 with a skill list and no magic at all.
+
+### What the engine owns, completely
+
+Slots per day (base table plus bonus spells from a high casting ability), caster level, and
+the save DC — 10 + the spell's level **on this caster's own list** + the ability modifier.
+Hold person is 2nd for a cleric and 3rd for a wizard, and taking the lowest level on any
+list would quietly make every wizard's DCs a point light.
+
+The GM cannot cast a spell the caster does not have, at a level they cannot reach, out of a
+slot already spent. Every refusal names the thing that is wrong and its number:
+
+- not a caster at all
+- not on that class's list
+- past the highest level they can reach
+- casting ability below 10 + spell level
+- not in the spellbook
+- in the book but never prepared today
+- no slots of that level left
+
+Slots are ordinary resource pools, so they refresh on a night's rest, survive a save and
+show on the sheet with no second mechanism for any of it. A night also **clears what was
+prepared** — otherwise a wizard sleeps off their spending and keeps the spells they cast.
+
+### What the engine does not own, deliberately
+
+**It does not derive what a spell does.** A spell's mechanics live in its prose — three
+thousand paragraphs of English — and a parser guessing at them would produce confident wrong
+numbers, which is the failure mode `CLAUDE.md` warns about most. An earlier draft of this
+document promised that `cast` would "emit the derived saves and attacks itself"; it does not,
+and that row has been corrected rather than left aspirational.
+
+The `cast` outcome carries the facts a narrator and a player both need — caster level, save
+type and DC, spell resistance, duration, range, area — and stops. Anything mechanical that
+follows arrives as its own `damage`, `condition` or `save` intent and is validated like
+everything else. That is the same boundary the app already draws around weapon damage: the
+sheet decides the numbers, the fiction decides that a number is called for.
+
+A spell with no saving throw does not get a DC printed beside it. Inventing one is the
+engine making up a mechanic.
+
+### Preparing
+
+Preparing is not a GM intent — nobody rolls for choosing what to memorise over breakfast —
+so it goes to `POST /api/spells/prepare` alongside body slots, with actions `learn`,
+`forget`, `prepare` and `unprepare`. The same refusals apply a step earlier: letting a
+wizard prepare a spell they cannot cast would put it on the sheet looking available and fail
+only when they reached for it in a fight. Preparation is counted against the slots of that
+level, so a wizard cannot memorise five fireballs into two slots.
+
+### Not yet
+
+Spontaneous casters (the sorcerer's spells-known table), domains and specialist schools,
+concentration checks, metamagic, and casting defensively — `defensively` is accepted as a
+parameter and currently does nothing, which is recorded here rather than left to be
+discovered from behaviour.

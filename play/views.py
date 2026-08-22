@@ -292,6 +292,98 @@ def slots(request):
     return JsonResponse(full_sheet(pc))
 
 
+def _level_of(actor, spell_id: str):
+    """The spell's level for this caster, or None if this build does not ship it.
+
+    A prepared list can name a spell a later build removed or renamed. Raising here would
+    make the whole spell page 500 over one stale id.
+    """
+    from rules import casting, spells as spells_mod
+
+    try:
+        return casting.spell_level_for(actor, spells_mod.get(spell_id))
+    except KeyError:
+        return None
+
+
+@require_POST
+def prepare_spells(request):
+    """Prepare, unprepare, or add a spell to the book.
+
+    Preparing is not a GM intent — nobody rolls for choosing what to memorise over
+    breakfast — so it goes straight to the character, the same way body slots do.
+
+    The refusals here are the same set `_check_cast` uses, applied a step earlier. Letting
+    a wizard prepare a spell they cannot cast would put it on the sheet looking available
+    and fail only when they reached for it in a fight.
+    """
+    from rules import casting, spells as spells_mod
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    if not casting.is_caster(pc):
+        return JsonResponse({"error": f"{pc.name} does not cast spells"}, status=400)
+
+    body = json.loads(request.body or "{}")
+    action = str(body.get("action", "prepare")).strip().lower()
+    spell_id = str(body.get("spell", "")).strip().lower()
+    count = max(1, int(body.get("count", 1) or 1))
+
+    try:
+        spell = spells_mod.get(spell_id)
+    except KeyError:
+        return JsonResponse({"error": f"no spell {spell_id!r}"}, status=404)
+
+    level = casting.spell_level_for(pc, spell)
+    if action in ("prepare", "learn"):
+        if level is None:
+            return JsonResponse(
+                {"error": f"{spell.name} is not on the "
+                          f"{casting.caster_data(pc).get('list', 'caster')} list"},
+                status=400)
+        if level > casting.highest_spell_level(pc):
+            return JsonResponse(
+                {"error": f"{spell.name} is level {level}; {pc.name} reaches level "
+                          f"{casting.highest_spell_level(pc)}"}, status=400)
+        if not casting.can_cast_level(pc, level):
+            ability = casting.casting_ability(pc)
+            return JsonResponse(
+                {"error": f"a level {level} spell needs {ability.title()} "
+                          f"{10 + level}"}, status=400)
+
+    if action == "learn":
+        if spell.id not in pc.spellbook:
+            pc.spellbook.append(spell.id)
+    elif action == "forget":
+        pc.spellbook = [s for s in pc.spellbook if s != spell.id]
+        casting.unprepare(pc, spell.id, 99)
+    elif action == "prepare":
+        if not casting.knows(pc, spell):
+            return JsonResponse(
+                {"error": f"{spell.name} is not in {pc.name}'s spellbook"}, status=400)
+        # Counted against the slots of that level, including what is already prepared:
+        # a wizard cannot memorise five fireballs into two slots.
+        holding = sum(n for sid, n in pc.prepared.items()
+                      if _level_of(pc, sid) == level)
+        room = casting.slots_for(pc).get(level, 0)
+        if holding + count > room:
+            return JsonResponse(
+                {"error": f"{pc.name} has {room} level {level} slots and has already "
+                          f"prepared {holding}"}, status=409)
+        casting.prepare(pc, spell.id, count)
+    elif action == "unprepare":
+        casting.unprepare(pc, spell.id, count)
+    else:
+        return JsonResponse(
+            {"error": "action must be learn, forget, prepare or unprepare"}, status=400)
+
+    c.save()
+    return JsonResponse(full_sheet(pc))
+
+
 @require_POST
 def say(request):
     """A player turn: GM call 1, validation, resolution."""

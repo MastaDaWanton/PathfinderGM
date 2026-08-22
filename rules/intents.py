@@ -184,6 +184,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Searching the ground. The roll is the player's: it is their afternoon.
     "forage": ((), ("actor", "track", "biome"), "player"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
+    # The engine owns the slot, the caster level and the save DC. It does *not* own what
+    # the spell does — that lives in three thousand paragraphs of English, and a parser
+    # guessing at it would produce confident wrong numbers. Anything mechanical the GM
+    # narrates comes back as its own `damage`, `condition` or `save` intent and is
+    # validated like everything else. See docs/intent-protocol.md §11.
+    "cast": (("spell",), ("at", "level", "defensively"), "hidden"),
     # Being pulled towards a target you did not choose. `to` is who is compelled; the
     # actor is who they are pulled towards. It penalises and never prohibits — see the
     # header of rules/compulsion.py, which is where that decision is argued.

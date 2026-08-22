@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/state", views.state, name="state"),
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
+    path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),
     path("api/characters", views.characters, name="characters"),
     path("api/character/new", views.new_character, name="new_character"),
     path("api/character/switch", views.switch_character, name="switch_character"),

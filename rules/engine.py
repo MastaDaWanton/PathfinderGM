@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import biomes
+from . import casting
 from . import compulsion
 from . import dc as dc_mod
 from . import foraging
@@ -23,6 +24,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import spells as spells_mod
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
@@ -434,6 +436,9 @@ class Engine:
 
         if intent.op == "craft":
             self._check_craft(intent, index)
+
+        if intent.op == "cast":
+            self._check_cast(intent, index)
 
         if intent.op == "move" and intent.params.get("square") is not None:
             self._check_move(intent, index)
@@ -1487,6 +1492,116 @@ class Engine:
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
         )
+
+    def _op_cast(self, intent: Intent, partial: dict) -> Outcome:
+        """Cast a spell: spend the slot, state the numbers, and stop there.
+
+        The engine owns the slot, the caster level and the save DC, and it owns them
+        completely — the GM cannot cast a spell the caster does not have, at a level they
+        cannot reach, out of a slot they already spent.
+
+        It does **not** own what the spell does. That lives in the spell's prose, and a
+        parser guessing mechanics out of three thousand English paragraphs would produce
+        confident wrong numbers, which is the failure mode this project has been bitten by
+        most. So the outcome carries the facts a narrator and a player both need — DC, save
+        type, caster level, duration, whether spell resistance applies — and any damage or
+        condition that follows arrives as its own validated intent.
+        """
+        actor = self.scene.actors[intent.actor]
+        spell = spells_mod.get(str(intent.params["spell"]))
+        level = casting.spell_level_for(actor, spell)
+        dc = casting.save_dc(actor, level)
+        cl = casting.caster_level(actor)
+
+        pool = casting.slot_pool(level)
+        spent = actor.spend_pool(pool, 1)
+        if not spent["ok"]:
+            raise IntentError(f"cast: {actor.name} has no {pool} left", "legality")
+        if casting.caster_data(actor).get("prepare_from") == "spellbook":
+            casting.unprepare(actor, spell.id, 1)
+
+        targets = intent.targets() or ([intent.params["at"]] if intent.params.get("at")
+                                       else [])
+        save = (spell.saving_throw or "").strip()
+        sr = (spell.spell_resistance or "").strip()
+
+        bits = [f"caster level {cl}"]
+        if save and save.lower() not in ("none", "no", "—", "-"):
+            bits.append(f"{save}, DC {dc}")
+        if sr and sr.lower() not in ("no", "none", "—", "-"):
+            bits.append(f"spell resistance {sr}")
+        if spell.duration:
+            bits.append(spell.duration)
+
+        return Outcome(
+            intent_id=intent.id, op="cast",
+            effects=[{"ref": actor.ref, "kind": "cast", "spell": spell.id,
+                      "name": spell.name, "spell_level": level, "dc": dc,
+                      "caster_level": cl, "save": save, "spell_resistance": sr,
+                      "duration": spell.duration, "range": spell.range,
+                      "area": spell.area or spell.effect or spell.targets,
+                      "targets": targets, "slot": pool,
+                      "slots_left": casting.slots_left(actor, level)}],
+            tell=f"{actor.name} casts {spell.name} ({'; '.join(bits)}).",
+            because=intent.because,
+        )
+
+    def _check_cast(self, intent: Intent, index: int) -> None:
+        """Everything about a cast that is checkable before anything is spent.
+
+        Each refusal names the thing that is wrong and, where there is one, the number,
+        because a rejection the model cannot act on costs a whole regeneration.
+        """
+        actor = self.scene.get(intent.actor)
+        if actor is None:
+            raise IntentError(f"cast: no such actor {intent.actor!r}", "refs", index)
+        if not casting.is_caster(actor):
+            raise IntentError(
+                f"cast: {actor.name} is a {actor.char_class or 'creature'} and does not "
+                f"cast spells.", "legality", index,
+            )
+        try:
+            spell = spells_mod.get(str(intent.params["spell"]))
+        except KeyError:
+            raise IntentError(
+                f"cast: no spell {intent.params['spell']!r}", "reference", index
+            ) from None
+
+        data = casting.caster_data(actor)
+        level = casting.spell_level_for(actor, spell)
+        if level is None:
+            raise IntentError(
+                f"cast: {spell.name} is not on the {data.get('list', 'caster')} list.",
+                "legality", index,
+            )
+        if level > casting.highest_spell_level(actor):
+            raise IntentError(
+                f"cast: {spell.name} is a level {level} spell and {actor.name} is a "
+                f"level {actor.level} {actor.char_class} — they reach level "
+                f"{casting.highest_spell_level(actor)}.", "legality", index,
+            )
+        if not casting.can_cast_level(actor, level):
+            ability = casting.casting_ability(actor)
+            raise IntentError(
+                f"cast: a level {level} spell needs {ability.title()} {10 + level} and "
+                f"{actor.name} has {actor.ability_score(ability)}.", "legality", index,
+            )
+        if not casting.knows(actor, spell):
+            raise IntentError(
+                f"cast: {spell.name} is not in {actor.name}'s spellbook.",
+                "legality", index,
+            )
+        if data.get("prepare_from") == "spellbook" and \
+                casting.prepared_count(actor, spell.id) < 1 and level > 0:
+            raise IntentError(
+                f"cast: {actor.name} did not prepare {spell.name} today.",
+                "legality", index,
+            )
+        if casting.slots_left(actor, level) < 1:
+            raise IntentError(
+                f"cast: {actor.name} has no level {level} slots left.",
+                "legality", index,
+            )
 
     def _op_compel(self, intent: Intent, partial: dict) -> Outcome:
         """Pull somebody towards the actor.

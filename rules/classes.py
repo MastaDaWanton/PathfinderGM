@@ -160,6 +160,12 @@ def apply(actor) -> dict:
                                  "source": spec.get("source") or cls.get("name", cid)})
         made.append(str(spec["id"]).strip().lower())
 
+    # Spell slots are ordinary pools, so they refresh on a night, survive a save and show
+    # on the sheet with no second mechanism for any of it.
+    from . import casting
+
+    made.extend(casting.define_slots(actor))
+
     return {"overrides": granted, "pools": made, "unknown_rules": unknown}
 
 
