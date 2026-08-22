@@ -157,6 +157,15 @@
     color: var(--ink); background: var(--sunk); border: 1px solid var(--edge);
     border-radius: 2px;
   }
+  /* The forage slider. Live-updating label, and a warning that appears when the hours
+     start costing the character something. */
+  .ground .hours { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
+  .ground .hours label { color: var(--dim); font-size: 12px; }
+  .ground .hours input[type=range] { flex: 1; accent-color: var(--gold); }
+  .ground .hours b { min-width: 22px; text-align: right; color: var(--gold);
+                     font-variant-numeric: tabular-nums; }
+  #hourwarn:empty { display: none; }
+  #hourwarn { margin-bottom: 6px; }
   .ground .row2 { display: flex; gap: 6px; }
   .ground .row2 > button { flex: 1; }
   #tablewrap { max-height: 176px; overflow-y: auto; margin-top: 8px; }
@@ -303,6 +312,16 @@ let PREVIEW = null;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
+// How long the player wants to spend on the ground. Every hour is its own Survival
+// check, and past a day awake every hour is also a Will save against dropping.
+let FORAGE_HOURS = 1;
+
+function hourWarning(h) {
+  if (h > 24) return `Past a day awake — a Will save every hour, harder each time.`;
+  if (h >= 12) return `A long shift. Water starts to matter after a day.`;
+  return "";
+}
+
 let TABLE = null;              // the d100 forage table for HERE
 let ATTEMPTS = 1;              // how many things one session turns up
 let SHOWTABLE = false;
@@ -409,8 +428,14 @@ function renderGround() {
     <b>${esc(HERE || "nowhere in particular")}</b>
     <em>${esc(t.describe || "")}</em>
     <select id="biomepick">${opts}</select>
+    <div class="hours">
+      <label for="foragehours">Hours</label>
+      <input type="range" id="foragehours" min="1" max="48" value="${FORAGE_HOURS}">
+      <b id="hourlabel">${FORAGE_HOURS}</b>
+    </div>
+    <div class="sub" id="hourwarn">${hourWarning(FORAGE_HOURS)}</div>
     <div class="row2">
-      <button class="mini" id="forage">Forage (${ATTEMPTS}×)</button>
+      <button class="mini" id="forage">Forage</button>
       <button class="mini" id="showtable">${SHOWTABLE ? "hide" : "roll table"}</button>
     </div>
     ${SHOWTABLE ? `<div id="tablewrap">${
@@ -587,6 +612,18 @@ function buttons() {
   $("#save").disabled = !CHOSEN.length && !Object.keys(USING).length;
 }
 
+// The slider updates its label and its warning without redrawing the ground panel, which
+// would tear the thumb out from under the pointer mid-drag.
+document.addEventListener("input", e => {
+  const slider = e.target.closest("#foragehours");
+  if (!slider) return;
+  FORAGE_HOURS = Number(slider.value);
+  const label = $("#hourlabel");
+  const warn = $("#hourwarn");
+  if (label) label.textContent = FORAGE_HOURS;
+  if (warn) warn.textContent = hourWarning(FORAGE_HOURS);
+});
+
 document.addEventListener("click", async e => {
   const tab = e.target.closest("[data-craft]");
   if (tab) { await selectCraft(tab.dataset.craft); return; }
@@ -607,7 +644,7 @@ document.addEventListener("click", async e => {
     const btn = e.target.closest("#forage");
     btn.disabled = true;
     try {
-      const d = await post("/api/forage", { biome: HERE });
+      const d = await post("/api/forage", { biome: HERE, hours: FORAGE_HOURS });
       $("#err").innerHTML = `<span style="color:var(--brew)">${esc(d.tell)}</span>`;
       await reloadShelf();
     } catch (err) { $("#err").textContent = err.message; }

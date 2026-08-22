@@ -59,6 +59,16 @@ ACTOR_RULES = {
         "half of the same idea as temp_hp.stacks: the class pays for its abilities in "
         "non-lethal damage, so where the threshold sits is where the class ends."
     ),
+    "needs.no_sleep": (
+        "This creature does not need to sleep, and never rolls to stay upright however "
+        "long it has been awake. A construct, or something stranger."
+    ),
+    "needs.no_food": (
+        "This creature does not need to eat, and never makes a hunger check."
+    ),
+    "needs.no_water": (
+        "This creature does not need to drink, and never makes a thirst check."
+    ),
     "temp_hp.stacks": (
         "Temporary hit points from different sources add up instead of the best one "
         "applying. Blood Bending needs this from 1st level: its whole economy is hit "
@@ -219,6 +229,22 @@ class Actor:
     # `weapons` is a list of plain strings, and the alternative was giving every torch
     # and length of rope a coating field.
     coating: dict = field(default_factory=dict)
+    # Minutes since this character last slept, ate and drank. Minutes rather than hours
+    # to match `scene.clock_minutes`, so nothing has to convert at the boundary and no
+    # half-hour is ever quietly lost to integer division.
+    #
+    # Time was free before foraging could take eighteen hours: the clock moved and the
+    # body did not know. See rules/survival.py.
+    awake_minutes: int = 0
+    fed_minutes: int = 0
+    watered_minutes: int = 0
+    # How many endurance checks each need has already extracted, because 1e's DCs rise by
+    # one per check made rather than per hour elapsed.
+    thirst_checks: int = 0
+    hunger_checks: int = 0
+    # Of the raw material carried, how much of each came back perfect. A subset of
+    # `inventory`, never larger than it, and spent first when the pot asks for that herb.
+    pristine: dict[str, int] = field(default_factory=dict)
     spellbook: list[str] = field(default_factory=list)
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
@@ -1145,10 +1171,17 @@ class Actor:
                     ready.append(pool.id)
         return ready
 
-    def carry(self, ingredient_id: str, count: int = 1) -> int:
-        """Put raw material in the satchel. Returns the new count."""
+    def carry(self, ingredient_id: str, count: int = 1, pristine: int = 0) -> int:
+        """Put raw material in the satchel. Returns the new count.
+
+        `pristine` is how many of them came back perfect — a very good hour on the ground
+        yields specimens worth more in the pot than the same herb grabbed in a hurry.
+        Counted alongside rather than as a separate item, because it is the same herb.
+        """
         key = (ingredient_id or "").strip().lower()
         self.inventory[key] = self.inventory.get(key, 0) + max(0, int(count))
+        if pristine:
+            self.pristine[key] = self.pristine.get(key, 0) + max(0, int(pristine))
         return self.inventory[key]
 
     def spend(self, ingredient_id: str, count: int = 1) -> int:
@@ -1346,6 +1379,10 @@ class Actor:
         # under, so a night wipes it rather than pretending to count.
         nonlethal_gone = self.nonlethal
         self.nonlethal = 0
+        # A night is what the awake clock is measured against, so a night resets it.
+        from . import survival
+
+        survival.sleep(self, hours)
         # A night undoes the morning's preparation as well as the day's wounds. Leaving
         # them prepared would let a wizard sleep off their slot spending and keep the
         # spells they had already cast — the slots refill and the preparation does not.
@@ -1756,6 +1793,10 @@ def to_dict(actor: Actor) -> dict:
         "nonlethal": actor.nonlethal, "speed": actor.speed,
         "compulsions": [c.as_dict() for c in actor.compulsions],
         "coating": dict(actor.coating),
+        "awake_minutes": actor.awake_minutes, "fed_minutes": actor.fed_minutes,
+        "watered_minutes": actor.watered_minutes,
+        "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
+        "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -1919,6 +1960,13 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         speed=int(data.get("speed", 30) or 30),
         compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
         coating=dict(data.get("coating") or {}),
+        awake_minutes=int(data.get("awake_minutes", 0) or 0),
+        fed_minutes=int(data.get("fed_minutes", 0) or 0),
+        watered_minutes=int(data.get("watered_minutes", 0) or 0),
+        thirst_checks=int(data.get("thirst_checks", 0) or 0),
+        hunger_checks=int(data.get("hunger_checks", 0) or 0),
+        pristine={k: int(v) for k, v in (data.get("pristine") or {}).items()
+                  if int(v) > 0},
         spellbook=list(data.get("spellbook") or []),
         prepared={k: int(v) for k, v in (data.get("prepared") or {}).items()
                   if int(v) > 0},

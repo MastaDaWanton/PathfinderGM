@@ -201,7 +201,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Where the party is standing, which decides what grows here.
     "travel": (("biome",), ("note",), "hidden"),
     # Searching the ground. The roll is the player's: it is their afternoon.
-    "forage": ((), ("actor", "track", "biome"), "player"),
+    # `hours` because foraging is time now: a minimum of one, and as many as the player
+    # wants to spend. Every hour is its own Survival check, and past a day awake every
+    # hour is also a Will save against dropping where you stand.
+    "forage": ((), ("actor", "track", "biome", "hours"), "player"),
     "condition": (("condition",), ("duration", "to"), "hidden"),
     # The engine owns the slot, the caster level and the save DC. It does *not* own what
     # the spell does — that lives in three thousand paragraphs of English, and a parser

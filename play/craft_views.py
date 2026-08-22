@@ -353,9 +353,14 @@ def forage_do(request):
     params = {}
     if body.get("biome"):
         params["biome"] = str(body["biome"])
+    # Clamped rather than trusted. The slider stops at 48, and a hand-written request for
+    # a thousand hours would spend a thousand rolls before the body ever got a word in.
+    hours = max(1, min(48, int(body.get("hours", 1) or 1)))
+    params["hours"] = hours
     try:
         resolution = c.engine().run(c.engine().validate([{
-            "op": "forage", "actor": "pc", "because": "an hour spent looking",
+            "op": "forage", "actor": "pc",
+            "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
             "params": params,
         }]))
     except IntentError as exc:

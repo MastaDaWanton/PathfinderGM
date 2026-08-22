@@ -137,15 +137,24 @@ def test_rarer_things_are_rarer_finds():
 
 
 def test_a_better_forager_comes_back_with_more():
-    """The track's payoff outside the workbench, without the tables changing at all."""
+    """The track's payoff outside the workbench.
+
+    It used to be a flat count of attempts per session — an Herbalist 5 simply rolled
+    three times where an Herbalist 1 rolled once. Now the track adds to the Survival check
+    instead, so a better forager reaches a better *band* and the band decides how much.
+    `attempts_for` is kept because it still describes the old shape of the payoff and
+    nothing has replaced it as a summary, but `forage` no longer calls it.
+    """
     assert foraging.attempts_for(1) == 1
     assert foraging.attempts_for(5) == 3
 
 
 def test_foraging_reports_every_roll_that_produced_it():
+    """The number of picks is no longer fixed: it is whatever the hour's band earned, so
+    this asserts they are all real d100s rather than counting them."""
     got = foraging.forage("forest", level=5, rank_ceiling=5, dice=Dice(seed=7))
-    assert len(got["rolls"]) == 3
     assert all(1 <= r["roll"] <= 100 for r in got["rolls"])
+    assert len(got["rolls"]) == sum(h["finds"] for h in got["hourly"])
 
 
 # --- the satchel ------------------------------------------------------------------------------

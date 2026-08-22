@@ -22,6 +22,7 @@ from . import dc as dc_mod
 from . import foraging
 from . import ingredients as ing_mod
 from . import resources
+from . import survival
 from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
@@ -1476,19 +1477,45 @@ class Engine:
         level = actor.track(track.id).level
         ceiling = worldclass.tier_rank(track.at(level).max_tier)
 
-        result = foraging.forage(biome, level, ceiling, self.dice)
-        for iid, n in result["found"].items():
-            actor.carry(iid, n)
+        # Foraging takes real time now, a minimum of an hour and as long as the player
+        # asks for. The body is consulted for every hour of it — see rules/survival.py —
+        # and a character who goes over is stopped at the hour they actually fell over
+        # rather than at the end of the stretch they meant to work.
+        hours = max(1, int(intent.params.get("hours", 1) or 1))
+        toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
+        worked = max(1, toll.hours)
 
+        result = foraging.forage(biome, level, ceiling, self.dice, hours=worked,
+                                 actor=actor)
+        result["asked_for"] = hours
+        result["toll"] = toll.as_dict()
+        for iid, n in result["found"].items():
+            actor.carry(iid, n, pristine=result["pristine"].get(iid, 0))
+
+        self.scene.clock_minutes += worked * survival.MINUTES_PER_HOUR
+
+        span = f"{worked} hour{'s' if worked != 1 else ''}"
         if result["empty"]:
-            tell = (f"{actor.name} knows nothing that grows in "
+            tell = (f"{actor.name} spends {span} and knows nothing that grows in "
                     f"{biomes.describe(biome).lower()}.")
         elif result["found"]:
             got = ", ".join(f"{n}× {ing_mod.get(i).name}"
                             for i, n in result["found"].items())
-            tell = f"{actor.name} comes back with {got}."
+            tell = f"{span} of looking: {actor.name} comes back with {got}."
+            if result["pristine"]:
+                best = ", ".join(ing_mod.get(i).name for i in result["pristine"])
+                tell += f" The {best} came up perfect."
         else:
-            tell = f"{actor.name} finds nothing worth carrying."
+            tell = f"{actor.name} spends {span} and finds nothing worth carrying."
+
+        spoiled = [h["wrecked"] for h in result["hourly"] if h.get("wrecked")]
+        if spoiled:
+            tell += (f" {len(spoiled)} hour{'s' if len(spoiled) != 1 else ''} came to "
+                     f"nothing but a spoiled {spoiled[0]}.")
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        if worked < hours:
+            tell += (f" They meant to keep at it for {hours} and did not last.")
 
         return Outcome(
             intent_id=intent.id, op="forage",
@@ -2162,6 +2189,26 @@ def _rehydrate(d: dict) -> Outcome:
         dc=d.get("dc"), verdict=d.get("verdict"), margin=d.get("margin"),
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
     )
+
+
+def survival_note(toll) -> str:
+    """What a long stretch of hours did to somebody, in a clause.
+
+    Written for the GM to narrate rather than for the log, so it names the conditions and
+    the collapse and leaves the individual DCs out — the checks are all in the effect for
+    anyone auditing it.
+    """
+    bits = []
+    if toll.nonlethal:
+        bits.append(f"{toll.nonlethal} non-lethal")
+    if toll.conditions:
+        bits.append(", ".join(toll.conditions))
+    if toll.collapsed:
+        bits.append("they went down where they stood")
+    failed = sum(1 for c in toll.checks if not c["passed"])
+    if failed and not bits:
+        bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")
+    return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
 
 
 def _damage_note(d: dict) -> str:
