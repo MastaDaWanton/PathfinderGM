@@ -251,13 +251,22 @@
     transition: transform .4s cubic-bezier(.25, .8, .25, 1),
                 border-color .3s ease, box-shadow .4s ease;
   }
+  /* The glowing edge, widened into metal. A five-pixel bevel ring drawn as a
+     gradient — struck light at the top-left, falling to shadow, kicking back
+     to light along the bottom lip, which is what makes a band read as raised
+     rather than painted — masked to a ring so the leather shows through the
+     middle, glowing faintly, and sitting at z-index 2: over the surface,
+     under the clasps and corner pieces at 3, which bolt through it. */
   .card::before {
-    content: ""; position: absolute; inset: -1px; z-index: -1;
-    border-radius: inherit; pointer-events: none;
+    content: ""; position: absolute; inset: -4px; pointer-events: none;
+    border-radius: inherit; z-index: 2; padding: 5px;
     background: linear-gradient(135deg,
-      rgba(201, 162, 39, .5), transparent 30%,
-      transparent 70%, rgba(201, 162, 39, .4));
-    opacity: .6;
+      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    box-shadow: 0 0 16px rgba(255, 176, 84, .16), 0 3px 8px rgba(0, 0, 0, .55);
   }
   .card.pick:hover, .card:hover {
     border-color: rgba(232, 197, 71, .45);
@@ -369,21 +378,27 @@
      transparency and mirrored as files because CSS cannot flip a background.
      See table.html for the full note. */
   .card::after {
-    content: ""; position: absolute; inset: -9px; pointer-events: none; z-index: 3;
+    content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
     background-image:
       url("{% static 'img/clasp-tl.png' %}"),
       url("{% static 'img/clasp-tr.png' %}"),
       url("{% static 'img/clasp-bl.png' %}"),
       url("{% static 'img/clasp-br.png' %}"),
-      url("{% static 'img/strap-top.png' %}"),
-      url("{% static 'img/strap-bottom.png' %}"),
-      url("{% static 'img/strap-left.png' %}"),
-      url("{% static 'img/strap-right.png' %}");
-    background-position: top left, top right, bottom left, bottom right,
-                         top center, bottom center, left center, right center;
+      url("{% static 'img/boss-top.png' %}"),
+      url("{% static 'img/boss-bottom.png' %}"),
+      url("{% static 'img/boss-left.png' %}"),
+      url("{% static 'img/boss-right.png' %}");
+    /* Geometry that clasps rather than covers: the pseudo-element reaches
+       34px past the card so every centre boss sits astride the border line —
+       half proud of the edge, half over the leather. The corners keep their
+       old 9px overhang via inward offsets. */
+    background-position: left 25px top 25px, right 25px top 25px,
+                         left 25px bottom 25px, right 25px bottom 25px,
+                         center top 16px, center bottom 16px,
+                         left 16px center, right 16px center;
     background-repeat: no-repeat;
     background-size: 96px auto, 96px auto, 96px auto, 96px auto,
-                     150px 26px, 150px 26px, 26px 150px, 26px 150px;
+                     56px auto, 56px auto, auto 56px, auto 56px;
     filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
   }
 

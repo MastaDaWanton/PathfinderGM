@@ -501,9 +501,22 @@
   }
   .card:hover { box-shadow: inset 0 0 0 1px rgba(221,196,142,.10),
                 0 6px 22px rgba(0,0,0,.6), 0 0 22px rgba(var(--ember), .05); }
+  /* The glowing edge, widened into metal. A five-pixel bevel ring drawn as a
+     gradient — struck light at the top-left, falling to shadow, kicking back
+     to light along the bottom lip, which is what makes a band read as raised
+     rather than painted — masked to a ring so the leather shows through the
+     middle, glowing faintly, and sitting at z-index 2: over the surface,
+     under the clasps and corner pieces at 3, which bolt through it. */
   .framed::before, .card::before, .slot::before {
-    content: ""; position: absolute; inset: 4px; pointer-events: none;
-    border: 1px solid rgba(221,196,142,.11); border-radius: 2px;
+    content: ""; position: absolute; inset: -4px; pointer-events: none;
+    border-radius: inherit; z-index: 2; padding: 5px;
+    background: linear-gradient(135deg,
+      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    box-shadow: 0 0 16px rgba(255, 176, 84, .16), 0 3px 8px rgba(0, 0, 0, .55);
   }
   .card { padding: 17px 19px; }
   .card > h3 {
@@ -684,13 +697,6 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
                 inset 0 1px 0 rgba(255, 230, 150, .08);
   }
-  .framed::before, .card::before, .slot::before {
-    inset: -1px; border: 0; border-radius: inherit; z-index: -1;
-    background: linear-gradient(135deg,
-      rgba(201, 162, 39, .5), transparent 30%,
-      transparent 70%, rgba(201, 162, 39, .4));
-    opacity: .6;
-  }
   .card:hover, .slot:hover {
     border-color: rgba(232, 197, 71, .45);
     box-shadow: 0 12px 40px rgba(0, 0, 0, .7),
@@ -865,24 +871,28 @@
      ride the panel's own ::after they lift with it under the cursor.
      ========================================================================== */
   .framed::after, .card::after, .slot::after {
-    content: ""; position: absolute; inset: -9px; pointer-events: none; z-index: 3;
+    content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
     background-image:
       url("{% static 'img/clasp-tl.png' %}"),
       url("{% static 'img/clasp-tr.png' %}"),
       url("{% static 'img/clasp-bl.png' %}"),
       url("{% static 'img/clasp-br.png' %}"),
-      url("{% static 'img/strap-top.png' %}"),
-      url("{% static 'img/strap-bottom.png' %}"),
-      url("{% static 'img/strap-left.png' %}"),
-      url("{% static 'img/strap-right.png' %}");
-    background-position: top left, top right, bottom left, bottom right,
-                         top center, bottom center, left center, right center;
+      url("{% static 'img/boss-top.png' %}"),
+      url("{% static 'img/boss-bottom.png' %}"),
+      url("{% static 'img/boss-left.png' %}"),
+      url("{% static 'img/boss-right.png' %}");
+    /* Geometry that clasps rather than covers: the pseudo-element reaches
+       34px past the card so every centre boss can sit astride the border
+       line — half proud of the edge, half over the leather — where the first
+       cut of the natural plaque hung inside and sat on the words. The
+       corners keep their old 9px overhang via inward offsets. */
+    background-position: left 25px top 25px, right 25px top 25px,
+                         left 25px bottom 25px, right 25px bottom 25px,
+                         center top 16px, center bottom 16px,
+                         left 16px center, right 16px center;
     background-repeat: no-repeat;
-    /* The strap is the boss drawn long and low — resampled to proportion at 2x
-       in the asset, because CSS stretching the original mushed the ornament —
-       and it sits on every edge, centred between the corner arms. */
     background-size: 96px auto, 96px auto, 96px auto, 96px auto,
-                     150px 26px, 150px 26px, 26px 150px, 26px 150px;
+                     56px auto, 56px auto, auto 56px, auto 56px;
     filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
   }
   /* The overlays wear the boss as well — the centre fitting of a book cover,
@@ -913,13 +923,22 @@
     background-repeat: no-repeat;
     /* Sized to the corner pieces' own edge run — a centre fitting is jewellery
        on the frame, not a second shield. */
-    background-size: 100px auto;
+    background-size: 80px auto;
     filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .55));
   }
   .popup { padding: 52px 30px 48px; }
   .deathpanel { padding: 52px 38px 48px; }
   /* The slots are small; full-size fittings would eat the medallion. */
-  .slot::after { background-size: 60px auto; inset: -5px; }
+  .slot::after {
+    inset: -5px;
+    background-image:
+      url("{% static 'img/clasp-tl.png' %}"),
+      url("{% static 'img/clasp-tr.png' %}"),
+      url("{% static 'img/clasp-bl.png' %}"),
+      url("{% static 'img/clasp-br.png' %}");
+    background-position: top left, top right, bottom left, bottom right;
+    background-size: 60px auto;
+  }
 
 
   /* The carried candle. A warm pool of light that follows the cursor and
