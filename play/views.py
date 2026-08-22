@@ -292,6 +292,43 @@ def slots(request):
     return JsonResponse(full_sheet(pc))
 
 
+@require_GET
+def feat_search(request):
+    """Browse the feat index, ranked by whether this character can actually take it.
+
+    Three buckets rather than a flat list, because "you qualify", "you are short by two
+    points of Strength" and "this one asks for something the sheet cannot check" are three
+    different answers and collapsing them loses the only useful part.
+    """
+    from rules import feats as feats_mod
+
+    pc = campaign_mod.current().scene.pc()
+    found = feats_mod.search(
+        text=request.GET.get("q", ""),
+        kind=request.GET.get("type", ""),
+        source=request.GET.get("source", ""),
+        tag=request.GET.get("tag", ""),
+        limit=int(request.GET.get("limit", 60) or 60),
+    )
+
+    out = []
+    for feat in found:
+        row = feat.as_dict()
+        if pc is not None:
+            verdict = feats_mod.meets(pc, feat)
+            row["qualifies"] = verdict["ok"]
+            row["unmet"] = verdict["unmet"]
+            row["unknown"] = verdict["unknown"]
+            row["held"] = feat.id in feats_mod._held(pc)
+        out.append(row)
+
+    return JsonResponse({
+        "feats": out,
+        "counts": feats_mod.meta().get("counts", {}),
+        "licence": feats_mod.meta().get("licence", ""),
+    })
+
+
 def _level_of(actor, spell_id: str):
     """The spell's level for this caster, or None if this build does not ship it.
 

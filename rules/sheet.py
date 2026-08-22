@@ -1525,16 +1525,40 @@ def full_sheet(actor: Actor) -> dict:
             **t,
         })
 
+    from . import feats as feats_mod
+
     feats = []
     for f in actor.feats:
         base = Actor._feat_name(f)
         known = FEATS.get(base)
+        target = Actor._feat_target(f)
+        # The index carries all 1,474 and the hand-written table carries the sixteen the
+        # engine computes with. A feat in the index but not the table used to read
+        # "carried as flavour — the engine applies nothing", which is true about the
+        # arithmetic and useless to a player trying to remember what the feat does.
+        entry = None
+        try:
+            entry = feats_mod.get(base)
+        except KeyError:
+            pass
+
+        if known:
+            effect = _feat_effect_text(known)
+        elif entry and entry.benefit:
+            effect = entry.benefit
+        else:
+            effect = "carried as flavour — the engine applies nothing"
+
+        name = (known or {}).get("name") or (entry.name if entry else f)
         feats.append({
-            "name": known["name"] + (f" ({Actor._feat_target(f)})"
-                                     if Actor._feat_target(f) else "") if known else f,
+            "name": name + (f" ({target})" if target else ""),
             "applied": known is not None,
-            "effect": _feat_effect_text(known) if known else
-                      "carried as flavour — the engine applies nothing",
+            "known": entry is not None,
+            "id": entry.id if entry else "",
+            "types": entry.types if entry else [],
+            "source": entry.source if entry else "",
+            "prerequisites": entry.prerequisites_text if entry else "",
+            "effect": effect,
         })
 
     maneuvers = []

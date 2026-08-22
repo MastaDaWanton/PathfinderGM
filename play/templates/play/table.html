@@ -166,6 +166,23 @@
   .prepcount.has { color: var(--accent); }
   /* A spent slot level reads as unavailable rather than as a small number. */
   .terms b.spent { color: var(--dim); }
+  /* Feats. The browse pane colours the verdict, because "can take" and "needs Str 13"
+     are the only two things anybody reads in a list of 1,474. */
+  #featq { width: 100%; padding: 7px 9px; margin-bottom: 10px; border-radius: 3px;
+           border: 1px solid #2e261c; background: #14120f; color: var(--ink);
+           font: inherit; }
+  #featresults { max-height: 46vh; overflow-y: auto; }
+  .featrow { padding: 7px 0; border-bottom: 1px solid #1d1811; }
+  .featrow:last-child { border-bottom: 0; }
+  .featrow small { color: var(--dim); margin-left: 6px; }
+  .featrow .why { margin: 3px 0; }
+  .verdict { font: 400 12px/1.4 var(--display); letter-spacing: .06em;
+             font-variant: small-caps; }
+  .verdict.ok { color: #6fa76f; }
+  .verdict.held { color: var(--gold); }
+  .verdict.no { color: #8a7a6a; }
+  .verdict.maybe { color: #b08a4a; }
+  .prereq { display: block; color: var(--dim); margin-left: 0; }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -1177,24 +1194,81 @@ function tabSkills(s) {
 }
 
 // --- Feats ---
+// The browse pane's last result, so a redraw does not lose it and typing does not refetch
+// on every keystroke.
+let FEAT_RESULTS = null;
+let FEAT_QUERY = "";
+
 function tabFeats(s) {
   return `<div class="cols">
     <div class="card">
       <h3>Feats</h3>
       <table class="sheet">
-        <tr><th>Feat</th><th>What the engine applies</th></tr>
+        <tr><th>Feat</th><th>What it does</th></tr>
         ${s.feats.map(f => `<tr class="${f.applied ? "" : "dim"}">
-          <td><b>${esc(f.name)}</b>${f.applied ? "" : ' <span class="pill warn">flavour</span>'}</td>
+          <td><b>${esc(f.name)}</b>${
+            f.applied ? "" :
+            f.known ? ' <span class="pill">not computed</span>'
+                    : ' <span class="pill warn">unknown feat</span>'}
+            ${f.prerequisites ? `<small class="prereq">${esc(f.prerequisites)}</small>` : ""}</td>
           <td class="why">${esc(f.effect)}</td>
         </tr>`).join("") || `<tr><td colspan="2" class="empty">None.</td></tr>`}
       </table>
+      <div class="why" style="margin-top:10px">
+        “Not computed” means the engine carries the feat and its text but applies no
+        number for it — sixteen feats have arithmetic the engine owns, and the rest are
+        yours to invoke.
+      </div>
     </div>
     <div class="card">
-      <h3>Traits &amp; languages</h3>
-      <div class="empty">Traits and languages are not modelled yet.</div>
+      <h3>Browse</h3>
+      <input type="search" id="featq" placeholder="Search 1,474 feats…"
+             value="${esc(FEAT_QUERY)}" autocomplete="off">
+      <div id="featresults">${featResults()}</div>
     </div>
   </div>`;
 }
+
+function featResults() {
+  if (FEAT_RESULTS === null) {
+    return `<div class="empty">Type to search, or see what you qualify for.</div>`;
+  }
+  if (!FEAT_RESULTS.length) return `<div class="empty">Nothing matches.</div>`;
+  return FEAT_RESULTS.map(f => {
+    // Three states, not two: "you qualify", "you are short by something specific", and
+    // "this asks for something the sheet cannot check". Collapsing the last into a no
+    // would be a lie about a feat the player may well be entitled to.
+    const state = f.held ? ["held", "have it"]
+      : f.qualifies ? ["ok", "can take"]
+      : f.unmet.length ? ["no", "needs " + f.unmet.join(", ")]
+      : ["maybe", "ask your GM: " + f.unknown.join("; ")];
+    return `<div class="featrow ${state[0]}">
+      <div><b>${esc(f.name)}</b>
+        <small>${esc(f.types.join(", "))}${f.source ? " · " + esc(f.source) : ""}</small></div>
+      <div class="why">${esc(f.benefit || f.description)}</div>
+      <div class="verdict ${state[0]}">${esc(state[1])}</div>
+    </div>`;
+  }).join("");
+}
+
+let featTimer = null;
+document.addEventListener("input", e => {
+  const box = e.target.closest("#featq");
+  if (!box) return;
+  FEAT_QUERY = box.value;
+  clearTimeout(featTimer);
+  // Debounced: 1,474 feats is fast to filter and slow to re-render on every keystroke.
+  featTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`/api/feats?q=${encodeURIComponent(FEAT_QUERY)}&limit=40`);
+      FEAT_RESULTS = (await r.json()).feats;
+    } catch (err) {
+      FEAT_RESULTS = [];
+    }
+    const box2 = $("#featresults");
+    if (box2) box2.innerHTML = featResults();
+  }, 180);
+});
 
 // --- Spells ---
 // --- Spells ---
