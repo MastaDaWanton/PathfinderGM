@@ -22,6 +22,7 @@ urlpatterns = [
     path("api/start", home_views.start_in_world, name="start_in_world"),
     path("api/resume", home_views.resume, name="resume"),
     path("api/effects/catalogue", home_views.effect_catalogue, name="effect_catalogue"),
+    path("api/kinds", home_views.kind_catalogue, name="kind_catalogue"),
     path("api/effects/preview", home_views.effect_preview, name="effect_preview"),
     path("api/consumables", home_views.save_consumable, name="save_consumable"),
     path("api/bench/<str:bench_id>/open/<str:thing_id>", home_views.open_thing,

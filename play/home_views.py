@@ -147,6 +147,20 @@ def effect_catalogue(request):
     return JsonResponse(effectspec.catalogue())
 
 
+@require_GET
+def kind_catalogue(request):
+    """Every kind of content the app knows how to hold, and the fields each one has.
+
+    The same idea as the effect catalogue one function above, applied a level up: the
+    builder draws its form from this rather than carrying a hand-written form per bench.
+    A new kind of content becomes one entry in `rules/registry.py` instead of a loader, a
+    route, a form and a template.
+    """
+    from rules import registry
+
+    return JsonResponse({"kinds": registry.catalogue()})
+
+
 @require_POST
 def effect_preview(request):
     """Validate a draft and show the line it would put on a card.
@@ -203,7 +217,7 @@ def open_thing(request, bench_id: str, thing_id: str):
     and nobody has read them, so being able to fix one is the difference between a
     conversion and a guess nobody can undo.
     """
-    from rules import ingredients
+    from rules import registry
 
     mine = homebrew.folder(homebrew.get(bench_id).dir) / f"{thing_id}.json"
     if mine.exists():
@@ -211,18 +225,29 @@ def open_thing(request, bench_id: str, thing_id: str):
         d["source"] = "yours"
         return JsonResponse(d)
 
-    if bench_id in ("ingredients", "consumables"):
-        try:
-            ing = ingredients.get(thing_id)
-        except KeyError as exc:
-            return JsonResponse({"error": str(exc)}, status=404)
-        return JsonResponse({
-            "id": ing.id, "name": ing.name, "kind": ing.kind,
-            "description": ing.text, "effects": ing.effects,
-            "converted": ing.effects_converted,
-            "source": "shipped",
-        })
-    return JsonResponse({"error": f"{thing_id!r} cannot be opened yet"}, status=404)
+    # Every bench, not two. This used to read `if bench_id in ("ingredients",
+    # "consumables")` and every other bench could create but never correct — a shipped
+    # creature, feat, weapon or spell simply would not open. `registry.find` looks in the
+    # user's directory first and then in whatever module owns that kind, so a bench is
+    # editable the moment it is declared rather than when somebody adds it to an `if`.
+    try:
+        found = registry.find(bench_id, thing_id)
+    except LookupError:
+        found = None
+    if not found:
+        return JsonResponse(
+            {"error": f"{thing_id!r} is not on the {bench_id} bench"}, status=404)
+
+    # `description` and `effects` are what the builder's form is written against, so an
+    # entry that calls them something else is translated rather than opening blank.
+    found.setdefault("description", found.get("text", ""))
+    found.setdefault("effects", [])
+    # Whether these effects came out of a machine reading prose or out of a person. 161
+    # ingredients were converted mechanically and nobody has read them, so an editor that
+    # cannot tell the two apart is asking someone to trust a parse.
+    found["converted"] = bool(found.get("effects_converted"))
+    found["source"] = "shipped"
+    return JsonResponse(found)
 
 
 @require_POST

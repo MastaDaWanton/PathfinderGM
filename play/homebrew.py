@@ -89,10 +89,10 @@ def benches() -> list[Bench]:
             shipped=len(CLASSES), shipped_label="in the Core Rulebook tables",
             blurb="Full 1e classes: hit dice, BAB, saves, class skills and what each "
                   "level grants. Blood Bending belongs here.",
-            waiting="Blood Bending is specified in docs/homebrew-rules.md and not yet "
-                    "written as data. Its numbers are settled; what it still needs from "
-                    "the engine is reactions, spawned battlefield objects and an "
-                    "interruptible damage pipeline.",
+            waiting="Blood Bending ships as data now, and the engine has the reactions "
+                    "and the interruptible damage pipeline it was waiting on. What a "
+                    "class still cannot declare here is a path — its Coagulator and "
+                    "Blood Commander branches are not in the file.",
         ),
         Bench(
             id="worldclasses", name="World classes", dir="world-classes",
@@ -128,11 +128,9 @@ def benches() -> list[Bench]:
             blurb="Stat blocks the engine can put in a scene and roll for. Unlike the "
                   "spell list these are executable: hit points, AC, saves, damage "
                   "reduction and an attack the engine rolls against.",
-            waiting="Three sources: the core Bestiary stat blocks parsed from the PDFs "
-                    "(which carry Environment, so a creature can be tied to a biome), a "
-                    "variant and NPC spreadsheet for the named villains, and a handful of "
-                    "hand-written town NPCs. Where two share a name the printed Bestiary "
-                    "block wins.",
+            waiting="Two sources, and only one of them carries Environment: the 782 "
+                    "Bestiary blocks parsed from the PDFs do, and the 6,406 from the "
+                    "spreadsheet do not. Where two share a name the printed block wins.",
         ),
         Bench(
             id="feats", name="Feats", dir="feats",
@@ -151,9 +149,9 @@ def benches() -> list[Bench]:
             shipped=len(spells.all_spells()), shipped_label="from The Spell Codex",
             blurb="Every 1e spell, with its school, its canonical descriptors and the "
                   "level it sits at on each class list. Searchable by any of them.",
-            waiting="The engine has no spell system, so these are reference and "
-                    "narration: nothing here is cast by the rules yet. What they give "
-                    "you now is a real list to build against.",
+            waiting="Castable now: slots, caster level and save DCs are the engine's. "
+                    "What a spell still does is its prose — the engine will not read "
+                    "\"1d6 per caster level\" out of English and turn it into a number.",
         ),
         Bench(
             id="campaigns", name="Campaigns", dir="campaigns", ready=False, shipped=0,

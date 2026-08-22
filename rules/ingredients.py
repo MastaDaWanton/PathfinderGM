@@ -159,23 +159,18 @@ _ALL: dict[str, Ingredient] | None = None
 
 
 def all_ingredients() -> dict[str, Ingredient]:
+    """Shipped plus homebrew, through the shared overlay in `rules.registry`.
+
+    This module used to carry its own copy of that walk, as six others did. They drifted:
+    some merged and some replaced, some read a file holding one entry and some only a file
+    holding a list. One place now, so a fix reaches every kind of content at once.
+    """
     global _ALL
     if _ALL is None:
-        from django.conf import settings
+        from . import registry
 
-        raw = load_dir(Path(settings.BASE_DIR) / "content" / "ingredients")
-        user = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "ingredients"
-        if user.is_dir():
-            # Merged field by field, not replaced wholesale. The editor saves a name, a
-            # description and a list of effects; replacing would have silently dropped the
-            # tier, the biomes and the harvesting notes it never asked about, so correcting
-            # one bonus would delete everything else the entry knew.
-            for key, entry in load_dir(user).items():
-                base = dict(raw.get(key, {}))
-                base.update({k: v for k, v in entry.items() if v not in (None, "")})
-                base["id"] = key
-                raw[key] = base
-        _ALL = {k: from_dict(v) for k, v in raw.items()}
+        _ALL = {k: from_dict({**v, "id": k})
+                for k, v in registry.load_raw("ingredients").items()}
     return _ALL
 
 

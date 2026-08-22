@@ -151,11 +151,15 @@ def test_the_bench_lists_spells(client):
     assert len(d["rows"]) <= 200
 
 
-def test_the_bench_says_the_engine_cannot_cast_them(client):
-    """Reference and narration, not rules. Saying so is the difference between a list you
-    can trust and one that implies a spell system exists."""
+def test_the_bench_says_where_the_engine_stops(client):
+    """This asserted "no spell system" and was right until one was built, which is the
+    hazard a page like this carries: a label that describes a limit outlives the limit and
+    starts lying. The boundary now is narrower and still real — slots, caster level and
+    save DCs are the engine's, and what a spell *does* is its prose."""
     d = client.get("/api/bench/spells").json()
-    assert "no spell system" in d["bench"]["waiting"]
+    waiting = d["bench"]["waiting"]
+    assert "Castable now" in waiting
+    assert "prose" in waiting
 
 
 def test_the_search_endpoint_filters(client):
