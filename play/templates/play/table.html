@@ -982,6 +982,16 @@
   @media (hover: none) { #cursorlight { display: none; } }
 
   /* The whole enchantment stands down for anyone who asked motion to stop. */
+  /* The carried candle becomes literal: the cursor is the candlestick, its
+     hotspot on the flame tip, so the pointer's point is the point of light —
+     and the glow that follows the pointer blooms exactly from the flame.
+     Text fields keep the beam: you cannot place a caret with a candle. */
+  body, a, button, select, label, summary,
+  .sugg, .pick, .tab, .card.pick, .prepbtn, .opensheet {
+    cursor: url("{% static 'img/cursor-candle.png' %}") 24 0, auto;
+  }
+  input[type=text], textarea, .dieface { cursor: text; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation: none !important; transition: none !important;
