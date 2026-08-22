@@ -99,6 +99,116 @@ def test_purifying_removes_the_drawback():
     assert not clean.risky and not clean.drawbacks
 
 
+# --- benefit, harm, and the line between them ------------------------------------------------
+
+def test_harm_is_a_drawback_rather_than_an_effect():
+    """From the bench, before: Dragon Flower's Effects panel listed "-2 actions while in
+    the area", "+5 save vs poison", "1d6 Constitution damage", "Fortitude DC 25" and
+    "Causes nauseated" as five undifferentiated bullets, and Drawbacks said one boilerplate
+    sentence that named nothing. 99 of the corpus's 178 effects were filed that way."""
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["grind"], ["dragon-flower"]))
+    assert r.effects == ["Dragon Flower: +5 save vs poison for 10 rounds"]
+    assert r.drawbacks == [
+        "Dragon Flower: Fortitude DC 25 or 1d6 Constitution damage, causes nauseated",
+        "Dragon Flower: -2 actions while in the area for 1d4 weeks",
+    ]
+
+
+def test_the_save_reads_as_the_gate_for_the_harm_it_governs():
+    """"Fortitude DC 25" was its own bullet, so nothing on the card said which of the four
+    other lines it applied to. Grouped by the ingredient the effects were read out of,
+    which is the only thing that ties them together."""
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["grind"], ["dragon-flower"]))
+    assert len(r.poisons) == 1
+    assert r.poisons[0]["source"] == "Dragon Flower"
+    assert r.poisons[0]["save_line"] == "Fortitude DC 25"
+    assert r.poisons[0]["lines"] == ["1d6 Constitution damage", "Causes nauseated"]
+
+
+def test_two_poisonous_ingredients_stay_two_poisons():
+    """A pot holding Dragon Flower and Skull Orchid is two poisons with two different
+    saves, not one heap of damage under whichever DC came first."""
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["grind"], ["dragon-flower", "skull-orchid"]))
+    assert [(p["source"], p["save_line"]) for p in r.poisons] == \
+        [("Dragon Flower", "Fortitude DC 25"), ("Skull Orchid", "DC 17")]
+
+
+def test_an_ingredient_that_is_only_dangerous_to_handle_is_named():
+    """30 of the corpus's ingredients are marked risky and extract no harmful mechanic at
+    all, because the danger is in the harvesting. The warning stays — but it says which
+    ingredient it is about, instead of the one sentence that used to be the whole panel
+    however many poisons were in the pot."""
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["grind"], ["basilisk-eye"]))
+    assert any("Untreated hazardous components: Basilisk Eye." in d for d in r.drawbacks)
+
+
+def test_purify_says_which_poison_it_took_out():
+    """It used to append "Side effects and secondary toxicities removed by the chain." — a
+    sentence that named nothing, whether the chain had cleansed one poison or three."""
+    r = crafting.preview("herbalist", 3,
+                         Chain("herbalist", ["grind", "purify"],
+                               ["dragon-flower", "mad-cap"]))
+    assert r.removed[:2] == [
+        "Purify removed Dragon Flower's poison: Fortitude DC 25 or 1d6 Constitution "
+        "damage, causes nauseated.",
+        "Purify removed Mad Cap's poison: DC 18 or causes exhausted, causes unconscious, "
+        "causes confused.",
+    ]
+
+
+def test_purify_takes_the_poison_out_of_the_item_and_not_only_off_the_card():
+    """Measured: purifying set a `cleansed` flag and appended a sentence, and left every
+    harmful spec on the Stock. A "Purified Draught of Skull Orchid" still did all three of
+    its ability damages when somebody drank it, and could still be thrown at people — the
+    method the author says "completely removes its negative side effects" removed nothing
+    whatsoever."""
+    from rules import consumables as con
+
+    raw = crafting.preview("herbalist", 3,
+                           Chain("herbalist", ["grind"], ["skull-orchid"]))
+    assert con.is_harmful(crafting.from_stock_dict(raw.output))
+
+    clean = crafting.preview("herbalist", 3,
+                             Chain("herbalist", ["grind", "purify"], ["skull-orchid"]))
+    made = crafting.from_stock_dict(clean.output)
+    assert not con.is_harmful(made)
+    assert not any(s["type"] == "ability_damage" for s in made.specs)
+
+
+def test_a_purified_poison_survives_into_inventory_still_purified():
+    """The removal has to be a property of the jar, not of the preview that made it —
+    otherwise the card is honest and the thing in the satchel is not."""
+    clean = crafting.preview("herbalist", 3,
+                             Chain("herbalist", ["grind", "purify"], ["skull-orchid"]))
+    back = crafting.from_stock_dict(crafting.from_stock_dict(clean.output).as_dict())
+    assert not back.drawbacks
+    assert any("Purify removed Skull Orchid's poison" in e for e in back.effects)
+
+
+def test_a_crafting_dc_restated_in_the_prose_does_not_become_a_poison():
+    """41 of the corpus's 59 save gates gate nothing: they are the entry's own crafting DC,
+    written at the end of its description ("Cave Star ... DC: 10.") and picked up by the
+    extractor's bare-DC fallback. Filing every gate under Drawbacks would have put 41
+    poisons on the shelf that poison nobody."""
+    r = crafting.preview("herbalist", 3, Chain("herbalist", ["grind"], ["cave-star"]))
+    assert r.poisons == []
+    assert r.drawbacks == []
+
+
+def test_a_card_line_and_its_mechanic_come_from_one_walk(shelf):
+    """`lines` and `specs` were two separate walks over the same effects with nothing
+    tying entry n of one to entry n of the other. Harmless while every line was printed
+    the same way; not harmless once the spec's type decides which panel its line lands in.
+    All 161 entries line up, and this is what keeps them lined up."""
+    for ing in shelf.values():
+        assert [line for line, _ in ing.pairs] == ing.lines
+        assert [spec for _, spec in ing.pairs if spec] == ing.specs
+
+
 def test_a_method_you_have_not_learned_is_named_with_the_level_that_grants_it():
     r = crafting.preview("herbalist", 1,
                          Chain("herbalist", ["distill"], ["woundwort"]))
@@ -243,6 +353,35 @@ def test_a_recipe_can_be_kept_and_corrected(client):
     # makes a duplicate is a bench nobody can correct a recipe at.
     assert len(d["recipes"]) == 1
     assert d["recipes"][0]["ingredients"] == ["woundwort", "comfrey"]
+
+
+def test_the_bench_is_sent_the_poisons_grouped(client):
+    """The page cannot group them itself: it receives lines, and the type that says
+    whether a line is a benefit is only on the server. Sending the grouping is what lets
+    the Drawbacks panel print the save in front of the harm it gates."""
+    d = client.post("/api/craft/preview", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["dragon-flower"],
+        "methods": ["grind"]}), content_type="application/json").json()
+    assert d["effects"] == ["Dragon Flower: +5 save vs poison for 10 rounds"]
+    assert d["poisons"][0]["save_line"] == "Fortitude DC 25"
+    assert d["poisons"][0]["harm"] == "1d6 Constitution damage, causes nauseated"
+
+
+def test_the_shelf_marks_a_jar_that_will_poison_whoever_drinks_it(client):
+    """A made poison and a made tea were the same green flask on the Made shelf, and the
+    only way to find out which was which was to drink one."""
+    from play import campaign as cm
+
+    c = cm.current()
+    c.scene.pc().add_stock(crafting.Stock(
+        base="Dragon Flower Tincture", craft="herbalist",
+        specs=[dict(s) for s in ingredients.get("dragon-flower").specs]), count=1)
+    c.save()
+
+    d = client.get("/api/craft/ingredients?craft=herbalism").json()
+    jar = next(s for s in d["stock"] if s["base"] == "Dragon Flower Tincture")
+    assert jar["poisons"][0]["body"] == \
+        "Fortitude DC 25 or 1d6 Constitution damage, causes nauseated"
 
 
 def test_a_nameless_recipe_is_refused(client):

@@ -57,25 +57,37 @@ class Ingredient:
         return tier_rank(self.tier)
 
     @property
-    def lines(self) -> list[str]:
-        """What this ingredient does, as card lines.
+    def pairs(self) -> list[tuple[str, dict]]:
+        """Each effect as (card line, structured effect), from one walk.
+
+        `lines` and `specs` used to be two separate walks over the same data, and nothing
+        tied entry n of one to entry n of the other. That was harmless while a card
+        printed every line the same way. It stopped being harmless the moment an effect's
+        *type* began deciding which panel its line appears in: a crafting card that files
+        "1d6 Constitution damage" under Effects because the two lists slipped by one is a
+        bug nothing would report.
 
         Read from the stored effects when there are any, and parsed from the description
         only when there are not — so an authored correction wins over the extractor,
-        which is the whole point of storing them.
+        which is the whole point of storing them. Both paths render through
+        `effectspec.render`, so a parsed entry and a stored one cannot read differently;
+        going through `Effect.text` here meant the card changed the moment somebody
+        pressed save without altering anything.
         """
         from . import effectspec
 
         if self.effects:
-            return [effectspec.render(e) for e in self.effects]
+            return [(effectspec.render(e), dict(e)) for e in self.effects]
 
-        # The fallback renders through the same function, so a parsed entry and a stored
-        # one cannot read differently. Going through `Effect.text` here meant the card
-        # changed the moment somebody pressed save without altering anything.
         from . import effects as fx
 
-        return [effectspec.render(e.spec) if e.spec else e.text
+        return [(effectspec.render(e.spec) if e.spec else e.text, dict(e.spec))
                 for e in fx.extract(self.text)]
+
+    @property
+    def lines(self) -> list[str]:
+        """What this ingredient does, as card lines."""
+        return [line for line, _ in self.pairs]
 
     @property
     def specs(self) -> list[dict]:
@@ -83,14 +95,10 @@ class Ingredient:
 
         `lines` is what a card shows and this is what the engine can run. Same source and
         same precedence — authored effects win over the extractor — so a card and the
-        thing that happens when you drink it can never disagree.
+        thing that happens when you drink it can never disagree. Shorter than `lines`
+        when a pattern found prose no authored type can hold.
         """
-        if self.effects:
-            return [dict(e) for e in self.effects]
-
-        from . import effects as fx
-
-        return [dict(e.spec) for e in fx.extract(self.text) if e.spec]
+        return [spec for _, spec in self.pairs if spec]
 
     @property
     def world_gated(self) -> bool:

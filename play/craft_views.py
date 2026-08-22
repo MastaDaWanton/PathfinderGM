@@ -16,7 +16,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes, crafting, foraging, ingredients, worldclass
+from rules import biomes, consumables, crafting, foraging, ingredients, worldclass
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -151,6 +151,12 @@ def craft_ingredients(request):
                        key=lambda s: (s.base.lower(), s.concentration)):
         d = item.as_dict()
         d["usable"] = bool(ceiling) and d["rank"] <= ceiling
+        # Read off the effects rather than the name, and grouped the same way the preview
+        # groups them, so a jar that will poison whoever drinks it says so on the shelf.
+        # A "Purified Draught of Skull Orchid" is not made safe by being called one, and
+        # nothing on the shelf used to distinguish the two.
+        d["poisons"] = [p.as_dict() for p in
+                        consumables.poisons(item.specs, source=item.base)]
         d["can_concentrate"] = item.count >= crafting.CONCENTRATE_COST
         out_of = crafting.concentrate(item)
         d["concentrates_to"] = {"name": out_of.name, "tier": out_of.tier,

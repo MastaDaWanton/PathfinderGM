@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from . import effects as fx
+from . import consumables as con
+from . import effectspec
 from . import ingredients as ing_mod
 from . import worldclass as wc
 
@@ -162,6 +163,12 @@ class Result:
     ingredients: list[dict]
     effects: list[str]
     drawbacks: list[str]
+    # The same drawbacks, grouped and structured: one entry per poison, each with its save
+    # and the effects that save gates. `drawbacks` is what a plain card shows; this is what
+    # the bench draws, so the save can sit visibly in front of the harm it governs.
+    poisons: list[dict] = field(default_factory=list)
+    # What Purify or Neutralize took out, named. Empty unless the chain cleansed something.
+    removed: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     # The prose the effects were read out of, kept so nothing is lost to the summary.
     described: list[dict] = field(default_factory=list)
@@ -178,6 +185,7 @@ class Result:
             "cleansed": self.cleansed, "risky": self.risky, "dc": self.dc,
             "chance": self.chance, "ingredients": self.ingredients,
             "effects": self.effects, "drawbacks": self.drawbacks,
+            "poisons": self.poisons, "removed": self.removed,
             "problems": self.problems, "described": self.described,
             "output": self.output,
             "consumes": self.consumes, "consumes_raw": self.consumes_raw,
@@ -185,8 +193,70 @@ class Result:
         }
 
 
-def mechanics(items, used) -> list[str]:
-    """The card's effect list: what each component actually does, mechanically.
+def _in_the_pot(items, used) -> list[tuple[str, str, dict]]:
+    """Everything in the pot as (source, card line, spec), in order, deduplicated.
+
+    One walk rather than two. `mechanics` read `Ingredient.lines` and `mechanical_specs`
+    read `Ingredient.specs`, and nothing tied entry n of one to entry n of the other —
+    harmless while every line was printed the same way, and not harmless at all now that
+    the spec's *type* decides which panel its line appears in.
+
+    Deduplicated on "source: line": two components that both cure fatigue cure it once,
+    and an item that lists it twice reads as a bug on the card. Per source rather than
+    globally, because two ingredients doing the same thing is a fact the card should keep.
+
+    A held item is read from its specs, not its prose, because those carry the `from` mark
+    that says which original ingredient each effect came out of — the only thing tying a
+    poison's save to the damage it gates. Stock saved before `specs` existed has none, and
+    falls back to the prose it does have rather than contributing nothing.
+    """
+    out: list[tuple[str, str, dict]] = []
+    seen: set[str] = set()
+
+    def add(source: str, line: str, spec: dict) -> None:
+        key = f"{source}: {line}"
+        if line and key not in seen:
+            seen.add(key)
+            # Marked here, once, so the spec that goes to the engine and the spec that
+            # decides which panel the line lands in are the same object.
+            out.append((source, line, {**spec, "from": spec.get("from") or source}
+                        if spec else {}))
+
+    for i in items:
+        for line, spec in i.pairs:
+            add(i.name, line, spec)
+    for held, _ in used:
+        if held.specs:
+            for spec in held.specs:
+                add(str(spec.get("from") or held.base), effectspec.render(spec), spec)
+        else:
+            for line in held.effects:
+                add(held.base, line, {})
+    return out
+
+
+@dataclass
+class Sifted:
+    """What is in the pot, sorted into what it does for you and what it does to you.
+
+    Measured on the shipped corpus before this existed: 99 of the 178 effects the 161
+    ingredients carry are harm — damage, ability damage, conditions, penalties and the
+    saves that gate them — and every one of them was printed under "Effects" beside the
+    bonuses, with the saves floating free of the harm they gate. 72 of the 161 entries
+    were affected.
+    """
+    effects: list[str] = field(default_factory=list)
+    drawbacks: list[str] = field(default_factory=list)
+    poisons: list[con.Poison] = field(default_factory=list)
+    # Harm that gates nothing and is gated by nothing: a flat -2 to all actions.
+    penalties: list[dict] = field(default_factory=list)
+    specs: list[dict] = field(default_factory=list)
+    # The specs that are *not* harm — what is left of the item once it has been purified.
+    benefits: list[dict] = field(default_factory=list)
+
+
+def sift(items, used) -> Sifted:
+    """The card's two lists: what each component does for you, and what it does to you.
 
     Sifted out of the descriptions rather than printed whole. The source is written for a
     person — "When dried and ground into a powder, the mottled red and gray bark of this
@@ -198,49 +268,44 @@ def mechanics(items, used) -> list[str]:
     the result and is stated once, beside the rarity and the DC; repeating it on each
     effect was noise on every card in the app.
     """
-    out: list[str] = []
-    for i in items:
-        for line_text in i.lines:
-            line = f"{i.name}: {line_text}"
-            if line not in out:
-                out.append(line)
-    for held, _ in used:
-        for e in held.effects:
-            if e not in out:
-                out.append(e)
-    return out
+    triples = _in_the_pot(items, used)
+    specs = [spec for _, _, spec in triples if spec]
+    sorted_out = con.sort_harm(specs)
+
+    effects = [f"{source}: {line}" for source, line, spec in triples
+               if not spec or any(spec is b for b in sorted_out.benefits)]
+    drawbacks = [p.line for p in sorted_out.poisons]
+    # Penalties are drawbacks but not poisons: a -2 to all actions hurts whoever drinks it
+    # and gates nothing, so it is listed on its own rather than folded into a save it
+    # never had.
+    for spec in sorted_out.penalties:
+        line = effectspec.render(spec)
+        source = spec.get("from")
+        drawbacks.append(f"{source}: {line}" if source else line)
+    return Sifted(effects=effects, drawbacks=drawbacks, poisons=sorted_out.poisons,
+                  penalties=sorted_out.penalties, specs=specs,
+                  benefits=sorted_out.benefits)
+
+
+def mechanics(items, used) -> list[str]:
+    """The card's effect list — what the item does *for* you.
+
+    Harm no longer appears here; it is a drawback, and `sift` puts it there.
+    """
+    return sift(items, used).effects
 
 
 def mechanical_specs(items, used) -> list[dict]:
     """The same effects as `mechanics`, structured rather than rendered.
 
     Kept as a second function rather than changing `mechanics`'s return type, because
-    `mechanics` feeds the card and half a dozen callers read strings from it. This feeds
-    the engine — without it a crafted potion is a paragraph, and drinking one could only
-    ever have been narration.
-
-    Deduplicated on the whole spec: two components that both cure fatigue should cure it
-    once, and an item that lists it twice reads as a bug on the card.
+    `mechanics` feeds the card and callers read strings from it. This feeds the engine —
+    without it a crafted potion is a paragraph, and drinking one could only ever have been
+    narration. Harm included: the Drawbacks panel is a matter of presentation, and a
+    poison that stopped poisoning people when it moved panels would be a worse bug than
+    the one being fixed.
     """
-    out: list[dict] = []
-    seen: set[str] = set()
-
-    def add(spec: dict, source: str) -> None:
-        if not spec:
-            return
-        marked = {**spec, "from": spec.get("from") or source}
-        key = repr(sorted(marked.items(), key=lambda kv: kv[0]))
-        if key not in seen:
-            seen.add(key)
-            out.append(marked)
-
-    for i in items:
-        for spec in i.specs:
-            add(spec, i.name)
-    for held, _ in used:
-        for spec in held.specs:
-            add(spec, held.base)
-    return out
+    return sift(items, used).specs
 
 
 def descriptions(items) -> list[dict]:
@@ -356,19 +421,57 @@ def preview(track_id: str, level: int, chain: Chain,
     risky = (any(i.risky for i in items) or any(h.drawbacks for h, _ in used)) \
         and not cleansed
 
-    effects = mechanics(items, used)
-    drawbacks = []
-    if risky:
-        drawbacks.append("Untreated hazardous components: harvesting and handling risks "
-                         "still apply. Purify or Neutralize removes them.")
+    sifted = sift(items, used)
+    effects, drawbacks = list(sifted.effects), list(sifted.drawbacks)
+    poisoned = [p.as_dict() for p in sifted.poisons]
+    specs = sifted.specs
+
+    # What is dangerous about a component but has no mechanic to name. 30 of the corpus's
+    # ingredients are marked risky and extract nothing harmful at all, because the danger
+    # is in the harvesting rather than in the dose. Those still deserve a warning — but
+    # one that says which ingredient it is about, instead of the boilerplate sentence that
+    # used to be the entire Drawbacks panel however many poisons were in the pot.
+    named = {p.source for p in sifted.poisons}
+    rough = [i.name for i in items if i.risky and i.name not in named]
+    rough += [h.name for h, _ in used if h.drawbacks and h.name not in named]
+
+    removed: list[str] = []
     if cleansed:
-        effects.append("Side effects and secondary toxicities removed by the chain.")
+        verb = " and ".join(sorted({m.title() for m in chain.methods if m in CLEANSING}))
+        removed = [f"{verb} removed {p.source}'s poison: {p.body}."
+                   if p.source else f"{verb} removed the poison: {p.body}."
+                   for p in sifted.poisons]
+        for spec in sifted.penalties:
+            removed.append(f"{verb} removed {effectspec.render(spec)} "
+                           f"({spec.get('from') or 'the mixture'}).")
+        if rough:
+            removed.append(f"{verb} removed the handling risks of "
+                           f"{', '.join(sorted(set(rough)))}.")
+        if not removed:
+            removed = [f"{verb} found nothing harmful to remove."]
+        # Struck from the item itself, not only from the card. Before this, purifying set
+        # a flag and appended a sentence while the harmful specs stayed on the Stock — so
+        # a "Purified Draught of Skull Orchid" still did every point of its Constitution
+        # damage when somebody drank it, and could still be thrown at people. The method
+        # that the author says "completely removes its negative side effects" removed
+        # nothing whatsoever.
+        specs = list(sifted.benefits)
+        drawbacks = []
+        poisoned = []
+        # Kept on the effect list rather than only on the preview, so the jar in the
+        # satchel says what was taken out of it long after the bench is closed.
+        effects = effects + removed
+    elif rough:
+        drawbacks.append(
+            f"Untreated hazardous components: {', '.join(sorted(set(rough)))}. "
+            f"Harvesting and handling risks still apply. "
+            f"Purify or Neutralize removes them.")
 
     dc = _dc(items, rank, chain.stages)
     name = chain.name or _name_for(items or [h for h, _ in used], chain.methods)
     out = Stock(base=name, concentration=1, tier=tier, potency=potency,
                 craft=track.id, effects=effects, drawbacks=drawbacks,
-                specs=mechanical_specs(items, used),
+                specs=specs,
                 from_ingredients=[i.id for i in items]
                 + [h.id for h, _ in used])
     return Result(
@@ -376,7 +479,8 @@ def preview(track_id: str, level: int, chain: Chain,
         cleansed=cleansed, risky=risky, dc=dc,
         chance=_chance(dc, level, rank, problems),
         ingredients=[i.as_dict() for i in items] + [h.as_dict() for h, _ in used],
-        effects=effects, drawbacks=drawbacks, problems=problems,
+        effects=effects, drawbacks=drawbacks, poisons=poisoned, removed=removed,
+        problems=problems,
         described=descriptions(items),
         output=out.as_dict(),
         consumes={h.id: n for h, n in used},
@@ -424,7 +528,9 @@ def _concentration(track, level: int, chain: Chain,
         dc=dc, chance=_chance(dc, level, made.rank, problems),
         ingredients=[held.as_dict()],
         effects=list(made.effects),
-        drawbacks=made.drawbacks, problems=problems, described=[],
+        drawbacks=made.drawbacks,
+        poisons=[p.as_dict() for p in con.poisons(made.specs, source=made.base)],
+        problems=problems, described=[],
         output=made.as_dict(), consumes={held.id: spend}, concentrating=True,
     )
 

@@ -236,9 +236,18 @@
   .fx { margin: 0; padding-left: 18px; }
   .fx li { margin-bottom: 8px; font-size: 14px; line-height: 1.55; }
   .fx li.bad { color: #cf9d95; }
+  .fx li.gone { color: #9dc9a8; }
   /* Which ingredient a line came from, quiet enough not to compete with the mechanic. */
   .fx .from { color: var(--dim); font-size: 12px; }
   .fx .from::after { content: " ·"; }
+  /* The save reads as the thing that gates the harm rather than as another effect beside
+     it. Before this the card listed "Fortitude DC 25" as its own bullet, so a poison's
+     save floated free of the Constitution damage it governs. */
+  .fx .save {
+    color: var(--alarm); font-weight: 600; white-space: nowrap;
+    border-bottom: 1px dotted rgba(168,68,58,.55);
+  }
+  h3.warn { color: #cf9d95; border-bottom-color: #3a2320; }
   .prose { color: var(--dim); font: italic 12.5px/1.55 var(--body); margin: 0 0 9px; }
   .prose b { color: var(--ink); font-style: normal; font-weight: 600; }
   .problems { color: #cf9d95; font-size: 14px; }
@@ -457,13 +466,18 @@ function renderStock() {
   wrap.innerHTML = `<h4 class="sect">Made</h4>
     <div class="shelf">${STOCK.map(s => {
       const inPot = USING[s.id] || 0;
+      // A jar that will poison whoever drinks it reads as one on the shelf. Read off the
+      // effects rather than the name: "Purified Draught of Skull Orchid" is not made safe
+      // by being called one, and the shelf used to show both as the same green flask.
+      const venom = s.poisons || [];
       return `<button class="jar made ${s.usable ? "" : "locked"} ${inPot ? "chosen" : ""}"
         data-stock="${esc(s.id)}" ${s.usable ? "" : "disabled"}
         title="${esc(s.name)} — ${esc(s.tier)}, ×${s.potency} potency. You have ${s.count}.
 Click to add one to the pot; right-click to take one out.
+${venom.map(v => `Poison — ${esc(v.body)}`).join("\n")}
 ${s.can_concentrate ? `Concentrating ${s.concentrates_to.cost} makes ${esc(s.concentrates_to.name)} (×${s.concentrates_to.potency}).` : ""}">
         <span class="count">${inPot ? `${inPot}/${s.count}` : s.count}</span>
-        <span class="glyph">🧪</span>
+        <span class="glyph">${venom.length ? "☠️" : "🧪"}</span>
         <b>${esc(s.base)}</b>
         ${s.concentration > 1 ? `<span class="conc">Tier ${s.concentration}</span>` : ""}
         <span class="tier t${s.rank}"></span>
@@ -533,6 +547,26 @@ function renderPreview(p) {
   if (!p) { el.innerHTML = `<div class="problems">Put something in the pot.</div>`; return; }
 
   const inferred = p.ingredients.some(i => i.tier_inferred);
+  // A line naming the source, dimmed, then the mechanic: "Leechwort: +2 Heal checks to
+  // staunch bleeding" reads as one card entry rather than two.
+  const sourced = x => {
+    const cut = x.indexOf(": ");
+    return cut > 0
+      ? `<span class="from">${esc(x.slice(0, cut))}</span> ${esc(x.slice(cut + 2))}`
+      : esc(x);
+  };
+  const poisons = p.poisons || [];
+  const removed = p.removed || [];
+  // The poisons are drawn from their own structured entries so the save can sit in front
+  // of the harm it gates. `drawbacks` holds the same poisons already rendered as flat
+  // lines for cards that have nowhere to put the structure, so they are filtered out here
+  // rather than printed twice.
+  const poisonLines = poisons.map(x => x.line);
+  const otherBad = (p.drawbacks || []).filter(x => !poisonLines.includes(x));
+  // Purify's own sentences are appended to the effect list so they survive into the jar's
+  // card in inventory. On the bench they have a section of their own, so the Effects list
+  // shows only what the thing still does.
+  const benefits = p.effects.filter(x => !removed.includes(x));
   el.innerHTML = `
     <div class="out-title"><b>${esc(p.name)}</b></div>
     <div class="meta">
@@ -549,19 +583,25 @@ function renderPreview(p) {
       }).join("")}</ul>` : ""}
     ${p.problems.length ? `<h3>Cannot be made</h3>
       <ul class="fx problems">${p.problems.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${p.effects.length ? `<h3>Effects</h3>
-      <ul class="fx">${p.effects.map(x => {
-        // "Leechwort: +2 Heal checks to staunch bleeding" — the source in front, the
-        // mechanic after, so a card with six lines still says where each came from.
-        const cut = x.indexOf(": ");
-        return cut > 0
-          ? `<li><span class="from">${esc(x.slice(0, cut))}</span> ${esc(x.slice(cut + 2))}</li>`
-          : `<li>${esc(x)}</li>`;
-      }).join("")}</ul>` : `<h3>Effects</h3>
-      <p class="none">No mechanical effect could be read out of these. What they say is
-        below.</p>`}
-    ${p.drawbacks.length ? `<h3>Drawbacks</h3>
-      <ul class="fx">${p.drawbacks.map(x => `<li class="bad">${esc(x)}</li>`).join("")}</ul>` : ""}
+    <h3>Effects</h3>
+    ${benefits.length
+      ? `<ul class="fx">${benefits.map(x => `<li>${sourced(x)}</li>`).join("")}</ul>`
+      : removed.length
+        ? `<p class="none">Everything these components did was harm, and the chain took it
+            out. What is left is inert.</p>`
+        : `<p class="none">No mechanical effect could be read out of these. What they say
+            is below.</p>`}
+    ${(poisons.length || otherBad.length) ? `<h3 class="warn">Drawbacks</h3>
+      <ul class="fx">
+        ${poisons.map(x => `<li class="bad">
+          ${x.source ? `<span class="from">${esc(x.source)}</span> ` : ""}
+          ${x.save_line ? `<span class="save">${esc(x.save_line)}</span> or ` : ""}
+          ${esc(x.harm)}</li>`).join("")}
+        ${otherBad.map(x => `<li class="bad">${sourced(x)}</li>`).join("")}
+      </ul>` : ""}
+    ${removed.length ? `<h3>Removed</h3>
+      <ul class="fx">${removed.map(x => `<li class="gone">${esc(x)}</li>`).join("")}</ul>`
+      : ""}
     ${(p.described && p.described.length) ? `<h3>
         <button class="mini" id="showprose" style="width:auto;padding:2px 8px">
           ${SHOWPROSE ? "hide" : "what the source says"}</button></h3>

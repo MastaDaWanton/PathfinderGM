@@ -115,6 +115,89 @@ def test_harm_is_read_off_the_effects_not_the_name():
         {"type": "ability_damage", "target": "con", "dice": "1d4"}]))
 
 
+# --- benefit and harm, told apart -----------------------------------------------------------
+
+def test_harm_does_not_read_as_a_benefit(poison_specs):
+    """Measured across the shipped corpus: 99 of the 178 effects its 161 ingredients carry
+    are harm, and every one of them was printed under "Effects" beside the bonuses. Dragon
+    Flower's card listed "1d6 Constitution damage" three lines below "+5 save vs poison"
+    with nothing to tell them apart."""
+    harm = [s for s in poison_specs if con.hurts(s)]
+    assert [s["type"] for s in harm] == \
+        ["situational_mod", "ability_damage", "apply_condition"]
+    assert not con.hurts({"type": "heal", "dice": "1d8"})
+
+
+def test_a_bonus_stays_a_benefit(poison_specs):
+    """"+5 bonus to save vs. poison for 10 rounds" is the good half of the same plant, and
+    a split that swept the whole ingredient into Drawbacks would be no better than the
+    flat list it replaced."""
+    good = next(s for s in poison_specs
+                if s["type"] == "situational_mod" and s["amount"] == 5)
+    assert not con.hurts(good)
+
+
+def test_a_penalty_is_a_drawback_but_not_a_poison(poison_specs):
+    """20 of the corpus's 178 effects are penalties. "-2 to all actions while in the area"
+    is harm on a card, but it poisons nobody: it must not make a draught throwable, which
+    is the only question `HARMFUL` is asked."""
+    bad = next(s for s in poison_specs
+               if s["type"] == "situational_mod" and s["amount"] == -2)
+    assert con.hurts(bad)
+    assert bad["type"] not in con.HARMFUL
+    assert [p.source for p in con.poisons([bad], source="Dragon Flower")] == []
+
+
+def test_a_poison_is_one_thing_rather_than_three_loose_lines(poison_specs):
+    """From the bench, before: "1d6 Constitution damage", "Fortitude DC 25" and "Causes
+    nauseated" were three unrelated bullets, so the save that gates the damage read as an
+    effect of its own. 1e writes a poison as one thing — a save, and what failing it
+    costs."""
+    found = con.poisons(poison_specs, source="Dragon Flower")
+    assert len(found) == 1
+    p = found[0]
+    assert p.source == "Dragon Flower"
+    assert p.save_line == "Fortitude DC 25"
+    assert p.lines == ["1d6 Constitution damage", "Causes nauseated"]
+    assert p.line == ("Dragon Flower: Fortitude DC 25 or 1d6 Constitution damage, "
+                      "causes nauseated")
+
+
+def test_a_bare_dc_that_gates_nothing_is_not_a_poison():
+    """41 of the corpus's 59 save gates carry nothing at all: they are the entry's own
+    crafting DC, restated at the end of its description ("Cave Star ... DC: 10.") and
+    swept up by the extractor's bare-DC fallback. Filing every gate under Drawbacks would
+    have invented 41 poisons that poison nobody."""
+    star = ing_mod.get("cave-star")
+    assert [s["type"] for s in star.specs] == ["save_gate"]
+    assert con.poisons(star.specs, source=star.name) == []
+    assert not con.hurts(star.specs[0])
+
+
+def test_each_ingredient_keeps_its_own_save():
+    """Grouped by which ingredient the effect was read out of, because that is the only
+    thing tying a save to the damage it gates. A compound of Dragon Flower and Mad Cap
+    holds two poisons, DC 25 and DC 18, not one save and five loose effects."""
+    specs = [dict(s, **{"from": "Dragon Flower"})
+             for s in ing_mod.get("dragon-flower").specs]
+    specs += [dict(s, **{"from": "Mad Cap"}) for s in ing_mod.get("mad-cap").specs]
+    found = con.poisons(specs)
+    assert [(p.source, p.save_line) for p in found] == \
+        [("Dragon Flower", "Fortitude DC 25"), ("Mad Cap", "DC 18")]
+
+
+def test_a_second_poison_gets_its_own_save_rolled():
+    """`plan` took "the first save_gate in the list" and emitted it once, so a brew made of
+    two poisonous ingredients rolled one save and applied both poisons' effects — Mad Cap's
+    coma landed with no save at all."""
+    specs = [dict(s, **{"from": "Dragon Flower"})
+             for s in ing_mod.get("dragon-flower").specs]
+    specs += [dict(s, **{"from": "Mad Cap"}) for s in ing_mod.get("mad-cap").specs]
+    use = con.plan(Stock(base="Two Flower Draught", specs=specs), "throw", "c1")
+    saves = [i["params"]["dc"]["value"] for i in use.intents if i["op"] == "save"]
+    assert saves == [25, 18]
+
+
 # --- potency reaches the dice ----------------------------------------------------------------
 
 def test_potency_scales_the_flat_part_not_the_dice():
