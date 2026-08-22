@@ -306,3 +306,124 @@ def test_there_is_no_fallback_when_nobody_is_left_to_fight(scene):
     ]))
     scene.get("pc").add_condition("unconscious")
     assert judgement.default_npc_action(scene, "c1") is None
+
+
+# --- the attack that landed on the wrong body (playtest, 2026-08-22) ----------------------
+
+@pytest.fixture
+def stale_scene():
+    """The exact shape the playtest produced: the PC, and one NPC dying at 0 hp who was
+    dragged along from a previous scene. Nobody else exists, whatever the fiction says."""
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    gatekeeper = instantiate("guildhand", scene=s, name="the guildhand on the gate")
+    gatekeeper.hp = 0
+    s.add(gatekeeper)
+    return s
+
+
+def test_a_dying_man_is_not_the_obvious_target(stale_scene):
+    """Verbatim from the playtest: every attack on the people the narration described was
+    filled onto the gatekeeper dying at 0 hp, because he was the only body in the room.
+    Being the only body must not make a bleeding man the reading of "I attack"."""
+    raw = [{"op": "attack", "actor": "pc"}]
+    assert judgement.fill_obvious_targets(raw, stale_scene)[0].get("target") is None
+
+
+def test_a_conscious_thug_still_is(scene):
+    raw = [{"op": "attack", "actor": "pc"}]
+    assert judgement.fill_obvious_targets(raw, scene)[0]["target"] == "c1"
+
+
+def test_an_attack_on_somebody_who_does_not_exist_creates_them(stale_scene):
+    """The playtest turn, replayed: the narration had introduced a winged woman, she was
+    never spawned, the player wrote "I rush the winged woman and run her through", and
+    the GM answered `attack c1` — a valid ref belonging to the dying gatekeeper three
+    scenes away. Every check passed and the wrong man was stabbed to -4."""
+    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
+    amended = judgement.repair_misaimed_attack(
+        raw, "I don't trust her. I rush the winged woman and run her through.",
+        stale_scene)
+    assert amended is not None
+    assert amended[0]["op"] == "spawn"
+    assert amended[0]["params"]["name"] == "winged woman"
+    assert amended[1]["op"] == "attack"
+    assert amended[1]["target"] == "c2"          # the ref the spawn will mint
+
+
+def test_naming_the_actual_target_repairs_nothing(scene):
+    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
+    assert judgement.repair_misaimed_attack(
+        raw, "I attack the thug before he can move.", scene) is None
+
+
+def test_a_pronoun_repairs_nothing(stale_scene):
+    """"I attack him" names nobody, so there is no disagreement to detect — and spawning
+    a creature called "him" would be worse than the misaim."""
+    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
+    assert judgement.repair_misaimed_attack(raw, "I attack him now.", stale_scene) is None
+
+
+def test_the_spawned_victim_survives_validation(stale_scene):
+    """The repair's output must pass the engine's own checks, projected ref and all —
+    otherwise the repair is a different way of losing the turn."""
+    raw = [{"op": "attack", "actor": "pc", "target": "c1"}]
+    amended = judgement.repair_misaimed_attack(
+        raw, "I charge the winged woman.", stale_scene)
+    engine = Engine(stale_scene, Dice(seed=7))
+    intents = engine.validate(amended)
+    assert [i.op for i in intents] == ["spawn", "attack"]
+
+
+def test_the_template_follows_the_players_wording(stale_scene):
+    amended = judgement.repair_misaimed_attack(
+        [{"op": "attack", "actor": "pc", "target": "c1"}],
+        "I rush the guard dog and stab it.", stale_scene)
+    assert amended[0]["params"]["template"] == "guard dog"
+
+
+# --- sleep and meals declared at the table (playtest, 2026-08-22) --------------------------
+
+def test_a_declared_sleep_becomes_a_rest_intent(scene):
+    """Measured in both sessions: "I sleep until morning" charged 20 minutes in one and
+    nothing in the other. The prompt carries a worked rest example and a briefing line;
+    both models ignored both. So the declaration is detected mechanically."""
+    out = judgement.inject_survival(
+        [{"op": "narrate_only"}], "I bed down by the embers and sleep until dawn.", scene)
+    assert {"op", "actor", "params"} <= set(out[-1])
+    assert out[-1]["op"] == "rest" and out[-1]["params"]["kind"] == "night"
+
+
+def test_eating_and_drinking_reach_the_engine(scene):
+    out = judgement.inject_survival(
+        [{"op": "narrate_only"}],
+        "I eat from my rations and drink from my waterskin.", scene)
+    ops = [r["op"] for r in out]
+    assert "eat" in ops and "drink" in ops
+
+
+def test_a_question_about_sleep_is_not_sleeping(scene):
+    out = judgement.inject_survival(
+        [{"op": "narrate_only"}], "Should I sleep here, or is it too exposed?", scene)
+    assert [r["op"] for r in out] == ["narrate_only"]
+
+
+def test_a_refusal_to_sleep_is_not_sleeping(scene):
+    out = judgement.inject_survival(
+        [{"op": "narrate_only"}], "No sleep tonight - I keep watch.", scene)
+    assert "rest" not in [r["op"] for r in out]
+
+
+def test_making_camp_alone_is_not_sleeping(scene):
+    """The playtest's own player made camp and then scouted for an hour. Camp is where
+    you sleep, not the sleeping."""
+    out = judgement.inject_survival(
+        [{"op": "narrate_only"}], "I make a small camp off the trail.", scene)
+    assert "rest" not in [r["op"] for r in out]
+
+
+def test_a_rest_the_model_proposed_is_not_doubled(scene):
+    out = judgement.inject_survival(
+        [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}],
+        "I go to sleep.", scene)
+    assert [r["op"] for r in out].count("rest") == 1

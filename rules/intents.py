@@ -236,6 +236,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "spawn": (("template",), ("from_entity_id", "count", "name"), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     "rest": ((), ("kind",), "hidden"),
+    # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
+    # does not: a night's sleep is not a meal. Two ops rather than one with flags,
+    # because a model reliably emits {"op": "eat"} and reliably mangles booleans.
+    # Found in the 2026-08-22 playtest: "I eat from my rations and drink from my
+    # waterskin" reached the engine as narrate_only, so the survival clocks built that
+    # week could never actually be answered — only run out.
+    "eat": ((), ("actor",), "hidden"),
+    "drink": ((), ("actor",), "hidden"),
     "narrate_only": ((), (), "hidden"),
 }
 

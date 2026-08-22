@@ -340,3 +340,43 @@ def test_the_rarer_the_plant_the_smaller_the_patch(forager):
             assert ordered == sorted(ordered, reverse=True), ranks
             return
     pytest.skip("no hour in 200 turned up two different ranks")
+
+
+# --- eating and drinking as ops (playtest, 2026-08-22) --------------------------------------
+
+def test_eating_resets_the_hunger_clock_and_only_that(wood):
+    """"I eat from my rations and drink from my waterskin" reached the engine as
+    narrate_only in both playtest sessions, so the hunger and thirst clocks could run out
+    but never be answered. Now they are ops."""
+    s, engine = wood
+    pc = s.pc()
+    pc.fed_minutes = pc.watered_minutes = pc.awake_minutes = 600
+
+    r = engine.run(engine.validate([{"op": "eat"}]))
+    assert pc.fed_minutes == 0
+    assert pc.watered_minutes == 600, "a meal is not a drink"
+    assert pc.awake_minutes == 600, "a meal is not a nap"
+    assert "eats" in r.outcomes[0].tell
+
+
+def test_drinking_resets_thirst(wood):
+    s, engine = wood
+    pc = s.pc()
+    pc.watered_minutes = 900
+    engine.run(engine.validate([{"op": "drink"}]))
+    assert pc.watered_minutes == 0
+
+
+def test_a_nights_rest_still_resets_the_awake_clock_but_not_the_stomach(wood):
+    """The reason eat/drink are their own ops rather than flags on rest: sleeping through
+    a night hungry leaves you a night hungrier."""
+    s, engine = wood
+    pc = s.pc()
+    pc.awake_minutes = 1200
+    pc.fed_minutes = 1200
+    before = s.clock_minutes
+    engine.run(engine.validate([{"op": "rest", "actor": "pc",
+                                     "params": {"kind": "night"}}]))
+    assert pc.awake_minutes == 0
+    assert pc.fed_minutes == 1200
+    assert s.clock_minutes - before == 8 * 60, "a night is eight hours, not twenty minutes"

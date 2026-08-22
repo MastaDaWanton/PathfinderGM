@@ -281,7 +281,17 @@ _SCAFFOLD = re.compile(
 MAX_CONSEQUENCE_CHARS = 700
 
 
-def clean_consequence(text: str, example_answer: str = "") -> str:
+# The consequence example's own scenery, which was chosen to exist nowhere in the shipped
+# world precisely so this list could be written. Verified live within the hour: llama
+# narrated a guild-yard punch and continued "the ferry's motion is starting to get worse,
+# and you can feel it pulling loose from its moorings" — a paraphrase, which no verbatim
+# check can touch, but the nouns give it away. A sentence naming one of these is the
+# example bleeding through, unless the turn itself is genuinely about a ferry — which is
+# what the `context` parameter decides.
+_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel")
+
+
+def clean_consequence(text: str, example_answer: str = "", context: str = "") -> str:
     """What survives of a call-2 reply once the prompt itself is taken back out of it.
 
     Everything here is mechanical — no model call, following the rule that held all
@@ -309,12 +319,15 @@ def clean_consequence(text: str, example_answer: str = "") -> str:
             if len(wanted) > 20:
                 text = text.replace(wanted, "")
 
+    low_context = (context or "").lower()
     seen: set[str] = set()
     kept: list[str] = []
     for sentence in _SENTENCE.findall(text):
         s = " ".join(sentence.split())
         key = s.lower().strip(".!? ")
         if not key or key in seen:
+            continue
+        if any(mark in key and mark not in low_context for mark in _EXAMPLE_MARKS):
             continue
         seen.add(key)
         kept.append(s)

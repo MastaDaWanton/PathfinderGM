@@ -169,7 +169,17 @@ and gets a real id.
 | `guard` | `to`, `kind?`, `amount?`, `range_ft?`, `uses?`, `pool?` | The actor gets between damage and `to`. `kind` is `redirect` / `share` / `absorb` / `convert` — see §10. |
 | `spawn` | `from_entity_id?`, `template`, `count` | Puts a creature on the board and returns its ref. |
 | `advance_time` | `amount`, `unit` | Ticks durations, rest, and the world clock. |
+| `rest` | `kind?` | A night's sleep or bed rest: natural healing, the awake clock resets, pools refill, the scene clock moves 8 or 24 hours. Refused mid-encounter, and refused for a character below 0 hp. |
+| `eat` | `actor?` | Resets the hunger clock. Not folded into `rest` — a night's sleep is not a meal. |
+| `drink` | `actor?` | Resets the thirst clock. |
 | `narrate_only` | — | **Explicit.** Says "this turn had no mechanics." |
+
+The GM is *asked* to propose `rest`, `eat` and `drink`, and both playtested models
+narrated sleep and meals without ever proposing them — so the app does not rely on the
+ask. A player turn that declares sleep, eating or drinking has the matching intent
+injected mechanically before validation (`gm/judgement.inject_survival`), and the ops
+stay in this table because the GM using them well is still better than the injection's
+conservative regexes.
 
 `narrate_only` exists so that an empty `intents` list is unambiguously a *failure* rather
 than a quiet "nothing happened". Without it, a model that forgets to emit intents is

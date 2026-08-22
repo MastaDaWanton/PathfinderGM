@@ -1994,6 +1994,39 @@ class Engine:
             tell=" ".join(bits), because=intent.because,
         )
 
+    def _op_eat(self, intent: Intent, partial: dict) -> Outcome:
+        """A meal. Resets the hunger clock and nothing else — food is not medicine."""
+        from . import survival
+
+        actor = self._eater(intent)
+        survival.eat(actor)
+        return Outcome(
+            intent_id=intent.id, op="eat",
+            effects=[{"ref": actor.ref, "kind": "eat"}],
+            tell=f"{actor.name} eats.", because=intent.because,
+        )
+
+    def _op_drink(self, intent: Intent, partial: dict) -> Outcome:
+        from . import survival
+
+        actor = self._eater(intent)
+        survival.drink(actor)
+        return Outcome(
+            intent_id=intent.id, op="drink",
+            effects=[{"ref": actor.ref, "kind": "drink"}],
+            tell=f"{actor.name} drinks.", because=intent.because,
+        )
+
+    def _eater(self, intent: Intent):
+        """Who the meal is for: the named actor, or the PC — the only creature whose
+        hunger the survival rules track in practice."""
+        who = intent.actor or intent.params.get("actor") \
+            or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError(f"{intent.op}: nobody here to {intent.op}", "refs")
+        return actor
+
     def _op_spawn(self, intent: Intent, partial: dict) -> Outcome:
         from .bestiary import instantiate  # local import: bestiary is data, not core
 

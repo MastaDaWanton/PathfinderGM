@@ -106,9 +106,23 @@ class GMAgent:
                 # The target is filled in *before* validation, because the engine refuses
                 # an untargeted attack with a `legality` error and legality errors
                 # regenerate rather than repair: five attempts, then the turn is gone.
-                intents = self.engine.validate(
-                    judgement.fill_obvious_targets(data.get("intents"),
-                                                   self.engine.scene))
+                #
+                # Three mechanical repairs, in dependency order. The misaim check first,
+                # because it reads the *model's* target before anything fills one in: an
+                # attack aimed at a valid ref that is not the person the player named
+                # gets the named person spawned and the attack moved onto them — the
+                # playtest stabbed a dying gatekeeper three scenes away because the
+                # winged woman in the narration had never been made real. Then the
+                # lone-candidate fill, then the survival injection, which appends `rest`,
+                # `eat` and `drink` for the sleep and meals both models narrate and
+                # neither ever proposes, worked example notwithstanding.
+                raw = data.get("intents")
+                raw = judgement.repair_misaimed_attack(
+                    raw, player_input, self.engine.scene) or raw
+                raw = judgement.fill_obvious_targets(raw, self.engine.scene)
+                raw = judgement.inject_survival(raw, player_input, self.engine.scene)
+                data = dict(data, intents=raw)
+                intents = self.engine.validate(raw)
             except IntentError as exc:
                 # The GM naming people it wanted to exist — "attack thug1" — is the one
                 # rejection it will not learn from, hint and example notwithstanding. It
@@ -379,7 +393,10 @@ class GMAgent:
         # straight into the transcript, because nothing stood between this return and
         # `c.transcript.append`. An empty answer is safe: the caller renders the tells.
         cleaned = narration_mod.clean_consequence(
-            reply.text.strip(), prompts.CONSEQUENCE_EXAMPLE["assistant"])
+            reply.text.strip(), prompts.CONSEQUENCE_EXAMPLE["assistant"],
+            # So a turn genuinely about the example's scenery keeps its sentences: the
+            # marker cut only fires on words absent from the turn itself.
+            context=f"{player_input} {narration}")
         text = judgement.name_refs(cleaned, self.engine.scene)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
 

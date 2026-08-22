@@ -237,12 +237,29 @@ def name_refs(text: str, scene) -> str:
 # A ref the GM invented for someone it wanted to exist: "thug1", "bravo_2", "guard1".
 _INVENTED_REF = re.compile(r"^[a-z][a-z_]{2,}[ _-]?\d*$", re.I)
 
-# What the player's words suggest the newcomers are.
+# What the player's words suggest the newcomers are. The animal cue is first because it
+# is the more specific claim: "the guard dog" contains "guard", and with the human cue
+# first the dog came out a watchman.
 _TEMPLATE_CUES = (
-    (re.compile(r"\b(watch|watchman|watchmen|guard|guards|soldier)\b", re.I), "watchman"),
     (re.compile(r"\b(dog|hound|mastiff)\b", re.I), "guard dog"),
+    (re.compile(r"\b(watch|watchman|watchmen|guard|guards|soldier)\b", re.I), "watchman"),
     (re.compile(r"\b(guildhand|clerk|servant|porter)\b", re.I), "guildhand"),
 )
+
+
+def _can_be_fought(actor) -> bool:
+    """Whether this creature is a plausible target for a fresh attack.
+
+    "Not dead" was the first version, and the 2026-08-22 playtest showed why it is not
+    enough: the only actor in the scene was the gatekeeper dying at 0 hp — dragged along
+    from three scenes back — and every attack on the people the narration described was
+    filled onto him. A man bleeding out on the ground is not the obvious reading of "I
+    attack"; being the only body in the room must not make him one.
+    """
+    if int(getattr(actor, "hp", 1)) <= 0:
+        return False
+    return not any(actor.has_condition(c)
+                   for c in ("dead", "dying", "unconscious", "stable"))
 
 
 def fill_obvious_targets(raw_intents, scene) -> list:
@@ -264,7 +281,7 @@ def fill_obvious_targets(raw_intents, scene) -> list:
 
     pc = scene.pc()
     candidates = [r for r, a in scene.actors.items()
-                  if not a.is_pc and not a.has_condition("dead")
+                  if not a.is_pc and _can_be_fought(a)
                   and (pc is None or r != pc.ref)]
     if len(candidates) != 1:
         return raw_intents
@@ -329,8 +346,18 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
         return None
 
     swap = dict(zip(invented, minted))
+    params = {"template": template, "count": count}
+    if count == 1:
+        # The GM's invented ref usually *is* the fiction's name — it wrote `kaldrimia`
+        # or `winged_woman`, not `npc7`. Spawning her as "thug" made every later tell
+        # narrate the wrong person: the live fight read "the thug steps forward" about a
+        # guildmate the scene had introduced by name. Only for one: two invented refs
+        # cannot share a name, and picking which ref names the pair is a guess.
+        cleaned = re.sub(r"\d+$", "", invented[0]).replace("_", " ").replace("-", " ").strip()
+        if cleaned and cleaned != template:
+            params["name"] = cleaned
     amended = [{"op": "spawn", "because": "they are already in the scene the GM described",
-                "params": {"template": template, "count": count}}]
+                "params": params}]
     for raw in raw_intents:
         raw = dict(raw)
         if isinstance(raw.get("actor"), str):
@@ -397,3 +424,153 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
 def _quote(text: str, limit: int = 120) -> str:
     text = " ".join((text or "").split())
     return repr(text if len(text) <= limit else text[:limit] + "…")
+
+
+# --- the attack that lands on the wrong body ---------------------------------------------
+
+# Words in an actor's display name that identify nobody: "the guildhand on the gate"
+# matches on "guildhand" and "gate", never on "the" or "on".
+_NAME_NOISE = {"the", "a", "an", "on", "of", "at", "in", "and", "or", "to", "with"}
+
+# The player's own victim, read from their sentence: an attack verb, then the phrase.
+# Deliberately requires a determiner, so "I attack him" (a pronoun, could be anybody)
+# never matches and never triggers the repair.
+_AIMED_AT = re.compile(
+    r"\b(?:attack|strike|stab|slash|shoot|charge|rush|tackle|swing (?:at|on)|throw[^.]*?\bat"
+    r"|run(?:ning)? [^.]*?through|cut(?:ting)? down|lunge at|go(?:ing)? for)\s+"
+    r"(?:the|that|this|those|these)\s+([a-z][a-z \-']{2,40}?)(?=[,.!?;]|\s+(?:and|with|before|while|as)\b|$)",
+    re.I)
+
+
+def _name_words(name: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z']+", (name or "").lower())
+            if w not in _NAME_NOISE}
+
+
+def repair_misaimed_attack(raw_intents, player_text: str, scene):
+    """Aim the attack at the person the player named, creating them if they must exist.
+
+    The failure this repairs, verbatim from the 2026-08-22 playtest: the narration had
+    introduced a winged woman; she was never spawned; the player wrote "I rush the winged
+    woman and run her through", and the GM answered `attack c1` — a *valid* ref belonging
+    to the gatekeeper dying at 0 hp, three scenes and one biome away. Every check passed,
+    the wrong man was stabbed to -4, and the narrator then rewrote the fiction to agree
+    with the engine ("it's Zara, the guildhand who was supposed to be watching the
+    gate"). `repair_unknown_refs` never fired because nothing was unknown.
+
+    So the mechanical test is disagreement between two names: the attack's target is a
+    known actor none of whose name-words appear anywhere in the player's sentence, while
+    the player's sentence names a victim — determiner and all — who matches no actor in
+    the scene. Both halves must hold. A pronoun triggers nothing; naming the actual
+    target triggers nothing; only aiming at somebody who does not exist while the intent
+    aims at somebody who does.
+
+    The repair spawns the named victim — a generic statblock under the fiction's own
+    name, template picked from the player's wording — and moves the attack onto them.
+    Returns None when there is nothing to do.
+    """
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return None
+    aimed = _AIMED_AT.search(player_text)
+    if not aimed:
+        return None
+    victim_phrase = " ".join(aimed.group(1).split())
+    victim_words = _name_words(victim_phrase)
+    if not victim_words:
+        return None
+
+    actors = getattr(scene, "actors", {}) or {}
+    # The player named somebody who is already here: nothing to repair, whatever the
+    # intent says — second-guessing a match is how a repair becomes a bug.
+    for a in actors.values():
+        if victim_words & _name_words(getattr(a, "name", "")):
+            return None
+
+    misaimed = False
+    for raw in raw_intents:
+        if not isinstance(raw, dict) or str(raw.get("op", "")).lower() != "attack":
+            continue
+        target = raw.get("target")
+        if not isinstance(target, str) or target not in actors:
+            continue
+        if not (victim_words & _name_words(getattr(actors[target], "name", ""))):
+            misaimed = True
+    if not misaimed:
+        return None
+
+    template = "thug"
+    for cue, name in _TEMPLATE_CUES:
+        if cue.search(victim_phrase) or cue.search(player_text):
+            template = name
+            break
+
+    n = 1
+    while f"c{n}" in actors:
+        n += 1
+    minted = f"c{n}"
+
+    out = [{"op": "spawn", "because": f"the {victim_phrase} the player is attacking "
+                                      f"was described but never created",
+            "params": {"template": template, "count": 1, "name": victim_phrase}}]
+    for raw in raw_intents:
+        raw = dict(raw) if isinstance(raw, dict) else raw
+        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and isinstance(raw.get("target"), str) and raw["target"] in actors
+                and not (victim_words & _name_words(
+                    getattr(actors[raw["target"]], "name", "")))):
+            raw["target"] = minted
+        out.append(raw)
+    return out
+
+
+# --- sleep, food and water declared at the table ----------------------------------------
+
+# A declaration of sleep, not a mention of it. Anchored on the verb phrases a player
+# actually types; "make camp" alone is not here because the playtest's own player made
+# camp and then scouted for an hour.
+_SLEEPS = re.compile(
+    r"\b(?:sleep|go to sleep|bed down|turn in|doze off|get some (?:sleep|rest)"
+    r"|rest (?:for the night|until (?:morning|dawn|daybreak)|till (?:morning|dawn)))\b",
+    re.I)
+_WONT_SLEEP = re.compile(r"\b(?:can't|cannot|won't|will not|don't|do not|no|never|without"
+                         r"|before I|rather than)\s+(?:\w+\s){0,2}?sleep", re.I)
+_EATS = re.compile(r"\b(?:eat|eats|eating|have (?:a|some) (?:meal|food|breakfast|supper"
+                   r"|dinner)|chew|rations?)\b", re.I)
+_DRINKS = re.compile(r"\b(?:drink|drinks|drinking|waterskin)\b", re.I)
+
+
+def inject_survival(raw_intents, player_text: str, scene) -> list:
+    """Make a declared sleep, meal or drink reach the engine, whatever the GM proposed.
+
+    Measured in both 2026-08-22 sessions: "I sleep until morning" charged 20 minutes in
+    one and nothing at all in the other, and "I eat from my rations and drink from my
+    waterskin" reached the engine as narrate_only — so the survival clocks built that
+    week could run out but never be answered. The prompt already carries a worked `rest`
+    example and a briefing line saying to use it; both models ignored both. Detect
+    mechanically, repair in code — the only kind of fix that has held.
+
+    Conservative on purpose: a question mark anywhere skips the whole thing (asking about
+    sleep is not sleeping), a negated sleep does not rest, and a fight in progress lets
+    the engine's own legality check say why not.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    pc = scene.pc()
+    out = list(raw_intents)
+
+    if _EATS.search(player_text) and "eat" not in present:
+        out.append({"op": "eat", "because": "the player said they eat"})
+    if _DRINKS.search(player_text) and "drink" not in present:
+        out.append({"op": "drink", "because": "the player said they drink"})
+    # Sleep last: you eat before you bed down, and the rest op's own legality check
+    # still applies — mid-fight it is refused with the reason, not silently dropped.
+    if (_SLEEPS.search(player_text) and not _WONT_SLEEP.search(player_text)
+            and "rest" not in present and not getattr(scene, "in_encounter", False)
+            and pc is not None and pc.hp >= 0):
+        out.append({"op": "rest", "actor": pc.ref, "params": {"kind": "night"},
+                    "because": "the player said they sleep"})
+    return out

@@ -296,3 +296,27 @@ def test_a_consequence_with_no_letters_is_nothing():
 
     assert narration.clean_consequence("-") == ""
     assert narration.clean_consequence("— …") == ""
+
+
+def test_a_paraphrased_example_is_caught_by_its_own_scenery():
+    """Moving the worked example to a ferry was supposed to make plagiarism detectable,
+    and it worked within the hour: llama narrated a guild-yard punch and continued "the
+    ferry's motion is starting to get worse, and you can feel it pulling loose from its
+    moorings" — a paraphrase no verbatim check can touch. The example's nouns exist
+    nowhere in the shipped world, so a sentence naming one is the example bleeding."""
+    from gm import narration
+
+    bled = ("His fist connects with your cheekbone. "
+            "The ferry's motion is starting to get worse, and you can feel it pulling "
+            "loose from its moorings again.")
+    assert narration.clean_consequence(bled) == "His fist connects with your cheekbone."
+
+
+def test_a_turn_genuinely_about_a_ferry_keeps_its_ferry():
+    """The cut is gated on the turn's own words, so the marker list cannot eat a real
+    river crossing."""
+    from gm import narration
+
+    line = "The ferry noses into the current and the ropes go taut."
+    kept = narration.clean_consequence(line, context="I board the ferry at the dock")
+    assert kept == line
