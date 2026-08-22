@@ -293,6 +293,35 @@ def slots(request):
 
 
 @require_GET
+def licence(request):
+    """The Open Game Licence, verbatim.
+
+    Section 10: "You MUST include a copy of this License with every copy of the Open Game
+    Content You Distribute." This app ships as a single executable, so the licence has to
+    be reachable from inside it rather than sitting beside the source — served as plain
+    text so nothing can reflow or truncate it on the way to the reader.
+
+    Read off `resource_root()` rather than `__file__`, because under PyInstaller `__file__`
+    points inside the bundle and says nothing about where the app was installed.
+    """
+    from django.http import HttpResponse, HttpResponseNotFound
+
+    from pathfindergm.paths import resource_root
+
+    path = resource_root() / "OGL.txt"
+    if not path.is_file():
+        # Loud rather than blank: a build that lost the licence is one that must not be
+        # distributed, and an empty page would look like a styling bug.
+        return HttpResponseNotFound(
+            "OGL.txt is missing from this build. The Open Game Licence must ship with "
+            "any copy of the Open Game Content — see OGL-NOTICE.md.",
+            content_type="text/plain; charset=utf-8",
+        )
+    return HttpResponse(path.read_text(encoding="utf-8"),
+                        content_type="text/plain; charset=utf-8")
+
+
+@require_GET
 def feat_search(request):
     """Browse the feat index, ranked by whether this character can actually take it.
 

@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/slots", views.slots, name="slots"),
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),
     path("api/feats", views.feat_search, name="feat_search"),
+    path("licence", views.licence, name="licence"),
     path("api/characters", views.characters, name="characters"),
     path("api/character/new", views.new_character, name="new_character"),
     path("api/character/switch", views.switch_character, name="switch_character"),

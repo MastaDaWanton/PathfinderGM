@@ -37,27 +37,65 @@ Nothing under `world/`, `gm/`, `play/`, `fixtures/` or `docs/` is Open Game Cont
 `fixtures/pangrella-campaign.json` is a World Bible export and carries no rules content at
 all — that boundary is deliberate and is documented in `docs/campaign-format.md`.
 
+`content/feats/feats.json` — 1,474 Pathfinder 1st Edition feats imported from an OGL feat
+spreadsheet. Names, types, prerequisites, benefits and the normal/special clauses are Open
+Game Content, and each entry records the sourcebook it came from. The typed
+`prerequisites` array is this app's own machine-readable restatement of the prerequisite
+text, which is also carried verbatim beside it.
+
+`content/weapons/weapons.json` — Pathfinder 1st Edition weapon statistics. Cost, damage,
+critical, range, weight, damage type and special qualities are Open Game Content. The
+component columns (head, haft, grip, guard) are the author's own additions for the
+crafting system and are not Open Game Content.
+
 ## Before shipping a build
 
-1. **Add `OGL.txt` containing the verbatim licence.** It is not reproduced here on
-   purpose: it must be an authoritative copy, taken from
+1. ~~**Add `OGL.txt` containing the verbatim licence.**~~ **Done.** `OGL.txt` holds the
+   licence as supplied by the project owner. It has not been paraphrased, reflowed or
+   truncated. Anyone re-verifying it should compare against
    [paizo.com/pathfinderRPG/prd/openGameLicense.html](https://paizo.com/pathfinderRPG/prd/openGameLicense.html)
-   or [d20pfsrd.com/opengamelicense](https://www.d20pfsrd.com/opengamelicense/), not
-   retyped. A paraphrased or truncated licence does not satisfy section 10.
-2. **Fill in Section 15** of that copy with the declarations of every source actually
-   used, in the order required. At minimum this build derives from the Pathfinder
-   Roleplaying Game Reference Document and the System Reference Document.
+   or [d20pfsrd.com/opengamelicense](https://www.d20pfsrd.com/opengamelicense/).
+2. **Fill in Section 15** — *outstanding, and larger than it looks.* `OGL.txt` currently
+   carries only the two declarations that came with the licence text: the Open Game
+   Licence itself and the System Reference Document. Section 6 requires the exact
+   COPYRIGHT NOTICE of **every** source whose Open Game Content is distributed, and this
+   build's content was imported in bulk. Run:
+
+   ```bash
+   python tools/ogl_sources.py --full
+   ```
+
+   As measured on the current content: **11,863 entries across 682 distinct sources**, and
+   **141 entries record no source at all**. Those 141 cannot be attributed and must either
+   gain a source or be dropped before a build ships. The 682 also span more than one
+   publisher — Rappan Athuk, Sword of Air and The Lost City of Barakus are Frog God
+   Games, not Paizo — so this is not one boilerplate block.
+
+   Two honest ways forward, and it is the project owner's call which:
+
+   - **Narrow what ships.** Restrict the bundled content to a small set of books whose
+     Section 15 declarations can be reproduced exactly, and treat the rest as data the
+     user imports themselves. This is the cheap and safe option.
+   - **Collect the declarations.** Copy each book's own Section 15 verbatim. Correct, and
+     a large amount of careful transcription for 682 sources.
+
+   `tools/ogl_sources.py` exists so this stays a mechanical check rather than a memory
+   exercise: a source it lists that this file does not is an attribution the build owes
+   and does not have. Re-run it after any content import.
 3. **Add the required notices to the packaged app** — the licence must reach the user, not
-   just the repository.
+   just the repository. `OGL.txt` is served at `/licence` and must also be added to the
+   PyInstaller bundle's data files when the spec is written.
 
 ## Still to decide
 
 `docs/product-brief.md` names three candidate SRD sources for bulk content (monsters,
 spells, items, feats). Each carries its own Section 15 declarations and its own cleaning
 cost, and d20PFSRD alters some names for OGL compliance — which matters when matching
-against Paizo's own reference. **Evaluate and settle that before importing any bulk
-content**, because the attribution obligations arrive with the data and are painful to
-reconstruct afterwards.
+against Paizo's own reference.
+
+This was written as "settle it **before** importing any bulk content, because the
+attribution obligations arrive with the data and are painful to reconstruct afterwards".
+The content was imported first. The warning was right, and item 2 above is the cost.
 
 ## Trademarks
 

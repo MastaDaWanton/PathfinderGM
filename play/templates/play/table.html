@@ -183,6 +183,7 @@
   .verdict.no { color: #8a7a6a; }
   .verdict.maybe { color: #b08a4a; }
   .prereq { display: block; color: var(--dim); margin-left: 0; }
+  .why a { color: var(--gold); }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -1461,6 +1462,14 @@ function tabBackground(s) {
       <h3>Notes</h3>
       ${b.notes ? `<div style="white-space:pre-wrap">${esc(b.notes)}</div>`
                 : `<div class="empty">None.</div>`}
+      <h3 style="margin-top:16px">Rules content</h3>
+      <div class="why">
+        The Pathfinder rules this app runs on — spells, creatures, feats, weapons and the
+        tables behind them — are Open Game Content under the
+        <a href="/licence" target="_blank" rel="noopener">Open Game Licence v1.0a</a>,
+        which section 10 requires travel with it. This project is not published by,
+        endorsed by, or affiliated with Paizo Inc.
+      </div>
     </div>
   </div>`;
 }
