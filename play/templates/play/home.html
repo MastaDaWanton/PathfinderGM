@@ -237,9 +237,72 @@
               border-radius: 2px; padding: 10px 14px; margin: 12px 0; color: #d08a7c; }
   .problems div { padding: 2px 0; }
   .forge .traits { color: var(--dim); font-size: 12.5px; font-style: italic; }
+
+  /* --- Second pass: obsidian crystal, matching the table ------------------------ */
+  .card {
+    isolation: isolate; position: relative;
+    background: rgba(18, 15, 12, .55);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border-color: rgba(201, 162, 39, .25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
+                inset 0 1px 0 rgba(255, 230, 150, .08);
+    transition: transform .4s cubic-bezier(.25, .8, .25, 1),
+                border-color .3s ease, box-shadow .4s ease;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: -1px; z-index: -1;
+    border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg,
+      rgba(201, 162, 39, .5), transparent 30%,
+      transparent 70%, rgba(201, 162, 39, .4));
+    opacity: .6;
+  }
+  .card.pick:hover, .card:hover {
+    border-color: rgba(232, 197, 71, .45);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .7),
+                0 0 20px rgba(201, 162, 39, .15),
+                inset 0 1px 0 rgba(255, 230, 150, .12);
+  }
+  .card.pick:hover {
+    transform: perspective(1000px) rotateX(1.6deg) rotateY(-2.2deg) translateY(-4px);
+  }
+  .card.pick.on, .card.on {
+    border-color: rgba(232, 197, 71, .55);
+    box-shadow: 0 0 22px rgba(201, 162, 39, .18),
+                inset 0 1px 0 rgba(255, 230, 150, .12);
+  }
+  header { background: rgba(20, 16, 12, .72);
+           -webkit-backdrop-filter: blur(14px) saturate(130%);
+           backdrop-filter: blur(14px) saturate(130%); }
+  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            overflow: hidden; }
+  #embers::before, #embers::after {
+    content: ""; position: absolute; inset: -220px 0 0 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(232,197,71,.4), transparent),
+      radial-gradient(1px 1px at 40% 70%, rgba(201,162,39,.3), transparent),
+      radial-gradient(1.5px 1.5px at 90% 40%, rgba(255,220,120,.25), transparent),
+      radial-gradient(1px 1px at 65% 15%, rgba(232,197,71,.3), transparent);
+    background-size: 220px 220px;
+    animation: emberdrift 46s linear infinite; opacity: .5;
+  }
+  #embers::after { background-size: 340px 340px; animation-duration: 90s; opacity: .28; }
+  @keyframes emberdrift { from { transform: translateY(0); }
+                          to { transform: translateY(-220px); } }
+  @keyframes candleGlow {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(201,162,39,.25)); }
+    50% { filter: brightness(1.08) drop-shadow(0 0 14px rgba(232,197,71,.4)); }
+  }
+  .abrow .val, .budget b { animation: candleGlow 4s ease-in-out infinite; }
+  header, main { position: relative; z-index: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
+<div id="embers" aria-hidden="true"></div>
 
 <header>
   <h1>Pathfinder GM<small>a world by World Bible, played here</small></h1>

@@ -644,6 +644,131 @@
   pre { font: 11px/1.4 ui-monospace, monospace; color: var(--dim); overflow-x: auto;
         background: #14120f; padding: 8px; border-radius: 3px; }
 
+  /* ==========================================================================
+     Second pass: obsidian crystal. Everything below deliberately *overrides*
+     rules above it — the panels stop being painted leather and become deep
+     translucent glass with a filigree ring, the key numbers breathe like
+     candleflame, embers drift up the room, and the cards tilt a degree or two
+     toward the cursor. Kept as a layer rather than woven in, so the base
+     design still stands on a machine whose GPU hates backdrop-filter.
+     ========================================================================== */
+
+  /* 1 + 2. Obsidian glass with a multi-layer gold rim. The old ::before inner
+     hairline is replaced by an inset shadow so the pseudo-element is free to
+     carry the filigree ring — a gradient that shows only at the edges, behind
+     the panel's own glass. `isolation` keeps its z-index:-1 inside the card. */
+  .framed, .card, .slot, .popup, .deathpanel {
+    isolation: isolate;
+    background: rgba(18, 15, 12, .55);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(201, 162, 39, .25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
+                inset 0 1px 0 rgba(255, 230, 150, .08);
+    transition: transform .4s cubic-bezier(.25, .8, .25, 1),
+                border-color .3s ease, box-shadow .4s ease;
+  }
+  .framed::before, .card::before, .slot::before {
+    inset: -1px; border: 0; border-radius: inherit; z-index: -1;
+    background: linear-gradient(135deg,
+      rgba(201, 162, 39, .5), transparent 30%,
+      transparent 70%, rgba(201, 162, 39, .4));
+    opacity: .6;
+  }
+  .card:hover, .slot:hover {
+    border-color: rgba(232, 197, 71, .45);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .7),
+                0 0 20px rgba(201, 162, 39, .15),
+                inset 0 1px 0 rgba(255, 230, 150, .12);
+  }
+  /* 5. The tilt. Two degrees, cursor side, only on the things dense enough to
+     read as objects — a whole popup lurching would be seasickness, not craft. */
+  .card:hover { transform: perspective(1000px) rotateX(1.6deg) rotateY(-2.2deg)
+                           translateY(-4px); }
+  .cell { transition: transform .4s cubic-bezier(.25, .8, .25, 1),
+                      border-color .25s ease, box-shadow .25s ease; }
+  .cell:hover { transform: perspective(700px) rotateX(2deg) rotateY(-3deg)
+                           translateY(-3px);
+                box-shadow: 0 6px 18px rgba(0,0,0,.55),
+                            0 0 14px rgba(201,162,39,.10); }
+  /* 6b. The ability cells take the gothic notch — an octagon cut, not a box. */
+  .cell { clip-path: polygon(0 7px, 7px 0, calc(100% - 7px) 0, 100% 7px,
+                             100% calc(100% - 7px), calc(100% - 7px) 100%,
+                             7px 100%, 0 calc(100% - 7px)); }
+
+  /* 3. Candleflame on the key numbers. Delays staggered so the six ability
+     scores never breathe in unison — synchronised flicker reads as a bug. */
+  @keyframes candleGlow {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(201,162,39,.25)); }
+    50% { filter: brightness(1.08) drop-shadow(0 0 14px rgba(232,197,71,.4)); }
+  }
+  .bignum, .dieface, .cell span { animation: candleGlow 4s ease-in-out infinite; }
+  .cell:nth-child(2) span { animation-delay: .7s; }
+  .cell:nth-child(3) span { animation-delay: 1.3s; }
+  .cell:nth-child(4) span { animation-delay: 2.1s; }
+  .cell:nth-child(5) span { animation-delay: 2.7s; }
+  .cell:nth-child(6) span { animation-delay: 3.4s; }
+  .sheethead h1 { animation: candleGlow 6s ease-in-out infinite; }
+
+  /* 4. Embers. Two drifting layers on one fixed element — different speeds,
+     different sizes, so the motes parallax instead of marching. transform-only
+     animation; the layer is behind everything and pointer-transparent. */
+  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            overflow: hidden; }
+  #embers::before, #embers::after {
+    content: ""; position: absolute; inset: -200px 0 0 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(232,197,71,.4), transparent),
+      radial-gradient(1px 1px at 40% 70%, rgba(201,162,39,.3), transparent),
+      radial-gradient(1.5px 1.5px at 90% 40%, rgba(255,220,120,.25), transparent),
+      radial-gradient(1px 1px at 65% 15%, rgba(232,197,71,.3), transparent);
+    background-size: 220px 220px;
+    animation: emberdrift 46s linear infinite;
+    opacity: .55;
+  }
+  #embers::after {
+    background-size: 340px 340px;
+    animation-duration: 90s; opacity: .3;
+  }
+  @keyframes emberdrift {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-220px); }
+  }
+
+  /* 6. Micro-interactions on the tables and tabs: a thin gold underline that
+     grows from the left on a hovered row, and a sliding underline under the
+     tab instead of a boxed button. */
+  table.sheet tr { position: relative; }
+  table.sheet tbody tr:hover td, table.sheet tr:hover td {
+    background: rgba(201, 162, 39, .045); color: var(--ink);
+  }
+  table.sheet td { background-image:
+      linear-gradient(90deg, rgba(232,197,71,.55), rgba(232,197,71,0));
+    background-repeat: no-repeat; background-size: 0% 1px;
+    background-position: 0 100%;
+    transition: background-size .35s cubic-bezier(.25,.8,.25,1); }
+  table.sheet tr:hover td { background-size: 100% 1px; }
+  .row { transition: color .2s ease; }
+  .row:hover span:last-child { text-shadow: 0 0 10px rgba(201,162,39,.35); }
+
+  .tabs button::after {
+    content: ""; position: absolute; left: 20%; right: 80%; bottom: 0;
+    height: 2px; background: linear-gradient(90deg, var(--accent), var(--candle));
+    opacity: 0; border-radius: 1px;
+    transition: left .3s cubic-bezier(.25,.8,.25,1),
+                right .3s cubic-bezier(.25,.8,.25,1), opacity .25s ease;
+  }
+  .tabs button:hover::after { left: 12%; right: 12%; opacity: .5; }
+  .tabs button[aria-selected="true"]::after { left: 8%; right: 8%; opacity: 1; }
+
+  /* The glass pane and the desk deepen to match the crystal. */
+  aside { background: rgba(16, 13, 10, .58);
+          -webkit-backdrop-filter: blur(16px) saturate(140%);
+          backdrop-filter: blur(16px) saturate(140%); }
+  footer { background: rgba(14, 11, 9, .55);
+           -webkit-backdrop-filter: blur(16px) saturate(135%);
+           backdrop-filter: blur(16px) saturate(135%); }
+
   /* The whole enchantment stands down for anyone who asked motion to stop. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -653,6 +778,7 @@
 </style>
 </head>
 <body>
+<div id="embers" aria-hidden="true"></div>
 <main>
   <div id="story"></div>
   <div id="busy">the GM is thinking…</div>
