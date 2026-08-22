@@ -154,7 +154,10 @@ def test_the_complaint_says_what_to_do(echoes):
         "Two shapes detach from the dark at the mouth of the alley, unhurried. "
         "Kesst Vayr waits.", pc_name="Kesst Vayr", echo_index=echoes)
     complaint = r.complaint()
-    assert "own words" in complaint
+    # The borrowed phrase is named. A repair the model cannot locate is a blind retry,
+    # and a blind retry costs a whole regeneration.
+    assert "copied wording" in complaint
+    assert "mouth of the alley" in complaint
     assert "'you'" in complaint
 
 
@@ -202,3 +205,31 @@ def test_the_complaint_tells_the_model_what_to_write_not_that_it_was_bad():
     complaint = r.complaint().lower()
     assert "see and hear" in complaint
     assert "choice" in complaint
+
+
+# --- how badly, not just whether -----------------------------------------------------------
+
+def test_the_echo_finding_weighs_what_it_costs(echoes):
+    """A rewrite that removed twenty of twenty-one borrowed phrases used to be thrown
+    away, because one echo finding before and one after is not "fewer findings". Measured
+    against a model that reproduces whole example paragraphs: every repair was discarded
+    and the plagiarism kept, on three turns out of three."""
+    whole = prompts.EXAMPLES[0]["reply"]["narration"]
+    heavy = narration.review(whole, echo_index=echoes)
+    light = narration.review(
+        "The lamp is at the far end of its arc now, and the yard is quiet.",
+        echo_index=echoes)
+
+    assert heavy.score > light.score
+    assert heavy.findings[0].weight > 1
+
+
+def test_an_ordinary_finding_weighs_one():
+    r = narration.review("The door opens.", min_chars=narration.MIN_SCENE_CHARS)
+    assert all(f.weight == 1 for f in r.findings)
+    assert r.score == len(r.findings)
+
+
+def test_a_clean_passage_scores_nothing(echoes):
+    assert narration.review("The gate hangs open on one hinge.",
+                            echo_index=echoes).score == 0

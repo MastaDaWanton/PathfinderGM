@@ -158,7 +158,8 @@ class GMAgent:
             attempts.extend(repair_attempts)
             narration, prose_repairs, prose_attempts = self.polish(
                 narration, earlier=recent_narration or [],
-                min_chars=narration_mod.MIN_SCENE_CHARS)
+                min_chars=narration_mod.MIN_SCENE_CHARS,
+                player_input=player_input, scene_brief=brief)
             attempts.extend(prose_attempts)
 
             return TurnPlan(narration=narration, intents=intents,
@@ -247,7 +248,8 @@ class GMAgent:
         return {n for n in names if n}
 
     def polish(self, text: str, earlier: list[str] | None = None,
-               min_chars: int = 0) -> tuple[str, list[str], list[Attempt]]:
+               min_chars: int = 0, player_input: str = "",
+               scene_brief: str = "") -> tuple[str, list[str], list[Attempt]]:
         """One targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -263,7 +265,8 @@ class GMAgent:
 
         try:
             reply = client.chat(
-                prompts.narration_repair_messages(text, review.complaint()),
+                prompts.narration_repair_messages(
+                    text, review.complaint(), player_input, scene_brief),
                 self.model, self.host, as_json=True, temperature=0.6, num_predict=900,
             )
             attempt = Attempt("polish", reply.seconds, reply.model, reply.text,
@@ -277,7 +280,16 @@ class GMAgent:
             fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
             known_names=self._known_names(), earlier=earlier, min_chars=min_chars,
         )
-        if fixed and len(after.findings) < len(review.findings):
+        # Scored, not counted. "One echo finding before, one after" threw away a rewrite
+        # that had removed twenty of twenty-one borrowed phrases, and the plagiarised
+        # original was kept every single time.
+        #
+        # But a lower score is not enough on its own. Asked to rewrite without any of the
+        # phrases it had copied, the model returned "..." — three characters, which scores
+        # far better than the plagiarism and is very much worse. So a repair may not
+        # introduce a kind of problem the original did not have.
+        was, now = {f.kind for f in review.findings}, {f.kind for f in after.findings}
+        if fixed and after.score < review.score and not (now - was):
             return fixed, review.as_log(), [attempt]
         return text, [f"unrepaired: {', '.join(review.as_log())}"], [attempt]
 

@@ -525,8 +525,22 @@ out.
 Reply with a JSON object: {"narration": "..."}."""
 
 
-def narration_repair_messages(text: str, complaint: str) -> list[dict]:
+def narration_repair_messages(text: str, complaint: str, player_input: str = "",
+                              scene_brief: str = "") -> list[dict]:
+    """The rewrite call, given something to write *about*.
+
+    It used to be handed the passage and the complaint and nothing else. Asked to rewrite
+    a paragraph using none of the phrases it had copied, with no scene in front of it, the
+    model had nothing to replace them with — and returned "..." and ". ..", three
+    characters long, which then scored better than the plagiarism it replaced. Measured on
+    all three turns of a live run.
+    """
+    body = complaint + "\n\nThe passage:\n" + text
+    if player_input:
+        body += f"\n\nThe player said: {player_input}"
+    if scene_brief:
+        body += f"\n\nWrite about this scene, and nothing else:\n{scene_brief}"
     return [
         {"role": "system", "content": NARRATION_REPAIR_BRIEFING},
-        {"role": "user", "content": complaint + "\n\nThe passage:\n" + text},
+        {"role": "user", "content": body},
     ]

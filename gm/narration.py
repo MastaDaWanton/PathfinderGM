@@ -52,6 +52,11 @@ class Finding:
     kind: str
     detail: str
     fix_hint: str = ""
+    # How bad it is, not just that it is. A repair that removed twenty of twenty-one
+    # borrowed phrases used to be thrown away, because one echo finding before and one
+    # echo finding after is not "fewer findings" — measured on a model that reproduces
+    # whole example paragraphs, where every repair was discarded and the plagiarism kept.
+    weight: int = 1
 
 
 @dataclass
@@ -62,6 +67,11 @@ class Review:
     @property
     def ok(self) -> bool:
         return not self.findings
+
+    @property
+    def score(self) -> int:
+        """Total badness. What a repair has to reduce to be worth keeping."""
+        return sum(f.weight for f in self.findings)
 
     def complaint(self) -> str:
         return " ".join(f.fix_hint or f.detail for f in self.findings)
@@ -141,12 +151,27 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     if echo_index:
         shared = _ngrams(text) & echo_index
         if shared:
-            phrase = " ".join(sorted(shared, key=len, reverse=True)[0])
+            # Every distinct run, not just one. Measured against a model that copies:
+            # naming a single phrase let it rewrite that clause and leave the rest of the
+            # borrowed paragraph standing, so the repair "failed" and the plagiarised
+            # text was kept.
+            phrases = [" ".join(p) for p in sorted(shared, key=len, reverse=True)[:4]]
+            quoted = "; ".join(repr(p) for p in phrases)
             out.findings.append(Finding(
-                "echoes-the-examples", f"reuses {phrase!r} from the examples",
-                "You have repeated a phrase from the examples word for word. The "
-                "examples show the shape of a reply, not its words. Write this scene "
-                "in your own words.",
+                "echoes-the-examples",
+                f"reuses {len(shared)} phrases from the examples, "
+                f"including {phrases[0]!r}",
+                # The phrase is named. A repair the model cannot locate is a blind retry,
+                # and a blind retry costs a whole regeneration — the same reason the ref
+                # rejection lists the refs that do exist. The first version of this hint
+                # said only "write this scene in your own words", and against a model
+                # that had reproduced an entire example paragraph it simply did not work.
+                f"You have copied wording from the examples: {quoted}. The examples show "
+                f"the shape and the length of a reply, never its words — this scene is "
+                f"not that scene. Rewrite it completely, about the same length, using "
+                f"none of those phrases and describing what is actually in front of the "
+                f"player now.",
+                weight=len(shared),
             ))
 
     # 2. The player's character described in the third person.
