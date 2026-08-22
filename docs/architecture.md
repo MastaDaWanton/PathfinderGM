@@ -34,11 +34,22 @@ Not a storyteller with dice bolted on. **A rules engine with two agents attached
 
 ## The decisions
 
-**Combat: initiative and positions, no grid.** Turn order, ranges as zones
-(engaged / near / far), full attack maths, conditions and buffs tracked with durations —
-but no squares to count. Keeps nearly all of 1e's mechanical depth and all of the
-bookkeeping worth offloading, and avoids needing maps, which the world export deliberately
-does not provide (no coordinates, no distances).
+**Combat: initiative, zones, and an optional five-foot grid.** Turn order, full attack
+maths, conditions and buffs tracked with durations. Ranges are zones — engaged / near /
+far — and a scene may additionally carry a map, in which case those same three words are
+*measured* from real distance rather than asserted by the GM.
+
+> **Reversed.** This decision originally read "no grid", on the grounds that the world
+> export provides no coordinates and no distances — which is still true, and is why maps
+> are generated for an encounter rather than imported. But zones cannot express the things
+> that turned out to matter: an attack of opportunity is defined by which squares a
+> creature threatens, a fireball by which squares it covers, a charge by whether there is a
+> straight lane to run down. Each of those had to be refused or hand-waved by the GM, and
+> hand-waving is how a rules engine turns back into a chat log.
+>
+> Zones were not replaced. `Scene.grid` and `Scene.positions` are both optional; a scene
+> without them behaves exactly as it did before, which is what let the grid arrive without
+> changing a line of the intent protocol. See `rules/grid.py` and `Scene.resync_zones`.
 
 **The GM proposes; the engine disposes.** The GM agent never states a mechanical outcome.
 It declares intent — *this calls for a Reflex save*, *the orc attacks* — the engine

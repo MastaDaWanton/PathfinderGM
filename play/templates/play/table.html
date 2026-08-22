@@ -134,6 +134,21 @@
   /* "not yet" and "not any more" are different refusals and lead to different next
      moves, so a pool waiting on a cooldown says how long rather than reading as empty. */
   .row small.cd { color: var(--dim); }
+  /* The map. Terrain is painted, the rules are hairlines, tokens sit on top. */
+  #map { width: 100%; height: auto; display: block; background: #14120f;
+         border: 1px solid #241d15; border-radius: 3px; }
+  #map .rule { stroke: #241d15; stroke-width: .5; }
+  #map .blocked { fill: #3a3128; }
+  #map .difficult { fill: #2a2416; }
+  #map .obscuring { fill: #23262b; }
+  /* Where the character can actually reach this turn — the engine's answer, painted. */
+  #map .reach { fill: var(--gold); opacity: .12; }
+  #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1; }
+  #map .token.pc { fill: var(--gold); }
+  #map .token.down { opacity: .35; }
+  #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
+                  pointer-events: none; }
+  .maplegend { margin-top: 4px; }
   .who { display: flex; justify-content: space-between; padding: 6px 0;
          border-bottom: 1px solid #241d15; }
   .who small { color: var(--dim); }
@@ -460,6 +475,7 @@
 <aside>
   <div id="sheet"></div>
   <div id="order"></div>
+  <div id="mapwrap"></div>
   <h2>In the scene</h2>
   <div id="board"></div>
   <h2>Rolls</h2>
@@ -703,6 +719,8 @@ function render(s) {
         <small>${i.out ? "down" : i.score}</small>
       </div>`).join("")}` : "";
 
+  renderMap(s);
+
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${a.ref}</small></span>
      <small>${a.hp}/${a.hp_max}${a.conditions.length ? " · " + a.conditions.join(", ") : ""}</small></div>`
@@ -711,6 +729,63 @@ function render(s) {
   renderRolls(s.log);
 
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
+}
+
+// --- the map -------------------------------------------------------------------------
+//
+// Drawn as an SVG rather than a grid of divs: a 20x20 map is 400 elements either way, and
+// the SVG version scales to the panel without every square needing its own size in pixels.
+//
+// The reachable squares are computed by the engine and sent down, never worked out here.
+// Two implementations of the alternating diagonal rule would eventually disagree, and the
+// one on screen is the one the player would believe.
+function renderMap(s) {
+  const g = s.scene.grid;
+  if (!g) { $("#mapwrap").innerHTML = ""; return; }
+
+  const CELL = 18;
+  const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
+  const parts = [];
+
+  for (const [c, r] of g.difficult) parts.push(cell(c, r, "difficult"));
+  for (const [c, r] of g.obscuring) parts.push(cell(c, r, "obscuring"));
+  for (const [c, r] of g.blocked) parts.push(cell(c, r, "blocked"));
+  for (const [key, cost] of reach) {
+    const [c, r] = key.split(",").map(Number);
+    parts.push(cell(c, r, "reach", `<title>${cost} ft</title>`));
+  }
+
+  // Grid lines last of the terrain, so they sit over the fills and under the tokens.
+  for (let c = 0; c <= g.width; c++)
+    parts.push(`<line class="rule" x1="${c * CELL}" y1="0" x2="${
+      c * CELL}" y2="${g.height * CELL}"/>`);
+  for (let r = 0; r <= g.height; r++)
+    parts.push(`<line class="rule" x1="0" y1="${r * CELL}" x2="${
+      g.width * CELL}" y2="${r * CELL}"/>`);
+
+  for (const a of s.scene.actors) {
+    if (!a.at) continue;
+    const [c, r] = a.at;
+    const n = a.squares || 1;
+    const down = a.hp <= 0;
+    parts.push(`<rect class="token${a.is_pc ? " pc" : ""}${down ? " down" : ""}"
+      x="${c * CELL + 2}" y="${r * CELL + 2}"
+      width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
+      <title>${esc(a.name)} — ${a.hp}/${a.hp_max}</title></rect>`);
+    parts.push(`<text class="tok" x="${(c + n / 2) * CELL}" y="${
+      (r + n / 2) * CELL + 4}">${esc(a.name.slice(0, 1).toUpperCase())}</text>`);
+  }
+
+  $("#mapwrap").innerHTML = `<h2>The ground</h2>
+    <svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
+         preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>
+    ${g.speed ? `<div class="sub maplegend">${
+      reach.size} squares within ${g.speed} ft</div>` : ""}`;
+
+  function cell(c, r, cls, inner = "") {
+    return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${
+      CELL}" height="${CELL}">${inner}</rect>`;
+  }
 }
 
 function renderRolls(log) {

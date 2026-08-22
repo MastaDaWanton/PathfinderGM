@@ -19,7 +19,8 @@ import re
 
 from .dice import Modifier
 from .tables import (
-    ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
+    ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
+    CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
@@ -201,6 +202,10 @@ class Actor:
     # abilities in self-inflicted non-lethal damage, and without a separate pool that
     # payment was indistinguishable from being stabbed.
     nonlethal: int = 0
+    # Base land speed in feet, before armour. 30 is a human's; Small races and dwarves
+    # have 20. Nothing needed this until the grid arrived — zones have no distance — so a
+    # sheet written before this defaults rather than failing to load.
+    speed: int = 30
     reductions: list[Reduction] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
@@ -429,6 +434,27 @@ class Actor:
         if not self.class_data:
             return self.flat_attack or 0
         return bab_for(self.class_data["bab"], self.level)
+
+    @property
+    def speed_feet(self) -> int:
+        """Land speed after armour and conditions, in feet — what a move is measured against.
+
+        Armour is a lookup rather than a fraction because the table is not one: 30 becomes
+        20 and 20 becomes 15, and neither is two thirds of the other. Entangled and
+        exhausted both halve what is left, and halving after the armour step rather than
+        before is the order the book uses.
+        """
+        base = max(0, int(self.speed))
+        if ARMOUR.get(self.armour, {}).get("weight") in ("medium", "heavy"):
+            base = ARMOUR_SPEED.get(base, base)
+        for slowed in ("entangled", "exhausted"):
+            if self.has_condition(slowed):
+                base //= 2
+                break
+        # Rounded down to a whole square. A speed of 22 feet lets you cross four squares,
+        # not four and a bit, and carrying the remainder makes the fifth square arrive one
+        # move sooner than it should.
+        return (base // 5) * 5
 
     @property
     def armour_check_penalty(self) -> int:
@@ -1360,6 +1386,7 @@ class Actor:
                        "ready": p.ready, "cooldown_left": p.cooldown_left}
                       for p in self.pools.values()],
             "ac": self.ac(),
+            "speed": self.speed_feet,
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
         }
@@ -1536,6 +1563,7 @@ def full_sheet(actor: Actor) -> dict:
                    # at 11, and a Blood Bender's line moves as their wards go up and down.
                    "nonlethal": actor.nonlethal,
                    "nonlethal_threshold": actor.nonlethal_threshold},
+            "speed": {"base": actor.speed, "current": actor.speed_feet},
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
                     "source": r.source} for r in actor.reductions],
             "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -1619,7 +1647,7 @@ def to_dict(actor: Actor) -> dict:
         "shield": actor.shield, "natural_armour": actor.natural_armour,
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
-        "nonlethal": actor.nonlethal,
+        "nonlethal": actor.nonlethal, "speed": actor.speed,
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -1772,6 +1800,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         hp_max=data.get("hp_max", data.get("hp", 1)),
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),
+        speed=int(data.get("speed", 30) or 30),
         temp_pools=_temp_pools(data),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},

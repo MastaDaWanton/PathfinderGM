@@ -108,6 +108,34 @@ def normalise_dc(spec, op: str, index: int) -> dict:
     )
 
 
+def _square(raw, op: str, index: int) -> tuple[int, int]:
+    """A grid square, however the GM wrote it.
+
+    A model asked for coordinates returns `[4, 7]` or `{"col": 4, "row": 7}` or `"4,7"`
+    depending on the phase of the moon, and all three mean the same square. Normalising
+    here rather than in the engine keeps every op that grows a position later reading one
+    shape — and gives one error message instead of three.
+    """
+    if isinstance(raw, dict):
+        try:
+            return (int(raw["col"]), int(raw["row"]))
+        except (KeyError, TypeError, ValueError):
+            raise IntentError(
+                f"{op}: square must have integer col and row, got {raw!r}",
+                "schema", index
+            ) from None
+    if isinstance(raw, str):
+        raw = [bit for bit in raw.replace("(", "").replace(")", "").split(",") if bit.strip()]
+    try:
+        col, row = raw
+        return (int(col), int(row))
+    except (TypeError, ValueError):
+        raise IntentError(
+            f"{op}: square must be a square like [col, row], got {raw!r}",
+            "schema", index
+        ) from None
+
+
 def _suggest(name: str, candidates) -> str:
     """A rejection the model cannot act on costs a whole regeneration.
 
@@ -162,7 +190,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # encounter was for one side to be wiped out, so a character could never
     # disengage — or rest afterwards, since resting is refused mid-fight.
     "end_encounter": ((), (), "hidden"),
-    "move": (("zone",), ("who",), "hidden"),
+    # `zone` stays required so every existing GM prompt and every saved intent still
+    # parses. `to` is the square, and on a scene with a map it is the one that decides
+    # where somebody ends up — the zone is then re-derived from the real distance rather
+    # than believed.
+    "move": (("zone",), ("who", "square"), "hidden"),
     "spawn": (("template",), ("from_entity_id", "count", "name"), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     "rest": ((), ("kind",), "hidden"),
@@ -435,6 +467,8 @@ def _check_params(intent: Intent, index: int) -> None:
                 f"move: zone must be one of {ZONES}, got {zone!r}", "schema", index
             )
         p["zone"] = zone
+        if p.get("square") not in (None, ""):
+            p["square"] = _square(p["square"], "move", index)
 
     elif op == "advance_time":
         unit = str(p["unit"]).strip().lower().rstrip("s")

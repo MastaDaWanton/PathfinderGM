@@ -25,6 +25,27 @@ from world.loader import load_cached
 
 SAVE_VERSION = 1
 
+
+def _grid(raw: dict | None):
+    """Rebuild a map from a save, or None for the scenes that never had one.
+
+    Squares arrive from JSON as lists and have to go back to tuples: a list is unhashable
+    and every set operation in `rules.grid` would raise, which is a crash at load rather
+    than a wrong answer — but only for saves that actually carry terrain, so it would ship
+    perfectly happily until the first map with a wall in it.
+    """
+    if not raw:
+        return None
+    from rules.grid import Grid
+
+    return Grid(
+        width=int(raw.get("width", 20)),
+        height=int(raw.get("height", 20)),
+        difficult={tuple(p) for p in raw.get("difficult", [])},
+        blocked={tuple(p) for p in raw.get("blocked", [])},
+        obscuring={tuple(p) for p in raw.get("obscuring", [])},
+    )
+
 # The campaign a fresh install starts in, before anyone has been enrolled.
 DEFAULT_CAMPAIGN = "slice"
 
@@ -99,6 +120,17 @@ class Campaign:
                 "location_id": self.scene.location_id,
                 "actors": {r: to_dict(a) for r, a in self.scene.actors.items()},
                 "zones": self.scene.zones,
+                # Terrain is stored as lists of squares rather than a dense array: a
+                # battlefield is mostly ordinary floor, and a 40x40 map of the word
+                # "normal" is 1,600 entries in every save file for no information.
+                "grid": None if self.scene.grid is None else {
+                    "width": self.scene.grid.width,
+                    "height": self.scene.grid.height,
+                    "difficult": sorted(self.scene.grid.difficult),
+                    "blocked": sorted(self.scene.grid.blocked),
+                    "obscuring": sorted(self.scene.grid.obscuring),
+                },
+                "positions": {r: list(p) for r, p in self.scene.positions.items()},
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
                 "turn": self.scene.turn,
@@ -146,6 +178,8 @@ class Campaign:
         scene = Scene(
             location_id=s.get("location_id"),
             zones=s.get("zones", {}),
+            grid=_grid(s.get("grid")),
+            positions={r: tuple(p) for r, p in (s.get("positions") or {}).items()},
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             turn=s.get("turn", -1),

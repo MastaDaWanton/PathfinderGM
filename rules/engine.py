@@ -19,7 +19,9 @@ from . import foraging
 from . import ingredients as ing_mod
 from . import resources
 from . import worldclass
+from . import grid as gridmod
 from .dice import Dice, Modifier, Roll
+from .grid import Grid
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS
@@ -34,6 +36,11 @@ class Scene:
     location_id: str | None = None
     actors: dict[str, Actor] = field(default_factory=dict)
     zones: dict[str, str] = field(default_factory=dict)
+    # The map, and where everybody is standing on it. Both optional: a scene with no grid
+    # behaves exactly as it did before there was one, which is what let the grid arrive
+    # without changing a line of the intent protocol.
+    grid: Grid | None = None
+    positions: dict[str, tuple[int, int]] = field(default_factory=dict)
     initiative: list[tuple[str, int]] = field(default_factory=list)
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
@@ -66,10 +73,70 @@ class Scene:
     # everything else and a scene stays reproducible.
     _dice: Any = None
 
-    def add(self, actor: Actor, zone: str = "near") -> Actor:
+    def add(self, actor: Actor, zone: str = "near", at: tuple[int, int] | None = None) -> Actor:
         self.actors[actor.ref] = actor
         self.zones[actor.ref] = zone
+        if at is not None:
+            self.positions[actor.ref] = (int(at[0]), int(at[1]))
         return actor
+
+    # --- the map, when there is one ------------------------------------------------------
+
+    @property
+    def has_grid(self) -> bool:
+        """A scene without a map is not a broken scene. Most of them do not need one — a
+        conversation in a tavern has no squares — and combat still resolves off zones."""
+        return self.grid is not None
+
+    def position(self, ref: str) -> tuple[int, int] | None:
+        return self.positions.get(ref)
+
+    def occupied(self, ignore: str = "") -> set[tuple[int, int]]:
+        """Every square something is standing on, for movement to route around."""
+        from .grid import footprint
+
+        out: set[tuple[int, int]] = set()
+        for ref, anchor in self.positions.items():
+            if ref == ignore or ref not in self.actors:
+                continue
+            if self.actors[ref].has_condition("dead"):
+                continue
+            out.update(footprint(anchor, self.actors[ref].size))
+        return out
+
+    def distance_between(self, a: str, b: str) -> int | None:
+        """Feet between two creatures, or None when the scene has no map to measure on.
+
+        None rather than 0 or a guess: "we are not tracking that" and "they are touching"
+        are answers a caller has to tell apart, and a silent 0 makes every reach check
+        succeed on a mapless scene.
+        """
+        from .grid import distance_between as gap
+
+        pa, pb = self.positions.get(a), self.positions.get(b)
+        if not self.has_grid or pa is None or pb is None:
+            return None
+        return gap(pa, self.actors[a].size, pb, self.actors[b].size)
+
+    def resync_zones(self) -> dict[str, str]:
+        """Re-derive every zone from the map.
+
+        The GM keeps speaking in engaged / near / far and now those words are measured
+        rather than asserted. Zones are kept rather than dropped so a scene can lose its
+        map — or never have had one — without any of the rest of the engine noticing.
+        """
+        from .grid import zone_between
+
+        pc = self.pc()
+        if not self.has_grid or pc is None or pc.ref not in self.positions:
+            return dict(self.zones)
+        anchor = self.positions[pc.ref]
+        for ref, actor in self.actors.items():
+            if ref == pc.ref or ref not in self.positions:
+                continue
+            self.zones[ref] = zone_between(self.positions[ref], actor.size,
+                                           anchor, pc.size)
+        return dict(self.zones)
 
     def refs(self) -> list[str]:
         return list(self.actors)
@@ -347,6 +414,9 @@ class Engine:
 
         if intent.op == "craft":
             self._check_craft(intent, index)
+
+        if intent.op == "move" and intent.params.get("square") is not None:
+            self._check_move(intent, index)
 
         actor = self.scene.get(intent.actor) if intent.actor else None
         if actor and intent.op in ("attack", "move", "check") and not actor.can_act():
@@ -1015,6 +1085,66 @@ class Engine:
             tell=" ".join(bits), because=intent.because,
         )
 
+    def _check_move(self, intent: Intent, index: int) -> None:
+        """A square is a claim about geometry, and geometry is checkable.
+
+        Every refusal here names the square and the number, because "you can't move there"
+        with no distance in it is the kind of GM ruling this whole engine exists to
+        replace. Outside an encounter nobody counts squares — walking across a village is
+        not a tactical decision — so the speed limit applies only in a fight.
+        """
+        ref = intent.params.get("who") or intent.actor
+        actor = self.scene.get(ref)
+        target = tuple(intent.params["square"])
+
+        if not self.scene.has_grid:
+            raise IntentError(
+                f"move: this scene has no map, so {target} means nothing. Move by zone "
+                f"instead.", "legality", index,
+            )
+        if actor is None:
+            raise IntentError(f"move: no such actor {ref!r}", "reference", index)
+
+        grid = self.scene.grid
+        occupied = self.scene.occupied(ignore=ref)
+        if not grid.inside(target):
+            raise IntentError(
+                f"move: {target} is off the map, which is {grid.width} by {grid.height} "
+                f"squares.", "legality", index,
+            )
+        for square in gridmod.footprint(target, actor.size):
+            if not grid.passable(square):
+                raise IntentError(
+                    f"move: {actor.name} cannot stand at {target} — {square} is solid.",
+                    "legality", index,
+                )
+            if square in occupied:
+                raise IntentError(
+                    f"move: {actor.name} cannot stand at {target} — {square} is taken.",
+                    "legality", index,
+                )
+
+        start = self.scene.positions.get(ref)
+        if start is None or not self.scene.in_encounter:
+            return
+
+        budget = actor.speed_feet
+        routes = grid.reachable(start, budget, size=actor.size, occupied=occupied)
+        if target in routes:
+            return
+        # Distinguish "too far" from "no way through". They lead to different next moves:
+        # one wants a double move, the other wants a different route.
+        anywhere = grid.reachable(start, 10_000, size=actor.size, occupied=occupied)
+        if target in anywhere:
+            raise IntentError(
+                f"move: {target} is {anywhere[target]} ft away by the shortest open route "
+                f"and {actor.name} has {budget} ft of movement.", "legality", index,
+            )
+        raise IntentError(
+            f"move: there is no route from {start} to {target} that {actor.name} fits "
+            f"through.", "legality", index,
+        )
+
     def _check_craft(self, intent: Intent, index: int) -> None:
         """Refuse work the character cannot do, before any of it is scored.
 
@@ -1240,6 +1370,25 @@ class Engine:
         actor = self.scene.actors[ref]
         zone = intent.params["zone"]
         was = self.scene.zones.get(ref, "near")
+        square = intent.params.get("square")
+
+        if square is not None and self.scene.has_grid:
+            from_square = self.scene.positions.get(ref)
+            self.scene.positions[ref] = tuple(square)
+            # The zone is now measured rather than taken on trust. The GM may still have
+            # said "near"; if the square it also gave is forty feet away, the square wins.
+            self.scene.resync_zones()
+            zone = self.scene.zones.get(ref, zone)
+            cost = self._move_cost(ref, from_square, tuple(square))
+            crossed = f" ({cost} ft)" if cost is not None else ""
+            return Outcome(
+                intent_id=intent.id, op="move",
+                effects=[{"ref": ref, "kind": "position", "from": from_square,
+                          "to": tuple(square), "feet": cost, "zone": zone}],
+                tell=f"{actor.name} moves to {zone}{crossed}.",
+                because=intent.because,
+            )
+
         self.scene.zones[ref] = zone
         return Outcome(
             intent_id=intent.id, op="move",
@@ -1247,6 +1396,21 @@ class Engine:
             tell=f"{actor.name} moves from {was} to {zone}.",
             because=intent.because,
         )
+
+    def _move_cost(self, ref: str, start: tuple[int, int] | None,
+                   end: tuple[int, int]) -> int | None:
+        """What the move actually cost, routed around terrain and other creatures.
+
+        `None` when there is no route — which is not the same as free, and is why this
+        returns an optional rather than falling back to straight-line distance. A creature
+        that has to go the long way round a wall pays for the long way.
+        """
+        if start is None or self.scene.grid is None:
+            return None
+        reach = self.scene.grid.reachable(
+            start, 10_000, size=self.scene.actors[ref].size,
+            occupied=self.scene.occupied(ignore=ref))
+        return reach.get(end)
 
     def _op_advance_time(self, intent: Intent, partial: dict) -> Outcome:
         amount, unit = intent.params["amount"], intent.params["unit"]

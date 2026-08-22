@@ -164,7 +164,7 @@ and gets a real id.
 | `damage` | `amount`, `type`, `to` | Environmental and untyped sources only; weapon damage rides on `attack`. |
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
 | `begin_encounter` | `sides`, `surprise?` | Rolls initiative for everyone, establishes the turn order. |
-| `move` | `who`, `zone` | `engaged` / `near` / `far`. No grid, per the architecture decision. |
+| `move` | `who`, `zone`, `square?` | `engaged` / `near` / `far`, always. On a scene that has a map, `square` is `[col, row]` and it is what decides where somebody ends up — the zone is then re-derived from measured distance. Where the two disagree, the square wins: it is checkable and the word is not. The engine refuses a square that is off the map, solid, occupied, unreachable, or further than the mover's speed *inside an encounter* — and every refusal carries the number. |
 | `spawn` | `from_entity_id?`, `template`, `count` | Puts a creature on the board and returns its ref. |
 | `advance_time` | `amount`, `unit` | Ticks durations, rest, and the world clock. |
 | `narrate_only` | — | **Explicit.** Says "this turn had no mechanics." |
@@ -365,8 +365,10 @@ for the favourable circumstance.) Player rolls 13 → 22. Verdict `success`, mar
 
 - **No readied actions or held actions.** They need an interrupt model in the state machine
   and there is no cheap version.
-- **No attacks of opportunity.** They follow from movement, and movement is zones for now;
-  getting AoOs right without a grid is its own design.
+- **No attacks of opportunity.** The geometry they need now exists —
+  `grid.threatened_squares` is the definition an AoO is built on — but the *interrupt* does
+  not: a reaction fires in the middle of somebody else's action, and `run()` has no way to
+  suspend one intent to resolve another. That is the reactions work, not the grid work.
 - **No multi-intent atomicity.** If intent 3 of 5 fails validation, intents 1–2 have already
   applied. Acceptable now; will need a transaction when combat gets long.
 - **No GM-authored damage on `attack`.** Weapon damage comes from the sheet, always.

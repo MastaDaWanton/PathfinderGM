@@ -18,7 +18,7 @@ from django.views.decorators.http import require_GET, require_POST
 from gm import judgement
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
-from rules import biomes, ingredients as ing_mod
+from rules import biomes, grid, ingredients as ing_mod
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -31,6 +31,33 @@ def _recent_events(world, location, limit=4):
     touching = [e for e in world.chronology if location and location.id in e.entity_ids]
     touching.sort(key=lambda e: (e.year is None, -(e.year or 0)))
     return touching[:limit]
+
+
+def _grid_state(scene) -> dict | None:
+    """The map, plus where the PC could actually go — or None when there is no map.
+
+    `reachable` is computed here rather than in the browser because it is the rules'
+    answer, not a drawing hint: it already knows about difficult terrain, corners, the
+    mover's size and everybody standing in the way. Recomputing it in JavaScript would
+    mean two implementations of the diagonal rule, and the one on screen would be the one
+    the player believes.
+    """
+    if scene.grid is None:
+        return None
+    g = scene.grid
+    out = {
+        "width": g.width, "height": g.height,
+        "difficult": sorted(g.difficult), "blocked": sorted(g.blocked),
+        "obscuring": sorted(g.obscuring),
+        "reachable": [],
+    }
+    pc = scene.pc()
+    if pc is not None and pc.ref in scene.positions and pc.can_act():
+        routes = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,
+                             occupied=scene.occupied(ignore=pc.ref))
+        out["reachable"] = [[c, r, cost] for (c, r), cost in sorted(routes.items())]
+        out["speed"] = pc.speed_feet
+    return out
 
 
 def _state(c) -> dict:
@@ -57,9 +84,12 @@ def _state(c) -> dict:
             "actors": [
                 {"ref": r, "name": a.name, "hp": a.hp, "hp_max": a.hp_max,
                  "zone": c.scene.zones.get(r, "near"), "is_pc": a.is_pc,
+                 "size": a.size, "squares": grid.size_squares(a.size),
+                 "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
                  "conditions": [x.name for x in a.conditions]}
                 for r, a in c.scene.actors.items()
             ],
+            "grid": _grid_state(c.scene),
         },
         # The player sees their own rolls and nobody else's. Hidden rolls are stripped
         # here, at the edge, rather than in the template — a number that never reaches

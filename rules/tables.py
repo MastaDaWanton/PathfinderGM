@@ -503,16 +503,27 @@ def is_physical(dtype: str | None) -> bool:
     d = normalise_damage_type(dtype)
     return d not in ENERGY_DAMAGE
 
+# `weight` is the armour category, which is what decides the speed penalty: medium and
+# heavy armour drop a 30-foot speed to 20 and a 20-foot speed to 15. Absent until the grid
+# arrived, because nothing measured movement in feet before there were squares to cross.
 ARMOUR: dict[str, dict] = {
-    "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0},
-    "padded": {"name": "padded armour", "ac": 1, "max_dex": 8, "acp": 0},
-    "leather": {"name": "leather armour", "ac": 2, "max_dex": 6, "acp": 0},
-    "studded leather": {"name": "studded leather", "ac": 3, "max_dex": 5, "acp": -1},
-    "chain shirt": {"name": "chain shirt", "ac": 4, "max_dex": 4, "acp": -2},
-    "breastplate": {"name": "breastplate", "ac": 6, "max_dex": 3, "acp": -4},
-    "chainmail": {"name": "chainmail", "ac": 6, "max_dex": 2, "acp": -5},
-    "full plate": {"name": "full plate", "ac": 9, "max_dex": 1, "acp": -6},
+    "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0, "weight": "light"},
+    "padded": {"name": "padded armour", "ac": 1, "max_dex": 8, "acp": 0, "weight": "light"},
+    "leather": {"name": "leather armour", "ac": 2, "max_dex": 6, "acp": 0, "weight": "light"},
+    "studded leather": {"name": "studded leather", "ac": 3, "max_dex": 5, "acp": -1,
+                        "weight": "light"},
+    "chain shirt": {"name": "chain shirt", "ac": 4, "max_dex": 4, "acp": -2,
+                    "weight": "light"},
+    "breastplate": {"name": "breastplate", "ac": 6, "max_dex": 3, "acp": -4,
+                    "weight": "medium"},
+    "chainmail": {"name": "chainmail", "ac": 6, "max_dex": 2, "acp": -5, "weight": "medium"},
+    "full plate": {"name": "full plate", "ac": 9, "max_dex": 1, "acp": -6, "weight": "heavy"},
 }
+
+# Core Rulebook table 7-6. A creature slowed by armour keeps the reduced speed until it
+# takes the armour off, which is why this is a lookup rather than a fraction: 30 goes to
+# 20 and 20 goes to 15, and neither is two thirds of the other.
+ARMOUR_SPEED = {30: 20, 20: 15}
 
 # --- Magic item body slots ---------------------------------------------------------
 
@@ -680,4 +691,28 @@ SIZES: dict[str, dict] = {
     "huge": {"attack_ac": -2, "cmb_cmd": 2, "stealth": -8},
     "gargantuan": {"attack_ac": -4, "cmb_cmd": 4, "stealth": -12},
     "colossal": {"attack_ac": -8, "cmb_cmd": 8, "stealth": -16},
+}
+
+# Space and natural reach, in feet. Core Rulebook table 8-4.
+#
+# `space` is how much of the map a creature stands on and `squares` is that in five-foot
+# squares, which is not always `space / 5`: everything Tiny and below occupies less than a
+# full square and shares one, and the app gives them a whole square rather than modelling
+# four kobold-sized creatures crowding a single one. Where that matters — a swarm, a
+# familiar in its owner's square — it is a rule the grid does not yet have rather than one
+# it gets wrong quietly.
+#
+# Reach comes in two shapes, and the distinction is real: a Large *tall* creature (an ogre)
+# threatens 10 feet, a Large *long* one (a horse) threatens 5. Getting this wrong changes
+# who can be attacked without moving, which is most of what a grid is for.
+SPACE_AND_REACH: dict[str, dict] = {
+    "fine":       {"space": 0.5, "squares": 1, "reach_tall": 0,  "reach_long": 0},
+    "diminutive": {"space": 1,   "squares": 1, "reach_tall": 0,  "reach_long": 0},
+    "tiny":       {"space": 2.5, "squares": 1, "reach_tall": 0,  "reach_long": 0},
+    "small":      {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5},
+    "medium":     {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5},
+    "large":      {"space": 10,  "squares": 2, "reach_tall": 10, "reach_long": 5},
+    "huge":       {"space": 15,  "squares": 3, "reach_tall": 15, "reach_long": 10},
+    "gargantuan": {"space": 20,  "squares": 4, "reach_tall": 20, "reach_long": 15},
+    "colossal":   {"space": 30,  "squares": 6, "reach_tall": 30, "reach_long": 20},
 }
