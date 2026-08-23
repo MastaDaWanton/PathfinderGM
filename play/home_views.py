@@ -18,6 +18,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from rules import biomes, effectspec, registry, spells
+from world.loader import UnsupportedSchema
 
 from . import campaign as campaign_mod
 from . import homebrew, library, roster
@@ -69,14 +70,47 @@ def world_detail(request, world_id: str):
     })
 
 
+@require_GET
+def worlds(request):
+    """The shelf, on its own. So the page can redraw after an import without a full
+    reload, which would throw away the message saying what just happened."""
+    return JsonResponse({"worlds": [w.as_dict() for w in library.worlds()]})
+
+
+@require_POST
+def import_world(request):
+    """Take a World Bible export onto the shelf.
+
+    Multipart rather than a path: the packaged app has no terminal, and a player who has
+    just exported a world from World Bible has a file in Downloads, not a path they want
+    to type. The file is refused with the loader's own reason if it is not a world this
+    build can read — schema and all — rather than landing and failing later at the point
+    somebody tries to play in it.
+    """
+    upload = request.FILES.get("world")
+    if upload is None:
+        return JsonResponse({"error": "No file was sent."}, status=400)
+    try:
+        card = library.import_upload(upload.name, upload.read())
+    except UnsupportedSchema as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse(
+            {"error": f"{upload.name} could not be read as a world: {exc}"}, status=400)
+    return JsonResponse({"ok": True, "world": card.as_dict()})
+
+
 @require_POST
 def start_in_world(request):
     """Begin a sandbox in a world, with a character.
 
-    Only the shipped world can be started in today, and the refusal says so rather than
-    quietly beginning somewhere else: `new_campaign` reads `settings.WORLD_EXPORT`, so
-    choosing another world here would produce a campaign in Pangrella wearing the wrong
-    name.
+    Any world on the shelf, imported or shipped. This used to refuse everything but the
+    shipped export, because `_begin` read `settings.WORLD_EXPORT` and a campaign started
+    in Kaelinora would have been a campaign in Pangrella wearing the wrong name. The
+    campaign already carried `world_source` and already loaded its world from it; the
+    setting was only ever the *default*, and it is passed explicitly now.
     """
     from django.conf import settings
     from pathlib import Path
@@ -89,14 +123,6 @@ def start_in_world(request):
         return JsonResponse({"error": str(exc)}, status=404)
     if not card.playable:
         return JsonResponse({"error": card.problem}, status=400)
-    if Path(card.source) != Path(settings.WORLD_EXPORT):
-        return JsonResponse(
-            {"error": f"{card.name} cannot be started in yet — this build plays in "
-                      f"{Path(settings.WORLD_EXPORT).stem} only. Importing a world puts "
-                      f"it on the shelf; playing in it needs the campaign to carry its "
-                      f"own world, which is the next piece."},
-            status=400)
-
     source = str(body.get("source", "")).strip()
     try:
         character = roster.from_pregen(source) if source else None
@@ -105,7 +131,7 @@ def start_in_world(request):
     if character is None:
         return JsonResponse({"error": "Pick who is playing."}, status=400)
 
-    campaign_mod.begin_with(character)
+    campaign_mod.begin_with(character, world_source=card.source)
     return JsonResponse({"ok": True})
 
 

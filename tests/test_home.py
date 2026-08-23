@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, override_settings
 
 from play import library
@@ -125,17 +126,42 @@ def test_starting_a_sandbox_enrols_and_switches(client):
     assert cm.current().scene.pc().name == "Borin Achereth"
 
 
-def test_a_world_this_build_cannot_play_in_says_so_rather_than_starting_elsewhere(client, tmp_path):
-    """`new_campaign` reads settings.WORLD_EXPORT, so choosing another world would have
-    produced a campaign in Pangrella wearing the wrong name."""
+def test_a_campaign_can_be_started_in_an_imported_world(client, tmp_path):
+    """This used to be refused with "cannot be started in yet".
+
+    `new_campaign` read `settings.WORLD_EXPORT` in the only two places that decided which
+    world a new game was in, so choosing another world would have produced a campaign in
+    Pangrella wearing the name Elsewhere. `Campaign` already carried `world_source` and
+    already loaded its world from it; the setting was only ever the default.
+    """
+    from play import campaign as cm
+
     (library.user_dir() / "elsewhere.json").write_text(
         json.dumps({"schema_version": "1.0", "world": {"name": "Elsewhere"},
                     "entities": [], "chronology": []}), encoding="utf-8")
     r = client.post("/api/start",
                     data=json.dumps({"world": "elsewhere", "source": "pc-borin"}),
                     content_type="application/json")
-    assert r.status_code == 400
-    assert "cannot be started in yet" in r.json()["error"]
+    assert r.status_code == 200, r.json()
+    active = cm.current()
+    assert active.world.name == "Elsewhere"
+    assert "elsewhere.json" in str(active.world_source)
+
+
+def test_the_world_a_campaign_is_in_survives_a_restart(client):
+    """The world has to come back off the save, not off the setting — otherwise a game in
+    an imported world silently moves to Pangrella the first time the app is reopened."""
+    from play import campaign as cm
+
+    (library.user_dir() / "elsewhere.json").write_text(
+        json.dumps({"schema_version": "1.0", "world": {"name": "Elsewhere"},
+                    "entities": [], "chronology": []}), encoding="utf-8")
+    client.post("/api/start",
+                data=json.dumps({"world": "elsewhere", "source": "pc-borin"}),
+                content_type="application/json")
+    campaign_id = cm.current().id
+    cm._LIVE.clear()                                   # as a restart would
+    assert cm.current(campaign_id).world.name == "Elsewhere"
 
 
 def test_resuming_puts_a_character_back_in_the_chair(client):
@@ -271,3 +297,89 @@ def test_the_page_carries_everything_it_draws(client):
     for key in ('"worlds"', '"recent"', '"benches"', '"continue"', '"pregens"',
                 '"authored"'):
         assert key in html
+
+
+# --- importing a world -----------------------------------------------------------------
+#
+# "need an import world button". `library.import_world` existed and took a filesystem
+# path, which is no use to a packaged app with no terminal: a player who has just exported
+# a world from World Bible has a file in Downloads, not a path they want to type.
+
+def _export(name="Elsewhere", schema="1.0"):
+    return json.dumps({"schema_version": schema, "world": {"name": name},
+                       "entities": [], "chronology": []}).encode("utf-8")
+
+
+def _upload(client, filename, data):
+    return client.post("/api/worlds/import",
+                       {"world": SimpleUploadedFile(filename, data,
+                                                    content_type="application/json")})
+
+
+def test_an_uploaded_world_lands_on_the_shelf(client):
+    r = _upload(client, "kaelinora.json", _export("Kaelinora"))
+    assert r.status_code == 200, r.json()
+    assert r.json()["world"]["name"] == "Kaelinora"
+    assert "kaelinora" in [w.id for w in library.worlds()]
+
+
+def test_a_file_that_is_not_a_world_is_refused_before_it_lands(client):
+    """Refused at the point the player can still do something about it, rather than
+    landing and failing later when somebody tries to play in it."""
+    r = _upload(client, "notes.json", b'{"hello": "world"}')
+    assert r.status_code == 400
+    assert "notes.json" not in [p.name for p in library.user_dir().glob("*.json")]
+
+
+def test_an_empty_file_is_refused(client):
+    assert _upload(client, "empty.json", b"").status_code == 400
+
+
+def test_a_broken_upload_does_not_destroy_the_world_it_overwrites(client):
+    """The import writes to its final path to validate there, because `load_cached` keys
+    its cache on the path. Without a rollback that made a bad file cost the player the
+    good world of the same name as well as the bad one."""
+    assert _upload(client, "shared.json", _export("The Good One")).status_code == 200
+    assert _upload(client, "shared.json", b"{ not json").status_code == 400
+    assert library.get("shared").name == "The Good One"
+
+
+@pytest.mark.parametrize("sent,expect", [
+    ("../../settings.json", "settings.json"),
+    (r"..\..\evil.json", "evil.json"),
+    ("/etc/passwd", "passwd.json"),
+    ("world.json", "world.json"),
+    ("no-extension", "no-extension.json"),
+])
+def test_an_uploaded_filename_cannot_escape_the_worlds_directory(sent, expect):
+    """An upload names its own file, and a browser will send `../../settings.json`
+    without complaint if something asks it to."""
+    assert library.safe_name(sent) == expect
+
+
+def test_a_file_larger_than_the_ceiling_is_refused(client, monkeypatch):
+    """Not a tight limit — a real export is over a megabyte — but without one the import
+    is a way to fill the disk."""
+    monkeypatch.setattr(library, "MAX_IMPORT_BYTES", 16)
+    r = _upload(client, "huge.json", _export("Too Big"))
+    assert r.status_code == 400
+    assert "MB" in r.json()["error"]
+
+
+def test_a_world_written_against_a_schema_this_build_cannot_read_says_so(client):
+    r = _upload(client, "future.json", _export("Tomorrow", schema="99.0"))
+    assert r.status_code == 400
+    assert "99" in r.json()["error"] or "schema" in r.json()["error"].lower()
+
+
+def test_no_file_at_all_is_a_sentence_rather_than_a_stack_trace(client):
+    r = client.post("/api/worlds/import", {})
+    assert r.status_code == 400 and "No file" in r.json()["error"]
+
+
+def test_the_shelf_can_be_reread_without_reloading_the_page(client):
+    """The page redraws from this after an import; a full reload would throw away the
+    message saying what just happened."""
+    before = len(client.get("/api/worlds").json()["worlds"])
+    _upload(client, "another.json", _export("Another"))
+    assert len(client.get("/api/worlds").json()["worlds"]) == before + 1

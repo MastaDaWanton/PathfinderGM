@@ -224,7 +224,7 @@ class Campaign:
 # --- The slice's starting situation -------------------------------------------------------
 
 def new_campaign(campaign_id: str = "slice", seed: int | None = None,
-                 character=None) -> Campaign:
+                 character=None, world_source=None) -> Campaign:
     """One scene in whatever world is loaded, built from that world's own material.
 
     Nothing here is invented and nothing here is named. The starting settlement is
@@ -238,7 +238,12 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     """
     from . import opening
 
-    world = load_cached(settings.WORLD_EXPORT)
+    # The world this campaign is in, which is not necessarily the shipped one. The setting
+    # is the default, not the rule: `Campaign` has always carried `world_source` and always
+    # loaded from it, and the two lines below were the only thing tying a new game to the
+    # export that happens to ship in the box.
+    world_source = world_source or settings.WORLD_EXPORT
+    world = load_cached(world_source)
     town = opening.starting_place(world)
     scene = Scene(location_id=town.id if town else None)
     # The ground underfoot, read from the world's own facts rather than assumed. The
@@ -250,7 +255,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     here = opening.roll(campaign_id, seed)
     scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
     return Campaign(
-        id=campaign_id, world_source=str(settings.WORLD_EXPORT), scene=scene, seed=seed,
+        id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
 
 
@@ -432,7 +437,7 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     return c
 
 
-def begin_with(character) -> Campaign:
+def begin_with(character, world_source=None) -> Campaign:
     """Start a campaign for a new character.
 
     Named for them, so it sits alongside everyone else's rather than replacing whoever
@@ -458,7 +463,7 @@ def begin_with(character) -> Campaign:
             roster.save(stale)
 
     entry = roster.enrol(character)
-    c = new_campaign(entry.id, character=character)
+    c = new_campaign(entry.id, character=character, world_source=world_source)
     c.character_id = entry.id
     entry.campaign_id = entry.id
     roster.save(entry)

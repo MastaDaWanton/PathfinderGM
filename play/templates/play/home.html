@@ -758,8 +758,17 @@ function paneWorlds() {
         seven races — validated by the rules as you go.</span>
     </div>
     <h2 class="sect">Worlds on the shelf</h2>
-    <p class="note">World Bible writes these; this app plays in them. Drop an export into
-      your worlds folder and it appears here.</p>
+    <p class="note">World Bible writes these; this app plays in them.</p>
+    <div style="margin:-6px 0 20px">
+      <button class="go" data-import>Import a world</button>
+      <span class="note" style="margin-left:12px">A World Bible export (<code>.json</code>).
+        It is read and checked before it lands, so a file this build cannot play is
+        refused here rather than halfway through a session.</span>
+      <!-- Hidden and driven by the button. A bare file input cannot be styled to match
+           anything, and the packaged app has no terminal to drop a path into. -->
+      <input type="file" id="worldfile" accept=".json,application/json" hidden>
+      <div class="note" id="importsay" style="margin-top:10px"></div>
+    </div>
     <div class="cards">${STATE.worlds.map(w => `
       <button class="card pick ${w.playable ? "" : "bad"}" data-world="${esc(w.id)}">
         <h3>${esc(w.name)}</h3>
@@ -1646,6 +1655,15 @@ document.addEventListener("click", async e => {
     render(); return;
   }
 
+  if (e.target.closest("[data-import]")) {
+    // The button opens the hidden input; the input's own change event does the work.
+    // Reset first, or picking the same file twice in a row fires no change at all —
+    // which reads as the button having stopped working.
+    const input = document.getElementById("worldfile");
+    if (input) { input.value = ""; input.click(); }
+    return;
+  }
+
   if (e.target.closest("[data-forge]")) {
     const opts = await (await fetch("/api/create/options")).json();
     FORGE = { opts, form: forgeDefaults(opts) };
@@ -1890,6 +1908,44 @@ document.addEventListener("change", async e => {
       spec[t.dataset.field] = t.value;
     }
     await repreview();
+  }
+});
+
+// Delegated on the document, because the pane is re-rendered from scratch on every state
+// change and a listener bound to the input itself dies with the markup it was bound to.
+document.addEventListener("change", async e => {
+  const input = e.target.closest("#worldfile");
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  // Re-queried on every call, not captured once: `render()` replaces the pane wholesale,
+  // so the node this message goes in is a different node after the shelf refreshes.
+  const tell = (text, bad) => {
+    const say = document.getElementById("importsay");
+    if (say) { say.textContent = text; say.style.color = bad ? "var(--alarm)" : "var(--brew)"; }
+  };
+  tell(`Reading ${file.name}…`, false);
+
+  // FormData rather than JSON: a world export is megabytes, and base64 in a JSON body
+  // would inflate it by a third for no reason.
+  const form = new FormData();
+  form.append("world", file);
+  try {
+    const r = await fetch("/api/worlds/import", {
+      method: "POST",
+      headers: { "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: form,
+    });
+    // Read as text first. A 500 returns Django's HTML error page, and `r.json()` on that
+    // throws a parse error that says nothing about what actually went wrong.
+    const raw = await r.text();
+    let data = {};
+    try { data = JSON.parse(raw); } catch { data = { error: `HTTP ${r.status}` }; }
+    if (!r.ok) { tell(data.error || `HTTP ${r.status}`, true); return; }
+    STATE.worlds = (await (await fetch("/api/worlds")).json()).worlds;
+    render();
+    tell(`${data.world.name} is on the shelf. Pick it to start a game there.`, false);
+  } catch (err) {
+    tell(err.message, true);
   }
 });
 

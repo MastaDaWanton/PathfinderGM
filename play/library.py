@@ -119,6 +119,59 @@ def import_world(source: Path) -> WorldCard:
     return _card(target, shipped=False)
 
 
+# A World Bible export of Kaelinora is 1.6 MB. The ceiling is generous rather than tight
+# because the cost of refusing somebody's real world is worse than the cost of writing a
+# large file, but it is not absent: without one, the upload is a way to fill the disk.
+MAX_IMPORT_BYTES = 64 * 1024 * 1024
+
+
+def safe_name(filename: str) -> str:
+    """A filename that cannot escape the worlds directory.
+
+    Everything before the last separator is discarded and the result is reduced to
+    characters that mean nothing to a path. An upload names its own file, and
+    `../../settings.json` is a filename a browser will happily send.
+    """
+    import re
+
+    stem = str(filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+    stem = re.sub(r"[^A-Za-z0-9._-]", "-", stem).strip(".-") or "world"
+    if not stem.lower().endswith(".json"):
+        stem += ".json"
+    return stem[-120:]
+
+
+def import_upload(filename: str, data: bytes) -> WorldCard:
+    """Land an uploaded export on the shelf, or raise with a reason a player can act on.
+
+    Written to its final place and validated there, then removed again if it does not
+    read — rather than validated in a temp file and copied — because `load_cached` keys
+    its cache on the path, and a world validated at one path and played from another is
+    two different files as far as the cache is concerned.
+    """
+    if len(data) > MAX_IMPORT_BYTES:
+        raise ValueError(f"That file is {len(data) // (1024 * 1024)} MB. "
+                         f"Worlds are expected under {MAX_IMPORT_BYTES // (1024 * 1024)} MB.")
+    if not data.strip():
+        raise ValueError("That file is empty.")
+
+    target = user_dir() / safe_name(filename)
+    existed = target.exists()
+    backup = target.read_bytes() if existed else None
+    target.write_bytes(data)
+    try:
+        load_cached(target)
+    except Exception:
+        # Put back whatever was there. Importing a broken file over a world that worked
+        # would otherwise cost the player the good one as well as the bad one.
+        if backup is None:
+            target.unlink(missing_ok=True)
+        else:
+            target.write_bytes(backup)
+        raise
+    return _card(target, shipped=False)
+
+
 # --- what has been played ------------------------------------------------------------------
 
 def campaigns_in(world_id: str) -> list[dict]:
