@@ -515,6 +515,38 @@
   /* The abilities block spans, because six scores in a 310px column wrap to three
      lines and the six numbers everything else is derived from should read at a glance. */
   .card.wide { grid-column: 1 / -1; }
+  /* The map tray. Off-screen rather than hidden, so opening it slides rather than
+     appears — the same ink-bleed logic the rest of the page uses. */
+  #maptab {
+    position: fixed; left: 0; top: 46%; z-index: 60; cursor: pointer;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-left: 0;
+    border-radius: 0 3px 3px 0; background: linear-gradient(#241d15, #17120d);
+    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
+    box-shadow: 3px 0 14px rgba(0,0,0,.6);
+  }
+  #maptab:hover { color: #ffe7b4; border-color: var(--gold); }
+  #maptray {
+    position: fixed; left: 0; top: 0; bottom: 0; width: min(560px, 72vw); z-index: 61;
+    transform: translateX(-102%); transition: transform .32s cubic-bezier(.2,.7,.3,1);
+    background: linear-gradient(rgba(14,10,7,.90), rgba(8,6,4,.95));
+    border-right: 1px solid rgba(201,168,106,.34);
+    box-shadow: 10px 0 40px rgba(0,0,0,.7);
+    display: flex; flex-direction: column; padding: 14px 18px 18px;
+  }
+  #maptray.on { transform: translateX(0); }
+  #maptray .traybar { display: flex; justify-content: space-between; align-items: center;
+                      margin-bottom: 10px; }
+  #maptray .traybar b { font: 400 16px/1 Cinzel, serif; color: var(--gold); }
+  #maptray button { background: none; border: 0; color: var(--dim); cursor: pointer;
+                    font-size: 17px; }
+  #maptray button:hover { color: var(--ink); }
+  #maptrayinner { overflow: auto; flex: 1; min-height: 0; }
+  #maptrayinner svg { width: 100%; height: auto; }
+  .mapopen { background: none; border: 0; color: var(--dim); cursor: pointer;
+             font-size: 13px; padding: 0 4px; }
+  .mapopen:hover { color: var(--gold); }
+  @media (prefers-reduced-motion: reduce) { #maptray { transition: none; } }
   .pathblock { border-left: 2px solid rgba(201,168,106,.22); padding: 2px 0 2px 14px;
                margin: 14px 0; }
   .pathblock.mine { border-left-color: var(--gold); }
@@ -1131,6 +1163,15 @@
   <div id="rolls"></div>
 </aside>
 
+<!-- The map, big enough to read. A tab on the left edge rather than a button in the
+     panel, so it is reachable whether or not the ground is currently drawn there. -->
+<button id="maptab" title="The map">MAP</button>
+<div id="maptray">
+  <div class="traybar"><b>The ground</b>
+    <button id="mapclose" title="Close">✕</button></div>
+  <div id="maptrayinner"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -1225,6 +1266,25 @@ async function openRoster() {
 // starting somebody new — both matched `.pick`, so a click on a roster row fired both:
 // it switched campaigns *and* posted /api/character/new with an undefined source, and
 // "Never mind" quietly rolled a new character instead of closing the panel.
+// The map tray. `render` refills it while it is open, so a token that moves on the
+// turn you are watching moves here too rather than going stale behind the tab.
+function showMap(on) {
+  $("#maptray").classList.toggle("on", on);
+  $("#maptab").style.display = on ? "none" : "";
+  if (on && STATE) renderMap(STATE);
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("#maptab") || e.target.closest("#mapopen")) showMap(true);
+  else if (e.target.closest("#mapclose")) showMap(false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("#maptray").classList.contains("on")) showMap(false);
+  // A map is worth a shortcut in a game where the whole question is where you stand.
+  if (e.key === "m" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+    showMap(!$("#maptray").classList.contains("on"));
+  }
+});
+
 // Taking a level. The roll goes through the campaign's dice, so the hit points land
 // in the roll log beside everything else the app rolls rather than appearing from
 // nowhere on the sheet.
@@ -1447,7 +1507,15 @@ document.addEventListener("click", e => {
 // one on screen is the one the player would believe.
 function renderMap(s) {
   const g = s.scene.grid;
-  if (!g) { $("#mapwrap").innerHTML = ""; return; }
+  if (!g) {
+    $("#mapwrap").innerHTML = "";
+    // A blank tray reads as broken. There is no grid outside a fight, and saying so
+    // is the difference between "nothing here" and "nothing happened".
+    $("#maptrayinner").innerHTML =
+      `<div class="empty">No ground is mapped. A grid is laid out when a fight
+       starts, or when the GM puts one down.</div>`;
+    return;
+  }
 
   const CELL = 18;
   const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
@@ -1482,11 +1550,19 @@ function renderMap(s) {
       (r + n / 2) * CELL + 4}">${esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
 
-  $("#mapwrap").innerHTML = `<h2>The ground</h2>
-    <svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
-         preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>
-    ${g.speed ? `<div class="sub maplegend">${
-      reach.size} squares within ${g.speed} ft</div>` : ""}`;
+  const svg = `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
+         preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>`;
+  const legend = g.speed ? `<div class="sub maplegend">${
+      reach.size} squares within ${g.speed} ft</div>` : "";
+  $("#mapwrap").innerHTML = `<h2>The ground <button class="mapopen" id="mapopen"
+      title="Open the map">⤢</button></h2>${svg}${legend}`;
+
+  // The same SVG at a readable size. The side panel's copy is 18px to the square and
+  // legible only as a shape; a grid the player is meant to plan a move on has to be
+  // something they can actually look at.
+  if ($("#maptray").classList.contains("on")) {
+    $("#maptrayinner").innerHTML = svg + legend;
+  }
 
   function cell(c, r, cls, inner = "") {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${
@@ -1694,6 +1770,7 @@ const TABS = [
   ["feats",     "Feats & Traits", s => tabFeats(s)],
   ["spells",    "Spells",    s => tabSpells(s)],
   ["equipment", "Equipment", s => tabEquipment(s)],
+  ["inventory", "Inventory", s => tabInventory(s)],
   ["companions","Companions",s => tabEmpty("No animal companion, familiar, cohort or mount.")],
   ["background","Background",s => tabBackground(s)],
   ["adventures","Adventures",s => tabEmpty("No adventure log yet. Sessions will be recorded here.")],
@@ -1895,6 +1972,39 @@ function tabSkills(s) {
 // on every keystroke.
 let FEAT_RESULTS = null;
 let FEAT_QUERY = "";
+
+function tabInventory(s) {
+  const d = s.defense || {};
+  const carried = d.carrying || [];
+  const purse = (d.purse || {}).coins || {};
+  const coins = STATE.coinage || [];
+  const any = carried.length || Object.keys(purse).length;
+  return `<div class="cols">
+    <div class="card">
+      <h3>Purse</h3>
+      <div class="bignum">${purseTotal(purse) ? esc(purseLine(purse, coins))
+        : "<small>empty</small>"}</div>
+      ${(d.purse || {}).copper ? `<div class="terms"><div class="t">
+        <span>In copper</span><b>${d.purse.copper}</b></div></div>` : ""}
+    </div>
+    <div class="card wide">
+      <h3>Carried</h3>
+      ${carried.length ? `<table class="sheet">
+        <tr><th>Thing</th><th>How many</th><th>What the engine knows</th></tr>
+        ${carried.map(i => `<tr class="${i.known ? "" : "dim"}">
+          <td><b>${esc(i.name)}</b></td><td>${i.count}</td>
+          <td class="why">${esc(i.line)}</td></tr>`).join("")}</table>`
+        : `<div class="empty">Nothing but what you are wearing.</div>`}
+    </div>
+    <div class="card">
+      <h3>In hand</h3>
+      <div class="terms">${(s.equipment.weapons || []).map(w => `
+        <div class="t"><span>${esc(w.name)}</span><b>${
+          w.equipped ? "drawn" : ""}</b></div>`).join("")
+        || `<div class="t"><span>unarmed</span><b></b></div>`}</div>
+    </div>
+  </div>`;
+}
 
 function tabClass(s) {
   const p = s.progression;

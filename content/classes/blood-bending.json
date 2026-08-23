@@ -346,22 +346,196 @@
       },
       "resolves": {
         "Blood Boil": "Blood Boil",
-        "Blood Rain": "Blood Rain",
+        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
         "Blood Volley": "Blood Volley",
-        "Blood Bomb": "Blood Bomb",
         "Blood Spike Projectile": "Blood Spike Projectile",
-        "Pool Resonance": "Pool Resonance",
-        "Splintering Spike": "Splintering Spike",
-        "Heart-Seeker Spike": "Heart-Seeker Spike",
-        "Siphon Pool": "Siphon Pool",
-        "Blood Mine": "Blood Mine",
-        "Blood Pool Manifestation": "Blood Pool Manifestation",
         "Crimson Torrent": "Crimson Torrent",
-        "Hemorrhagic Eruption": "Hemorrhagic Eruption"
+        "Blood Rain": "Blood Rain",
+        "Siphon Pool": "Siphon Pool",
+        "Blood Bomb": "Blood Bomb",
+        "Heart-Seeker Spike": "Heart-Seeker Spike",
+        "Splintering Spike": "Splintering Spike",
+        "Blood Pool Manifestation": "Blood Pool Manifestation",
+        "Blood Mine": "Blood Mine",
+        "Pool Resonance": "Pool Resonance"
       },
       "upgrades": {},
       "core": [],
-      "undescribed": []
+      "undescribed": [],
+      "effects": {
+        "Blood Spike Projectile": [
+          {
+            "type": "damage",
+            "dice": "1d8",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Spike Projectile"
+          }
+        ],
+        "Siphon Pool": [
+          {
+            "type": "temp_hp",
+            "dice": "1d8",
+            "source": "Siphon Pool"
+          },
+          {
+            "type": "heal",
+            "dice": "1d8",
+            "lethality": "nonlethal"
+          }
+        ],
+        "Blood Mine": [
+          {
+            "type": "save_gate",
+            "target": "ref",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          },
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Crimson Torrent": [
+          {
+            "type": "damage",
+            "dice": "2d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Crimson Torrent"
+          }
+        ],
+        "Blood Boil": [
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1d4"
+          },
+          {
+            "type": "ability_damage",
+            "target": "con",
+            "dice": "1d4"
+          },
+          {
+            "type": "save_gate",
+            "target": "fort",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          },
+          {
+            "type": "apply_condition",
+            "target": "sickened"
+          }
+        ],
+        "Splintering Spike": [
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Blood Bomb": [
+          {
+            "type": "damage",
+            "dice": "1d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Bomb"
+          },
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Blood Volley": [
+          {
+            "type": "damage",
+            "dice": "3d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Volley"
+          }
+        ],
+        "Heart-Seeker Spike": [
+          {
+            "type": "damage",
+            "dice": "4d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Heart-Seeker Spike"
+          },
+          {
+            "type": "save_gate",
+            "target": "fort",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          },
+          {
+            "type": "narrative",
+            "target": "applies 3 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 3
+          }
+        ],
+        "Blood Rain": [
+          {
+            "type": "narrative",
+            "target": "applies 2 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 2
+          }
+        ]
+      },
+      "needs": {
+        "Blood Spike Projectile": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Blood Pool Manifestation": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Siphon Pool": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Blood Mine": [
+          "Blood Pools as objects the scene can hold",
+          "a multiple of the class table's Blood die",
+          "a save DC computed from level and Constitution"
+        ],
+        "Crimson Torrent": [
+          "Blood Pools as objects the scene can hold",
+          "a multiple of the class table's Blood die"
+        ],
+        "Blood Boil": [
+          "a save DC computed from level and Constitution"
+        ],
+        "Hemorrhagic Eruption": [
+          "Blood Pools as objects the scene can hold",
+          "a multiple of the class table's Blood die"
+        ],
+        "Blood Bomb": [
+          "a multiple of the class table's Blood die"
+        ],
+        "Pumping": [
+          "a value that scales with Control Blood level"
+        ],
+        "Blood Volley": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Pool Resonance": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Heart-Seeker Spike": [
+          "a multiple of the class table's Blood die",
+          "a save DC computed from level and Constitution"
+        ],
+        "Blood Rain": [
+          "Blood Pools as objects the scene can hold",
+          "a multiple of the class table's Blood die"
+        ]
+      },
+      "effects_converted": true
     },
     "coagulator": {
       "name": "Coagulator",
@@ -414,27 +588,102 @@
         "Avatar of Coagulation": "1/day free action. Become a blood behemoth for 1 minute: Size increases by one category, base DR/- doubles, Non-Lethal damage taken is reduced by 50%, and when an enemy within range attacks an ally, spend an immediate action to strike them for Fist DMG and pull them adjacent to you."
       },
       "resolves": {
-        "Aggressive Draw": "Aggressive Draw",
         "Sanguine Spray": "Sanguine Spray",
-        "Exsanguinating Taunt": "Exsanguinating Taunt",
-        "Viscous Threat": "Viscous Threat",
-        "Iron Clot (DR 2/-)": "Iron Clot",
-        "Avatar of Coagulation": "Avatar of Coagulation",
-        "Iron Clot (DR 8/-)": "Iron Clot",
-        "Iron Clot (DR 12/-)": "Iron Clot",
-        "Crimson Guard": "Crimson Guard",
-        "Caustic Blood": "Caustic Blood",
-        "Blood Spatter Aura": "Blood Spatter Aura",
-        "Hemophormic Retribution": "Hemophormic Retribution",
-        "Coagulated Plate": "Coagulated Plate",
-        "Sanguine Siphon": "Sanguine Siphon",
-        "Clotting Shield": "Clotting Shield",
         "Iron Clot (DR 5/-)": "Iron Clot",
+        "Caustic Blood": "Caustic Blood",
+        "Sanguine Siphon": "Sanguine Siphon",
+        "Iron Clot (DR 2/-)": "Iron Clot",
+        "Clotting Shield": "Clotting Shield",
+        "Viscous Threat": "Viscous Threat",
+        "Iron Clot (DR 12/-)": "Iron Clot",
+        "Coagulated Plate": "Coagulated Plate",
+        "Aggressive Draw": "Aggressive Draw",
+        "Exsanguinating Taunt": "Exsanguinating Taunt",
+        "Iron Clot (DR 8/-)": "Iron Clot",
+        "Avatar of Coagulation": "Avatar of Coagulation",
+        "Blood Spatter Aura": "Blood Spatter Aura",
+        "Crimson Guard": "Crimson Guard",
+        "Hemophormic Retribution": "Hemophormic Retribution",
         "Blood Sponge": "Blood Sponge"
       },
       "upgrades": {},
       "core": [],
-      "undescribed": []
+      "undescribed": [],
+      "effects": {
+        "Aggressive Draw": [
+          {
+            "type": "save_gate",
+            "target": "will",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          }
+        ],
+        "Sanguine Spray": [
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Viscous Threat": [
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Blood Spatter Aura": [
+          {
+            "type": "damage",
+            "dice": "1d4",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Spatter Aura"
+          },
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Hemophormic Retribution": [
+          {
+            "type": "save_gate",
+            "target": "ref",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          }
+        ],
+        "Exsanguinating Taunt": [
+          {
+            "type": "save_gate",
+            "target": "will",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          }
+        ]
+      },
+      "needs": {
+        "Coagulated Plate": [
+          "a value that scales with Control Blood level"
+        ],
+        "Aggressive Draw": [
+          "a save DC computed from level and Constitution"
+        ],
+        "Iron Clot": [
+          "a value that scales with Control Blood level"
+        ],
+        "Caustic Blood": [
+          "Blood Pools as objects the scene can hold"
+        ],
+        "Hemophormic Retribution": [
+          "a save DC computed from level and Constitution"
+        ],
+        "Exsanguinating Taunt": [
+          "a save DC computed from level and Constitution"
+        ]
+      },
+      "effects_converted": true
     },
     "blood commander": {
       "name": "Blood Commander",
@@ -482,24 +731,66 @@
       },
       "resolves": {
         "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
+        "Blood Transfusion": "Blood Transfusion",
+        "Blood Siphon": "Blood Siphon",
+        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
+        "Blood Transfer": "Blood Transfer",
+        "Blood Buffer 3NLDR": "Blood Buffer",
+        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
+        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Blood Javelin": "Blood Javelin",
+        "Forced Mitosis": "Forced Mitosis",
+        "DMG Purge": "DMG Purge",
         "Mass Rupture": "Mass Rupture",
         "Blood Shatter": "Blood Shatter",
-        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
-        "DMG Purge": "DMG Purge",
-        "Blood Transfer": "Blood Transfer",
-        "Blood Javelin": "Blood Javelin",
-        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
-        "Blood Siphon": "Blood Siphon",
-        "Blood Buffer 2NLDR": "Blood Buffer",
-        "Forced Mitosis": "Forced Mitosis",
-        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
-        "Blood Buffer 3NLDR": "Blood Buffer",
-        "Blood Transfusion": "Blood Transfusion"
+        "Blood Buffer 2NLDR": "Blood Buffer"
       },
       "upgrades": {},
       "core": [],
-      "undescribed": []
+      "undescribed": [],
+      "effects": {
+        "Blood Transfusion": [
+          {
+            "type": "damage",
+            "dice": "1d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Transfusion"
+          },
+          {
+            "type": "heal",
+            "dice": "2d10"
+          }
+        ],
+        "Blood Siphon": [
+          {
+            "type": "damage",
+            "dice": "1d10",
+            "damage_type": "untyped",
+            "lethality": "nonlethal",
+            "note": "the cost of Blood Siphon"
+          },
+          {
+            "type": "heal",
+            "dice": "2d10+1"
+          },
+          {
+            "type": "save_gate",
+            "target": "fort",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          }
+        ]
+      },
+      "needs": {
+        "Blood Javelin": [
+          "a multiple of the class table's Blood die"
+        ],
+        "Blood Siphon": [
+          "a save DC computed from level and Constitution"
+        ]
+      },
+      "effects_converted": true
     },
     "battle blood": {
       "name": "Battle Blood",
@@ -550,22 +841,22 @@
         "1-2-Punch": "Subsequent attacks on the same target hit twice, dealing damage and applying on-hit effects twice."
       },
       "resolves": {
-        "Vortex Pull": "Vortex Pull",
-        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
-        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
-        "1-2-Punch": "1-2-Punch",
-        "Rupture Self 60ft": "Rupture Self",
-        "Vampiric Recovery": "Vampiric Recovery",
-        "Swift Strikes": "Swift Strikes",
+        "Blood Burst 40ft": "Blood Burst",
         "Battle Blood Ki Pool": "Battle Blood Ki Pool",
-        "Blood Rage": "Blood Rage",
-        "Coagulant Stacks": "Coagulant Stacks",
+        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
         "Greater Blood Rage": "Blood Rage",
-        "Blood Booster": "Blood Booster",
-        "Blood Burst 20ft": "Blood Burst",
-        "Blood Burst 60ft": "Blood Burst",
+        "Vampiric Recovery": "Vampiric Recovery",
         "Mighty Blood Rage": "Blood Rage",
-        "Blood Burst 40ft": "Blood Burst"
+        "Rupture Self 60ft": "Rupture Self",
+        "Blood Burst 20ft": "Blood Burst",
+        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
+        "Vortex Pull": "Vortex Pull",
+        "Blood Rage": "Blood Rage",
+        "Blood Booster": "Blood Booster",
+        "1-2-Punch": "1-2-Punch",
+        "Coagulant Stacks": "Coagulant Stacks",
+        "Blood Burst 60ft": "Blood Burst",
+        "Swift Strikes": "Swift Strikes"
       },
       "upgrades": {
         "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD",
@@ -574,8 +865,109 @@
       "core": [
         "Uncanny Dodge"
       ],
-      "undescribed": []
+      "undescribed": [],
+      "effects": {
+        "Extracorporeal Blood Armament": [
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ],
+        "Vampiric Recovery": [
+          {
+            "type": "heal",
+            "dice": "50"
+          }
+        ],
+        "Blood Rage": [
+          {
+            "type": "temp_hp",
+            "dice": "2",
+            "source": "Blood Rage"
+          },
+          {
+            "type": "temp_hp",
+            "dice": "3",
+            "source": "Blood Rage"
+          },
+          {
+            "type": "temp_hp",
+            "dice": "4",
+            "source": "Blood Rage"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 2,
+            "target": "attack",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 2,
+            "target": "damage",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 3,
+            "target": "attack",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 3,
+            "target": "damage",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 4,
+            "target": "attack",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": 4,
+            "target": "damage",
+            "bonus_type": "untyped"
+          },
+          {
+            "type": "combat_mod",
+            "amount": -2,
+            "target": "ac",
+            "bonus_type": "untyped"
+          }
+        ],
+        "Blood Burst": [
+          {
+            "type": "save_gate",
+            "target": "ref",
+            "note": "DC 10+12LVL+CONmod — the class's formula"
+          },
+          {
+            "type": "narrative",
+            "target": "applies 1 blood stack(s)",
+            "resource": "blood stack",
+            "amount": 1
+          }
+        ]
+      },
+      "needs": {
+        "Blood Rage": [
+          "temporary hit points scaled per Hit Die"
+        ],
+        "Blood Burst": [
+          "a save DC computed from level and Constitution"
+        ],
+        "Rupture Self": [
+          "Blood Pools as objects the scene can hold"
+        ]
+      },
+      "effects_converted": true
     }
   },
-  "_paths_note": "Imported from the author's own document by tools/import_blood_paths.py. Abilities are tiered by Control Blood level (1-5), which is what 'control blood 1a' through '5b' on the progression table refers to — not by character level. Descriptions are the document's own sentences, unedited: the engine executes none of them yet, so what the app shows is what the author wrote rather than a paraphrase of it."
+  "_paths_note": "Imported from the author's own document by tools/import_blood_paths.py. Abilities are tiered by Control Blood level (1-5), which is what 'control blood 1a' through '5b' on the progression table refers to — not by character level. Descriptions are the document's own sentences, unedited: the engine executes none of them yet, so what the app shows is what the author wrote rather than a paraphrase of it.",
+  "_effects_note": "Path abilities carry effect specs converted by tools/convert_blood_paths.py from the author's own sentences. `needs` records, per ability, which of three missing engine capabilities it depends on — Control Blood scaling, Blood Pools as scene objects, or a multiple of the class table's Blood die. An ability with effects and no needs is one the engine can resolve today."
 }

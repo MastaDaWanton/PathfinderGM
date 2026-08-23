@@ -272,3 +272,64 @@ def test_levelling_is_refused_at_twenty_over_the_wire(tmp_path, settings):
     r = client.post("/api/level-up")
     assert r.status_code == 409
     assert "20th level" in r.json()["error"]
+
+
+# --- abilities the engine can actually run ---------------------------------------------
+
+def test_path_abilities_carry_converted_effects():
+    """The same treatment consumables and creatures had: prose anchored on a number, a
+    save or a named mechanic becomes an effect spec; anything a pattern cannot claim is
+    left as prose rather than guessed at."""
+    for name in leveling.paths_for("blood bending"):
+        det = leveling.path_detail("blood bending", name)
+        assert det["effects_converted"] is True
+        assert isinstance(det["effects"], dict)
+        assert isinstance(det["needs"], dict)
+
+
+def test_a_ladder_of_damage_reduction_is_not_four_reductions():
+    """Iron Clot writes its whole ladder in one sentence — DR 2/-, 5/-, 8/-, 12/- —
+    and emitting each gave a first-level character DR 27. Several values is a rank
+    that scales, which the engine cannot express, so it converts to nothing and says
+    what it is waiting for."""
+    coag = leveling.path_detail("blood bending", "coagulator")
+    assert "Iron Clot" not in coag["effects"]
+    assert "scales with Control Blood level" in " ".join(coag["needs"]["Iron Clot"])
+
+
+def test_taking_stacks_away_is_not_applying_one():
+    """"Pull back blood stacks from all surrounding enemies" was converted as applying
+    a stack — the opposite of what it does. A confidently wrong conversion is worse
+    than no conversion."""
+    coag = leveling.path_detail("blood bending", "coagulator")
+    assert "Sanguine Siphon" not in coag["effects"]
+
+
+def test_what_the_engine_still_lacks_is_named_per_ability():
+    """Three shapes recur and none is forced: Control Blood scaling, Blood Pools as
+    scene objects, and multiples of the class table's Blood die."""
+    spike = leveling.path_detail("blood bending", "blood spike")
+    every = {n for names in spike["needs"].values() for n in names}
+    assert any("Blood Pools" in n for n in every)
+
+
+def test_a_self_cost_in_non_lethal_damage_converts():
+    """The class's whole economy is paying in non-lethal damage, and it is the one
+    cost the engine already models exactly."""
+    coag = leveling.path_detail("blood bending", "coagulator")
+    aura = coag["effects"]["Blood Spatter Aura"]
+    cost = next(e for e in aura if e["type"] == "damage")
+    assert cost["lethality"] == "nonlethal" and cost["dice"] == "1d4"
+
+
+def test_the_map_has_a_tab_of_its_own():
+    """"the mapping is under the hood lets have a tab on the left that can pop out the
+    map for the user to see." The side panel drew it at 18px to the square, legible as
+    a shape and not as a grid anybody could plan a move on."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert 'id="maptab"' in page and 'id="maptray"' in page
+    assert "function showMap(" in page
+    # It refills while open, so a token that moves during a turn moves here too.
+    assert '$("#maptray").classList.contains("on")' in page
