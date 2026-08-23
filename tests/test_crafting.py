@@ -974,3 +974,124 @@ def test_the_bench_says_how_many_the_materials_allow(client):
         "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
         content_type="application/json").json()
     assert d["batch_max"] == 47
+
+
+# --- the craft is a check, rolled where you can see it ---------------------------------
+#
+# "instead of a percentage chance and a blind roll just roll a d100 on screen or even
+# better convert it all to a skill DC and have it be a herbalist check (d20 + Herbalist
+# lvl + 1/2 Character Lvl + WIS Mod)."
+#
+# The DC was already computed from the chain and then thrown away: `_chance` turned it
+# into a percentage using `3 * level + 2 * (level - rank)` — a bonus invented here with no
+# counterpart anywhere in 1e — and the roll was a d20 against `21 - chance/5`, made on the
+# server and reported as a verdict. Every term now comes from the character sheet.
+
+def _crafter(level=8, wis=16, ranks=None):
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.level = level
+    pc.abilities["wis"] = wis
+    return pc
+
+
+def test_the_bonus_is_the_authors_formula():
+    """Track level, half character level rounded down, Wisdom. Nothing else."""
+    pc = _crafter(level=8, wis=16)                     # half of 8 is 4, Wis 16 is +3
+    assert crafting.check_bonus(pc, 4) == 4 + 4 + 3
+
+
+def test_half_character_level_rounds_down():
+    """As every half-level term in 1e rounds. A 7th-level crafter adds 3, not 3.5."""
+    assert crafting.check_bonus(_crafter(level=7, wis=10), 0) == 3
+
+
+def test_a_negative_wisdom_modifier_counts_against_you():
+    """It is a modifier, not a bonus. Wisdom 8 is -1 and the check is worse for it."""
+    assert crafting.check_bonus(_crafter(level=2, wis=8), 3) == 3 + 1 - 1
+
+
+def test_the_terms_are_itemised_not_just_summed():
+    """"+9" says nothing; "Herbalist 4, half level +4, Wis +3" says which of the three to
+    go and improve. The bench draws these rows under the die."""
+    labels = [t["label"] for t in crafting.check_terms(_crafter(), 4)]
+    assert any("Herbalist 4" in x for x in labels)
+    assert any("half character level" in x for x in labels)
+    assert any("Wisdom" in x for x in labels)
+
+
+def test_the_preview_carries_the_check_to_the_bench():
+    """The page draws `d20+11 vs DC 20` on the button from these, so they have to survive
+    the trip rather than only the percentage they imply."""
+    r = crafting.preview("herbalist", 4,
+                         Chain(track="herbalist", methods=["brew"],
+                               ingredient_ids=["woundwort"]),
+                         satchel={"woundwort": 5}, carrier=_crafter())
+    assert r.bonus == 11 and r.dc > 0
+    assert r.as_dict()["bonus"] == 11 and r.as_dict()["terms"]
+
+
+def test_the_chance_is_derived_from_the_check_rather_than_being_the_mechanic():
+    """It is a label now. d20+11 against DC 20 needs a 9: twelve faces of twenty, 60%."""
+    assert crafting._chance(20, 11) == 60
+
+
+def test_a_craft_reports_the_whole_check_not_a_verdict(client):
+    """The roll used to come back as `succeeded` and a d20 face against a percentage,
+    which a player could not check. The die, the terms, the total and the DC all travel."""
+    from play import campaign as cm
+
+    cm.current().scene.pc().inventory["woundwort"] = 5
+    d = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
+        content_type="application/json").json()
+    assert 1 <= d["roll"] <= 20
+    assert d["total"] == d["roll"] + d["bonus"]
+    assert d["dc"] > 0 and d["terms"]
+
+
+def test_the_die_and_the_dc_decide_it_not_the_percentage(client, monkeypatch):
+    """The whole point of the change: the outcome follows from `roll + bonus >= dc`."""
+    from play import campaign as cm
+    from rules import dice as dice_mod
+
+    pc = cm.current().scene.pc()
+    pc.inventory["woundwort"] = 40
+    seen = []
+    for face in (2, 19):
+        monkeypatch.setattr(dice_mod.Dice, "d20",
+                            lambda self, *a, **k: _face(face))
+        d = client.post("/api/craft/do", data=json.dumps({
+            "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
+            content_type="application/json").json()
+        seen.append((d["roll"], d["total"] >= d["dc"], d["succeeded"]))
+    for roll, makes_dc, succeeded in seen:
+        assert succeeded == makes_dc, seen
+
+
+def _face(n):
+    from rules.dice import Roll
+
+    return Roll(die="d20", faces=[n], label="craft", visibility="player")
+
+
+def test_a_natural_one_still_fails_whatever_the_bonus(client, monkeypatch):
+    """A master with +30 against DC 5 still ruins one batch in twenty. No craft is safe,
+    which is why the odds label is clamped at 95 rather than reaching certainty."""
+    from play import campaign as cm
+    from rules import dice as dice_mod
+
+    pc = cm.current().scene.pc()
+    pc.inventory["woundwort"] = 5
+    # A crafter whose arithmetic clears the DC on its own, or the natural 1 proves
+    # nothing: the first cut of this used the fixture's +1 and failed for the ordinary
+    # reason, which would have passed the assertion for the wrong cause.
+    pc.level = 12
+    pc.abilities["wis"] = 20
+    pc.track("herbalist").level = 5
+    cm.current().save()
+    monkeypatch.setattr(dice_mod.Dice, "d20", lambda self, *a, **k: _face(1))
+    d = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
+        content_type="application/json").json()
+    assert d["roll"] == 1 and not d["succeeded"]
+    assert d["total"] >= d["dc"], "the arithmetic made it; the natural 1 overrode it"

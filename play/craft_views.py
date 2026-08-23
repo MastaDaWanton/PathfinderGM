@@ -319,10 +319,11 @@ def craft_do(request):
     if len(attempts) == 1:
         a = attempts[0]
         line = (f"{name}: {'made' if a['succeeded'] else 'spoiled'} "
-                f"(d20 {a['roll']} against {a['chance']}%). {a['tell']}").strip()
+                f"(d20 {a['roll']}{a['bonus']:+d} = {a['total']} vs DC {a['dc']}). "
+                f"{a['tell']}").strip()
     elif attempts:
         line = (f"{name} x{len(attempts)}: {succeeded} made, {spoiled} spoiled "
-                f"(each against {attempts[0]['chance']}%).")
+                f"(d20{attempts[0]['bonus']:+d} vs DC {attempts[0]['dc']} each).")
     else:
         line = ""
     if stopped:
@@ -337,6 +338,8 @@ def craft_do(request):
         # this endpoint go on working unchanged; the batch block is an addition.
         "succeeded": bool(last.get("succeeded")),
         "roll": last.get("roll"), "chance": last.get("chance"),
+        "total": last.get("total"), "bonus": last.get("bonus"),
+        "dc": last.get("dc"), "terms": last.get("terms") or [],
         "result": last.get("result"), "tell": last.get("tell", ""),
         "made": last.get("made"), "spent": spent_all,
         "batch": {
@@ -354,7 +357,12 @@ def _one_craft(c, disc, state, result) -> dict:
     engine = c.engine()
     roll = engine.dice.d20(label=f"{disc['name']}: {result.name}", visibility="player")
     face = roll.faces[0]
-    succeeded = face != 1 and (face == 20 or _hits(face, result.chance))
+    # A check, not a percentile behind a curtain. The DC was already computed from the
+    # chain and then thrown away in favour of a chance-to-hit; now the die is added to the
+    # crafter's own bonus and compared to it, the way every other roll in the game works.
+    # Natural 1 and natural 20 keep their usual authority over the arithmetic.
+    total = face + result.bonus
+    succeeded = face != 1 and (face == 20 or total >= result.dc)
 
     # The deed a milestone-locked level waits on, recorded when it is actually done.
     # Without this the bench sent no `milestone` at all, so a character could craft the
@@ -405,18 +413,10 @@ def _one_craft(c, disc, state, result) -> dict:
         "name": result.name, "succeeded": succeeded, "roll": face,
         "chance": result.chance, "result": result.as_dict(), "made": made,
         "spent": spent,
+        # The whole check, so the bench can show the arithmetic rather than a verdict.
+        "total": total, "bonus": result.bonus, "dc": result.dc, "terms": result.terms,
         "tell": " ".join(o.tell for o in resolution.outcomes if o.tell),
     }
-
-
-def _hits(face: int, chance: int) -> bool:
-    """A d20 face against a percentage: 95% needs 2+, 25% needs 16+, 5% needs a 20.
-
-    A d20 rather than a d100 because every other roll in the game is a d20 and the log
-    should read the same way throughout. The cost is granularity — chances land on
-    multiples of 5 — which `crafting._chance` already produces.
-    """
-    return face >= 21 - max(1, round(chance / 5))
 
 
 @require_POST

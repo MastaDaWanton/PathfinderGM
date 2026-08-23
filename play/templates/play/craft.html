@@ -337,6 +337,62 @@
   .batch input:focus { outline: none; border-color: var(--accent); }
   .batch #batchmax { padding: 13px 14px; font-size: 13px; }
   .batch.off { display: none; }
+
+  /* --- the roll ---------------------------------------------------------------------
+     Shown, not reported. The bench used to compute a percentage, roll a d20 behind the
+     curtain and print a verdict, so the one moment with any tension in it was the one
+     moment the player could not see. Same furniture as the table's own dice popup —
+     `.dieface` and `.terms` there — so a roll looks like a roll wherever it happens. */
+  #rollmat {
+    position: fixed; inset: 0; z-index: 40; display: none;
+    align-items: center; justify-content: center;
+    background: radial-gradient(60% 50% at 50% 40%, rgba(10,8,6,.72), rgba(4,3,3,.90));
+  }
+  #rollmat.on { display: flex; }
+  #rollmat .card {
+    width: 380px; padding: 26px 28px; border-radius: 3px;
+    background: linear-gradient(rgba(27,22,17,.96), rgba(18,15,11,.97));
+    border: 1px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px rgba(221,196,142,.08), 0 18px 60px rgba(0,0,0,.8);
+  }
+  #rollmat h3 {
+    margin: 0 0 2px; color: var(--gold); font: 400 22px/1.2 var(--display);
+    letter-spacing: .06em; font-variant: small-caps; text-align: center;
+  }
+  #rollmat .against { color: var(--dim); font-style: italic; font-size: 13px;
+                      text-align: center; margin-bottom: 16px; }
+  .dieface {
+    width: 100%; color: var(--gold); text-align: center; padding: 18px 16px;
+    font: 400 52px/1 var(--display); border-radius: 2px;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
+    box-shadow: inset 0 3px 10px rgba(0,0,0,.7);
+  }
+  /* Settled, so a 1 and a 20 read before the numbers are. */
+  .dieface.crit { color: var(--brew); border-color: var(--brew-dim);
+                  text-shadow: 0 0 26px rgba(111,207,143,.45); }
+  .dieface.fumble { color: var(--alarm); border-color: #6b322a;
+                    text-shadow: 0 0 26px rgba(168,68,58,.45); }
+  .dieface.rolling { color: var(--ink); opacity: .75; }
+  .terms {
+    background: rgba(0,0,0,.34); border: 1px solid #2b2319; border-radius: 2px;
+    padding: 11px 13px; margin: 14px 0 4px;
+  }
+  .terms .row { display: flex; justify-content: space-between; font-size: 13px;
+                color: var(--dim); }
+  .terms .row b { color: var(--ink); font-weight: 400;
+                  font-variant-numeric: tabular-nums; }
+  .terms .row.total { border-top: 1px solid #3a3022; margin-top: 7px; padding-top: 7px;
+                      color: var(--gold); }
+  .terms .row.total b { color: var(--gold); }
+  #rollmat .verdict {
+    text-align: center; margin: 14px 0 16px; font: 400 19px/1 var(--display);
+    letter-spacing: .07em; font-variant: small-caps; min-height: 19px;
+  }
+  #rollmat .verdict.made { color: var(--brew); }
+  #rollmat .verdict.spoiled { color: var(--alarm); }
+  #rollmat .tallyline { color: var(--dim); font-size: 13px; text-align: center;
+                        margin-bottom: 14px; }
   button.act:disabled { opacity: .4; cursor: not-allowed; }
   button.act.go { border-color: var(--brew-dim); color: var(--brew); }
   button.act.go:hover:not(:disabled) { border-color: var(--brew); color: #b6f0ca; }
@@ -381,6 +437,16 @@
 </header>
 
 <main id="main"></main>
+
+<div id="rollmat"><div class="card">
+  <h3 id="rollname">Herbalism</h3>
+  <div class="against" id="rollagainst"></div>
+  <div class="dieface" id="dieface">–</div>
+  <div class="terms" id="rollterms"></div>
+  <div class="verdict" id="rollverdict"></div>
+  <div class="tallyline" id="rolltally"></div>
+  <button class="act" id="rollclose" style="width:100%">Close</button>
+</div></div>
 
 <footer>
   <button class="act go" id="craft" disabled>Craft</button>
@@ -801,8 +867,12 @@ function buttons() {
 
   const n = box ? Math.max(1, Math.floor(Number(box.value) || 1)) : 1;
   $("#craft").disabled = !ok;
+  // The check, not just the odds. "d20+11 vs DC 30" tells a player what to improve;
+  // "10% success" tells them only to give up.
+  const sign = PREVIEW && PREVIEW.bonus >= 0 ? "+" : "";
   $("#craft").textContent = ok
-    ? (n > 1 ? `Craft ${n} (${PREVIEW.chance}% each)` : `Craft (${PREVIEW.chance}% success)`)
+    ? (n > 1 ? `Craft ${n} — d20${sign}${PREVIEW.bonus} vs DC ${PREVIEW.dc}`
+             : `Craft — d20${sign}${PREVIEW.bonus} vs DC ${PREVIEW.dc}`)
     : "Craft";
   $("#save").disabled = !CHOSEN.length && !Object.keys(USING).length;
 }
@@ -913,6 +983,7 @@ $("#craft").addEventListener("click", async () => {
     // left showing the ceiling the character had a moment ago.
     await reloadShelf();
     const b = d.batch || { attempted: 1, made: d.succeeded ? 1 : 0, spoiled: d.succeeded ? 0 : 1 };
+    await showRoll(d, b);
     if (b.attempted > 1) {
       // The tally, not a hundred roll lines. Every attempt was its own d20; what the
       // player wants to know afterwards is how many jars they ended up with.
@@ -931,6 +1002,62 @@ $("#craft").addEventListener("click", async () => {
     if ($("#batch")) $("#batch").value = 1;
   } catch (e) { $("#err").textContent = e.message; }
   await refresh();
+});
+
+// The die, tumbling and then settling on what the server actually rolled. The faces
+// during the tumble are decoration and are thrown away; the landed face is `d.roll` and
+// nothing here decides anything — the check was made on the server before this ran.
+async function showRoll(d, b) {
+  const mat = $("#rollmat"), face = $("#dieface");
+  if (!mat || d.roll == null) return;
+  const terms = d.terms || [];
+  $("#rollname").textContent = d.result?.name || "Herbalism";
+  $("#rollagainst").textContent = `DC ${d.dc}`;
+  $("#rollverdict").textContent = "";
+  $("#rollverdict").className = "verdict";
+  $("#rolltally").textContent = "";
+  $("#rollterms").innerHTML = "";
+  face.className = "dieface rolling";
+  face.textContent = "–";
+  mat.classList.add("on");
+
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  // Slowing as it settles, which is what makes it read as a die rather than a spinner.
+  for (const gap of [55, 55, 60, 70, 85, 105, 135, 175]) {
+    face.textContent = 1 + Math.floor(Math.random() * 20);
+    await wait(gap);
+  }
+  face.textContent = d.roll;
+  face.className = "dieface" + (d.roll === 20 ? " crit" : d.roll === 1 ? " fumble" : "");
+  await wait(180);
+
+  $("#rollterms").innerHTML =
+    `<div class="row"><span>d20</span><b>${d.roll}</b></div>` +
+    terms.map(x => `<div class="row"><span>${esc(x.label)}</span>
+      <b>${x.value >= 0 ? "+" : ""}${x.value}</b></div>`).join("") +
+    `<div class="row total"><span>against DC ${d.dc}</span><b>${d.total}</b></div>`;
+
+  const v = $("#rollverdict");
+  v.textContent = d.succeeded ? "Made" : "Spoiled";
+  v.className = "verdict " + (d.succeeded ? "made" : "spoiled");
+  if (d.roll === 20) v.textContent += " — natural 20";
+  if (d.roll === 1) v.textContent += " — natural 1";
+  // A batch rolled many times; the mat shows the last of them and says so, because
+  // showing a hundred dice one after another is a punishment rather than a feature.
+  if (b.attempted > 1) {
+    $("#rolltally").textContent =
+      `${b.made} made, ${b.spoiled} spoiled over ${b.attempted} attempts. ` +
+      `The die above is the last of them.`;
+  }
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#rollclose") || e.target.id === "rollmat") {
+    $("#rollmat").classList.remove("on");
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") $("#rollmat").classList.remove("on");
 });
 
 $("#save").addEventListener("click", async () => {

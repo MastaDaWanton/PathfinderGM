@@ -300,13 +300,20 @@ class Result:
     consumes: dict[str, int] = field(default_factory=dict)
     consumes_raw: dict[str, int] = field(default_factory=dict)
     concentrating: bool = False
+    # The crafter's own bonus on this chain, and what it is made of. Carried rather than
+    # only the percentage it implies, because the roll is a check now: the bench shows
+    # d20 + bonus against the DC, and a player who can see the terms can see what would
+    # improve them.
+    bonus: int = 0
+    terms: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
             "name": self.name, "tier": self.tier, "rank": self.rank,
             "stages": self.stages, "potency": round(self.potency, 2),
             "cleansed": self.cleansed, "risky": self.risky, "dc": self.dc,
-            "chance": self.chance, "ingredients": self.ingredients,
+            "chance": self.chance, "bonus": self.bonus, "terms": self.terms,
+            "ingredients": self.ingredients,
             "effects": self.effects, "drawbacks": self.drawbacks,
             "poisons": self.poisons, "removed": self.removed,
             "problems": self.problems, "described": self.described,
@@ -505,7 +512,7 @@ def preview(track_id: str, level: int, chain: Chain,
         and not problems
     )
     if concentrating:
-        return _concentration(track, level, chain, used[0], ceiling)
+        return _concentration(track, level, chain, used[0], ceiling, carrier=carrier)
 
     for m in chain.methods:
         if m not in track.unlocked_methods(track.max_level):
@@ -620,6 +627,9 @@ def preview(track_id: str, level: int, chain: Chain,
             f"Purify or Neutralize removes them.")
 
     dc = _dc(items, rank, chain.stages)
+    # d20 + track level + half character level + Wisdom, itemised for the bench.
+    _terms = check_terms(carrier, level)
+    _bonus = sum(x["value"] for x in _terms)
 
     # An infusion is the tincture, enriched — not a new thing named after whatever went
     # into it. It came out named "Woundwort Infusion" at concentration 1, so infusing a
@@ -644,7 +654,7 @@ def preview(track_id: str, level: int, chain: Chain,
     return Result(
         name=name, tier=tier, rank=rank, stages=chain.stages, potency=potency,
         cleansed=cleansed, risky=risky, dc=dc,
-        chance=_chance(dc, level, rank, problems),
+        chance=_chance(dc, _bonus, problems), bonus=_bonus, terms=_terms,
         ingredients=[i.as_dict() for i in items] + [h.as_dict() for h, _ in used],
         effects=effects, drawbacks=drawbacks, poisons=poisoned, removed=removed,
         problems=problems,
@@ -656,7 +666,7 @@ def preview(track_id: str, level: int, chain: Chain,
 
 
 def _concentration(track, level: int, chain: Chain,
-                   pair: tuple[Stock, int], ceiling: int) -> Result:
+                   pair: tuple[Stock, int], ceiling: int, carrier=None) -> Result:
     """Two doses in, one of twice the strength out.
 
     A trade of quantity for density, not a gain — which is why the pair is spent and the
@@ -696,10 +706,12 @@ def _concentration(track, level: int, chain: Chain,
     # ladder sat at the 5% floor at *every* level, master or not, while each attempt ate
     # two doses. Aligned, the same step is 15% at Herbalist 4 and 30% at Herbalist 5.
     dc = _dc([], made.rank, chain.stages)
+    _terms = check_terms(carrier, level)
+    _bonus = sum(x["value"] for x in _terms)
     return Result(
         name=made.name, tier=made.tier, rank=made.rank, stages=max(1, chain.stages),
         potency=made.potency, cleansed=False, risky=bool(made.drawbacks),
-        dc=dc, chance=_chance(dc, level, made.rank, problems),
+        dc=dc, chance=_chance(dc, _bonus, problems), bonus=_bonus, terms=_terms,
         ingredients=[held.as_dict()],
         effects=list(made.effects),
         drawbacks=made.drawbacks,
@@ -720,17 +732,42 @@ def _dc(items, rank: int, stages: int) -> int:
     return base + 2 * max(0, stages - 1)
 
 
-def _chance(dc: int, level: int, rank: int, problems: list[str]) -> int:
-    """Percent chance the craft succeeds.
+def check_terms(actor, level: int) -> list[dict]:
+    """What a crafter adds to the die, itemised.
 
-    A d20 roll against the chain's DC, with the crafter's level and the gap between their
-    tier and the material's standing in for a skill bonus. Clamped to 5-95 rather than
-    allowed to reach certainty: a natural 1 fails, so no craft is ever safe, and the
-    number on the button should never claim otherwise.
+    The author's formula: **d20 + track level + half character level + Wisdom**. It
+    replaced `3 * level + 2 * (level - rank)`, which was invented here and had no
+    counterpart anywhere in 1e — and, being invisible, could not be reasoned about at the
+    bench. Every term now comes from somewhere the player can point at on their sheet.
+
+    Itemised rather than summed because the sum is the boring half. "+9" says nothing;
+    "Herbalist 4, half level +3, Wis +2" says which of the three to go and improve.
+    """
+    track_level = max(0, int(level or 0))
+    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
+    wis = int(actor.ability_mod("wis")) if actor is not None else 0
+    return [
+        {"label": f"Herbalist {track_level}", "value": track_level},
+        # Half level, rounded down, as every half-level term in 1e rounds.
+        {"label": f"half character level ({char_level})", "value": char_level // 2},
+        {"label": "Wisdom", "value": wis},
+    ]
+
+
+def check_bonus(actor, level: int) -> int:
+    return sum(t["value"] for t in check_terms(actor, level))
+
+
+def _chance(dc: int, bonus: int, problems: list[str] = ()) -> int:
+    """Percent chance the check makes the DC, for the label on the button.
+
+    Derived from the check rather than being the mechanic: the roll is d20 + bonus against
+    the DC, and this only says what that comes to. Clamped to 5-95 because a natural 1
+    always fails and a natural 20 always succeeds, so no craft is ever certain either way
+    and the number should not claim otherwise.
     """
     if problems:
         return 0
-    bonus = 3 * level + 2 * max(0, (level - rank))
     need = dc - bonus
     chance = int(round(100 * (21 - need) / 20))
     return max(5, min(95, chance))

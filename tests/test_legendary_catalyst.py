@@ -115,12 +115,17 @@ def test_an_herbalist_four_has_a_legal_opening_on_legendary_material(herbalist):
     every level from 3 to 5 and the engine refused it outright; the deed was reachable
     from nowhere."""
     held = _exotic()
+    # A crafter, because the bonus is a check on a character now rather than a number
+    # derived from the track alone: an Herbalist 4 of 8th level with Wisdom 16 is +11.
+    crafter = load_pc("fixtures/pc-kesst.json")
+    crafter.level = 8
+    crafter.abilities["wis"] = 16
     r = crafting.preview("herbalist", 4,
                          Chain("herbalist", ["distill"], stock_used={held.id: 2}),
-                         stock={held.id: held}, satchel={})
+                         stock={held.id: held}, satchel={}, carrier=crafter)
     assert not r.problems
     assert r.tier == "legendary" and r.concentrating
-    assert r.chance == 15
+    assert r.bonus == 11 and r.chance == 10
 
 
 # --- 2. the DC that pinned the top rung to the floor -------------------------------------
@@ -128,15 +133,20 @@ def test_an_herbalist_four_has_a_legal_opening_on_legendary_material(herbalist):
 def test_the_ladders_top_rung_was_a_five_percent_floor_at_every_level():
     """`_concentration` open-coded `10 + 5 * rank` where `_dc` reads `5 + 5 * rank` —
     two copies of one rule, five apart, and the five bit at exactly one place. A
-    crafter's whole bonus is `3 * level`, so at Herbalist 5 it is +15 and DC 35 needed a
+    crafter's bonus was `3 * level` then, so at Herbalist 5 it was +15 and DC 35 needed a
     20 on the d20. The last step of the ladder read 5% at Herbalist 3, 4 and 5 alike,
-    while each attempt ate two doses. Now 15% at 4 and 30% at 5."""
+    while each attempt ate two doses.
+
+    The DC is the part this test is about and it has not moved. The bonus since became a
+    real check — d20 + track level + half character level + Wisdom — so the percentages
+    are quoted against a stated bonus rather than derived from the level alone.
+    """
     assert crafting._dc([], 5, 1) == 30                    # was 35
-    assert crafting._chance(30, 4, 5, []) == 15            # was 5
-    assert crafting._chance(30, 5, 5, []) == 30            # was 5
+    assert crafting._chance(30, 12) == 15                  # a bonus of +12 makes it 15%
+    assert crafting._chance(30, 15) == 30                  # +15, as the old formula gave
     # The rungs below it kept their shape: still a ladder, not a lift.
-    assert crafting._chance(crafting._dc([], 4, 1), 4, 4, []) == 40
-    assert crafting._chance(crafting._dc([], 3, 1), 4, 3, []) == 75
+    assert crafting._chance(crafting._dc([], 4, 1), 12) == 40
+    assert crafting._chance(crafting._dc([], 3, 1), 12) == 65
 
 
 def test_the_ceiling_still_gates_the_ladder(herbalist):
