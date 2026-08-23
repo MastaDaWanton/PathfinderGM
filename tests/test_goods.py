@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from gm import judgement
 from rules import goods
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -403,3 +404,61 @@ def test_every_class_walks_out_dressed():
         actor = from_dict(built["sheet"])
         assert actor.goods, cid["id"]
         assert actor.slots.get("body"), cid["id"]
+
+
+# --- an abstract noun is not a thing you can carry -------------------------------------
+#
+# Found in a live save: the Inventory tab listed "offer" and "scene on" beside a
+# traveller's outfit. `inject_goods` builds a `give` intent from a regex over the player's
+# own sentence — the GM never proposed either of them — and "I accept the offer" and
+# "I take in the scene on the ridge" both parse as somebody picking something up.
+#
+# Two gates, both mechanical. The verb is not acquisition when an idiom follows it, and
+# the head noun has to be something a satchel could hold.
+
+@pytest.mark.parametrize("said", [
+    "I accept the offer",                       # the exact sentence, from the save
+    "I take in the scene on the ridge",         # the other one
+    "I take a moment to breathe",
+    "I take cover behind the wall",
+    "I take note of the door",
+    "I take a seat by the fire",
+    "I take a look at the map",
+    "I take stock of the situation",
+    "I take charge of the group",
+    "I take my leave of the innkeeper",
+    "I accept the risk",
+    "I take the lead",
+])
+def test_an_abstract_noun_never_becomes_an_item(said):
+    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    assert not [i for i in out if i.get("op") == "give"], said
+
+
+@pytest.mark.parametrize("said,item", [
+    ("I take the brass key", "brass key"),
+    ("I buy a lantern", "lantern"),
+    ("I pick up the leather satchel", "leather satchel"),
+    ("I pocket the silver ring", "silver ring"),
+])
+def test_a_real_object_still_reaches_the_engine(said, item):
+    """The control. The stop-list must not turn the feature off — an inventory nothing
+    ever writes to is a field on a sheet, not a game."""
+    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    give = [i for i in out if i.get("op") == "give"]
+    assert give and give[0]["params"]["item"] == item
+
+
+def test_the_head_noun_decides_not_the_whole_phrase():
+    """"the offer of a room" is an offer; "a leather satchel" is a satchel. English puts
+    the head last, so the check reads from the end rather than looking for any match."""
+    assert judgement._is_a_thing("leather satchel")
+    assert judgement._is_a_thing("brass key")
+    assert not judgement._is_a_thing("generous offer")
+    assert not judgement._is_a_thing("long look")
+
+
+def test_a_plural_abstract_noun_is_refused_too():
+    """"I take my chances" is not two chances in a satchel."""
+    assert not judgement._is_a_thing("chances")
+    assert not judgement._is_a_thing("offers")

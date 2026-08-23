@@ -628,6 +628,53 @@ _THING = re.compile(
     r"(?=\s*(?:[.,;!?]|\band\b|\bfrom\b|\bto\b|\bfor\b|\bwith\b|$))", re.I)
 
 
+# Nouns that are never objects, however much they read like them after "I take". Found in
+# a live save: the Inventory tab listed "offer" and "scene on" beside a traveller's outfit,
+# because "I accept the offer" and "I take in the scene on the ridge" both parse as a
+# player picking something up. Every one of these came off a real sentence or is the same
+# shape as one — the list is a stop-list rather than a taste filter, so a word only earns
+# a place here if it cannot be a physical thing you could put in a satchel.
+_NOT_A_THING = frozenset("""
+offer chance opportunity moment breath look glance peek listen turn seat rest care
+time aim cover shelter refuge comfort courage heart hope faith note notice stock heed
+charge lead hold blame credit risk oath vow name word advice counsel deal bargain
+scene sight view air place position stand side part share step pace lay lie stroll
+walk stairs road path route way route trail direction watch guard vigil pause breather
+initiative action reaction move measure account stance grip liberty leave offence
+umbrage pride solace revenge vengeance revenge stock example lesson point issue matter
+""".split())
+
+# Idioms where the verb is not acquisition at all. Matched on what immediately follows the
+# verb, because "take in", "take note of" and "take stock of" are single verbs wearing two
+# words — and "I take in the scene" is not a theft.
+_IDIOM = re.compile(
+    r"^\s*(?:in|note|stock|cover|charge|heed|aim|offence|offense|umbrage|refuge|shelter|"
+    r"comfort|solace|pride|issue|leave|part|place|root|shape|effect|hold\s+of|"
+    # A possessive in front of the idiom: "I take my leave", "I take our chances". The
+    # first cut matched only what sat immediately after the verb, so "I take my leave of
+    # the innkeeper" read on and came back with the innkeeper.
+    r"(?:my|our|your|his|her|their)\s+(?:leave|turn|chances?|time|rest|place|position|"
+    r"aim|revenge|vengeance|bearings|pick|seat|stand|due|share)|"
+    r"a\s+(?:look|glance|peek|seat|moment|breath|break|rest|turn|step|walk|stroll|chance|"
+    r"stand|hint|guess|dislike|liking|shine|swing|bow|knee))\b", re.I)
+
+
+def _is_a_thing(item: str) -> bool:
+    """Whether this noun phrase could be something you carry.
+
+    The head noun is the one that decides — "the offer of a room" is an offer, and
+    "a leather satchel" is a satchel. Read from the end, because English puts the head
+    last: adjectives pile up in front of it.
+    """
+    words = [w for w in str(item or "").lower().replace("-", " ").split() if w]
+    if not words:
+        return False
+    head = words[-1]
+    if head.endswith("s") and head[:-1] in _NOT_A_THING:
+        return False
+    return head not in _NOT_A_THING
+
+
 def inject_goods(raw_intents, player_text: str, scene) -> list:
     """Make a declared purchase or pick-up reach the engine.
 
@@ -658,11 +705,19 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
         if not found:
             continue
         rest = player_text[found.end():]
+        # "I take in the scene", "I take a moment", "I take cover". The verb is not
+        # acquisition when these follow it, and reading on for a noun phrase is how an
+        # afternoon's reflection became a line in the inventory.
+        if _IDIOM.match(rest):
+            continue
         thing = _THING.search(rest)
         if not thing:
             continue
         item = " ".join(thing.group(1).split()).strip(" -'")
         if not item or len(item) < 3:
+            continue
+        # And the noun itself has to be something a satchel could hold.
+        if not _is_a_thing(item):
             continue
         params = {"item": item}
         if gains:

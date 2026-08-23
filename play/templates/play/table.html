@@ -143,7 +143,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .06), rgba(8, 6, 4, .24)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     box-shadow: 0 -1px 0 rgba(221,196,142,.10), 0 -18px 44px rgba(0,0,0,.45);
   }
   form { display: flex; gap: 10px; }
@@ -355,7 +362,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
     box-shadow: inset 0 0 0 1px rgba(221,196,142,.08), 0 24px 80px rgba(0,0,0,.9),
                 0 0 60px rgba(var(--bloodglow), .18);
@@ -380,7 +394,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border: 1px solid var(--gold-dim);
     position: relative; overflow: hidden;
     transition: border-color .2s ease, transform .16s ease, box-shadow .25s ease;
@@ -485,7 +506,14 @@
     background:
       linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
       url("{% static 'img/card-leather.jpg' %}") #1d1710;
-    background-size: auto, 340px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     box-shadow: 0 1px 0 #0a0806, 0 2px 0 rgba(221,196,142,.10);
   }
   .sigil { width: 46px; height: 62px; flex: none; color: var(--blood); }
@@ -524,7 +552,14 @@
     background:
       linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 340px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     box-shadow: inset 0 1px 0 rgba(221,196,142,.16);
   }
   .sheetbody { overflow-y: auto; padding: 26px 44px 70px; position: relative; z-index: 1; }
@@ -791,7 +826,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border: 1px solid rgba(201, 162, 39, .25);
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
                 inset 0 1px 0 rgba(255, 230, 150, .08),

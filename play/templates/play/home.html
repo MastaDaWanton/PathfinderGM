@@ -58,7 +58,14 @@
     background:
       linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 340px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
   }
   .tab b { display: inline-block; margin-left: 7px; color: var(--dim);
@@ -73,7 +80,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border: 1px solid var(--brew-dim);
     border-radius: 3px; padding: 18px 22px; margin-bottom: 26px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
@@ -219,7 +233,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
     padding: 22px 26px; box-shadow: 0 8px 32px rgba(0, 0, 0, .5),
     inset 0 1px 0 rgba(255, 230, 150, .06);
@@ -324,7 +345,14 @@
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
     border-color: rgba(201, 162, 39, .25);
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
                 inset 0 1px 0 rgba(255, 230, 150, .08);
@@ -399,7 +427,14 @@
     background:
       linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
       url("{% static 'img/card-leather.jpg' %}") #1d1710;
-    background-size: auto, 340px auto;
+    background-size: auto, cover;
+    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
+       every 340-400px, which reads as texture on a small card and as wallpaper
+       the moment a panel is taller or wider than the tile — the crafting shelf
+       and the character panel both are. `cover` on a fixed attachment also keeps
+       the grain still while the contents scroll over it. */
+    background-repeat: no-repeat;
+    background-attachment: scroll, fixed;
   }
   /* 4. Embers, third generation: thicker and deeper. Four layers now — a new
      nearest sheet of big soft coals drifting fast in front, then the bright
