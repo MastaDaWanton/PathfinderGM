@@ -99,6 +99,36 @@ def control_blood_for(actor, path: str) -> int:
     return control_blood(actor)["a" if taken.index(key) == 0 else "b"]
 
 
+def table_die(actor, column: str) -> str:
+    """A die the class prints on its own table for this level — "blood", "fist".
+
+    Read by column name rather than by a list of the ones this app knows, which is the
+    same reason the class tab draws whatever columns it finds: a class that ships with
+    a die nobody here has heard of still works.
+    """
+    row = classes_mod.table_at(getattr(actor, "char_class", "") or "",
+                               int(getattr(actor, "level", 1) or 1))
+    return str(row.get(column) or "")
+
+
+def multiply_dice(notation: str, times: int) -> str:
+    """"1d8" three times over is "3d8".
+
+    The count multiplies and the face does not, which is what a damage multiplier means
+    in 1e — three times a d8 is three d8s, not one d24. A flat bonus rides along
+    multiplied too, because it is part of the thing being tripled.
+    """
+    m = re.fullmatch(r"\s*(\d*)d(\d+)\s*(?:([+-])\s*(\d+))?\s*", str(notation or ""),
+                     re.I)
+    if not m or times < 1:
+        return str(notation or "")
+    count = max(1, int(m.group(1) or 1)) * int(times)
+    out = f"{count}d{m.group(2)}"
+    if m.group(3):
+        out += f"{m.group(3)}{int(m.group(4)) * int(times)}"
+    return out
+
+
 def resolve_effect(spec: dict, actor, path: str = "") -> dict:
     """One effect with its scaling worked out for this character.
 
@@ -119,6 +149,13 @@ def resolve_effect(spec: dict, actor, path: str = "") -> dict:
             out["at_tier"] = reached[-1]
         else:
             out["inactive"] = True      # the character is not far enough along yet
+    if spec.get("dice_from"):
+        die = table_die(actor, spec["dice_from"])
+        if die:
+            out["dice"] = multiply_dice(die, int(spec.get("times", 1) or 1))
+            out["from_column"] = f"{spec['dice_from']} {die}"
+        else:
+            out["inactive"] = True      # this class prints no such column
     if spec.get("formula"):
         from . import resources
 

@@ -528,3 +528,63 @@ def test_a_class_that_does_not_branch_reads_zero_rather_than_failing():
     from rules import resources
 
     assert resources.evaluate("control_blood", load_pc("fixtures/pc-kesst.json")) == 0
+
+
+# --- multiples of the class table's own die -----------------------------------------------
+
+def _spiker(level=1):
+    built, problems = creation.build(bender(name="Spike", paths=["blood spike"]))
+    assert problems == []
+    pc = from_dict(built["sheet"])
+    pc.level = level
+    return pc
+
+
+def test_the_die_is_read_off_the_row_not_written_into_the_effect():
+    """"Blood DMG ×2" names a column and a multiplier. The number cannot be baked in:
+    a Blood Bender's blood die is 1d8 at first level and 5d12 at twentieth."""
+    spec = next(e for e in leveling.path_detail(
+        "blood bending", "blood spike")["effects"]["Blood Mine"] if e.get("dice_from"))
+    assert spec["dice_from"] == "blood" and spec["times"] == 2
+    assert "dice" not in spec
+
+
+def test_a_multiplier_multiplies_the_count_and_not_the_face():
+    """Three times a d8 is three d8s, not one d24 — what a damage multiplier means in
+    1e. A flat bonus is part of the thing being tripled, so it rides along."""
+    assert leveling.multiply_dice("1d8", 3) == "3d8"
+    assert leveling.multiply_dice("2d8", 2) == "4d8"
+    assert leveling.multiply_dice("1d6+2", 3) == "3d6+6"
+    assert leveling.multiply_dice("5d12", 1) == "5d12"
+
+
+def test_the_same_ability_grows_with_the_class_table():
+    spec = next(e for e in leveling.path_detail(
+        "blood bending", "blood spike")["effects"]["Blood Mine"] if e.get("dice_from"))
+    got = [leveling.resolve_effect(spec, _spiker(n), "blood spike")["dice"]
+           for n in (1, 4, 10, 20)]
+    assert got == ["2d8", "4d8", "8d8", "10d12"]
+
+
+def test_the_resolved_effect_says_where_the_die_came_from():
+    """The sheet's whole proposition: not "8d8" but "8d8, from blood 4d8"."""
+    spec = next(e for e in leveling.path_detail(
+        "blood bending", "blood spike")["effects"]["Blood Mine"] if e.get("dice_from"))
+    got = leveling.resolve_effect(spec, _spiker(10), "blood spike")
+    assert got["from_column"] == "blood 4d8"
+
+
+def test_a_class_printing_no_such_column_is_inactive_rather_than_wrong():
+    """Read by column name so a class with a die nobody here has heard of works. The
+    other half of that is a class that has none: better silent than invented."""
+    got = leveling.resolve_effect({"type": "damage", "dice_from": "blood", "times": 2},
+                                  load_pc("fixtures/pc-kesst.json"))
+    assert got.get("inactive") is True
+
+
+def test_nothing_is_left_needing_the_blood_die():
+    """It was the last of the three shapes the conversion could not express."""
+    for name in leveling.paths_for("blood bending"):
+        every = " ".join(n for names in leveling.path_detail(
+            "blood bending", name)["needs"].values() for n in names)
+        assert "Blood die" not in every, name

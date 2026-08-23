@@ -189,8 +189,18 @@ def convert(name: str, text: str) -> tuple[list[dict], list[str]]:
         # firing *from* one, Blood Teleportation trading places with one. The scene can
         # hold them now; targeting one still has nowhere to go.
         needs.append("targeting a particular Blood Pool on the map")
-    if re.search(r"blood dmg\s*[×x]\s*\d", low):
-        needs.append("a multiple of the class table's Blood die")
+    # "Blood DMG ×3" is a multiple of the die the class table already carries per
+    # level. The number is not written here because it is not fixed: a Blood Bender's
+    # blood die is 1d8 at first level and 5d12 at twentieth, so the effect names the
+    # column and the multiplier and the sheet reads the row.
+    for m in re.finditer(r"blood dmg\s*[×x]\s*(\d+)", low):
+        out.append({"type": "damage", "dice_from": "blood",
+                    "times": int(m.group(1)), "damage_type": "untyped",
+                    "lethality": "lethal"})
+    # Plain "Deals Blood DMG" with no multiplier is the die once.
+    if not re.search(r"blood dmg\s*[×x]", low) and re.search(r"\bblood dmg\b", low):
+        out.append({"type": "damage", "dice_from": "blood", "times": 1,
+                    "damage_type": "untyped", "lethality": "lethal"})
     return out, sorted(set(needs))
 
 
