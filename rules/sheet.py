@@ -17,6 +17,7 @@ from pathlib import Path
 
 import re
 
+from . import houserules
 from .dice import Modifier
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
@@ -915,9 +916,23 @@ class Actor:
         A class may be exempted through `temp_hp.stacks`, and Blood Bending is: hit points
         are its resource, and a Coagulator layering Blood Sponge over a ward is the path
         working as written rather than a rule being broken.
+
+        The *magic effect stacking* house rule is a third, distinct behaviour: different
+        sources each keep their own pool, but the same source reapplies — its pool is set
+        back to the new value, never added to. That last clause is what separates it from
+        `temp_hp.stacks`, where same-source accumulation is the class's whole design.
         """
         amount = max(0, int(amount))
         existing = next((p for p in self.temp_pools if p.source == source), None)
+
+        if houserules.magic_stacking() and not self.allows("temp_hp.stacks"):
+            if existing:
+                existing.amount, existing.rounds_left = amount, rounds
+                return {"temp_hp": self.temp_hp, "refreshed": True, "source": source,
+                        "stacked": True}
+            self.temp_pools.append(TempPool(amount, source, rounds))
+            return {"temp_hp": self.temp_hp, "added": amount, "source": source,
+                    "stacked": True}
 
         if self.allows("temp_hp.stacks"):
             if existing:

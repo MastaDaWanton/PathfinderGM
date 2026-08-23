@@ -181,9 +181,10 @@ def benches() -> list[Bench]:
                   "campaign format; sandbox play works today.",
         ),
         Bench(
-            id="rulesets", name="Rulesets", dir="rulesets", ready=False, shipped=0,
-            blurb="Toggles and numeric overrides — max hit points at 1st level, crit "
-                  "confirmation off. See docs/homebrew-rules.md.",
+            id="rulesets", name="Rulesets", dir="rulesets", shipped=2,
+            shipped_label="house rules to set",
+            blurb="The table's own rules. Point-buy tiers up to the full hundred, and "
+                  "whether magic effects from different sources stack.",
         ),
     ]
 

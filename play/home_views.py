@@ -360,6 +360,24 @@ def creation_options(request):
     return JsonResponse(creation.options())
 
 
+def house_rules(request):
+    """Read or change the table's house rules.
+
+    GET answers with what is in effect and the tiers on offer; POST changes it and
+    answers the same shape, so the page never has to guess what the server settled on.
+    A refused change comes back with the rules unchanged and the reason named.
+    """
+    from rules import houserules
+
+    if request.method == "POST":
+        body = json.loads(request.body or "{}")
+        rules, problems = houserules.set_active(body)
+        if problems:
+            return JsonResponse({"rules": rules, "problems": problems}, status=400)
+    return JsonResponse({"rules": houserules.active(),
+                         "tiers": houserules.POINT_BUY_TIERS})
+
+
 @require_POST
 def create_character(request):
     """Make a character, or say everything wrong with the attempt at once.

@@ -256,6 +256,16 @@
                      cursor: pointer; font-size: 14px; }
   .skillgrid label.classskill { color: var(--gold); }
   .skillgrid input { accent-color: #c9a86a; }
+  .featlist { max-height: 300px; overflow-y: auto; margin-top: 8px;
+              border: 1px solid rgba(201,168,106,.22); border-radius: 2px; }
+  .featrow { display: flex; gap: 12px; align-items: baseline; width: 100%;
+             text-align: left; padding: 7px 12px; background: none; border: 0;
+             border-bottom: 1px solid rgba(201,168,106,.10); cursor: pointer;
+             color: var(--ink); font-size: 14px; }
+  .featrow:last-child { border-bottom: 0; }
+  .featrow:hover { background: rgba(201,168,106,.08); }
+  .featrow b { color: var(--gold); font-weight: 600; white-space: nowrap; }
+  .featrow span { color: var(--dim); font-size: 12.5px; font-style: italic; }
   .problems { border: 1px solid #4a2620; background: rgba(110,31,31,.12);
               border-radius: 2px; padding: 10px 14px; margin: 12px 0; color: #d08a7c; }
   .problems div { padding: 2px 0; }
@@ -987,6 +997,7 @@ function paneHomebrew() {
         you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
       ${b.id === "spells" ? paneSpells() : ""}
+      ${b.id === "rulesets" ? paneRules() : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
@@ -1015,6 +1026,53 @@ function paneHomebrew() {
           : `<span class="pill soon">not built yet</span>`}
         ${b.waiting ? `<div class="waiting">${esc(b.waiting)}</div>` : ""}
       </button>`).join("")}</div>`;
+}
+
+// --- House rules: the toggles the Rulesets bench holds ----------------------------------
+let RULES = null;   // { rules, tiers } while the bench is open
+
+function paneRules() {
+  if (!RULES) return `<p class="note">Reading the house rules…</p>`;
+  const r = RULES.rules;
+  return `
+    <h2 class="sect">Point buy</h2>
+    <p class="note">The budget the forge builds against. One tier at a time — a budget
+      is a single number, and the forge and the validator read this same one. The first
+      four are the Core Rulebook's own table; past 25 is this table's homebrew.</p>
+    <div class="cards tight">${RULES.tiers.map(t => `
+      <button class="card pick ${r.point_buy === t.points ? "on" : ""}"
+              data-hbtier="${t.points}">
+        <h3>${t.points} points</h3>
+        <em>${esc(t.name)}${t.book ? "" : " · homebrew"}</em>
+      </button>`).join("")}</div>
+
+    <h2 class="sect">Magic effect stacking</h2>
+    <p class="note">By the book, magical effects from different sources do not stack —
+      the best one applies. This lets them stack; the same source still reapplies
+      rather than piling onto itself, so two castings of one ward stay one ward.
+      Today this reaches temporary hit points, the engine's live no-stack rule;
+      typed bonuses join it when the engine executes them at all.</p>
+    <button class="card pick ${r.magic_stacking ? "on" : ""}" data-hbstack="1"
+            style="max-width:340px">
+      <h3>${r.magic_stacking ? "Stacking — on" : "By the book — off"}</h3>
+      <em>${r.magic_stacking
+        ? "Different sources add together; the same source reapplies."
+        : "The best source applies; the rest wait their turn."}</em>
+    </button>
+    <div id="ruleserr"></div>`;
+}
+
+async function setHouseRule(patch) {
+  const r = await fetch("/api/homebrew/rules", {
+    method: "POST", headers: { "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+    body: JSON.stringify(patch),
+  });
+  const d = await r.json();
+  RULES = { rules: d.rules, tiers: d.tiers || RULES.tiers };
+  render();
+  if (!r.ok) $("#ruleserr").innerHTML =
+    `<div class="problems">${(d.problems || []).map(p => `<div>${esc(p)}</div>`).join("")}</div>`;
 }
 
 function paneCharacters() {
@@ -1047,6 +1105,25 @@ function paneCharacters() {
 // is what the thing is. The server is the authority on every rule — the counters here are
 // a courtesy, and the submit round-trips the whole form and renders every problem at once.
 let FORGE = null;   // { opts, form } while the forge is open
+
+function featName(fid) {
+  const found = FORGE?.opts.feats.find(x => x.id === fid);
+  return found ? found.name : fid;
+}
+
+function featMatches() {
+  // A fragment rather than part of paneForge, so typing can repaint only this box:
+  // re-rendering the whole pane on every keystroke throws the caret out of the input.
+  const q = (FORGE.featq || "").trim().toLowerCase();
+  if (q.length < 2) return `<p class="note">Type two letters to search. Chosen feats
+    sit above as buttons — click one to take it back off.</p>`;
+  const hits = FORGE.opts.feats.filter(x =>
+    !FORGE.form.feats.includes(x.id) && x.name.toLowerCase().includes(q)).slice(0, 24);
+  if (!hits.length) return `<p class="note">No feat matches “${esc(FORGE.featq)}”.</p>`;
+  return `<div class="featlist">${hits.map(x => `
+    <button class="featrow" data-craddfeat="${esc(x.id)}"><b>${esc(x.name)}</b>${
+      x.prereq ? `<span>${esc(x.prereq)}</span>` : ""}</button>`).join("")}</div>`;
+}
 
 function forgeDefaults(opts) {
   return {
@@ -1152,9 +1229,14 @@ function paneForge() {
       <span>one for everyone${f.race === "human" ? ", one for a human" : ""}${
         f.class === "fighter" ? ", one for a fighter" : ""}</span>
       <b>${f.feats.length} / ${fb}</b></div>
-    <input type="text" data-cr="featstext" value="${esc(f.feats.join(", "))}"
-      placeholder="By name, comma-separated — Power Attack, Toughness…">
-    <p class="note">The Feats bench on the homebrew tab lists all 1,474 with prerequisites.</p>
+    <div style="margin:6px 0 10px">${f.feats.map(fid => `
+      <button class="quiet" data-crunfeat="${esc(fid)}" title="remove">
+        ${esc(featName(fid))} ✕</button>`).join(" ")
+      || `<span class="note">None chosen yet.</span>`}</div>
+    <input type="text" id="featsearch" data-cr="featsearch" value="${esc(FORGE.featq || "")}"
+      placeholder="Search all ${opts.feats.length} feats — Power Attack, Toughness…"
+      autocomplete="off">
+    <div id="featmatches">${featMatches()}</div>
 
     ${sc ? `<h2 class="sect">Spells known</h2>
       <div class="budget ${f.spellbook.length > sc ? "over" : ""}">
@@ -1209,10 +1291,15 @@ document.addEventListener("input", e => {
   if (!FORGE || !e.target.dataset) return;
   const f = FORGE.form, key = e.target.dataset.cr;
   if (key === "name" || key === "heritage") { f[key] = e.target.value; return; }
-  // The comma lists parse on input and render on submit, so typing is never fought.
-  if (key === "featstext") {
-    f.feats = e.target.value.split(",").map(s => s.trim()).filter(Boolean); return;
+  // Repaints only the results box: a full render on every keystroke would throw the
+  // caret out of the very input being typed in.
+  if (key === "featsearch") {
+    FORGE.featq = e.target.value;
+    const box = $("#featmatches");
+    if (box) box.innerHTML = featMatches();
+    return;
   }
+  // The comma list parses on input and renders on submit, so typing is never fought.
   if (key === "spellstext") {
     f.spellbook = e.target.value.split(",").map(s => s.trim()).filter(Boolean); return;
   }
@@ -1245,6 +1332,19 @@ document.addEventListener("click", async e => {
     if (cls) { f.class = cls.dataset.crclass; render(); return; }
     const bonus = e.target.closest("[data-crbonus]");
     if (bonus) { f.bonus_ability = bonus.dataset.crbonus; render(); return; }
+    const addfeat = e.target.closest("[data-craddfeat]");
+    if (addfeat) {
+      f.feats = [...new Set([...f.feats, addfeat.dataset.craddfeat])];
+      render();
+      // Back into the search, because the next feat is usually the next thing typed.
+      const s = $("#featsearch"); if (s) { s.focus(); s.select(); }
+      return;
+    }
+    const unfeat = e.target.closest("[data-crunfeat]");
+    if (unfeat) {
+      f.feats = f.feats.filter(x => x !== unfeat.dataset.crunfeat);
+      render(); return;
+    }
     const up = e.target.closest("[data-abup]");
     if (up) { f.abilities[up.dataset.abup] += 1; render(); return; }
     const dn = e.target.closest("[data-abdn]");
@@ -1297,9 +1397,18 @@ document.addEventListener("click", async e => {
     return;
   }
 
+  const tier = e.target.closest("[data-hbtier]");
+  if (tier) { await setHouseRule({ point_buy: Number(tier.dataset.hbtier) }); return; }
+  const stack = e.target.closest("[data-hbstack]");
+  if (stack) { await setHouseRule({ magic_stacking: !RULES.rules.magic_stacking }); return; }
+
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {
     BENCH = await (await fetch(`/api/bench/${encodeURIComponent(bench.dataset.bench)}`)).json();
+    if (BENCH.bench.id === "rulesets") {
+      RULES = await (await fetch("/api/homebrew/rules")).json();
+      render(); return;
+    }
     if (BENCH.bench.builder === "effects") {
       if (!CAT) CAT = await (await fetch("/api/effects/catalogue")).json();
       if (!KINDS) {

@@ -18,7 +18,7 @@ What is deliberately simple, stated so it reads as a decision:
 """
 from __future__ import annotations
 
-from . import casting, classes as classes_mod, feats as feats_mod
+from . import casting, classes as classes_mod, feats as feats_mod, houserules
 from .sheet import from_dict
 from .tables import ARMOUR, SKILLS, WEAPONS
 
@@ -60,7 +60,9 @@ RACES: dict[str, dict] = {
 # approximation of it is wrong at one end or the other.
 POINT_COSTS = {7: -4, 8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7,
                16: 10, 17: 13, 18: 17}
-POINT_BUDGET = 20
+# The budget itself lives in rules/houserules.py — it is a tier the player picks on
+# the homebrew tab, 20 ("High fantasy") by default, and reading it from a constant
+# here is how a forge and a validator come to disagree.
 
 # What a first-level character of each class walks out the door holding.
 #
@@ -99,6 +101,19 @@ SPELLS_KNOWN: dict[str, object] = {
 }
 
 
+def _feat_index() -> list[dict]:
+    from collections import Counter
+
+    everything = feats_mod.all_feats()
+    seen = Counter(f.name for f in everything.values())
+    return sorted(
+        ({"id": fid,
+          "name": f.name if seen[f.name] == 1 else f"{f.name} ({f.source})",
+          "prereq": f.prerequisites_text.rstrip(".")}
+         for fid, f in everything.items()),
+        key=lambda row: row["name"].lower())
+
+
 def options() -> dict:
     """Everything the creation wizard's forms are drawn from — one payload, no guessing."""
     return {
@@ -113,9 +128,18 @@ def options() -> dict:
                      "features": classes_mod.features_at(cid, 1)}
                     for cid, c in sorted(classes_mod.all_classes().items())
                     if cid != "blood bending" or True],
-        "point_costs": POINT_COSTS, "point_budget": POINT_BUDGET,
+        # The budget is the house rule's, not the constant's: a forge that showed 20
+        # while the validator enforced 40 would refuse characters its own form said
+        # were legal.
+        "point_costs": POINT_COSTS, "point_budget": houserules.point_budget(),
         "skills": sorted(SKILLS),
         "spells_known": SPELLS_KNOWN,
+        # The full feat index, so the forge can offer a picker rather than a spelling
+        # test. Names alone: the bench remains the place to read a feat in full.
+        # 148 names collide with a Mythic Adventures twin — two rows both reading
+        # "Dodge" is a coin flip presented as a choice, so a collided name carries
+        # its source and only a collided one does.
+        "feats": _feat_index(),
     }
 
 
@@ -157,8 +181,9 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
             score = 10
         spent += POINT_COSTS.get(score, 0)
         abilities[ab] = score
-    if spent > POINT_BUDGET:
-        problems.append(f"That spends {spent} of {POINT_BUDGET} points.")
+    budget = houserules.point_budget()
+    if spent > budget:
+        problems.append(f"That spends {spent} of {budget} points.")
 
     bonus_ab = str(payload.get("bonus_ability", "")).strip().lower()
     if race:
