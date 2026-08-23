@@ -203,7 +203,15 @@
     background:
       linear-gradient(rgba(16, 12, 8, .06), rgba(8, 6, 4, .24)),
       url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    /* One piece of leather, not a wall of 400px tiles. The panel is the tallest thing on
+       the page and scrolls, so a repeating swatch put a visible seam every 400px down the
+       character sheet — the grain reads as a texture at this size and as wallpaper the
+       moment it repeats. `cover` on a fixed attachment keeps the grain still while the
+       sheet scrolls over it, which is what a page lying on leather does. */
+    background-repeat: no-repeat;
+    background-size: auto, cover;
+    background-position: center, center;
+    background-attachment: scroll, fixed;
     box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
   }
   aside h2 {
