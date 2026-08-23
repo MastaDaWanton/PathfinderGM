@@ -1975,6 +1975,11 @@ def _progression(actor: Actor) -> dict:
         "skill_ranks": cls.get("skill_ranks", 2),
         "class_skills": list(cls.get("class_skills") or []),
         "paths_offered": leveling.paths_for(cid),
+        # What each branch actually does, as the class file states it. The tab showed
+        # four names and a line saying they granted nothing; now it shows the abilities
+        # at every Control Blood tier, in the author's own words.
+        "path_detail": {n: leveling.path_detail(cid, n)
+                        for n in leveling.paths_for(cid)},
         "paths_taken": list(actor.paths),
         "rows": leveling.preview(cid, actor.level or 1, actor.paths),
         "next": (leveling.gains_at(cid, int(actor.level or 1) + 1)

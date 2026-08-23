@@ -155,14 +155,45 @@ def test_the_class_tab_exists_and_draws_the_table():
     assert 'id="levelup"' in page
 
 
-def test_the_page_says_plainly_that_the_paths_grant_nothing_yet():
-    """The one thing this must not do is imply the branches work. They are recorded
-    and displayed; they grant nothing until somebody writes them into the class file."""
+def test_the_paths_carry_the_authors_own_abilities():
+    """They were in the author's document all along, tiered by Control Blood level —
+    which is exactly what `control blood 1a` through `5b` on the class table means.
+    `tools/import_blood_paths.py` lifted them in without paraphrase."""
+    for name in ("blood spike", "coagulator", "blood commander", "battle blood"):
+        det = leveling.path_detail("blood bending", name)
+        assert det, name
+        assert det["role"], name
+        # Not every path carries a blurb: Blood Commander's heading is followed
+        # straight by its table in the document, and inventing one line of flavour is
+        # the same mistake as inventing eighty abilities.
+        assert "summary" in det
+        assert sorted(det["tiers"]) == ["1", "2", "3", "4", "5"], name
+        assert det["abilities"], name
+
+
+def test_a_scaled_ability_finds_the_text_written_under_its_bare_name():
+    """A tier row names "Blood Burst 40ft"; the description is written once under
+    "Blood Burst". Without resolving that, four ranks in five rendered blank."""
+    bb = leveling.path_detail("blood bending", "battle blood")
+    assert bb["resolves"]["Blood Burst 40ft"] == "Blood Burst"
+    assert bb["abilities"]["Blood Burst"]
+
+
+def test_abilities_the_document_never_describes_are_recorded_as_such():
+    """Battle Blood's table names four the document never writes up. Recorded rather
+    than dropped, so the page can say so instead of showing a blank nobody explains."""
+    bb = leveling.path_detail("blood bending", "battle blood")
+    assert "Mighty Blood Rage" in bb["undescribed"]
+    assert leveling.path_detail("blood bending", "coagulator")["undescribed"] == []
+
+
+def test_the_page_shows_the_tiers_and_is_honest_about_the_engine():
     from pathlib import Path
 
     page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
-    assert "not\n          in the class file yet" in page or \
-           "not" in page and "grants nothing until they are written" in page
+    assert "Control Blood ${esc(tier)}" in page
+    assert "the source does not describe it" in page
+    assert "the engine does not" in page and "execute these yet" in page
 
 
 # --- over the wire ---------------------------------------------------------------------

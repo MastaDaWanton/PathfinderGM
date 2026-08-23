@@ -33,9 +33,24 @@ MAX_LEVEL = 20
 
 
 def paths_for(class_id: str) -> list[str]:
-    """The branches this class offers, or [] when it offers none."""
+    """The branches this class offers, or [] when it offers none.
+
+    A class may declare its paths as bare names or as a mapping of name to detail.
+    Iterating a dict yields its keys, so both shapes read the same here — which is what
+    let the four Blood Bending names become four full paths without this line changing.
+    """
     found = classes_mod.get(class_id).get("paths") or []
     return [str(p) for p in found if str(p).strip()]
+
+
+def path_detail(class_id: str, name: str) -> dict:
+    """Everything the class file says about one path. {} when it says only the name."""
+    found = classes_mod.get(class_id).get("paths")
+    if isinstance(found, dict):
+        got = found.get(str(name).strip().lower())
+        if isinstance(got, dict):
+            return got
+    return {}
 
 
 def needs_path(class_id: str) -> bool:

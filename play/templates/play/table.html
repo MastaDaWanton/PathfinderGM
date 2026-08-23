@@ -515,6 +515,18 @@
   /* The abilities block spans, because six scores in a 310px column wrap to three
      lines and the six numbers everything else is derived from should read at a glance. */
   .card.wide { grid-column: 1 / -1; }
+  .pathblock { border-left: 2px solid rgba(201,168,106,.22); padding: 2px 0 2px 14px;
+               margin: 14px 0; }
+  .pathblock.mine { border-left-color: var(--gold); }
+  .pathblock h4 { font: 400 15px/1.3 Cinzel, serif; color: var(--gold); margin: 0 0 4px; }
+  .pathblock h4 small { color: var(--dim); font-family: Palatino, serif;
+                        font-style: italic; font-size: 12px; }
+  .tier { margin-top: 9px; }
+  .tier > b { font-size: 12px; color: var(--dim); letter-spacing: .05em; }
+  .ab-line { display: grid; grid-template-columns: minmax(140px, 210px) 1fr; gap: 12px;
+             padding: 3px 0; font-size: 13.5px; border-bottom: 1px solid rgba(201,168,106,.07); }
+  .ab-line span { color: var(--ink); }
+  .ab-line em { color: var(--dim); font-style: normal; }
   .abilities { display: grid; gap: 10px;
                grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); }
   .ab { display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -1909,12 +1921,31 @@ function tabClass(s) {
           p.paths_taken.length
             ? `You follow <b>${p.paths_taken.map(esc).join("</b>, <b>")}</b>.`
             : "This character has none recorded."}</div>
-        <div class="terms">${p.paths_offered.map(x => `
-          <div class="t"><span>${esc(x)}</span><b>${
-            p.paths_taken.includes(x) ? "followed" : "—"}</b></div>`).join("")}</div>
-        <div class="why" style="margin-top:8px">The abilities behind each path are not
-          in the class file yet — see its own note. Choosing one is recorded here and
-          grants nothing until they are written.</div>` : ""}
+        ${p.paths_offered.map(x => {
+          const det = (p.path_detail || {})[x] || {};
+          const mine = p.paths_taken.includes(x);
+          return `<div class="pathblock ${mine ? "mine" : ""}">
+            <h4>${esc(det.name || x)}${det.role ? ` <small>${esc(det.role)}</small>` : ""}
+              ${mine ? '<span class="pill now">followed</span>' : ""}</h4>
+            ${det.summary ? `<div class="why">${esc(det.summary)}</div>` : ""}
+            ${det.global_rule ? `<div class="why"><b>Global rule.</b> ${
+              esc(det.global_rule)}</div>` : ""}
+            ${Object.entries(det.tiers || {}).map(([tier, names]) => `
+              <div class="tier"><b>Control Blood ${esc(tier)}</b>
+                ${names.map(n => {
+                  const key = (det.resolves || {})[n];
+                  const text = key ? (det.abilities || {})[key] : "";
+                  return `<div class="ab-line"><span>${esc(n)}</span>
+                    <em>${text ? esc(text)
+                      : "named on the table; the source does not describe it"}</em>
+                  </div>`;
+                }).join("")}</div>`).join("")}
+          </div>`;
+        }).join("")}
+        <div class="why" style="margin-top:8px">Abilities are tiered by Control Blood
+          level, which is what <b>control blood 1a</b> through <b>5b</b> on the table
+          above means. The text is the class document's own; the engine does not
+          execute these yet — they are yours to invoke at the table.</div>` : ""}
       ${p.next ? `
         <h3 style="margin-top:20px">Next level</h3>
         <div class="terms">
