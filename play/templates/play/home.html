@@ -283,6 +283,20 @@
   .go.danger:hover { border-color: rgba(214,72,72,.9); color: #fff0ea; }
   .quiet.danger { border-color: rgba(150,26,26,.45); color: #d08a7c; }
   .quiet.danger:hover { border-color: rgba(214,72,72,.85); color: #ffb9a8; }
+  .rolecard { border: 1px solid rgba(201,168,106,.22); border-radius: 2px;
+              padding: 13px 16px; margin-bottom: 12px; }
+  .rolecard h3 { font: 400 16px/1 Cinzel, serif; color: var(--gold); margin: 0 0 4px; }
+  .rolefields { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 9px; }
+  .rolefields label { display: flex; flex-direction: column; gap: 3px; flex: 1 1 190px;
+                      font-size: 11.5px; color: var(--dim); }
+  .rolefields select, .rolefields input { padding: 7px 9px; font: inherit;
+    font-size: 13px; color: var(--ink); border-radius: 2px;
+    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a; }
+  .keyrow { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .keyrow span:first-child { flex: 0 0 140px; color: var(--dim); font-size: 13px; }
+  .keyrow input { flex: 1; padding: 7px 9px; font: inherit; font-size: 13px;
+    color: var(--ink); border-radius: 2px;
+    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a; }
   .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
@@ -618,6 +632,7 @@ const STATE = {{ state_json|safe }};
 // Who was just forged, if the forge sent us back here. Opens on the roster rather than
 // the shelf, so the character that was made is the thing on screen.
 const MADE = new URLSearchParams(location.search).get("made") || "";
+let SETTINGS = null;   // { roles, providers, keys, installed } once opened
 let TAB = MADE ? "characters" : "worlds";
 let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
@@ -707,6 +722,8 @@ const TABS = [
   { id: "worlds", name: "Available worlds", count: () => STATE.worlds.length },
   { id: "homebrew", name: "Homebrew", count: () => STATE.authored },
   { id: "characters", name: "Recent characters", count: () => STATE.recent.length },
+  // No count: "Settings 3" would be a number about nothing.
+  { id: "settings", name: "Settings", count: () => "" },
 ];
 
 function tabs() {
@@ -1154,6 +1171,91 @@ async function setHouseRule(patch) {
     `<div class="problems">${(d.problems || []).map(p => `<div>${esc(p)}</div>`).join("")}</div>`;
 }
 
+function paneSettings() {
+  if (!SETTINGS) return `<p class="note">Reading the model settings…</p>`;
+  const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
+  return `
+    <h2 class="sect">Who does which job</h2>
+    <p class="note">Three jobs, and they are genuinely different work. Everything ships
+      pointed at Ollama on this machine, which needs no key and sends nothing anywhere;
+      a hosted provider needs a key below.</p>
+    ${SETTINGS.roles.map(r => `
+      <div class="rolecard">
+        <h3>${esc(r.label)}</h3>
+        <div class="why">${esc(r.why)}</div>
+        <div class="rolefields">
+          <label>Provider
+            <select data-role="${esc(r.id)}" data-field="provider">
+              ${SETTINGS.providers.map(p => `<option value="${esc(p.id)}"
+                ${p.id === r.provider ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
+            </select></label>
+          <label>Model
+            <input type="text" data-role="${esc(r.id)}" data-field="model"
+              list="ollamamodels" value="${esc(r.model || "")}"
+              placeholder="llama3.1:8b"></label>
+          <label>Host
+            <input type="text" data-role="${esc(r.id)}" data-field="host"
+              value="${esc(r.host || "")}"
+              placeholder="${esc(byId[r.provider]?.host || "")}"></label>
+        </div>
+        ${byId[r.provider] && !byId[r.provider].key
+          ? `<div class="why">${esc(byId[r.provider].note || "")}</div>` : ""}
+      </div>`).join("")}
+    <datalist id="ollamamodels">${(SETTINGS.installed || [])
+      .map(m => `<option value="${esc(m)}">`).join("")}</datalist>
+
+    <h2 class="sect">API keys</h2>
+    <p class="note">Kept in a file beside your campaigns, on this machine only, never
+      in the app's own folder. A saved key is never sent back to this page — you see
+      that one is set and its last four characters. Type <code>clear</code> to remove
+      one.</p>
+    ${SETTINGS.providers.filter(p => p.key).map(p => {
+      const k = (SETTINGS.keys || {})[p.id] || {};
+      return `<div class="keyrow">
+        <span>${esc(p.name)}</span>
+        <input type="password" data-key="${esc(p.id)}" autocomplete="off"
+          placeholder="${k.set ? `set — …${esc(k.tail)}` : "not set"}">
+        ${k.set ? '<span class="pill now">set</span>' : ""}
+      </div>`;
+    }).join("")}
+
+    <div style="margin-top:18px">
+      <button class="go" id="savemodels">Save</button>
+      <span class="note" id="modelsaid" style="margin-left:12px"></span>
+    </div>
+    <div id="modelerr"></div>`;
+}
+
+async function saveModelSettings() {
+  const roles = {};
+  document.querySelectorAll("[data-role]").forEach(el => {
+    roles[el.dataset.role] = roles[el.dataset.role] || {};
+    roles[el.dataset.role][el.dataset.field] = el.value;
+  });
+  const keys = {};
+  document.querySelectorAll("[data-key]").forEach(el => {
+    // An untouched field is blank because the real key is never sent here. Blank has
+    // to mean "leave it alone", or opening this page and saving would wipe every key.
+    if (el.value.trim()) keys[el.dataset.key] = el.value.trim();
+  });
+  const r = await fetch("/api/settings/models", {
+    method: "POST", headers: { "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+    body: JSON.stringify({ roles, keys }),
+  });
+  const body = await r.text();
+  let d; try { d = JSON.parse(body); } catch { d = { problems: [body.slice(0, 160)] }; }
+  if (!r.ok) {
+    $("#modelerr").innerHTML = `<div class="problems">${
+      (d.problems || ["could not save"]).map(p => `<div>${esc(p)}</div>`).join("")}</div>`;
+    return;
+  }
+  SETTINGS = d;
+  render();
+  const said = $("#modelsaid");
+  if (said) said.textContent = "Saved. The next turn uses it.";
+}
+
 function paneCharacters() {
   const forge = `<button class="go" data-forge style="margin-bottom:18px">
     Forge a character</button>`;
@@ -1435,6 +1537,7 @@ function render() {
   $("#pane").innerHTML =
     FORGE ? paneForge()
     : TAB === "worlds" ? paneWorlds()
+    : TAB === "settings" ? paneSettings()
     : TAB === "homebrew" ? paneHomebrew()
     : paneCharacters();
 }
@@ -1456,6 +1559,21 @@ document.addEventListener("input", e => {
     f.spellbook = e.target.value.split(",").map(s => s.trim()).filter(Boolean); return;
   }
 });
+
+document.addEventListener("change", e => {
+  const sel = e.target.closest('[data-field="provider"]');
+  if (sel && SETTINGS) {
+    // The host that goes with the provider you just picked, unless you have typed one.
+    const spec = SETTINGS.providers.find(p => p.id === sel.value);
+    const host = document.querySelector(
+      `[data-role="${sel.dataset.role}"][data-field="host"]`);
+    if (spec && host) host.value = spec.host || "";
+    const role = SETTINGS.roles.find(r => r.id === sel.dataset.role);
+    if (role) role.provider = sel.value;
+    render();
+    return;
+  }
+}, true);
 
 document.addEventListener("change", e => {
   if (!FORGE || !e.target.dataset || !e.target.dataset.crskill) return;
@@ -1519,7 +1637,14 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("click", async e => {
   const tab = e.target.closest("[data-tab]");
-  if (tab) { TAB = tab.dataset.tab; WORLD = null; BENCH = null; render(); return; }
+  if (tab) {
+    TAB = tab.dataset.tab; WORLD = null; BENCH = null;
+    if (TAB === "settings" && !SETTINGS) {
+      render();
+      SETTINGS = await (await fetch("/api/settings/models")).json();
+    }
+    render(); return;
+  }
 
   if (e.target.closest("[data-forge]")) {
     const opts = await (await fetch("/api/create/options")).json();
@@ -1616,6 +1741,7 @@ document.addEventListener("click", async e => {
   if (tier) { await setHouseRule({ point_buy: Number(tier.dataset.hbtier) }); return; }
   const stack = e.target.closest("[data-hbstack]");
   if (stack) { await setHouseRule({ magic_stacking: !RULES.rules.magic_stacking }); return; }
+  if (e.target.closest("#savemodels")) { await saveModelSettings(); return; }
   const cap = e.target.closest("[data-hbcap]");
   if (cap) { await setHouseRule({ ability_cap: Number(cap.dataset.hbcap) }); return; }
 

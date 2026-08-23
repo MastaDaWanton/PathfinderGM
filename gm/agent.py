@@ -48,16 +48,25 @@ class GMAgent:
     def __init__(self, world, engine, role: str = "narrator"):
         self.world = world
         self.engine = engine
-        cfg = settings.MODELS[role]
+        # From the settings page if the player has set one, from `settings.MODELS`
+        # if they have not. Read per agent rather than at import, so changing a model
+        # takes effect on the next turn instead of the next restart.
+        from play import modelcfg
+
+        cfg = modelcfg.for_role(role)
         self.model = cfg["model"]
         self.host = cfg["host"]
+        self.provider = cfg.get("provider", "ollama")
+        self.api_key = cfg.get("api_key", "")
         # Call 2 may run on a different model. It writes one or two sentences of prose
         # with no schema to satisfy, which is the half of the job a creative-writing tune
         # is good at and the half where its trouble with structured output cannot bite.
         # Falls back to the narrator, so a config that never heard of this still works.
-        prose = settings.MODELS.get("prose") or cfg
+        prose = modelcfg.for_role("prose") or cfg
         self.prose_model = prose.get("model", self.model)
         self.prose_host = prose.get("host", self.host)
+        self.prose_provider = prose.get("provider", self.provider)
+        self.prose_key = prose.get("api_key", "")
         self._echoes = None
 
     # --- Call 1 ---------------------------------------------------------------------
@@ -91,17 +100,22 @@ class GMAgent:
         attempts: list[Attempt] = []
         rejections: list[str] = []
 
-        schedule = [(self.model, self.host)] * max_attempts
-        spare = settings.MODELS.get("fallback") or {}
+        from play import modelcfg
+
+        schedule = [(self.model, self.host, self.provider, self.api_key)] * max_attempts
+        spare = modelcfg.for_role("fallback") or {}
         if spare.get("model") and spare["model"] != self.model:
-            schedule += [(spare["model"], spare.get("host", self.host))] * 2
+            schedule += [(spare["model"], spare.get("host", self.host),
+                          spare.get("provider", "ollama"),
+                          spare.get("api_key", ""))] * 2
         last = len(schedule) - 1
 
-        for n, (model, host) in enumerate(schedule):
+        for n, (model, host, provider, key) in enumerate(schedule):
             if n == max_attempts:
                 rejections.append(f"— handing the turn to {model}")
             reply = client.chat(messages, model, host, as_json=True,
-                                temperature=0.8 if n == 0 else 0.5)
+                                temperature=0.8 if n == 0 else 0.5,
+                                provider=provider, api_key=key)
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
             try:
@@ -246,7 +260,8 @@ class GMAgent:
         rejections: list[str] = []
 
         for n in range(max_attempts):
-            reply = client.chat(messages, self.model, self.host, as_json=True,
+            reply = client.chat(messages, self.model, self.host, as_json=True, provider=self.provider,
+                api_key=self.api_key,
                                 temperature=0.7, num_predict=400)
             attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
             try:
@@ -326,7 +341,8 @@ class GMAgent:
             reply = client.chat(
                 prompts.narration_repair_messages(
                     text, review.complaint(), player_input, scene_brief),
-                self.model, self.host, as_json=True, temperature=0.6, num_predict=900,
+                self.model, self.host, as_json=True, provider=self.provider,
+                api_key=self.api_key, temperature=0.6, num_predict=900,
             )
             attempt = Attempt("polish", reply.seconds, reply.model, reply.text,
                               note="; ".join(review.as_log()))
@@ -427,6 +443,7 @@ class GMAgent:
             # empty string once the thinking was stripped. Ollama's `think: false` is
             # accepted by the API and ignored by this tune, so headroom is the fix.
             self.prose_model, self.prose_host, temperature=0.7, num_predict=700,
+            provider=self.prose_provider, api_key=self.prose_key,
         )
         # Mechanical, before anything else sees it: the 4B qwen echoed the whole call-2
         # prompt back as prose — scaffold headers, bullet lists, the worked example's

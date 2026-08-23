@@ -26,6 +26,8 @@ urlpatterns = [
     path("api/character/create", home_views.create_character, name="create_character"),
     path("api/character/delete", home_views.delete_character,
          name="delete_character"),
+    path("api/settings/models", home_views.model_settings,
+         name="model_settings"),
     path("api/homebrew/rules", home_views.house_rules, name="house_rules"),
     path("api/effects/catalogue", home_views.effect_catalogue, name="effect_catalogue"),
     path("api/kinds", home_views.kind_catalogue, name="kind_catalogue"),

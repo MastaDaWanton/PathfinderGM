@@ -79,6 +79,8 @@ def chat(
     temperature: float = 0.8,
     timeout: int = 600,
     num_predict: int = 700,
+    provider: str = "ollama",
+    api_key: str = "",
 ) -> Reply:
     """
     The timeout is generous because a cold load is genuinely slow: measured on this
@@ -88,6 +90,10 @@ def chat(
     inference — which is why the first turn of a session should warm the model rather
     than making the player wait for it.
     """
+    if provider and provider != "ollama":
+        return _hosted(messages, model, host, provider, api_key, as_json,
+                       temperature, timeout, num_predict)
+
     payload = {
         "model": model,
         "messages": messages,
@@ -121,6 +127,65 @@ def chat(
         seconds=time.monotonic() - started,
         model=model,
     )
+
+
+def _hosted(messages, model, host, provider, api_key, as_json,
+            temperature, timeout, num_predict) -> Reply:
+    """A provider that is not on this machine.
+
+    Everything here speaks the OpenAI chat shape except Anthropic, which is close
+    enough that one branch covers it: a different auth header, a different envelope,
+    and the system message lifted out of the list. Google is reached through its own
+    OpenAI-compatible endpoint rather than a third shape.
+
+    The key is read from the config and never logged. A failure names the provider and
+    the status and nothing else — an error message with a bearer token in it is a
+    credential in a screenshot.
+    """
+    if not api_key:
+        raise ModelUnavailable(
+            f"{provider} needs an API key. Add one on the settings page.")
+
+    anthropic = provider == "anthropic"
+    headers = {"Content-Type": "application/json"}
+    if anthropic:
+        headers["x-api-key"] = api_key
+        headers["anthropic-version"] = "2023-06-01"
+        system = " ".join(m["content"] for m in messages if m.get("role") == "system")
+        body = {"model": model, "max_tokens": num_predict,
+                "temperature": temperature,
+                "messages": [m for m in messages if m.get("role") != "system"]}
+        if system:
+            body["system"] = system
+        url = f"{host.rstrip('/')}/messages"
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
+        body = {"model": model, "messages": messages,
+                "temperature": temperature, "max_tokens": num_predict}
+        if as_json:
+            body["response_format"] = {"type": "json_object"}
+        url = f"{host.rstrip('/')}/chat/completions"
+
+    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                 headers=headers)
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            got = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise ModelUnavailable(
+            f"{provider} refused the request ({exc.code}). Check the model name and "
+            f"the key on the settings page.") from None
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise ModelUnavailable(f"cannot reach {provider}: {exc}") from None
+
+    if anthropic:
+        text = "".join(b.get("text", "") for b in got.get("content", [])
+                       if b.get("type") == "text")
+    else:
+        text = (got.get("choices") or [{}])[0].get("message", {}).get("content", "")
+    return Reply(text=strip_thinking(text), seconds=time.monotonic() - started,
+                 model=model)
 
 
 def available(host: str = "http://localhost:11434", timeout: int = 3) -> list[str]:

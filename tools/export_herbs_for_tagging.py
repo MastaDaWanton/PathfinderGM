@@ -1,0 +1,148 @@
+"""Write out every ingredient, with a prompt asking a model to tag it.
+
+`rules/herbprep.py` gave every ingredient six preparation flags and defaults that keep
+the 161 already authored behaving exactly as they did. Which means all 161 currently
+say the same thing: grind it, mix it, brew it, keep it a week. That is safe and it is
+not interesting, and the answers are already sitting in the harvesting notes and the
+descriptions — "the shell must be cracked", "the sap ignites", "dries to a powder".
+
+This writes two files: the whole corpus in a form a chat model can read, and a prompt
+that asks for the tags back as JSON keyed by id. Nothing here decides anything. The
+model's answer comes back through `tools/apply_herb_tags.py`, which validates it
+against the real ids before it touches the content.
+
+    python tools/export_herbs_for_tagging.py
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pathfindergm.settings")
+
+import django  # noqa: E402
+
+django.setup()
+
+OUT = Path(__file__).resolve().parents[1] / "docs"
+
+PROMPT = """You are tagging a Pathfinder 1e herbalism corpus for a solo play app.
+
+Each ingredient below needs six preparation flags. They govern what a player is allowed
+to do with it at the crafting bench, so the answers have to follow from what the entry
+actually says — not from what the herb is called, and not from real-world herbalism.
+
+The flags, and what each one means mechanically:
+
+  needs_extraction  The usable part is inside something: a shell, a husk, a pod, a
+                    gland, a sac, bark that must be stripped, a stone in a fruit.
+                    Nothing else can be done to it until it is out.
+
+  volatile          It reacts badly to being worked: it ignites, burns, blisters,
+                    fumes, explodes, corrodes, or is a contact poison in the raw. It
+                    must be neutralised before it can be ground.
+
+  can_grind         It can be reduced to powder at all. Say no for things that are wet,
+                    fleshy, gelatinous, liquid, or that the text says must stay whole.
+
+  mix_raw           It can go straight into a cold mixture. Say no if the text implies
+                    the whole form is inert and it must be broken down first.
+
+  brew_raw          It can go straight into the pot. Say no if it needs grinding first
+                    to give anything up. This flag also decides whether the herb can be
+                    infused into a finished tincture raw, so weigh it accordingly.
+
+  animal            It came from a creature: gland, blood, scale, horn, ichor, carapace,
+                    venom, organ, hide. These spoil in 48 hours rather than a week.
+
+Rules for your answer:
+
+* Default to the ordinary case. Most herbs are leaves and roots: they grind, they mix
+  raw, they brew raw, they are not volatile, they need no extraction. Only depart from
+  that when the entry gives you a reason.
+* Quote your reason. For every flag you set away from the default, give the phrase from
+  the entry that justifies it. If you cannot quote one, do not set the flag.
+* Do not invent. If an entry is too thin to judge, leave it at defaults and say so.
+* `kind` is a strong hint for `animal` — "monster part" is almost always yes — but read
+  the text, because a few are plants growing on creatures.
+
+Answer with JSON only, in exactly this shape, one object per ingredient you are
+changing from the defaults. Omit any ingredient you are leaving alone:
+
+{
+  "adder-s-tongue": {
+    "needs_extraction": false,
+    "volatile": true,
+    "can_grind": true,
+    "mix_raw": false,
+    "brew_raw": true,
+    "animal": false,
+    "why": {"volatile": "the sap blisters skin", "mix_raw": "inert until crushed"}
+  }
+}
+
+The ingredients follow.
+"""
+
+
+def main() -> int:
+    from rules import ingredients as ing
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    everything = ing.all_ingredients()
+
+    rows = []
+    for iid, item in sorted(everything.items(), key=lambda kv: kv[1].name.lower()):
+        rows.append({
+            "id": iid,
+            "name": item.name,
+            "kind": getattr(item, "kind", ""),
+            "tier": getattr(item, "tier", ""),
+            "description": " ".join(str(getattr(item, "text", "") or "").split()),
+            "harvesting": " ".join(
+                str(getattr(item, "harvesting", "") or "").split()),
+            "effects": list(getattr(item, "lines", []) or []),
+        })
+
+    data = OUT / "herbs-for-tagging.json"
+    data.write_text(json.dumps(rows, indent=1, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+
+    # And a readable version, because a person has to check the answer.
+    lines = [f"# Ingredients to tag ({len(rows)})", "",
+             "Generated by `tools/export_herbs_for_tagging.py`. The prompt for a chat "
+             "model is in `docs/herb-tagging-prompt.md`; the machine-readable corpus "
+             "is `docs/herbs-for-tagging.json`.", ""]
+    for r in rows:
+        lines.append(f"## {r['name']}  \n`{r['id']}` · {r['kind']} · {r['tier']}")
+        if r["description"]:
+            lines.append("")
+            lines.append(r["description"])
+        if r["harvesting"]:
+            lines.append("")
+            lines.append(f"**Harvesting.** {r['harvesting']}")
+        if r["effects"]:
+            lines.append("")
+            lines.append("**Effects.** " + "; ".join(r["effects"]))
+        lines.append("")
+    (OUT / "herbs.md").write_text("\n".join(lines), encoding="utf-8")
+
+    prompt = OUT / "herb-tagging-prompt.md"
+    prompt.write_text(
+        PROMPT + "\n```json\n"
+        + json.dumps(rows, indent=1, ensure_ascii=False)
+        + "\n```\n", encoding="utf-8")
+
+    print(f"{len(rows)} ingredients")
+    print(f"  {data}          machine-readable corpus")
+    print(f"  {OUT / 'herbs.md'}                      readable, for checking by eye")
+    print(f"  {prompt}   paste this into Claude")
+    print(f"  prompt is {len(prompt.read_text(encoding='utf-8')):,} characters")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

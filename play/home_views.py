@@ -379,6 +379,36 @@ def house_rules(request):
                          "caps": houserules.ABILITY_CAPS})
 
 
+def model_settings(request):
+    """Read or set which model does which job, and the keys for the hosted ones.
+
+    GET never returns a key. It returns whether each provider has one and its last four
+    characters — enough to recognise the key you pasted, and not enough to be worth
+    lifting off a screenshot.
+    """
+    from . import modelcfg
+
+    if request.method == "POST":
+        body = json.loads(request.body or "{}")
+        problems = modelcfg.save(body.get("roles"), body.get("keys"))
+        if problems:
+            return JsonResponse({"problems": problems}, status=400)
+
+    from gm.client import available
+
+    live = modelcfg.roles()
+    local = live.get("narrator", {}).get("host") or "http://localhost:11434"
+    return JsonResponse({
+        "roles": [{"id": r, "label": label, "why": why, **live.get(r, {})}
+                  for r, label, why in modelcfg.ROLES],
+        "providers": [{"id": k, **v} for k, v in modelcfg.PROVIDERS.items()],
+        "keys": modelcfg.masked(),
+        # What Ollama actually has pulled, so the page can offer real names rather
+        # than making the player remember a tag.
+        "installed": available(local),
+    })
+
+
 @require_POST
 def delete_character(request):
     """Remove a character from the roster, on the player's explicit say-so."""
