@@ -515,6 +515,16 @@
   /* The abilities block spans, because six scores in a 310px column wrap to three
      lines and the six numbers everything else is derived from should read at a glance. */
   .card.wide { grid-column: 1 / -1; }
+  #abilities { display: flex; flex-wrap: wrap; gap: 7px; align-items: center;
+               padding: 0 0 8px; }
+  .abrow-label { font: 400 11px/1 Cinzel, serif; letter-spacing: .16em;
+                 color: var(--dim); margin-right: 4px; }
+  .abilitybtn { padding: 5px 11px; border-radius: 2px; cursor: pointer;
+                border: 1px solid rgba(150,26,26,.45);
+                background: linear-gradient(rgba(90,18,18,.35), rgba(40,10,10,.4));
+                color: #e8c9a0; font: 400 12.5px/1 Palatino, serif; }
+  .abilitybtn:hover { border-color: rgba(214,72,72,.8); color: #ffe7b4;
+                      box-shadow: 0 0 14px rgba(150,26,26,.35); }
   /* The map tray. Off-screen rather than hidden, so opening it slides rather than
      appears — the same ink-bleed logic the rest of the page uses. */
   #maptab {
@@ -1141,6 +1151,7 @@
   <div id="err"></div>
   <footer>
     <div id="suggestions"></div>
+  <div id="abilities"></div>
     <form id="sayform" autocomplete="off">
       <input type="text" id="input" placeholder="What do you do?" autofocus>
       <button type="submit" id="send">Say</button>
@@ -1464,6 +1475,7 @@ function render(s) {
 
   renderMap(s);
   renderSuggestions(s);
+  renderAbilities(s);
 
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${a.ref}</small></span>
@@ -1474,6 +1486,27 @@ function render(s) {
 
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
 }
+
+// The character's own class abilities, as buttons. Clicking one sends the turn
+// directly rather than putting words in the box: the engine looks the ability up by
+// name, so there is nothing for the player to phrase and nothing for the model to
+// mishear. The tooltip is the author's own sentence.
+function renderAbilities(s) {
+  const list = s.abilities || [];
+  if (!list.length) { $("#abilities").innerHTML = ""; return; }
+  $("#abilities").innerHTML = `<div class="abrow-label">Your abilities</div>` +
+    list.map(a => `<button class="abilitybtn" data-ability="${esc(a.name)}"
+      title="${esc(a.path)} · Control Blood ${a.tier}${
+        a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}</button>`).join("");
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-ability]");
+  if (!btn) return;
+  const foe = (STATE.scene.actors || []).find(a => !a.is_pc && a.hp > 0);
+  takeTurn({ text: `I use ${btn.dataset.ability}${
+    foe ? " on " + foe.name : ""}.` }, false);
+});
 
 // --- what the GM offered -----------------------------------------------------------
 //

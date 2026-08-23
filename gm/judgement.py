@@ -676,6 +676,54 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
+def inject_ability(raw_intents, player_text: str, scene) -> list:
+    """A named class ability the player reached for reaches the engine.
+
+    Same shape and the same reason as the survival and goods injections. The brief now
+    lists what the character can do, and the model still narrates a spike being thrown
+    and emits `narrate_only` — instructing it is the fix that has never held here.
+
+    Matched on the ability's own name appearing in what the player typed, longest
+    first so "Blood Pool Manifestation" is not read as "Blood Pool". A question is not
+    a use.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "use_ability" in present:
+        return raw_intents
+
+    pc = scene.pc()
+    if pc is None or not getattr(pc, "paths", None):
+        return raw_intents
+
+    from rules import leveling
+
+    said = player_text.lower()
+    names = []
+    for path in pc.paths:
+        det = leveling.path_detail(pc.char_class or "", path)
+        reached = leveling.control_blood_for(pc, path)
+        for tier, listed in (det.get("tiers") or {}).items():
+            if int(tier) <= reached:
+                names += listed
+    for name in sorted(set(names), key=len, reverse=True):
+        if name.lower() in said:
+            params = {"ability": name}
+            # One hostile and nobody named is not a guess, the same rule
+            # `fill_obvious_targets` applies to an attack.
+            hostiles = [r for r, a in scene.actors.items()
+                        if not a.is_pc and _can_be_fought(a)]
+            if len(hostiles) == 1:
+                params["to"] = hostiles[0]
+            return list(raw_intents) + [{
+                "op": "use_ability", "actor": pc.ref, "params": params,
+                "because": f"the player used {name}"}]
+    return raw_intents
+
+
 # --- travel declared at the table --------------------------------------------------------
 
 # Ground words a player actually types, mapped onto the canonical biomes. Deliberately

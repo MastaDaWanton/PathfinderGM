@@ -64,6 +64,30 @@ def _grid_state(scene) -> dict | None:
     return out
 
 
+def _usable_abilities(pc) -> list[dict]:
+    """What this character can use right now, path by path.
+
+    Only at or below the tier they have reached, because an ability is not theirs
+    because the class prints it somewhere — and a button for one they cannot use is a
+    button that exists to be refused.
+    """
+    if pc is None or not getattr(pc, "paths", None):
+        return []
+    from rules import leveling
+
+    out = []
+    for path in pc.paths:
+        det = leveling.path_detail(pc.char_class or "", path)
+        reached = leveling.control_blood_for(pc, path)
+        for tier, names in sorted((det.get("tiers") or {}).items()):
+            for name in names:
+                if int(tier) <= reached:
+                    key = (det.get("resolves") or {}).get(name, "")
+                    out.append({"name": name, "path": path, "tier": int(tier),
+                                "text": (det.get("abilities") or {}).get(key, "")})
+    return out
+
+
 def _state(c) -> dict:
     pc = c.scene.pc()
     from rules import goods as goods_mod
@@ -108,6 +132,9 @@ def _state(c) -> dict:
             # them.
             "pools": [b.as_dict() for b in c.scene.pools],
         },
+        # The abilities this character can use right now, for the row of buttons under
+        # the transcript. Sent with the state because reaching a tier changes it.
+        "abilities": _usable_abilities(pc),
         # The player sees their own rolls and nobody else's. Hidden rolls are stripped
         # here, at the edge, rather than in the template — a number that never reaches
         # the browser cannot be read out of the page source either.

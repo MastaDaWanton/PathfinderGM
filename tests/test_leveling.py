@@ -679,3 +679,90 @@ def test_a_trigger_clause_is_not_damage_dealt():
     spike = leveling.path_detail("blood bending", "blood spike")
     made = spike["effects"]["Blood Pool Manifestation"]
     assert all(e.get("type") != "damage" for e in made)
+
+
+# --- the GM knowing, and a way to press it -----------------------------------------------
+
+def test_the_brief_tells_the_gm_what_this_character_can_do():
+    """Fifty-four turns produced one mechanical intent between them, partly because
+    the GM was never told the class had abilities at all. It cannot reach for a name
+    it has not been given."""
+    from gm import prompts
+
+    eng, pc = _table()
+
+    class W:
+        name, secret, premise = "Testholme", "", {}
+        entities, unwritten, chronology, factions = {}, [], [], []
+
+        def ancestors(self, _):
+            return []
+
+    brief = prompts.scene_brief(W(), eng.scene, None, None)
+    assert "WHAT VASHKA CAN DO" in brief
+    assert "Blood Mine" in brief and "use_ability" in brief
+    # And nothing above their tier, which would be a name they cannot use.
+    assert "Heart-Seeker Spike" not in brief
+
+
+def test_a_named_ability_reaches_the_engine_whatever_the_gm_proposed():
+    """The brief lists them and the model still narrates the spike and emits
+    narrate_only. Same shape and same reason as the survival and goods injections."""
+    from gm import judgement
+
+    eng, _ = _table()
+    out = judgement.inject_ability([{"op": "narrate_only"}],
+                                   "I lay a Blood Mine in the doorway", eng.scene)
+    used = next(i for i in out if i["op"] == "use_ability")
+    assert used["params"]["ability"] == "Blood Mine"
+    assert used["params"]["to"] == "c1"          # one hostile is not a guess
+
+
+def test_the_longest_name_wins():
+    """"Blood Pool Manifestation" must not be read as "Blood Pool"."""
+    from gm import judgement
+
+    eng, _ = _table()
+    out = judgement.inject_ability([{"op": "narrate_only"}],
+                                   "I use Blood Pool Manifestation", eng.scene)
+    assert next(i for i in out if i["op"] == "use_ability"
+                )["params"]["ability"] == "Blood Pool Manifestation"
+
+
+def test_asking_about_an_ability_is_not_using_it():
+    from gm import judgement
+
+    eng, _ = _table()
+    raw = [{"op": "narrate_only"}]
+    assert judgement.inject_ability(raw, "What does Blood Mine do?", eng.scene) == raw
+
+
+def test_an_ability_above_their_tier_is_not_injected():
+    from gm import judgement
+
+    eng, _ = _table(level=5)
+    raw = [{"op": "narrate_only"}]
+    assert judgement.inject_ability(raw, "I fire a Heart-Seeker Spike", eng.scene) == raw
+
+
+def test_the_state_carries_only_the_abilities_they_can_use():
+    from play.views import _usable_abilities
+
+    _, pc = _table(level=5)
+    names = {a["name"] for a in _usable_abilities(pc)}
+    assert "Blood Mine" in names and "Heart-Seeker Spike" not in names
+    assert all(a["path"] and a["tier"] for a in _usable_abilities(pc))
+
+
+def test_a_character_with_no_paths_gets_no_buttons():
+    from play.views import _usable_abilities
+
+    assert _usable_abilities(load_pc("fixtures/pc-kesst.json")) == []
+
+
+def test_the_page_draws_them_as_buttons():
+    from pathlib import Path
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert 'id="abilities"' in page and "renderAbilities" in page
+    assert "data-ability" in page

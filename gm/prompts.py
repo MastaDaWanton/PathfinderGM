@@ -606,6 +606,28 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
             note = actor.notes.split(".")[0] if actor.notes else ""
             lines.append(f"  {ref} — {actor.name}. {note}.")
 
+    # What the player's class can actually do, by name. Without this the GM narrates a
+    # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,
+    # which is how fifty-four turns produced one mechanical intent between them.
+    pc = scene.pc()
+    if pc is not None and getattr(pc, "paths", None):
+        from rules import leveling
+
+        usable = []
+        for path in pc.paths:
+            det = leveling.path_detail(pc.char_class or "", path)
+            reached = leveling.control_blood_for(pc, path)
+            for tier, names in sorted((det.get("tiers") or {}).items()):
+                if int(tier) <= reached:
+                    usable += names
+        if usable:
+            lines.append(
+                f"\nWHAT {pc.name.upper()} CAN DO (their own class abilities — when they "
+                f'use one, emit {{"op": "use_ability", "params": {{"ability": "<name>", '
+                f'"to": "<ref>"}}}} and let the engine resolve it):')
+            for name in usable:
+                lines.append(f"  {name}")
+
     if recent_events:
         lines.append("\nWHAT THIS PLACE REMEMBERS:")
         for e in recent_events:
