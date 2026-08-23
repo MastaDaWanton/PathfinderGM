@@ -136,6 +136,7 @@ class GMAgent:
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
+                raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)

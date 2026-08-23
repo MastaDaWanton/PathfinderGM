@@ -1,0 +1,244 @@
+"""Carrying things, and what money is called where the game is being played.
+
+The defect these answer to is one number: across fifty-four turns of a live game the GM
+emitted fifty-four `narrate_only` and a single `check`. It narrated a pouch of lucite
+crystals, a room paid for, a key handed over — and not one of them existed anywhere the
+engine could see. There was nowhere for a thing to *be*, so nothing could be spent,
+dropped, counted or stolen, and the side panel showing what was in the scene had
+nothing to show because nothing was ever put there.
+"""
+from __future__ import annotations
+
+import pytest
+
+from rules import goods
+from rules.dice import Dice
+from rules.engine import Engine, Scene
+from rules.intents import parse_all
+from rules.sheet import from_dict, load_pc, to_dict
+
+
+# --- money -----------------------------------------------------------------------------
+
+def test_a_world_that_says_nothing_gets_the_books_own_coins():
+    """Never wrong, and the fallback the whole design leans on."""
+    assert [c.name for c in goods.coinage()] == [
+        "copper piece", "silver piece", "gold piece", "platinum piece"]
+
+
+def test_the_ratios_are_1e_whatever_the_coins_are_called():
+    """Every price in the shipped tables is in copper, silver and gold. A world that
+    renamed the arithmetic would have a longsword cost the wrong number."""
+    assert [c.copper for c in goods.coinage()] == [1, 10, 100, 1000]
+    assert goods.in_copper({"gp": 2, "sp": 3}) == 230
+
+
+class FakePlace:
+    def __init__(self, facts):
+        self.facts = facts
+
+    def fact(self, key, default=""):
+        return self.facts.get(key, default)
+
+
+class FakeWorld:
+    factions: list = []
+    entities: dict = {}
+
+
+def test_a_currency_the_world_actually_names_is_used_as_written():
+    place = FakePlace({"Currency": "Paid in Vermillion marks and nothing else."})
+    assert [c.name for c in goods.coinage(FakeWorld(), place)][2] == \
+        "Vermillion gold piece"
+
+
+def test_a_coined_name_comes_from_the_worlds_own_vocabulary_and_says_it_is_coined():
+    """"the game needs the ability to invent basic items like different kinds of
+    currency depending on the world." Inventing is the feature — inventing from
+    *nothing* is not, so the name is taken from a proper noun the world already uses
+    and the coin is flagged as this app's invention rather than the export's."""
+    place = FakePlace({"Social Classes": "Khy'vyr-centric clans, Nirkor artisans"})
+    coins = goods.coinage(FakeWorld(), place)
+    assert coins[2].name == "Khy'vyr gold piece"
+    assert all(c.coined for c in coins)
+
+
+def test_the_stem_is_taken_not_the_compound():
+    """"Khy'vyr-centric clans" names the Khy'vyr. A "Khy'vyr-centric copper piece" is
+    the app mistaking an adjective for a people."""
+    place = FakePlace({"Social Classes": "Khy'vyr-centric clans"})
+    assert "centric" not in goods.coinage(FakeWorld(), place)[0].name
+
+
+def test_coins_pluralise_as_pieces():
+    """Naming the coin after the metal alone gave "2 Khy'vyr golds"."""
+    place = FakePlace({"Social Classes": "Khy'vyr-centric clans"})
+    coins = goods.coinage(FakeWorld(), place)
+    assert goods.purse_line({"gp": 2, "sp": 1}, coins) == \
+        "2 Khy'vyr gold pieces, 1 Khy'vyr silver piece"
+
+
+def test_an_empty_purse_says_so_rather_than_showing_nothing():
+    assert goods.purse_line({}) == "nothing"
+
+
+@pytest.mark.parametrize("said,expect", [
+    ("gp", "gp"), ("gold", "gp"), ("silver pieces", "sp"), ("3 copper", "cp"),
+    ("Khy'vyr gold piece", "gp"), ("a lantern", ""),
+])
+def test_a_denomination_is_recognised_by_id_metal_or_world_name(said, expect):
+    place = FakePlace({"Social Classes": "Khy'vyr-centric clans"})
+    assert goods.coin_named(said, goods.coinage(FakeWorld(), place)) == expect
+
+
+def test_paying_breaks_a_big_coin_and_takes_the_change():
+    """2 gold and 3 silver, paying 1 gold 5 silver, is 8 silver — not a negative
+    balance and not a refusal."""
+    after, ok = goods.spend({"gp": 2, "sp": 3}, 150)
+    assert ok and after == {"sp": 8}
+    assert goods.in_copper(after) == 80
+
+
+def test_a_purse_that_cannot_cover_it_refuses_rather_than_going_negative():
+    after, ok = goods.spend({"cp": 4}, 100)
+    assert not ok and after == {"cp": 4}
+
+
+# --- carrying anything at all ------------------------------------------------------------
+
+def test_an_item_the_tables_know_is_described_from_the_tables():
+    assert "1d4" in goods.describe("dagger")
+
+
+def test_an_item_the_tables_never_heard_of_is_carried_and_says_so():
+    """A game in which the GM can only hand over things the Core Rulebook printed is
+    not a game. The honesty is the point: the player must not assume their lucite
+    crystal does something."""
+    line = goods.describe("lucite crystal", 3)
+    assert line.startswith("3 × lucite crystal")
+    assert "no rules for it" in line
+
+
+# --- the op ------------------------------------------------------------------------------
+
+@pytest.fixture
+def engine():
+    scene = Scene(location_id=None)
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    return Engine(scene, Dice(seed=3))
+
+
+def run(engine, raw):
+    return engine.run(engine.validate([raw])).outcomes
+
+
+def test_taking_something_puts_it_in_your_hands(engine):
+    run(engine, {"op": "give", "params": {"item": "lucite crystal", "count": 3,
+                                          "to": "pc"}})
+    assert engine.scene.pc().goods == {"lucite crystal": 3}
+
+
+def test_money_lands_in_the_purse_not_among_the_goods(engine):
+    """A denomination is an item whose name the world has opinions about; it is still
+    counted separately, because arithmetic can be done on it."""
+    run(engine, {"op": "give", "params": {"item": "gold", "count": 5, "to": "pc"}})
+    pc = engine.scene.pc()
+    assert pc.purse == {"gp": 5} and pc.goods == {}
+
+
+def test_parting_with_something_you_do_not_have_says_so_rather_than_going_negative(engine):
+    out = run(engine, {"op": "give", "params": {"item": "lantern", "from_": "pc"}})
+    assert "no lantern to give" in out[0].tell
+    assert engine.scene.pc().goods == {}
+
+
+def test_a_price_is_paid_out_of_the_purse_in_the_same_breath(engine):
+    pc = engine.scene.pc()
+    pc.purse = {"gp": 3}
+    run(engine, {"op": "give", "params": {"item": "lantern", "to": "pc",
+                                          "price": "2 gp"}})
+    assert pc.goods == {"lantern": 1}
+    assert pc.purse == {"gp": 1}
+
+
+def test_a_sale_you_cannot_afford_does_not_happen(engine):
+    pc = engine.scene.pc()
+    pc.purse = {"sp": 2}
+    out = run(engine, {"op": "give", "params": {"item": "warhorse", "to": "pc",
+                                                "price": "200 gp"}})
+    assert "cannot afford" in out[0].tell
+    assert pc.goods == {} and pc.purse == {"sp": 2}
+
+
+def test_what_is_carried_survives_a_save(engine):
+    pc = engine.scene.pc()
+    pc.goods = {"brass key": 1}
+    pc.purse = {"sp": 7}
+    again = from_dict(to_dict(pc))
+    assert again.goods == {"brass key": 1} and again.purse == {"sp": 7}
+
+
+# --- and the GM has to actually emit it --------------------------------------------------
+
+def _scene():
+    scene = Scene(location_id=None)
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    return scene
+
+
+@pytest.mark.parametrize("said,item", [
+    ("I buy a lantern", "lantern"),
+    ("I pick up the brass key", "brass key"),
+    ("I take a loaf of bread from the stall", "loaf of bread"),
+])
+def test_a_declared_purchase_reaches_the_engine_whatever_the_gm_proposed(said, item):
+    """The same shape and the same reason as `inject_survival`: the prompt already
+    carries the op and the model does not use it. Fifty-four turns, fifty-four
+    narrate_only."""
+    from gm import judgement
+
+    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    give = next(i for i in out if i["op"] == "give")
+    assert give["params"]["item"] == item
+    assert give["params"]["to"] == "pc"
+
+
+def test_handing_something_over_takes_it_from_the_player():
+    from gm import judgement
+
+    out = judgement.inject_goods([{"op": "narrate_only"}], "I hand over the brass key",
+                                 _scene())
+    assert next(i for i in out if i["op"] == "give")["params"]["from_"] == "pc"
+
+
+def test_asking_about_a_thing_is_not_taking_it():
+    """A question mark anywhere skips it, the same rule the survival injection uses."""
+    from gm import judgement
+
+    said = "Can I buy a lantern here?"
+    assert judgement.inject_goods([{"op": "narrate_only"}], said, _scene()) == \
+        [{"op": "narrate_only"}]
+
+
+def test_the_gm_naming_its_own_give_is_left_alone():
+    from gm import judgement
+
+    raw = [{"op": "give", "params": {"item": "rope", "to": "pc"}}]
+    assert judgement.inject_goods(raw, "I buy a lantern", _scene()) == raw
+
+
+# --- and being unhurt must not stop you sleeping ------------------------------------
+
+def test_an_untargeted_heal_is_aimed_at_the_player_rather_than_killing_the_turn():
+    """Measured: "I go to my room, lock the door, and go to sleep" came back with an
+    untargeted `heal` beside the rest, and the whole turn died on "heal: needs somebody
+    to heal" — so being tired and unhurt made it impossible to go to bed."""
+    from gm import judgement
+
+    scene = _scene()
+    out = judgement.fill_obvious_targets([{"op": "heal", "params": {"amount": "1d8"}}],
+                                         scene)
+    assert out[0]["actor"] == "pc"
+
+    engine = Engine(scene, Dice(seed=1))
+    engine.run(engine.validate(out))            # no IntentError

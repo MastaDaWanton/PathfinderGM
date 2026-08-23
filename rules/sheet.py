@@ -17,6 +17,7 @@ from pathlib import Path
 
 import re
 
+from . import goods
 from . import houserules
 from .dice import Modifier
 from .tables import (
@@ -286,6 +287,15 @@ class Actor:
     # A plain count rather than an object: a handful of woundwort is a number, and
     # nothing about a raw herb differs from the next one of its kind.
     inventory: dict[str, int] = field(default_factory=dict)
+    # Everything else carried, by the name the fiction gave it. Deliberately open: the
+    # tables know a longsword and will never know a lucite crystal, and a game in which
+    # the GM can only hand over things the Core Rulebook printed is not a game. See
+    # `rules/goods.py` — an unknown item is carried and counted, and says plainly that
+    # the engine has no rules for it rather than implying that it has.
+    goods: dict[str, int] = field(default_factory=dict)
+    # Money, by denomination id. The ratios are 1e's because every price in the shipped
+    # tables is; only what the coins are *called* belongs to the world.
+    purse: dict[str, int] = field(default_factory=dict)
     # Spendable pools: ki, rage rounds, uses per day, and stacks somebody else put here.
     # A pool with `scope: target` sits on the creature it was applied to, which is why
     # these live on the Actor rather than on whoever created them.
@@ -1526,6 +1536,10 @@ class Actor:
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "world_classes": _world_class_summary(self),
             "satchel": _satchel_summary(self),
+            # The side panel is the only sheet most turns ever show, so what the
+            # character is carrying and what is in their purse belong on it.
+            "carrying": [{"name": n, "count": c} for n, c in sorted(self.goods.items())],
+            "purse": dict(self.purse),
             "pools": [{"id": p.id, "current": p.current, "max": p.maximum,
                        "ready": p.ready, "cooldown_left": p.cooldown_left}
                       for p in self.pools.values()],
@@ -1739,6 +1753,15 @@ def full_sheet(actor: Actor) -> dict:
                     "source": r.source} for r in actor.reductions],
             "temp_pools": [{"amount": p.amount, "source": p.source,
                             "rounds_left": p.rounds_left} for p in actor.temp_pools],
+            # Everything carried that is not a weapon, a herb or a jar: whatever the
+            # fiction has handed over. Named, counted, and honest about which of them
+            # the engine has rules for — see rules/goods.py.
+            "carrying": [{"name": name, "count": n,
+                          "line": goods.describe(name, n),
+                          "known": goods.known_item(name) is not None}
+                         for name, n in sorted(actor.goods.items())],
+            "purse": {"coins": dict(actor.purse),
+                      "copper": goods.in_copper(actor.purse)},
             # Only gear something has happened to. An undamaged sword has no record.
             "gear": [{"name": i.name, "material": i.material, "hardness": i.hardness,
                       "hp": i.hp, "hp_max": i.hp_max,
@@ -1895,6 +1918,8 @@ def to_dict(actor: Actor) -> dict:
         # extra derived keys `as_dict` carries are ignored by `from_stock_dict`.
         "stock": {k: v.as_dict() for k, v in actor.stock.items()},
         "inventory": dict(actor.inventory),
+        "goods": dict(actor.goods),
+        "purse": dict(actor.purse),
         "pools": {k: v.as_dict() for k, v in actor.pools.items()},
         "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
                               "mishaps": p.mishaps, "milestones": p.milestones}
@@ -2104,6 +2129,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         stock=_stock(data.get("stock") or {}),
         inventory={k: int(v) for k, v in (data.get("inventory") or {}).items()
                    if int(v) > 0},
+        goods={str(k): int(v) for k, v in (data.get("goods") or {}).items()
+               if int(v) > 0},
+        purse={str(k): int(v) for k, v in (data.get("purse") or {}).items()
+               if int(v) > 0},
         pools=_pools(data.get("pools") or {}),
         reductions=[_reduction(r) for r in (data.get("reductions") or [])],
         immunities=immunities,

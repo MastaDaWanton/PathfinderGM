@@ -268,6 +268,12 @@ def _can_be_fought(actor) -> bool:
                    for c in ("dead", "dying", "unconscious", "stable"))
 
 
+# Ops whose subject is a person and whose unnamed subject is the player. `attack` is
+# deliberately absent: who you are hitting is never obvious from the op alone.
+_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "condition",
+             "ability_damage", "resource", "give"}
+
+
 def fill_obvious_targets(raw_intents, scene) -> list:
     """Give an attack the only creature it could possibly mean, before validation sees it.
 
@@ -286,6 +292,24 @@ def fill_obvious_targets(raw_intents, scene) -> list:
         return raw_intents
 
     pc = scene.pc()
+
+    # Ops that land on a person and default to the player when the GM names nobody.
+    # Measured: "I go to my room, lock the door, and go to sleep" came back with an
+    # untargeted `heal` beside the rest, and the whole turn died on "heal: needs
+    # somebody to heal" — so being tired and unhurt made it impossible to go to bed.
+    # There is no ambiguity to protect here the way there is with an attack: a heal
+    # nobody is aimed at, on a turn the player spent resting, is aimed at the player.
+    if pc is not None:
+        filled = []
+        for raw in raw_intents:
+            if (isinstance(raw, dict)
+                    and str(raw.get("op", "")).strip().lower() in _SELF_OPS
+                    and not raw.get("actor") and not raw.get("target")
+                    and not (raw.get("params") or {}).get("to")):
+                raw = dict(raw, actor=pc.ref)
+            filled.append(raw)
+        raw_intents = filled
+
     candidates = [r for r, a in scene.actors.items()
                   if not a.is_pc and _can_be_fought(a)
                   and (pc is None or r != pc.ref)]
@@ -584,6 +608,72 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
         out.append({"op": "rest", "actor": pc.ref, "params": {"kind": "night"},
                     "because": "the player said they sleep"})
     return out
+
+
+# --- things changing hands, declared at the table ----------------------------------------
+
+# Taking, being given, buying. The verb has to be the player's own: "I buy a lantern",
+# not "a lantern for sale". `pay`/`buy` are separated from `take`/`pick up` only so the
+# reason clause reads truthfully in the log.
+_ACQUIRES = re.compile(
+    r"\bi\s+(?:take|takes|pick(?:\s+up)?|buy|buys|purchase|purchases|grab|grabs"
+    r"|pocket|pockets|accept|accepts|collect|collects|claim|claims)\b", re.I)
+_HANDS_OVER = re.compile(
+    r"\bi\s+(?:give|gives|hand(?:\s+over)?|hands|pay|pays|drop|drops|sell|sells"
+    r"|offer|offers|leave behind)\b", re.I)
+# What was taken: the noun phrase after the verb, stopped at a clause boundary. Small
+# and greedy-free on purpose — a whole sentence is not an item.
+_THING = re.compile(
+    r"\b(?:a|an|the|some|my|two|three|four|five|\d+)\s+([a-z][a-z' -]{2,28}?)"
+    r"(?=\s*(?:[.,;!?]|\band\b|\bfrom\b|\bto\b|\bfor\b|\bwith\b|$))", re.I)
+
+
+def inject_goods(raw_intents, player_text: str, scene) -> list:
+    """Make a declared purchase or pick-up reach the engine.
+
+    Same shape and the same reason as `inject_survival`. Fifty-four turns of one live
+    game produced fifty-four `narrate_only` and a single `check`: the GM narrated a
+    pouch of crystals, a room paid for and a key handed over, and not one of them
+    existed anywhere the engine could see. An inventory nothing ever writes to is a
+    field on a sheet, not a game.
+
+    Conservative in the same way: a question is not a purchase, and only the player's
+    own declaration counts — what the GM says is lying on the table is not something
+    the player picked up.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "give" in present:
+        return raw_intents
+
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
+        found = pattern.search(player_text)
+        if not found:
+            continue
+        rest = player_text[found.end():]
+        thing = _THING.search(rest)
+        if not thing:
+            continue
+        item = " ".join(thing.group(1).split()).strip(" -'")
+        if not item or len(item) < 3:
+            continue
+        params = {"item": item}
+        if gains:
+            params["to"] = pc.ref
+        else:
+            params["from_"] = pc.ref
+        return list(raw_intents) + [{
+            "op": "give", "params": params,
+            "because": f"the player said they {'took' if gains else 'handed over'} it",
+        }]
+    return raw_intents
 
 
 # --- travel declared at the table --------------------------------------------------------

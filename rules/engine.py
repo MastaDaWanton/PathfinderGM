@@ -10,10 +10,12 @@ same list from exactly where it stopped.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from . import biomes
+from . import goods
 from . import casting
 from . import compulsion
 from . import consumables
@@ -359,10 +361,14 @@ class _NeedsPlayerRoll(Exception):
 # --- The engine ---------------------------------------------------------------------
 
 class Engine:
-    def __init__(self, scene: Scene, dice: Dice | None = None):
+    def __init__(self, scene: Scene, dice: Dice | None = None, world=None):
         self.scene = scene
         self.dice = dice or Dice()
         self.scene._dice = self.dice
+        # Optional, and only money reads it: what the coins are called belongs to the
+        # world, and an engine built without one falls back to the Core Rulebook's own
+        # names rather than refusing to do arithmetic.
+        self.world = world
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -2034,6 +2040,90 @@ class Engine:
             tell="The fighting stops." + (f" Still standing: {', '.join(standing)}."
                                           if standing else ""),
             because=intent.because,
+        )
+
+    def _op_give(self, intent: Intent, partial: dict) -> Outcome:
+        """Something changes hands.
+
+        One op for picking a thing up, being handed it, buying it and dropping it,
+        because they are the same event with different ends attached. Either end may be
+        the world: `to` alone is a gain, `from_` alone is a loss.
+
+        Money is the same event again — a denomination is just an item whose name the
+        world happens to have opinions about — so `price` is paid out of the receiver's
+        purse in the same breath, and a purse that cannot cover it refuses the sale
+        rather than going negative where nobody would notice.
+        """
+        item = str(intent.params.get("item", "")).strip()
+        if not item:
+            raise IntentError("give: needs something to give", "schema")
+        count = max(1, int(intent.params.get("count", 1) or 1))
+        pc = self.scene.pc()
+
+        to_ref = intent.params.get("to") or intent.target or intent.actor
+        from_ref = intent.params.get("from_")
+        if not to_ref and not from_ref:
+            to_ref = pc.ref if pc else None
+        taker = self.scene.actors.get(to_ref) if to_ref else None
+        giver = self.scene.actors.get(from_ref) if from_ref else None
+
+        coins = goods.coinage(getattr(self, "world", None), None)
+        denom = goods.coin_named(item, coins)
+
+        paid = ""
+        price = intent.params.get("price")
+        if price and taker is not None:
+            want = goods.coin_named(str(price).split()[-1], coins) or "gp"
+            try:
+                number = int(re.sub(r"\D", "", str(price)) or 0)
+            except ValueError:
+                number = 0
+            cost_cp = number * dict(goods.DENOMINATIONS).get(want, 100)
+            purse, enough = goods.spend(taker.purse, cost_cp)
+            if not enough:
+                return Outcome(
+                    intent_id=intent.id, op="give", effects=[],
+                    tell=(f"{taker.name} cannot afford {item}: "
+                          f"{goods.purse_line(taker.purse, coins)} against {price}."),
+                    because=intent.because,
+                )
+            taker.purse = purse
+            paid = f" for {price}"
+
+        moved = 0
+        if giver is not None:
+            held = (giver.purse if denom else giver.goods)
+            moved = min(count, int(held.get(denom or item, 0)))
+            if moved:
+                held[denom or item] -= moved
+                if held[denom or item] <= 0:
+                    del held[denom or item]
+        else:
+            moved = count           # it came from the world, which never runs out
+
+        if taker is not None and moved:
+            bag = taker.purse if denom else taker.goods
+            bag[denom or item] = bag.get(denom or item, 0) + moved
+
+        what = f"{moved} × {item}" if moved != 1 else item
+        if giver is not None and taker is not None:
+            tell = f"{giver.name} hands {taker.name} {what}{paid}."
+        elif taker is not None:
+            tell = f"{taker.name} takes {what}{paid}."
+        elif giver is not None:
+            tell = f"{giver.name} parts with {what}."
+        else:
+            tell = f"{what} changes hands."
+        if giver is not None and not moved:
+            tell = f"{giver.name} has no {item} to give."
+
+        return Outcome(
+            intent_id=intent.id, op="give",
+            effects=[{"ref": (taker or giver).ref if (taker or giver) else "",
+                      "kind": "give", "item": denom or item, "count": moved,
+                      "purse": dict(taker.purse) if taker else {},
+                      "goods": dict(taker.goods) if taker else {}}],
+            tell=tell, because=intent.because,
         )
 
     def _op_rest(self, intent: Intent, partial: dict) -> Outcome:

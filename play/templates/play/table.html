@@ -1311,6 +1311,12 @@ function render(s) {
           sign(Math.floor((v-10)/2))})</small></span>${
           hurt ? `<em>-${hurt}</em>` : ""}</div>`;
       }).join("")}</div>
+      ${(pc.carrying && pc.carrying.length) || (s.coinage && purseTotal(pc.purse))
+        ? `<h2>Carrying</h2>${
+          purseTotal(pc.purse) ? `<div class="row"><span>Purse</span><span>${
+            esc(purseLine(pc.purse, s.coinage))}</span></div>` : ""}${
+          (pc.carrying || []).map(i => `<div class="row"><span>${esc(i.name)}</span>
+            <span>${i.count}</span></div>`).join("")}` : ""}
       ${(pc.satchel && pc.satchel.length) ? `<h2>Satchel</h2>${
         pc.satchel.map(i => `<div class="row"><span>${esc(i.name)}</span><span>${
           i.count}</span></div>`).join("")}` : ""}
@@ -2112,6 +2118,19 @@ function busy(on) {
   $("#busy").classList.toggle("on", on);
   $("#send").disabled = on;
 }
+// Money, in this world's words. The names arrive with the state rather than being
+// written here, because what a coin is called is the world's business — see
+// rules/goods.py on why the ratios stay 1e's while the names do not.
+const purseTotal = p => Object.values(p || {}).reduce((n, v) => n + (v || 0), 0);
+function purseLine(purse, coinage) {
+  const names = Object.fromEntries((coinage || []).map(c => [c.id, c]));
+  return (coinage || []).slice().reverse()
+    .map(c => [(purse || {})[c.id] || 0, c])
+    .filter(([n]) => n)
+    .map(([n, c]) => `${n} ${n === 1 ? c.name : c.plural}`)
+    .join(", ") || "empty";
+}
+
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sign = n => (n >= 0 ? "+" : "") + n;

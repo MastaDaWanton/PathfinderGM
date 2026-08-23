@@ -238,6 +238,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "move": (("zone",), ("who", "square"), "hidden"),
     "spawn": (("template",), ("from_entity_id", "count", "name"), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
+    # Something changes hands. One op rather than four, because picking a thing up,
+    # being handed it, buying it and dropping it are the same event with different ends
+    # attached: `to` is who gains it, `from_` who loses it, and either may be absent
+    # when the other end is the world. `item` is any name at all — see rules/goods.py on
+    # why an unknown item is carried rather than refused.
+    "give": (("item",), ("count", "to", "from_", "price"), "hidden"),
     "rest": ((), ("kind",), "hidden"),
     # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
     # does not: a night's sleep is not a meal. Two ops rather than one with flags,
@@ -265,6 +271,15 @@ PARAM_ALIASES = {
     "opposed": "opposed_by",
     "against": "opposed_by",
     "difficulty": "dc",
+    # `from` is a Python keyword, so the op's param is `from_`; the GM writes the
+    # English word and should not have to know that.
+    "from": "from_",
+    "giver": "from_",
+    "receiver": "to",
+    "recipient": "to",
+    "quantity": "count",
+    "amount_of": "count",
+    "cost": "price",
 }
 
 # Params the GM keeps supplying that the *engine* owns. docs/intent-protocol.md §1 is

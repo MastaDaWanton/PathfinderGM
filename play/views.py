@@ -66,8 +66,16 @@ def _grid_state(scene) -> dict | None:
 
 def _state(c) -> dict:
     pc = c.scene.pc()
+    from rules import goods as goods_mod
+
+    coins = goods_mod.coinage(c.world, c.location)
     return {
         "transcript": c.transcript,
+        # What money is called here. Sent with the state because it is a fact about the
+        # world, not a constant: a purse rendered with hard-coded "gp" would be the one
+        # thing on the page that had never heard of the world it is being played in.
+        "coinage": [{"id": x.id, "name": x.name, "plural": x.plural,
+                     "copper": x.copper, "coined": x.coined} for x in coins],
         "suggestions": list(getattr(c, "suggestions", []) or []),
         "awaiting": c.scene.awaiting,
         "pc": pc.summary() if pc else None,

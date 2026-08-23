@@ -103,7 +103,7 @@ class Campaign:
         return self.scene.biome
 
     def engine(self) -> Engine:
-        return Engine(self.scene, Dice(self.seed))
+        return Engine(self.scene, Dice(self.seed), world=self.world)
 
     # --- persistence ------------------------------------------------------------------
 
