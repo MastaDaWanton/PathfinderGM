@@ -1161,6 +1161,7 @@
     }
   }
 </style>
+<script src="{% static 'js/dice3d.js' %}"></script>
 </head>
 <body>
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -1330,6 +1331,22 @@ document.addEventListener("click", async e => {
         document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""}});
     const d = await r.json();
     if (!r.ok) { $("#levelerr").textContent = d.error || "could not level"; return; }
+    // Shown before the sheet redraws, so the number arrives as a die landing rather than
+    // as a figure that was already on the sheet by the time anybody looked.
+    if (d.rolled != null) {
+      await Dice3D.land({
+        title: "Hit points",
+        why: `${d.name || "You"} reaches level ${d.level}`,
+        sides: d.hit_die || 8,
+        result: d.rolled,
+        terms: [
+          { label: `d${d.hit_die || 8}`, value: d.rolled },
+          ...(d.con ? [{ label: "Constitution", value: sign(d.con) }] : []),
+          { label: "hit points gained", value: d.hp, total: true },
+        ],
+        note: `${d.hp_max != null ? "Now " + d.hp_max + " at full." : ""}`,
+      });
+    }
     render(d);
     SHEET = await (await fetch("/api/sheet")).json();
     $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
@@ -1663,57 +1680,24 @@ function renderRolls(log) {
 }
 
 function showPopup(p) {
-  const terms = p.breakdown.map(m =>
-    `<div class="row"><span>${esc(m.source)}</span><span>${sign(m.value)}</span></div>`).join("");
-  // The die is not always a d20: damage asks for a pool total, so the bounds come from
-  // the prompt rather than being hardcoded.
+  // The 3D die, asking. `Dice3D.ask` resolves with a number the player rolled on a real
+  // die — behind the debug toggle, because a die on the desk is the exception — or null,
+  // meaning the table rolls it, which is the default and what the solid is for.
   const lo = p.min != null ? p.min : 1, hi = p.max != null ? p.max : 20;
   const die = p.die || "1d20";
-  $("#popup").innerHTML = `
-    <h3>${esc(p.label)}</h3>
-    <div class="because">${esc(p.because || "")}</div>
-    <input class="dieface" id="face" type="number" min="${lo}" max="${hi}"
-           placeholder="${esc(die)}">
-    <div class="terms">
-      <div class="row"><span>Roll</span><span>${esc(die)}${
-        lo === hi ? "" : ` (${lo}–${hi})`}</span></div>
-      ${terms}
-      <div class="row total"><span>Your modifier</span><span>${sign(p.modifier)}</span></div>
-      ${p.dc != null ? `<div class="row"><span>Beat</span><span>${p.dc}</span></div>` : ""}
-    </div>
-    <div class="acts">
-      <button id="submitroll">Roll it myself</button>
-      <button class="ghost" id="autoroll">Let the table roll</button>
-    </div>`;
-  $("#veil").classList.add("on");
-  $("#face").focus();
-  $("#submitroll").onclick = () => {
-    const v = parseInt($("#face").value, 10);
-    if (!(v >= lo && v <= hi)) { $("#face").focus(); return; }
-    sendRoll(v);
-  };
-  $("#autoroll").onclick = () => sendRoll(null);
-  $("#face").onkeydown = e => { if (e.key === "Enter") $("#submitroll").click(); };
-}
+  const terms = p.breakdown.map(m => ({ label: m.source, value: sign(m.value) }));
+  terms.push({ label: "your modifier", value: sign(p.modifier), total: true });
+  if (p.dc != null) terms.push({ label: "beat", value: p.dc });
 
-// Using something you made. Straight to the engine rather than through the GM: there is
-// nothing here for a model to decide, and routing it through narration is why thirty jars
-// could be looked at and never used.
-document.addEventListener("click", async e => {
-  const btn = e.target.closest("[data-use]");
-  if (!btn) return;
-  btn.disabled = true;
-  try {
-    const d = await post("/api/use", { item: btn.dataset.use, how: btn.dataset.how });
-    SHEET = d.sheet;
-    $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
-    $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
-    // The dose is spent and hit points may have moved, so the table's own numbers are
-    // refreshed rather than left showing what was true before the drink.
-    render(await (await fetch("/api/state")).json());
-  } catch (err) { $("#err").textContent = err.message; }
-  btn.disabled = false;
-});
+  Dice3D.ask({
+    title: p.label,
+    why: p.because || "",
+    sides: hi - lo + 1 === 20 ? 20 : (hi - lo + 1),
+    lo: lo, hi: hi, die: die,
+    terms: terms,
+    note: lo === hi ? "" : `${die} (${lo}–${hi})`,
+  }).then(sendRoll);
+}
 
 async function sendRoll(face) {
   $("#veil").classList.remove("on");
