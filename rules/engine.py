@@ -2147,6 +2147,23 @@ class Engine:
                 # chain shirt wearable and a bought potion drinkable through the
                 # machinery that already exists for each. Everything lands in `goods` as
                 # well, because that is the list of what you are carrying.
+                # A raw ingredient goes in the satchel, not the pack, and it goes in
+                # with a timestamp. The 48 hours an animal part has were only ever
+                # counted from foraging, so a gland the GM handed over across a table
+                # kept forever — which made the whole spoilage rule avoidable by
+                # never picking anything up yourself.
+                from . import ingredients as ing_mod
+
+                herb = ing_mod.by_name(item)
+                if herb is not None:
+                    # The satchel only. Everything else lands in `goods` as well
+                    # because `goods` answers "what am I carrying", but the satchel
+                    # answers that for ingredients — and one herb in two lists is two
+                    # counts that drift the first time the pot spends from one.
+                    taker.carry(herb.id, moved, at_minute=self.scene.clock_minutes)
+                    return self._gave(intent, taker, giver, herb.name,
+                                      moved, paid, denom)
+
                 kind = goods.kind_of(item)
                 taker.goods[item] = taker.goods.get(item, 0) + moved
                 key = item.lower()
@@ -2388,6 +2405,28 @@ class Engine:
             tell=(f"{actor.name} {'draws' if kind == 'weapon' else 'puts on'} "
                   f"the {item}.{moved}"),
             because=intent.because,
+        )
+
+    def _gave(self, intent, taker, giver, what, moved, paid, denom) -> Outcome:
+        """The outcome for a handover that has already been applied.
+
+        Shared because an ingredient returns early — it goes to the satchel and must
+        not also land in `goods` — and the tell it deserves is the same one everything
+        else gets.
+        """
+        thing = f"{moved} × {what}" if moved != 1 else what
+        if giver is not None and taker is not None:
+            tell = f"{giver.name} hands {taker.name} {thing}{paid}."
+        elif taker is not None:
+            tell = f"{taker.name} takes {thing}{paid}."
+        else:
+            tell = f"{thing} changes hands."
+        return Outcome(
+            intent_id=intent.id, op="give",
+            effects=[{"ref": (taker or giver).ref if (taker or giver) else "",
+                      "kind": "give", "item": denom or what, "count": moved,
+                      "satchel": dict(taker.inventory) if taker else {}}],
+            tell=tell, because=intent.because,
         )
 
     def _op_rest(self, intent: Intent, partial: dict) -> Outcome:

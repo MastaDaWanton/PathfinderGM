@@ -504,3 +504,89 @@ def test_a_volatile_shelled_herb_needs_opening_before_it_is_infused():
     sealed = FakeHerb("Salamander Gland", needs_extraction=True, volatile=True)
     assert any("extracted" in p for p in _infusion_additions([sealed], [], ["infuse"]))
     assert _infusion_additions([sealed], [], ["extract", "infuse"]) == []
+
+
+# --- a herb the GM hands over gets the same clock (2026-08-23) ------------------------
+
+def _scene_at(minute=0):
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene(location_id=None)
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.clock_minutes = minute
+    return Engine(scene, Dice(seed=3))
+
+
+def _give(engine, item, count=1):
+    raw = {"op": "give", "actor": "pc",
+           "params": {"item": item, "count": count, "to": "pc"}}
+    return engine.run(engine.validate([raw])).outcomes[0]
+
+
+def test_a_handed_over_herb_reaches_the_satchel():
+    """It used to land in `goods` as a generic carried thing, so the crafting bench
+    could not see it at all — the shelf reads the satchel."""
+    eng = _scene_at()
+    _give(eng, "woundwort", 3)
+    pc = eng.scene.pc()
+    assert pc.inventory.get("woundwort") == 3
+    assert "woundwort" not in {k.lower() for k in pc.goods}, \
+        "one herb in two lists is two counts that drift"
+
+
+def test_it_is_named_from_the_prose_the_gm_actually_writes():
+    """"three sprigs of woundwort" is how a handover is written, not `woundwort`."""
+    eng = _scene_at()
+    _give(eng, "a salamander ember gland")
+    assert eng.scene.pc().inventory.get("salamander-ember-gland") == 1
+
+
+def test_the_clock_starts_when_it_changes_hands():
+    """The 48 hours were only counted from foraging, so a gland handed across a table
+    kept forever — which made the spoilage rule avoidable by never picking anything up
+    yourself."""
+    eng = _scene_at(minute=600)
+    _give(eng, "wyrmfang venom")
+    pc = eng.scene.pc()
+    assert pc.picked_at.get("wyrmfang-venom") == 600
+
+    prep = H.Prep(animal=True)
+    assert pc.freshness("wyrmfang-venom", 600 + 47 * 60, prep)[0] is False
+    assert pc.freshness("wyrmfang-venom", 600 + 49 * 60, prep)[0] is True
+
+
+def test_salt_in_the_pack_preserves_what_is_handed_over_too():
+    eng = _scene_at()
+    eng.scene.pc().goods["rock salt"] = 1
+    _give(eng, "wyrmfang venom")
+    assert eng.scene.pc().preserved.get("wyrmfang-venom") is True
+
+
+def test_something_that_is_not_an_ingredient_still_goes_to_the_pack():
+    eng = _scene_at()
+    _give(eng, "brass key")
+    pc = eng.scene.pc()
+    assert pc.goods.get("brass key") == 1 and not pc.inventory
+
+
+def test_a_near_miss_is_not_a_match():
+    """Deliberately not fuzzy: the wrong herb in the satchel is one the player crafts
+    with for a week before noticing."""
+    from rules import ingredients as ing
+
+    assert ing.by_name("a brass lantern") is None
+    assert ing.by_name("Juniper Berry").name == "Juniper Berry"   # not "Juniper"
+
+
+def test_the_matcher_has_no_stray_control_characters():
+    """`\b` written through a shell heredoc arrives as a literal backspace byte, which
+    silently breaks the pattern while every test still passes. It happened here: the
+    word-boundary match became a search for a control character and no phrase longer
+    than the bare name resolved. CLAUDE.md opens its everyday section with this."""
+    from pathlib import Path
+
+    source = Path("rules/ingredients.py").read_text(encoding="utf-8")
+    assert not any(chr(c) in source for c in range(1, 9)), \
+        "a control character is in the source"

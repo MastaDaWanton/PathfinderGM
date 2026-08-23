@@ -12,6 +12,8 @@ given world is not this module's call.
 """
 from __future__ import annotations
 
+import re
+
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -213,6 +215,30 @@ def get(ingredient_id: str) -> Ingredient:
     if ing is None:
         raise KeyError(f"no ingredient {ingredient_id!r}")
     return ing
+
+
+def by_name(text: str) -> Ingredient | None:
+    """The ingredient a piece of prose is naming, or None.
+
+    The GM hands things over in words — "three sprigs of woundwort", "a salamander
+    ember gland" — and the only way a satchel can take one is if the name resolves.
+    Matched on the whole name appearing in the text rather than the other way round,
+    longest first, so "Juniper Berry" is not answered with "Juniper".
+
+    Deliberately not fuzzy. A near-miss here would put the wrong herb in the pot and
+    the player would craft with it for a week.
+    """
+    said = " ".join(str(text or "").split()).strip().lower()
+    if not said:
+        return None
+    everything = all_ingredients()
+    if said in everything:
+        return everything[said]
+    for item in sorted(everything.values(), key=lambda i: len(i.name), reverse=True):
+        name = item.name.lower()
+        if said == name or re.search(rf"\b{re.escape(name)}\b", said):
+            return item
+    return None
 
 
 def usable_at(rank: int) -> list[Ingredient]:
