@@ -201,8 +201,11 @@
     border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
     min-height: 0; font: 14px/1.55 var(--body);
     background:
-      linear-gradient(rgba(96, 76, 50, .16), rgba(52, 40, 26, .30)),
+      linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .26)),
+      linear-gradient(rgba(206, 172, 126, .20), rgba(180, 146, 102, .18)),
+      linear-gradient(#6e5232, #59412a),
       url("{% static 'img/grimoire-leather.jpg' %}") #241d15;
+    background-blend-mode: normal, soft-light, color, normal;
     /* One piece of leather, not a wall of 400px tiles. The panel is the tallest thing on
        the page and scrolls, so a repeating swatch put a visible seam every 400px down the
        character sheet. `cover` on a fixed attachment keeps the grain still while the
@@ -211,9 +214,9 @@
        overlay is lighter than the swatch's: that one was tan and needed darkening,
        and the same overlay on the dark hide went to black. */
     background-repeat: no-repeat;
-    background-size: auto, cover;
-    background-position: center, center;
-    background-attachment: scroll, fixed;
+    background-size: auto, auto, auto, cover;
+    background-position: center;
+    background-attachment: scroll, scroll, scroll, fixed;
     box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
   }
   aside h2 {

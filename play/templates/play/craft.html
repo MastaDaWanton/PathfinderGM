@@ -102,11 +102,14 @@
        went to black, while a warm wash went to milk. Measured against the tabs
        beside it until the two leathers read as one bench. */
     background:
-      linear-gradient(rgba(96, 76, 50, .16), rgba(52, 40, 26, .30)),
+      linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .26)),
+      linear-gradient(rgba(206, 172, 126, .20), rgba(180, 146, 102, .18)),
+      linear-gradient(#6e5232, #59412a),
       url("{% static 'img/grimoire-leather.jpg' %}") #241d15;
+    background-blend-mode: normal, soft-light, color, normal;
     background-repeat: no-repeat;
-    background-attachment: scroll, fixed;
-    background-size: auto, cover;
+    background-attachment: scroll, scroll, scroll, fixed;
+    background-size: auto, auto, auto, cover;
     border: 1px solid rgba(201, 162, 39, .25);
     border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.45),
     0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
