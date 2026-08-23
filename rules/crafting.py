@@ -474,11 +474,16 @@ def preview(track_id: str, level: int, chain: Chain,
 
     if satchel is not None:
         for iid, n in wanted.items():
-            have = int(satchel.get(iid, 0))
-            if have < n:
+            # `carrying`, not `have`: `have` is the shelf of crafted jars three lines
+            # up, and reusing the name rebound it to an integer — so the very next loop
+            # called `.get` on an int and every chain that put a raw herb *and* a jar in
+            # the same pot died with an AttributeError. Which is most infusions.
+            carrying = int(satchel.get(iid, 0))
+            if carrying < n:
                 name = ing_mod.get(iid).name
-                problems.append(f"{name}: you are carrying {have}, the chain wants {n}."
-                                if have else f"You have no {name}. Forage for it.")
+                problems.append(
+                    f"{name}: you are carrying {carrying}, the chain wants {n}."
+                    if carrying else f"You have no {name}. Forage for it.")
 
     used: list[tuple[Stock, int]] = []
     for sid, n in chain.stock_used.items():
@@ -530,6 +535,8 @@ def preview(track_id: str, level: int, chain: Chain,
 
     problems.extend(_preparation_problems(items, chain.methods))
     problems.extend(_spoiled_problems(items, carrier, now_minute))
+    problems.extend(_infusion_problems(items, used, chain.methods))
+    problems.extend(_infusion_additions(items, used, chain.methods))
 
     # The result is as rare as its rarest component, which is also what gates who can
     # make it — a common chain with one legendary petal in it is a legendary brew.
@@ -717,6 +724,78 @@ SHAPE_WORDS = {
 # mapping rather than renaming leaves every saved chain readable.
 _AS_STEP = {"grind": "grind", "mix": "mix", "brew": "brew", "extract": "extract",
             "neutralize": "neutralise", "preserve": "preserve"}
+
+
+def is_tincture(held) -> bool:
+    """Whether a jar on the shelf is a tincture.
+
+    Read off the name, because the name is what `distill` writes: `SHAPE_WORDS` turns
+    that method into the word "Tincture" and nothing else in the chain produces it.
+    A stored `craft` field would be better and does not exist on the jars already
+    saved, and inventing one that only new jars carry would make the rule apply to
+    half a satchel.
+    """
+    word = SHAPE_WORDS["distill"].lower()
+    return word in str(getattr(held, "base", "") or "").lower()
+
+
+def _infusion_problems(items, used, methods) -> list[str]:
+    """A tincture may only be combined with anything else by infusing it.
+
+    The author's rule: "Infusions should be the only way to combine tinctures with
+    other things... you can solo distill and concentrate but until infusions unlock
+    you cannot combine tinctures or add in effects of new ingredients to the existing
+    tinctures."
+
+    So the test is not "is there a tincture in the pot" but "is there a tincture *and*
+    something else". A tincture on its own can be distilled, concentrated, refined or
+    purified at any level that has those methods — that is the solo work the rule
+    explicitly protects. The moment a second thing joins it, the chain needs `infuse`,
+    and since `infuse` is learned at Herbalist 4 the restriction lifts itself exactly
+    when the character earns it.
+    """
+    tinctures = [h for h, _ in used if is_tincture(h)]
+    if not tinctures:
+        return []
+    # Everything in the pot other than the tincture doing the taking — including a
+    # *second* tincture, which the first version excluded. Two tinctures in one pot is
+    # the plainest case of combining tinctures there is, and it sailed through.
+    others = [h.name for h, _ in used if h is not tinctures[0]] \
+        + [i.name for i in items]
+    if not others:
+        return []
+    if "infuse" in methods:
+        return []
+
+    lead = tinctures[0].name
+    joined = ", ".join(others[:3]) + ("…" if len(others) > 3 else "")
+    return [f"{lead} can only take {joined} by infusion. Put the infusion in the "
+            f"chain, or work the tincture on its own."]
+
+
+def _infusion_additions(items, used, methods) -> list[str]:
+    """What may go *into* an infusion, once one is being made.
+
+    "…other tinctures or brews, ground or mixed herbs, raw herbs as long as the raw
+    herbs could be brewed raw, and some herbs that are volatile need extraction." A raw
+    herb in the pot has not been ground unless the chain grinds it, so the question for
+    each one is the same question `herbprep` already answers.
+    """
+    if "infuse" not in methods:
+        return []
+    from . import herbprep
+
+    ground = "grind" in methods
+    extracted = "extract" in methods
+    out = []
+    for item in items:
+        prep = herbprep.Prep.of(item)
+        state = "ground" if ground else ("extracted" if extracted else "raw")
+        ok, why = herbprep.can_infuse({"kind": "tincture", "crafted": True},
+                                      item, state)
+        if not ok:
+            out.append(f"{item.name} cannot be infused: {why}.")
+    return out
 
 
 def _spoiled_problems(items, carrier, now_minute) -> list[str]:

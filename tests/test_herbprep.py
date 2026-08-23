@@ -423,3 +423,84 @@ def test_material_carried_before_the_clock_existed_is_treated_as_fresh():
     pc.inventory["wyrmfang-venom"] = 2          # no timestamp, as an old save has none
     spoiled, _ = pc.freshness("wyrmfang-venom", 9999 * 60, H.Prep(animal=True))
     assert spoiled is False
+
+
+# --- infusion is the only way to combine a tincture (2026-08-23) ----------------------
+
+def _pot(methods, stock_names=(), raw=(), level=5):
+    """A chain over named jars and raw ingredients, without touching the corpus."""
+    from rules import crafting
+
+    stock = {}
+    for name in stock_names:
+        s = crafting.Stock(base=name, tier="common", count=9)
+        stock[s.id] = s
+    chain = crafting.Chain(track="herbalist", methods=list(methods),
+                           ingredient_ids=list(raw),
+                           stock_used={sid: 1 for sid in stock})
+    return crafting.preview("herbalist", level, chain, stock=stock,
+                            satchel={i: 9 for i in raw})
+
+
+def test_a_tincture_alone_can_still_be_distilled():
+    """"you can solo distill and concentrate" — the rule is about combining, and a
+    tincture worked on its own is not combined with anything."""
+    got = _pot(["distill"], stock_names=["Mad Cap Tincture"])
+    assert not any("infusion" in p for p in got.problems), got.problems
+
+
+def test_a_tincture_will_not_take_a_herb_without_an_infusion():
+    """"Infusions should be the only way to combine tinctures with other things.\""""
+    got = _pot(["mix"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
+    assert any("only take" in p and "infusion" in p for p in got.problems), got.problems
+
+
+def test_two_tinctures_will_not_combine_without_one_either():
+    got = _pot(["mix"], stock_names=["Mad Cap Tincture", "Ice Lotus Tincture"])
+    assert any("infusion" in p for p in got.problems), got.problems
+
+
+def test_infusing_is_what_makes_it_legal():
+    got = _pot(["infuse"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
+    assert not any("infusion" in p for p in got.problems), got.problems
+
+
+def test_the_restriction_lifts_itself_when_the_method_is_learned():
+    """`infuse` is Herbalist 4, so below it the chain is refused for not knowing the
+    method — which is the same wall arriving by a different route, and correct."""
+    from rules import worldclass as wc
+
+    track = wc.tracks()["herbalist"]
+    assert "infuse" in track.unlocked_methods(4)
+    assert "infuse" not in track.unlocked_methods(3)
+    assert "distill" in track.unlocked_methods(3)
+
+    low = _pot(["infuse"], stock_names=["Mad Cap Tincture"], raw=["acacia"], level=3)
+    assert any("learned at" in p for p in low.problems), low.problems
+
+
+def test_a_jar_that_is_not_a_tincture_is_not_restricted():
+    """A tea and a herb in the same pot is an ordinary compound, which is most of what
+    the bench does; the rule is about tinctures alone."""
+    got = _pot(["mix"], stock_names=["Woundwort Tea"], raw=["acacia"])
+    assert not any("infusion" in p for p in got.problems), got.problems
+
+
+def test_a_raw_herb_that_cannot_be_brewed_raw_cannot_be_infused_raw():
+    """"raw herbs as long as the raw herbs could be brewed raw" — the same question
+    asked twice, so the same flag answers it."""
+    from rules.crafting import _infusion_additions
+
+    dry = FakeHerb("Coldwood", brew_raw=False)
+    assert any("brewed raw" in p for p in _infusion_additions([dry], [], ["infuse"]))
+    # Grinding it in the same chain answers the objection.
+    assert _infusion_additions([dry], [], ["grind", "infuse"]) == []
+
+
+def test_a_volatile_shelled_herb_needs_opening_before_it_is_infused():
+    """"some herbs that are volitile need extraction.\""""
+    from rules.crafting import _infusion_additions
+
+    sealed = FakeHerb("Salamander Gland", needs_extraction=True, volatile=True)
+    assert any("extracted" in p for p in _infusion_additions([sealed], [], ["infuse"]))
+    assert _infusion_additions([sealed], [], ["extract", "infuse"]) == []
