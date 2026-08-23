@@ -191,7 +191,8 @@ def craft_preview(request):
     pc = c.scene.pc()
     result = crafting.preview(state["track"], state["level"], chain,
                               stock=_stock_of(c, disc["id"]),
-                              satchel=dict(pc.inventory) if pc else {})
+                              satchel=dict(pc.inventory) if pc else {},
+                              carrier=pc, now_minute=c.scene.clock_minutes)
     return JsonResponse(result.as_dict())
 
 
@@ -219,7 +220,8 @@ def craft_do(request):
     pc = c.scene.pc()
     result = crafting.preview(state["track"], state["level"], chain,
                               stock=_stock_of(c, disc["id"]),
-                              satchel=dict(pc.inventory) if pc else {})
+                              satchel=dict(pc.inventory) if pc else {},
+                              carrier=pc, now_minute=c.scene.clock_minutes)
     if result.problems:
         return JsonResponse({"error": " ".join(result.problems)}, status=400)
 

@@ -264,6 +264,17 @@ class Actor:
     # Of the raw material carried, how much of each came back perfect. A subset of
     # `inventory`, never larger than it, and spent first when the pot asks for that herb.
     pristine: dict[str, int] = field(default_factory=dict)
+    # When each raw ingredient was picked, as the world clock read at the time. Animal
+    # parts have 48 hours and plants a week (rules/herbprep.py), and without a
+    # timestamp there is nothing for that clock to count from. Ingredients carried
+    # before this existed have no entry and are treated as fresh — a save that
+    # retroactively spoiled somebody's satchel would be a worse answer than a lenient
+    # one.
+    picked_at: dict[str, int] = field(default_factory=dict)
+    # Ones that were salted at the time. Preserved material does not spoil at all, and
+    # it is recorded per ingredient rather than as a fact about the character because
+    # whether you had salt is a question about the moment you picked it up.
+    preserved: dict[str, bool] = field(default_factory=dict)
     spellbook: list[str] = field(default_factory=list)
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
@@ -1266,7 +1277,8 @@ class Actor:
                     ready.append(pool.id)
         return ready
 
-    def carry(self, ingredient_id: str, count: int = 1, pristine: int = 0) -> int:
+    def carry(self, ingredient_id: str, count: int = 1, pristine: int = 0,
+               at_minute: int | None = None) -> int:
         """Put raw material in the satchel. Returns the new count.
 
         `pristine` is how many of them came back perfect — a very good hour on the ground
@@ -1277,7 +1289,35 @@ class Actor:
         self.inventory[key] = self.inventory.get(key, 0) + max(0, int(count))
         if pristine:
             self.pristine[key] = self.pristine.get(key, 0) + max(0, int(pristine))
+        if at_minute is not None:
+            # The newest handful sets the clock for the pile. Tracking each one
+            # separately would mean a satchel of dated batches and a UI to explain
+            # them, for a rule whose whole content is "use it or lose it".
+            self.picked_at[key] = int(at_minute)
+            from . import herbprep
+
+            if herbprep.has_salt(self):
+                self.preserved[key] = True
         return self.inventory[key]
+
+    def freshness(self, ingredient_id: str, now_minute: int, prep) -> tuple[bool, int]:
+        """Whether this has spoiled, and how many hours are left if it has not.
+
+        Material carried before the clock existed has no timestamp and is treated as
+        fresh: a save that retroactively spoiled somebody's satchel would be a worse
+        answer than a lenient one.
+        """
+        from . import herbprep
+
+        key = (ingredient_id or "").strip().lower()
+        if self.preserved.get(key):
+            return False, -1                       # salted; no clock runs
+        picked = self.picked_at.get(key)
+        if picked is None:
+            return False, -1
+        hours = max(0, (int(now_minute) - int(picked)) // 60)
+        limit = herbprep.spoils_after(prep)
+        return hours >= limit, max(0, limit - hours)
 
     def spend(self, ingredient_id: str, count: int = 1) -> int:
         """Take raw material out. Returns how many were actually taken.
@@ -1918,6 +1958,8 @@ def to_dict(actor: Actor) -> dict:
         "watered_minutes": actor.watered_minutes,
         "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
+        "picked_at": dict(actor.picked_at),
+        "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -2215,6 +2257,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         stock=_stock(data.get("stock") or {}),
         inventory={k: int(v) for k, v in (data.get("inventory") or {}).items()
                    if int(v) > 0},
+        picked_at={str(k): int(v) for k, v in (data.get("picked_at") or {}).items()},
+        preserved={str(k): bool(v) for k, v in (data.get("preserved") or {}).items()},
         goods={str(k): int(v) for k, v in (data.get("goods") or {}).items()
                if int(v) > 0},
         purse={str(k): int(v) for k, v in (data.get("purse") or {}).items()

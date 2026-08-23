@@ -280,3 +280,146 @@ def test_the_shipped_corpus_is_untouched_by_tagging():
     entries = corpus.get("ingredients", corpus)
     assert not any("volatile" in e for e in entries), \
         "preparation flags belong in the overlay, not in the shipped file"
+
+
+# --- and the bench enforces it (2026-08-23) ------------------------------------------
+
+class FakeHerb:
+    """An ingredient with flags chosen by the test rather than by the corpus.
+
+    The tagged flags live in the *homebrew overlay*, in the player's own data
+    directory — so a test that reached for "Hydra Gall is volatile" would be asserting
+    something about whoever ran it. It passed on this machine and would fail on a fresh
+    clone, which is the worst kind of green.
+    """
+    def __init__(self, name, **flags):
+        self.id = name.lower().replace(" ", "-")
+        self.name = name
+        self.kind = flags.pop("kind", "herb")
+        self.tier = "common"
+        self.rank = 1
+        self.risky = False
+        self.effects = []
+        self.text = ""
+        for k, v in flags.items():
+            setattr(self, k, v)
+
+
+def _problems(methods, *herbs):
+    from rules.crafting import _preparation_problems
+
+    return _preparation_problems(list(herbs), methods)
+
+
+def test_a_shelled_herb_cannot_simply_be_ground():
+    """The pot has to be told to open it first, and the refusal names the ingredient
+    and the rule rather than only saying no."""
+    got = _problems(["grind"], FakeHerb("Hydra Gall", needs_extraction=True))
+    assert any("Hydra Gall" in p and "extracted" in p for p in got)
+
+
+def test_extracting_first_makes_the_same_chain_legal():
+    """The state is carried through the chain, which is the whole point: checking each
+    step against the raw ingredient would refuse a chain that extracts and then works."""
+    assert _problems(["extract", "brew"],
+                     FakeHerb("Hydra Gall", needs_extraction=True)) == []
+
+
+def test_a_volatile_herb_will_not_be_ground_until_it_is_neutralised():
+    volatile = FakeHerb("Henbane", volatile=True)
+    got = _problems(["grind"], volatile)
+    assert any("Henbane" in p and "neutralise" in p for p in got)
+    assert _problems(["neutralize", "grind"], volatile) == []
+
+
+def test_a_step_an_ingredient_has_no_use_for_is_not_an_error():
+    """Neutralising a pot of eight herbs because one is volatile is the point; the
+    other seven are not spoiled by sitting through it."""
+    got = _problems(["neutralize", "brew"],
+                    FakeHerb("Henbane", volatile=True), FakeHerb("Acacia"))
+    assert got == []
+
+
+def test_only_the_ingredient_at_fault_is_named():
+    got = _problems(["grind"], FakeHerb("Acacia"),
+                    FakeHerb("Hydra Gall", needs_extraction=True))
+    assert any("Hydra Gall" in p for p in got)
+    assert not any("Acacia" in p for p in got)
+
+
+def test_one_that_cannot_be_brewed_raw_is_refused_until_it_is_ground():
+    dry = FakeHerb("Coldwood", brew_raw=False)
+    assert any("ground" in p for p in _problems(["brew"], dry))
+    assert _problems(["grind", "brew"], dry) == []
+
+
+def test_grinding_and_brewing_pay_more_in_better_hands():
+    """The per-level term reaches the bench: the same chain is worth more to a master.
+    `herbprep` holds the numbers so the two cannot disagree about what a grind is."""
+    from rules import crafting
+
+    def potency(level):
+        return crafting.preview(
+            "herbalist", level,
+            crafting.Chain(track="herbalist", methods=["brew"],
+                           ingredient_ids=["acacia"]),
+            satchel={"acacia": 9}).potency
+
+    assert potency(5) > potency(1) > 1.0
+
+
+def test_spoiled_material_is_refused_rather_than_quietly_weakened():
+    """"all animal parts need preserved within 48 hours for they become garbage" —
+    and garbage in a pot is not a worse potion, it is not a potion."""
+    from rules import crafting
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.carry("wyrmfang-venom", 3, at_minute=0)
+    got = crafting.preview(
+        "herbalist", 3,
+        crafting.Chain(track="herbalist", methods=["brew"],
+                       ingredient_ids=["wyrmfang-venom"]),
+        satchel=dict(pc.inventory), carrier=pc, now_minute=49 * 60)
+    assert any("spoiled" in p for p in got.problems), got.problems
+
+
+def test_salt_carried_at_the_time_keeps_it():
+    from rules import crafting
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.goods["rock salt"] = 1
+    pc.carry("wyrmfang-venom", 3, at_minute=0)      # salted on the way in
+    got = crafting.preview(
+        "herbalist", 3,
+        crafting.Chain(track="herbalist", methods=["brew"],
+                       ingredient_ids=["wyrmfang-venom"]),
+        satchel=dict(pc.inventory), carrier=pc, now_minute=1000 * 60)
+    assert not any("spoiled" in p for p in got.problems), got.problems
+
+
+def test_a_plant_keeps_a_week_where_a_gland_keeps_two_days():
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.carry("acacia", 1, at_minute=0)
+    pc.carry("wyrmfang-venom", 1, at_minute=0)
+    from rules import ingredients as ing
+
+    e = ing.all_ingredients()
+    at_three_days = 72 * 60
+    assert pc.freshness("acacia", at_three_days, H.Prep.of(e["acacia"]))[0] is False
+    assert pc.freshness("wyrmfang-venom", at_three_days,
+                        H.Prep.of(e["wyrmfang-venom"]))[0] is True
+
+
+def test_material_carried_before_the_clock_existed_is_treated_as_fresh():
+    """A save that retroactively spoiled somebody's satchel would be a worse answer
+    than a lenient one."""
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.inventory["wyrmfang-venom"] = 2          # no timestamp, as an old save has none
+    spoiled, _ = pc.freshness("wyrmfang-venom", 9999 * 60, H.Prep(animal=True))
+    assert spoiled is False

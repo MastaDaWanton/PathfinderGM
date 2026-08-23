@@ -441,7 +441,8 @@ def descriptions(items) -> list[dict]:
 
 
 def preview(track_id: str, level: int, chain: Chain,
-            stock: dict | None = None, satchel: dict | None = None) -> Result:
+            stock: dict | None = None, satchel: dict | None = None,
+            carrier=None, now_minute: int | None = None) -> Result:
     """What this chain would make, and how likely it is to work.
 
     Never raises for a chain that is merely bad — an empty pot, a method the character
@@ -527,6 +528,9 @@ def preview(track_id: str, level: int, chain: Chain,
         if m in FINISHING:
             problems.append(f"{m.title()} finishes a chain; nothing follows it.")
 
+    problems.extend(_preparation_problems(items, chain.methods))
+    problems.extend(_spoiled_problems(items, carrier, now_minute))
+
     # The result is as rare as its rarest component, which is also what gates who can
     # make it — a common chain with one legendary petal in it is a legendary brew.
     rank = max([i.rank for i in items] + [h.rank for h, _ in used], default=1)
@@ -535,6 +539,14 @@ def preview(track_id: str, level: int, chain: Chain,
     potency = 1.0
     for m in chain.methods:
         potency *= POTENCY.get(m, 1.0)
+    # Grinding and brewing pay, and pay more in better hands. `herbprep` holds the
+    # numbers so the bench and the ingredient rules cannot disagree about what a grind
+    # is worth; the per-level term is why a master gets more out of the same leaf.
+    from . import herbprep
+
+    for m in chain.methods:
+        if m in ("grind", "brew"):
+            potency *= 1.0 + herbprep.potency_change(m, level)
     # A crafted input brings its own concentration with it, so a compound made from a
     # doubled tea is stronger than one made from a plain one.
     for held, n in used:
@@ -698,6 +710,74 @@ SHAPE_WORDS = {
     "infuse": "Infusion", "neutralize": "Neutralised Draught", "refine": "Elixir",
     "catalyst crafting": "Catalyst",
 }
+
+
+# The bench's own method names against the preparation steps `rules/herbprep.py`
+# knows. `neutralize` is spelled the American way here and the British way there;
+# mapping rather than renaming leaves every saved chain readable.
+_AS_STEP = {"grind": "grind", "mix": "mix", "brew": "brew", "extract": "extract",
+            "neutralize": "neutralise", "preserve": "preserve"}
+
+
+def _spoiled_problems(items, carrier, now_minute) -> list[str]:
+    """Anything in the pot that has gone off.
+
+    Refused rather than quietly weakened: the author's rule is that unpreserved animal
+    parts "become garbage", and garbage in a pot is not a worse potion, it is not a
+    potion. Nothing is checked when the caller has no clock to check against, which is
+    every call that predates one.
+    """
+    from . import herbprep
+
+    if carrier is None or now_minute is None:
+        return []
+    out = []
+    for item in items:
+        prep = herbprep.Prep.of(item)
+        spoiled, _ = carrier.freshness(item.id, now_minute, prep)
+        if spoiled:
+            out.append(
+                f"{item.name} has spoiled — {herbprep.spoils_after(prep)} hours "
+                f"unpreserved and it is refuse. Salt keeps it; potency is the price.")
+    return out
+
+
+def _preparation_problems(items, methods) -> list[str]:
+    """Whether every ingredient in the pot can take every step in the chain.
+
+    Walked in order, carrying each ingredient's state with it, because that is what the
+    rules are about: a thing is raw until it is extracted, volatile until it is
+    neutralised, whole until it is ground, and what it can take next depends on where it
+    already is. Checking each step against the raw state would pass a chain that
+    extracts and then grinds, and refuse the same chain for the same ingredient.
+
+    Only the ingredient the step applies to is refused, by name and with the rule. A
+    chain of eight herbs where one is a shelled nut should say which nut.
+    """
+    from . import herbprep
+
+    out: list[str] = []
+    steps = [(_AS_STEP[m], m) for m in methods if m in _AS_STEP]
+    if not steps:
+        return out
+
+    for item in items:
+        prep = herbprep.Prep.of(item)
+        state = "raw"
+        for step, written in steps:
+            ok, why = herbprep.can(step, prep, state)
+            if ok:
+                state = herbprep.after(step, state)
+                continue
+            # A step an ingredient simply has no use for is not an error: neutralising a
+            # pot of eight herbs when one of them is volatile is the whole point, and the
+            # other seven are not spoiled by sitting through it.
+            if why.startswith(("it is not volatile", "there is nothing to extract",
+                               "it is already", "it has already")):
+                continue
+            out.append(f"{item.name}: {why}.")
+            break
+    return out
 
 
 def _name_for(items, methods) -> str:

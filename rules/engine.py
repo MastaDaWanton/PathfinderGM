@@ -1610,7 +1610,13 @@ class Engine:
         result["asked_for"] = hours
         result["toll"] = toll.as_dict()
         for iid, n in result["found"].items():
-            actor.carry(iid, n, pristine=result["pristine"].get(iid, 0))
+            # Stamped with the world clock, so the 48 hours an animal part has can
+            # be counted from something. Salt, if the character has any, is applied
+            # here rather than as a separate action — "preservation can be automatic if
+            # i have salt", and the turn you pick a gland up is the turn you are least
+            # likely to be thinking about when it goes off.
+            actor.carry(iid, n, pristine=result["pristine"].get(iid, 0),
+                        at_minute=self.scene.clock_minutes)
 
         self.scene.clock_minutes += worked * survival.MINUTES_PER_HOUR
 
