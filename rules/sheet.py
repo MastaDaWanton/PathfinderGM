@@ -307,6 +307,10 @@ class Actor:
     world_entity_id: str | None = None
     world_people_id: str | None = None
     heritage: str = ""
+    # Which branch of the class this character follows. A list because a class
+    # may let you take more than one — Blood Bending declares four and the
+    # player may follow one or several. Empty for every class that has none.
+    paths: list[str] = field(default_factory=list)
     race: str = "human"
     # Stated, never guessed. The model called Kesst "him" in one sentence and "her" in
     # the next because nothing on the sheet said, so it invented one each time.
@@ -1734,6 +1738,10 @@ def full_sheet(actor: Actor) -> dict:
         # than from the class *name*. The header said "Blood Bending 1" and nothing on
         # the sheet said what a Blood Bender could do.
         "class_features": _class_features(actor),
+        # The whole twenty-level table, reached rows and unreached alike, because the
+        # point of showing a class is deciding what to build towards. Plus the paths
+        # this class offers and the ones this character follows.
+        "progression": _progression(actor),
         # What the race gives you. The tab is called "Feats & Traits" and listed only
         # feats: a half-orc's darkvision and ferocity were nowhere on the sheet, so the
         # one place a player checks what their character can do was silent about half
@@ -1945,12 +1953,39 @@ def to_dict(actor: Actor) -> dict:
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
+        "paths": list(actor.paths),
         "flat_skills": actor.flat_skills, "flat_saves": actor.flat_saves,
         "flat_ac": actor.flat_ac, "flat_attack": actor.flat_attack,
         "flat_damage": actor.flat_damage, "flat_initiative": actor.flat_initiative,
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _progression(actor: Actor) -> dict:
+    from . import leveling
+
+    cid = actor.char_class or ""
+    cls = _classes_get(cid)
+    return {
+        "class": cls.get("name", cid), "level": int(actor.level or 1),
+        "summary": cls.get("summary", ""),
+        "hit_die": cls.get("hit_die", 8), "bab": cls.get("bab", ""),
+        "good_saves": list(cls.get("good_saves") or []),
+        "skill_ranks": cls.get("skill_ranks", 2),
+        "class_skills": list(cls.get("class_skills") or []),
+        "paths_offered": leveling.paths_for(cid),
+        "paths_taken": list(actor.paths),
+        "rows": leveling.preview(cid, actor.level or 1, actor.paths),
+        "next": (leveling.gains_at(cid, int(actor.level or 1) + 1)
+                 if int(actor.level or 1) < leveling.MAX_LEVEL else None),
+    }
+
+
+def _classes_get(cid: str) -> dict:
+    from . import classes as classes_mod
+
+    return classes_mod.get(cid)
 
 
 def _racial_traits(actor: Actor) -> list[dict]:
@@ -2179,6 +2214,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         world_people_id=data.get("world_people_id"),
         heritage=data.get("heritage", ""),
         race=data.get("race", "human"),
+        paths=[str(p) for p in (data.get("paths") or [])],
         pronouns=data.get("pronouns", "they/them"),
         flat_skills={k.lower(): v for k, v in (data.get("flat_skills") or {}).items()},
         flat_saves=data.get("flat_saves") or {},

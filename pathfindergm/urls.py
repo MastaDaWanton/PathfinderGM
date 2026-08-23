@@ -9,6 +9,7 @@ urlpatterns = [
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),
+    path("api/level-up", views.level_up, name="level_up"),
     path("api/feats", views.feat_search, name="feat_search"),
     path("licence", views.licence, name="licence"),
     path("api/characters", views.characters, name="characters"),

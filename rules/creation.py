@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 
 from . import casting, classes as classes_mod, feats as feats_mod, houserules
+from . import leveling
 from .sheet import from_dict
 from .tables import ARMOUR, SKILLS, WEAPONS
 
@@ -221,7 +222,8 @@ def options() -> dict:
                      "class_skills": c.get("class_skills", []),
                      "summary": c.get("summary", ""),
                      "caster": bool(casting.CASTERS.get(cid) or c.get("casting")),
-                     "features": classes_mod.features_at(cid, 1)}
+                     "features": classes_mod.features_at(cid, 1),
+                     "paths": leveling.paths_for(cid)}
                     for cid, c in sorted(classes_mod.all_classes().items())
                     if cid != "blood bending" or True],
         # The budget is the house rule's, not the constant's: a forge that showed 20
@@ -322,6 +324,14 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
                         f"{' + Int' if int_mod else ''}"
                         f"{' + human' if race and race.get('bonus_ranks') else ''}).")
 
+    # --- paths ---------------------------------------------------------------------
+    # A class that declares branches must have one chosen at creation: the user's own
+    # framing, "you have to choose a path or both paths". A class with none must carry
+    # none, because a rogue with a Coagulator branch is a save that confuses everything
+    # downstream that reads it.
+    paths, path_problems = leveling.check_paths(cid, payload.get("paths"))
+    problems.extend(path_problems)
+
     # --- feats ---------------------------------------------------------------------
     feat_budget = 1 + (1 if race and race.get("bonus_feat") else 0) \
         + (1 if cid == "fighter" else 0)
@@ -380,6 +390,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         # Worn *and* carried, because those are two different questions and the sheet
         # asks both: the `body` slot is what the equipment page draws on the figure,
         # and `goods` is the answer to "what am I carrying".
+        "paths": paths,
         "goods": {outfit: 1},
         "slots": {"body": [outfit]},
         "hp": hp, "hp_max": hp,

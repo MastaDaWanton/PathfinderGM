@@ -26,7 +26,7 @@ def test_first_level_takes_the_whole_die_and_never_rolls_it():
         "name": "Full Health", "race": "half-orc", "bonus_ability": "con",
         "class": "blood bending",
         "abilities": {"str": 10, "dex": 10, "con": 14, "int": 10, "wis": 10, "cha": 10},
-        "skills": [], "feats": [],
+        "skills": [], "feats": [], "paths": ["coagulator"],
     })
     assert problems == [], problems
     # Con 14 +2 half-orc = 16, a +3 modifier. 16 from the dice, and no dice were rolled.

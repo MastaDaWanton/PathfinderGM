@@ -304,6 +304,9 @@ def test_every_class_on_the_menu_can_actually_be_built():
             "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
                           "wis": 12, "cha": 12},
             "skills": [], "feats": [],
+            # A class that declares branches must have one chosen; one that declares
+            # none must carry none. Taking the first offered exercises both sides.
+            "paths": creation.leveling.paths_for(c["id"])[:1],
         })
         assert problems == [], (c["id"], problems)
         from_dict(built["sheet"])
@@ -324,7 +327,8 @@ def test_a_hit_die_may_be_written_as_notation():
 
 def test_a_blood_bender_gets_the_hit_points_the_class_grants():
     built, problems = creation.build(spec(**{"class": "blood bending"},
-                                          skills=[], feats=["toughness"]))
+                                          skills=[], feats=["toughness"],
+                                          paths=["battle blood"]))
     assert problems == [], problems
     # 2d8 maxed is 16, and the dwarf's Con 16 adds 3.
     assert built["sheet"]["hp"] == 16 + 3

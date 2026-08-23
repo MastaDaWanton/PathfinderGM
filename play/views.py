@@ -334,6 +334,38 @@ def licence(request):
                         content_type="text/plain; charset=utf-8")
 
 
+@require_POST
+def level_up(request):
+    """Take the next level, and say exactly what it was worth.
+
+    The hit points are rolled through the campaign's own dice so the number lands in
+    the turn log with every other roll the app makes — a level that quietly added seven
+    hit points would be the one figure on the sheet nobody could account for.
+    """
+    from rules import leveling
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    result = leveling.level_up(pc, dice=c.engine().dice)
+    if not result.get("ok"):
+        return JsonResponse({"error": result.get("why", "cannot level")}, status=409)
+
+    bits = [f"{pc.name} reaches level {result['level']}.",
+            f"Hit points: rolled {result['rolled']}"
+            + (f" {result['con']:+d} Con" if result['con'] else "")
+            + f" = {result['hp']} ({pc.hp}/{pc.hp_max})."]
+    if result["grants"]:
+        bits.append("Gains: " + ", ".join(result["grants"]) + ".")
+    c.transcript.append({"who": "gm", "text": " ".join(bits), "kind": "consequence"})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**_state(c), "levelled": result})
+
+
 @require_GET
 def feat_search(request):
     """Browse the feat index, ranked by whether this character can actually take it.

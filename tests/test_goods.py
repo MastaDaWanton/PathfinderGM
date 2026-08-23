@@ -397,7 +397,7 @@ def test_every_class_walks_out_dressed():
             "class": cid["id"],
             "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
                           "wis": 12, "cha": 12},
-            "skills": [], "feats": [],
+            "skills": [], "feats": [], "paths": cid.get("paths", [])[:1],
         })
         assert problems == [], (cid["id"], problems)
         actor = from_dict(built["sheet"])

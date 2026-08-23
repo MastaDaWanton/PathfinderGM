@@ -1189,7 +1189,7 @@ function forgeDefaults(opts) {
   return {
     name: "", race: "", bonus_ability: "", heritage: "", pronouns: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    skills: [], feats: [], spellbook: [],
+    skills: [], feats: [], spellbook: [], paths: [],
   };
 }
 
@@ -1263,6 +1263,14 @@ function paneForge() {
           ${c.skill_ranks}+Int skills${c.caster ? " · caster" : ""}</div>
         <div class="traits">${(c.features || []).map(esc).join(" · ")}</div>
       </button>`).join("")}</div>
+
+    ${cls && (cls.paths || []).length ? `
+      <h2 class="sect">Path</h2>
+      <p class="note">A ${esc(cls.name)} follows at least one path. Take one, or take
+        more than one — the class declares ${cls.paths.length}.</p>
+      <div class="cards tight">${cls.paths.map(x => `
+        <button class="card pick ${f.paths.includes(x) ? "on" : ""}"
+                data-crpath="${esc(x)}"><h3>${esc(x)}</h3></button>`).join("")}</div>` : ""}
 
     <h2 class="sect">Abilities</h2>
     <p class="note">Point buy, ${opts.point_budget} points. The race lands after.
@@ -1421,7 +1429,15 @@ document.addEventListener("click", async e => {
     const race = e.target.closest("[data-crrace]");
     if (race) { f.race = race.dataset.crrace; f.bonus_ability = ""; render(); return; }
     const cls = e.target.closest("[data-crclass]");
-    if (cls) { f.class = cls.dataset.crclass; render(); return; }
+    // Paths belong to the class that offers them, so changing class drops them.
+    if (cls) { f.class = cls.dataset.crclass; f.paths = []; render(); return; }
+    const path = e.target.closest("[data-crpath]");
+    if (path) {
+      const name = path.dataset.crpath;
+      f.paths = f.paths.includes(name)
+        ? f.paths.filter(x => x !== name) : [...f.paths, name];
+      render(); return;
+    }
     const bonus = e.target.closest("[data-crbonus]");
     if (bonus) { f.bonus_ability = bonus.dataset.crbonus; render(); return; }
     const addfeat = e.target.closest("[data-craddfeat]");

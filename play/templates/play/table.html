@@ -1213,6 +1213,24 @@ async function openRoster() {
 // starting somebody new — both matched `.pick`, so a click on a roster row fired both:
 // it switched campaigns *and* posted /api/character/new with an undefined source, and
 // "Never mind" quietly rolled a new character instead of closing the panel.
+// Taking a level. The roll goes through the campaign's dice, so the hit points land
+// in the roll log beside everything else the app rolls rather than appearing from
+// nowhere on the sheet.
+document.addEventListener("click", async e => {
+  if (!e.target.closest("#levelup")) return;
+  e.target.closest("#levelup").disabled = true;
+  try {
+    const r = await fetch("/api/level-up", {
+      method: "POST", headers: {"X-CSRFToken":
+        document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""}});
+    const d = await r.json();
+    if (!r.ok) { $("#levelerr").textContent = d.error || "could not level"; return; }
+    render(d);
+    SHEET = await (await fetch("/api/sheet")).json();
+    $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
+  } catch (err) { $("#levelerr").textContent = String(err); }
+});
+
 document.addEventListener("click", async e => {
   const pick = e.target.closest(".pick");
   if (!pick || pick.disabled) return;
@@ -1660,6 +1678,7 @@ const TABS = [
   ["defense",   "Defense",   s => tabDefense(s)],
   ["offense",   "Offense",   s => tabOffense(s)],
   ["skills",    "Skills",    s => tabSkills(s)],
+  ["class",     "Class",     s => tabClass(s)],
   ["feats",     "Feats & Traits", s => tabFeats(s)],
   ["spells",    "Spells",    s => tabSpells(s)],
   ["equipment", "Equipment", s => tabEquipment(s)],
@@ -1864,6 +1883,69 @@ function tabSkills(s) {
 // on every keystroke.
 let FEAT_RESULTS = null;
 let FEAT_QUERY = "";
+
+function tabClass(s) {
+  const p = s.progression;
+  if (!p || !p.rows) return tabEmpty("No class data for this character.");
+  // Every column the class prints on its own table, gathered from the rows rather
+  // than named here — a class with columns this app has never heard of still shows
+  // them, which is the whole point of the classes being data.
+  const cols = [...new Set(p.rows.flatMap(r => Object.keys(r.columns || {})))];
+  return `<div class="cols">
+    <div class="card wide">
+      <h3>${esc(p.class)}</h3>
+      <div class="why">${esc(p.summary || "")}</div>
+      <div class="terms">
+        <div class="t"><span>Hit die</span><b>${esc(String(p.hit_die))}</b></div>
+        <div class="t"><span>Base attack</span><b>${
+          esc(String(p.bab).replace(/_/g, " "))}</b></div>
+        <div class="t"><span>Good saves</span><b>${
+          esc((p.good_saves || []).join(", ") || "none")}</b></div>
+        <div class="t"><span>Skill ranks</span><b>${p.skill_ranks}+Int</b></div>
+      </div>
+      ${(p.paths_offered || []).length ? `
+        <h3 style="margin-top:20px">Paths</h3>
+        <div class="why">This class branches. ${
+          p.paths_taken.length
+            ? `You follow <b>${p.paths_taken.map(esc).join("</b>, <b>")}</b>.`
+            : "This character has none recorded."}</div>
+        <div class="terms">${p.paths_offered.map(x => `
+          <div class="t"><span>${esc(x)}</span><b>${
+            p.paths_taken.includes(x) ? "followed" : "—"}</b></div>`).join("")}</div>
+        <div class="why" style="margin-top:8px">The abilities behind each path are not
+          in the class file yet — see its own note. Choosing one is recorded here and
+          grants nothing until they are written.</div>` : ""}
+      ${p.next ? `
+        <h3 style="margin-top:20px">Next level</h3>
+        <div class="terms">
+          <div class="t"><span>Level</span><b>${p.next.level}</b></div>
+          ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${
+            p.next.bab}</b></div>` : ""}
+          ${Object.entries(p.next.saves || {}).map(([k, v]) =>
+            `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
+          ${(p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
+            esc(p.next.grants.join(", "))}</b></div>` : ""}
+        </div>
+        <button class="go" id="levelup" style="margin-top:14px">Take level ${
+          p.next.level}</button>
+        <div id="levelerr" class="why"></div>` : `<div class="why"
+          style="margin-top:16px">Twentieth level. There is no more table.</div>`}
+    </div>
+    <div class="card wide">
+      <h3>The whole table</h3>
+      <table class="sheet">
+        <tr><th>Level</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}
+          <th>What it grants</th></tr>
+        ${p.rows.map(r => `<tr class="${r.reached ? "" : "dim"}">
+          <td><b>${r.level}</b>${r.level === p.level
+            ? ' <span class="pill now">here</span>' : ""}</td>
+          ${cols.map(c => `<td>${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
+          <td class="why">${esc((r.grants || []).join(", ") || "—")}</td>
+        </tr>`).join("")}
+      </table>
+    </div>
+  </div>`;
+}
 
 function tabFeats(s) {
   return `<div class="cols">
