@@ -98,9 +98,24 @@ class Track:
     deeds: dict[str, dict] = field(default_factory=dict)
     grantable_at_creation: bool = True
 
+    # The last level the track *writes down*. Levelling does not stop there: see
+    # `to_next`. A track that wants a hard ceiling says so with `capped`.
+    capped: bool = False
+
     @property
     def max_level(self) -> int:
         return max((l.level for l in self.levels), default=1)
+
+    @property
+    def top_cost(self) -> int:
+        """What a level costs once the written thresholds run out.
+
+        Held flat at the last one rather than climbing: "dont increase the points
+        required to level beyond 100". The unlocks stop at 5 because that is where the
+        track's own table stops, and everything that scales with the level goes on
+        scaling past it.
+        """
+        return self.thresholds[-1] if self.thresholds else 100
 
     def deed_done(self, *, tier: str, success: bool) -> str:
         """The milestone this craft satisfies, if it satisfies one.
@@ -122,6 +137,9 @@ class Track:
         return next((name for need, name in earned if rank >= need), "")
 
     def at(self, level: int) -> Level:
+        # Only for reading the unlock table: a level past its end unlocks whatever the
+        # last row did, and clamping *here* is what keeps that lookup in range without
+        # capping the character.
         level = max(1, min(int(level), self.max_level))
         return next(l for l in self.levels if l.level == level)
 
@@ -141,10 +159,18 @@ class Track:
         return out
 
     def to_next(self, level: int) -> int | None:
-        """Mastery needed to leave this level, or None at the top."""
-        if level >= self.max_level:
+        """Mastery needed to leave this level. None only for a track that says it caps.
+
+        Past the written table the cost is the last threshold, unchanged. A herbalist
+        who has unlocked everything at 5 keeps levelling at the same price, and every
+        number that reads the level — the potency a grind adds, a formula naming the
+        track — keeps growing with it.
+        """
+        if self.capped and level >= self.max_level:
             return None
-        return self.thresholds[level - 1]
+        if level - 1 < len(self.thresholds):
+            return self.thresholds[level - 1]
+        return self.top_cost
 
 
 @dataclass
@@ -213,7 +239,8 @@ def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
 def _advance(track: Track, progress: Progress) -> list[int]:
     """Spend mastery on levels, as many as have been earned."""
     gained = []
-    while progress.level < track.max_level:
+    # No ceiling: `to_next` returns None only for a track that declares one.
+    while True:
         need = track.to_next(progress.level)
         if need is None or progress.mp < need:
             break

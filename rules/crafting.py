@@ -625,6 +625,13 @@ def _concentration(track, level: int, chain: Chain,
     made = concentrate(held)
 
     problems = []
+    # Two doses in, one out — so fewer than two is not a cheap concentration, it is a
+    # free one. Rounding down left `spend` at zero for a single dose: the pair was
+    # never taken, the output was still made, and a lone jar became a rarer jar at no
+    # cost. Found by driving the bench rather than by reading it.
+    if spend < CONCENTRATE_COST:
+        problems.append(
+            f"Concentrating takes {CONCENTRATE_COST} doses and you have {want}.")
     if held.rank > ceiling:
         problems.append(f"{held.name} is {held.tier}; {track.name} {level} works "
                         f"{track.at(level).max_tier} at best.")

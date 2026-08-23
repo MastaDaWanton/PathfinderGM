@@ -547,3 +547,16 @@ def test_a_spoiled_batch_still_spends_the_doses(client):
     assert "woundwort-tea#1" not in cm.current().scene.pc().stock
     if d["succeeded"]:
         assert cm.current().scene.pc().stock["woundwort-tea#2"].count == 1
+
+
+def test_one_dose_is_not_a_free_concentration():
+    """Found by driving the bench: `spend` rounds down, so a single dose gave
+    `(1 // 2) * 2 = 0`. The pair was never taken, the output was still made, and a lone
+    jar became a rarer jar at no cost — the opposite of the two-for-one trade."""
+    from rules import crafting, worldclass
+
+    track = worldclass.tracks()["herbalist"]
+    held = crafting.Stock(base="Ice Lotus", concentration=1, tier="uncommon", count=1)
+    chain = crafting.Chain(track="herbalist", methods=["distill"])
+    got = crafting._concentration(track, 5, chain, (held, 1), ceiling=99)
+    assert any("takes 2 doses" in p for p in got.problems)

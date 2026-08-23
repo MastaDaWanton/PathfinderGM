@@ -89,6 +89,32 @@ def is_spoiled(prep: Prep, hours_old: int, preserved: bool = False) -> bool:
     return not preserved and int(hours_old or 0) >= spoils_after(prep)
 
 
+# What preserving takes. Salt by any of the names a shelf might use for it, because the
+# player buys "a bag of salt" and the goods table has never heard of an id.
+SALT = ("salt", "rock salt", "sea salt", "curing salt", "saltpetre", "saltpeter")
+
+
+def has_salt(actor) -> bool:
+    """Whether this character is carrying something they could cure with."""
+    carried = list(getattr(actor, "goods", {}) or {}) + \
+        list(getattr(actor, "inventory", {}) or {})
+    return any(any(s in str(name).lower() for s in SALT) for name in carried)
+
+
+def preserve_automatically(actor, prep: Prep) -> tuple[bool, float, str]:
+    """Whether this is cured on the spot, and what it costs.
+
+    "preservation can be automatic if i have salt" — so it is not an action the player
+    has to remember on the turn they pick a gland up, which is the turn they are least
+    likely to be thinking about the forty-eight hours that start now. Carrying salt is
+    the whole condition; the potency it costs is the price, and it is charged once.
+    """
+    if not has_salt(actor):
+        return False, 0.0, ("no salt — this keeps for "
+                            f"{spoils_after(prep)} hours and then it is refuse")
+    return True, potency_change("preserve"), "preserved with salt"
+
+
 def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
     """Whether a step is allowed now, and the reason when it is not.
 

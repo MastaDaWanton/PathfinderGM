@@ -146,7 +146,13 @@
   }
   .jar { position: relative; }
   .jar .conc { font: italic 9px/1.2 var(--body); color: var(--dim); }
-  .stockrow { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  /* Wraps. Without this the concentrate buttons kept extending left off the panel
+     instead of starting a second line, so the ones past the edge were unreachable. */
+  .onlymine { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px;
+              font-size: 12.5px; color: var(--dim); cursor: pointer; }
+  .onlymine input { accent-color: #6fcf8f; }
+  .stockrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+              margin-bottom: 8px; }
   .mini {
     flex: 1; background: linear-gradient(#22190f, #150f09); border: 1px solid var(--edge);
     border-radius: 2px; padding: 5px 9px; cursor: pointer; color: var(--gold);
@@ -421,6 +427,8 @@ function renderBench() {
       <div class="inner">
         <div id="ground"></div>
         <input id="filter" type="text" placeholder="Search the shelf…" autocomplete="off">
+        <label class="onlymine"><input type="checkbox" id="onlyhave">
+          Only what I am carrying</label>
         <div id="stockwrap"></div>
         <h4 class="sect">Raw</h4>
         <div class="shelf" id="shelf"></div>
@@ -444,6 +452,7 @@ function renderBench() {
       <div class="inner" id="preview"></div>
     </section>`;
   $("#filter").addEventListener("input", renderShelf);
+  $("#onlyhave").addEventListener("change", renderShelf);
   renderStations();
   renderShelf();
 }
@@ -517,10 +526,19 @@ function renderShelf() {
   renderGround();
   renderStock();
   const q = ($("#filter")?.value || "").trim().toLowerCase();
-  const list = SHELF.filter(i => !q
+  // The shelf lists every ingredient in the game, which is the right default when you
+  // are learning what exists and the wrong one when you are deciding what to brew
+  // tonight. `have` is what is actually in the satchel.
+  const mine = !!$("#onlyhave")?.checked;
+  const list = SHELF.filter(i => (!mine || (i.held || 0) > 0) && (!q
     || i.name.toLowerCase().includes(q)
     || (i.aka || "").toLowerCase().includes(q)
-    || i.kind.includes(q) || i.tier.includes(q));
+    || i.kind.includes(q) || i.tier.includes(q)));
+  if (mine && !list.length) {
+    $("#shelf").innerHTML = `<div class="sub" style="grid-column:1/-1">You are not
+      carrying any ingredients. Forage, or untick the box to see the whole shelf.</div>`;
+    return;
+  }
   $("#shelf").innerHTML = list.map(i => `
     <button class="jar ${i.usable ? "" : "locked"} ${CHOSEN.includes(i.id) ? "chosen" : ""}"
             data-ing="${esc(i.id)}" ${i.usable ? "" : "disabled"}

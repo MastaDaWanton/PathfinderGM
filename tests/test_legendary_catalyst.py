@@ -219,7 +219,8 @@ def test_the_bench_records_the_deed_and_the_level_lands(client):
 
     progress = cm.current().scene.pc().track("herbalist")
     assert "legendary-catalyst" in progress.milestones
-    assert progress.level == 5
+    # The deed lands the level; the track no longer stops there.
+    assert progress.level >= 5
     assert "catalyst crafting" in wc.get("herbalist").unlocked_methods(progress.level)
 
 

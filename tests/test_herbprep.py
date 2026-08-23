@@ -203,3 +203,32 @@ def test_every_new_field_explains_itself_or_is_obvious():
     for f in registry.KINDS["ingredients"].fields:
         if f.name in ("volatile", "mix_raw", "brew_raw", "needs_extraction", "animal"):
             assert f.help, f.name
+
+
+# --- salt (asked for 2026-08-23) ---------------------------------------------------------
+
+class Carrier:
+    def __init__(self, **goods):
+        self.goods = goods
+        self.inventory = {}
+
+
+def test_carrying_salt_preserves_it_without_being_asked():
+    """"preservation can be automatic if i have salt" — so it does not depend on the
+    player remembering on the turn they pick a gland up, which is the turn they are
+    least likely to be thinking about the 48 hours that start now."""
+    gland = H.Prep(animal=True)
+    ok, cost, why = H.preserve_automatically(Carrier(**{"rock salt": 2}), gland)
+    assert ok and cost < 0 and "salt" in why
+
+
+def test_without_salt_it_says_how_long_there_is():
+    ok, cost, why = H.preserve_automatically(Carrier(rope=50), H.Prep(animal=True))
+    assert not ok and cost == 0
+    assert "48 hours" in why
+
+
+def test_salt_is_recognised_by_the_name_a_player_would_buy():
+    for name in ("salt", "Sea Salt", "a pouch of curing salt"):
+        assert H.has_salt(Carrier(**{name: 1})), name
+    assert not H.has_salt(Carrier(lantern=1))

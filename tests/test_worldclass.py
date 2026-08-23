@@ -180,14 +180,36 @@ def test_the_top_level_waits_on_a_deed_as_well_as_points(herbalist):
 
     wc.award(herbalist, p, recipe_id="xian tao brew", tier="legendary",
              milestone="legendary-catalyst")
-    assert p.level == 5
+    # At least 5: the deed opens the gate, and banked points now carry on past it
+    # rather than piling up against a ceiling. The gate itself is the assertion above.
+    assert p.level >= 5
 
 
-def test_nothing_advances_past_the_top(herbalist):
+def test_the_track_goes_on_past_its_written_table(herbalist):
+    """Reversed on request: "uncap the level and dont increase the points required to
+    level beyond 100". The unlocks stop at 5 because that is where the track's own
+    table stops; the level does not, and everything scaling with it goes on scaling.
+    """
     p = wc.Progress(track="herbalist", level=5, mp=9999)
     wc.award(herbalist, p, recipe_id="another", tier="legendary")
-    assert p.level == 5
-    assert herbalist.to_next(5) is None
+    assert p.level > 5
+    assert herbalist.to_next(5) is not None
+
+
+def test_the_price_of_a_level_stops_climbing(herbalist):
+    """"dont increase the points required to level beyond 100" — past the written
+    thresholds the cost is the last one, unchanged."""
+    top = herbalist.thresholds[-1]
+    assert herbalist.to_next(herbalist.max_level) == top
+    assert herbalist.to_next(herbalist.max_level + 40) == top
+
+
+def test_a_track_that_wants_a_ceiling_still_gets_one(herbalist):
+    """Uncapped by default, not by force: `capped` is how a track says otherwise."""
+    import dataclasses
+
+    walled = dataclasses.replace(herbalist, capped=True)
+    assert walled.to_next(walled.max_level) is None
 
 
 # --- through the engine --------------------------------------------------------------------
