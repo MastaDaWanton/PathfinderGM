@@ -76,7 +76,12 @@
   /* --- three columns, per the reference layout --- */
   main {
     flex: 1; display: grid; gap: 16px; padding: 18px 22px 0;
-    grid-template-columns: minmax(280px, 380px) minmax(360px, 1fr) minmax(300px, 380px);
+    /* The shelf takes the slack, not the chain. The chain column was `1fr` and so ate
+       every spare pixel — 1086px of it on a 1922px screen, holding eleven small station
+       buttons and a cauldron, while 162 jars queued up four-across in the column beside
+       it. The chain is a fixed amount of furniture and is sized to it; the shelf is the
+       part that gets better with room. */
+    grid-template-columns: minmax(320px, 1fr) minmax(300px, 420px) minmax(300px, 380px);
     /* Stretch, not start: with `start` the three columns ended up 650, 423 and 509 tall
        and the bench read as three unrelated boxes rather than one workspace. */
     align-items: stretch; min-height: 0;
@@ -251,7 +256,16 @@
   .arrow { color: var(--gold-dim); }
 
   /* --- the pot --- */
-  .pot { text-align: center; padding: 16px 0 10px; }
+  /* Centred in whatever height is left rather than sitting at the top of it. The three
+     columns are deliberately the same height, so the chain column always has slack; with
+     the pot pinned to the top that slack read as a gap at the bottom of the panel instead
+     of as space around the cauldron. */
+  /* `flex: 1` as well as `display: flex`: `.inner` is sized to its content by default, so
+     the slack in this column sat *outside* it and the pot had no room to centre in. The
+     empty space belongs to the inner box or the centring does nothing. */
+  .panel .inner.chainside { display: flex; flex-direction: column; flex: 1; }
+  .pot { text-align: center; padding: 16px 0 10px; flex: 1;
+         display: flex; flex-direction: column; justify-content: center; }
   .cauldron { font-size: 54px; line-height: 1; filter: drop-shadow(0 0 14px rgba(111,207,143,.30)); }
   .pot .in {
     display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px;
@@ -499,10 +513,10 @@ function renderBench() {
 
     <section class="panel">
       <h2>Crafting Chain</h2>
-      <div class="inner">
+      <div class="inner chainside">
         <div class="stations" id="stations"></div>
         <div class="chain" id="chainrow"></div>
-        <div class="pot">
+        <div class="pot" id="pot">
           <div class="cauldron">🍲</div>
           <div class="in" id="potin"></div>
         </div>
