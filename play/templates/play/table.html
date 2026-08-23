@@ -201,22 +201,15 @@
     border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
     min-height: 0; font: 14px/1.55 var(--body);
     background:
-      linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .26)),
-      linear-gradient(rgba(206, 172, 126, .20), rgba(180, 146, 102, .18)),
-      linear-gradient(#6e5232, #59412a),
-      url("{% static 'img/grimoire-leather.jpg' %}") #241d15;
-    background-blend-mode: normal, soft-light, color, normal;
-    /* One piece of leather, not a wall of 400px tiles. The panel is the tallest thing on
-       the page and scrolls, so a repeating swatch put a visible seam every 400px down the
-       character sheet. `cover` on a fixed attachment keeps the grain still while the
-       sheet scrolls over it — and the source is the 2560px hide, because `cover` had
-       been stretching the 760px swatch double and the grain came out as mush. The
-       overlay is lighter than the swatch's: that one was tan and needed darkening,
-       and the same overlay on the dark hide went to black. */
+      linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .30)),
+      linear-gradient(#584428, #3a2c1a),
+      url("{% static 'img/leather-2x.jpg' %}") #241d15;
+    background-blend-mode: normal, multiply, normal;
     background-repeat: no-repeat;
-    background-size: auto, auto, auto, cover;
     background-position: center;
-    background-attachment: scroll, scroll, scroll, fixed;
+    background-attachment: scroll, scroll, fixed;
+    background-size: auto, auto, cover;
+    /* Same treatment as the craft panels; see there for why the page hide would not do. */
     box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
   }
   aside h2 {
