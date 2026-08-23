@@ -311,6 +311,18 @@
     background: linear-gradient(#2a2114, #1a140c); border: 1px solid var(--gold-dim);
   }
   button.act:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  /* The batch count, sitting with Craft rather than in the panels: it is part of pressing
+     the button, not part of building the chain. */
+  .batch { display: flex; align-items: center; gap: 6px; }
+  .batch label { color: var(--dim); font: 400 17px/1 var(--display); }
+  .batch input {
+    width: 68px; padding: 12px 8px; text-align: center; border-radius: 2px;
+    font: 400 16px/1 var(--display); font-variant-numeric: tabular-nums;
+    color: var(--gold); background: var(--sunk); border: 1px solid var(--gold-dim);
+  }
+  .batch input:focus { outline: none; border-color: var(--accent); }
+  .batch #batchmax { padding: 13px 14px; font-size: 13px; }
+  .batch.off { display: none; }
   button.act:disabled { opacity: .4; cursor: not-allowed; }
   button.act.go { border-color: var(--brew-dim); color: var(--brew); }
   button.act.go:hover:not(:disabled) { border-color: var(--brew); color: #b6f0ca; }
@@ -358,6 +370,13 @@
 
 <footer>
   <button class="act go" id="craft" disabled>Craft</button>
+  <!-- How many. A hundred doses is a hundred separate attempts, each with its own d20 —
+       the same thing as pressing Craft a hundred times, which is what this replaces. -->
+  <span class="batch" id="batchwrap">
+    <label for="batch">×</label>
+    <input type="number" id="batch" min="1" value="1" step="1">
+    <button class="act" id="batchmax" title="As many as your materials allow">all</button>
+  </span>
   <button class="act" id="save" disabled>Save recipe</button>
   <span id="err"></span>
   <span class="mastery" id="mastery"></span>
@@ -376,6 +395,10 @@ let PREVIEW = null;
 // the same walk that enforces the rules, rather than worked out here: the preparation
 // rules live in exactly one place and this is a picture of them, not a second copy.
 let REFUSED = {};
+// How many of the current chain the materials allow, from the server. Kept so the "all"
+// button and the ceiling on the number field agree with what the bench will actually
+// accept, rather than being counted twice in two places that can disagree.
+let BATCH_MAX = 0;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
@@ -734,6 +757,7 @@ async function refresh() {
       { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING });
   } catch (e) { $("#err").textContent = e.message; }
   REFUSED = (answer && answer.refused) || {};
+  BATCH_MAX = (answer && answer.batch_max) || 0;
   PREVIEW = empty ? null : answer;
   renderShelf();
   renderPreview(PREVIEW);
@@ -742,10 +766,43 @@ async function refresh() {
 
 function buttons() {
   const ok = PREVIEW && !PREVIEW.problems.length;
+  const box = $("#batch");
+  // Clamped to what the materials allow, here rather than only on the server, so the
+  // field cannot sit showing 100 while the bench is about to stop at 12.
+  const cap = Math.max(1, BATCH_MAX || 1);
+  if (box) {
+    box.max = cap;
+    let n = Math.floor(Number(box.value) || 1);
+    if (n < 1) n = 1;
+    if (n > cap) n = cap;
+    box.value = n;
+    box.disabled = !ok;
+  }
+  const wrap = $("#batchwrap");
+  // Hidden when there is nothing to repeat. A "×1 all" beside a dead Craft button is
+  // three controls saying nothing.
+  if (wrap) wrap.classList.toggle("off", !ok || cap <= 1);
+  const max = $("#batchmax");
+  if (max) { max.disabled = !ok || cap <= 1; max.textContent = `all ${cap}`; }
+
+  const n = box ? Math.max(1, Math.floor(Number(box.value) || 1)) : 1;
   $("#craft").disabled = !ok;
-  $("#craft").textContent = ok ? `Craft (${PREVIEW.chance}% success)` : "Craft";
+  $("#craft").textContent = ok
+    ? (n > 1 ? `Craft ${n} (${PREVIEW.chance}% each)` : `Craft (${PREVIEW.chance}% success)`)
+    : "Craft";
   $("#save").disabled = !CHOSEN.length && !Object.keys(USING).length;
 }
+
+// Typing in the count re-labels Craft without going back to the server: the chain has not
+// changed, only how many times it is to be worked.
+document.addEventListener("input", e => {
+  if (e.target.closest("#batch")) buttons();
+});
+document.addEventListener("click", e => {
+  if (!e.target.closest("#batchmax")) return;
+  const box = $("#batch");
+  if (box) { box.value = Math.max(1, BATCH_MAX || 1); buttons(); }
+});
 
 // The slider updates its label and its warning without redrawing the ground panel, which
 // would tear the thumb out from under the pointer mid-drag.
@@ -829,8 +886,10 @@ $("#craft").addEventListener("click", async () => {
   $("#err").textContent = "";
   $("#craft").disabled = true;
   try {
+    const asked = Math.max(1, Math.floor(Number($("#batch")?.value) || 1));
     const d = await post("/api/craft/do",
-      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING, name: PREVIEW?.name });
+      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING,
+        name: PREVIEW?.name, batch: asked });
     STATE.tracks[CRAFT] = d.track;
     // Spent doses are gone; leaving them selected offers the player stock they no
     // longer have and the next preview refuses it.
@@ -839,9 +898,23 @@ $("#craft").addEventListener("click", async () => {
     // Levelling can unlock methods and tiers, so the shelf is re-fetched rather than
     // left showing the ceiling the character had a moment ago.
     await reloadShelf();
-    $("#err").innerHTML = `<span style="color:${d.succeeded ? "var(--brew)" : "var(--alarm)"}">
-      d20 ${d.roll} against ${d.chance}% — ${d.succeeded ? "made" : "spoiled"}.</span>
-      <span style="color:var(--dim)"> ${esc(d.tell)}</span>`;
+    const b = d.batch || { attempted: 1, made: d.succeeded ? 1 : 0, spoiled: d.succeeded ? 0 : 1 };
+    if (b.attempted > 1) {
+      // The tally, not a hundred roll lines. Every attempt was its own d20; what the
+      // player wants to know afterwards is how many jars they ended up with.
+      $("#err").innerHTML = `<span style="color:var(--brew)">${b.made} made</span>
+        <span style="color:var(--dim)">·</span>
+        <span style="color:${b.spoiled ? "var(--alarm)" : "var(--dim)"}">${b.spoiled} spoiled</span>
+        <span style="color:var(--dim)"> — ${b.attempted} attempt${b.attempted === 1 ? "" : "s"}
+        at ${d.chance}% each.${b.stopped ? " " + esc(b.stopped) : ""}</span>`;
+    } else {
+      $("#err").innerHTML = `<span style="color:${d.succeeded ? "var(--brew)" : "var(--alarm)"}">
+        d20 ${d.roll} against ${d.chance}% — ${d.succeeded ? "made" : "spoiled"}.</span>
+        <span style="color:var(--dim)"> ${esc(d.tell)}</span>`;
+    }
+    // Back to one. A batch of ninety left in the box is a batch of ninety one careless
+    // press away from happening again.
+    if ($("#batch")) $("#batch").value = 1;
   } catch (e) { $("#err").textContent = e.message; }
   await refresh();
 });

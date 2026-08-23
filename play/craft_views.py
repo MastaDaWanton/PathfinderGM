@@ -199,6 +199,9 @@ def craft_preview(request):
     # enforced correctly and saying nothing until you had already built a chain and
     # pressed Craft — which reads exactly like the rules not working at all.
     out["refused"] = _shelf_refusals(chain.methods)
+    # How many the materials allow, so the bench can offer "all 47" rather than making the
+    # player count it out and then find they were three short halfway through the batch.
+    out["batch_max"] = batch_max(result, pc)
     return JsonResponse(out)
 
 
@@ -220,14 +223,46 @@ def _shelf_refusals(methods) -> dict:
     return out
 
 
+# A ceiling on one request, well above any real batch. "100 acacia powder tea" is the
+# case this exists for; a hand-written request for a million would otherwise roll a
+# million d20s before the response ever went out.
+MAX_BATCH = 1000
+
+
+def batch_max(result, pc) -> int:
+    """How many of this chain the materials on hand allow.
+
+    Per-dose costs against what is carried, taking the tightest. Reported with the preview
+    so the bench can offer "all 47" rather than making the player work it out and then
+    discover halfway through a batch that they were three short.
+    """
+    if pc is None:
+        return 0
+    limit = MAX_BATCH
+    for sid, n in (result.consumes or {}).items():
+        if n > 0:
+            held = getattr(pc.stock.get(sid), "count", 0)
+            limit = min(limit, int(held) // n)
+    for iid, n in (result.consumes_raw or {}).items():
+        if n > 0:
+            limit = min(limit, int(pc.inventory.get(iid, 0)) // n)
+    return max(0, limit)
+
+
 @require_POST
 def craft_do(request):
-    """Attempt the chain. The dice decide, and the track advances either way.
+    """Attempt the chain, once or many times over.
 
     Scored through the engine's `craft` op rather than here, so crafting at this bench and
     crafting narrated at the table pass through exactly one piece of arithmetic. A spoiled
     batch still teaches something, which is the author's rule and the reason failure is
     reported rather than refused.
+
+    A batch is N separate attempts, not one attempt for N doses: its own d20 each time,
+    its own success, its own mastery. "i should not need to click the craft button 100
+    times" is a complaint about the clicking, and the fix must not quietly become a change
+    to the game — one roll for a hundred doses would mean a single 1 spoiling the lot,
+    which is a different rule rather than the same rule automated.
     """
     body = json.loads(request.body or "{}")
     c = campaign_mod.current()
@@ -240,15 +275,82 @@ def craft_do(request):
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
+    wanted = max(1, min(MAX_BATCH, int(body.get("batch", 1) or 1)))
     chain = _chain_from(body, state["track"])
-    pc = c.scene.pc()
-    result = crafting.preview(state["track"], state["level"], chain,
-                              stock=_stock_of(c, disc["id"]),
-                              satchel=dict(pc.inventory) if pc else {},
-                              carrier=pc, now_minute=c.scene.clock_minutes)
-    if result.problems:
-        return JsonResponse({"error": " ".join(result.problems)}, status=400)
 
+    attempts, made_all, spent_all = [], [], {}
+    stopped = ""
+    for _ in range(wanted):
+        # Recomputed every time round. The shelf changes as the batch runs — doses are
+        # spent, and a concentration puts its output back on it — so a preview taken once
+        # and reused would be describing a pot that no longer exists by attempt three.
+        pc = c.scene.pc()
+        result = crafting.preview(state["track"], state["level"], chain,
+                                  stock=_stock_of(c, disc["id"]),
+                                  satchel=dict(pc.inventory) if pc else {},
+                                  carrier=pc, now_minute=c.scene.clock_minutes)
+        if result.problems:
+            if not attempts:
+                return JsonResponse({"error": " ".join(result.problems)}, status=400)
+            # Out of something, partway through. The doses already made are kept and the
+            # reason is reported: a batch that rolled back on running short would throw
+            # away work that really happened.
+            stopped = " ".join(result.problems)
+            break
+        try:
+            one = _one_craft(c, disc, state, result)
+        except IntentError as exc:
+            if not attempts:
+                return JsonResponse({"error": str(exc)}, status=400)
+            stopped = str(exc)
+            break
+        attempts.append(one)
+        if one["made"]:
+            made_all.append(one["made"])
+        for k, n in one["spent"].items():
+            spent_all[k] = spent_all.get(k, 0) + n
+
+    succeeded = sum(1 for a in attempts if a["succeeded"])
+    spoiled = len(attempts) - succeeded
+    name = attempts[0]["name"] if attempts else ""
+
+    # One line in the transcript however many doses were worked. A hundred crafts is one
+    # afternoon at the bench, not a hundred things that happened to the party.
+    if len(attempts) == 1:
+        a = attempts[0]
+        line = (f"{name}: {'made' if a['succeeded'] else 'spoiled'} "
+                f"(d20 {a['roll']} against {a['chance']}%). {a['tell']}").strip()
+    elif attempts:
+        line = (f"{name} x{len(attempts)}: {succeeded} made, {spoiled} spoiled "
+                f"(each against {attempts[0]['chance']}%).")
+    else:
+        line = ""
+    if stopped:
+        line = f"{line} Stopped: {stopped}".strip()
+    if line:
+        c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
+    c.save()
+
+    last = attempts[-1] if attempts else {}
+    return JsonResponse({
+        # The single-craft shape is kept intact so the page and everything else reading
+        # this endpoint go on working unchanged; the batch block is an addition.
+        "succeeded": bool(last.get("succeeded")),
+        "roll": last.get("roll"), "chance": last.get("chance"),
+        "result": last.get("result"), "tell": last.get("tell", ""),
+        "made": last.get("made"), "spent": spent_all,
+        "batch": {
+            "asked": wanted, "attempted": len(attempts),
+            "made": succeeded, "spoiled": spoiled,
+            "rolls": [a["roll"] for a in attempts],
+            "items": made_all, "stopped": stopped,
+        },
+        "track": _track_state(c, disc),
+    })
+
+
+def _one_craft(c, disc, state, result) -> dict:
+    """One attempt: one roll, one outcome, one advance of the track."""
     engine = c.engine()
     roll = engine.dice.d20(label=f"{disc['name']}: {result.name}", visibility="player")
     face = roll.faces[0]
@@ -261,25 +363,22 @@ def craft_do(request):
     track = worldclass.get(state["track"])
     milestone = track.deed_done(tier=result.tier, success=succeeded)
 
-    try:
-        resolution = engine.run(engine.validate([{
-            "op": "craft", "actor": "pc",
-            "because": f"a session at the {disc['name'].lower()} bench",
-            "params": {
-                "track": state["track"],
-                "recipe": result.name.lower(),
-                "tier": result.tier,
-                "stages": max(1, result.stages),
-                "risky": result.risky,
-                "failed": not succeeded,
-                "milestone": milestone,
-                # Two doses in, one of the next band out: the ceiling is checked against
-                # what went in, so the engine has to be told which kind of craft this is.
-                "concentrating": result.concentrating,
-            },
-        }]))
-    except IntentError as exc:
-        return JsonResponse({"error": str(exc)}, status=400)
+    resolution = engine.run(engine.validate([{
+        "op": "craft", "actor": "pc",
+        "because": f"a session at the {disc['name'].lower()} bench",
+        "params": {
+            "track": state["track"],
+            "recipe": result.name.lower(),
+            "tier": result.tier,
+            "stages": max(1, result.stages),
+            "risky": result.risky,
+            "failed": not succeeded,
+            "milestone": milestone,
+            # Two doses in, one of the next band out: the ceiling is checked against
+            # what went in, so the engine has to be told which kind of craft this is.
+            "concentrating": result.concentrating,
+        },
+    }]))
 
     # The inputs are spent either way. A spoiled batch that hands the ingredients back
     # would make failure free, and the author's own note is that failure matters because
@@ -302,18 +401,12 @@ def craft_do(request):
         pc.add_stock(item, 1)
         made = item.as_dict()
 
-    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
-    c.transcript.append({
-        "who": "gm", "kind": "consequence",
-        "text": f"{result.name}: {'made' if succeeded else 'spoiled'} "
-                f"(d20 {face} against {result.chance}%). {tell}".strip(),
-    })
-    c.save()
-    return JsonResponse({
-        "succeeded": succeeded, "roll": face, "chance": result.chance,
-        "result": result.as_dict(), "tell": tell, "made": made, "spent": spent,
-        "track": _track_state(c, disc),
-    })
+    return {
+        "name": result.name, "succeeded": succeeded, "roll": face,
+        "chance": result.chance, "result": result.as_dict(), "made": made,
+        "spent": spent,
+        "tell": " ".join(o.tell for o in resolution.outcomes if o.tell),
+    }
 
 
 def _hits(face: int, chance: int) -> bool:

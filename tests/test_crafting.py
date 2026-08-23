@@ -14,6 +14,7 @@ import json
 import pytest
 from django.test import Client, override_settings
 
+from play import craft_views
 from rules import crafting, herbprep, ingredients
 from rules.crafting import Chain
 from rules.sheet import load_pc
@@ -848,3 +849,128 @@ def test_neutralise_is_not_held_to_the_purify_rule(monkeypatch):
     volatile = _herb("woundwort", volatile=True)
     monkeypatch.setattr(ingredients, "all_ingredients", lambda: {volatile.id: volatile})
     assert not _problems([volatile.id], ["neutralize", "grind"])
+
+
+# --- crafting in a batch ----------------------------------------------------------------
+#
+# "if i have 100 acacia powder and i want to make 100 acacia powder tea i should not need
+# to click the craft button 100 times." A batch is N separate attempts rather than one
+# attempt for N doses: its own d20 each time, its own success, its own mastery. That is
+# what pressing the button N times did, and automating the pressing must not quietly
+# become a change to the rule — one roll for a hundred doses would mean a single 1
+# spoiling the lot.
+
+def _stocked(client, ingredient="woundwort", count=100):
+    from play import campaign as cm
+
+    pc = cm.current().scene.pc()
+    pc.inventory[ingredient] = count
+    return pc
+
+
+def _brew(client, batch=1, ingredient="woundwort"):
+    return client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": [ingredient], "methods": ["brew"],
+        "batch": batch}), content_type="application/json")
+
+
+def test_a_batch_makes_many_jars_from_one_press(client):
+    _stocked(client)
+    d = _brew(client, batch=20).json()
+    assert d["batch"]["attempted"] == 20
+    assert d["batch"]["made"] + d["batch"]["spoiled"] == 20
+
+
+def test_every_dose_in_a_batch_gets_its_own_roll(client):
+    """Not one roll for the lot. A single 1 must cost one jar, not twenty."""
+    _stocked(client)
+    rolls = _brew(client, batch=20).json()["batch"]["rolls"]
+    assert len(rolls) == 20
+    assert len(set(rolls)) > 1, rolls
+
+
+def test_a_batch_spends_the_materials_for_every_dose(client):
+    """Twenty teas cost twenty herbs, made or spoiled. The inputs are spent either way —
+    a spoiled batch that handed them back would make failure free."""
+    from play import campaign as cm
+
+    pc = _stocked(client, count=100)
+    _brew(client, batch=20)
+    assert cm.current().scene.pc().inventory.get("woundwort", 0) == 80
+
+
+def test_a_batch_stops_when_the_materials_run_out_and_keeps_what_it_made(client):
+    """Asked for more than the shelf can supply. The doses already made are real work and
+    are kept; the reason is reported rather than the batch being rolled back."""
+    _stocked(client, count=5)
+    d = _brew(client, batch=50).json()
+    assert d["batch"]["asked"] == 50
+    assert d["batch"]["attempted"] == 5
+    assert d["batch"]["stopped"]
+
+
+def test_a_batch_of_one_is_the_single_craft_it_always_was(client):
+    """The old response shape is kept intact, so anything reading this endpoint — the
+    page included — goes on working unchanged."""
+    _stocked(client)
+    d = _brew(client, batch=1).json()
+    assert set(["succeeded", "roll", "chance", "result", "made", "spent"]) <= set(d)
+    assert d["batch"]["attempted"] == 1
+
+
+def test_no_batch_field_at_all_still_crafts_once(client):
+    _stocked(client)
+    d = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
+        content_type="application/json").json()
+    assert d["batch"]["attempted"] == 1
+
+
+def test_a_batch_writes_one_line_to_the_transcript_not_a_hundred(client):
+    """A hundred crafts is one afternoon at the bench, not a hundred things that happened
+    to the party."""
+    from play import campaign as cm
+
+    _stocked(client)
+    before = len(cm.current().transcript)
+    _brew(client, batch=30)
+    assert len(cm.current().transcript) == before + 1
+
+
+def test_a_batch_advances_the_track_once_per_dose(client):
+    """Batching must be worth exactly what the clicking was worth. Mastery per attempt,
+    not per press — otherwise the button is either a nerf or a shortcut."""
+    from play import campaign as cm
+
+    _stocked(client)
+    one = _brew(client, batch=1).json()["track"]
+    many = _brew(client, batch=10).json()["track"]
+    assert (many["level"], many["mp"]) != (one["level"], one["mp"])
+
+
+def test_an_absurd_batch_is_capped_rather_than_rolling_forever(client):
+    """Without a ceiling a hand-written request for a million would roll a million d20s
+    before the response ever went out."""
+    _stocked(client, count=100)
+    d = _brew(client, batch=10_000_000).json()
+    assert d["batch"]["asked"] <= craft_views.MAX_BATCH
+
+
+def test_a_chain_that_cannot_be_made_is_refused_before_any_of_the_batch_runs(client):
+    """The first attempt is checked like any single craft: nothing is spent and the error
+    is the chain's own, not "stopped after 0"."""
+    r = client.post("/api/craft/do", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["distill"],
+        "batch": 10}), content_type="application/json")
+    assert r.status_code == 400
+    assert "liquid" in r.json()["error"]
+
+
+def test_the_bench_says_how_many_the_materials_allow(client):
+    """So the page can offer "all 47" rather than making the player count it out and then
+    discover halfway through that they were three short."""
+    _stocked(client, count=47)
+    d = client.post("/api/craft/preview", data=json.dumps({
+        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
+        content_type="application/json").json()
+    assert d["batch_max"] == 47
