@@ -54,6 +54,7 @@ class Prep:
     mix_raw: bool = True                # or only once ground
     brew_raw: bool = True               # or only once ground
     animal: bool = False                # 48 hours rather than a week
+    liquid: bool = False                # a sap, an oil, a gall — already pourable
 
     @classmethod
     def of(cls, ingredient) -> "Prep":
@@ -77,7 +78,36 @@ class Prep:
             brew_raw=flag("brew_raw", True),
             # An ingredient that never said so is an animal part if its kind says it is.
             animal=flag("animal", "monster part" in str(kind).lower()),
+            # And is a liquid if its own name says it is. Detected rather than tagged
+            # because 162 ingredients would otherwise all need a second pass to teach
+            # the corpus something its names already say; an explicit tag still wins.
+            liquid=flag("liquid", looks_liquid(
+                (ingredient.get("name") if isinstance(ingredient, dict)
+                 else getattr(ingredient, "name", "")) or "", kind)),
         )
+
+
+# Words that mean a thing arrives already pourable. Whole words only: "Sapwood" is not a
+# sap and "Oilseed" is a seed. Kept deliberately short — over-detecting here would hand
+# distillation back the permissiveness this list exists to take away.
+LIQUID_WORDS = (
+    "sap", "oil", "essence", "gall", "blood", "ichor", "venom", "nectar",
+    "milk", "juice", "brine", "resin", "tears", "honey", "dew", "wine",
+    "water", "extract", "syrup", "bile", "serum", "tincture", "tea",
+)
+
+
+def looks_liquid(name: str, kind: str = "") -> bool:
+    """Whether an ingredient's own name says it arrives as a liquid.
+
+    Read off the name rather than tagged, because the corpus already says it — "Cotsbalm
+    Sap", "Banshee Wail Essence", "Hydra Gall". A tag on the ingredient still wins, so
+    anything the names get wrong is one edit away in the ingredient editor.
+    """
+    import re
+
+    said = f"{name} {kind}".lower()
+    return any(re.search(rf"\b{w}s?\b", said) for w in LIQUID_WORDS)
 
 
 def spoils_after(prep: Prep) -> int:

@@ -123,6 +123,10 @@ KINDS: dict[str, Kind] = {
                        "it can be infused into a tincture raw."),
             Field("animal", "Animal part", type="choice", choices=("no", "yes"),
                   help="Spoils in 48 hours unpreserved, rather than a week."),
+            Field("liquid", "Already a liquid", type="choice", choices=("no", "yes"),
+                  help="A sap, an oil, a gall, an essence. Only a liquid can be "
+                       "distilled; anything else has to be brewed into one first. "
+                       "Left unset, the ingredient's own name decides."),
             Field("effects", "Effects", type="effects"),
         ],
     ),

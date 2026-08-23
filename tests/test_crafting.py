@@ -14,7 +14,7 @@ import json
 import pytest
 from django.test import Client, override_settings
 
-from rules import crafting, ingredients
+from rules import crafting, herbprep, ingredients
 from rules.crafting import Chain
 from rules.sheet import load_pc
 
@@ -753,3 +753,98 @@ def test_the_shelf_and_the_craft_button_agree(client, tagged):
             content_type="application/json").json()["problems"]
         named = [p for p in problems if p.startswith(tagged[iid].name)]
         assert bool(named) == (iid in refused), (iid, problems, refused)
+
+
+# --- distilling needs a liquid; purifying needs something to purify --------------------
+#
+# Reported from play: "i can still distill anything — how can i distill a dry leaf or a
+# mushroom", and "to purify it needs to have a negative effect to purify". Both methods
+# ran on anything at all: `distill` was not in the preparation walk at all, and `purify`
+# had already worked out that it would find nothing, written "found nothing harmful to
+# remove" on the jar as a note, and gone ahead — spending the ingredients, advancing the
+# track and producing a Purified Draught of a thing that was never impure.
+
+def _problems(iids, methods, level=5, stock=None):
+    stock = {s.id: s for s in (stock or [])}
+    chain = Chain(track="herbalist", methods=list(methods), ingredient_ids=list(iids),
+                  stock_used={sid: 1 for sid in stock})
+    return crafting.preview("herbalist", level, chain, stock=stock,
+                            satchel={i: 5 for i in iids}).problems
+
+
+def test_a_dry_leaf_cannot_be_distilled():
+    """The report, exactly. There is no liquid in a handful of leaves to boil off."""
+    assert any("liquid" in p for p in _problems(["woundwort"], ["distill"]))
+
+
+def test_a_mushroom_cannot_be_distilled():
+    assert any("liquid" in p for p in _problems(["mad-cap"], ["distill"]))
+
+
+def test_something_that_already_pours_can_be_distilled():
+    """Nine ingredients in the corpus arrive as liquid — saps, galls, essences, tears.
+    Refusing those would have traded one wrong answer for another."""
+    sap = ingredients.all_ingredients()["trollheart-sap"]
+    assert herbprep.Prep.of(sap).liquid
+    assert not _problems(["trollheart-sap"], ["distill"])
+
+
+def test_a_tea_off_the_shelf_can_be_distilled():
+    """The ordinary route to a tincture: brew a tea in one chain, distil it in the next.
+    Brewing finishes a chain, so this has to work across two of them or not at all."""
+    tea = crafting.Stock(base="Woundwort Tea", tier="common", count=3, potency=1.25,
+                         craft="herbalist", effects=["Stops bleeding"])
+    assert not _problems([], ["distill"], stock=[tea])
+
+
+def test_grinding_takes_the_liquid_back_out_of_the_pot():
+    """Order is the whole point: `grind → distill` and `brew → distill` are the same two
+    methods, and only one of them is a thing you can do. A check against the ingredients
+    alone, ignoring the order, would pass both."""
+    problems = _problems(["trollheart-sap"], ["grind", "distill"])
+    assert any("liquid" in p for p in problems), problems
+
+
+def test_the_shelf_marks_a_leaf_when_distil_is_chosen():
+    """The cue has to cover distillation too. `prep_problem` only walked the preparation
+    steps, and `distill` is not one of them — so choosing it greyed nothing."""
+    leaf = ingredients.all_ingredients()["woundwort"]
+    assert "pour" in crafting.prep_problem(leaf, ["distill"])
+    assert crafting.prep_problem(leaf, ["brew", "distill"]) == ""
+
+
+def test_the_refusal_is_not_reported_twice():
+    """`_preparation_problems` and `_distillation_problems` both ask the same question of
+    the same pot. Both answering meant every dry leaf was refused twice over."""
+    problems = _problems(["woundwort"], ["distill"])
+    assert len([p for p in problems if "liquid" in p or "pour" in p]) == 1, problems
+
+
+def test_purify_needs_something_harmful_to_remove():
+    """Woundwort stops bleeding and does nothing else. There is nothing in it to strip."""
+    problems = _problems(["woundwort"], ["purify"])
+    assert any("nothing to remove" in p for p in problems), problems
+
+
+def test_purify_is_allowed_when_the_pot_is_actually_poisonous():
+    assert not _problems(["mad-cap"], ["purify"])
+
+
+def test_purify_is_allowed_when_the_pot_is_merely_hazardous_to_handle():
+    """`risky` ingredients carry no poison spec — the danger is in the harvesting — and
+    purify has always claimed to remove those handling risks. It still may."""
+    risky = next(i.id for i in ingredients.all_ingredients().values() if i.risky)
+    assert not _problems([risky], ["purify"])
+
+
+def test_neutralise_is_not_held_to_the_purify_rule(monkeypatch):
+    """Neutralise has a second job: making a volatile herb safe to grind. It shares the
+    CLEANSING list with purify, so a rule written against the list rather than against
+    the method would have broken every volatile chain.
+
+    The herb is made here: the shipped corpus tags nothing volatile — those tags live in
+    the homebrew overlay in the player's own data directory.
+    """
+    volatile = _herb("woundwort", volatile=True)
+    monkeypatch.setattr(ingredients, "all_ingredients", lambda: {volatile.id: volatile})
+    assert not _problems([volatile.id], ["neutralize", "grind"])

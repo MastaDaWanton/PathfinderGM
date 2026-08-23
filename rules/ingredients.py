@@ -67,6 +67,7 @@ class Ingredient:
     mix_raw: bool = True
     brew_raw: bool = True
     animal: bool = False
+    liquid: bool = False
 
     @property
     def rank(self) -> int:
@@ -134,6 +135,10 @@ class Ingredient:
 
 
 def from_dict(d: dict) -> Ingredient:
+    # Imported here rather than at the top: `herbprep` is the rules layer above this one
+    # and importing it at module scope would tie the corpus to the bench.
+    from . import herbprep
+
     return Ingredient(
         id=d["id"], name=d["name"], kind=d.get("kind", "herb"),
         tier=d.get("tier", "common"), tier_inferred=bool(d.get("tier_inferred")),
@@ -157,6 +162,10 @@ def from_dict(d: dict) -> Ingredient:
         # of what they are, not because somebody ticked a box that did not exist when
         # the corpus was written.
         animal=_flag(d.get("animal"), d.get("kind", "") == "monster part"),
+        # Same shape: unstated means the name decides. "Trollheart Sap" is a liquid
+        # whether or not anyone ever tagged it, and only a liquid can be distilled.
+        liquid=_flag(d.get("liquid"),
+                     herbprep.looks_liquid(d.get("name", ""), d.get("kind", ""))),
     )
 
 

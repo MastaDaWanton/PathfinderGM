@@ -537,6 +537,7 @@ def preview(track_id: str, level: int, chain: Chain,
     problems.extend(_spoiled_problems(items, carrier, now_minute))
     problems.extend(_infusion_problems(items, used, chain.methods))
     problems.extend(_infusion_additions(items, used, chain.methods))
+    problems.extend(_distillation_problems(items, used, chain.methods))
 
     # The result is as rare as its rarest component, which is also what gates who can
     # make it — a common chain with one legendary petal in it is a legendary brew.
@@ -576,6 +577,15 @@ def preview(track_id: str, level: int, chain: Chain,
     named = {p.source for p in sifted.poisons}
     rough = [i.name for i in items if i.risky and i.name not in named]
     rough += [h.name for h, _ in used if h.drawbacks and h.name not in named]
+
+    # Purification with nothing to purify. The chain already worked out that it would
+    # find nothing and wrote "found nothing harmful to remove" on the jar as a note —
+    # which meant the step ran, spent the ingredients, advanced the track and produced a
+    # Purified Draught of a thing that was never impure. It is a refusal now.
+    if "purify" in chain.methods and not (sifted.poisons or sifted.penalties or rough):
+        problems.append(
+            "Purify has nothing to remove: nothing in the pot is harmful. "
+            "It strips poisons and penalties, and there are none here.")
 
     removed: list[str] = []
     if cleansed:
@@ -741,6 +751,75 @@ _AS_STEP = {"grind": "grind", "mix": "mix", "brew": "brew", "extract": "extract"
             "neutralize": "neutralise", "preserve": "preserve"}
 
 
+# What each method leaves in the pot, read off the shape word it already names its output
+# with — so there is one statement in the code of what a brew produces, not two that can
+# drift. `mix` makes a "Compound", which is whatever went into it, so it is in neither set
+# and carries the pot's form through unchanged.
+LIQUID_SHAPES = {"Tea", "Tincture", "Purified Draught", "Infusion",
+                 "Neutralised Draught", "Elixir"}
+SOLID_SHAPES = {"Powder", "Preserve", "Extract", "Catalyst"}
+
+
+def pot_is_liquid(items, used, methods=()) -> bool:
+    """Whether there is anything pourable in the pot once `methods` have been worked.
+
+    A property of the pot rather than of any one ingredient: brewing turns everything in
+    it into a tea, and grinding a tea is not a question the ingredients can answer on
+    their own.
+    """
+    from . import herbprep
+
+    liquid = any(herbprep.Prep.of(i).liquid for i in items) \
+        or any(is_liquid_stock(h) for h, _ in used)
+    for m in methods:
+        shape = SHAPE_WORDS.get(m)
+        if shape in LIQUID_SHAPES:
+            liquid = True
+        elif shape in SOLID_SHAPES:
+            liquid = False
+    return liquid
+
+
+def is_liquid_stock(held) -> bool:
+    """Whether a jar on the shelf pours.
+
+    Read off the name, the same way `is_tincture` reads off the name, because the name is
+    what the method wrote: `SHAPE_WORDS` turns a brew into a "Tea" and a distillation into
+    a "Tincture", and that word is still on the jar hours later.
+    """
+    name = str(getattr(held, "base", "") or getattr(held, "name", "")).lower()
+    return any(shape.lower() in name for shape in LIQUID_SHAPES)
+
+
+def _distillation_problems(items, used, methods) -> list[str]:
+    """Distillation needs a liquid.
+
+    Reported from play: "i can still distill anything — how can i distill a dry leaf or a
+    mushroom". You cannot. Distilling is separating a liquid by boiling it off, so there
+    has to be a liquid: a tea, a tincture, an ingredient that arrives as sap or gall or
+    essence, or the brew you are about to make one step earlier in the same chain.
+
+    The pot's form is carried through the chain in order for the same reason the
+    preparation walk is: `grind → distill` and `brew → distill` are the same two methods
+    and only one of them is a thing you can do.
+    """
+    if "distill" not in methods:
+        return []
+
+    out = []
+    for at, m in enumerate(methods):
+        if m != "distill":
+            continue
+        if pot_is_liquid(items, used, methods[:at]):
+            continue
+        before = " → ".join(methods[:at])
+        out.append(
+            f"Distil needs a liquid{f' — after {before} there is none' if before else ''}. "
+            f"Brew it into a tea first and distil the tea, or start from something "
+            f"that already pours.")
+    return out
+
+
 def _infusion_base(used, methods):
     """The tincture an infusion is being poured into, or None.
 
@@ -892,13 +971,15 @@ def _preparation_problems(items, methods) -> list[str]:
 
     out: list[str] = []
     for item in items:
-        why = prep_problem(item, methods)
+        # `pot=False`: whether the pot holds a liquid is `_distillation_problems`'
+        # question, and asking it here too refused every dry leaf twice over.
+        why = prep_problem(item, methods, pot=False)
         if why:
             out.append(f"{item.name}: {why}.")
     return out
 
 
-def prep_problem(item, methods) -> str:
+def prep_problem(item, methods, pot=True) -> str:
     """Why this one ingredient cannot go through this chain, or "".
 
     Split out of `_preparation_problems` so the shelf can grey a jar the chain would
@@ -912,13 +993,9 @@ def prep_problem(item, methods) -> str:
     """
     from . import herbprep
 
-    steps = [(_AS_STEP[m], m) for m in methods if m in _AS_STEP]
-    if not steps:
-        return ""
-
     prep = herbprep.Prep.of(item)
     state = "raw"
-    for step, _written in steps:
+    for step, _written in [(_AS_STEP[m], m) for m in methods if m in _AS_STEP]:
         ok, why = herbprep.can(step, prep, state)
         if ok:
             state = herbprep.after(step, state)
@@ -930,6 +1007,19 @@ def prep_problem(item, methods) -> str:
                            "it is already", "it has already")):
             continue
         return why
+
+    # Distillation is asked of the pot rather than of the ingredient, but the shelf still
+    # has to answer it: with `distill` chosen, a dry leaf is the wrong thing to reach for
+    # and should say so before it is picked up. Asked last, because "it has to be
+    # extracted first" is the more useful sentence when both are true. Only the steps in
+    # front of the first distillation matter — `brew → distill` is fine for anything that
+    # can be brewed.
+    methods = list(methods)
+    if pot and "distill" in methods:
+        at = methods.index("distill")
+        if not pot_is_liquid([item], [], methods[:at]):
+            return ("it does not pour — distilling needs a liquid. Brew it into a "
+                    "tea first and distil that")
     return ""
 
 
