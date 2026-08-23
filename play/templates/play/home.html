@@ -267,6 +267,20 @@
                         letter-spacing: .18em; color: var(--dim); }
   .pathslot b { display: block; color: var(--gold); font-size: 15px; margin: 3px 0; }
   .pathslot em { color: var(--dim); font-size: 12px; font-style: italic; }
+  .askveil { position: fixed; inset: 0; z-index: 90; display: flex;
+             align-items: center; justify-content: center;
+             background: rgba(6,4,3,.72); backdrop-filter: blur(2px); }
+  .askbox { max-width: 430px; padding: 22px 26px; border-radius: 3px;
+            border: 1px solid rgba(201,168,106,.4);
+            background: linear-gradient(#1b1610, #100d09);
+            box-shadow: 0 20px 60px rgba(0,0,0,.75); }
+  .askbox h3 { font: 400 19px/1.2 Cinzel, serif; color: var(--gold); margin: 0 0 8px; }
+  .askbox p { color: var(--dim); font-size: 14px; margin: 0 0 16px; }
+  .askbox code { color: var(--ink); }
+  .askrow { display: flex; gap: 10px; justify-content: flex-end; }
+  .go.danger { border-color: rgba(150,26,26,.6);
+               background: linear-gradient(#5a1212, #2a0a0a); color: #ffd9cc; }
+  .go.danger:hover { border-color: rgba(214,72,72,.9); color: #fff0ea; }
   .quiet.danger { border-color: rgba(150,26,26,.45); color: #d08a7c; }
   .quiet.danger:hover { border-color: rgba(214,72,72,.85); color: #ffb9a8; }
   .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
@@ -1452,6 +1466,32 @@ document.addEventListener("change", e => {
   render();
 });
 
+function askToDelete(who) {
+  return new Promise(resolve => {
+    const veil = document.createElement("div");
+    veil.className = "askveil";
+    veil.innerHTML = `<div class="askbox" role="dialog" aria-modal="true">
+      <h3>Delete ${esc(who)}?</h3>
+      <p>They come off the roster. Their file is kept in the
+        <code>characters/archive</code> folder, so this can be undone by hand.</p>
+      <div class="askrow">
+        <button class="quiet" data-ask="no">Keep them</button>
+        <button class="go danger" data-ask="yes">Delete ${esc(who)}</button>
+      </div></div>`;
+    const done = answer => { veil.remove(); document.removeEventListener("keydown", key);
+                             resolve(answer); };
+    const key = e => { if (e.key === "Escape") done(false); };
+    veil.addEventListener("click", e => {
+      const b = e.target.closest("[data-ask]");
+      if (b) done(b.dataset.ask === "yes");
+      else if (e.target === veil) done(false);   // clicking away is not consent
+    });
+    document.addEventListener("keydown", key);
+    document.body.appendChild(veil);
+    veil.querySelector('[data-ask="no"]').focus();
+  });
+}
+
 // Deleting a character. Two presses, never one: a roster row is the record of a game
 // somebody played, and the confirm names them so a misclick on the wrong card is
 // caught by reading rather than by regret.
@@ -1459,10 +1499,11 @@ document.addEventListener("click", async e => {
   const btn = e.target.closest("[data-remove]");
   if (!btn) return;
   const who = btn.dataset.name || "this character";
-  if (!confirm(`Delete ${who}?
-
-They come off the roster. Their file is kept in `
-      + `the characters/archive folder, so this can be undone by hand.`)) return;
+  // Asked in the page, not by `confirm()`. The native dialog is suppressed in the
+  // app's own browser pane — a real mouse click produced no prompt and no delete, so
+  // the button read as broken — and CLAUDE.md is explicit that anything working in a
+  // browser has to work in the packaged desktop build.
+  if (!await askToDelete(who)) return;
   try {
     const r = await fetch("/api/character/delete", {
       method: "POST", headers: { "Content-Type": "application/json",

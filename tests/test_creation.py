@@ -414,6 +414,13 @@ def test_the_page_asks_before_it_deletes():
 
     page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
     assert "data-remove" in page
-    assert "confirm(`Delete ${who}?" in page
+    # Asked in the page rather than by `confirm()`: the native dialog is suppressed
+    # in the app's own browser pane, so a real mouse click produced no prompt and no
+    # delete, and the button read as broken.
+    assert "function askToDelete(" in page
+    assert "await askToDelete(who)" in page
+    # The *call*, not the word: the comment above it explains the ban.
+    assert "if (!confirm(" not in page, "native dialogs die in the packaged app"
+    assert "Keep them" in page
     # And the card you are playing offers no button at all.
     assert 'c.active ? "" : `<button class="quiet danger"' in page
