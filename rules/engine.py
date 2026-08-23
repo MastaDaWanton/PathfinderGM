@@ -2102,8 +2102,22 @@ class Engine:
             moved = count           # it came from the world, which never runs out
 
         if taker is not None and moved:
-            bag = taker.purse if denom else taker.goods
-            bag[denom or item] = bag.get(denom or item, 0) + moved
+            if denom:
+                taker.purse[denom] = taker.purse.get(denom, 0) + moved
+            else:
+                # Routed by what the thing is, so a bought sword is swingable, a bought
+                # chain shirt wearable and a bought potion drinkable through the
+                # machinery that already exists for each. Everything lands in `goods` as
+                # well, because that is the list of what you are carrying.
+                kind = goods.kind_of(item)
+                taker.goods[item] = taker.goods.get(item, 0) + moved
+                key = item.lower()
+                if kind == "weapon" and key not in [w.lower() for w in taker.weapons]:
+                    taker.weapons.append(key)
+                elif kind == "consumable":
+                    from .crafting import Stock
+
+                    taker.add_stock(Stock(base=item, tier="common"), moved)
 
         what = f"{moved} × {item}" if moved != 1 else item
         if giver is not None and taker is not None:
@@ -2124,6 +2138,49 @@ class Engine:
                       "purse": dict(taker.purse) if taker else {},
                       "goods": dict(taker.goods) if taker else {}}],
             tell=tell, because=intent.because,
+        )
+
+    def _op_wear(self, intent: Intent, partial: dict) -> Outcome:
+        """Put on something you are carrying, and let it reach the numbers.
+
+        Refused for anything not actually held: an inventory that can be worn without
+        being owned is a sheet that claims protection nobody bought.
+        """
+        item = str(intent.params.get("item", "")).strip()
+        ref = intent.params.get("actor") or intent.actor or (
+            self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(ref) if ref else None
+        if actor is None:
+            raise IntentError("wear: nobody here to wear it", "refs")
+
+        key = item.lower()
+        carried = {k.lower() for k in actor.goods} | {w.lower() for w in actor.weapons}
+        if key not in carried:
+            return Outcome(intent_id=intent.id, op="wear", effects=[],
+                           tell=f"{actor.name} is not carrying {item}.",
+                           because=intent.because)
+
+        kind = goods.kind_of(item)
+        before = actor.ac()
+        if kind == "armour":
+            actor.armour = key
+        elif kind == "shield":
+            actor.shield = key
+        elif kind == "weapon":
+            actor.equipped = key
+        else:
+            return Outcome(intent_id=intent.id, op="wear", effects=[],
+                           tell=f"{item} is not something that can be worn or wielded.",
+                           because=intent.because)
+
+        after = actor.ac()
+        moved = f" Armour class {before} to {after}." if after != before else ""
+        return Outcome(
+            intent_id=intent.id, op="wear",
+            effects=[{"ref": actor.ref, "kind": "wear", "item": key, "ac": after}],
+            tell=(f"{actor.name} {'draws' if kind == 'weapon' else 'puts on'} "
+                  f"the {item}.{moved}"),
+            because=intent.because,
         )
 
     def _op_rest(self, intent: Intent, partial: dict) -> Outcome:

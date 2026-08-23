@@ -512,6 +512,19 @@
     grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
     align-items: start;
   }
+  /* The abilities block spans, because six scores in a 310px column wrap to three
+     lines and the six numbers everything else is derived from should read at a glance. */
+  .card.wide { grid-column: 1 / -1; }
+  .abilities { display: grid; gap: 10px;
+               grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); }
+  .ab { display: flex; flex-direction: column; align-items: center; gap: 1px;
+        padding: 9px 4px; border: 1px solid rgba(201,168,106,.16); border-radius: 2px;
+        background: rgba(201,168,106,.05); }
+  .ab.hurt { border-color: rgba(150,60,50,.5); }
+  .abk { font: 600 10.5px/1 Cinzel, serif; letter-spacing: .16em; color: var(--dim); }
+  .ab b { font: 400 25px/1.1 Cinzel, serif; color: var(--gold); }
+  .abm { font-size: 12.5px; color: var(--ink); }
+  .ab em { font-size: 11px; color: #d08a7c; font-style: normal; }
   .framed, .card, .slot {
     position: relative;
     background:
@@ -1715,6 +1728,23 @@ const tabEmpty = msg => `<div class="empty">${esc(msg)}</div>`;
 function tabDefense(s) {
   const d = s.defense;
   return `<div class="cols">
+    <!-- The six scores. The sheet has always *sent* them and only ever read Con, to
+         work out what number you die at — so the one thing every other number on this
+         page is derived from was the one thing it never showed. -->
+    <div class="card wide">
+      <h3>Abilities</h3>
+      <div class="abilities">${s.abilities.map(a => `
+        <div class="ab${a.damage || a.drain ? " hurt" : ""}">
+          <span class="abk">${esc(a.key.toUpperCase())}</span>
+          <b>${a.score}</b>
+          <span class="abm">${a.modifier >= 0 ? "+" : ""}${a.modifier}</span>
+          ${a.damage ? `<em>-${a.damage} damage</em>` : ""}
+          ${a.drain ? `<em>-${a.drain} drain</em>` : ""}
+        </div>`).join("")}</div>
+      ${(s.class_features && s.class_features.length) ? `<div class="terms">
+        ${s.class_features.map(f => `<div class="t"><span>${esc(f)}</span></div>`)
+          .join("")}</div>` : ""}
+    </div>
     <div class="card">
       <h3>Hit points</h3>
       <div class="bignum">${d.hp.current} <small>of ${d.hp.max}</small></div>

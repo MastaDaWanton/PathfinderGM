@@ -199,6 +199,44 @@ def known_item(name: str) -> dict | None:
     return None
 
 
+# Things you drink, eat or smear on a blade. Matched on the head noun, because the
+# fiction names them "a potion of cure light wounds" and "willow-bark tea", and the
+# crafting bench already knows what to do with anything that reaches `stock`.
+_CONSUMABLE = re.compile(
+    r"\b(?:potion|tincture|tea|draught|draft|elixir|philtre|philter|tonic|salve|"
+    r"poultice|oil|unguent|balm|brew|infusion|decoction|antitoxin|antidote|ration|"
+    r"rations|poison|venom)\b", re.I)
+
+# Things measured out rather than counted: rope, chain, cloth, cord. The count is the
+# quantity and the unit travels with it, so fifty feet of rope is one entry and not
+# fifty ropes.
+MEASURED = {"rope": "ft", "chain": "ft", "cord": "ft", "twine": "ft", "silk": "ft",
+            "cloth": "ft", "wire": "ft", "fuse": "ft", "candle": "hours"}
+
+
+def kind_of(name: str) -> str:
+    """Which shelf this thing belongs on: weapon, armour, shield, consumable or gear.
+
+    Routing by what a thing *is* rather than dropping everything in one bag is the
+    difference between an inventory and a list of nouns. A bought longsword should be
+    swingable, a bought chain shirt wearable, and a bought potion drinkable through the
+    machinery that already exists for all three.
+    """
+    entry = known_item(name)
+    if entry:
+        return entry["table"]
+    return "consumable" if _CONSUMABLE.search(str(name or "")) else "gear"
+
+
+def unit_for(name: str) -> str:
+    """"ft" for rope, "" for a lantern."""
+    words = re.findall(r"[a-z]+", str(name or "").lower())
+    for word in words:
+        if word in MEASURED:
+            return MEASURED[word]
+    return ""
+
+
 def describe(name: str, count: int = 1) -> str:
     """One line for the inventory list, and honest about what the engine knows.
 
@@ -207,9 +245,14 @@ def describe(name: str, count: int = 1) -> str:
     player assuming their lucite crystal does something.
     """
     entry = known_item(name)
-    head = f"{count} × {name}" if count != 1 else str(name)
+    unit = unit_for(name)
+    # Measured goods read as a quantity, not a tally: fifty feet of rope, never
+    # "50 × rope", which is what the count alone said.
+    head = (f"{name} — {count} {unit}" if unit
+            else f"{count} × {name}" if count != 1 else str(name))
     if entry is None:
-        return f"{head} — carried; the engine has no rules for it"
+        return (head if unit else f"{head} — carried; "
+                f"the engine has no rules for it")
     if entry.get("table") == "weapon":
         return f"{head} — {entry['damage']} {entry['type']}, ×{entry['crit_mult']}"
     return f"{head} — +{entry.get('ac', 0)} AC"

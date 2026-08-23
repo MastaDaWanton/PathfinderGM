@@ -242,3 +242,87 @@ def test_an_untargeted_heal_is_aimed_at_the_player_rather_than_killing_the_turn(
 
     engine = Engine(scene, Dice(seed=1))
     engine.run(engine.validate(out))            # no IntentError
+
+
+# --- what kind of thing it is decides where it goes ----------------------------------
+
+@pytest.mark.parametrize("name,kind", [
+    ("longsword", "weapon"), ("chain shirt", "armour"), ("light shield", "shield"),
+    ("potion of cure light wounds", "consumable"), ("willow-bark tea", "consumable"),
+    ("brass key", "gear"), ("rope", "gear"),
+])
+def test_an_item_is_routed_by_what_it_is(name, kind):
+    """"inventory should hold my potions/tinctures/tea... items that can be reused or
+    armor and jewelry that i can equip and should show up in my equipment tab and
+    influence my stats." One bag of nouns is a list; routing is what makes it an
+    inventory."""
+    assert goods.kind_of(name) == kind
+
+
+def test_rope_is_measured_rather_than_counted():
+    """"rope(#ft)". Fifty feet of rope is one entry, not fifty ropes."""
+    assert goods.unit_for("silk rope") == "ft"
+    assert goods.unit_for("lantern") == ""
+
+
+def test_a_bought_weapon_becomes_one_you_can_swing(engine):
+    run(engine, {"op": "give", "params": {"item": "longsword", "to": "pc"}})
+    pc = engine.scene.pc()
+    assert "longsword" in [w.lower() for w in pc.weapons]
+    assert pc.goods == {"longsword": 1}
+
+
+def test_a_bought_potion_reaches_the_shelf_the_use_op_reads(engine):
+    """Consumables already had a whole machinery — crafting, drinking, throwing,
+    coating a blade. A bought potion that landed only in `goods` would have been a
+    word on a list beside a system that could have used it."""
+    run(engine, {"op": "give", "params": {"item": "potion of cure light wounds",
+                                          "to": "pc"}})
+    pc = engine.scene.pc()
+    assert any("potion" in s.base.lower() for s in pc.stock.values())
+
+
+def test_worn_armour_changes_the_armour_class(engine):
+    pc = engine.scene.pc()
+    before = pc.ac()
+    run(engine, {"op": "give", "params": {"item": "chain shirt", "to": "pc"}})
+    out = run(engine, {"op": "wear", "params": {"item": "chain shirt", "actor": "pc"}})
+    assert pc.ac() > before
+    assert f"{pc.ac()}" in out[0].tell
+
+
+def test_you_cannot_wear_what_you_do_not_have(engine):
+    """An inventory that can be worn without being owned is a sheet claiming
+    protection nobody bought."""
+    was = engine.scene.pc().armour
+    out = run(engine, {"op": "wear", "params": {"item": "full plate", "actor": "pc"}})
+    assert "not carrying" in out[0].tell
+    assert engine.scene.pc().armour == was      # unchanged, not silently upgraded
+
+
+def test_a_brass_key_cannot_be_worn(engine):
+    run(engine, {"op": "give", "params": {"item": "brass key", "to": "pc"}})
+    out = run(engine, {"op": "wear", "params": {"item": "brass key", "actor": "pc"}})
+    assert "not something that can be worn" in out[0].tell
+
+
+# --- the sheet shows what everything else is derived from -----------------------------
+
+def test_the_sheet_carries_the_six_scores_and_what_the_class_grants():
+    """Reported from the Defense tab: "character sheet is missing abilities and class".
+    `full_sheet` had always *sent* the abilities and the page read exactly one of them,
+    Constitution, to work out the number you die at."""
+    from rules.sheet import full_sheet
+
+    sheet = full_sheet(load_pc("fixtures/pc-kesst.json"))
+    assert {a["key"] for a in sheet["abilities"]} == {
+        "str", "dex", "con", "int", "wis", "cha"}
+    assert "class_features" in sheet
+
+
+def test_the_defense_tab_actually_renders_them():
+    from pathlib import Path
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert 'class="abilities"' in page
+    assert "s.class_features" in page

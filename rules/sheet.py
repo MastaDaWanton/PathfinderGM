@@ -1730,6 +1730,10 @@ def full_sheet(actor: Actor) -> dict:
             "world_people_id": actor.world_people_id,
             "world_entity_id": actor.world_entity_id,
         },
+        # What the class actually grants at this level, read from the class data rather
+        # than from the class *name*. The header said "Blood Bending 1" and nothing on
+        # the sheet said what a Blood Bender could do.
+        "class_features": _class_features(actor),
         "abilities": [
             {"key": a, "name": ABILITY_NAMES[a], "score": actor.ability_score(a),
              "modifier": actor.ability_mod(a),
@@ -1942,6 +1946,18 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _class_features(actor: Actor) -> list[str]:
+    """Everything the class has granted up to this level, in order."""
+    from . import classes as classes_mod
+
+    out: list[str] = []
+    for level in range(1, max(1, int(actor.level or 1)) + 1):
+        for granted in classes_mod.features_at(actor.char_class or "", level):
+            if granted not in out:
+                out.append(granted)
+    return out
 
 
 def _satchel_summary(actor: Actor) -> list[dict]:

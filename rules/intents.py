@@ -243,7 +243,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # attached: `to` is who gains it, `from_` who loses it, and either may be absent
     # when the other end is the world. `item` is any name at all — see rules/goods.py on
     # why an unknown item is carried rather than refused.
-    "give": (("item",), ("count", "to", "from_", "price"), "hidden"),
+    "give": (("item",), ("count", "to", "from_", "price", "unit"), "hidden"),
+    # Putting on what you are carrying. Armour and shields change the AC the engine
+    # computes; a weapon becomes the one in your hand. Refused for anything you do not
+    # actually have, so the sheet can never claim protection nobody bought.
+    "wear": (("item",), ("actor",), "hidden"),
     "rest": ((), ("kind",), "hidden"),
     # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
     # does not: a night's sleep is not a meal. Two ops rather than one with flags,
