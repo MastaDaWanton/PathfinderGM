@@ -380,6 +380,18 @@ def house_rules(request):
 
 
 @require_POST
+def delete_character(request):
+    """Remove a character from the roster, on the player's explicit say-so."""
+    from . import roster as roster_mod
+
+    body = json.loads(request.body or "{}")
+    ok, why = roster_mod.retire_file(str(body.get("id", "")).strip())
+    if not ok:
+        return JsonResponse({"error": why}, status=409)
+    return JsonResponse({"ok": True, "message": why})
+
+
+@require_POST
 def create_character(request):
     """Make a character, or say everything wrong with the attempt at once.
 

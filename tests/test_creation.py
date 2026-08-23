@@ -350,3 +350,70 @@ def test_the_forge_survives_a_server_that_answers_in_html():
     page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
     assert "const body = await r.text();" in page
     assert "did not answer in JSON" in page
+
+
+# --- taking a character off the roster --------------------------------------------------
+
+def test_a_character_can_be_deleted(client, tmp_path, settings):
+    from play import roster
+
+    r = client.post("/api/character/create", data=json.dumps(spec(name="Gone Soon")),
+                    content_type="application/json")
+    made = r.json()["id"]
+    assert roster.load(made) is not None
+
+    r = client.post("/api/character/delete", data=json.dumps({"id": made}),
+                    content_type="application/json")
+    assert r.status_code == 200
+    assert roster.load(made) is None
+    assert made not in [e.id for e in roster.everyone()]
+
+
+def test_the_file_is_archived_rather_than_unlinked(client, tmp_path, settings):
+    """A character is the record of a game somebody played. The row leaves the page
+    and the file stays on disk — the same choice `campaign._read` makes for a save it
+    cannot parse, and the one `tools/prune_roster.py` made for the duplicate Kessts."""
+    from play import roster
+
+    r = client.post("/api/character/create", data=json.dumps(spec(name="Archived")),
+                    content_type="application/json")
+    made = r.json()["id"]
+    client.post("/api/character/delete", data=json.dumps({"id": made}),
+                content_type="application/json")
+    assert (roster.root() / "archive" / f"{made}.json").exists()
+
+
+def test_the_character_being_played_cannot_be_deleted(client, tmp_path, settings):
+    """Deleting the game under your own cursor is not a tidy-up, it is a bug."""
+    from play import campaign as cm, roster
+
+    cm._LIVE.clear()
+    r = client.post("/api/character/create",
+                    data=json.dumps(spec(name="In The Chair", begin=True)),
+                    content_type="application/json")
+    made = r.json()["id"]
+
+    r = client.post("/api/character/delete", data=json.dumps({"id": made}),
+                    content_type="application/json")
+    assert r.status_code == 409
+    assert "character you are playing" in r.json()["error"]
+    assert roster.load(made) is not None
+
+
+def test_deleting_somebody_who_is_not_there_says_so(client, tmp_path, settings):
+    r = client.post("/api/character/delete", data=json.dumps({"id": "nobody"}),
+                    content_type="application/json")
+    assert r.status_code == 409
+    assert "no character" in r.json()["error"]
+
+
+def test_the_page_asks_before_it_deletes():
+    """One press deletes nothing. The confirm names them, so a misclick on the wrong
+    card is caught by reading rather than by regret."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "data-remove" in page
+    assert "confirm(`Delete ${who}?" in page
+    # And the card you are playing offers no button at all.
+    assert 'c.active ? "" : `<button class="quiet danger"' in page

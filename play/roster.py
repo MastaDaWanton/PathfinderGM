@@ -156,6 +156,33 @@ def bury(character_id: str, actor: Actor, epitaph: str = "") -> Entry | None:
 
 # --- Who is available to play ------------------------------------------------------------
 
+def retire_file(character_id: str) -> tuple[bool, str]:
+    """Take a character off the roster.
+
+    Archived rather than unlinked, which is the same choice `campaign._read` makes for
+    a save it cannot parse and `tools/prune_roster.py` made for the duplicate Kessts:
+    the row leaves the page, the file stays on disk. A character is the record of a
+    game somebody played, and "delete" that cannot be undone is the one button nobody
+    should be one misclick away from.
+    """
+    entry = load(character_id)
+    if entry is None:
+        return False, f"there is no character called {character_id!r}."
+
+    from . import campaign as campaign_mod
+
+    if campaign_mod.current().character_id == character_id:
+        return False, (f"{entry.name} is the character you are playing. Switch to "
+                       f"somebody else first.")
+
+    archive = root() / "archive"
+    archive.mkdir(parents=True, exist_ok=True)
+    src = path_for(character_id)
+    if src.exists():
+        src.rename(archive / src.name)
+    return True, f"{entry.name} is off the roster. Their file is in {archive}."
+
+
 def pregens() -> list[dict]:
     """The characters that ship with the app, for when there is nobody left to play.
 

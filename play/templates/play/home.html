@@ -267,6 +267,8 @@
                         letter-spacing: .18em; color: var(--dim); }
   .pathslot b { display: block; color: var(--gold); font-size: 15px; margin: 3px 0; }
   .pathslot em { color: var(--dim); font-size: 12px; font-style: italic; }
+  .quiet.danger { border-color: rgba(150,26,26,.45); color: #d08a7c; }
+  .quiet.danger:hover { border-color: rgba(214,72,72,.85); color: #ffb9a8; }
   .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
@@ -1164,6 +1166,9 @@ function paneCharacters() {
           ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}">${
             c.active ? "Go to the table" : "Play as " + esc(c.name)
           }</button>` : ""}
+          ${c.active ? "" : `<button class="quiet danger"
+            data-remove="${esc(c.id)}" data-name="${esc(c.name)}"
+            title="Take them off the roster">Delete</button>`}
         </div>
       </div>`).join("")}</div>
     <div id="err"></div>`;
@@ -1445,6 +1450,30 @@ document.addEventListener("change", e => {
     ? [...new Set([...f.skills, s])]
     : f.skills.filter(x => x !== s);
   render();
+});
+
+// Deleting a character. Two presses, never one: a roster row is the record of a game
+// somebody played, and the confirm names them so a misclick on the wrong card is
+// caught by reading rather than by regret.
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-remove]");
+  if (!btn) return;
+  const who = btn.dataset.name || "this character";
+  if (!confirm(`Delete ${who}?
+
+They come off the roster. Their file is kept in `
+      + `the characters/archive folder, so this can be undone by hand.`)) return;
+  try {
+    const r = await fetch("/api/character/delete", {
+      method: "POST", headers: { "Content-Type": "application/json",
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: JSON.stringify({ id: btn.dataset.remove }),
+    });
+    const body = await r.text();
+    let d; try { d = JSON.parse(body); } catch { d = { error: body.slice(0, 160) }; }
+    if (!r.ok) { alert(d.error || "could not delete"); return; }
+    window.location.href = "/";       // the roster is server-rendered
+  } catch (err) { alert(String(err)); }
 });
 
 document.addEventListener("click", async e => {
