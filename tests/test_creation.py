@@ -223,3 +223,60 @@ def test_the_forge_is_reachable_from_the_shelf_and_from_a_world():
     assert "next piece; until it lands" not in page
     # And the forge outranks the tab, so it can open from any of them.
     assert "FORGE ? paneForge()\n    : TAB === \"worlds\"" in page
+
+
+# --- the two buttons that looked broken (found in play, 2026-08-22) --------------------
+
+def test_create_and_play_plays_the_character_it_says_it_made(client, tmp_path, settings):
+    """Reported as "does not start a session with the created character".
+
+    `create_character` enrolled the character and then called `begin_with`, which
+    enrols one itself — two roster rows per press. Once beginning a game started
+    retiring abandoned starts, the first of the pair was retired on the spot and the
+    campaign ran on "doubled-twice-2", while the response reported "doubled-twice".
+    The id the API hands back must be the id that is actually being played.
+    """
+    from play import campaign as cm, roster
+
+    cm._LIVE.clear()
+    r = client.post("/api/character/create",
+                    data=json.dumps(spec(name="Doubled Twice", begin=True)),
+                    content_type="application/json")
+    assert r.status_code == 200
+    made = r.json()["id"]
+
+    assert cm.current().character_id == made
+    assert roster.load(made).status == roster.ALIVE
+    assert [e.id for e in roster.everyone()] == [made], "one press, one character"
+
+
+def test_a_character_parked_on_the_roster_survives_the_next_game_starting(client,
+                                                                          tmp_path,
+                                                                          settings):
+    """"Create for the roster" means build them and leave them on the shelf. The
+    abandoned-start sweep read every alive character with no turns as walked out on,
+    which retired the ones deliberately parked — they have no campaign because they
+    are waiting for one, not because anybody abandoned them."""
+    from play import campaign as cm, roster
+    from rules.sheet import load_pc
+
+    cm._LIVE.clear()
+    r = client.post("/api/character/create", data=json.dumps(spec(name="Shelf Sitter")),
+                    content_type="application/json")
+    parked = r.json()["id"]
+    assert roster.load(parked).campaign_id == ""
+
+    cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+    assert roster.load(parked).status == roster.ALIVE
+
+
+def test_the_forge_sends_you_where_the_new_character_is():
+    """Reported as "create for roster also does nothing". It did work — it reloaded
+    onto the shelf of worlds, and the character it had just made was on a tab nobody
+    had opened. The page now opens on the roster and names them."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert 'window.location.href = `/?made=${encodeURIComponent(d.id)}`' in page
+    assert 'let TAB = MADE ? "characters" : "worlds"' in page
+    assert "madebanner" in page

@@ -256,6 +256,12 @@
                      cursor: pointer; font-size: 14px; }
   .skillgrid label.classskill { color: var(--gold); }
   .skillgrid input { accent-color: #c9a86a; }
+  .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
+                background: rgba(201,168,106,.08); border-radius: 2px;
+                padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
+  .madebanner b { color: var(--gold); }
+  .madebanner em { color: var(--ink); font-style: italic; }
+  .card.justmade { border-color: rgba(201,168,106,.5); }
   .featlist { max-height: 300px; overflow-y: auto; margin-top: 8px;
               border: 1px solid rgba(201,168,106,.22); border-radius: 2px; }
   .featrow { display: flex; gap: 12px; align-items: baseline; width: 100%;
@@ -554,7 +560,10 @@
 
 <script>
 const STATE = {{ state_json|safe }};
-let TAB = "worlds";
+// Who was just forged, if the forge sent us back here. Opens on the roster rather than
+// the shelf, so the character that was made is the thing on screen.
+const MADE = new URLSearchParams(location.search).get("made") || "";
+let TAB = MADE ? "characters" : "worlds";
 let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
@@ -1078,13 +1087,19 @@ async function setHouseRule(patch) {
 function paneCharacters() {
   const forge = `<button class="go" data-forge style="margin-bottom:18px">
     Forge a character</button>`;
+  // Said plainly, and only once. A button whose whole effect is a row further down a
+  // page you were not looking at is a button that reads as broken.
+  const made = MADE && STATE.recent.find(c => c.id === MADE);
+  const banner = made ? `<div class="madebanner"><b>${esc(made.name)}</b> is on the
+    roster — ${esc(made.line)}. They are waiting for a game; press
+    <em>Play as ${esc(made.name)}</em> below, or pick a world from the shelf.</div>` : "";
   if (!STATE.recent.length) return forge + `<p class="note">Nobody has been played yet.</p>`;
-  return continueBlock() + forge + `
+  return banner + continueBlock() + forge + `
     <h2 class="sect">Everyone played</h2>
     <p class="note">The dead stay on the roster — they are the reason the next game went
       the way it did.</p>
     <div class="cards">${STATE.recent.map(c => `
-      <div class="card">
+      <div class="card ${c.id === MADE ? "justmade" : ""}">
         <h3>${esc(c.name)}</h3>
         <em>${esc(c.line)}${c.world ? ` · ${esc(c.world)}` : ""}</em>
         <div class="stat">${esc(c.hp)} hp · <b>${c.turns_played}</b> turns played</div>
@@ -1271,8 +1286,10 @@ async function forgeSubmit(begin) {
   }
   if (begin) { window.location.href = "/play/"; return; }
   // The roster block on this page is server-rendered state; a reload is the one honest
-  // refresh that cannot drift from it.
-  window.location.reload();
+  // refresh that cannot drift from it. It reloads onto the *characters* tab naming who
+  // was just made, because the plain reload landed on the shelf of worlds — the new
+  // character was on a tab nobody had opened, and the button read as doing nothing.
+  window.location.href = `/?made=${encodeURIComponent(d.id)}`;
 }
 
 

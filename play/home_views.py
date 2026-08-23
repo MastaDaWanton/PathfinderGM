@@ -389,7 +389,6 @@ def create_character(request):
     """
     from rules import creation
 
-    from . import roster
     from .roster import enrol
 
     body = json.loads(request.body or "{}")
@@ -400,10 +399,17 @@ def create_character(request):
     from rules.sheet import from_dict
 
     actor = from_dict(built["sheet"], ref="pc")
-    entry = enrol(actor)
-    out = {"ok": True, "id": entry.id, "name": actor.name,
-           "warnings": built["warnings"]}
+
+    # Exactly one enrolment, whichever button was pressed. `begin_with` enrols the
+    # character itself, so calling `enrol` first and then `begin_with` put two of them
+    # on the roster — and once beginning a game started retiring abandoned starts, the
+    # first of the pair was retired on the spot and the campaign ran on the duplicate.
+    # "Create & play" therefore reported making a character it had just shelved.
     if body.get("begin"):
-        campaign_mod.begin_with(actor)
-        out["begun"] = True
-    return JsonResponse(out)
+        campaign = campaign_mod.begin_with(actor)
+        entry_id, begun = campaign.character_id, True
+    else:
+        entry_id, begun = enrol(actor).id, False
+
+    return JsonResponse({"ok": True, "id": entry_id, "name": actor.name,
+                         "warnings": built["warnings"], "begun": begun})

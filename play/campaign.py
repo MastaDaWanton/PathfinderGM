@@ -447,8 +447,13 @@ def begin_with(character) -> Campaign:
     # Retired rather than deleted, which is the answer this module already gives for the
     # character a reset replaces — nothing is lost, and the record stops pretending
     # somebody is waiting to be played.
+    #
+    # A *started* game is the whole condition. The first cut of this swept every alive
+    # character with no turns on them, which quietly retired the ones the player had
+    # deliberately built and parked with "Create for the roster" — they have no
+    # campaign because they are waiting for one, not because they were walked out on.
     for stale in roster.everyone():
-        if stale.status == roster.ALIVE and not stale.turns_played:
+        if stale.status == roster.ALIVE and stale.campaign_id and not stale.turns_played:
             stale.status = roster.RETIRED
             roster.save(stale)
 
