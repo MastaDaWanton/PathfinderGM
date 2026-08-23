@@ -204,14 +204,13 @@
     overflow-y: auto; padding: 22px;
     min-height: 0; font: 14px/1.55 var(--body);
     background:
-      linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .30)),
-      linear-gradient(#4d3b27, #433322),
-      url("{% static 'img/leather-2x.jpg' %}") #241d15;
+      linear-gradient(rgba(0, 0, 0, .04), rgba(0, 0, 0, .16)),
+      linear-gradient(#57432d, #4b3a27),
+      url("{% static 'img/leather-tile.jpg' %}") #241d15;
     background-blend-mode: normal, multiply, normal;
-    background-repeat: no-repeat;
-    background-position: center;
+    background-repeat: no-repeat, no-repeat, repeat;
     background-attachment: scroll, scroll, fixed;
-    background-size: auto, auto, cover;
+    background-size: auto, auto, 512px auto;
     /* Same treatment as the craft panels; see there for why the page hide would not do. */
     box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
   }

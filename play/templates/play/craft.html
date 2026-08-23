@@ -101,14 +101,13 @@
        the page hide when it was tried here. Fixed attachment keeps the grain still
        while the shelf scrolls over it. */
     background:
-      linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .30)),
-      linear-gradient(#4d3b27, #433322),
-      url("{% static 'img/leather-2x.jpg' %}") #241d15;
+      linear-gradient(rgba(0, 0, 0, .04), rgba(0, 0, 0, .16)),
+      linear-gradient(#57432d, #4b3a27),
+      url("{% static 'img/leather-tile.jpg' %}") #241d15;
     background-blend-mode: normal, multiply, normal;
-    background-repeat: no-repeat;
-    background-position: center;
+    background-repeat: no-repeat, no-repeat, repeat;
     background-attachment: scroll, scroll, fixed;
-    background-size: auto, auto, cover;
+    background-size: auto, auto, 512px auto;
     border: 1px solid rgba(201, 162, 39, .25);
     border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.45),
     0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
