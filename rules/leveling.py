@@ -26,6 +26,8 @@ grant like anything else without a line changing here.
 """
 from __future__ import annotations
 
+import re
+
 from . import classes as classes_mod
 from .tables import ability_modifier, bab_for, save_for
 
@@ -51,6 +53,80 @@ def path_detail(class_id: str, name: str) -> dict:
         if isinstance(got, dict):
             return got
     return {}
+
+
+def control_blood(actor) -> dict:
+    """How far along each branch this character has come.
+
+    The class table grants "control blood 1a" at 1st, "2a" at 3rd, up to "5a" at 10th,
+    then "1b" at 11th through "5b" at 20th. Two tracks, and the reason the class asks
+    you to choose "a path or both paths": the a-track is the first path you follow and
+    the b-track the second. So a Control Blood level is not one number — it is one per
+    branch, and the abilities of a path are tiered against its own.
+
+    Read from the grants rather than from a table written out again here, because the
+    class file is the class and a second copy of its progression is a second thing to
+    keep level with the first.
+    """
+    reached = {"a": 0, "b": 0}
+    # Defensive because `resources.variables` calls this for every formula on every
+    # sheet, including the stand-in actors the pool tests build with three attributes.
+    # A branching track is one class's business; nothing else should fail over it.
+    try:
+        features = classes_mod.features_at(getattr(actor, "char_class", "") or "",
+                                           int(getattr(actor, "level", 1) or 1))
+    except Exception:
+        return reached
+    for feature in features:
+        m = re.fullmatch(r"control blood\s*(\d+)\s*([ab])", str(feature).strip().lower())
+        if m:
+            track = m.group(2)
+            reached[track] = max(reached[track], int(m.group(1)))
+    return reached
+
+
+def control_blood_for(actor, path: str) -> int:
+    """The tier this character has reached *in this path*.
+
+    The first path taken runs on the a-track and the second on the b-track, which is
+    what the two halves of the progression are for. A path the character does not
+    follow is 0 — they have no tier in a branch they never took.
+    """
+    taken = [p.lower() for p in (getattr(actor, "paths", None) or [])]
+    key = str(path).strip().lower()
+    if key not in taken:
+        return 0
+    return control_blood(actor)["a" if taken.index(key) == 0 else "b"]
+
+
+def resolve_effect(spec: dict, actor, path: str = "") -> dict:
+    """One effect with its scaling worked out for this character.
+
+    A tiered value picks the highest rung at or below the tier reached — "DR 2 (Lvl 1),
+    DR 5 (Lvl 2), DR 8 (Lvl 3), DR 12 (Lvl 5)" is DR 8 at tier 4, because tier 4 grants
+    nothing new and the rung below is still in force. A formula is evaluated against
+    the sheet the same way a pool's is. Anything with neither passes through untouched.
+    """
+    out = dict(spec)
+    tier = control_blood_for(actor, path) if path else max(control_blood(actor).values())
+    out["control_blood"] = tier
+
+    if spec.get("scales_by") == "control_blood":
+        rungs = {int(k): v for k, v in (spec.get("by_tier") or {}).items()}
+        reached = [n for n in sorted(rungs) if n <= tier]
+        if reached:
+            out.update(rungs[reached[-1]])
+            out["at_tier"] = reached[-1]
+        else:
+            out["inactive"] = True      # the character is not far enough along yet
+    if spec.get("formula"):
+        from . import resources
+
+        try:
+            out["amount"] = resources.evaluate(spec["formula"], actor)
+        except Exception:
+            out["inactive"] = True
+    return out
 
 
 def needs_path(class_id: str) -> bool:

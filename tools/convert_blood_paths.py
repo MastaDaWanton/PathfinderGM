@@ -64,7 +64,29 @@ def convert(name: str, text: str) -> tuple[list[dict], list[str]]:
         out.append({"type": "damage_reduction", "amount": int(amount),
                     "bypass": "" if bypass in ("-", "—") else bypass})
     elif len(found_dr) > 1:
-        needs.append("a value that scales with Control Blood level")
+        # The ladder, tier by tier: "DR 2/- (Lvl 1), DR 5/- (Lvl 2), DR 8/- (Lvl 3),
+        # DR 12/- (Lvl 5)". Reading the tier each value belongs to is what turns four
+        # numbers that once summed to DR 27 into one number chosen by where the
+        # character actually is on the track.
+        ladder = {}
+        for m in re.finditer(r"\bDR\s*(\d+)\s*/\s*([^\s,.;)]+)\s*\(\s*Lvl\s*(\d+)\s*\)",
+                             text, re.I):
+            ladder[m.group(3)] = {"amount": int(m.group(1)),
+                                  "bypass": "" if m.group(2) in ("-", "—")
+                                            else m.group(2)}
+        if ladder:
+            out.append({"type": "damage_reduction", "scales_by": "control_blood",
+                        "by_tier": ladder})
+        else:
+            needs.append("a value that scales with Control Blood level")
+
+    # A value written as an expression of the track: "Armor Bonus to AC equal to
+    # 3+ControlBloodLevel". The pools have evaluated formulas since they were written;
+    # this simply points one at the track instead of at character level.
+    for m in re.finditer(r"Armor Bonus to AC equal to\s*(\d+)\s*\+\s*"
+                         r"Control ?Blood ?Level", text, re.I):
+        out.append({"type": "combat_mod", "target": "ac", "bonus_type": "armor",
+                    "formula": f"{m.group(1)} + control_blood"})
 
     # Temporary hit points. "+2 Temp HP per Hit Die" is per-HD and so is a formula, but
     # the amount is still a number the engine can be handed once HD are known.
@@ -141,7 +163,11 @@ def convert(name: str, text: str) -> tuple[list[dict], list[str]]:
                     "resource": "blood stack", "amount": int(m.group(1))})
 
     # And the three shapes that genuinely have nowhere to go.
-    if re.search(r"control ?blood ?level|controlbloodlevel|\bCB ?L(?:vl|evel)\b", low):
+    # Still unconverted only where the track is named and nothing above turned it into
+    # a number: a sentence that says "per Control Blood level" without a ladder or an
+    # expression the pattern can read.
+    if (re.search(r"control ?blood ?level|controlbloodlevel|\bCB ?L(?:vl|evel)\b", low)
+            and not any(e.get("scales_by") or e.get("formula") for e in out)):
         needs.append("a value that scales with Control Blood level")
     # Blood Pools are scene objects now, so the two things abilities do with them —
     # leave one behind, take some back off the ground — are ops rather than a missing

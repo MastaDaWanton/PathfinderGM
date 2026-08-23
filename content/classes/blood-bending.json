@@ -345,19 +345,19 @@
         "Blood Rain": "Full-round action. Sacrifice 20% max HP as Non-Lethal damage to convert all active Blood Pools within range into falling spikes over a 30-ft radius. Deals Blood DMG ×5 and applies 2 blood stacks to all targets in the area."
       },
       "resolves": {
-        "Crimson Torrent": "Crimson Torrent",
-        "Pool Resonance": "Pool Resonance",
-        "Blood Rain": "Blood Rain",
-        "Blood Mine": "Blood Mine",
-        "Blood Spike Projectile": "Blood Spike Projectile",
-        "Splintering Spike": "Splintering Spike",
-        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
         "Blood Volley": "Blood Volley",
         "Heart-Seeker Spike": "Heart-Seeker Spike",
-        "Blood Bomb": "Blood Bomb",
-        "Blood Pool Manifestation": "Blood Pool Manifestation",
+        "Blood Mine": "Blood Mine",
+        "Blood Rain": "Blood Rain",
+        "Blood Spike Projectile": "Blood Spike Projectile",
+        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
+        "Siphon Pool": "Siphon Pool",
         "Blood Boil": "Blood Boil",
-        "Siphon Pool": "Siphon Pool"
+        "Pool Resonance": "Pool Resonance",
+        "Splintering Spike": "Splintering Spike",
+        "Crimson Torrent": "Crimson Torrent",
+        "Blood Pool Manifestation": "Blood Pool Manifestation",
+        "Blood Bomb": "Blood Bomb"
       },
       "upgrades": {},
       "core": [],
@@ -606,33 +606,65 @@
         "Avatar of Coagulation": "1/day free action. Become a blood behemoth for 1 minute: Size increases by one category, base DR/- doubles, Non-Lethal damage taken is reduced by 50%, and when an enemy within range attacks an ally, spend an immediate action to strike them for Fist DMG and pull them adjacent to you."
       },
       "resolves": {
+        "Aggressive Draw": "Aggressive Draw",
         "Iron Clot (DR 5/-)": "Iron Clot",
-        "Sanguine Siphon": "Sanguine Siphon",
-        "Iron Clot (DR 2/-)": "Iron Clot",
-        "Viscous Threat": "Viscous Threat",
-        "Caustic Blood": "Caustic Blood",
-        "Clotting Shield": "Clotting Shield",
-        "Exsanguinating Taunt": "Exsanguinating Taunt",
-        "Blood Sponge": "Blood Sponge",
         "Crimson Guard": "Crimson Guard",
+        "Iron Clot (DR 12/-)": "Iron Clot",
+        "Iron Clot (DR 2/-)": "Iron Clot",
+        "Caustic Blood": "Caustic Blood",
+        "Viscous Threat": "Viscous Threat",
+        "Avatar of Coagulation": "Avatar of Coagulation",
+        "Blood Sponge": "Blood Sponge",
+        "Sanguine Siphon": "Sanguine Siphon",
+        "Exsanguinating Taunt": "Exsanguinating Taunt",
         "Iron Clot (DR 8/-)": "Iron Clot",
+        "Clotting Shield": "Clotting Shield",
         "Hemophormic Retribution": "Hemophormic Retribution",
         "Sanguine Spray": "Sanguine Spray",
-        "Blood Spatter Aura": "Blood Spatter Aura",
-        "Iron Clot (DR 12/-)": "Iron Clot",
         "Coagulated Plate": "Coagulated Plate",
-        "Aggressive Draw": "Aggressive Draw",
-        "Avatar of Coagulation": "Avatar of Coagulation"
+        "Blood Spatter Aura": "Blood Spatter Aura"
       },
       "upgrades": {},
       "core": [],
       "undescribed": [],
       "effects": {
+        "Coagulated Plate": [
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "bonus_type": "armor",
+            "formula": "3 + control_blood"
+          }
+        ],
         "Aggressive Draw": [
           {
             "type": "save_gate",
             "target": "will",
             "note": "DC 10+12LVL+CONmod — the class's formula"
+          }
+        ],
+        "Iron Clot": [
+          {
+            "type": "damage_reduction",
+            "scales_by": "control_blood",
+            "by_tier": {
+              "1": {
+                "amount": 2,
+                "bypass": ""
+              },
+              "2": {
+                "amount": 5,
+                "bypass": ""
+              },
+              "3": {
+                "amount": 8,
+                "bypass": ""
+              },
+              "5": {
+                "amount": 12,
+                "bypass": ""
+              }
+            }
           }
         ],
         "Sanguine Spray": [
@@ -682,14 +714,8 @@
         ]
       },
       "needs": {
-        "Coagulated Plate": [
-          "a value that scales with Control Blood level"
-        ],
         "Aggressive Draw": [
           "a save DC computed from level and Constitution"
-        ],
-        "Iron Clot": [
-          "a value that scales with Control Blood level"
         ],
         "Caustic Blood": [
           "targeting a particular Blood Pool on the map"
@@ -748,21 +774,21 @@
         "Forced Mitosis": "1/day. Double current health and duplicate created hemophorms/weapons for free until end of combat."
       },
       "resolves": {
-        "Blood Transfer": "Blood Transfer",
-        "Blood Buffer 2NLDR": "Blood Buffer",
-        "Blood Transfusion": "Blood Transfusion",
-        "Blood Shatter": "Blood Shatter",
-        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
-        "Forced Mitosis": "Forced Mitosis",
-        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
-        "Blood Siphon": "Blood Siphon",
         "DMG Purge": "DMG Purge",
-        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
-        "Blood Javelin": "Blood Javelin",
-        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Blood Transfusion": "Blood Transfusion",
+        "Forced Mitosis": "Forced Mitosis",
         "Blood Buffer 3NLDR": "Blood Buffer",
+        "Blood Siphon": "Blood Siphon",
+        "Blood Javelin": "Blood Javelin",
+        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
+        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
+        "Blood Buffer 2NLDR": "Blood Buffer",
+        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Mass Rupture": "Mass Rupture",
         "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
-        "Mass Rupture": "Mass Rupture"
+        "Blood Transfer": "Blood Transfer",
+        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Blood Shatter": "Blood Shatter"
       },
       "upgrades": {},
       "core": [],
@@ -859,26 +885,26 @@
         "1-2-Punch": "Subsequent attacks on the same target hit twice, dealing damage and applying on-hit effects twice."
       },
       "resolves": {
-        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
-        "Greater Blood Rage": "Blood Rage",
         "Blood Burst 40ft": "Blood Burst",
         "Mighty Blood Rage": "Blood Rage",
-        "Coagulant Stacks": "Coagulant Stacks",
-        "Blood Burst 20ft": "Blood Burst",
-        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
-        "Vampiric Recovery": "Vampiric Recovery",
+        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
         "Rupture Self 60ft": "Rupture Self",
+        "1-2-Punch": "1-2-Punch",
+        "Swift Strikes": "Swift Strikes",
+        "Coagulant Stacks": "Coagulant Stacks",
+        "Blood Burst 60ft": "Blood Burst",
+        "Blood Booster": "Blood Booster",
         "Battle Blood Ki Pool": "Battle Blood Ki Pool",
         "Blood Rage": "Blood Rage",
-        "Blood Booster": "Blood Booster",
-        "Blood Burst 60ft": "Blood Burst",
+        "Blood Burst 20ft": "Blood Burst",
+        "Greater Blood Rage": "Blood Rage",
+        "Vampiric Recovery": "Vampiric Recovery",
         "Vortex Pull": "Vortex Pull",
-        "Swift Strikes": "Swift Strikes",
-        "1-2-Punch": "1-2-Punch"
+        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament"
       },
       "upgrades": {
-        "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD",
-        "Mighty Blood Rage": "+4 attack/damage, +4 Temp HP/HD"
+        "Mighty Blood Rage": "+4 attack/damage, +4 Temp HP/HD",
+        "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD"
       },
       "core": [
         "Uncanny Dodge"

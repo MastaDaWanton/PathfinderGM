@@ -63,6 +63,14 @@ def variables(actor) -> dict[str, int]:
         "temp_hp": actor.temp_hp,
         "bab": actor.bab,
     }
+    # A branching class tiers its abilities against its own track rather than against
+    # character level, so a formula has to be able to say so. Zero for every class that
+    # does not branch, which is every class but one.
+    from . import leveling
+
+    tracks = leveling.control_blood(actor)
+    out["control_blood"] = max(tracks.values())
+    out["control_blood_a"], out["control_blood_b"] = tracks["a"], tracks["b"]
     for ab in ABILITIES:
         out[ab] = actor.ability_score(ab)
         out[f"{ab}_mod"] = actor.ability_mod(ab)

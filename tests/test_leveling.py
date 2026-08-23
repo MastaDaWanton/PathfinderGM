@@ -289,12 +289,17 @@ def test_path_abilities_carry_converted_effects():
 
 def test_a_ladder_of_damage_reduction_is_not_four_reductions():
     """Iron Clot writes its whole ladder in one sentence — DR 2/-, 5/-, 8/-, 12/- —
-    and emitting each gave a first-level character DR 27. Several values is a rank
-    that scales, which the engine cannot express, so it converts to nothing and says
-    what it is waiting for."""
+    and emitting each as its own effect gave a first-level character DR 27.
+
+    It first converted to nothing, honestly, because several values is a rank that
+    scales and the engine could not express one. Now it converts to a single reduction
+    whose rung is chosen by the track, which is what the sentence always meant.
+    """
     coag = leveling.path_detail("blood bending", "coagulator")
-    assert "Iron Clot" not in coag["effects"]
-    assert "scales with Control Blood level" in " ".join(coag["needs"]["Iron Clot"])
+    spec = coag["effects"]["Iron Clot"]
+    assert len(spec) == 1, "one reduction, not four"
+    assert spec[0]["scales_by"] == "control_blood"
+    assert "Iron Clot" not in coag["needs"]
 
 
 def test_taking_stacks_away_is_not_applying_one():
@@ -441,3 +446,85 @@ def test_the_map_draws_them():
     page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
     assert "bloodpool" in page
     assert "pools of blood on the ground" in page or "pool${" in page
+
+
+# --- Control Blood scaling ---------------------------------------------------------------
+
+def _coagulator(level=1):
+    built, problems = creation.build(bender(name="Clot", paths=["coagulator"]))
+    assert problems == []
+    pc = from_dict(built["sheet"])
+    pc.level = level
+    return pc
+
+
+def test_control_blood_is_read_off_the_class_table_not_written_out_again():
+    """The grants say "control blood 1a" at 1st, "2a" at 3rd, "5a" at 10th, "1b" at
+    11th. A second copy of that progression here would be a second thing to keep level
+    with the first."""
+    assert leveling.control_blood(_coagulator(1)) == {"a": 1, "b": 0}
+    assert leveling.control_blood(_coagulator(5)) == {"a": 3, "b": 0}
+    assert leveling.control_blood(_coagulator(11)) == {"a": 5, "b": 1}
+
+
+def test_the_two_tracks_are_the_two_paths():
+    """"you have to choose a path or both paths" — the a-track is the first path
+    followed and the b-track the second, which is what the halves of the table are
+    for. A path never taken has no tier."""
+    built, _ = creation.build(bender(paths=["coagulator", "blood spike"]))
+    pc = from_dict(built["sheet"])
+    pc.level = 11
+    assert leveling.control_blood_for(pc, "coagulator") == 5
+    assert leveling.control_blood_for(pc, "blood spike") == 1
+    assert leveling.control_blood_for(pc, "battle blood") == 0
+
+
+def test_a_ladder_picks_the_rung_the_character_has_reached():
+    """Iron Clot's four values are one DR chosen by the track, not four DRs summing to
+    27 — the false conversion this replaces."""
+    spec = leveling.path_detail("blood bending", "coagulator")["effects"]["Iron Clot"][0]
+    assert spec["scales_by"] == "control_blood"
+    got = [leveling.resolve_effect(spec, _coagulator(n), "coagulator")["amount"]
+           for n in (1, 3, 5, 10)]
+    assert got == [2, 5, 8, 12]
+
+
+def test_a_tier_that_grants_no_new_rung_keeps_the_one_below():
+    """The ladder skips tier 4. At Control Blood 4 the character still has DR 8,
+    because nothing took it away."""
+    spec = leveling.path_detail("blood bending", "coagulator")["effects"]["Iron Clot"][0]
+    got = leveling.resolve_effect(spec, _coagulator(7), "coagulator")
+    assert got["control_blood"] == 4 and got["at_tier"] == 3 and got["amount"] == 8
+
+
+def test_a_formula_over_the_track_is_evaluated_like_any_pool_formula():
+    """"Armor Bonus to AC equal to 3+ControlBloodLevel". The pools have evaluated
+    formulas since they were written; this points one at the track."""
+    spec = leveling.path_detail(
+        "blood bending", "coagulator")["effects"]["Coagulated Plate"][0]
+    assert spec["formula"] == "3 + control_blood"
+    assert leveling.resolve_effect(spec, _coagulator(5), "coagulator")["amount"] == 6
+
+
+def test_a_branch_the_character_never_took_grants_nothing():
+    spec = leveling.path_detail("blood bending", "coagulator")["effects"]["Iron Clot"][0]
+    built, _ = creation.build(bender(paths=["blood spike"]))
+    got = leveling.resolve_effect(spec, from_dict(built["sheet"]), "coagulator")
+    assert got.get("inactive") is True
+
+
+def test_formulas_can_name_the_track():
+    """`resources.variables` exposes it, so a class file can write a pool or a
+    modifier against Control Blood rather than against character level."""
+    from rules import resources
+
+    assert resources.evaluate("control_blood", _coagulator(5)) == 3
+    assert resources.evaluate("control_blood_b", _coagulator(11)) == 1
+
+
+def test_a_class_that_does_not_branch_reads_zero_rather_than_failing():
+    """Every formula on every sheet runs through this, including classes and stand-in
+    actors that have never heard of a track."""
+    from rules import resources
+
+    assert resources.evaluate("control_blood", load_pc("fixtures/pc-kesst.json")) == 0

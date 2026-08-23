@@ -1980,6 +1980,14 @@ def _progression(actor: Actor) -> dict:
         # at every Control Blood tier, in the author's own words.
         "path_detail": {n: leveling.path_detail(cid, n)
                         for n in leveling.paths_for(cid)},
+        # How far along each branch, and what that makes the scaling abilities worth
+        # right now. The sheet's whole proposition is showing where a number came
+        # from, and "DR 8 at Control Blood 3" is exactly that.
+        "control_blood": leveling.control_blood(actor),
+        "path_now": {n: {a: [leveling.resolve_effect(e, actor, n) for e in fx]
+                         for a, fx in (leveling.path_detail(cid, n).get("effects")
+                                       or {}).items()}
+                     for n in actor.paths},
         "paths_taken": list(actor.paths),
         "rows": leveling.preview(cid, actor.level or 1, actor.paths),
         "next": (leveling.gains_at(cid, int(actor.level or 1) + 1)
