@@ -75,7 +75,7 @@
 
   /* --- three columns, per the reference layout --- */
   main {
-    flex: 1; display: grid; gap: 16px; padding: 18px 22px 0;
+    flex: 1; display: grid; gap: 34px; padding: 18px 30px 0;
     /* The shelf takes the slack, not the chain. The chain column was `1fr` and so ate
        every spare pixel — 1086px of it on a 1922px screen, holding eleven small station
        buttons and a cauldron, while 162 jars queued up four-across in the column beside
@@ -102,7 +102,7 @@
        while the shelf scrolls over it. */
     background:
       linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .30)),
-      linear-gradient(#584428, #3a2c1a),
+      linear-gradient(#4d3b27, #433322),
       url("{% static 'img/leather-2x.jpg' %}") #241d15;
     background-blend-mode: normal, multiply, normal;
     background-repeat: no-repeat;
@@ -114,6 +114,42 @@
     0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
     display: flex; flex-direction: column; min-height: 0;
   }
+  .panel { position: relative; }
+  /* The world card's own frame, applied whole — the user's reference, "exactly".
+     Bevel ring at z2, ironmongery at z3 bolting through it; both on .panel rather
+     than .inner, so they hold still while the shelf scrolls inside. */
+  .panel::before {
+    content: ""; position: absolute; inset: -4px; pointer-events: none;
+    border-radius: inherit; z-index: 2; padding: 5px;
+    background: linear-gradient(135deg,
+      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    box-shadow: 0 0 16px rgba(255, 176, 84, .16), 0 3px 8px rgba(0, 0, 0, .55);
+  }
+  .panel::after {
+    content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
+    background-image:
+      url("{% static 'img/clasp-tl.png' %}"),
+      url("{% static 'img/clasp-tr.png' %}"),
+      url("{% static 'img/clasp-bl.png' %}"),
+      url("{% static 'img/clasp-br.png' %}"),
+      url("{% static 'img/boss-top.png' %}"),
+      url("{% static 'img/boss-bottom.png' %}"),
+      url("{% static 'img/boss-left.png' %}"),
+      url("{% static 'img/boss-right.png' %}");
+    background-position: left 24px top 24px, right 24px top 24px,
+                         left 24px bottom 24px, right 24px bottom 24px,
+                         center top 21px, center bottom 21px,
+                         left 21px center, right 21px center;
+    background-repeat: no-repeat;
+    background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+                     40px auto, 40px auto, auto 40px, auto 40px;
+    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
+  }
+
   .panel > h2 {
     margin: 0; padding: 12px 16px 10px; color: var(--gold);
     font: 400 17px/1 var(--display); letter-spacing: .11em; font-variant: small-caps;
@@ -380,10 +416,53 @@
     cursor: url("{% static 'img/cursor-candle.png' %}") 24 0, auto;
   }
   input[type=text], textarea, .dieface { cursor: text; }
+
+  /* The carried candle, same as home's. A veil of darkness with a hole in it, plus a
+     warm screen-blended pool at the flame; position from the pointer, intensity from
+     noise. See home.html for the full account of why each number is what it is. */
+  #cursorshade {
+    position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
+    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 55;
+    transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
+               scale(calc(.94 + .10 * var(--flick, .8)));
+    background: radial-gradient(circle,
+      transparent 0 130px, rgba(4, 3, 2, .05) 240px,
+      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 100%);
+  }
+  #cursorlight {
+    position: fixed; left: 0; top: 0; width: 170px; height: 170px;
+    margin: -85px 0 0 -85px; pointer-events: none; z-index: 60;
+    opacity: calc(.5 + .5 * var(--flick, .8));
+    transform: translate(calc(var(--cx, -9000px) + var(--jx, 0px)),
+                         calc(var(--cy, -9000px) + 5px + var(--jy, 0px)));
+    background: radial-gradient(circle,
+      rgba(255, 190, 100, .15), rgba(232, 170, 80, .06) 45%, transparent 70%);
+    mix-blend-mode: screen;
+  }
+  #cursorlight::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle,
+      rgba(255, 200, 110, .22), rgba(240, 175, 85, .08) 40%, transparent 65%);
+    -webkit-mask-image: repeating-radial-gradient(circle at 32% 30%,
+      #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+    mask-image: repeating-radial-gradient(circle at 32% 30%,
+      #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+    animation: dappleswing 8.6s ease-in-out infinite alternate;
+  }
+  @keyframes dappleswing {
+    from { transform: rotate(-16deg) scale(1.04); }
+    to   { transform: rotate(19deg) scale(.98); }
+  }
+  @media (hover: none) { #cursorlight { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
 </head>
 <body>
+<div id="cursorshade" aria-hidden="true"></div>
+<div id="cursorlight" aria-hidden="true"></div>
 
 <header>
   <h1>Crafting</h1>
@@ -409,6 +488,32 @@
 </footer>
 
 <script>
+// The flame, same two channels as home: --cx/--cy from the pointer, --flick from
+// summed irrational sines plus a bounded walk. See home.html for the reasoning.
+{
+  const root = document.documentElement.style;
+  document.addEventListener("pointermove", e => {
+    root.setProperty("--cx", `${e.clientX}px`);
+    root.setProperty("--cy", `${e.clientY}px`);
+  }, { passive: true });
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    let walk = 0;
+    const tick = now => {
+      const t = now / 1000;
+      walk = Math.max(-0.5, Math.min(0.5, walk + (Math.random() - 0.5) * 0.04));
+      const flick = 0.72 + 0.14 * Math.sin(t * 1.7) + 0.09 * Math.sin(t * 4.3 + 1.3)
+        + 0.05 * Math.sin(t * 9.1 + 4.1) + 0.12 * walk;
+      root.setProperty("--flick", flick.toFixed(3));
+      root.setProperty("--jx", `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`);
+      root.setProperty("--jy", `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px`);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  } else {
+    root.setProperty("--flick", "0.8");
+  }
+}
+
 const STATE = {{ state_json|safe }};
 let CRAFT = "herbalism";       // the discipline tab in front
 let SHELF = [];                // raw ingredients for the current discipline

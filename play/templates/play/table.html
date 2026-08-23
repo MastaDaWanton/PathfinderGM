@@ -198,11 +198,14 @@
   /* --- The obsidian pane -------------------------------------------------- */
   aside {
     position: relative; z-index: 2;
-    border-left: 1px solid var(--gold-dim); overflow-y: auto; padding: 22px;
+    border: 5px solid transparent;
+    border-image: linear-gradient(135deg,
+      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%) 1;
+    overflow-y: auto; padding: 22px;
     min-height: 0; font: 14px/1.55 var(--body);
     background:
       linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .30)),
-      linear-gradient(#584428, #3a2c1a),
+      linear-gradient(#4d3b27, #433322),
       url("{% static 'img/leather-2x.jpg' %}") #241d15;
     background-blend-mode: normal, multiply, normal;
     background-repeat: no-repeat;
