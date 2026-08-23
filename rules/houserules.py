@@ -42,7 +42,19 @@ POINT_BUY_TIERS = [
     {"points": 100, "name": "The full hundred", "book": False},
 ]
 
-DEFAULTS = {"point_buy": 20, "magic_stacking": False}
+# How high one score may go before the race is applied. 18 is the Core Rulebook's own
+# ceiling and the point-buy table stops there; everything above it is this table's
+# homebrew and the cost of it is extrapolated (see `creation.point_cost`). 0 means no
+# ceiling at all — which is not unlimited in practice, because the point budget is
+# still a wall and a 24 costs fifty of it.
+ABILITY_CAPS = [
+    {"cap": 18, "name": "By the book", "book": True},
+    {"cap": 20, "name": "Heroic", "book": False},
+    {"cap": 25, "name": "Titanic", "book": False},
+    {"cap": 0, "name": "No cap", "book": False},
+]
+
+DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18}
 
 
 def _path() -> Path:
@@ -70,6 +82,8 @@ def active() -> dict:
         if raw.get("point_buy") in {t["points"] for t in POINT_BUY_TIERS}:
             out["point_buy"] = int(raw["point_buy"])
         out["magic_stacking"] = bool(raw.get("magic_stacking", False))
+        if raw.get("ability_cap") in {c["cap"] for c in ABILITY_CAPS}:
+            out["ability_cap"] = int(raw["ability_cap"])
     return out
 
 
@@ -91,6 +105,18 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
             current["point_buy"] = points
     if "magic_stacking" in updates:
         current["magic_stacking"] = bool(updates["magic_stacking"])
+    if "ability_cap" in updates:
+        allowed = {c["cap"] for c in ABILITY_CAPS}
+        try:
+            cap = int(updates["ability_cap"])
+        except (TypeError, ValueError):
+            cap = -1
+        if cap not in allowed:
+            problems.append(
+                f"{updates['ability_cap']!r} is not an ability ceiling; the ceilings "
+                f"are " + ", ".join(str(c["cap"]) or "none" for c in ABILITY_CAPS) + ".")
+        else:
+            current["ability_cap"] = cap
     if not problems:
         _path().write_text(json.dumps(current, indent=2), encoding="utf-8")
     return active(), problems
@@ -102,3 +128,8 @@ def point_budget() -> int:
 
 def magic_stacking() -> bool:
     return active()["magic_stacking"]
+
+
+def ability_cap() -> int:
+    """The highest a single score may be bought to. 0 means no ceiling."""
+    return int(active()["ability_cap"])

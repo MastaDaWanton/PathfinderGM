@@ -64,7 +64,53 @@ POINT_COSTS = {7: -4, 8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7,
                16: 10, 17: 13, 18: 17}
 # The budget itself lives in rules/houserules.py — it is a tier the player picks on
 # the homebrew tab, 20 ("High fantasy") by default, and reading it from a constant
-# here is how a forge and a validator come to disagree.
+# here is how a forge and a validator come to disagree. The 18 ceiling lives there too.
+
+# The book's table stops at 18. Its marginal cost rises by one every second point —
+# 14 and 15 cost 2 each, 16 and 17 cost 3, 18 costs 4 — so a score above 18 continues
+# that curve: 19 costs 4 more, 20 and 21 five each, 22 and 23 six. This is
+# extrapolation and not the Core Rulebook, which is exactly why it is only reachable
+# by lifting a ceiling on the homebrew tab.
+ABILITY_FLOOR = 7
+
+
+def point_cost(score: int) -> int:
+    """What one score costs, on the book's table or on its continuation."""
+    score = int(score)
+    if score in POINT_COSTS:
+        return POINT_COSTS[score]
+    if score < ABILITY_FLOOR:
+        raise ValueError(f"{score} is below the floor of {ABILITY_FLOOR}")
+    total, step = POINT_COSTS[18], 4
+    for n in range(19, score + 1):
+        total += step
+        # The step grows on every odd score, which is the rhythm the printed table has
+        # from 14 upward: pairs of equal increments.
+        if n % 2:
+            step += 1
+    return total
+
+
+def _reachable_cap() -> int:
+    """The highest score this table's rules and budget could actually reach.
+
+    With a ceiling that is the ceiling. Without one it is arithmetic: five other
+    scores must still be bought at 7 (which refunds points), so the budget plus those
+    refunds is what one score has to spend.
+    """
+    cap = houserules.ability_cap()
+    if cap:
+        return cap
+    purse = houserules.point_budget() - 5 * POINT_COSTS[ABILITY_FLOOR]
+    top = 18
+    while point_cost(top + 1) <= purse and top < 60:
+        top += 1
+    return top
+
+
+def point_costs_to(cap: int) -> dict[int, int]:
+    """The whole table the wizard draws its counter from, up to a ceiling."""
+    return {n: point_cost(n) for n in range(ABILITY_FLOOR, max(18, cap) + 1)}
 
 # What every character is wearing before anything else is bought. The Core Rulebook
 # gives one outfit free at first level and it never reached the sheet, so a character
@@ -181,7 +227,13 @@ def options() -> dict:
         # The budget is the house rule's, not the constant's: a forge that showed 20
         # while the validator enforced 40 would refuse characters its own form said
         # were legal.
-        "point_costs": POINT_COSTS, "point_budget": houserules.point_budget(),
+        # The table runs to whatever the ceiling allows. With no ceiling the budget is
+        # the only wall left, so the payload stops at the highest score this budget
+        # could actually buy — a counter offering a 40 nobody can afford is noise.
+        "point_costs": point_costs_to(_reachable_cap()),
+        "point_budget": houserules.point_budget(),
+        "ability_cap": houserules.ability_cap(),
+        "ability_floor": ABILITY_FLOOR,
         "skills": sorted(SKILLS),
         "spells_known": SPELLS_KNOWN,
         # The full feat index, so the forge can offer a picker rather than a spelling
@@ -226,10 +278,14 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
             score = int(raw.get(ab, 10))
         except (TypeError, ValueError):
             score = -1
-        if score not in POINT_COSTS:
-            problems.append(f"{ab}: scores run 7 to 18 before race, not {raw.get(ab)!r}.")
+        cap = houserules.ability_cap()
+        top = f"{cap}" if cap else "no ceiling"
+        if score < ABILITY_FLOOR or (cap and score > cap):
+            problems.append(
+                f"{ab}: scores run {ABILITY_FLOOR} to {top} before race, "
+                f"not {raw.get(ab)!r}.")
             score = 10
-        spent += POINT_COSTS.get(score, 0)
+        spent += point_cost(score)
         abilities[ab] = score
     budget = houserules.point_budget()
     if spent > budget:

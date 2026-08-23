@@ -132,14 +132,16 @@ def client(isolated):
 
 def test_the_rules_endpoint_round_trips(client):
     d = client.get("/api/homebrew/rules").json()
-    assert d["rules"] == {"point_buy": 20, "magic_stacking": False}
+    assert d["rules"] == {"point_buy": 20, "magic_stacking": False,
+                          "ability_cap": 18}
     assert d["tiers"][-1]["points"] == 100
 
     r = client.post("/api/homebrew/rules",
                     data=json.dumps({"point_buy": 100, "magic_stacking": True}),
                     content_type="application/json")
     assert r.status_code == 200
-    assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True}
+    assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True,
+                                 "ability_cap": 18}
 
     r = client.post("/api/homebrew/rules", data=json.dumps({"point_buy": 37}),
                     content_type="application/json")
@@ -171,3 +173,70 @@ def test_the_forge_payload_carries_the_feat_index(isolated):
     # An uncontested name stays plain. (Power Attack is not one — it too has a
     # mythic twin, which is rather the point of checking.)
     assert "Ability Focus" in names
+
+
+# --- the 18 ceiling is a house rule (asked for 2026-08-23) ---------------------------
+
+def test_eighteen_is_the_default_and_still_refuses_nineteen(isolated):
+    """"unlock the cap of 18 in a single ability in character creation, no cap can go
+    in the rules homebrew." Unlocked by choice, not by default — the book's ceiling is
+    what a table gets until it says otherwise."""
+    assert houserules.ability_cap() == 18
+    _, problems = creation.build(spec(abilities={
+        "str": 19, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10}))
+    assert any("7 to 18" in p for p in problems)
+
+
+def test_lifting_the_ceiling_lets_a_score_past_eighteen(isolated):
+    houserules.set_active({"point_buy": 100, "ability_cap": 0})
+    built, problems = creation.build(spec(abilities={
+        "str": 20, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10}))
+    assert problems == [], problems
+    assert built["sheet"]["abilities"]["str"] == 20      # dwarf gives nothing to Str
+
+
+def test_a_ceiling_between_the_two_refuses_what_is_past_it(isolated):
+    houserules.set_active({"point_buy": 100, "ability_cap": 20})
+    _, problems = creation.build(spec(abilities={
+        "str": 21, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10}))
+    assert any("7 to 20" in p for p in problems)
+
+
+def test_the_cost_above_eighteen_continues_the_books_own_curve(isolated):
+    """The printed table's marginal cost rises by one every second point — 14 and 15
+    cost 2 each, 16 and 17 cost 3, 18 costs 4. Above 18 that rhythm simply carries on.
+    This is extrapolation, not the Core Rulebook, which is why it is only reachable by
+    lifting a ceiling on the homebrew tab."""
+    assert [creation.point_cost(n) for n in range(18, 25)] == \
+        [17, 21, 26, 31, 37, 43, 50]
+    deltas = [creation.point_cost(n + 1) - creation.point_cost(n) for n in range(13, 23)]
+    assert deltas == [2, 2, 3, 3, 4, 4, 5, 5, 6, 6]
+
+
+def test_the_floor_is_untouched_by_any_of_this(isolated):
+    houserules.set_active({"ability_cap": 0})
+    _, problems = creation.build(spec(abilities={
+        "str": 6, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10}))
+    assert any("not 6" in p for p in problems)
+
+
+def test_no_cap_is_not_unlimited_because_the_budget_is_still_a_wall(isolated):
+    houserules.set_active({"point_buy": 20, "ability_cap": 0})
+    _, problems = creation.build(spec(abilities={
+        "str": 24, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10}))
+    assert any("of 20 points" in p for p in problems)
+
+
+def test_the_wizard_is_offered_only_scores_the_budget_could_buy(isolated):
+    """A counter offering a 40 nobody can afford is noise. With no ceiling the payload
+    stops at the highest score this budget could actually reach."""
+    houserules.set_active({"point_buy": 20, "ability_cap": 0})
+    small = max(creation.options()["point_costs"])
+    houserules.set_active({"point_buy": 100})
+    assert max(creation.options()["point_costs"]) > small
+
+
+def test_only_a_listed_ceiling_can_be_set(isolated):
+    rules, problems = houserules.set_active({"ability_cap": 19})
+    assert problems and "19" in problems[0]
+    assert rules["ability_cap"] == 18

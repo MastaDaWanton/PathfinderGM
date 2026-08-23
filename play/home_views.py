@@ -375,7 +375,8 @@ def house_rules(request):
         if problems:
             return JsonResponse({"rules": rules, "problems": problems}, status=400)
     return JsonResponse({"rules": houserules.active(),
-                         "tiers": houserules.POINT_BUY_TIERS})
+                         "tiers": houserules.POINT_BUY_TIERS,
+                         "caps": houserules.ABILITY_CAPS})
 
 
 @require_POST

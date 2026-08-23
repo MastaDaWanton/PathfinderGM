@@ -1085,6 +1085,18 @@ function paneRules() {
         <em>${esc(t.name)}${t.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
 
+    <h2 class="sect">Ability ceiling</h2>
+    <p class="note">How high one score may be bought before the race lands. 18 is the
+      Core Rulebook's own ceiling and its point-buy table stops there; above it the
+      cost is extrapolated from the book's own curve — 19 costs 21, 20 costs 26, 24
+      costs 50. No cap is not unlimited: the point budget is still a wall.</p>
+    <div class="cards tight">${(RULES.caps || []).map(c => `
+      <button class="card pick ${r.ability_cap === c.cap ? "on" : ""}"
+              data-hbcap="${c.cap}">
+        <h3>${c.cap ? c.cap : "∞"}</h3>
+        <em>${esc(c.name)}${c.book ? "" : " · homebrew"}</em>
+      </button>`).join("")}</div>
+
     <h2 class="sect">Magic effect stacking</h2>
     <p class="note">By the book, magical effects from different sources do not stack —
       the best one applies. This lets them stack; the same source still reapplies
@@ -1108,7 +1120,10 @@ async function setHouseRule(patch) {
     body: JSON.stringify(patch),
   });
   const d = await r.json();
-  RULES = { rules: d.rules, tiers: d.tiers || RULES.tiers };
+  // Every list the pane draws from, not just the one this call happened to change.
+  // Rebuilding from `d.rules` alone dropped `caps` on the first toggle and the whole
+  // ability-ceiling section vanished off the page until the bench was reopened.
+  RULES = { ...RULES, ...d, rules: d.rules };
   render();
   if (!r.ok) $("#ruleserr").innerHTML =
     `<div class="problems">${(d.problems || []).map(p => `<div>${esc(p)}</div>`).join("")}</div>`;
@@ -1250,14 +1265,23 @@ function paneForge() {
       </button>`).join("")}</div>
 
     <h2 class="sect">Abilities</h2>
-    <p class="note">Point buy, ${opts.point_budget} points. The race lands after.</p>
+    <p class="note">Point buy, ${opts.point_budget} points. The race lands after.
+      ${opts.ability_cap
+        ? `No score above ${opts.ability_cap} before race.`
+        : `No ceiling on a single score — the budget is the only wall.`}</p>
     <div class="budget ${spent > opts.point_budget ? "over" : ""}">
       <span>spent</span><b>${spent} / ${opts.point_budget}</b></div>
     ${["str","dex","con","int","wis","cha"].map(ab => `
       <div class="abrow"><b>${ab.toUpperCase()}</b>
-        <button data-abdn="${ab}" ${f.abilities[ab] <= 7 ? "disabled" : ""}>−</button>
+        <button data-abdn="${ab}" ${
+          f.abilities[ab] <= (opts.ability_floor ?? 7) ? "disabled" : ""}>−</button>
         <span class="val">${f.abilities[ab]}</span>
-        <button data-abup="${ab}" ${f.abilities[ab] >= 18 ? "disabled" : ""}>+</button>
+        <!-- The ceiling is a house rule, not a constant. With none set the button
+             stops where the point table the server sent stops, which is the highest
+             score this budget could actually pay for. -->
+        <button data-abup="${ab}" ${
+          f.abilities[ab] >= (opts.ability_cap || Math.max(
+            ...Object.keys(opts.point_costs).map(Number))) ? "disabled" : ""}>+</button>
         <span class="fin">${race ? `becomes ${abfinal(ab)}` : ""}</span>
       </div>`).join("")}
 
@@ -1469,6 +1493,8 @@ document.addEventListener("click", async e => {
   if (tier) { await setHouseRule({ point_buy: Number(tier.dataset.hbtier) }); return; }
   const stack = e.target.closest("[data-hbstack]");
   if (stack) { await setHouseRule({ magic_stacking: !RULES.rules.magic_stacking }); return; }
+  const cap = e.target.closest("[data-hbcap]");
+  if (cap) { await setHouseRule({ ability_cap: Number(cap.dataset.hbcap) }); return; }
 
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {
