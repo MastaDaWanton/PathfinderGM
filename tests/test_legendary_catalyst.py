@@ -319,15 +319,63 @@ def test_a_legendary_find_is_still_an_event_not_a_tuesday():
     assert hits == 0
 
 
-def test_three_of_the_four_legendary_ingredients_have_no_way_into_a_satchel():
-    """Recorded, not fixed. Behemoth Hide, Kraken Ink and Phoenix Feather are monster
-    parts: `forageable` is False, foraging filters on it, and `Actor.carry` has exactly
-    one caller in the whole app — `Engine._op_forage`. There is no harvest or loot op, so
-    no legal play can put them in a satchel and the shelf greys them forever. Building
-    one is a feature, not a bug fix, which is why this test asserts the gap rather than
-    closing it."""
+def test_three_of_the_four_legendary_ingredients_cannot_be_foraged():
+    """Behemoth Hide, Kraken Ink and Phoenix Feather are monster parts, so `forageable`
+    is False and foraging filters on it. No amount of walking the ground finds one.
+
+    This test used to add that nothing in the app could put them in a satchel at all —
+    `Actor.carry` had exactly one caller, `_op_forage`. That is no longer true: the `give`
+    op routes anything `ingredients.by_name` recognises into the satchel with a clock on
+    it, so a GM handing over a Phoenix Feather works and is now the only way to hold one.
+    There is still no harvest or loot op, so killing the phoenix yourself does not.
+
+    None of which blocks the top of the track. Concentration is the way in — two exotic
+    doses distil into one legendary at Herbalist 4 — and it needs no monster part.
+    """
     shelf = ingredients.all_ingredients()
     stranded = [i for i in shelf.values() if i.rank == 5 and not i.forageable]
     assert sorted(i.id for i in stranded) == ["behemoth-hide", "kraken-ink",
                                               "phoenix-feather"]
     assert all(i.kind == "monster part" for i in stranded)
+
+
+def test_a_gm_can_hand_over_a_legendary_monster_part(client):
+    """The route that opened after this file was written. `give` puts anything the
+    ingredient list recognises into the satchel, `forageable` or not — so the three
+    legendary monster parts are holdable, even though no legal play finds one."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.biome = "forest"
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.add(instantiate("thug", scene=scene, name="a wandering trader"))
+    engine = Engine(scene, Dice(seed=3))
+    engine.run(engine.validate([{
+        "op": "give", "actor": "c1", "because": "the trader hands it over",
+        "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}]))
+    assert scene.pc().inventory.get("phoenix-feather") == 1
+
+
+def test_the_way_to_the_top_needs_no_monster_part_at_all(herbalist):
+    """The practical route, end to end: an exotic jar is within an Herbalist 4's ceiling,
+    two of its doses concentrate to legendary, and a legendary success is the deed.
+
+    Worth pinning because the obvious reading of "legendary catalyst" is that you need
+    legendary material, and three of the four legendary ingredients cannot be foraged.
+    They are not the way in.
+    """
+    held = _exotic()
+    r = crafting.preview("herbalist", 4,
+                         Chain("herbalist", ["distill"], stock_used={held.id: 2}),
+                         stock={held.id: held}, satchel={})
+    assert not r.problems and r.tier == "legendary"
+    assert herbalist.deed_done(tier=r.tier, success=True) == "legendary-catalyst"
+    # And raw legendary material is still correctly out of reach at that level: the
+    # ceiling is what makes concentration the interesting move rather than a workaround.
+    raw = crafting.preview("herbalist", 4,
+                           Chain("herbalist", ["grind"], ["phoenix-feather"]),
+                           stock={}, satchel={"phoenix-feather": 1})
+    assert any("Herbalist 4 works exotic" in p for p in raw.problems), raw.problems
