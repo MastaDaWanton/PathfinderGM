@@ -1,0 +1,193 @@
+"""What has to happen to an ingredient before it can be used, and what that costs.
+
+The crafting bench could already brew, but it treated every ingredient as equally
+ready: a shelled nut, a volatile resin and a handful of leaves all went into the pot
+the same way. The author's rules say otherwise, and they are rules about *states* — a
+thing is raw, or extracted, or neutralised, or ground, or preserved — with each step
+allowed or refused per ingredient and each one moving the potency.
+
+**States and the order they come in.** Extraction first, because a thing still in its
+shell cannot be neutralised or ground or mixed. Neutralising second, and only for the
+volatile, because grinding one of those without it is the accident the rule exists to
+prevent. Grinding third. Preservation is not a step in that line at all — it is
+something done to a *fresh* thing to stop the clock, and it is the only step that costs
+potency rather than adding it.
+
+**Potency is the whole economy.** Grinding and brewing each raise it, and how much
+depends on the herbalist: a novice grinding a leaf gets less out of it than a master
+does. Preserving lowers it, which is the price of not losing the material entirely.
+
+**Freshness is a clock, not a flag.** An animal part has 48 hours before it is refuse;
+a plant has a week. Preserved, neither spoils. The numbers are the author's and live in
+one place so the bench, the sheet and the ingredient editor cannot disagree.
+
+Everything here reads flags off the ingredient, and every flag has a default that makes
+an ingredient written before this module behave exactly as it did: ordinary leaves that
+grind, mix, brew and keep for a week. Nothing already authored becomes wrong.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+# Hours before unpreserved material is refuse. The author's numbers.
+ANIMAL_HOURS = 48
+PLANT_HOURS = 24 * 7
+
+# What each step does to potency, before the herbalist's own skill is added.
+GRIND_POTENCY = 0.25
+BREW_POTENCY = 0.25
+PRESERVE_POTENCY = -0.20
+
+# Per level of the herbalism track, on top of the base. A master gets more out of the
+# same leaf, which is what levelling a craft is for.
+PER_LEVEL = 0.05
+
+STATES = ("raw", "extracted", "neutralised", "ground", "preserved")
+
+
+@dataclass(frozen=True)
+class Prep:
+    """One ingredient's processing rules, with defaults that preserve old behaviour."""
+    needs_extraction: bool = False      # in a shell, a pod, a gland
+    volatile: bool = False              # must be neutralised before grinding
+    can_grind: bool = True
+    mix_raw: bool = True                # or only once ground
+    brew_raw: bool = True               # or only once ground
+    animal: bool = False                # 48 hours rather than a week
+
+    @classmethod
+    def of(cls, ingredient) -> "Prep":
+        """Read from an ingredient object or a plain dict, either way."""
+        def flag(name, default):
+            if isinstance(ingredient, dict):
+                got = ingredient.get(name, default)
+            else:
+                got = getattr(ingredient, name, default)
+            if isinstance(got, str):
+                return got.strip().lower() in ("yes", "true", "1")
+            return bool(got) if got is not None else default
+
+        kind = (ingredient.get("kind") if isinstance(ingredient, dict)
+                else getattr(ingredient, "kind", "")) or ""
+        return cls(
+            needs_extraction=flag("needs_extraction", False),
+            volatile=flag("volatile", False),
+            can_grind=flag("can_grind", True),
+            mix_raw=flag("mix_raw", True),
+            brew_raw=flag("brew_raw", True),
+            # An ingredient that never said so is an animal part if its kind says it is.
+            animal=flag("animal", "monster part" in str(kind).lower()),
+        )
+
+
+def spoils_after(prep: Prep) -> int:
+    """Hours before this is refuse, unpreserved."""
+    return ANIMAL_HOURS if prep.animal else PLANT_HOURS
+
+
+def is_spoiled(prep: Prep, hours_old: int, preserved: bool = False) -> bool:
+    return not preserved and int(hours_old or 0) >= spoils_after(prep)
+
+
+def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
+    """Whether a step is allowed now, and the reason when it is not.
+
+    The reason is the whole point. "You cannot grind this" teaches nothing; "this is
+    volatile — neutralise it first" is the rule, and a player who reads it once knows
+    it for every volatile thing afterwards.
+    """
+    step, state = str(step).lower(), str(state or "raw").lower()
+
+    if prep.needs_extraction and state == "raw" and step != "extract":
+        return False, "it has to be extracted before anything else can be done with it"
+
+    if step == "extract":
+        if not prep.needs_extraction:
+            return False, "there is nothing to extract it from"
+        if state != "raw":
+            return False, "it has already been extracted"
+        return True, ""
+
+    if step == "neutralise":
+        if not prep.volatile:
+            return False, "it is not volatile; there is nothing to neutralise"
+        if state == "neutralised":
+            return False, "it is already neutralised"
+        return True, ""
+
+    if step == "grind":
+        if not prep.can_grind:
+            return False, "it cannot be ground"
+        if state == "ground":
+            return False, "it is already ground"
+        if prep.volatile and state != "neutralised":
+            return False, "it is volatile — neutralise it before grinding"
+        return True, ""
+
+    if step == "mix":
+        if state == "ground" or prep.mix_raw:
+            return True, ""
+        return False, "it can only be mixed once it has been ground"
+
+    if step == "brew":
+        if state == "ground" or prep.brew_raw:
+            return True, ""
+        return False, "it can only be brewed once it has been ground"
+
+    if step == "preserve":
+        return True, ""
+
+    return False, f"{step!r} is not something you can do to an ingredient"
+
+
+def potency_change(step: str, herbalism_level: int = 0) -> float:
+    """What a step does to potency. Negative for preservation, which is its price."""
+    step = str(step).lower()
+    bonus = max(0, int(herbalism_level or 0)) * PER_LEVEL
+    if step == "grind":
+        return GRIND_POTENCY + bonus
+    if step == "brew":
+        return BREW_POTENCY + bonus
+    if step == "preserve":
+        return PRESERVE_POTENCY
+    return 0.0
+
+
+def after(step: str, state: str = "raw") -> str:
+    """The state a step leaves the ingredient in."""
+    step, state = str(step).lower(), str(state or "raw").lower()
+    return {"extract": "extracted", "neutralise": "neutralised",
+            "grind": "ground"}.get(step, state)
+
+
+# --- infusions ----------------------------------------------------------------------
+
+def can_infuse(base, addition, state: str = "raw") -> tuple[bool, str]:
+    """Whether this can go into an existing tincture.
+
+    "Infusions are only possible on already crafted tinctures, they can be infused with
+    other tinctures or brews, ground or mixed herbs, raw herbs as long as the raw herbs
+    could be brewed raw, and some herbs that are volatile need extraction."
+
+    So the base has to be finished work, and the addition has to be in a state the
+    tincture can actually take up — which for a raw herb is the same question as
+    whether it could have been brewed raw in the first place.
+    """
+    base_kind = str((base or {}).get("kind", "") if isinstance(base, dict)
+                    else getattr(base, "kind", "")).lower()
+    if "tincture" not in base_kind and not (
+            base.get("crafted") if isinstance(base, dict)
+            else getattr(base, "crafted", False)):
+        return False, "an infusion goes into a tincture that has already been crafted"
+
+    prep = Prep.of(addition)
+    state = str(state or "raw").lower()
+
+    if prep.needs_extraction and state == "raw":
+        return False, "it has to be extracted before it can be infused"
+    if state in ("ground", "extracted", "neutralised"):
+        return True, ""
+    if prep.brew_raw:
+        return True, ""
+    return False, ("a raw herb can only be infused if it could be brewed raw; "
+                   "grind it first")

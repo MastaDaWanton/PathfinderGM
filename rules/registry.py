@@ -104,6 +104,25 @@ KINDS: dict[str, Kind] = {
             Field("craft_dc", "Craft DC", type="number"),
             Field("harvesting", "Harvesting", type="textarea"),
             Field("risky", "Hazardous to handle", type="choice", choices=("no", "yes")),
+            # How this one has to be handled before it is any use. Declared here rather
+            # than in a form, because the bench draws every editor from this list — so
+            # a new preparation rule is one Field and appears in the UI without a line
+            # of template changing. Defaults match `rules/herbprep.Prep`, which is what
+            # keeps the 161 already authored behaving exactly as they did.
+            Field("needs_extraction", "Must be extracted first", type="choice",
+                  choices=("no", "yes"),
+                  help="In a shell, a pod or a gland. Nothing else can be done to it "
+                       "until it is out."),
+            Field("volatile", "Volatile", type="choice", choices=("no", "yes"),
+                  help="Must be neutralised before it can be ground."),
+            Field("can_grind", "Can be ground", type="choice", choices=("yes", "no")),
+            Field("mix_raw", "Can be mixed raw", type="choice", choices=("yes", "no"),
+                  help="No means it has to be ground first."),
+            Field("brew_raw", "Can be brewed raw", type="choice", choices=("yes", "no"),
+                  help="No means it has to be ground first. This also decides whether "
+                       "it can be infused into a tincture raw."),
+            Field("animal", "Animal part", type="choice", choices=("no", "yes"),
+                  help="Spoils in 48 hours unpreserved, rather than a week."),
             Field("effects", "Effects", type="effects"),
         ],
     ),
