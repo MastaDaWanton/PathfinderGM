@@ -640,3 +640,116 @@ def test_a_chain_with_no_infuse_is_still_named_for_its_ingredients():
     result = crafting.preview("herbalist", 5, chain, stock={jar.id: jar},
                               satchel={"woundwort": 5})
     assert "Mad Cap Tincture" not in result.name, result.name
+
+
+# --- the shelf says which jars the chain will take -----------------------------------
+#
+# The preparation rules were enforced correctly and said nothing until a chain was built
+# and Craft was pressed, which reads exactly like the rules not working at all. Reported
+# from play: "I don't think the restrictions on material processing are holding up."
+# They were: on the reporter's own corpus, choosing `brew` refuses 24 of 162 ingredients
+# and greyed none of them.
+#
+# The flags are asserted against herbs the test makes up, never against the corpus. The
+# tags live in the homebrew overlay in the player's data directory, so "Chimera Horn
+# cannot be brewed raw" is a fact about whoever ran the suite — green on this machine and
+# red on a fresh clone, which is the worst kind of green.
+
+def _herb(source_id, **flags):
+    """A real ingredient with exactly the preparation flags this test names.
+
+    Built by replacing fields on a corpus entry rather than by faking one: `preview` and
+    the view walk the full `Ingredient` interface — `craft_dc`, `as_dict`, `pairs` — and
+    a stub grew three more attributes every time it was run against another code path.
+    """
+    import dataclasses
+
+    return dataclasses.replace(ingredients.all_ingredients()[source_id], **flags)
+
+
+def test_choosing_brew_marks_what_has_to_be_ground_first():
+    """The exact case the report names, at the point the page asks the question: a method
+    picked, nothing in the pot yet."""
+    horn = _herb("chimera-horn", brew_raw=False)
+    assert "ground" in crafting.prep_problem(horn, ["brew"])
+
+
+def test_adding_the_grind_clears_the_mark():
+    """A refusal has to be a statement about the chain, not about the ingredient. If
+    grinding first did not clear it, the mark would be telling the player to give up on a
+    herb that is perfectly usable."""
+    horn = _herb("chimera-horn", brew_raw=False)
+    assert crafting.prep_problem(horn, ["grind", "brew"]) == ""
+
+
+def test_a_step_an_ingredient_has_no_use_for_is_not_a_refusal():
+    """Neutralising a pot of eight herbs when one is volatile is the whole point; the
+    other seven must not come back marked for having sat through it."""
+    plain = _herb("woundwort", volatile=False)
+    assert crafting.prep_problem(plain, ["neutralize", "brew"]) == ""
+
+
+def test_a_volatile_herb_is_marked_until_it_is_neutralised():
+    volatile = _herb("dragon-flower", volatile=True, needs_extraction=False)
+    assert "volatile" in crafting.prep_problem(volatile, ["grind"])
+    assert crafting.prep_problem(volatile, ["neutralize", "grind"]) == ""
+
+
+def test_the_reason_carries_no_name_prefix():
+    """It is drawn on the jar, which is already wearing the name. `_preparation_problems`
+    adds the name back for the problems panel, where eight herbs are listed together."""
+    horn = _herb("chimera-horn", brew_raw=False)
+    assert not crafting.prep_problem(horn, ["brew"]).startswith(horn.name)
+
+
+# --- the same answer, through the bench ------------------------------------------------
+
+@pytest.fixture
+def tagged(monkeypatch):
+    """A shelf of three herbs with known flags, standing in for the whole corpus."""
+    shelf = {h.id: h for h in [
+        _herb("chimera-horn", brew_raw=False, volatile=False, needs_extraction=False),
+        _herb("dragon-flower", volatile=True, needs_extraction=False),
+        _herb("woundwort", volatile=False, needs_extraction=False, brew_raw=True),
+    ]}
+    monkeypatch.setattr(ingredients, "all_ingredients", lambda: shelf)
+    return shelf
+
+
+def _refusals(client, methods, pot=()):
+    return client.post("/api/craft/preview", data=json.dumps({
+        "craft": "herbalism", "ingredients": list(pot), "methods": list(methods)}),
+        content_type="application/json").json().get("refused") or {}
+
+
+def test_the_bench_sends_a_reason_for_every_jar_the_chain_refuses(client, tagged):
+    """Sent with the preview rather than worked out in the page, so there is one copy of
+    the preparation rules and the shelf cannot drift from what Craft will accept."""
+    refused = _refusals(client, ["brew"])
+    assert "chimera-horn" in refused and "ground" in refused["chimera-horn"]
+    assert "woundwort" not in refused
+
+
+def test_an_empty_pot_still_gets_the_refusals(client, tagged):
+    """The page returned early on an empty pot, so picking a method first — the order most
+    people work in — greyed nothing at all. The refusals must not depend on the pot."""
+    assert _refusals(client, ["brew"], pot=[]) == _refusals(client, ["brew"],
+                                                            pot=["woundwort"])
+
+
+def test_no_chain_refuses_nothing(client, tagged):
+    """Before a method is chosen there is no rule to break, and a shelf that came up all
+    crossed out would be worse than one that says nothing."""
+    assert _refusals(client, []) == {}
+
+
+def test_the_shelf_and_the_craft_button_agree(client, tagged):
+    """Both answers come from one walk, so a jar marked refused must also produce a
+    problem when it is actually put in the pot — and one left unmarked must not."""
+    refused = _refusals(client, ["brew"])
+    for iid in tagged:
+        problems = client.post("/api/craft/preview", data=json.dumps({
+            "craft": "herbalism", "ingredients": [iid], "methods": ["brew"]}),
+            content_type="application/json").json()["problems"]
+        named = [p for p in problems if p.startswith(tagged[iid].name)]
+        assert bool(named) == (iid in refused), (iid, problems, refused)

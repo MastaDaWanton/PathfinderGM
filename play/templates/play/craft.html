@@ -146,6 +146,27 @@
   }
   .jar { position: relative; }
   .jar .conc { font: italic 9px/1.2 var(--body); color: var(--dim); }
+  /* A jar the chain as written cannot take. Dimmed but not as far as `.locked`, because
+     this one is still pressable: adding a grind can make it legal, and it has to stay
+     visibly different from a herb that is simply beyond your tier. The reason is in the
+     jar's title, so hovering says which rule and which step. */
+  .jar.refused { opacity: .45; border-color: #4a2b26; }
+  .jar.refused:hover { opacity: 1; border-color: var(--alarm); }
+  .jar.refused b { color: #c39a92; }
+  .jar.refused .glyph { filter: saturate(.15) brightness(.8); }
+  .jar .nomark {
+    position: absolute; top: -5px; left: -5px; width: 15px; height: 15px;
+    border-radius: 8px; background: #2a1512; border: 1px solid #6b322a;
+    color: var(--alarm); font: 700 9px/13px var(--body);
+  }
+  /* Chosen wins over refused: a jar already in the pot must read as in the pot, even
+     while the chain is momentarily illegal — that is how you see what to fix. */
+  .jar.refused.chosen { opacity: 1; border-color: var(--brew); }
+  /* Locked stays the dimmest thing on the shelf. `.refused` is declared after `.locked`
+     at equal specificity, so it silently won and 24 beyond-your-tier jars brightened from
+     .34 to .45 — a cue quietly weakened by a rule that was not about it. */
+  .jar.locked.refused { opacity: .34; }
+  .jar.locked.refused:hover { opacity: .34; border-color: #4a2b26; }
   /* Wraps. Without this the concentrate buttons kept extending left off the panel
      instead of starting a second line, so the ones past the edge were unreachable. */
   .onlymine { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px;
@@ -351,6 +372,10 @@ let CHOSEN = [];               // raw ingredient ids in the pot
 let USING = {};                // stock id -> how many of it are in the pot
 let CHAIN = [];                // methods, in order
 let PREVIEW = null;
+// ingredient id -> why the chain as it stands would refuse it. Sent by the server from
+// the same walk that enforces the rules, rather than worked out here: the preparation
+// rules live in exactly one place and this is a picture of them, not a second copy.
+let REFUSED = {};
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
@@ -555,16 +580,26 @@ function renderShelf() {
       carrying any ingredients. Forage, or untick the box to see the whole shelf.</div>`;
     return;
   }
-  $("#shelf").innerHTML = list.map(i => `
-    <button class="jar ${i.usable ? "" : "locked"} ${CHOSEN.includes(i.id) ? "chosen" : ""}"
+  $("#shelf").innerHTML = list.map(i => {
+    // Marked, not disabled. A jar the chain refuses is still worth picking up — you may
+    // be about to add the grind that fixes it — and a button you cannot press gives you
+    // no way to find out what it would take.
+    const no = REFUSED[i.id] || "";
+    return `
+    <button class="jar ${i.usable ? "" : "locked"} ${no ? "refused" : ""} ${
+              CHOSEN.includes(i.id) ? "chosen" : ""}"
             data-ing="${esc(i.id)}" ${i.usable ? "" : "disabled"}
             title="${esc(i.name)}${i.aka ? ` (${esc(i.aka)})` : ""} — ${esc(i.tier)}${
-              i.usable ? "" : ", beyond your tier"}\n\n${esc(i.text).slice(0, 400)}">
+              i.usable ? "" : ", beyond your tier"}${
+              no ? `\n\n${esc(CHAIN.join(" → "))}: ${esc(no)}.` : ""
+            }\n\n${esc(i.text).slice(0, 400)}">
       <span class="glyph">${KIND_GLYPH[i.kind] || "🌿"}</span>
       <b>${esc(i.name)}</b>
       ${i.held ? `<span class="held">×${i.held}</span>` : ""}
+      ${no ? `<span class="nomark" aria-hidden="true">✕</span>` : ""}
       <span class="tier t${i.rank}"></span>
-    </button>`).join("")
+    </button>`;
+  }).join("")
     || `<div class="problems">Nothing on the shelf matches that.</div>`;
 }
 
@@ -689,13 +724,18 @@ function renderMastery() {
 async function refresh() {
   renderChain();
   renderMastery();
-  if (!CHOSEN.length && !Object.keys(USING).length) {
-    PREVIEW = null; renderPreview(null); buttons(); return;
-  }
+  // An empty pot used to return here, which meant choosing "brew" first — the order most
+  // people work in — greyed nothing at all and the rules read as broken. An empty pot is
+  // exactly when the shelf most needs to say which jars the chain will take.
+  const empty = !CHOSEN.length && !Object.keys(USING).length;
+  let answer = null;
   try {
-    PREVIEW = await post("/api/craft/preview",
+    answer = await post("/api/craft/preview",
       { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING });
-  } catch (e) { $("#err").textContent = e.message; PREVIEW = null; }
+  } catch (e) { $("#err").textContent = e.message; }
+  REFUSED = (answer && answer.refused) || {};
+  PREVIEW = empty ? null : answer;
+  renderShelf();
   renderPreview(PREVIEW);
   buttons();
 }

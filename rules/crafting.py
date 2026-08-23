@@ -891,27 +891,46 @@ def _preparation_problems(items, methods) -> list[str]:
     from . import herbprep
 
     out: list[str] = []
+    for item in items:
+        why = prep_problem(item, methods)
+        if why:
+            out.append(f"{item.name}: {why}.")
+    return out
+
+
+def prep_problem(item, methods) -> str:
+    """Why this one ingredient cannot go through this chain, or "".
+
+    Split out of `_preparation_problems` so the shelf can grey a jar the chain would
+    refuse *before* it is put in the pot. The alternative was a second copy of the walk
+    in the page's JavaScript, which is the shape of bug this project has already paid for
+    twice: a rule corrected in one place and left stale in the copy nobody looked at.
+
+    The reason comes back without the ingredient's name on it, because the jar it is
+    shown on is already wearing the name. `_preparation_problems` adds it back for the
+    problems panel, where eight herbs are listed together and the name is the point.
+    """
+    from . import herbprep
+
     steps = [(_AS_STEP[m], m) for m in methods if m in _AS_STEP]
     if not steps:
-        return out
+        return ""
 
-    for item in items:
-        prep = herbprep.Prep.of(item)
-        state = "raw"
-        for step, written in steps:
-            ok, why = herbprep.can(step, prep, state)
-            if ok:
-                state = herbprep.after(step, state)
-                continue
-            # A step an ingredient simply has no use for is not an error: neutralising a
-            # pot of eight herbs when one of them is volatile is the whole point, and the
-            # other seven are not spoiled by sitting through it.
-            if why.startswith(("it is not volatile", "there is nothing to extract",
-                               "it is already", "it has already")):
-                continue
-            out.append(f"{item.name}: {why}.")
-            break
-    return out
+    prep = herbprep.Prep.of(item)
+    state = "raw"
+    for step, _written in steps:
+        ok, why = herbprep.can(step, prep, state)
+        if ok:
+            state = herbprep.after(step, state)
+            continue
+        # A step an ingredient simply has no use for is not an error: neutralising a pot
+        # of eight herbs when one of them is volatile is the whole point, and the other
+        # seven are not spoiled by sitting through it.
+        if why.startswith(("it is not volatile", "there is nothing to extract",
+                           "it is already", "it has already")):
+            continue
+        return why
+    return ""
 
 
 def _name_for(items, methods) -> str:

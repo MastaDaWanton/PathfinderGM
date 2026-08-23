@@ -193,7 +193,31 @@ def craft_preview(request):
                               stock=_stock_of(c, disc["id"]),
                               satchel=dict(pc.inventory) if pc else {},
                               carrier=pc, now_minute=c.scene.clock_minutes)
-    return JsonResponse(result.as_dict())
+    out = result.as_dict()
+    # Why each jar on the shelf would be refused by the chain as it currently stands, so
+    # the shelf can grey them before one is picked up. The preparation rules were being
+    # enforced correctly and saying nothing until you had already built a chain and
+    # pressed Craft — which reads exactly like the rules not working at all.
+    out["refused"] = _shelf_refusals(chain.methods)
+    return JsonResponse(out)
+
+
+def _shelf_refusals(methods) -> dict:
+    """`{ingredient id: why the chain would refuse it}` for everything on the shelf.
+
+    Computed here rather than in the page, from the same walk `preview` uses, because a
+    second copy of the preparation rules in JavaScript is the shape of bug this project
+    has paid for twice — a rule corrected in one place and left stale in the copy nobody
+    looked at. 162 ingredients through a walk of at most a handful of steps is nothing.
+    """
+    if not methods:
+        return {}
+    out = {}
+    for iid, item in ingredients.all_ingredients().items():
+        why = crafting.prep_problem(item, methods)
+        if why:
+            out[iid] = why
+    return out
 
 
 @require_POST
