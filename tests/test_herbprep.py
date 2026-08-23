@@ -232,3 +232,51 @@ def test_salt_is_recognised_by_the_name_a_player_would_buy():
     for name in ("salt", "Sea Salt", "a pouch of curing salt"):
         assert H.has_salt(Carrier(**{name: 1})), name
     assert not H.has_salt(Carrier(lantern=1))
+
+
+# --- the tags actually survive the trip in (found by applying them, 2026-08-23) ------
+
+def test_the_ingredient_dataclass_has_somewhere_to_put_them():
+    """55 ingredients were tagged, the file merged correctly, and every one still read
+    as an ordinary leaf: `from_dict` builds a dataclass and quietly drops anything it
+    has no field for. The flags were nowhere on `Ingredient`, so they vanished on the
+    way in with nothing raised and nothing logged."""
+    from rules.ingredients import Ingredient
+
+    fields = set(Ingredient.__dataclass_fields__)
+    assert {"needs_extraction", "volatile", "can_grind", "mix_raw", "brew_raw",
+            "animal"} <= fields
+
+
+def test_a_flag_stored_as_the_word_no_is_not_true():
+    """The editor stores choices as "yes"/"no" and the importer writes the same. A
+    plain `bool("no")` is True, which would turn "cannot be ground" into its
+    opposite — the worst direction for a rule about volatile things to fail in."""
+    from rules.ingredients import from_dict
+
+    got = from_dict({"id": "x", "name": "X", "can_grind": "no", "volatile": "yes"})
+    assert got.can_grind is False and got.volatile is True
+
+
+def test_a_monster_part_is_animal_unless_the_entry_says_otherwise():
+    from rules.ingredients import from_dict
+
+    assert from_dict({"id": "a", "name": "A", "kind": "monster part"}).animal
+    assert not from_dict({"id": "b", "name": "B", "kind": "herb"}).animal
+    # And an explicit answer wins, which is how a plant growing on a creature is told
+    # apart from the creature.
+    assert from_dict({"id": "c", "name": "C", "kind": "monster part",
+                      "animal": "no"}).animal is False
+
+
+def test_the_shipped_corpus_is_untouched_by_tagging():
+    """The tags land in the homebrew overlay. Deleting one file undoes all of it, and
+    a corrected corpus in a later build is not shadowed by a stale copy."""
+    import json
+    from pathlib import Path
+
+    corpus = json.loads(
+        Path("content/ingredients/herbs-and-parts.json").read_text(encoding="utf-8"))
+    entries = corpus.get("ingredients", corpus)
+    assert not any("volatile" in e for e in entries), \
+        "preparation flags belong in the overlay, not in the shipped file"

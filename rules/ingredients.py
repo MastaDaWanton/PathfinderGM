@@ -51,6 +51,20 @@ class Ingredient:
     # correct one: the next parse would silently overwrite the edit.
     effects: list = field(default_factory=list)
     effects_converted: bool = False
+    # How it has to be handled before it is any use. See `rules/herbprep.py` for what
+    # each one means and why the defaults are these: everything authored before the
+    # flags existed grinds, mixes, brews and keeps for a week, exactly as it did.
+    #
+    # They live on the dataclass rather than being read off a dict, because `from_dict`
+    # builds this and quietly drops anything it has no field for — so the tags for 55
+    # ingredients loaded, merged, and vanished on the way in, and every one of them
+    # still read as an ordinary leaf.
+    needs_extraction: bool = False
+    volatile: bool = False
+    can_grind: bool = True
+    mix_raw: bool = True
+    brew_raw: bool = True
+    animal: bool = False
 
     @property
     def rank(self) -> int:
@@ -129,7 +143,27 @@ def from_dict(d: dict) -> Ingredient:
         biomes=list(d.get("biomes") or []),
         biomes_inferred=bool(d.get("biomes_inferred")),
         forageable=bool(d.get("forageable", True)),
+        # The editor stores its choices as "yes"/"no" and the importer writes the same,
+        # so a plain `bool()` would read the string "no" as True — which is how a flag
+        # meaning "cannot be ground" would have come out meaning the opposite.
+        needs_extraction=_flag(d.get("needs_extraction"), False),
+        volatile=_flag(d.get("volatile"), False),
+        can_grind=_flag(d.get("can_grind"), True),
+        mix_raw=_flag(d.get("mix_raw"), True),
+        brew_raw=_flag(d.get("brew_raw"), True),
+        # Unstated for a monster part means yes: those are on the 48-hour clock because
+        # of what they are, not because somebody ticked a box that did not exist when
+        # the corpus was written.
+        animal=_flag(d.get("animal"), d.get("kind", "") == "monster part"),
     )
+
+
+def _flag(value, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in ("yes", "true", "1")
+    return bool(value)
 
 
 def load_dir(path: str | Path) -> dict[str, dict]:

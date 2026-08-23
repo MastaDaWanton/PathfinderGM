@@ -41,6 +41,13 @@ def main() -> int:
         raw = raw[raw.index("{"):] if "{" in raw else raw
     proposed = json.loads(raw)
 
+    # Two shapes arrive in practice. The prompt asks for {id: {flags}} and a model
+    # often answers with the whole corpus back, each entry carrying its flags inline —
+    # which is a perfectly clear answer and not worth rejecting over its envelope.
+    if isinstance(proposed, list):
+        proposed = {str(r.get("id")): {k: v for k, v in r.items() if k != "id"}
+                    for r in proposed if isinstance(r, dict) and r.get("id")}
+
     from django.conf import settings
 
     from rules import herbprep, ingredients as ing
