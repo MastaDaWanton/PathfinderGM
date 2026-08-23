@@ -1984,6 +1984,7 @@ def _progression(actor: Actor) -> dict:
         # right now. The sheet's whole proposition is showing where a number came
         # from, and "DR 8 at Control Blood 3" is exactly that.
         "control_blood": leveling.control_blood(actor),
+        "unlocks_b": leveling.unlocks_at(cid, 1),
         "path_now": {n: {a: [leveling.resolve_effect(e, actor, n) for e in fx]
                          for a, fx in (leveling.path_detail(cid, n).get("effects")
                                        or {}).items()}

@@ -258,6 +258,15 @@
                      cursor: pointer; font-size: 14px; }
   .skillgrid label.classskill { color: var(--gold); }
   .skillgrid input { accent-color: #c9a86a; }
+  .slotrow { display: flex; gap: 14px; margin: 6px 0 14px; flex-wrap: wrap; }
+  .pathslot { flex: 1 1 200px; padding: 9px 13px; border-radius: 2px;
+              border: 1px dashed rgba(201,168,106,.3); }
+  .pathslot.filled { border-style: solid; border-color: var(--gold);
+                     background: rgba(201,168,106,.07); }
+  .pathslot .slotname { display: block; font: 400 10.5px/1 Cinzel, serif;
+                        letter-spacing: .18em; color: var(--dim); }
+  .pathslot b { display: block; color: var(--gold); font-size: 15px; margin: 3px 0; }
+  .pathslot em { color: var(--dim); font-size: 12px; font-style: italic; }
   .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
@@ -1265,12 +1274,36 @@ function paneForge() {
       </button>`).join("")}</div>
 
     ${cls && (cls.paths || []).length ? `
-      <h2 class="sect">Path</h2>
-      <p class="note">A ${esc(cls.name)} follows at least one path. Take one, or take
-        more than one — the class declares ${cls.paths.length}.</p>
-      <div class="cards tight">${cls.paths.map(x => `
-        <button class="card pick ${f.paths.includes(x) ? "on" : ""}"
-                data-crpath="${esc(x)}"><h3>${esc(x)}</h3></button>`).join("")}</div>` : ""}
+      <h2 class="sect">Paths</h2>
+      <p class="note">A ${esc(cls.name)} follows two paths, and the order is the
+        choice. The <b>first</b> you pick is <b>Path A</b> — you begin with it and
+        take its Control Blood 1 abilities at 1st level. The <b>second</b> is
+        <b>Path B</b>, and it stays shut until the table opens its track at
+        <b>${cls.unlocks_b || 11}th level</b>. Pick one now if you would rather
+        decide the other later.</p>
+      <div class="slotrow">
+        <div class="pathslot ${f.paths[0] ? "filled" : ""}">
+          <span class="slotname">Path A</span>
+          <b>${f.paths[0] ? esc(f.paths[0]) : "not chosen"}</b>
+          <em>from 1st level</em>
+        </div>
+        <div class="pathslot ${f.paths[1] ? "filled" : ""}">
+          <span class="slotname">Path B</span>
+          <b>${f.paths[1] ? esc(f.paths[1]) : "not chosen"}</b>
+          <em>from ${cls.unlocks_b || 11}th level</em>
+        </div>
+      </div>
+      <div class="cards tight">${cls.paths.map(x => {
+        const at = f.paths.indexOf(x);
+        return `<button class="card pick ${at >= 0 ? "on" : ""}"
+                data-crpath="${esc(x)}"
+                ${at < 0 && f.paths.length >= 2 ? "disabled style=opacity:.4" : ""}>
+          <h3>${esc(x)}</h3>
+          <div class="traits">${at === 0 ? "Path A — from 1st level"
+            : at === 1 ? `Path B — from ${cls.unlocks_b || 11}th`
+            : f.paths.length >= 2 ? "both slots taken" : "click to take"}</div>
+        </button>`;
+      }).join("")}</div>` : ""}
 
     <h2 class="sect">Abilities</h2>
     <p class="note">Point buy, ${opts.point_budget} points. The race lands after.
@@ -1434,8 +1467,12 @@ document.addEventListener("click", async e => {
     const path = e.target.closest("[data-crpath]");
     if (path) {
       const name = path.dataset.crpath;
+      // Order is the meaning, so a path is appended and never sorted: the first
+      // taken is Path A and the second Path B. A third is refused here as well as by
+      // the server, because a disabled button the page still honours is a lie.
       f.paths = f.paths.includes(name)
-        ? f.paths.filter(x => x !== name) : [...f.paths, name];
+        ? f.paths.filter(x => x !== name)
+        : f.paths.length >= 2 ? f.paths : [...f.paths, name];
       render(); return;
     }
     const bonus = e.target.closest("[data-crbonus]");

@@ -40,7 +40,7 @@ def test_the_class_declares_its_own_paths():
 def test_a_bender_must_take_a_path():
     """"if you choose blood bender you have to choose a path or both paths"."""
     _, problems = creation.build(bender(paths=[]))
-    assert any("follows at least one path" in p for p in problems)
+    assert any("follows a path" in p and "Path A" in p for p in problems)
 
 
 def test_a_bender_may_take_more_than_one():
@@ -766,3 +766,57 @@ def test_the_page_draws_them_as_buttons():
     page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
     assert 'id="abilities"' in page and "renderAbilities" in page
     assert "data-ability" in page
+
+
+# --- two paths, in order (clarified 2026-08-23) ------------------------------------------
+
+def test_a_bender_follows_two_paths_at_most():
+    """"you should only be able to chose two paths, Path A and Path B." Two is not a
+    house rule: the progression has an a-track and a b-track and no third, so it is
+    what the table can actually carry."""
+    assert leveling.max_paths("blood bending") == 2
+    _, problems = creation.build(bender(
+        paths=["coagulator", "blood spike", "battle blood"]))
+    assert any("2 paths at most" in p and "Path A" in p for p in problems)
+
+
+def test_the_first_chosen_is_path_a_and_the_second_path_b():
+    """"the fist path you choose should be path A and the second path b" — order is
+    the whole meaning of the choice, so it is preserved rather than sorted."""
+    built, problems = creation.build(bender(paths=["blood spike", "coagulator"]))
+    assert problems == []
+    assert built["sheet"]["paths"] == ["blood spike", "coagulator"]
+
+
+def test_path_a_runs_from_first_level_and_path_b_waits():
+    """"you begin with path A available getting 1a abilities at lvl 1 ... you
+    eventually unlock 1b at which point you gain access to the next path.\""""
+    assert leveling.unlocks_at("blood bending", 0) == 1
+    assert leveling.unlocks_at("blood bending", 1) == 11
+
+    built, _ = creation.build(bender(paths=["coagulator", "blood spike"]))
+    pc = from_dict(built["sheet"])
+    pc.level = 1
+    assert leveling.control_blood_for(pc, "coagulator") == 1
+    assert leveling.control_blood_for(pc, "blood spike") == 0
+    pc.level = 11
+    assert leveling.control_blood_for(pc, "blood spike") == 1
+
+
+def test_nothing_from_path_b_is_usable_before_it_opens():
+    from play.views import _usable_abilities
+
+    built, _ = creation.build(bender(paths=["coagulator", "blood spike"]))
+    pc = from_dict(built["sheet"])
+    pc.level = 5
+    paths = {a["path"] for a in _usable_abilities(pc)}
+    assert paths == {"coagulator"}
+    pc.level = 11
+    assert "blood spike" in {a["path"] for a in _usable_abilities(pc)}
+
+
+def test_the_forge_says_which_slot_is_which():
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "Path A" in page and "Path B" in page

@@ -223,7 +223,9 @@ def options() -> dict:
                      "summary": c.get("summary", ""),
                      "caster": bool(casting.CASTERS.get(cid) or c.get("casting")),
                      "features": classes_mod.features_at(cid, 1),
-                     "paths": leveling.paths_for(cid)}
+                     "paths": leveling.paths_for(cid),
+                     "max_paths": leveling.max_paths(cid),
+                     "unlocks_b": leveling.unlocks_at(cid, 1)}
                     for cid, c in sorted(classes_mod.all_classes().items())
                     if cid != "blood bending" or True],
         # The budget is the house rule's, not the constant's: a forge that showed 20

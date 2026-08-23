@@ -223,6 +223,7 @@ def check_paths(class_id: str, chosen) -> tuple[list[str], list[str]]:
     """
     offered = paths_for(class_id)
     picked, problems = [], []
+    limit = max_paths(class_id)
     for name in (chosen or []):
         key = " ".join(str(name).split()).strip().lower()
         if not key:
@@ -233,11 +234,56 @@ def check_paths(class_id: str, chosen) -> tuple[list[str], list[str]]:
                 + (f": {', '.join(offered)}." if offered else "; it has none."))
         elif key not in picked:
             picked.append(key)
+    name = classes_mod.get(class_id).get("name", class_id)
     if offered and not picked:
         problems.append(
-            f"A {classes_mod.get(class_id).get('name', class_id)} follows at least one "
-            f"path: {', '.join(offered)}. Take one, or take more than one.")
+            f"A {name} follows a path. Take one to be your Path A: "
+            f"{', '.join(offered)}.")
+    if limit and len(picked) > limit:
+        # Order is the whole meaning of the choice: the first is Path A and runs from
+        # first level, the second is Path B and waits for the track to open.
+        problems.append(
+            f"A {name} follows {limit} paths at most — the first is Path A and the "
+            f"second Path B. You have taken {len(picked)}: "
+            f"{', '.join(picked)}.")
     return picked, problems
+
+
+def max_paths(class_id: str) -> int:
+    """How many branches this class allows. 0 when it does not say.
+
+    Blood Bending's table has an a-track and a b-track and no third, so two is not a
+    house rule here — it is what the progression can actually carry.
+    """
+    found = classes_mod.get(class_id).get("paths")
+    if not found:
+        return 0
+    stated = classes_mod.get(class_id).get("max_paths")
+    if stated:
+        return int(stated)
+    tracks = {m.group(1) for lvl in range(1, MAX_LEVEL + 1)
+              for feature in classes_mod.table_at(class_id, lvl).get("grants") or []
+              if (m := re.search(r"control blood\s*\d+\s*([ab])",
+                                 str(feature).lower()))}
+    return len(tracks) or 0
+
+
+def unlocks_at(class_id: str, index: int) -> int:
+    """The level the track behind the index-th path opens. 0 if it never does.
+
+    Read off the grants: Path B is available when the table first grants "control
+    blood 1b", which is 11th level and is the class's business rather than this
+    module's.
+    """
+    track = "ab"[index] if index < 2 else ""
+    if not track:
+        return 0
+    for lvl in range(1, MAX_LEVEL + 1):
+        for feature in classes_mod.table_at(class_id, lvl).get("grants") or []:
+            if re.fullmatch(rf"control blood\s*1\s*{track}",
+                            str(feature).strip().lower()):
+                return lvl
+    return 0
 
 
 def preview(class_id: str, level: int, paths=None) -> list[dict]:

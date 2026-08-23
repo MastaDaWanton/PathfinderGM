@@ -2072,16 +2072,27 @@ function tabClass(s) {
       </div>
       ${(p.paths_offered || []).length ? `
         <h3 style="margin-top:20px">Paths</h3>
-        <div class="why">This class branches. ${
-          p.paths_taken.length
-            ? `You follow <b>${p.paths_taken.map(esc).join("</b>, <b>")}</b>.`
+        <div class="why">This class follows two paths, in order. Path A runs from 1st
+          level; Path B stays shut until its track opens at ${p.unlocks_b || 11}th.
+          ${p.paths_taken.length ? `You follow <b>${esc(p.paths_taken[0])}</b> as
+            Path A${p.paths_taken[1]
+              ? ` and <b>${esc(p.paths_taken[1])}</b> as Path B` : ""}.`
             : "This character has none recorded."}</div>
+        <div class="terms">
+          <div class="t"><span>Path A — ${esc(p.paths_taken[0] || "not chosen")}</span>
+            <b>Control Blood ${(p.control_blood || {}).a || 0}</b></div>
+          <div class="t"><span>Path B — ${esc(p.paths_taken[1] || "not chosen")}</span>
+            <b>${(p.control_blood || {}).b
+              ? "Control Blood " + p.control_blood.b
+              : `opens at ${p.unlocks_b || 11}th`}</b></div>
+        </div>
         ${p.paths_offered.map(x => {
           const det = (p.path_detail || {})[x] || {};
           const mine = p.paths_taken.includes(x);
           return `<div class="pathblock ${mine ? "mine" : ""}">
             <h4>${esc(det.name || x)}${det.role ? ` <small>${esc(det.role)}</small>` : ""}
-              ${mine ? '<span class="pill now">followed</span>' : ""}</h4>
+              ${mine ? `<span class="pill now">Path ${
+                p.paths_taken.indexOf(x) === 0 ? "A" : "B"}</span>` : ""}</h4>
             ${det.summary ? `<div class="why">${esc(det.summary)}</div>` : ""}
             ${det.global_rule ? `<div class="why"><b>Global rule.</b> ${
               esc(det.global_rule)}</div>` : ""}
