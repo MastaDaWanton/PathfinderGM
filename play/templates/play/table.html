@@ -445,6 +445,19 @@
     box-shadow: inset 0 3px 10px rgba(0,0,0,.7), 0 0 20px rgba(var(--ember), .14);
     text-shadow: 0 0 22px rgba(var(--ember), .4);
   }
+  /* The Inventory tab's own buttons. Small, in a column of their own, so a table of
+     thirty jars does not become a wall of controls. */
+  td.useact { white-space: nowrap; text-align: right; }
+  td.useact .mini {
+    margin-left: 5px; cursor: pointer; border-radius: 2px; padding: 5px 10px;
+    color: var(--gold); background: linear-gradient(#2a2114, #1a140c);
+    border: 1px solid var(--gold-dim); font: 400 12px/1 var(--display);
+    letter-spacing: .06em; font-variant: small-caps;
+  }
+  td.useact .mini:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  td.useact .mini:disabled { opacity: .4; cursor: not-allowed; }
+  .poisonmark { color: var(--alarm); }
+
   .popup .acts { display: flex; gap: 9px; }
   .popup .acts button { flex: 1; }
   #busy, #err { font-family: var(--body); }
@@ -1683,6 +1696,25 @@ function showPopup(p) {
   $("#face").onkeydown = e => { if (e.key === "Enter") $("#submitroll").click(); };
 }
 
+// Using something you made. Straight to the engine rather than through the GM: there is
+// nothing here for a model to decide, and routing it through narration is why thirty jars
+// could be looked at and never used.
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-use]");
+  if (!btn) return;
+  btn.disabled = true;
+  try {
+    const d = await post("/api/use", { item: btn.dataset.use, how: btn.dataset.how });
+    SHEET = d.sheet;
+    $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
+    $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
+    // The dose is spent and hit points may have moved, so the table's own numbers are
+    // refreshed rather than left showing what was true before the drink.
+    render(await (await fetch("/api/state")).json());
+  } catch (err) { $("#err").textContent = err.message; }
+  btn.disabled = false;
+});
+
 async function sendRoll(face) {
   $("#veil").classList.remove("on");
   busy(true);
@@ -2041,6 +2073,27 @@ function tabInventory(s) {
         <span>In copper</span><b>${d.purse.copper}</b></div></div>` : ""}
     </div>
     <div class="card wide">
+      <h3>What you have made</h3>
+      ${(d.stock || []).length ? `<table class="sheet">
+        <tr><th>Preparation</th><th>How many</th><th>What it does</th><th></th></tr>
+        ${d.stock.map(j => `<tr>
+          <td><b>${esc(j.name)}</b>${j.poisons && j.poisons.length
+            ? ` <span class="poisonmark" title="This will poison whoever drinks it">☠</span>` : ""}</td>
+          <td>${j.count}</td>
+          <td class="why">${esc((j.effects || []).join(" · ") || "nothing the engine can run")}${
+            (j.drawbacks || []).length ? ` <em>${esc(j.drawbacks.join(" "))}</em>` : ""}</td>
+          <td class="useact">
+            ${j.drinkable ? `<button class="mini" data-use="${esc(j.id)}" data-how="drink"
+                >drink</button>` : ""}
+            ${j.throwable ? `<button class="mini" data-use="${esc(j.id)}" data-how="throw"
+                >throw</button>` : ""}
+            ${j.coatable ? `<button class="mini" data-use="${esc(j.id)}" data-how="coat"
+                >coat</button>` : ""}
+          </td></tr>`).join("")}</table>`
+        : `<div class="empty">Nothing crafted yet. The bench is under
+           <a href="/craft/">Crafting</a>.</div>`}
+    </div>
+    <div class="card wide">
       <h3>Carried</h3>
       ${carried.length ? `<table class="sheet">
         <tr><th>Thing</th><th>How many</th><th>What the engine knows</th></tr>
@@ -2048,6 +2101,14 @@ function tabInventory(s) {
           <td><b>${esc(i.name)}</b></td><td>${i.count}</td>
           <td class="why">${esc(i.line)}</td></tr>`).join("")}</table>`
         : `<div class="empty">Nothing but what you are wearing.</div>`}
+    </div>
+    <div class="card wide">
+      <h3>Satchel</h3>
+      ${(d.satchel || []).length ? `<table class="sheet">
+        <tr><th>Ingredient</th><th>How many</th></tr>
+        ${d.satchel.map(h => `<tr><td><b>${esc(h.name)}</b></td>
+          <td>${h.count}</td></tr>`).join("")}</table>`
+        : `<div class="empty">No raw material. Forage from the crafting bench.</div>`}
     </div>
     <div class="card">
       <h3>In hand</h3>

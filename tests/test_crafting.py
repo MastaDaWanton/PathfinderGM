@@ -1095,3 +1095,108 @@ def test_a_natural_one_still_fails_whatever_the_bonus(client, monkeypatch):
         content_type="application/json").json()
     assert d["roll"] == 1 and not d["succeeded"]
     assert d["total"] >= d["dc"], "the arithmetic made it; the natural 1 overrode it"
+
+
+# --- what you made is in your inventory, and you can use it ----------------------------
+#
+# "my crafted tinctures don't appear in my inventory I want to be able to use my
+# consumables." Reported against a live save holding thirty crafted jars: the Inventory tab
+# listed three things — "offer", "scene on" and a traveller's outfit — because `carrying`
+# was `actor.goods`, and jars live in `actor.stock`. The most usable thing the character
+# owned was the one thing the sheet did not show, and there was no route to use it: the
+# `use_item` op existed and had no door from the sheet.
+
+def _made(pc, base="Woundwort Tea", count=2, heal=True):
+    item = crafting.Stock(
+        base=base, tier="common", count=count, potency=1.0, craft="herbalist",
+        effects=["Heals 1d8 hit points"] if heal else ["Deals 1d6 damage"],
+        specs=[{"type": "heal", "dice": "1d8"}] if heal
+        else [{"type": "damage", "dice": "1d6", "target": "enemy"}])
+    pc.add_stock(item, count)
+    return item
+
+
+def test_a_crafted_jar_reaches_the_character_sheet(client):
+    """It was on the crafting bench and nowhere else."""
+    from play import campaign as cm
+    from rules.sheet import full_sheet
+
+    item = _made(cm.current().scene.pc())
+    names = [j["name"] for j in full_sheet(cm.current().scene.pc())["defense"]["stock"]]
+    assert item.name in names
+
+
+def test_the_sheet_says_which_ways_a_jar_can_be_used(client):
+    """Asked of `rules.consumables` rather than guessed from the name, so the button on
+    the sheet and the refusal from the engine cannot disagree."""
+    from play import campaign as cm
+    from rules.sheet import full_sheet
+
+    _made(cm.current().scene.pc(), base="Kind Tea", heal=True)
+    row = next(j for j in full_sheet(cm.current().scene.pc())["defense"]["stock"]
+               if j["name"] == "Kind Tea")
+    assert row["drinkable"]
+    # Nothing harmful in it, so there is nothing to throw at anybody and the sheet must
+    # not offer a button the engine would refuse.
+    assert not row["throwable"]
+
+
+def test_the_satchel_is_on_the_sheet_too(client):
+    """Raw material is carried and does spoil, so it belongs on the Inventory tab even
+    though it is not usable."""
+    from play import campaign as cm
+    from rules.sheet import full_sheet
+
+    cm.current().scene.pc().inventory["woundwort"] = 4
+    satchel = full_sheet(cm.current().scene.pc())["defense"]["satchel"]
+    assert {"id": "woundwort", "name": "Woundwort", "count": 4} in satchel
+
+
+def test_drinking_a_jar_spends_the_dose(client):
+    """The route the sheet's button uses. Straight to the engine, no GM turn."""
+    from play import campaign as cm
+
+    item = _made(cm.current().scene.pc(), count=2)
+    r = client.post("/api/use", data=json.dumps({"item": item.id, "how": "drink"}),
+                    content_type="application/json")
+    assert r.status_code == 200, r.json()
+    assert cm.current().scene.pc().stock[item.id].count == 1
+
+
+def test_the_last_dose_leaves_the_shelf(client):
+    from play import campaign as cm
+
+    item = _made(cm.current().scene.pc(), count=1)
+    client.post("/api/use", data=json.dumps({"item": item.id, "how": "drink"}),
+                content_type="application/json")
+    assert item.id not in cm.current().scene.pc().stock
+
+
+def test_using_something_you_do_not_have_is_refused_with_what_you_do(client):
+    r = client.post("/api/use", data=json.dumps({"item": "nonesuch#1", "how": "drink"}),
+                    content_type="application/json")
+    assert r.status_code == 400
+    assert "not carrying" in r.json()["error"]
+
+
+def test_throwing_something_harmless_is_refused(client):
+    """The engine's own rule, reached through the same door: a tea that only heals has
+    nothing to throw at anybody."""
+    from play import campaign as cm
+
+    item = _made(cm.current().scene.pc(), heal=True)
+    r = client.post("/api/use", data=json.dumps({"item": item.id, "how": "throw"}),
+                    content_type="application/json")
+    assert r.status_code == 400
+
+
+def test_using_a_jar_hands_back_the_fresh_sheet(client):
+    """So the tab redraws with the dose gone rather than showing the count it had before
+    the drink — the same trap as any page that acts and does not re-read."""
+    from play import campaign as cm
+
+    item = _made(cm.current().scene.pc(), count=3)
+    d = client.post("/api/use", data=json.dumps({"item": item.id, "how": "drink"}),
+                    content_type="application/json").json()
+    row = next(j for j in d["sheet"]["defense"]["stock"] if j["id"] == item.id)
+    assert row["count"] == 2

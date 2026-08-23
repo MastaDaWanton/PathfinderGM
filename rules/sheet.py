@@ -1610,6 +1610,30 @@ class Actor:
         return out
 
 
+def _herb_name(iid: str) -> str:
+    from . import ingredients as ing_mod
+
+    found = ing_mod.all_ingredients().get(iid)
+    return found.name if found else iid.replace("-", " ").title()
+
+
+def _stock_row(item) -> dict:
+    """One crafted jar, with what can be done to it.
+
+    `drinkable` and `throwable` are asked of `rules.consumables` rather than guessed from
+    the name, so the button on the sheet and the refusal from the engine cannot disagree:
+    a jar that does nothing harmful has nothing to throw, and the sheet should not offer.
+    """
+    from . import consumables as con
+
+    d = item.as_dict()
+    d["poisons"] = [p.as_dict() for p in con.poisons(item.specs, source=item.base)]
+    d["drinkable"] = con.plan(item, how="drink").ok
+    d["throwable"] = con.plan(item, how="throw").ok
+    d["coatable"] = con.plan(item, how="coat").ok
+    return d
+
+
 def _terms(mods: list[Modifier]) -> dict:
     return {"total": sum(m.value for m in mods),
             "terms": [m.as_dict() for m in mods]}
@@ -1817,6 +1841,16 @@ def full_sheet(actor: Actor) -> dict:
                           "line": goods.describe(name, n),
                           "known": goods.known_item(name) is not None}
                          for name, n in sorted(actor.goods.items())],
+            # The jars. `goods` is only the things the fiction handed over, so thirty
+            # crafted tinctures sat in `stock`, visible on the crafting bench and nowhere
+            # on the character sheet — "my crafted tinctures don't appear in my inventory".
+            # They are the most usable thing the character owns and they were the one
+            # thing the Inventory tab did not list.
+            "stock": [_stock_row(item) for _, item in
+                      sorted(actor.stock.items(), key=lambda kv: kv[1].name.lower())],
+            # And the raw material, which is not usable but is carried and does spoil.
+            "satchel": [{"id": iid, "name": _herb_name(iid), "count": n}
+                        for iid, n in sorted(actor.inventory.items()) if n > 0],
             "purse": {"coins": dict(actor.purse),
                       "copper": goods.in_copper(actor.purse)},
             # Only gear something has happened to. An undamaged sword has no record.

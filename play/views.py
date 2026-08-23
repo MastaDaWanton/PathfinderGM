@@ -838,3 +838,41 @@ def _log_turn(c, plan, resolution, replace: bool = False):
         c.turn_log[-1] = entry
     else:
         c.turn_log.append(entry)
+
+
+@require_POST
+def use_item(request):
+    """Drink, throw or coat a blade with something the character crafted.
+
+    A player action on their own property, so it goes straight to the engine rather than
+    through the GM: there is nothing here for a model to decide, and routing it through
+    narration was why thirty crafted jars could be looked at and not used.
+
+    The op is `use_item`, which already existed and already emits ordinary intents for the
+    effects — this only gives it a door from the sheet.
+    """
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    item = str(body.get("item", "")).strip().lower()
+    how = str(body.get("how", "drink")).strip().lower()
+    target = str(body.get("to", "") or "pc").strip()
+    try:
+        engine = c.engine()
+        resolution = engine.run(engine.validate([{
+            "op": "use_item", "actor": "pc",
+            "because": f"{pc.name} reaches for it",
+            "params": {"item": item, "how": how, "to": target},
+        }]))
+    except IntentError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    from rules.sheet import full_sheet
+
+    return JsonResponse({"ok": True, "tell": tell, "sheet": full_sheet(pc)})

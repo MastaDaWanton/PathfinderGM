@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/character/switch", views.switch_character, name="switch_character"),
     path("api/say", views.say, name="say"),
     path("api/roll", views.roll, name="roll"),
+    path("api/use", views.use_item, name="use_item"),
     path("craft/", craft_views.craft_page, name="craft"),
     path("api/world/<str:world_id>", home_views.world_detail, name="world_detail"),
     path("api/bench/<str:bench_id>", home_views.bench, name="bench"),
