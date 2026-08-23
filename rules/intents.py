@@ -255,6 +255,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Hemorrhagic Eruption detonates any number of them at once.
     "blood_pool": ((), ("actor", "at", "amount", "source", "to"), "hidden"),
     "spend_pools": ((), ("actor", "count", "why"), "hidden"),
+    # Using one of your class's path abilities by name. The engine looks it up on the
+    # paths this character follows, refuses one they have not reached, and resolves
+    # whatever of it it can — the rest is narrated, and the outcome says which was
+    # which rather than implying the whole thing was mechanised.
+    "use_ability": (("ability",), ("actor", "to"), "player"),
     "rest": ((), ("kind",), "hidden"),
     # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
     # does not: a night's sleep is not a meal. Two ops rather than one with flags,

@@ -197,8 +197,15 @@ def convert(name: str, text: str) -> tuple[list[dict], list[str]]:
         out.append({"type": "damage", "dice_from": "blood",
                     "times": int(m.group(1)), "damage_type": "untyped",
                     "lethality": "lethal"})
-    # Plain "Deals Blood DMG" with no multiplier is the die once.
-    if not re.search(r"blood dmg\s*[×x]", low) and re.search(r"\bblood dmg\b", low):
+    # Plain "Deals Blood DMG" with no multiplier is the die once — but only where the
+    # sentence deals it. "Whenever you deal Blood DMG..." is a trigger and "+2 on your
+    # next Blood DMG attack roll" is a modifier, and reading either as damage had the
+    # ability wounding its own user: Blood Pool Manifestation, whose entire content is
+    # leaving a pool behind, was taking ten off the bender who used it.
+    if (not re.search(r"blood dmg\s*[×x]", low)
+            and re.search(r"\bdeal(?:s|ing)\s+blood dmg\b", low)
+            and not re.search(r"\b(?:whenever|when|if|next|on your)\b[^.]{0,40}"
+                              r"blood dmg\b", low)):
         out.append({"type": "damage", "dice_from": "blood", "times": 1,
                     "damage_type": "untyped", "lethality": "lethal"})
     return out, sorted(set(needs))

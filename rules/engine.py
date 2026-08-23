@@ -2172,6 +2172,109 @@ class Engine:
             tell=tell, because=intent.because,
         )
 
+    def _op_use_ability(self, intent: Intent, partial: dict) -> Outcome:
+        """Use a path ability, and be exact about how much of it the engine did.
+
+        Every effect converted from the author's sentences is applied here; everything
+        that stayed prose is reported as narrated. An ability that says it did nine
+        things and silently did two would be worse than one that did nothing, so the
+        tell counts both.
+        """
+        from . import leveling
+
+        ref = intent.params.get("actor") or intent.actor
+        actor = self.scene.actors.get(ref) if ref else self.scene.pc()
+        if actor is None:
+            raise IntentError("use_ability: nobody here to use it", "refs")
+
+        wanted = str(intent.params.get("ability", "")).strip()
+        path, found, effects = leveling.find_ability(actor, wanted)
+        if not found:
+            raise IntentError(
+                f"use_ability: {actor.name} has no ability called {wanted!r}. "
+                f"Their paths are {', '.join(actor.paths) or 'none'}.", "legality")
+        if not effects:
+            tier = leveling.tier_needed(actor, wanted)
+            return Outcome(
+                intent_id=intent.id, op="use_ability", effects=[],
+                tell=(f"{found.title()} is a Control Blood {tier} ability of the "
+                      f"{path} path; {actor.name} has reached "
+                      f"{leveling.control_blood_for(actor, path)}."),
+                because=intent.because)
+
+        target = self.scene.actors.get(intent.params.get("to") or "") or actor
+        done, narrated, rolls = [], [], []
+        for spec in effects:
+            if spec.get("inactive"):
+                continue
+            kind = spec.get("type")
+            if kind == "damage" and spec.get("lethality") == "nonlethal":
+                roll = self.dice.roll(str(spec["dice"]), label=f"{found}: the cost",
+                                      visibility="player")
+                rolls.append(roll)
+                actor.take_nonlethal(roll.total)
+                done.append(f"{actor.name} pays {roll.total} non-lethal")
+            elif kind == "damage":
+                # Never at the user by default. Half these abilities are areas —
+                # Hemorrhagic Eruption detonates pools "in a 10-ft radius" — and
+                # falling back to the actor had the bender blowing themselves up for
+                # 21 and ending the demonstration at -1 hit points.
+                if not intent.params.get("to"):
+                    narrated.append("damage with nobody named")
+                    continue
+                roll = self.dice.roll(str(spec.get("dice", "0")), label=found,
+                                      visibility="player")
+                rolls.append(roll)
+                target.take_damage(roll.total, spec.get("damage_type", "untyped"))
+                done.append(f"{roll.total} damage to {target.name}")
+            elif kind == "heal":
+                roll = self.dice.roll(str(spec["dice"]), label=found,
+                                      visibility="player")
+                rolls.append(roll)
+                if spec.get("lethality") == "nonlethal":
+                    actor.heal_nonlethal(roll.total)
+                    done.append(f"{roll.total} non-lethal healed")
+                else:
+                    done.append(f"{actor.heal(roll.total)} hit points healed")
+            elif kind == "temp_hp":
+                roll = self.dice.roll(str(spec["dice"]), label=found,
+                                      visibility="player")
+                rolls.append(roll)
+                actor.gain_temp_hp(roll.total, spec.get("source") or found)
+                done.append(f"{roll.total} temporary hit points")
+            elif kind == "damage_reduction":
+                done.append(f"DR {spec.get('amount')}/{spec.get('bypass') or '—'}")
+            elif kind == "combat_mod":
+                done.append(f"{int(spec.get('amount', 0)):+d} "
+                            f"{spec.get('target', 'attack')}")
+            elif kind == "apply_condition":
+                done.append(f"{target.name} may become {spec.get('target')}")
+            elif spec.get("op") == "blood_pool":
+                where = self.scene.positions.get(actor.ref)
+                self.scene.pools.append(BloodPool(owner=actor.ref, at=where,
+                                                  source=found))
+                done.append("blood on the ground")
+            elif spec.get("op") == "spend_pools":
+                mine = [b for b in self.scene.pools if b.owner == actor.ref]
+                take = len(mine) if str(spec.get("count")) == "all"                     else min(len(mine), int(spec.get("count", 1) or 1))
+                for pool in mine[:take]:
+                    self.scene.pools.remove(pool)
+                done.append(f"{take} pool{'s' if take != 1 else ''} spent")
+            else:
+                narrated.append(kind)
+
+        bits = [f"{actor.name} uses {found.title()}."]
+        if done:
+            bits.append("The engine resolves: " + "; ".join(done) + ".")
+        if narrated:
+            bits.append(f"{len(narrated)} part(s) of it are yours to narrate.")
+        return Outcome(
+            intent_id=intent.id, op="use_ability", rolls=rolls,
+            effects=[{"ref": actor.ref, "kind": "use_ability", "ability": found,
+                      "path": path, "resolved": len(done), "narrated": len(narrated)}],
+            tell=" ".join(bits), because=intent.because,
+        )
+
     def _op_blood_pool(self, intent: Intent, partial: dict) -> Outcome:
         """Put blood on the ground.
 

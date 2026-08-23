@@ -345,19 +345,19 @@
         "Blood Rain": "Full-round action. Sacrifice 20% max HP as Non-Lethal damage to convert all active Blood Pools within range into falling spikes over a 30-ft radius. Deals Blood DMG ×5 and applies 2 blood stacks to all targets in the area."
       },
       "resolves": {
-        "Blood Pool Manifestation": "Blood Pool Manifestation",
-        "Blood Mine": "Blood Mine",
-        "Blood Rain": "Blood Rain",
-        "Blood Volley": "Blood Volley",
-        "Siphon Pool": "Siphon Pool",
-        "Blood Boil": "Blood Boil",
-        "Pool Resonance": "Pool Resonance",
-        "Splintering Spike": "Splintering Spike",
+        "Heart-Seeker Spike": "Heart-Seeker Spike",
         "Blood Bomb": "Blood Bomb",
-        "Blood Spike Projectile": "Blood Spike Projectile",
-        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
+        "Blood Rain": "Blood Rain",
+        "Pool Resonance": "Pool Resonance",
+        "Blood Boil": "Blood Boil",
+        "Blood Pool Manifestation": "Blood Pool Manifestation",
+        "Blood Volley": "Blood Volley",
+        "Splintering Spike": "Splintering Spike",
         "Crimson Torrent": "Crimson Torrent",
-        "Heart-Seeker Spike": "Heart-Seeker Spike"
+        "Blood Spike Projectile": "Blood Spike Projectile",
+        "Siphon Pool": "Siphon Pool",
+        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
+        "Blood Mine": "Blood Mine"
       },
       "upgrades": {},
       "core": [],
@@ -384,13 +384,6 @@
             "type": "engine_op",
             "op": "blood_pool",
             "note": "leaves blood on the ground"
-          },
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
           }
         ],
         "Siphon Pool": [
@@ -403,13 +396,6 @@
             "type": "heal",
             "dice": "1d8",
             "lethality": "nonlethal"
-          },
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
           }
         ],
         "Blood Mine": [
@@ -664,23 +650,23 @@
         "Avatar of Coagulation": "1/day free action. Become a blood behemoth for 1 minute: Size increases by one category, base DR/- doubles, Non-Lethal damage taken is reduced by 50%, and when an enemy within range attacks an ally, spend an immediate action to strike them for Fist DMG and pull them adjacent to you."
       },
       "resolves": {
-        "Iron Clot (DR 2/-)": "Iron Clot",
-        "Iron Clot (DR 12/-)": "Iron Clot",
-        "Caustic Blood": "Caustic Blood",
-        "Sanguine Siphon": "Sanguine Siphon",
-        "Sanguine Spray": "Sanguine Spray",
-        "Hemophormic Retribution": "Hemophormic Retribution",
-        "Blood Sponge": "Blood Sponge",
-        "Exsanguinating Taunt": "Exsanguinating Taunt",
-        "Iron Clot (DR 8/-)": "Iron Clot",
-        "Crimson Guard": "Crimson Guard",
-        "Viscous Threat": "Viscous Threat",
-        "Iron Clot (DR 5/-)": "Iron Clot",
-        "Clotting Shield": "Clotting Shield",
-        "Blood Spatter Aura": "Blood Spatter Aura",
-        "Aggressive Draw": "Aggressive Draw",
         "Coagulated Plate": "Coagulated Plate",
-        "Avatar of Coagulation": "Avatar of Coagulation"
+        "Blood Sponge": "Blood Sponge",
+        "Clotting Shield": "Clotting Shield",
+        "Caustic Blood": "Caustic Blood",
+        "Iron Clot (DR 8/-)": "Iron Clot",
+        "Sanguine Spray": "Sanguine Spray",
+        "Iron Clot (DR 2/-)": "Iron Clot",
+        "Viscous Threat": "Viscous Threat",
+        "Exsanguinating Taunt": "Exsanguinating Taunt",
+        "Aggressive Draw": "Aggressive Draw",
+        "Avatar of Coagulation": "Avatar of Coagulation",
+        "Blood Spatter Aura": "Blood Spatter Aura",
+        "Iron Clot (DR 5/-)": "Iron Clot",
+        "Sanguine Siphon": "Sanguine Siphon",
+        "Iron Clot (DR 12/-)": "Iron Clot",
+        "Hemophormic Retribution": "Hemophormic Retribution",
+        "Crimson Guard": "Crimson Guard"
       },
       "upgrades": {},
       "core": [],
@@ -832,35 +818,26 @@
         "Forced Mitosis": "1/day. Double current health and duplicate created hemophorms/weapons for free until end of combat."
       },
       "resolves": {
-        "Blood Buffer 3NLDR": "Blood Buffer",
-        "Blood Buffer 2NLDR": "Blood Buffer",
-        "Mass Rupture": "Mass Rupture",
-        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
-        "Blood Javelin": "Blood Javelin",
-        "Blood Siphon": "Blood Siphon",
-        "DMG Purge": "DMG Purge",
-        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
-        "Forced Mitosis": "Forced Mitosis",
         "Blood Transfer": "Blood Transfer",
-        "Blood Transfusion": "Blood Transfusion",
+        "Blood Shatter": "Blood Shatter",
+        "Blood Buffer 3NLDR": "Blood Buffer",
+        "Blood Javelin": "Blood Javelin",
+        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
+        "Blood Siphon": "Blood Siphon",
+        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
         "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
-        "Blood Shatter": "Blood Shatter"
+        "DMG Purge": "DMG Purge",
+        "Mass Rupture": "Mass Rupture",
+        "Forced Mitosis": "Forced Mitosis",
+        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Blood Buffer 2NLDR": "Blood Buffer",
+        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Blood Transfusion": "Blood Transfusion"
       },
       "upgrades": {},
       "core": [],
       "undescribed": [],
       "effects": {
-        "Blood Transfer": [
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
-          }
-        ],
         "Blood Transfusion": [
           {
             "type": "damage",
@@ -958,22 +935,22 @@
         "1-2-Punch": "Subsequent attacks on the same target hit twice, dealing damage and applying on-hit effects twice."
       },
       "resolves": {
-        "Blood Burst 60ft": "Blood Burst",
-        "Vampiric Recovery": "Vampiric Recovery",
-        "Blood Burst 40ft": "Blood Burst",
-        "Vortex Pull": "Vortex Pull",
-        "Greater Blood Rage": "Blood Rage",
-        "Coagulant Stacks": "Coagulant Stacks",
-        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
-        "Swift Strikes": "Swift Strikes",
-        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
-        "Mighty Blood Rage": "Blood Rage",
         "Blood Rage": "Blood Rage",
+        "Vortex Pull": "Vortex Pull",
+        "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
+        "Greater Blood Rage": "Blood Rage",
+        "Swift Strikes": "Swift Strikes",
         "Battle Blood Ki Pool": "Battle Blood Ki Pool",
-        "1-2-Punch": "1-2-Punch",
-        "Blood Burst 20ft": "Blood Burst",
         "Blood Booster": "Blood Booster",
-        "Rupture Self 60ft": "Rupture Self"
+        "Blood Burst 40ft": "Blood Burst",
+        "Blood Burst 60ft": "Blood Burst",
+        "1-2-Punch": "1-2-Punch",
+        "Coagulant Stacks": "Coagulant Stacks",
+        "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
+        "Vampiric Recovery": "Vampiric Recovery",
+        "Rupture Self 60ft": "Rupture Self",
+        "Blood Burst 20ft": "Blood Burst",
+        "Mighty Blood Rage": "Blood Rage"
       },
       "upgrades": {
         "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD",
@@ -990,13 +967,6 @@
             "target": "applies 1 blood stack(s)",
             "resource": "blood stack",
             "amount": 1
-          },
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
           }
         ],
         "Vampiric Recovery": [
@@ -1075,22 +1045,6 @@
             "target": "applies 1 blood stack(s)",
             "resource": "blood stack",
             "amount": 1
-          },
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
-          }
-        ],
-        "Rupture Self": [
-          {
-            "type": "damage",
-            "dice_from": "blood",
-            "times": 1,
-            "damage_type": "untyped",
-            "lethality": "lethal"
           }
         ]
       },

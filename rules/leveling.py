@@ -99,6 +99,49 @@ def control_blood_for(actor, path: str) -> int:
     return control_blood(actor)["a" if taken.index(key) == 0 else "b"]
 
 
+def find_ability(actor, wanted: str) -> tuple[str, str, list[dict]]:
+    """The ability this character has by that name: its path, its real name, its effects.
+
+    Searched only across the paths they actually follow, and only at or below the tier
+    they have reached — an ability is not yours because the class prints it somewhere.
+    Returns ("", "", []) when they do not have it, so the caller can say which of the
+    two reasons applies.
+    """
+    want = " ".join(str(wanted or "").split()).strip().lower()
+    if not want:
+        return "", "", []
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        tier_of = {}
+        for tier, names in (det.get("tiers") or {}).items():
+            for listed in names:
+                tier_of[listed.lower()] = int(tier)
+        reached = control_blood_for(actor, path)
+        for listed, tier in tier_of.items():
+            if listed != want and not listed.startswith(want):
+                continue
+            if tier > reached:
+                return path, listed, []          # theirs eventually, not yet
+            key = (det.get("resolves") or {}).get(
+                next(n for n in (det.get("tiers") or {}).get(str(tier), [])
+                     if n.lower() == listed))
+            specs = (det.get("effects") or {}).get(key or "", [])
+            return path, listed, [resolve_effect(s, actor, path) for s in specs]
+    return "", "", []
+
+
+def tier_needed(actor, wanted: str) -> int:
+    """Which tier an ability sits at on a path this character follows. 0 if none does."""
+    want = " ".join(str(wanted or "").split()).strip().lower()
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        for tier, names in (det.get("tiers") or {}).items():
+            for listed in names:
+                if listed.lower() == want or listed.lower().startswith(want):
+                    return int(tier)
+    return 0
+
+
 def table_die(actor, column: str) -> str:
     """A die the class prints on its own table for this level — "blood", "fist".
 

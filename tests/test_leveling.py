@@ -588,3 +588,94 @@ def test_nothing_is_left_needing_the_blood_die():
         every = " ".join(n for names in leveling.path_detail(
             "blood bending", name)["needs"].values() for n in names)
         assert "Blood die" not in every, name
+
+
+# --- using one in play -------------------------------------------------------------------
+
+def _table(level=5, paths=("blood spike", "coagulator")):
+    from rules.bestiary import instantiate
+    from rules.engine import Engine, Scene
+    from rules.grid import Grid
+
+    built, problems = creation.build(bender(name="Vashka", paths=list(paths)))
+    assert problems == []
+    pc = from_dict(built["sheet"], ref="pc")
+    pc.level = level
+    scene = Scene(location_id=None, grid=Grid(width=8, height=8))
+    scene.add(pc)
+    scene.positions["pc"] = (2, 2)
+    scene.add(instantiate("thug", scene=scene, name="the bravo"))
+    scene.positions["c1"] = (4, 2)
+    return Engine(scene, Dice(seed=6)), pc
+
+
+def _use(engine, **params):
+    raw = {"op": "use_ability", "actor": "pc", "params": params}
+    return engine.run(engine.validate([raw])).outcomes[0]
+
+
+def test_an_ability_can_be_used_by_name():
+    eng, pc = _table()
+    out = _use(eng, ability="Blood Pool Manifestation")
+    assert "Blood Pool Manifestation" in out.tell
+    assert len(eng.scene.pools) == 1
+
+
+def test_the_tell_counts_what_was_resolved_and_what_was_not():
+    """An ability that says it did nine things and silently did two is worse than one
+    that did nothing, so both halves are reported."""
+    eng, _ = _table()
+    out = _use(eng, ability="Blood Mine", to="c1")
+    assert "The engine resolves:" in out.tell
+    assert "yours to narrate" in out.tell
+
+
+def test_lethal_damage_never_falls_back_to_the_person_using_it():
+    """Half of these are areas. Defaulting the target to the actor had Hemorrhagic
+    Eruption detonating pools on its own caster for 21 and ending them at -1."""
+    eng, pc = _table()
+    _use(eng, ability="Blood Pool Manifestation")
+    before = pc.hp
+    out = _use(eng, ability="Hemorrhagic Eruption")
+    assert pc.hp == before, out.tell
+    assert "pool spent" in out.tell
+
+
+def test_the_self_cost_is_still_paid_by_the_user():
+    """The one damage that *is* the user's: this class buys everything with its own
+    non-lethal, and that must not be lost with the fix above."""
+    eng, pc = _table()
+    out = _use(eng, ability="Crimson Torrent", to="c1")
+    assert "pays" in out.tell and "non-lethal" in out.tell
+
+
+def test_an_ability_above_the_characters_tier_is_refused_with_the_number():
+    eng, _ = _table(level=5)
+    out = _use(eng, ability="Heart-Seeker Spike")
+    assert "Control Blood 5" in out.tell and "has reached 3" in out.tell
+
+
+def test_an_ability_from_a_path_never_taken_is_not_theirs():
+    from rules.intents import IntentError
+
+    eng, _ = _table(paths=("coagulator",))
+    with pytest.raises(IntentError):
+        _use(eng, ability="Blood Mine")
+
+
+def test_an_ability_nobody_wrote_is_refused_and_says_which_paths_they_have():
+    from rules.intents import IntentError
+
+    eng, _ = _table()
+    with pytest.raises(IntentError) as e:
+        _use(eng, ability="Blood Accountancy")
+    assert "blood spike" in str(e.value)
+
+
+def test_a_trigger_clause_is_not_damage_dealt():
+    """"Whenever you deal Blood DMG ... a Blood Pool appears" is a condition, not an
+    attack. Reading it as one made Blood Pool Manifestation — whose whole content is
+    leaving a pool behind — take ten hit points off the bender who used it."""
+    spike = leveling.path_detail("blood bending", "blood spike")
+    made = spike["effects"]["Blood Pool Manifestation"]
+    assert all(e.get("type") != "damage" for e in made)
