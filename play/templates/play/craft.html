@@ -184,8 +184,14 @@
                      font-variant-numeric: tabular-nums; }
   #hourwarn:empty { display: none; }
   #hourwarn { margin-bottom: 6px; }
-  .ground .row2 { display: flex; gap: 6px; }
-  .ground .row2 > button { flex: 1; }
+  .ground .row2 { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ground .row2 > button { flex: 1 1 auto; }
+  /* The reason the Forage button is dead, in the alarm colour the bench already uses for
+     a chain it will not make, so a refusal reads the same wherever it comes from. */
+  .ground .busy { color: var(--alarm); margin-bottom: 6px; }
+  /* The debug teleport sits with the real buttons but must never look like one. */
+  .ground .row2 > #debugtoggle { flex: 0 0 auto; opacity: .4; font-size: 11px; }
+  .ground .row2 > #debugtoggle:hover { opacity: 1; }
   #tablewrap { max-height: 176px; overflow-y: auto; margin-top: 8px; }
   #tablewrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
   #tablewrap td { padding: 2px 4px; border-bottom: 1px solid #241d15; }
@@ -348,6 +354,13 @@ let PREVIEW = null;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
+// Why foraging is refused right now, in the engine's own words, or "". Asked for with
+// the table so the button can be dead and *say so*, rather than looking alive and
+// failing when pressed.
+let BUSY = "";
+// The biome picker is a debug teleport, not a game action — you go somewhere by going
+// there. Kept because it is the only way to test a biome without walking to one.
+let DEBUG = localStorage.getItem("pfgm.debug") === "1";
 // How long the player wants to spend on the ground. Every hour is its own Survival
 // check, and past a day awake every hour is also a Will save against dropping.
 let FORAGE_HOURS = 1;
@@ -400,6 +413,7 @@ async function selectCraft(id) {
   const d = await r.json();
   const f = await ft.json();
   BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
+  BUSY = f.busy || "";
   SHELF = d.ingredients;
   STOCK = d.stock || [];
   HERE = d.biome || "";
@@ -466,16 +480,18 @@ function renderGround() {
   g.innerHTML = `<div class="ground">
     <b>${esc(HERE || "nowhere in particular")}</b>
     <em>${esc(t.describe || "")}</em>
-    <select id="biomepick">${opts}</select>
+    ${DEBUG ? `<select id="biomepick">${opts}</select>` : ""}
     <div class="hours">
       <label for="foragehours">Hours</label>
       <input type="range" id="foragehours" min="1" max="48" value="${FORAGE_HOURS}">
       <b id="hourlabel">${FORAGE_HOURS}</b>
     </div>
-    <div class="sub" id="hourwarn">${hourWarning(FORAGE_HOURS)}</div>
+    <div class="sub" id="hourwarn">${BUSY ? "" : hourWarning(FORAGE_HOURS)}</div>
+    ${BUSY ? `<div class="sub busy">${esc(BUSY)}</div>` : ""}
     <div class="row2">
-      <button class="mini" id="forage">Forage</button>
+      <button class="mini" id="forage" ${BUSY ? "disabled" : ""}>Forage</button>
       <button class="mini" id="showtable">${SHOWTABLE ? "hide" : "roll table"}</button>
+      <button class="mini ghost" id="debugtoggle" title="Move the ground underfoot without walking there. For testing.">${DEBUG ? "hide debug" : "debug"}</button>
     </div>
     ${SHOWTABLE ? `<div id="tablewrap">${
       t.rows.length ? `<table>${t.rows.map(r =>
@@ -719,11 +735,16 @@ document.addEventListener("click", async e => {
   if (e.target.closest("#showtable")) {
     SHOWTABLE = !SHOWTABLE; renderGround(); return;
   }
+  if (e.target.closest("#debugtoggle")) {
+    DEBUG = !DEBUG;
+    localStorage.setItem("pfgm.debug", DEBUG ? "1" : "0");
+    renderGround(); return;
+  }
   if (e.target.closest("#forage")) {
     const btn = e.target.closest("#forage");
     btn.disabled = true;
     try {
-      const d = await post("/api/forage", { biome: HERE, hours: FORAGE_HOURS });
+      const d = await post("/api/forage", { hours: FORAGE_HOURS });
       $("#err").innerHTML = `<span style="color:var(--brew)">${esc(d.tell)}</span>`;
       await reloadShelf();
     } catch (err) { $("#err").textContent = err.message; }
@@ -815,6 +836,7 @@ async function reloadShelf() {
   const f = await ft.json();
   SHELF = d.ingredients; STOCK = d.stock || []; HERE = d.biome || "";
   TABLE = d.table || null; BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
+  BUSY = f.busy || "";
   STATE.tracks[CRAFT] = d.track;
   renderShelf();
   await refresh();

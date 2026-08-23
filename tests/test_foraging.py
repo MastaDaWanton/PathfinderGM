@@ -267,3 +267,118 @@ def test_crafting_spends_what_was_foraged(client):
         content_type="application/json").json()
     assert d["spent"] == {"woundwort": 1}
     assert "woundwort" not in cm.current().scene.pc().inventory
+
+
+# --- you forage where you are, and only when you are free ---------------------------------
+#
+# Both of these were unchecked. A character could spend forty-eight hours on their hands
+# and knees in the middle of an initiative order, or walk off mid-conversation and come
+# back with a full satchel and no time having passed for anyone else. And because the
+# `biome` parameter was honoured over the scene's own ground, a request could search a
+# forest from the middle of a city.
+
+@pytest.fixture
+def treeline():
+    from rules.bestiary import instantiate
+    from rules.dice import Dice as _Dice
+    from rules.engine import Engine, Scene
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["level"] = 6
+    d["ranks"] = {"survival": 6}
+    s = Scene(location_id="5bbd0c40345f")
+    s.biome = "forest"
+    s.add(from_dict(d, ref="pc"))
+    return s, Engine(s, _Dice(seed=5)), instantiate
+
+
+def _forage(engine, **params):
+    return engine.run(engine.validate([
+        {"op": "forage", "actor": "pc", "because": "she works the treeline",
+         "params": {"hours": 1, **params}}]))
+
+
+def test_foraging_alone_on_open_ground_still_works(treeline):
+    """The control. Everything below refuses; this one has to go through, or the rule has
+    simply turned foraging off."""
+    scene, engine, _ = treeline
+    _forage(engine)
+    assert scene.clock_minutes == 60
+
+
+def test_you_cannot_forage_in_the_middle_of_a_fight(treeline):
+    """An hour minimum, forty-eight at most, in an initiative order counted in rounds."""
+    from rules.engine import IntentError
+
+    scene, engine, instantiate = treeline
+    scene.add(instantiate("thug", scene=scene, name="the thug"))
+    engine.run(engine.validate([{
+        "op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    assert scene.in_encounter
+    with pytest.raises(IntentError) as exc:
+        _forage(engine)
+    assert "fight" in str(exc.value)
+
+
+def test_you_cannot_forage_with_somebody_standing_in_front_of_you(treeline):
+    """Company is the test for conversation, because the engine has no dialogue flag and
+    one the GM had to remember to set would be wrong more often than right."""
+    from rules.engine import IntentError
+
+    scene, engine, instantiate = treeline
+    scene.add(instantiate("thug", scene=scene, name="the thug"))
+    assert not scene.in_encounter
+    with pytest.raises(IntentError) as exc:
+        _forage(engine)
+    assert "the thug" in str(exc.value)
+
+
+def test_somebody_unconscious_is_not_company(treeline):
+    """A refusal that fires over a body on the ground would strand the player: there is no
+    op for leaving, so the scene could not be cleared and foraging would never come back."""
+    scene, engine, instantiate = treeline
+    thug = instantiate("thug", scene=scene, name="the thug")
+    scene.add(thug)
+    thug.hp = -1
+    _forage(engine)
+    assert scene.clock_minutes == 60
+
+
+def test_foraging_searches_the_ground_underfoot_whatever_it_is_asked_for(treeline):
+    """`biome` was honoured over the scene's, so a bench in a city could search a forest.
+
+    Golden Maple Leaves make the check readable: they grow exclusively in urban areas, so
+    a forager standing in a city and asking for forest picking them up is proof the ground
+    won and the parameter lost.
+    """
+    scene, engine, _ = treeline
+    scene.biome = "urban"
+    resolution = _forage(engine, biome="forest")
+    found = [e for o in resolution.outcomes for e in o.effects
+             if e.get("kind") == "forage"]
+    assert [e for e in found if e.get("biome") == "urban"], found
+    assert "golden-maple-leaves" in scene.pc().inventory, dict(scene.pc().inventory)
+
+
+def test_the_bench_says_why_foraging_is_refused_before_it_is_pressed(client):
+    """The button greyed with no reason, and the refusal only arrived on pressing it —
+    the same defect the crafting chain preview already fixes by sending its problems."""
+    from play import campaign as cm
+    from rules.bestiary import instantiate
+
+    c = cm.current()
+    # The opening scene ships with an apprentice minding the door, so the empty case has
+    # to be made rather than assumed — and the fact that it does is why this rule bites
+    # in a real campaign at all.
+    for ref in [r for r in c.scene.actors if r != "pc"]:
+        c.scene.depart(ref)
+    assert client.get("/api/forage/table").json()["busy"] == ""
+
+    c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))
+    said = client.get("/api/forage/table").json()["busy"]
+    assert "the thug" in said, said
+
+    r = client.post("/api/forage", data=json.dumps({}),
+                    content_type="application/json")
+    assert r.status_code == 400
+    assert "the thug" in r.json()["error"]

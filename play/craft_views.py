@@ -348,8 +348,24 @@ def forage_table(request):
         "biomes": [{"id": b, "describe": d} for b, d in biomes.BIOMES.items()],
         "table": foraging.table_for(biome, ceiling).as_dict(),
         "attempts": foraging.attempts_for(state.get("level", 1)),
+        # Why the button is dead, sent with the table rather than discovered by pressing
+        # it. The bench greys chains it cannot make and says why; foraging offered no
+        # reason at all until the request came back refused.
+        "busy": _forage_blocked(c),
         "track": state,
     })
+
+
+def _forage_blocked(c) -> str:
+    """The engine's own reason, asked before the attempt rather than after.
+
+    Read off `Engine._too_busy_to_forage` rather than re-derived here, because two copies
+    of a rule is how a corrected rule goes on shipping from the copy nobody looked at.
+    """
+    pc = c.scene.pc()
+    if pc is None:
+        return ""
+    return c.engine()._too_busy_to_forage(pc)
 
 
 @require_POST
@@ -358,9 +374,9 @@ def forage_do(request):
     the bench and the table roll on exactly the same machinery."""
     body = json.loads(request.body or "{}")
     c = campaign_mod.current()
+    # No biome is sent. You forage where you are standing; the ground is `travel`'s to
+    # change, and the bench has no business claiming to be somewhere else.
     params = {}
-    if body.get("biome"):
-        params["biome"] = str(body["biome"])
     # Clamped rather than trusted. The slider stops at 48, and a hand-written request for
     # a thousand hours would spend a thousand rolls before the body ever got a word in.
     hours = max(1, min(48, int(body.get("hours", 1) or 1)))

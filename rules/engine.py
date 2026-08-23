@@ -1569,6 +1569,35 @@ class Engine:
             because=intent.because,
         )
 
+    def _too_busy_to_forage(self, actor) -> str:
+        """Why this character cannot wander off looking for herbs, or "".
+
+        Foraging is an hour at minimum and forty-eight at most, spent alone with your eyes
+        on the ground. Neither of the two things that make that impossible was being
+        checked: a character could forage for a day and a half in the middle of a fight,
+        or walk away mid-sentence and come back with a satchel and no lost time.
+
+        Company is the test for conversation rather than any dialogue flag, because the
+        engine has no such flag and inventing one would mean the GM had to remember to set
+        it. Somebody standing in front of you is the fact that matters either way.
+
+        Phrased as a whole sentence rather than a clause, because the bench prints it
+        verbatim: a fragment came out as "You are not while you are with a road warden."
+        """
+        if self.scene.in_encounter:
+            return ("You are in a fight. Foraging is an hour on your hands and knees "
+                    "at the very least — end the encounter first.")
+
+        # Unconscious company is not company, and neither is your own reflection.
+        here = [a for ref, a in self.scene.actors.items()
+                if ref != actor.ref and self.scene.conscious(ref)]
+        if here:
+            names = ", ".join(sorted(a.name for a in here[:3]))
+            more = ", and others" if len(here) > 3 else ""
+            return (f"You are with {names}{more}. Foraging takes hours alone — "
+                    f"leave the scene first.")
+        return ""
+
     def _op_forage(self, intent: Intent, partial: dict) -> Outcome:
         """Search the ground here for what grows on it.
 
@@ -1582,7 +1611,15 @@ class Engine:
         if actor is None:
             raise IntentError("forage: nobody here to look", "refs")
 
-        biome = biomes.canonical(str(intent.params.get("biome") or self.scene.biome or ""))
+        busy = self._too_busy_to_forage(actor)
+        if busy:
+            raise IntentError(f"forage refused. {busy}", "legality")
+
+        # The ground underfoot, and nothing else. Foraging used to honour a `biome`
+        # parameter, which meant a request could search a forest from the middle of a
+        # city — the bench sent one and the GM could invent one. Where you are is a fact
+        # the scene owns; `travel` is the only thing that changes it.
+        biome = biomes.canonical(str(self.scene.biome or ""))
         if biome is None:
             raise IntentError(
                 "forage: nowhere in particular. Set the ground first with "
