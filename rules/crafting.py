@@ -610,8 +610,23 @@ def preview(track_id: str, level: int, chain: Chain,
             f"Purify or Neutralize removes them.")
 
     dc = _dc(items, rank, chain.stages)
-    name = chain.name or _name_for(items or [h for h, _ in used], chain.methods)
-    out = Stock(base=name, concentration=1, tier=tier, potency=potency,
+
+    # An infusion is the tincture, enriched — not a new thing named after whatever went
+    # into it. It came out named "Woundwort Infusion" at concentration 1, so infusing a
+    # Tier 3 tincture with a herb threw away both the identity and the two doses that
+    # bought the concentration. The base keeps its name, its concentration and its
+    # place in the satchel; what was added rides along in the name so two differently
+    # infused jars of the same tincture do not stack as one.
+    infused = _infusion_base(used, chain.methods)
+    if infused is not None:
+        added = [i.name for i in items] + [h.base for h, _ in used if h is not infused]
+        name = chain.name or _infused_name(infused, added)
+        concentration = infused.concentration
+    else:
+        name = chain.name or _name_for(items or [h for h, _ in used], chain.methods)
+        concentration = 1
+
+    out = Stock(base=name, concentration=concentration, tier=tier, potency=potency,
                 craft=track.id, effects=effects, drawbacks=drawbacks,
                 specs=specs,
                 from_ingredients=[i.id for i in items]
@@ -724,6 +739,46 @@ SHAPE_WORDS = {
 # mapping rather than renaming leaves every saved chain readable.
 _AS_STEP = {"grind": "grind", "mix": "mix", "brew": "brew", "extract": "extract",
             "neutralize": "neutralise", "preserve": "preserve"}
+
+
+def _infusion_base(used, methods):
+    """The tincture an infusion is being poured into, or None.
+
+    The first tincture in the pot, which is the same one `_infusion_problems` measures
+    everything else against — so the jar the rule protects and the jar the result is
+    built from are guaranteed to be the same jar.
+    """
+    if "infuse" not in methods:
+        return None
+    return next((h for h, _ in used if is_tincture(h)), None)
+
+
+def _infused_name(base, added) -> str:
+    """The tincture's own name, carrying what went into it.
+
+    Not the bare base name: two differently infused jars of one tincture would share
+    an id and stack in the satchel as though they were the same thing. Not a stacked
+    shape word either — `_name_for` already learned that lesson producing "Tincture
+    Tincture Tincture".
+    """
+    import re
+
+    raw = str(base.base or "").strip()
+    # A tincture infused twice is still one tincture. The earlier addition is read back
+    # out of the name and carried rather than replaced, so infusing woundwort and then
+    # mad cap does not quietly erase the woundwort from the label — the jar still holds
+    # both, and the effects list will say so.
+    was = re.search(r"\s*\(([^)]*)\)\s*$", raw)
+    keep = raw[: was.start()].strip() if was else raw
+    before = [p.strip() for p in (was.group(1) if was else "").split(",")]
+    names = [a for a in dict.fromkeys(before + list(added)) if a and a != "…"]
+    if not names:
+        return keep
+    # Capped, because the alternative is the compounding that produced "Tincture
+    # Tincture Tincture Tincture" in a live campaign. The full list survives in
+    # `from_ingredients` and on the effect lines; only the label is short.
+    shown = ", ".join(names[:2]) + ("…" if len(names) > 2 else "")
+    return f"{keep} ({shown})"
 
 
 def is_tincture(held) -> bool:

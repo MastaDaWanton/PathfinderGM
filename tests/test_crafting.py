@@ -560,3 +560,83 @@ def test_one_dose_is_not_a_free_concentration():
     chain = crafting.Chain(track="herbalist", methods=["distill"])
     got = crafting._concentration(track, 5, chain, (held, 1), ceiling=99)
     assert any("takes 2 doses" in p for p in got.problems)
+
+
+# --- infusions carry into the tincture ------------------------------------------------
+#
+# "Infusions should be the only way to combine tinctures with other things" — and the
+# thing that comes out is the tincture, enriched. Before this, infusing a Tier 3 Mad Cap
+# Tincture with woundwort produced "Woundwort Infusion" at concentration 1: the tincture's
+# identity gone, and the two doses that bought the concentration silently thrown away.
+
+def _tincture(base="Mad Cap Tincture", concentration=1, count=3):
+    return crafting.Stock(
+        base=base, concentration=concentration, tier="uncommon", count=count,
+        potency=1.25, craft="herbalist", effects=["Heals 2d8 hit points"],
+        specs=[{"type": "heal", "dice": "2d8", "from": "Mad Cap"}])
+
+
+def _infuse(jar, ingredient_id, level=5):
+    chain = Chain(track="herbalist", methods=["infuse"], ingredient_ids=[ingredient_id],
+                  stock_used={jar.id: 1})
+    return crafting.preview("herbalist", level, chain, stock={jar.id: jar},
+                            satchel={ingredient_id: 5})
+
+
+def test_an_infusion_keeps_the_tinctures_own_effects():
+    """The base jar's `heal 2d8` has to survive the pour.
+
+    Both sides end up on the result: the tincture's heal and the herb's line, rather than
+    the herb's line alone.
+    """
+    result = _infuse(_tincture(), "woundwort")
+    joined = " | ".join(result.effects)
+    assert "Heals 2d8" in joined, result.effects
+    assert "Woundwort" in joined, result.effects
+    assert [s for s in result.as_dict()["output"]["specs"] if s.get("type") == "heal"]
+
+
+def test_an_infusion_is_still_the_tincture_it_was_poured_into():
+    """It came out named "Woundwort Infusion" — named after the herb, not the jar."""
+    result = _infuse(_tincture(), "woundwort")
+    assert result.as_dict()["output"]["base"].startswith("Mad Cap Tincture"), result.name
+
+
+def test_an_infusion_does_not_throw_away_the_concentration():
+    """A Tier 3 tincture infused came back at concentration 1.
+
+    Four doses bought that Tier 3 (two per step); infusing a herb into it is not a reason
+    to hand back one dose of the base strength.
+    """
+    result = _infuse(_tincture(concentration=3), "woundwort")
+    assert result.as_dict()["output"]["concentration"] == 3
+
+
+def test_two_differently_infused_jars_of_one_tincture_do_not_stack():
+    """Stock is held per base name, so identical names merge into one count.
+
+    A Mad Cap Tincture infused with woundwort and one infused with dragon flower are not
+    interchangeable, and would have become a count of two of whichever was crafted first.
+    """
+    first = _infuse(_tincture(), "woundwort").as_dict()["output"]
+    second = _infuse(_tincture(), "mad-cap").as_dict()["output"]
+    assert first["id"] != second["id"], first["id"]
+
+
+def test_infusing_twice_keeps_the_first_infusion_on_the_label():
+    """Stripping the parenthetical to avoid "Tincture Tincture Tincture" compounding
+    would otherwise erase woundwort from a jar that still contains it."""
+    once = _infuse(_tincture(), "woundwort").as_dict()["output"]
+    twice = _infuse(_tincture(base=once["base"]), "mad-cap").as_dict()["output"]
+    assert "Woundwort" in twice["base"] and "Mad Cap" in twice["base"], twice["base"]
+
+
+def test_a_chain_with_no_infuse_is_still_named_for_its_ingredients():
+    """The tincture-keeping rule is scoped to infusions. A plain brew of woundwort is a
+    new thing and should not inherit a name from whatever jar was in the pot."""
+    jar = _tincture()
+    chain = Chain(track="herbalist", methods=["brew"], ingredient_ids=["woundwort"],
+                  stock_used={jar.id: 1})
+    result = crafting.preview("herbalist", 5, chain, stock={jar.id: jar},
+                              satchel={"woundwort": 5})
+    assert "Mad Cap Tincture" not in result.name, result.name
