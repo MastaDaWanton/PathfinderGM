@@ -29,10 +29,16 @@ def engine(scene):
 
 # --- Check 1: schema --------------------------------------------------------------
 
-def test_unknown_op_is_rejected():
-    with pytest.raises(IntentError, match="unknown op") as e:
-        parse({"op": "vibes", "actor": "pc"})
-    assert e.value.check == "schema"
+def test_unknown_op_becomes_a_story_turn():
+    """Reversed on 2026-08-22, on a live session: "I want to go to the gym and work
+    out" produced op "exercise" five attempts running and the turn died. An op the
+    protocol never heard of is the GM naming an activity with no mechanic, and an
+    activity with no mechanic is `narrate_only` — its params dropped with it. A blank
+    op is still refused (tests/test_turn_salvage.py), because nothing was meant there.
+    """
+    intent = parse({"op": "vibes", "actor": "pc", "params": {"mood": "immaculate"}})
+    assert intent.op == "narrate_only"
+    assert intent.params == {}
 
 
 def test_missing_required_param_is_rejected():

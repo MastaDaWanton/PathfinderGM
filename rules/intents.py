@@ -377,6 +377,15 @@ OP_ALIASES = {
     "end_combat": "end_encounter", "end_fight": "end_encounter",
     "start_encounter": "begin_encounter", "begin_combat": "begin_encounter",
     "skill_check": "check", "ability_check": "check", "saving_throw": "save",
+    # Everyday activity, from the live session that died on it: "I want to go to the
+    # gym and work out" produced op "exercise" five attempts running. 1e has no
+    # exercising mechanic, and an activity with no mechanic is a story turn.
+    "exercise": "narrate_only", "train": "narrate_only", "training": "narrate_only",
+    "workout": "narrate_only", "work_out": "narrate_only",
+    "practice": "narrate_only", "practise": "narrate_only", "spar": "narrate_only",
+    "study": "narrate_only", "pray": "narrate_only", "meditate": "narrate_only",
+    "shop": "narrate_only", "browse": "narrate_only", "socialize": "narrate_only",
+    "socialise": "narrate_only",
 }
 
 
@@ -394,6 +403,41 @@ def normalise_raw(raw: dict) -> dict:
     if op in OP_ALIASES:
         raw = dict(raw, op=OP_ALIASES[op])
         op = raw["op"]
+
+    # An op the protocol has never heard of, after the aliases have had their say.
+    # Two cases, told apart mechanically. A near-miss of a real op is a spelling and
+    # snaps to it — "atack" is not a new idea, it is "attack" typed badly. Anything
+    # else is the GM naming an activity the engine has no mechanic for, and an
+    # activity with no mechanic is a story turn: `narrate_only`, params dropped
+    # because the op that owned them is gone. Rejecting instead was measured to cost
+    # the whole turn — the model does not learn the op list from being shown it.
+    if op and op not in OPS:
+        skill = normalise_skill(op)
+        near = difflib.get_close_matches(op, list(OPS), n=1, cutoff=0.8)
+        if skill:
+            # "stealth" or "climb" as an op is a check by another spelling.
+            raw = dict(raw, op="check",
+                       params={**(raw.get("params") or {}), "skill": skill})
+        elif near:
+            raw = dict(raw, op=near[0])
+        else:
+            raw = dict(raw, op="narrate_only", params={})
+        op = raw["op"]
+
+    # A check that never says what to roll. The live turn retried "exercise" as
+    # `check` with no skill three attempts running. If the reason clause names a
+    # skill, that is the roll; otherwise there is nothing to roll and the turn is
+    # story, same as above.
+    if op == "check":
+        params = raw.get("params") or {}
+        if not params.get("skill"):
+            because = str(raw.get("because") or "")
+            found = next((s for w in re.findall(r"[a-z]+", because.lower())
+                          if (s := normalise_skill(w))), None)
+            if found:
+                raw = dict(raw, params={**params, "skill": found})
+            else:
+                raw = dict(raw, op="narrate_only", params={})
 
     # A skill in the manoeuvre slot: "manoeuvre": "intimidate" is the GM reaching for
     # demoralising somebody, which in 1e is a skill check and not a manoeuvre at all.

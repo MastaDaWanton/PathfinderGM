@@ -127,7 +127,13 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     #    Stealth check, carrying the previous turn's reason, "going over the wall while
     #    the lamp is away". The player's words had changed completely and the GM had not
     #    read them.
-    if previous and _signature(intents) == list(previous):
+    #    Only when the repeat has mechanics in it. A run of social turns is narrate_only
+    #    after narrate_only, legitimately — the live session died here when the player
+    #    politely declined a trainer and the GM's "same" turn was the same *nothing*.
+    #    Rolling the same check again is the GM not reading; saying nothing twice is
+    #    just two quiet turns.
+    if (previous and _signature(intents) == list(previous)
+            and any(i.op != "narrate_only" for i in intents)):
         out.objections.append(Finding(
             "repeats-the-last-turn",
             f"you have proposed exactly the same thing as last turn, but the player "

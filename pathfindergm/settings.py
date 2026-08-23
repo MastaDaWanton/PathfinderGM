@@ -92,6 +92,16 @@ MODELS = {
                  "host": "http://localhost:11434"},
     "prose": {"provider": "ollama", "model": "llama3.1:8b",
               "host": "http://localhost:11434"},
+    # Second opinion, not second choice. When the narrator burns every attempt at a
+    # turn — llama3.1 will occasionally refuse a schema outright, or circle one wrong
+    # shape until the attempts are gone — the same turn is offered to this model before
+    # the player sees an error. The 4B qwen lost the narrator seat on a full session
+    # (see above), but "worse narrator than llama" and "useless" are different claims:
+    # a rescued turn from a weaker model beats a red wall from a stronger one, and the
+    # validators strip both models' output to the same checked facts either way.
+    "fallback": {"provider": "ollama",
+                 "model": "richardyoung/qwen3-4b-instruct-2507-abliterated",
+                 "host": "http://localhost:11434"},
     # RESERVED, AND CURRENTLY WIRED TO NOTHING. The world-state agent of
     # `docs/architecture.md` — the cheap model that would watch play, move factions
     # between scenes and turn a burned bridge into a hook — has not been built. There is

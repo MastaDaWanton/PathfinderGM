@@ -73,6 +73,13 @@ class GMAgent:
         genuinely teaches it something and three was cutting it off mid-convergence. A
         warm attempt costs about 4s, so five is a worst case of ~20s — cheap against
         losing the turn.
+
+        And then a different model. A live session hit a turn llama3.1 could not
+        produce in any of its five shapes, and the player got a wall of red where the
+        game should be. The last two slots on the schedule belong to the configured
+        fallback model — a different tune makes different mistakes, which is the whole
+        reason to have one — and it inherits the final rejection, so it starts warned
+        rather than fresh.
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
         # A fight is a different job, and gets a different prompt and a different floor.
@@ -84,8 +91,16 @@ class GMAgent:
         attempts: list[Attempt] = []
         rejections: list[str] = []
 
-        for n in range(max_attempts):
-            reply = client.chat(messages, self.model, self.host, as_json=True,
+        schedule = [(self.model, self.host)] * max_attempts
+        spare = settings.MODELS.get("fallback") or {}
+        if spare.get("model") and spare["model"] != self.model:
+            schedule += [(spare["model"], spare.get("host", self.host))] * 2
+        last = len(schedule) - 1
+
+        for n, (model, host) in enumerate(schedule):
+            if n == max_attempts:
+                rejections.append(f"— handing the turn to {model}")
+            reply = client.chat(messages, model, host, as_json=True,
                                 temperature=0.8 if n == 0 else 0.5)
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
@@ -156,7 +171,7 @@ class GMAgent:
             verdict = judgement.review(player_input, intents, self.engine.scene,
                                         previous=previous_intents)
             repairs = list(verdict.as_log())
-            if not verdict.ok and n < max_attempts - 1:
+            if not verdict.ok and n < last:
                 complaint = " ".join(o.message for o in verdict.objections)
                 rejections.append(f"attempt {n + 1} [judgement]: {complaint}")
                 messages = _with_correction(base, reply.text, complaint)
@@ -171,7 +186,7 @@ class GMAgent:
                     intents = self.engine.validate([i.as_dict() for i in intents])
                 except IntentError as exc:
                     rejections.append(f"attempt {n + 1} [after-correction]: {exc}")
-                    if n < max_attempts - 1:
+                    if n < last:
                         messages = _with_correction(base, reply.text, str(exc))
                         continue
                     raise
@@ -197,7 +212,8 @@ class GMAgent:
 
         raise IntentError(
             "the GM could not produce a valid turn in "
-            f"{max_attempts} attempts:\n" + "\n".join(rejections)
+            f"{len(schedule)} attempts across "
+            f"{len({m for m, _ in schedule})} model(s):\n" + "\n".join(rejections)
         )
 
     # --- An NPC's turn -------------------------------------------------------------------
