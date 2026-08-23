@@ -306,11 +306,25 @@ def test_taking_stacks_away_is_not_applying_one():
 
 
 def test_what_the_engine_still_lacks_is_named_per_ability():
-    """Three shapes recur and none is forced: Control Blood scaling, Blood Pools as
-    scene objects, and multiples of the class table's Blood die."""
+    """Two shapes recur and neither is forced: Control Blood scaling and multiples of
+    the class table's Blood die. "Blood Pools as scene objects" used to be the third
+    and is now built, which is why this test no longer looks for it."""
     spike = leveling.path_detail("blood bending", "blood spike")
     every = {n for names in spike["needs"].values() for n in names}
-    assert any("Blood Pools" in n for n in every)
+    assert any("Blood die" in n or "Control Blood level" in n for n in every)
+    assert not any("Pools as objects" in n for n in every)
+
+
+def test_making_and_spending_pools_are_ops_now():
+    """The capability that unlocked the largest block of unconverted abilities."""
+    spike = leveling.path_detail("blood bending", "blood spike")
+    made = spike["effects"]["Blood Pool Manifestation"]
+    assert made[0]["op"] == "blood_pool"
+    burst = spike["effects"]["Hemorrhagic Eruption"]
+    spend = next(e for e in burst if e.get("op") == "spend_pools")
+    # "Detonate any number of Blood Pools" is genuinely unbounded; a cap here would be
+    # a rule nobody wrote.
+    assert spend["count"] == "all"
 
 
 def test_a_self_cost_in_non_lethal_damage_converts():
@@ -333,3 +347,97 @@ def test_the_map_has_a_tab_of_its_own():
     assert "function showMap(" in page
     # It refills while open, so a token that moves during a turn moves here too.
     assert '$("#maptray").classList.contains("on")' in page
+
+
+# --- blood on the ground ---------------------------------------------------------------
+
+def _fight():
+    from rules.engine import Engine, Scene
+    from rules.grid import Grid
+
+    scene = Scene(location_id=None, grid=Grid(width=8, height=8))
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.positions["pc"] = (2, 2)
+    return Engine(scene, Dice(seed=9))
+
+
+def _run(engine, raw):
+    return engine.run(engine.validate([raw])).outcomes
+
+
+def test_a_pool_lands_where_the_bender_is_standing():
+    """Blood Pool Manifestation puts one "in the target's square (or your square if
+    self)", so the square is read from the scene rather than asked for."""
+    eng = _fight()
+    _run(eng, {"op": "blood_pool", "actor": "pc"})
+    assert len(eng.scene.pools) == 1
+    assert eng.scene.pools[0].at == (2, 2)
+    assert eng.scene.pools[0].owner == "pc"
+
+
+def test_a_pool_can_be_put_on_a_named_square():
+    eng = _fight()
+    _run(eng, {"op": "blood_pool", "actor": "pc", "params": {"at": [5, 6]}})
+    assert eng.scene.pools[0].at == (5, 6)
+
+
+def test_pools_work_without_a_map_at_all():
+    """The scene's positions are optional and so are theirs — a pool in a
+    theatre-of-the-mind fight is still a pool that can be spent."""
+    from rules.engine import Engine, Scene
+
+    scene = Scene(location_id=None)
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    eng = Engine(scene, Dice(seed=2))
+    _run(eng, {"op": "blood_pool", "actor": "pc"})
+    assert len(eng.scene.pools) == 1 and eng.scene.pools[0].at is None
+
+
+def test_spending_takes_them_back_off_the_ground():
+    eng = _fight()
+    for _ in range(3):
+        _run(eng, {"op": "blood_pool", "actor": "pc"})
+    out = _run(eng, {"op": "spend_pools", "actor": "pc", "params": {"count": 2}})
+    assert len(eng.scene.pools) == 1
+    assert "2 pools" in out[0].tell
+
+
+def test_any_number_means_all_of_them():
+    """"Detonate any number of Blood Pools within Blood Sense range" is genuinely
+    unbounded, and a cap the engine invented would be a rule nobody wrote."""
+    eng = _fight()
+    for _ in range(4):
+        _run(eng, {"op": "blood_pool", "actor": "pc"})
+    _run(eng, {"op": "spend_pools", "actor": "pc", "params": {"count": "all"}})
+    assert eng.scene.pools == []
+
+
+def test_spending_blood_that_is_not_there_says_so():
+    eng = _fight()
+    out = _run(eng, {"op": "spend_pools", "actor": "pc"})
+    assert "no blood on the ground" in out[0].tell
+
+
+def test_pools_survive_a_save(tmp_path, settings):
+    from play import campaign as cm
+
+    settings.CAMPAIGN_DIR = str(tmp_path / "campaigns")
+    cm._LIVE.clear()
+    c = cm.new_campaign("pools", character=load_pc("fixtures/pc-kesst.json"))
+    eng = c.engine()
+    _run(eng, {"op": "blood_pool", "actor": "pc", "params": {"amount": 2,
+                                                            "source": "a spike"}})
+    c.save()
+
+    again = cm.Campaign.load(c.path())
+    assert len(again.scene.pools) == 1
+    assert again.scene.pools[0].amount == 2
+    assert again.scene.pools[0].source == "a spike"
+
+
+def test_the_map_draws_them():
+    from pathlib import Path
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert "bloodpool" in page
+    assert "pools of blood on the ground" in page or "pool${" in page

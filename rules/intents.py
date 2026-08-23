@@ -248,6 +248,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # computes; a weapon becomes the one in your hand. Refused for anything you do not
     # actually have, so the sheet can never claim protection nobody bought.
     "wear": (("item",), ("actor",), "hidden"),
+    # Blood on the ground. `blood_pool` puts one down — at a square when there is a
+    # grid, beside the actor when there is not — and `spend_pools` is how every
+    # ability that siphons, detonates or steps through them takes them back off.
+    # `count` on the spend is how many to consume; "all" is a real answer, because
+    # Hemorrhagic Eruption detonates any number of them at once.
+    "blood_pool": ((), ("actor", "at", "amount", "source", "to"), "hidden"),
+    "spend_pools": ((), ("actor", "count", "why"), "hidden"),
     "rest": ((), ("kind",), "hidden"),
     # Eating and drinking reset the hunger and thirst clocks, which `rest` deliberately
     # does not: a night's sleep is not a meal. Two ops rather than one with flags,

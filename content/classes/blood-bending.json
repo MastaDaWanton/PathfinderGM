@@ -345,19 +345,19 @@
         "Blood Rain": "Full-round action. Sacrifice 20% max HP as Non-Lethal damage to convert all active Blood Pools within range into falling spikes over a 30-ft radius. Deals Blood DMG ×5 and applies 2 blood stacks to all targets in the area."
       },
       "resolves": {
-        "Blood Boil": "Blood Boil",
+        "Crimson Torrent": "Crimson Torrent",
+        "Pool Resonance": "Pool Resonance",
+        "Blood Rain": "Blood Rain",
+        "Blood Mine": "Blood Mine",
+        "Blood Spike Projectile": "Blood Spike Projectile",
+        "Splintering Spike": "Splintering Spike",
         "Hemorrhagic Eruption": "Hemorrhagic Eruption",
         "Blood Volley": "Blood Volley",
-        "Blood Spike Projectile": "Blood Spike Projectile",
-        "Crimson Torrent": "Crimson Torrent",
-        "Blood Rain": "Blood Rain",
-        "Siphon Pool": "Siphon Pool",
-        "Blood Bomb": "Blood Bomb",
         "Heart-Seeker Spike": "Heart-Seeker Spike",
-        "Splintering Spike": "Splintering Spike",
+        "Blood Bomb": "Blood Bomb",
         "Blood Pool Manifestation": "Blood Pool Manifestation",
-        "Blood Mine": "Blood Mine",
-        "Pool Resonance": "Pool Resonance"
+        "Blood Boil": "Blood Boil",
+        "Siphon Pool": "Siphon Pool"
       },
       "upgrades": {},
       "core": [],
@@ -370,6 +370,13 @@
             "damage_type": "untyped",
             "lethality": "nonlethal",
             "note": "the cost of Blood Spike Projectile"
+          }
+        ],
+        "Blood Pool Manifestation": [
+          {
+            "type": "engine_op",
+            "op": "blood_pool",
+            "note": "leaves blood on the ground"
           }
         ],
         "Siphon Pool": [
@@ -435,6 +442,14 @@
             "amount": 1
           }
         ],
+        "Hemorrhagic Eruption": [
+          {
+            "type": "engine_op",
+            "op": "spend_pools",
+            "count": "all",
+            "note": "takes blood back off the ground"
+          }
+        ],
         "Blood Bomb": [
           {
             "type": "damage",
@@ -457,6 +472,11 @@
             "damage_type": "untyped",
             "lethality": "nonlethal",
             "note": "the cost of Blood Volley"
+          },
+          {
+            "type": "engine_op",
+            "op": "blood_pool",
+            "note": "leaves blood on the ground"
           }
         ],
         "Heart-Seeker Spike": [
@@ -485,33 +505,35 @@
             "target": "applies 2 blood stack(s)",
             "resource": "blood stack",
             "amount": 2
+          },
+          {
+            "type": "engine_op",
+            "op": "spend_pools",
+            "count": "all",
+            "note": "takes blood back off the ground"
           }
         ]
       },
       "needs": {
         "Blood Spike Projectile": [
-          "Blood Pools as objects the scene can hold"
-        ],
-        "Blood Pool Manifestation": [
-          "Blood Pools as objects the scene can hold"
+          "targeting a particular Blood Pool on the map"
         ],
         "Siphon Pool": [
-          "Blood Pools as objects the scene can hold"
+          "targeting a particular Blood Pool on the map"
         ],
         "Blood Mine": [
-          "Blood Pools as objects the scene can hold",
           "a multiple of the class table's Blood die",
-          "a save DC computed from level and Constitution"
+          "a save DC computed from level and Constitution",
+          "targeting a particular Blood Pool on the map"
         ],
         "Crimson Torrent": [
-          "Blood Pools as objects the scene can hold",
-          "a multiple of the class table's Blood die"
+          "a multiple of the class table's Blood die",
+          "targeting a particular Blood Pool on the map"
         ],
         "Blood Boil": [
           "a save DC computed from level and Constitution"
         ],
         "Hemorrhagic Eruption": [
-          "Blood Pools as objects the scene can hold",
           "a multiple of the class table's Blood die"
         ],
         "Blood Bomb": [
@@ -520,18 +542,14 @@
         "Pumping": [
           "a value that scales with Control Blood level"
         ],
-        "Blood Volley": [
-          "Blood Pools as objects the scene can hold"
-        ],
         "Pool Resonance": [
-          "Blood Pools as objects the scene can hold"
+          "targeting a particular Blood Pool on the map"
         ],
         "Heart-Seeker Spike": [
           "a multiple of the class table's Blood die",
           "a save DC computed from level and Constitution"
         ],
         "Blood Rain": [
-          "Blood Pools as objects the scene can hold",
           "a multiple of the class table's Blood die"
         ]
       },
@@ -588,23 +606,23 @@
         "Avatar of Coagulation": "1/day free action. Become a blood behemoth for 1 minute: Size increases by one category, base DR/- doubles, Non-Lethal damage taken is reduced by 50%, and when an enemy within range attacks an ally, spend an immediate action to strike them for Fist DMG and pull them adjacent to you."
       },
       "resolves": {
-        "Sanguine Spray": "Sanguine Spray",
         "Iron Clot (DR 5/-)": "Iron Clot",
-        "Caustic Blood": "Caustic Blood",
         "Sanguine Siphon": "Sanguine Siphon",
         "Iron Clot (DR 2/-)": "Iron Clot",
-        "Clotting Shield": "Clotting Shield",
         "Viscous Threat": "Viscous Threat",
+        "Caustic Blood": "Caustic Blood",
+        "Clotting Shield": "Clotting Shield",
+        "Exsanguinating Taunt": "Exsanguinating Taunt",
+        "Blood Sponge": "Blood Sponge",
+        "Crimson Guard": "Crimson Guard",
+        "Iron Clot (DR 8/-)": "Iron Clot",
+        "Hemophormic Retribution": "Hemophormic Retribution",
+        "Sanguine Spray": "Sanguine Spray",
+        "Blood Spatter Aura": "Blood Spatter Aura",
         "Iron Clot (DR 12/-)": "Iron Clot",
         "Coagulated Plate": "Coagulated Plate",
         "Aggressive Draw": "Aggressive Draw",
-        "Exsanguinating Taunt": "Exsanguinating Taunt",
-        "Iron Clot (DR 8/-)": "Iron Clot",
-        "Avatar of Coagulation": "Avatar of Coagulation",
-        "Blood Spatter Aura": "Blood Spatter Aura",
-        "Crimson Guard": "Crimson Guard",
-        "Hemophormic Retribution": "Hemophormic Retribution",
-        "Blood Sponge": "Blood Sponge"
+        "Avatar of Coagulation": "Avatar of Coagulation"
       },
       "upgrades": {},
       "core": [],
@@ -674,7 +692,7 @@
           "a value that scales with Control Blood level"
         ],
         "Caustic Blood": [
-          "Blood Pools as objects the scene can hold"
+          "targeting a particular Blood Pool on the map"
         ],
         "Hemophormic Retribution": [
           "a save DC computed from level and Constitution"
@@ -730,21 +748,21 @@
         "Forced Mitosis": "1/day. Double current health and duplicate created hemophorms/weapons for free until end of combat."
       },
       "resolves": {
-        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
-        "Blood Transfusion": "Blood Transfusion",
-        "Blood Siphon": "Blood Siphon",
-        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
         "Blood Transfer": "Blood Transfer",
-        "Blood Buffer 3NLDR": "Blood Buffer",
-        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
-        "Blood Javelin": "Blood Javelin",
-        "Forced Mitosis": "Forced Mitosis",
-        "DMG Purge": "DMG Purge",
-        "Mass Rupture": "Mass Rupture",
+        "Blood Buffer 2NLDR": "Blood Buffer",
+        "Blood Transfusion": "Blood Transfusion",
         "Blood Shatter": "Blood Shatter",
-        "Blood Buffer 2NLDR": "Blood Buffer"
+        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Forced Mitosis": "Forced Mitosis",
+        "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
+        "Blood Siphon": "Blood Siphon",
+        "DMG Purge": "DMG Purge",
+        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
+        "Blood Javelin": "Blood Javelin",
+        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Blood Buffer 3NLDR": "Blood Buffer",
+        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
+        "Mass Rupture": "Mass Rupture"
       },
       "upgrades": {},
       "core": [],
@@ -841,22 +859,22 @@
         "1-2-Punch": "Subsequent attacks on the same target hit twice, dealing damage and applying on-hit effects twice."
       },
       "resolves": {
-        "Blood Burst 40ft": "Blood Burst",
-        "Battle Blood Ki Pool": "Battle Blood Ki Pool",
         "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
         "Greater Blood Rage": "Blood Rage",
-        "Vampiric Recovery": "Vampiric Recovery",
+        "Blood Burst 40ft": "Blood Burst",
         "Mighty Blood Rage": "Blood Rage",
-        "Rupture Self 60ft": "Rupture Self",
+        "Coagulant Stacks": "Coagulant Stacks",
         "Blood Burst 20ft": "Blood Burst",
         "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
-        "Vortex Pull": "Vortex Pull",
+        "Vampiric Recovery": "Vampiric Recovery",
+        "Rupture Self 60ft": "Rupture Self",
+        "Battle Blood Ki Pool": "Battle Blood Ki Pool",
         "Blood Rage": "Blood Rage",
         "Blood Booster": "Blood Booster",
-        "1-2-Punch": "1-2-Punch",
-        "Coagulant Stacks": "Coagulant Stacks",
         "Blood Burst 60ft": "Blood Burst",
-        "Swift Strikes": "Swift Strikes"
+        "Vortex Pull": "Vortex Pull",
+        "Swift Strikes": "Swift Strikes",
+        "1-2-Punch": "1-2-Punch"
       },
       "upgrades": {
         "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD",
@@ -962,7 +980,7 @@
           "a save DC computed from level and Constitution"
         ],
         "Rupture Self": [
-          "Blood Pools as objects the scene can hold"
+          "targeting a particular Blood Pool on the map"
         ]
       },
       "effects_converted": true

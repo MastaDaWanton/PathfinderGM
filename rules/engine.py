@@ -65,6 +65,12 @@ class Scene:
     # on the guardian it is lost when you look up the protected creature, and stored on
     # both it is two copies to keep level.
     guards: list["Guard"] = field(default_factory=list)
+    # Blood the bender has put on the ground and can still reach. Half of Blood Spike
+    # and most of Coagulator act on these — siphoning them, detonating them, standing
+    # in them, trading places with them — so they have to be things the scene holds
+    # rather than a phrase in the narration. A pool knows where it is, whose it is and
+    # how much blood is in it; everything else about it is the ability's business.
+    pools: list["BloodPool"] = field(default_factory=list)
     initiative: list[tuple[str, int]] = field(default_factory=list)
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
@@ -356,6 +362,32 @@ class _NeedsPlayerRoll(Exception):
         super().__init__("awaiting player roll")
         self.prompt = prompt
         self.partial = partial or {}
+
+
+@dataclass
+class BloodPool:
+    """A pool of blood somewhere on the ground.
+
+    `at` is a grid square when the scene has a grid and None when it does not — the
+    same optionality the rest of the scene gives positions, so pools work in a
+    theatre-of-the-mind fight and gain a location the moment a map is laid down.
+    """
+    owner: str
+    at: tuple[int, int] | None = None
+    amount: int = 1
+    source: str = ""
+
+    def as_dict(self) -> dict:
+        return {"owner": self.owner, "at": list(self.at) if self.at else None,
+                "amount": self.amount, "source": self.source}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "BloodPool":
+        at = d.get("at")
+        return cls(owner=d.get("owner", ""),
+                   at=tuple(at) if at else None,
+                   amount=int(d.get("amount", 1) or 1),
+                   source=d.get("source", ""))
 
 
 # --- The engine ---------------------------------------------------------------------
@@ -2138,6 +2170,72 @@ class Engine:
                       "purse": dict(taker.purse) if taker else {},
                       "goods": dict(taker.goods) if taker else {}}],
             tell=tell, because=intent.because,
+        )
+
+    def _op_blood_pool(self, intent: Intent, partial: dict) -> Outcome:
+        """Put blood on the ground.
+
+        Where matters when there is a map and does not when there is not, so `at` is
+        taken if given, otherwise the pool lands under whoever it came out of. That is
+        also what the abilities say: Blood Pool Manifestation puts one "in the target's
+        square (or your square if self)".
+        """
+        ref = intent.params.get("actor") or intent.actor
+        actor = self.scene.actors.get(ref) if ref else self.scene.pc()
+        if actor is None:
+            raise IntentError("blood_pool: nobody here to bleed", "refs")
+
+        where = intent.params.get("at")
+        onto = intent.params.get("to")
+        if where is None:
+            landed_on = onto if onto in self.scene.positions else actor.ref
+            where = self.scene.positions.get(landed_on)
+        amount = max(1, int(intent.params.get("amount", 1) or 1))
+        made = BloodPool(owner=actor.ref, at=tuple(where) if where else None,
+                         amount=amount, source=str(intent.params.get("source") or
+                                                   intent.because or ""))
+        self.scene.pools.append(made)
+
+        return Outcome(
+            intent_id=intent.id, op="blood_pool",
+            effects=[{"ref": actor.ref, "kind": "blood_pool", **made.as_dict(),
+                      "pools": len(self.scene.pools)}],
+            tell=(f"A pool of {actor.name}'s blood spreads"
+                  + (f" at {where[0]},{where[1]}." if where else " underfoot.")),
+            because=intent.because,
+        )
+
+    def _op_spend_pools(self, intent: Intent, partial: dict) -> Outcome:
+        """Take pools back off the ground: siphoned, detonated, stepped through.
+
+        One op for all of them because the *spending* is the shared mechanic — what
+        each ability does with the blood is its own effect, resolved by its own intent.
+        `count` may be "all": Hemorrhagic Eruption detonates any number at once, and a
+        cap this op invented would be a rule nobody wrote.
+        """
+        ref = intent.params.get("actor") or intent.actor
+        actor = self.scene.actors.get(ref) if ref else self.scene.pc()
+        mine = [b for b in self.scene.pools
+                if actor is None or b.owner == actor.ref]
+        want = intent.params.get("count", 1)
+        take = len(mine) if str(want).lower() == "all" else max(1, int(want or 1))
+        spent = mine[:take]
+
+        if not spent:
+            return Outcome(intent_id=intent.id, op="spend_pools", effects=[],
+                           tell="There is no blood on the ground to use.",
+                           because=intent.because)
+        for pool in spent:
+            self.scene.pools.remove(pool)
+        why = str(intent.params.get("why") or intent.because or "").strip()
+        return Outcome(
+            intent_id=intent.id, op="spend_pools",
+            effects=[{"ref": actor.ref if actor else "", "kind": "spend_pools",
+                      "spent": len(spent), "left": len(self.scene.pools)}],
+            tell=(f"{len(spent)} pool{'s' if len(spent) != 1 else ''} of blood "
+                  f"{'are' if len(spent) != 1 else 'is'} used up"
+                  + (f" — {why}." if why else ".")),
+            because=intent.because,
         )
 
     def _op_wear(self, intent: Intent, partial: dict) -> Outcome:

@@ -19,7 +19,7 @@ from django.conf import settings
 from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
-from rules.engine import Engine, Scene
+from rules.engine import BloodPool, Engine, Scene
 from rules.guards import from_dict as guard_from_dict
 from rules.sheet import from_dict, load_pc, to_dict
 from world.loader import load_cached
@@ -140,6 +140,7 @@ class Campaign:
                 # everybody a fresh attack of opportunity for reloading.
                 "reacted": self.scene.reacted,
                 "guards": [g.as_dict() for g in self.scene.guards],
+                "pools": [b.as_dict() for b in self.scene.pools],
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
                 "turn": self.scene.turn,
@@ -192,6 +193,7 @@ class Campaign:
             positions={r: tuple(p) for r, p in (s.get("positions") or {}).items()},
             reacted={k: int(v) for k, v in (s.get("reacted") or {}).items()},
             guards=[guard_from_dict(g) for g in (s.get("guards") or [])],
+            pools=[BloodPool.from_dict(b) for b in (s.get("pools") or [])],
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             turn=s.get("turn", -1),

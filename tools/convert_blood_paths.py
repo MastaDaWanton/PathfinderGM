@@ -143,8 +143,26 @@ def convert(name: str, text: str) -> tuple[list[dict], list[str]]:
     # And the three shapes that genuinely have nowhere to go.
     if re.search(r"control ?blood ?level|controlbloodlevel|\bCB ?L(?:vl|evel)\b", low):
         needs.append("a value that scales with Control Blood level")
-    if re.search(r"blood pool", low):
-        needs.append("Blood Pools as objects the scene can hold")
+    # Blood Pools are scene objects now, so the two things abilities do with them —
+    # leave one behind, take some back off the ground — are ops rather than a missing
+    # capability. What each ability then *does* with the blood stays its own effect.
+    if re.search(r"\b(?:a |one )?blood pool appears|creat\w+ a blood pool|"
+                 r"leaves? a blood pool|blood pool manifest", low):
+        out.append({"type": "engine_op", "op": "blood_pool",
+                    "note": "leaves blood on the ground"})
+    m = re.search(r"(?:absorb|detonate|consume|siphon|convert)\w*\s+"
+                  r"(any number of|all|\d+)?\s*(?:active\s+)?blood pools?", low)
+    if m:
+        count = (m.group(1) or "1").strip()
+        out.append({"type": "engine_op", "op": "spend_pools",
+                    "count": "all" if count in ("any number of", "all") else int(count),
+                    "note": "takes blood back off the ground"})
+    elif re.search(r"blood pool", low) and not any(
+            e.get("op") == "blood_pool" for e in out):
+        # Pools it reads or moves between rather than makes or spends — Pool Resonance
+        # firing *from* one, Blood Teleportation trading places with one. The scene can
+        # hold them now; targeting one still has nowhere to go.
+        needs.append("targeting a particular Blood Pool on the map")
     if re.search(r"blood dmg\s*[×x]\s*\d", low):
         needs.append("a multiple of the class table's Blood die")
     return out, sorted(set(needs))

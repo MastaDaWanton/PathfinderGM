@@ -103,6 +103,10 @@ def _state(c) -> dict:
                 for r, a in c.scene.actors.items()
             ],
             "grid": _grid_state(c.scene),
+            # Blood on the ground. Sent whether or not there is a grid: without one
+            # they are still a count the player needs, because half the class spends
+            # them.
+            "pools": [b.as_dict() for b in c.scene.pools],
         },
         # The player sees their own rolls and nobody else's. Hidden rolls are stripped
         # here, at the edge, rather than in the template — a number that never reaches
