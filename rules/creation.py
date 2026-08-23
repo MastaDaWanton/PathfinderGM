@@ -66,6 +66,20 @@ POINT_COSTS = {7: -4, 8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7,
 # the homebrew tab, 20 ("High fantasy") by default, and reading it from a constant
 # here is how a forge and a validator come to disagree.
 
+# What every character is wearing before anything else is bought. The Core Rulebook
+# gives one outfit free at first level and it never reached the sheet, so a character
+# stood in the opening scene with a sword, armour and, by the app's own reckoning, no
+# clothes. Free, no mechanics, and it fills the `body` slot the equipment page draws.
+OUTFITS: dict[str, str] = {
+    "barbarian": "cold-weather outfit", "bard": "entertainer's outfit",
+    "cleric": "cleric's vestments", "druid": "traveler's outfit",
+    "fighter": "traveler's outfit", "monk": "monk's outfit",
+    "paladin": "traveler's outfit", "ranger": "traveler's outfit",
+    "rogue": "traveler's outfit", "sorcerer": "traveler's outfit",
+    "wizard": "scholar's outfit", "blood bending": "traveler's outfit",
+}
+DEFAULT_OUTFIT = "traveler's outfit"
+
 # What a first-level character of each class walks out the door holding.
 #
 # Everything here is drawn from the *small* core tables the sheet validates against —
@@ -292,6 +306,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
 
     # --- assemble, exactly the pregen shape ------------------------------------------
     kit = KITS.get(cid, {"weapons": ["dagger"], "armour": "none"})
+    outfit = OUTFITS.get(cid, DEFAULT_OUTFIT)
     hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
     sheet = {
         "name": name, "kind": "pc", "class": cid, "level": 1,
@@ -306,6 +321,11 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "equipped": kit["weapons"][0],
         "armour": kit.get("armour", "none"),
         "shield": kit.get("shield", "none"),
+        # Worn *and* carried, because those are two different questions and the sheet
+        # asks both: the `body` slot is what the equipment page draws on the figure,
+        # and `goods` is the answer to "what am I carrying".
+        "goods": {outfit: 1},
+        "slots": {"body": [outfit]},
         "hp": hp, "hp_max": hp,
         "notes": str(payload.get("notes", "")).strip(),
     }

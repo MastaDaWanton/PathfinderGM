@@ -326,3 +326,80 @@ def test_the_defense_tab_actually_renders_them():
     page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
     assert 'class="abilities"' in page
     assert "s.class_features" in page
+
+
+# --- what the race gives you, and the clothes you stand up in ------------------------
+
+def test_racial_traits_reach_the_sheet():
+    """"feats and trait only shows feats and is missing my racial traits darkvision
+    and ferocity." The tab is called Feats & Traits and listed only feats, so half of
+    what a half-orc can do was nowhere on the page a player checks."""
+    from rules.creation import RACES
+    from rules.sheet import full_sheet
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.race = "half-orc"
+    names = [t["name"] for t in full_sheet(pc)["traits"]]
+    assert "darkvision 60 ft" in names
+    assert "ferocity: keep fighting below 0" in names
+    # One source with the forge, so a trait shown at creation is the trait shown after.
+    assert names == RACES["half-orc"]["traits"]
+
+
+def test_every_race_the_forge_offers_has_traits_on_the_sheet():
+    from rules.creation import RACES
+    from rules.sheet import full_sheet
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    for race in RACES:
+        pc.race = race
+        assert full_sheet(pc)["traits"], race
+
+
+def test_the_feats_tab_renders_traits_and_class_features():
+    from pathlib import Path
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert "Racial traits" in page and "s.traits.map" in page
+    assert "Class features" in page
+
+
+def test_a_new_character_is_wearing_something():
+    """"the clothes my character spawns in should be in my inventory as well and
+    should get equipped in the proper slots." The Core Rulebook gives an outfit free at
+    first level; the app dressed characters in a sword and armour and nothing else."""
+    from rules import creation
+    from rules.sheet import body_slots, from_dict
+
+    built, problems = creation.build({
+        "name": "Clothed", "race": "half-orc", "bonus_ability": "str",
+        "class": "fighter",
+        "abilities": {"str": 14, "dex": 12, "con": 12, "int": 10, "wis": 10, "cha": 10},
+        "skills": [], "feats": [],
+    })
+    assert problems == []
+    actor = from_dict(built["sheet"])
+    assert actor.goods.get("traveler's outfit") == 1          # carried
+    assert actor.slots["body"] == ["traveler's outfit"]       # and worn
+
+    worn = body_slots(actor)
+    body = next(s for s in worn["left"] + worn["right"] if s["key"] == "body")
+    assert body["items"][0]["item"] == "traveler's outfit"
+
+
+def test_every_class_walks_out_dressed():
+    from rules import creation
+    from rules.sheet import from_dict
+
+    for cid in creation.options()["classes"]:
+        built, problems = creation.build({
+            "name": f"Dressed {cid['id']}", "race": "human", "bonus_ability": "con",
+            "class": cid["id"],
+            "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
+                          "wis": 12, "cha": 12},
+            "skills": [], "feats": [],
+        })
+        assert problems == [], (cid["id"], problems)
+        actor = from_dict(built["sheet"])
+        assert actor.goods, cid["id"]
+        assert actor.slots.get("body"), cid["id"]

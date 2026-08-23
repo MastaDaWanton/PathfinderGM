@@ -1734,6 +1734,11 @@ def full_sheet(actor: Actor) -> dict:
         # than from the class *name*. The header said "Blood Bending 1" and nothing on
         # the sheet said what a Blood Bender could do.
         "class_features": _class_features(actor),
+        # What the race gives you. The tab is called "Feats & Traits" and listed only
+        # feats: a half-orc's darkvision and ferocity were nowhere on the sheet, so the
+        # one place a player checks what their character can do was silent about half
+        # of it.
+        "traits": _racial_traits(actor),
         "abilities": [
             {"key": a, "name": ABILITY_NAMES[a], "score": actor.ability_score(a),
              "modifier": actor.ability_mod(a),
@@ -1946,6 +1951,22 @@ def to_dict(actor: Actor) -> dict:
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
     }
+
+
+def _racial_traits(actor: Actor) -> list[dict]:
+    """The race's own line items, from the same table creation builds from.
+
+    One source, so a trait the forge showed when the character was made is the trait
+    the sheet shows afterwards. Imported here rather than at module scope because
+    `rules.creation` imports this module.
+    """
+    from .creation import RACES
+
+    race = RACES.get(str(actor.race or "").strip().lower())
+    if not race:
+        return []
+    return [{"name": t, "source": race.get("name", actor.race)}
+            for t in race.get("traits", [])]
 
 
 def _class_features(actor: Actor) -> list[str]:
