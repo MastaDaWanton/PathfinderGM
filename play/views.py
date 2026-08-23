@@ -724,7 +724,13 @@ def _log_turn(c, plan, resolution, replace: bool = False):
     entry = {
         "kind": "turn",
         "seconds": round(plan.seconds, 1),
-        "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "note": a.note}
+        # The model is recorded because the turn log is the only place that can answer
+        # "which one wrote this". `Attempt` has carried the field since it was written
+        # and the save dropped it, so a narration defect could only be pinned on a
+        # model by counting rejections and reasoning about which one the schedule would
+        # have reached — which is a deduction, not a record.
+        "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "note": a.note,
+                      "model": a.model}
                      for a in plan.attempts],
         "repairs": plan.repairs,
         "rejections": plan.rejections,

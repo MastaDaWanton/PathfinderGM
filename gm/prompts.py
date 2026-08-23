@@ -504,7 +504,9 @@ slavishly — they are what a turn is made of:
   ANCHOR   pick up from what just happened, in a clause, not a recap
   SENSE    two or three concrete things: what is heard, smelt, felt underfoot, not seen
   PUSH     somebody or something acts — an NPC moves, the weather turns, a door closes
-  TURN     hand it back with a real question
+  TURN     hand it back by asking what they DO. Never what they see, notice, feel or
+           find — the player cannot perceive anything you have not already written,
+           so a question about their senses is you asking them to write the room.
 
 Which of them carries the weight depends on the situation. Some shapes that work:
 

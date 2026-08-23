@@ -129,6 +129,74 @@ MIN_COMBAT_CHARS = 140
 # file and therefore caught nothing at all.
 MAX_COMBAT_CHARS = 600
 
+# The GM asking the player to do the GM's job. Measured in live play (2026-08-22,
+# llama3.1:8b, zero rejections on every turn — this is the narrator's own drift and not
+# the fallback's): three consecutive beats ended "What do you see?", "What do you notice
+# next?" and "What do you feel next?". The player had asked to follow somebody into a
+# room; describing that room is the only thing the narrator is for.
+#
+# The rule that produced it is one line up the file — a turn must end in a question —
+# and the model satisfied it the cheapest way available. Instructing it not to is the
+# fix CLAUDE.md records as never having held, so the shape is detected instead.
+_PERCEPTION = (r"see|notice|feel|hear|smell|taste|sense|observe|spot|perceive|find|"
+               r"think|believe|remember|recall|imagine|picture|want|wish|expect")
+_ASKS_TO_NARRATE = re.compile(
+    # Either "what/how ... you ... <perceive>", or the same request with the verb in
+    # front of the pronoun — "What does the room look like to you now?"
+    rf"\b(?:what|how|which)\b(?:"
+    rf"[^.?!]{{0,70}}\byou\b[^.?!]{{0,40}}\b(?:{_PERCEPTION})\b"
+    rf"|[^.?!]{{0,70}}\blooks?\s+like\b"
+    rf")",
+    re.I)
+# "What do you want to do?" reaches for `want` and is a perfectly good hand-back: the
+# thing being asked for is still an action. Only the perception itself is refused.
+_STILL_AN_ACTION = re.compile(
+    # What follows "to" has to be a verb. Without the lookahead, "What does the room
+    # look like to you now?" matched on "like to you" and was waved through as an
+    # action — the exemption swallowing the very case it sits next to.
+    r"\b(?:want|wish|like|choose|mean|try|care|hope)\w*\s+to\s+"
+    r"(?!you\b|him\b|her\b|them\b|it\b|me\b|us\b|the\b|an?\b)\w+", re.I)
+_QUESTION = re.compile(r"[^.?!]*\?")
+
+
+def _bad_hand_back(sentence: str) -> bool:
+    if any(q in sentence for q in "\"“”"):
+        return False        # an NPC may ask the player anything they like
+    return bool(_ASKS_TO_NARRATE.search(sentence)
+                and not _STILL_AN_ACTION.search(sentence))
+
+
+def asks_player_to_narrate(text: str) -> str:
+    """The closing question, if it asks the player to describe the world. Else ""."""
+    questions = [m for m in _QUESTION.finditer(text or "") if m.group().strip()]
+    if not questions:
+        return ""
+    last = questions[-1].group().strip()
+    return last if _bad_hand_back(last) else ""
+
+
+def fix_hand_back(text: str) -> tuple[str, str]:
+    """Swap a describe-it-for-me question for the one the examples all use.
+
+    A backstop, not the repair: `review` raises this as a finding first and the model
+    gets a chance to write the description it skipped. If that rewrite fails the turn
+    still must not ship asking the player what they can see, and replacing the question
+    is always safe — every example in the prompt ends on this exact sentence.
+
+    By span, never `str.replace`: the same trap `cut_outcome_claims` documents, where a
+    whitespace shift between the extracted sentence and the text it came from turns the
+    replacement into a silent no-op.
+    """
+    questions = [m for m in _QUESTION.finditer(text or "") if m.group().strip()]
+    if not questions or not _bad_hand_back(questions[-1].group().strip()):
+        return text, ""
+    span = questions[-1]
+    gone = span.group().strip()
+    fixed = (text[:span.start()] + span.group()[:len(span.group())
+                                                - len(span.group().lstrip())]
+             + "What do you do?" + text[span.end():])
+    return " ".join(fixed.split()), gone
+
 
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
@@ -165,6 +233,21 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             "no-hand-back", "does not ask the player anything",
             "End by handing the turn to the player with a real question about what they "
             "do next.",
+        ))
+
+    # 6b. Handed back, but by asking the player to do the narrating. The rule above is
+    #     what produces this: a question is required, and "What do you see?" is the
+    #     cheapest one there is.
+    outsourced = asks_player_to_narrate(text)
+    if outsourced:
+        out.findings.append(Finding(
+            "asks-the-player-to-narrate", f"ends on {outsourced!r}",
+            f"You ended with {outsourced!r}. That is your job, not theirs — the player "
+            f"cannot see anything you have not written. Describe what is actually there: "
+            f"what they see, hear and smell in this room, what the people in it are "
+            f"doing, and what has just changed. Then hand the turn back by asking what "
+            f"they *do*.",
+            weight=2,
         ))
 
     # 1. Lifted straight from the examples.

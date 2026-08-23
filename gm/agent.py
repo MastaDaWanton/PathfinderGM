@@ -204,6 +204,15 @@ class GMAgent:
                 player_input=player_input, scene_brief=brief)
             attempts.extend(prose_attempts)
 
+            # Last, and unconditional. `polish` keeps the original whenever its rewrite
+            # is no better, so a narration that outsources the description can survive
+            # the repair — and the one thing that must never reach the player is the GM
+            # asking them what they can see.
+            narration, outsourced = narration_mod.fix_hand_back(narration)
+            if outsourced:
+                prose_repairs = prose_repairs + [
+                    f"asked the player to narrate: replaced {outsourced!r}"]
+
             return TurnPlan(narration=narration, intents=intents,
                             suggestions=_suggestions(data),
                             attempts=attempts,
@@ -250,6 +259,10 @@ class GMAgent:
                 str(data.get("narration", "")).strip(), self.engine.scene)
             narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
+            narration, outsourced = narration_mod.fix_hand_back(narration)
+            if outsourced:
+                repairs = repairs + [
+                    f"asked the player to narrate: replaced {outsourced!r}"]
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
                             repairs=repairs, rejections=rejections)
 
@@ -424,6 +437,9 @@ class GMAgent:
             # marker cut only fires on words absent from the turn itself.
             context=f"{player_input} {narration}")
         text = judgement.name_refs(cleaned, self.engine.scene)
+        # Call 2 says what the dice did; it has even less business asking the player
+        # what they perceive than call 1 does.
+        text, _ = narration_mod.fix_hand_back(text)
         return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
 
 
