@@ -40,16 +40,9 @@
   header {
     border-bottom: 1px solid var(--gold-dim);
     background:
-      linear-gradient(rgba(58, 45, 29, .62), rgba(32, 25, 17, .74)),
-      url("{% static 'img/grimoire-leather.jpg' %}") #1d1710;
-    background-size: auto, cover;
-    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
-       every 340-400px, which reads as texture on a small card and as wallpaper
-       the moment a panel is taller or wider than the tile — the crafting shelf
-       and the character panel both are. `cover` on a fixed attachment also keeps
-       the grain still while the contents scroll over it. */
-    background-repeat: no-repeat;
-    background-attachment: scroll, fixed;
+      linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
+      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+    background-size: auto, 340px auto;
     padding: 0 26px; display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap;
   }
   h1 {
@@ -72,16 +65,9 @@
   .tab.on {
     color: var(--gold);
     background:
-      linear-gradient(rgba(86, 68, 44, .58), rgba(52, 41, 27, .62)),
-      url("{% static 'img/grimoire-leather.jpg' %}") #241d15;
-    background-size: auto, cover;
-    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
-       every 340-400px, which reads as texture on a small card and as wallpaper
-       the moment a panel is taller or wider than the tile — the crafting shelf
-       and the character panel both are. `cover` on a fixed attachment also keeps
-       the grain still while the contents scroll over it. */
-    background-repeat: no-repeat;
-    background-attachment: scroll, fixed;
+      linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 340px auto;
     border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
   }
   .tab small { display: block; font: italic 11px/1 var(--body); letter-spacing: 0;
@@ -109,17 +95,18 @@
   }
 
   .panel {
+    /* The one surface bigger than the tile, so it gets the 2560px hide as a single
+       piece — `cover` on a fixed attachment, grain still while the shelf scrolls.
+       The overlay is lighter than the swatch's, because the hide is already dark:
+       the swatch was tan and needed darkening, and the same overlay on the hide
+       went to black, while a warm wash went to milk. Measured against the tabs
+       beside it until the two leathers read as one bench. */
     background:
-      linear-gradient(rgba(74, 58, 38, .58), rgba(44, 34, 23, .66)),
+      linear-gradient(rgba(96, 76, 50, .16), rgba(52, 40, 26, .30)),
       url("{% static 'img/grimoire-leather.jpg' %}") #241d15;
-    background-size: auto, cover;
-    /* One piece of leather per panel, not a wall of tiles. The swatch repeated
-       every 340-400px, which reads as texture on a small card and as wallpaper
-       the moment a panel is taller or wider than the tile — the crafting shelf
-       and the character panel both are. `cover` on a fixed attachment also keeps
-       the grain still while the contents scroll over it. */
     background-repeat: no-repeat;
     background-attachment: scroll, fixed;
+    background-size: auto, cover;
     border: 1px solid rgba(201, 162, 39, .25);
     border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.45),
     0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
