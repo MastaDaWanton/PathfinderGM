@@ -351,6 +351,15 @@ def test_each_character_is_greeted_as_their_own_people(tmp_path):
         kesst = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         thessaly = cm.begin_with(roster.from_pregen("pc-thessaly"))
 
-    assert "flightless" in kesst.transcript[0]["text"]
-    assert "winged" in thessaly.transcript[0]["text"]
-    assert "flightless" not in thessaly.transcript[0]["text"]
+    # The *standing* clause, not the whole opening. The opening now also states what
+    # the world is — "Winged people and the flightless beneath them" — which is true
+    # for every character in it and says nothing about any one of them. Reading the
+    # whole text made this pass on the world's own premise rather than on the line
+    # that is actually about the character.
+    def about_them(campaign):
+        pc = campaign.scene.pc().name
+        return next(p for p in campaign.transcript[0]["text"].split("\n\n") if pc in p)
+
+    assert "flightless" in about_them(kesst)
+    assert "winged" in about_them(thessaly)
+    assert "flightless" not in about_them(thessaly)

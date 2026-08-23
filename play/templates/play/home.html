@@ -228,8 +228,10 @@
   /* --- The forge: character creation ------------------------------------------- */
   .forge h2.sect { margin-top: 26px; }
   .forge .cards.tight { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 26px; }
-  .forge .card.pick.on { border-color: var(--accent);
-                         box-shadow: 0 0 18px rgba(201,168,106,.12); }
+  /* The forge's own chosen-card rule used to live here at .12 opacity. Being four
+     classes deep it beat the general one further down however the order fell, so the
+     strongest glow in the sheet was the one nobody could see. Removed at source
+     rather than out-specified — see CLAUDE.md on fixing a rule in every copy. */
   .forge input[type=text] {
     width: 100%; color: var(--ink); padding: 10px 13px; font: inherit;
     border-radius: 2px; background: linear-gradient(var(--sunk), #14100c);
@@ -321,10 +323,38 @@
   }
 
   .card.pick:hover { transform: translateY(-4px); }
+  /* Chosen. A 22px glow at .18 opacity over leather was invisible on anything but a
+     bright screen — picking a race gave no sign the click had landed, which on a page
+     of twelve identical cards is the difference between a form and a guess. The frame
+     itself catches light now, and the heading with it. */
   .card.pick.on, .card.on {
-    border-color: rgba(232, 197, 71, .55);
-    box-shadow: 0 0 22px rgba(201, 162, 39, .18),
-                inset 0 1px 0 rgba(255, 230, 150, .12);
+    border-color: rgba(255, 214, 128, .9);
+    background-image:
+      linear-gradient(rgba(224, 168, 60, .17), rgba(224, 168, 60, .05)),
+      url("{% static 'img/card-leather.jpg' %}");
+    box-shadow: 0 0 0 1px rgba(255, 214, 128, .5),
+                0 0 34px rgba(224, 168, 60, .5),
+                0 12px 34px rgba(0, 0, 0, .6),
+                inset 0 0 26px rgba(224, 168, 60, .2),
+                inset 0 1px 0 rgba(255, 235, 170, .28);
+  }
+  /* The bevel ring is real metal in this design, so a selected card is that metal
+     lit rather than a coloured outline drawn on top of it. */
+  .card.pick.on::before, .card.on::before {
+    background: linear-gradient(135deg, #fff3d4 0%, #f2cd82 18%, #c08f42 44%,
+                                        #7d5a24 60%, #f2d18c 84%, #fff7e2 100%);
+    box-shadow: 0 0 28px rgba(255, 190, 90, .55), 0 3px 8px rgba(0, 0, 0, .55);
+    animation: chosenglow 3.2s ease-in-out infinite;
+  }
+  .card.pick.on h3, .card.on h3 {
+    color: #ffe7b4; text-shadow: 0 0 15px rgba(255, 190, 90, .5);
+  }
+  @keyframes chosenglow {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.3); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card.pick.on::before, .card.on::before { animation: none; }
   }
   header {
     background:

@@ -223,17 +223,21 @@ class Campaign:
 
 def new_campaign(campaign_id: str = "slice", seed: int | None = None,
                  character=None) -> Campaign:
-    """One scene in Pangrella, built from the world's own material.
+    """One scene in whatever world is loaded, built from that world's own material.
 
-    Nothing here is invented: Pangrella is the export's home town, its `Shadow Power`
-    fact names the Zhilakai minority, its standing `Tension` is the winged nobility
-    against the merchant castes, and the PC is Zhilakai. The situation is the friction
-    the world already documents, not a premise bolted on top of it.
+    Nothing here is invented and nothing here is named. The starting settlement is
+    found — `opening.starting_place` takes the smallest inhabited thing the export
+    describes — because this file used to hold a literal entity id out of the shipped
+    Pangrella fixture, so every other world began nowhere and the opening said so.
+
+    The company is rolled with the situation: whoever the opening puts within speaking
+    distance is who the scene starts with, rather than a guildhand on a gate that only
+    the fixture's own opening ever mentioned.
     """
+    from . import opening
+
     world = load_cached(settings.WORLD_EXPORT)
-    # By id, not by name: the WORLD and this CITY are both called "Pangrella", so the
-    # name lookup returns the planet and the opening scene is set nowhere.
-    town = world.get(PANGRELLA_TOWN) or world.by_name("Pangrella", kind="CITY")
+    town = opening.starting_place(world)
     scene = Scene(location_id=town.id if town else None)
     # The ground underfoot, read from the world's own facts rather than assumed. The
     # export carries `Biomes`, `Terrain` and `Climate` — Kaelinora's reads "Pangrellan
@@ -241,25 +245,19 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     found = biomes.from_world(world, town)
     scene.biome = found[0] if found else "grassland"
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
-    scene.add(
-        instantiate("guildhand", scene=scene, name="the guildhand on the gate"),
-        zone="near",
-    )
+    here = opening.roll(campaign_id, seed)
+    scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
     return Campaign(
         id=campaign_id, world_source=str(settings.WORLD_EXPORT), scene=scene, seed=seed,
     )
 
 
 def opening_text(campaign: Campaign) -> str:
-    loc = campaign.location
-    pc = campaign.scene.pc()
-    return (
-        f"{loc.name}, after dark. {loc.fact('Architecture')} "
-        f"The guild yard is shut for the night, and there is a lamp on a chain over the "
-        f"wall.\n\n"
-        f"You are {pc.name} — {_standing(campaign.world, pc)}. "
-        f"What do you do?"
-    )
+    """The first thing the player reads. Built in `play/opening.py`, which explains at
+    length why it is rolled and why it names nothing the world did not."""
+    from . import opening
+
+    return opening.compose(campaign, _standing(campaign.world, campaign.scene.pc()))
 
 
 def _standing(world, pc) -> str:
