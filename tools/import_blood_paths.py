@@ -70,7 +70,7 @@ def parse_paths(lines: list[str]) -> dict:
         # Definitions: "Name: the author's own sentence."
         abilities: dict[str, str] = {}
         for l in seg:
-            m2 = re.match(r"^([A-Z][^:]{2,60}):\s+(.+)$", l)
+            m2 = re.match(r"^([A-Z0-9][^:]{2,60}):\s+(.+)$", l)
             if m2 and not l.startswith("Global Rule"):
                 abilities[m2.group(1).strip()] = m2.group(2).strip()
 
@@ -78,11 +78,18 @@ def parse_paths(lines: list[str]) -> dict:
         # Manipulation 3" — and the description is written once under the bare name.
         # Resolving them here means the sheet can show the text beside every rank
         # instead of blanking four rows in five.
-        resolved, undescribed = {}, []
+        resolved, upgrades, core, undescribed = {}, {}, [], []
         for listed in {a for row in tiers.values() for a in row}:
             key = _match(listed, abilities)
             if key:
                 resolved[listed] = key
+                continue
+            parent, detail = _upgrade_of(listed, abilities)
+            if parent:
+                resolved[listed] = parent
+                upgrades[listed] = detail
+            elif _strip(listed) in CORE_ABILITIES:
+                core.append(listed)
             else:
                 undescribed.append(listed)
 
@@ -92,6 +99,11 @@ def parse_paths(lines: list[str]) -> dict:
             "tiers": {k: tiers[k] for k in sorted(tiers)},
             "abilities": abilities,
             "resolves": resolved,
+            # A rank whose text lives inside its parent's sentence, and the parenthetical
+            # that distinguishes it: "Mighty Blood Rage" -> "+4 attack/damage, +4 Temp HP/HD".
+            "upgrades": upgrades,
+            # Named here, defined by the Core Rulebook. A reference, not an omission.
+            "core": sorted(core),
             # Named on the table and never written up. Recorded rather than dropped:
             # the page can say "the source names this and does not describe it", which
             # is the truth, where a silent blank would read as a bug in the app.
@@ -114,6 +126,27 @@ def _match(listed: str, abilities: dict) -> str:
         if _strip(key) == want:
             return key
     return ""
+
+
+# Abilities the Core Rulebook already defines. Naming one on a homebrew table is a
+# reference, not an omission, and reporting it as undescribed says the document is
+# missing something it had no reason to write.
+CORE_ABILITIES = {"uncanny dodge", "improved uncanny dodge", "evasion",
+                  "improved evasion", "combat expertise", "combat reflexes"}
+
+
+def _upgrade_of(listed: str, abilities: dict) -> tuple[str, str]:
+    """A rank described inside another ability's sentence, as parent and detail.
+
+    "Upgrades to Greater Blood Rage (+3 attack/damage, +3 Temp HP/HD) and Mighty Blood
+    Rage (+4 ...)" defines two abilities without giving either its own heading. Reading
+    only headings reported both as undescribed, which is what the author corrected.
+    """
+    for key, text in abilities.items():
+        m = re.search(rf"{re.escape(listed)}\s*\(([^)]+)\)", text, re.I)
+        if m:
+            return key, m.group(1).strip()
+    return "", ""
 
 
 def main() -> int:

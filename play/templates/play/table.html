@@ -1934,9 +1934,13 @@ function tabClass(s) {
               <div class="tier"><b>Control Blood ${esc(tier)}</b>
                 ${names.map(n => {
                   const key = (det.resolves || {})[n];
+                  const up = (det.upgrades || {})[n];
+                  const core = (det.core || []).includes(n);
                   const text = key ? (det.abilities || {})[key] : "";
                   return `<div class="ab-line"><span>${esc(n)}</span>
-                    <em>${text ? esc(text)
+                    <em>${up ? `<b>${esc(up)}</b> — upgrade of ${esc(key)}: ${esc(text)}`
+                      : text ? esc(text)
+                      : core ? "a Core Rulebook ability; see the rules reference"
                       : "named on the table; the source does not describe it"}</em>
                   </div>`;
                 }).join("")}</div>`).join("")}

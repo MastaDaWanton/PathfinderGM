@@ -345,20 +345,22 @@
         "Blood Rain": "Full-round action. Sacrifice 20% max HP as Non-Lethal damage to convert all active Blood Pools within range into falling spikes over a 30-ft radius. Deals Blood DMG ×5 and applies 2 blood stacks to all targets in the area."
       },
       "resolves": {
-        "Heart-Seeker Spike": "Heart-Seeker Spike",
-        "Splintering Spike": "Splintering Spike",
-        "Blood Mine": "Blood Mine",
-        "Hemorrhagic Eruption": "Hemorrhagic Eruption",
+        "Blood Boil": "Blood Boil",
+        "Blood Rain": "Blood Rain",
+        "Blood Volley": "Blood Volley",
         "Blood Bomb": "Blood Bomb",
         "Blood Spike Projectile": "Blood Spike Projectile",
-        "Blood Volley": "Blood Volley",
-        "Blood Rain": "Blood Rain",
-        "Blood Pool Manifestation": "Blood Pool Manifestation",
         "Pool Resonance": "Pool Resonance",
+        "Splintering Spike": "Splintering Spike",
+        "Heart-Seeker Spike": "Heart-Seeker Spike",
         "Siphon Pool": "Siphon Pool",
-        "Blood Boil": "Blood Boil",
-        "Crimson Torrent": "Crimson Torrent"
+        "Blood Mine": "Blood Mine",
+        "Blood Pool Manifestation": "Blood Pool Manifestation",
+        "Crimson Torrent": "Crimson Torrent",
+        "Hemorrhagic Eruption": "Hemorrhagic Eruption"
       },
+      "upgrades": {},
+      "core": [],
       "undescribed": []
     },
     "coagulator": {
@@ -412,24 +414,26 @@
         "Avatar of Coagulation": "1/day free action. Become a blood behemoth for 1 minute: Size increases by one category, base DR/- doubles, Non-Lethal damage taken is reduced by 50%, and when an enemy within range attacks an ally, spend an immediate action to strike them for Fist DMG and pull them adjacent to you."
       },
       "resolves": {
-        "Iron Clot (DR 5/-)": "Iron Clot",
         "Aggressive Draw": "Aggressive Draw",
-        "Exsanguinating Taunt": "Exsanguinating Taunt",
         "Sanguine Spray": "Sanguine Spray",
-        "Coagulated Plate": "Coagulated Plate",
-        "Iron Clot (DR 12/-)": "Iron Clot",
-        "Caustic Blood": "Caustic Blood",
-        "Iron Clot (DR 2/-)": "Iron Clot",
-        "Blood Sponge": "Blood Sponge",
-        "Avatar of Coagulation": "Avatar of Coagulation",
-        "Hemophormic Retribution": "Hemophormic Retribution",
-        "Crimson Guard": "Crimson Guard",
-        "Clotting Shield": "Clotting Shield",
-        "Blood Spatter Aura": "Blood Spatter Aura",
-        "Sanguine Siphon": "Sanguine Siphon",
+        "Exsanguinating Taunt": "Exsanguinating Taunt",
         "Viscous Threat": "Viscous Threat",
-        "Iron Clot (DR 8/-)": "Iron Clot"
+        "Iron Clot (DR 2/-)": "Iron Clot",
+        "Avatar of Coagulation": "Avatar of Coagulation",
+        "Iron Clot (DR 8/-)": "Iron Clot",
+        "Iron Clot (DR 12/-)": "Iron Clot",
+        "Crimson Guard": "Crimson Guard",
+        "Caustic Blood": "Caustic Blood",
+        "Blood Spatter Aura": "Blood Spatter Aura",
+        "Hemophormic Retribution": "Hemophormic Retribution",
+        "Coagulated Plate": "Coagulated Plate",
+        "Sanguine Siphon": "Sanguine Siphon",
+        "Clotting Shield": "Clotting Shield",
+        "Iron Clot (DR 5/-)": "Iron Clot",
+        "Blood Sponge": "Blood Sponge"
       },
+      "upgrades": {},
+      "core": [],
       "undescribed": []
     },
     "blood commander": {
@@ -477,22 +481,24 @@
         "Forced Mitosis": "1/day. Double current health and duplicate created hemophorms/weapons for free until end of combat."
       },
       "resolves": {
-        "Blood Javelin": "Blood Javelin",
-        "Forced Mitosis": "Forced Mitosis",
-        "Blood Buffer 3NLDR": "Blood Buffer",
+        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
         "Mass Rupture": "Mass Rupture",
+        "Blood Shatter": "Blood Shatter",
+        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
         "DMG Purge": "DMG Purge",
         "Blood Transfer": "Blood Transfer",
+        "Blood Javelin": "Blood Javelin",
         "Extracorporeal Blood Manipulation 5": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 3": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
-        "Extracorporeal Blood Manipulation 1": "Extracorporeal Blood Manipulation",
+        "Blood Siphon": "Blood Siphon",
         "Blood Buffer 2NLDR": "Blood Buffer",
-        "Blood Transfusion": "Blood Transfusion",
-        "Blood Shatter": "Blood Shatter",
-        "Extracorporeal Blood Manipulation 2": "Extracorporeal Blood Manipulation",
-        "Blood Siphon": "Blood Siphon"
+        "Forced Mitosis": "Forced Mitosis",
+        "Extracorporeal Blood Manipulation 4": "Extracorporeal Blood Manipulation",
+        "Blood Buffer 3NLDR": "Blood Buffer",
+        "Blood Transfusion": "Blood Transfusion"
       },
+      "upgrades": {},
+      "core": [],
       "undescribed": []
     },
     "battle blood": {
@@ -540,29 +546,35 @@
         "Blood Burst": "Standard action. Eject blood dealing 20% current HP in lethal damage to self. Area enemies take Blood DMG on failed Reflex save (DC 10+12LVL+CONmod) and gain 1 blood stack. Allies get +5 on save. Radius scales from 20 ft to 40 ft and 60 ft.",
         "Blood Booster": "Free action to boost STR, DEX, FORT, or REF by taking increasing nonlethal dmg. +1 to the modifier--2d6 non-lethal dmg. the cost is doubled for every additional +1",
         "Extracorporeal Blood Rage Armor": "Gain 50% resistance to physical damage while in Blood Rage.",
-        "Rupture Self": "1/day standard action. Explode dealing 100% current HP in lethal damage to self and Blood DMG to enemies in 60 ft (Reflex save). Turn into a blood pool for 1 round, then reform next turn recalled stacks, healing Blood DMG per stack and resetting Non-Lethal damage."
+        "Rupture Self": "1/day standard action. Explode dealing 100% current HP in lethal damage to self and Blood DMG to enemies in 60 ft (Reflex save). Turn into a blood pool for 1 round, then reform next turn recalled stacks, healing Blood DMG per stack and resetting Non-Lethal damage.",
+        "1-2-Punch": "Subsequent attacks on the same target hit twice, dealing damage and applying on-hit effects twice."
       },
       "resolves": {
-        "Blood Burst 60ft": "Blood Burst",
         "Vortex Pull": "Vortex Pull",
-        "Blood Burst 40ft": "Blood Burst",
-        "Blood Burst 20ft": "Blood Burst",
-        "Blood Booster": "Blood Booster",
-        "Swift Strikes": "Swift Strikes",
         "Extracorporeal Blood Rage Armor": "Extracorporeal Blood Rage Armor",
-        "Blood Rage": "Blood Rage",
-        "Rupture Self 60ft": "Rupture Self",
-        "Coagulant Stacks": "Coagulant Stacks",
         "Extracorporeal Blood Armament": "Extracorporeal Blood Armament",
+        "1-2-Punch": "1-2-Punch",
+        "Rupture Self 60ft": "Rupture Self",
         "Vampiric Recovery": "Vampiric Recovery",
-        "Battle Blood Ki Pool": "Battle Blood Ki Pool"
+        "Swift Strikes": "Swift Strikes",
+        "Battle Blood Ki Pool": "Battle Blood Ki Pool",
+        "Blood Rage": "Blood Rage",
+        "Coagulant Stacks": "Coagulant Stacks",
+        "Greater Blood Rage": "Blood Rage",
+        "Blood Booster": "Blood Booster",
+        "Blood Burst 20ft": "Blood Burst",
+        "Blood Burst 60ft": "Blood Burst",
+        "Mighty Blood Rage": "Blood Rage",
+        "Blood Burst 40ft": "Blood Burst"
       },
-      "undescribed": [
-        "1-2-Punch",
-        "Greater Blood Rage",
-        "Mighty Blood Rage",
+      "upgrades": {
+        "Greater Blood Rage": "+3 attack/damage, +3 Temp HP/HD",
+        "Mighty Blood Rage": "+4 attack/damage, +4 Temp HP/HD"
+      },
+      "core": [
         "Uncanny Dodge"
-      ]
+      ],
+      "undescribed": []
     }
   },
   "_paths_note": "Imported from the author's own document by tools/import_blood_paths.py. Abilities are tiered by Control Blood level (1-5), which is what 'control blood 1a' through '5b' on the progression table refers to — not by character level. Descriptions are the document's own sentences, unedited: the engine executes none of them yet, so what the app shows is what the author wrote rather than a paraphrase of it."

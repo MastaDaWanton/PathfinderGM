@@ -179,12 +179,36 @@ def test_a_scaled_ability_finds_the_text_written_under_its_bare_name():
     assert bb["abilities"]["Blood Burst"]
 
 
-def test_abilities_the_document_never_describes_are_recorded_as_such():
-    """Battle Blood's table names four the document never writes up. Recorded rather
-    than dropped, so the page can say so instead of showing a blank nobody explains."""
+def test_a_rank_described_inside_its_parents_sentence_is_found():
+    """I reported four Battle Blood abilities as undescribed and the author corrected
+    me on every one. Two are ranks defined inside Blood Rage's own sentence —
+    "Upgrades to Greater Blood Rage (+3 attack/damage, +3 Temp HP/HD) and Mighty Blood
+    Rage (+4 ...)" — which reading only headings could never see."""
     bb = leveling.path_detail("blood bending", "battle blood")
-    assert "Mighty Blood Rage" in bb["undescribed"]
-    assert leveling.path_detail("blood bending", "coagulator")["undescribed"] == []
+    assert bb["resolves"]["Mighty Blood Rage"] == "Blood Rage"
+    assert bb["upgrades"]["Mighty Blood Rage"] == "+4 attack/damage, +4 Temp HP/HD"
+    assert bb["upgrades"]["Greater Blood Rage"] == "+3 attack/damage, +3 Temp HP/HD"
+
+
+def test_an_ability_whose_name_starts_with_a_digit_is_read():
+    """"1-2-Punch" was skipped because the definition pattern insisted on a capital
+    letter, so a fully-written ability was reported as missing."""
+    bb = leveling.path_detail("blood bending", "battle blood")
+    assert bb["abilities"]["1-2-Punch"].startswith("Subsequent attacks")
+
+
+def test_a_core_rulebook_ability_is_a_reference_not_an_omission():
+    """Uncanny Dodge is 1e's, and naming it on a homebrew table is a citation. Calling
+    it undescribed said the document was missing something it had no reason to write."""
+    bb = leveling.path_detail("blood bending", "battle blood")
+    assert bb["core"] == ["Uncanny Dodge"]
+
+
+def test_every_listed_ability_now_resolves_to_something():
+    """62 of 62 — nothing on any path's table is left unexplained."""
+    for name in leveling.paths_for("blood bending"):
+        det = leveling.path_detail("blood bending", name)
+        assert det["undescribed"] == [], (name, det["undescribed"])
 
 
 def test_the_page_shows_the_tiers_and_is_honest_about_the_engine():
