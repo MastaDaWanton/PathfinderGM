@@ -18,6 +18,8 @@ What is deliberately simple, stated so it reads as a decision:
 """
 from __future__ import annotations
 
+import re
+
 from . import casting, classes as classes_mod, feats as feats_mod, houserules
 from .sheet import from_dict
 from .tables import ARMOUR, SKILLS, WEAPONS
@@ -101,6 +103,36 @@ SPELLS_KNOWN: dict[str, object] = {
 }
 
 
+def max_hit_die(spec) -> int:
+    """The best a class's first-level hit die can roll.
+
+    A hit die is not always a number. The Core classes declare `8` or `12`, and a
+    homebrew class is free to declare notation — Blood Bending ships `"2d8"`, and
+    `int("2d8")` raised a ValueError that reached the browser as a 500, which the
+    forge showed as a button that did nothing at all. Anything unreadable falls back
+    to a d8: refusing to build the character over its hit die would be a worse answer
+    than the commonest die in the game.
+    """
+    if isinstance(spec, (int, float)):
+        return max(1, int(spec))
+    text = str(spec).strip().lower()
+    if text.isdigit():
+        return max(1, int(text))
+    m = re.fullmatch(r"(\d*)d(\d+)\s*(?:([+-])\s*(\d+))?", text)
+    if not m:
+        return 8
+    count = int(m.group(1) or 1)
+    total = count * int(m.group(2))
+    if m.group(3):
+        total += int(m.group(4)) * (-1 if m.group(3) == "-" else 1)
+    return max(1, total)
+
+
+def die_label(spec) -> str:
+    """How a hit die is written on a class card. `8` is a d8; `"2d8"` is already said."""
+    return f"d{spec}" if isinstance(spec, (int, float)) or str(spec).isdigit() else str(spec)
+
+
 def _feat_index() -> list[dict]:
     from collections import Counter
 
@@ -120,7 +152,11 @@ def options() -> dict:
         "races": [{"id": rid, **{k: v for k, v in r.items() if k != "bonus_feat"}}
                   for rid, r in RACES.items()],
         "classes": [{"id": cid, "name": c.get("name", cid.title()),
-                     "hit_die": c["hit_die"], "bab": c["bab"],
+                     # A homebrew class may declare notation rather than a number, so
+                     # the label is made here rather than by pasting a "d" on the front
+                     # in the template — Blood Bending's card read "d2d8".
+                     "hit_die": c["hit_die"], "die_label": die_label(c["hit_die"]),
+                     "bab": c["bab"],
                      "good_saves": c["good_saves"], "skill_ranks": c["skill_ranks"],
                      "class_skills": c.get("class_skills", []),
                      "summary": c.get("summary", ""),
@@ -256,7 +292,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
 
     # --- assemble, exactly the pregen shape ------------------------------------------
     kit = KITS.get(cid, {"weapons": ["dagger"], "armour": "none"})
-    hp = max(1, int(cls["hit_die"]) + con_mod)   # max die at first level, the kind rule
+    hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
     sheet = {
         "name": name, "kind": "pc", "class": cid, "level": 1,
         "race": next(k for k, v in RACES.items() if v is race),

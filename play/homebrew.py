@@ -250,8 +250,11 @@ def rows_for(bench_id: str) -> list[dict]:
     if bench_id == "consumables":
         pass                      # nothing ships; the bench exists to be authored into
     elif bench_id == "classes":
+        from rules.creation import die_label
+
         rows += [{"name": v["name"], "kind": "class", "mine": False, "id": k,
-                  "note": f"d{v['hit_die']} · {v['bab'].replace('_', ' ')} BAB · "
+                  "note": f"{die_label(v['hit_die'])} · "
+                          f"{v['bab'].replace('_', ' ')} BAB · "
                           f"{v['skill_ranks']}+Int skills · good "
                           f"{', '.join(v['good_saves'])}"}
                  for k, v in CLASSES.items()]

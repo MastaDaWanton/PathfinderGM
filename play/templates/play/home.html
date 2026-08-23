@@ -1213,7 +1213,8 @@ function paneForge() {
       <button class="card pick ${f.class === c.id ? "on" : ""}" data-crclass="${c.id}">
         <h3>${esc(c.name)}</h3>
         <em>${esc(c.summary || "")}</em>
-        <div class="stat">d${c.hit_die} · ${esc(String(c.bab).replace("_", " "))} BAB ·
+        <div class="stat">${esc(c.die_label || `d${c.hit_die}`)} ·
+          ${esc(String(c.bab).replace("_", " "))} BAB ·
           ${c.skill_ranks}+Int skills${c.caster ? " · caster" : ""}</div>
         <div class="traits">${(c.features || []).map(esc).join(" · ")}</div>
       </button>`).join("")}</div>
@@ -1272,16 +1273,36 @@ async function forgeSubmit(begin) {
   const f = FORGE.form;
   const payload = { ...f, begin: !!begin };
   delete payload.featstext; delete payload.spellstext;
-  const r = await fetch("/api/character/create", {
-    method: "POST", headers: { "Content-Type": "application/json",
-      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
-    body: JSON.stringify(payload),
-  });
-  const d = await r.json();
+  const say = lines => { $("#forgeproblems").innerHTML = `<div class="problems">${
+    lines.map(p => `<div>${esc(p)}</div>`).join("")}</div>`; };
+
+  let r, d;
+  try {
+    r = await fetch("/api/character/create", {
+      method: "POST", headers: { "Content-Type": "application/json",
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    say([`The app could not be reached: ${err}`]); return;
+  }
+  // Not `await r.json()` on its own. A server error answers with Django's HTML debug
+  // page, that throws a SyntaxError inside this async handler, and an unhandled
+  // rejection is invisible: the button did nothing, said nothing, and logged nothing.
+  // A crash the user cannot see is worse than the crash. Blood Bending's "2d8" hit die
+  // was reaching `int()` and 500ing exactly here.
+  const body = await r.text();
+  try {
+    d = JSON.parse(body);
+  } catch {
+    const summary = (body.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "")
+      .replace(/\s+/g, " ").trim();
+    say([`The server failed with ${r.status} and did not answer in JSON.`,
+         summary || body.slice(0, 200)]);
+    return;
+  }
   if (!r.ok) {
-    $("#forgeproblems").innerHTML = `<div class="problems">${
-      (d.problems || [d.error || "something refused"]).map(p =>
-        `<div>${esc(p)}</div>`).join("")}</div>`;
+    say(d.problems || [d.error || "something refused"]);
     return;
   }
   if (begin) { window.location.href = "/play/"; return; }

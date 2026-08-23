@@ -280,3 +280,69 @@ def test_the_forge_sends_you_where_the_new_character_is():
     assert 'window.location.href = `/?made=${encodeURIComponent(d.id)}`' in page
     assert 'let TAB = MADE ? "characters" : "worlds"' in page
     assert "madebanner" in page
+
+
+# --- the class the wizard could not build (found by mouse, 2026-08-22) ----------------
+
+def test_every_class_on_the_menu_can_actually_be_built():
+    """Reported as "I click the button and nothing happens", on a half-orc Blood Bender.
+
+    `test_every_kit_survives_the_sheet_validator` walked `creation.KITS`, and Blood
+    Bending has no kit — so the one class that could not be built was the one class
+    the loop never tried. This walks what the wizard actually *offers*, which is the
+    only list that matches what a player can click.
+
+    The crash: Blood Bending declares `"hit_die": "2d8"` and `int("2d8")` raised a
+    ValueError, which reached the browser as a 500 the forge rendered as nothing at all.
+    """
+    opts = creation.options()
+    assert any(c["id"] == "blood bending" for c in opts["classes"])
+    for c in opts["classes"]:
+        built, problems = creation.build({
+            "name": f"Menu test {c['id']}", "race": "human", "bonus_ability": "con",
+            "class": c["id"],
+            "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
+                          "wis": 12, "cha": 12},
+            "skills": [], "feats": [],
+        })
+        assert problems == [], (c["id"], problems)
+        from_dict(built["sheet"])
+
+
+def test_a_hit_die_may_be_written_as_notation():
+    """Core classes say `8`; a homebrew class may say `2d8`, and its first level takes
+    the maximum of it like everybody else's."""
+    assert creation.max_hit_die(8) == 8
+    assert creation.max_hit_die("8") == 8
+    assert creation.max_hit_die("2d8") == 16
+    assert creation.max_hit_die("d10") == 10
+    assert creation.max_hit_die("1d8+2") == 10
+    # Unreadable is a d8 rather than a refusal: losing the character over its hit die
+    # would be the worse answer.
+    assert creation.max_hit_die("a fistful of dice") == 8
+
+
+def test_a_blood_bender_gets_the_hit_points_the_class_grants():
+    built, problems = creation.build(spec(**{"class": "blood bending"},
+                                          skills=[], feats=["toughness"]))
+    assert problems == [], problems
+    # 2d8 maxed is 16, and the dwarf's Con 16 adds 3.
+    assert built["sheet"]["hp"] == 16 + 3
+
+
+def test_a_class_card_never_reads_d2d8():
+    assert creation.die_label(8) == "d8"
+    assert creation.die_label("2d8") == "2d8"
+    labels = {c["id"]: c["die_label"] for c in creation.options()["classes"]}
+    assert labels["blood bending"] == "2d8" and labels["fighter"] == "d10"
+
+
+def test_the_forge_survives_a_server_that_answers_in_html():
+    """The 500 was invisible because the page did `await r.json()` on Django's HTML
+    debug page: a SyntaxError inside an async click handler is an unhandled rejection,
+    and the button did nothing, said nothing and logged nothing."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "const body = await r.text();" in page
+    assert "did not answer in JSON" in page
