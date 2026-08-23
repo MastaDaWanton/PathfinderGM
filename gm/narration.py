@@ -166,12 +166,25 @@ def _bad_hand_back(sentence: str) -> bool:
                 and not _STILL_AN_ACTION.search(sentence))
 
 
+def _closing_question(text: str):
+    """The hand-back itself: the final sentence, and only when it is a question.
+
+    Anything earlier is dialogue or rhetoric — "'What do you need?' you ask the
+    guildhand" is the player's character speaking, not the narrator handing over, and
+    judging it as the hand-back would fix the wrong sentence.
+    """
+    if not (text or "").rstrip().endswith("?"):
+        return None
+    questions = [m for m in _QUESTION.finditer(text) if m.group().strip()]
+    return questions[-1] if questions else None
+
+
 def asks_player_to_narrate(text: str) -> str:
     """The closing question, if it asks the player to describe the world. Else ""."""
-    questions = [m for m in _QUESTION.finditer(text or "") if m.group().strip()]
-    if not questions:
+    found = _closing_question(text)
+    if found is None:
         return ""
-    last = questions[-1].group().strip()
+    last = found.group().strip()
     return last if _bad_hand_back(last) else ""
 
 
@@ -187,10 +200,9 @@ def fix_hand_back(text: str) -> tuple[str, str]:
     whitespace shift between the extracted sentence and the text it came from turns the
     replacement into a silent no-op.
     """
-    questions = [m for m in _QUESTION.finditer(text or "") if m.group().strip()]
-    if not questions or not _bad_hand_back(questions[-1].group().strip()):
+    span = _closing_question(text)
+    if span is None or not _bad_hand_back(span.group().strip()):
         return text, ""
-    span = questions[-1]
     gone = span.group().strip()
     fixed = (text[:span.start()] + span.group()[:len(span.group())
                                                 - len(span.group().lstrip())]
@@ -228,11 +240,23 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
 
     # 6. The turn is not handed back. Every example ends by asking the player something,
     #    and a turn that closes on a full stop tends to close the fiction with it.
-    if min_chars and "?" not in text:
+    #    Tested on the *ending*, not on the presence of a question mark anywhere. A turn
+    #    that closed "'What do you need?' you ask the guildhand, trying to keep your tone
+    #    neutral." satisfied `"?" in text` on its own dialogue punctuation and shipped: the
+    #    player's character asked a question, nobody answered it, and the scene stopped
+    #    with nothing handed back.
+    #
+    #    Stripping the speech first and looking for a question mark in what is left would
+    #    also have caught that one, and is the weaker rule: it still accepts a question
+    #    buried three sentences from the end. The hand-back is by definition the last
+    #    thing in the turn, so that is what is checked.
+    if min_chars and not text.rstrip().endswith("?"):
         out.findings.append(Finding(
-            "no-hand-back", "does not ask the player anything",
-            "End by handing the turn to the player with a real question about what they "
-            "do next.",
+            "no-hand-back", f"ends on {text.rstrip()[-40:]!r}, not on a question",
+            "The turn has to end by handing back to the player, and the last thing in it "
+            "must be that question. If they asked somebody something, the answer is what "
+            "this turn is for — give it to them in the person's own words, let them react, "
+            "and then ask what the player does.",
         ))
 
     # 6b. Handed back, but by asking the player to do the narrating. The rule above is

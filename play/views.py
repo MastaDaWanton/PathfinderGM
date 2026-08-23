@@ -455,6 +455,15 @@ def prepare_spells(request):
     return JsonResponse(full_sheet(pc))
 
 
+# What the Continue button sends. Written as an instruction to the GM rather than as
+# something the character does, because the whole point is that the player is *not*
+# acting: a turn that put "I wait" in the box would have the character stand there while
+# the question they just asked went on not being answered.
+CARRY_ON = ("I take no action. Carry the scene on from where it stopped: if I asked "
+            "somebody something, let them answer in their own words, and let the people "
+            "and the place here go on doing what they were doing.")
+
+
 @require_POST
 def say(request):
     """A player turn: GM call 1, validation, resolution."""
@@ -464,17 +473,34 @@ def say(request):
             {"error": "There is a roll waiting on you."}, status=409
         )
 
-    text = (json.loads(request.body or "{}").get("text") or "").strip()
+    body = json.loads(request.body or "{}")
+    text = (body.get("text") or "").strip()
+
+    # Continue: the player is not acting, and is asking the scene to go on without them.
+    # It exists because a turn can stop with nothing to answer — the GM narrated the
+    # character asking the guildhand a question and then ended the beat, so there was no
+    # reply and nothing to type that was not an action the player did not want to take.
+    # The line is written here rather than typed into the box, so it cannot be mistaken
+    # for a declaration and cannot be refused by the check below.
+    carry_on = bool(body.get("carry_on"))
+    if carry_on:
+        text = CARRY_ON
     if not text:
         return JsonResponse({"error": "say something"}, status=400)
+    # The GM is told the whole instruction; the player sees the button they pressed.
+    # Printing the instruction back as though they had typed it would put words in
+    # their mouth on the one turn whose entire point is that they said nothing.
+    shown = "…" if carry_on else text
 
     # The player controls one character; the GM controls the world. A turn that declares
     # what the world does is handed back rather than resolved — gently, and without
     # consuming the turn, because the player has not done anything wrong so much as
     # reached across the table.
-    said = player_input.check(text)
-    if not said.ok:
-        return JsonResponse({"hint": said.hint, "offending": said.offending}, status=422)
+    if not carry_on:
+        said = player_input.check(text)
+        if not said.ok:
+            return JsonResponse({"hint": said.hint, "offending": said.offending},
+                                status=422)
 
     # A character at or below 0 hit points does not get a turn. Nothing used to ask:
     # Kesst was dying at -3, the player typed "now what", and the GM cheerfully narrated
@@ -485,7 +511,7 @@ def say(request):
 
     pc = c.scene.pc()
     if downed.state_of(pc) not in ("fine", "disabled"):
-        c.transcript.append({"who": "player", "text": text})
+        c.transcript.append({"who": "player", "text": shown})
         outcome = downed.resolve(c)
         for line in outcome.lines:
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
@@ -496,7 +522,7 @@ def say(request):
         c.save()
         return JsonResponse(_state(c))
 
-    c.transcript.append({"who": "player", "text": text})
+    c.transcript.append({"who": "player", "text": shown})
     world = c.world
     agent = GMAgent(world, c.engine())
 

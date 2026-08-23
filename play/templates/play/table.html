@@ -1086,6 +1086,12 @@
     <form id="sayform" autocomplete="off">
       <input type="text" id="input" placeholder="What do you do?" autofocus>
       <button type="submit" id="send">Say</button>
+      <!-- For the turn that stops mid-scene: your character asks a question and
+           nobody answers it, and there is nothing to type because you have already
+           done the thing. This asks the GM to carry on rather than making you invent
+           an action you did not want to take. -->
+      <button type="button" id="carryon" class="quiet"
+              title="Let the scene continue without acting">Continue</button>
     </form>
   </footer>
 </main>
@@ -1507,17 +1513,14 @@ async function sendRoll(face) {
   finally { busy(false); }
 }
 
-$("#sayform").onsubmit = async e => {
-  e.preventDefault();
-  const text = $("#input").value.trim();
-  if (!text) return;
+async function takeTurn(body, clearInput) {
   $("#err").textContent = "";
   $("#err").className = "";
   busy(true);
   try {
-    const s = await post("/api/say", {text});
+    const s = await post("/api/say", body);
     render(s);
-    $("#input").value = "";          // cleared only once the turn was taken
+    if (clearInput) $("#input").value = "";   // cleared only once the turn was taken
     if (s.ended) showDeath(s);
   }
   catch (err) {
@@ -1525,7 +1528,17 @@ $("#sayform").onsubmit = async e => {
     if (err.hint) $("#err").className = "hint";
   }
   finally { busy(false); }
+}
+
+$("#sayform").onsubmit = e => {
+  e.preventDefault();
+  const text = $("#input").value.trim();
+  if (text) takeTurn({text}, true);
 };
+
+// No `text` at all. The server knows what an empty continue means and writes the
+// player's line itself, so nothing has to be typed and nothing invented on their behalf.
+$("#carryon").onclick = () => takeTurn({carry_on: true}, false);
 
 /* ---- The full character sheet -------------------------------------------------
    Section names are the Pathfinder Player Character Folio's own, so a player who

@@ -117,3 +117,95 @@ def test_the_turn_log_records_which_model_spoke():
 
     saved = Path("play/views.py").read_text(encoding="utf-8")
     assert '"model": a.model' in saved
+
+
+# --- the turn that stopped with nothing to answer (found in play, 2026-08-22) --------
+
+DEAD_END = (
+    "You quickly dress yourself, pulling on your worn leather tunic and cinching your "
+    "belt around your waist. The guildhand's eyes flicker towards you as you move, his "
+    "expression still wary but slightly less tense than before. His gaze lingers on the "
+    "small pouch at your side, where you keep your few remaining lucite crystals. You "
+    "take a deep breath, trying to calm the air of unease that seems to cling to "
+    "everything in this room. The woman on the bed stirs, her dark eyes fluttering open "
+    "as she takes in the scene before her. She looks pale and drawn, with dark circles "
+    "under her eyes. 'What do you need?' you ask the guildhand, trying to keep your "
+    "tone neutral."
+)
+
+
+def test_a_question_mark_inside_dialogue_is_not_a_hand_back():
+    """Verbatim from a live turn. The rule tested `"?" in text`, the character's own
+    speech supplied the question mark, and the beat shipped: the player's character
+    asked the guildhand something, nobody answered, and the scene stopped with nothing
+    for the player to respond to."""
+    review = narration.review(DEAD_END, min_chars=320)
+    assert "no-hand-back" in {f.kind for f in review.findings}
+
+
+def test_a_question_three_sentences_from_the_end_is_still_not_a_hand_back():
+    """Why the ending is tested rather than the un-quoted body.
+
+    Stripping the speech would have caught the turn above too — but it accepts any
+    question anywhere, including one the narration has since walked away from. The
+    hand-back is by definition the last thing in the turn.
+    """
+    text = ("What kind of person keeps a room like this? " + "The lamp swings out over "
+            "the yard and back again. " * 10)
+    assert "?" in narration.unquoted(text)          # the weaker rule would pass this
+    assert "no-hand-back" in {f.kind for f in narration.review(text, min_chars=320).findings}
+
+
+def test_the_players_own_speech_is_never_mistaken_for_the_hand_back():
+    """`asks_player_to_narrate` reads the *closing* question. Before it required the
+    text to end on one, it would have judged "'What do you need?'" — the character
+    speaking — and rewritten a line of dialogue into "What do you do?"."""
+    assert narration.asks_player_to_narrate(DEAD_END) == ""
+    assert narration.fix_hand_back(DEAD_END) == (DEAD_END, "")
+
+
+def test_a_turn_that_ends_on_a_full_stop_is_flagged_however_long_it_is():
+    text = "The lamp swings out over the yard and back again. " * 12
+    review = narration.review(text, min_chars=320)
+    assert "no-hand-back" in {f.kind for f in review.findings}
+
+
+# --- Continue: a turn the player takes by not acting ---------------------------------
+
+def test_continue_sends_an_instruction_to_the_gm_not_an_action():
+    """"maybe we should add a continue button to ask the narrator to keep going."
+
+    The line is written by the server, not typed into the box: a turn that put "I wait"
+    in the input would have the character stand there while the question they had just
+    asked went on not being answered."""
+    from play.views import CARRY_ON
+
+    assert "take no action" in CARRY_ON
+    assert "answer" in CARRY_ON
+
+
+def test_continue_shows_the_player_nothing_they_did_not_say():
+    """The GM is given the whole instruction; the transcript shows the button. Printing
+    the instruction back would put words in their mouth on the one turn whose entire
+    point is that they said none."""
+    from pathlib import Path
+
+    view = Path("play/views.py").read_text(encoding="utf-8")
+    assert 'shown = "…" if carry_on else text' in view
+    assert '"who": "player", "text": shown' in view
+    assert '"who": "player", "text": text' not in view
+
+    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    assert 'id="carryon"' in page
+    assert "takeTurn({carry_on: true}, false)" in page
+
+
+def test_continue_is_not_run_through_the_declaration_check():
+    """`player_input.check` refuses a turn that narrates the world — which is exactly
+    what this instruction asks the GM to do. Routing it through the check would make
+    the button refuse itself."""
+    from pathlib import Path
+
+    view = Path("play/views.py").read_text(encoding="utf-8")
+    assert "if not carry_on:" in view
+    assert "said = player_input.check(text)" in view
