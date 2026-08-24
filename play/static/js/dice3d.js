@@ -1,39 +1,23 @@
-/* A real die, in three dimensions, shared by everything in the app that rolls one.
+/* Real dice, in three dimensions, shared by everything in the app that rolls one.
  *
- * An icosahedron built from its own geometry rather than from twenty hand-written CSS
- * transforms: the twelve vertices are the golden-ratio construction, the twenty faces are
- * found by taking every triple of vertices an edge apart, and each face is placed with a
- * `matrix3d` assembled from that face's own basis. Hand-transcribing twenty transforms is
- * the kind of thing that is wrong in one place and nobody ever finds out which.
+ * Every die is its own solid now — "this is 2 d20s, that is a d10": a d4 is a
+ * tetrahedron, a d6 a cube, a d8 an octahedron, a d10 a pentagonal trapezohedron with
+ * kite faces, a d12 a dodecahedron, a d20 an icosahedron, and a d100 is the percentile
+ * pair of d10s every table actually throws. Each is built from its own vertex
+ * construction rather than hand-written CSS transforms, for the same reason the
+ * icosahedron was: twenty (or twelve, or ten) hand-transcribed transforms is the kind
+ * of thing that is wrong in one place and nobody finds out which.
  *
  * The die lands on the number the *server* rolled. Nothing here decides anything — the
- * faces flickering during the tumble are decoration, thrown away, and the landing
- * orientation is computed from a result that arrived before the animation started. A die
- * that decided its own result would be a second source of randomness in an app whose whole
- * design is that the engine owns the dice.
- *
- * One shape for every die. A d20 numbers its faces 1-20 and lands on the rolled one. For
- * anything else — a d8 for hit points, a pooled 2d6 for damage — the faces are labelled
- * with that die's own values (repeated across twenty faces where there are fewer than
- * twenty) and it still lands on a face bearing the true number. It is a d20-shaped object
- * showing d8 numbers, which is a compromise; the alternative was five more polyhedra, and
- * every number you can read is true either way.
+ * tumble is decoration, thrown away, and the landing orientation is computed from a
+ * result that arrived before the animation started. A die that decided its own result
+ * would be a second source of randomness in an app whose whole design is that the
+ * engine owns the dice.
  */
 (function () {
   "use strict";
 
   var PHI = (1 + Math.sqrt(5)) / 2;
-
-  // The twelve vertices: three golden rectangles at right angles. Edge length is 2.
-  function vertices() {
-    var v = [];
-    [-1, 1].forEach(function (a) {
-      [-PHI, PHI].forEach(function (b) {
-        v.push([0, a, b], [a, b, 0], [b, 0, a]);
-      });
-    });
-    return v;
-  }
 
   function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
   function cross(a, b) {
@@ -43,84 +27,220 @@
   function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
   function len(a) { return Math.sqrt(dot(a, a)); }
   function norm(a) { var l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
-  function dist2(a, b) { var d = sub(a, b); return dot(d, d); }
-
-  // Every triple of vertices that are pairwise one edge apart is a face. Twenty of them,
-  // found rather than listed — the count is asserted below, so a wrong constant cannot
-  // pass silently.
-  function faces(verts) {
-    var out = [], edge = 4.0, eps = 0.001;
-    for (var i = 0; i < verts.length; i++) {
-      for (var j = i + 1; j < verts.length; j++) {
-        if (Math.abs(dist2(verts[i], verts[j]) - edge) > eps) continue;
-        for (var k = j + 1; k < verts.length; k++) {
-          if (Math.abs(dist2(verts[i], verts[k]) - edge) > eps) continue;
-          if (Math.abs(dist2(verts[j], verts[k]) - edge) > eps) continue;
-          out.push([i, j, k]);
-        }
-      }
-    }
-    return out;
+  function centreOf(verts, face) {
+    var c = [0, 0, 0];
+    face.forEach(function (i) {
+      c[0] += verts[i][0]; c[1] += verts[i][1]; c[2] += verts[i][2];
+    });
+    return [c[0] / face.length, c[1] / face.length, c[2] / face.length];
   }
 
-  var VERTS = vertices();
-  var FACES = faces(VERTS);
+  /* --- the solids -------------------------------------------------------------------
+     Each construction returns {verts, faces}, faces as vertex-index lists. Vertex
+     order within a face does not matter — faces are re-ordered by angle around their
+     own centre before rendering. Every solid is normalised to the same circumradius,
+     so a d8 and a d20 sit on the mat at the same visual weight. */
 
-  // Face centres double as outward normals: the solid is centred on the origin, so the
-  // direction from the centre to a face centre is that face's normal.
-  var CENTRES = FACES.map(function (f) {
-    return [(VERTS[f[0]][0] + VERTS[f[1]][0] + VERTS[f[2]][0]) / 3,
-            (VERTS[f[0]][1] + VERTS[f[1]][1] + VERTS[f[2]][1]) / 3,
-            (VERTS[f[0]][2] + VERTS[f[1]][2] + VERTS[f[2]][2]) / 3];
-  });
+  function tetrahedron() {
+    return { verts: [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]],
+             faces: [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]] };
+  }
 
-  // Opposite faces sum to 21, the way a real d20 is numbered. Found by looking for the
-  // face whose normal is the negation of this one, rather than assumed from the order the
-  // triples happened to be generated in.
-  function numbering() {
-    var n = new Array(FACES.length).fill(0), next = 1;
-    for (var i = 0; i < CENTRES.length; i++) {
-      if (n[i]) continue;
-      var mine = norm(CENTRES[i]);
-      var opposite = -1;
-      for (var j = 0; j < CENTRES.length; j++) {
-        if (j !== i && dot(mine, norm(CENTRES[j])) < -0.999) { opposite = j; break; }
+  function cube() {
+    var v = [];
+    [-1, 1].forEach(function (x) { [-1, 1].forEach(function (y) {
+      [-1, 1].forEach(function (z) { v.push([x, y, z]); }); }); });
+    // A face is the four vertices sharing one fixed coordinate.
+    var faces = [];
+    [0, 1, 2].forEach(function (axis) {
+      [-1, 1].forEach(function (side) {
+        faces.push(v.map(function (p, i) { return [p, i]; })
+          .filter(function (pi) { return pi[0][axis] === side; })
+          .map(function (pi) { return pi[1]; }));
+      });
+    });
+    return { verts: v, faces: faces };
+  }
+
+  function octahedron() {
+    var v = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    var faces = [];
+    [0, 1].forEach(function (x) { [2, 3].forEach(function (y) {
+      [4, 5].forEach(function (z) { faces.push([x, y, z]); }); }); });
+    return { verts: v, faces: faces };
+  }
+
+  /* The d10: a pentagonal trapezohedron. Ten kite faces, not triangles — the shape in
+     the photograph. An equator of ten points zigzagging above and below the midline,
+     an apex over each pole; each kite is an apex, two near equator points and the far
+     one between them. */
+  function trapezohedron() {
+    var verts = [], faces = [];
+    for (var k = 0; k < 10; k++) {
+      var ang = Math.PI * 2 * k / 10;
+      verts.push([Math.cos(ang), Math.sin(ang), (k % 2 === 0 ? 0.25 : -0.25)]);
+    }
+    verts.push([0, 0, 1.15]);      // 10: top apex
+    verts.push([0, 0, -1.15]);     // 11: bottom apex
+    for (var i = 0; i < 5; i++) {
+      faces.push([10, (2 * i) % 10, (2 * i + 1) % 10, (2 * i + 2) % 10]);
+      faces.push([11, (2 * i + 1) % 10, (2 * i + 2) % 10, (2 * i + 3) % 10]);
+    }
+    return { verts: verts, faces: faces };
+  }
+
+  function icosahedron() {
+    var v = [];
+    [-1, 1].forEach(function (a) { [-PHI, PHI].forEach(function (b) {
+      v.push([0, a, b], [a, b, 0], [b, 0, a]); }); });
+    // Faces found, not listed: every triple of vertices pairwise one edge apart.
+    var faces = [], edge = 4.0, eps = 0.001;
+    function d2(a, b) { var d = sub(a, b); return dot(d, d); }
+    for (var i = 0; i < v.length; i++)
+      for (var j = i + 1; j < v.length; j++) {
+        if (Math.abs(d2(v[i], v[j]) - edge) > eps) continue;
+        for (var k = j + 1; k < v.length; k++)
+          if (Math.abs(d2(v[i], v[k]) - edge) < eps &&
+              Math.abs(d2(v[j], v[k]) - edge) < eps) faces.push([i, j, k]);
       }
-      n[i] = next;
-      if (opposite >= 0) n[opposite] = 21 - next;
+    return { verts: v, faces: faces };
+  }
+
+  /* The dodecahedron's pentagons are found rather than listed: its twelve face
+     directions are the icosahedron's twelve vertices, and each face is the five
+     dodecahedron vertices leaning furthest that way. */
+  function dodecahedron() {
+    var v = [];
+    [-1, 1].forEach(function (x) { [-1, 1].forEach(function (y) {
+      [-1, 1].forEach(function (z) { v.push([x, y, z]); }); }); });
+    [-1, 1].forEach(function (a) { [-1, 1].forEach(function (b) {
+      v.push([0, a / PHI, b * PHI], [a / PHI, b * PHI, 0], [a * PHI, 0, b / PHI]);
+    }); });
+    var dirs = icosahedron().verts;
+    var faces = dirs.map(function (dir) {
+      var n = norm(dir);
+      return v.map(function (p, i) { return [dot(norm(p), n), i]; })
+        .sort(function (a, b) { return b[0] - a[0]; })
+        .slice(0, 5).map(function (x) { return x[1]; });
+    });
+    return { verts: v, faces: faces };
+  }
+
+  /* --- solid preparation ------------------------------------------------------------
+     Normalise to a shared circumradius, order each face's vertices by angle, compute
+     centres and outward normals, and number the faces so opposite ones sum the way a
+     real die's do. Done once per shape and cached. */
+  var TARGET_R = 1.9;   // the icosahedron's own circumradius — the size everything had
+
+  function prepare(raw, zeroBased) {
+    var maxR = Math.max.apply(null, raw.verts.map(len));
+    var verts = raw.verts.map(function (p) {
+      return [p[0] * TARGET_R / maxR, p[1] * TARGET_R / maxR, p[2] * TARGET_R / maxR];
+    });
+    var faces = raw.faces.map(function (face) {
+      var c = centreOf(verts, face);
+      var z = norm(c);
+      var y0 = norm(sub(verts[face[0]], c));
+      var x0 = norm(cross(y0, z));
+      var ordered = face.slice().sort(function (a, b) {
+        function ang(i) {
+          var d = sub(verts[i], c);
+          return Math.atan2(dot(d, y0), dot(d, x0));
+        }
+        return ang(a) - ang(b);
+      });
+      return { idx: ordered, centre: c, normal: z };
+    });
+
+    // Opposite faces sum to faces+1 — or faces-1 zero-based, the way a real d10's 0
+    // backs onto its 9 — found by looking for the negated normal rather than assumed
+    // from construction order. A tetrahedron has no opposite faces; the gaps fill in
+    // order afterwards.
+    var n = faces.length;
+    var numbers = new Array(n).fill(null), next = zeroBased ? 0 : 1;
+    var total = zeroBased ? n - 1 : n + 1;
+    for (var i = 0; i < n; i++) {
+      if (numbers[i] !== null) continue;
+      var opp = -1;
+      for (var j = 0; j < n; j++)
+        if (j !== i && dot(faces[i].normal, faces[j].normal) < -0.98) { opp = j; break; }
+      numbers[i] = next;
+      if (opp >= 0) numbers[opp] = total - next;
       next++;
     }
-    return n;
+    var used = {}, fill = zeroBased ? 0 : 1;
+    numbers = numbers.map(function (x) {
+      if (x !== null && !used[x]) { used[x] = true; return x; }
+      while (used[fill]) fill++;
+      used[fill] = true;
+      return fill;
+    });
+
+    return { verts: verts, faces: faces, numbers: numbers };
   }
 
-  var NUMBERS = numbering();
-
-  /* The transform that puts one flat triangle onto one face of the solid.
-   *
-   * Built from the face's own basis: local +Z becomes the face normal, local -Y points at
-   * the face's first vertex (which is where the clip-path puts the triangle's apex), and
-   * +X follows from those two. `matrix3d` takes exactly that, column by column.
-   */
-  function facePlacement(index, scale) {
-    var f = FACES[index], c = CENTRES[index];
-    var z = norm(c);
-    var apex = norm(sub(VERTS[f[0]], c));
-    var y = [-apex[0], -apex[1], -apex[2]];          // CSS +Y runs down the screen
-    var x = cross(y, z);
-    // Right-handed or the triangle lands mirrored, and a mirrored 6 is a 9.
-    if (dot(cross(x, y), z) < 0) x = [-x[0], -x[1], -x[2]];
-    x = norm(x); y = norm(y);
-    var t = [c[0] * scale, c[1] * scale, c[2] * scale];
-    return "matrix3d(" + [x[0], x[1], x[2], 0,
-                          y[0], y[1], y[2], 0,
-                          z[0], z[1], z[2], 0,
-                          t[0], t[1], t[2], 1].join(",") + ")";
+  var SHAPES = {};
+  function shape(sides) {
+    if (!SHAPES[sides]) {
+      SHAPES[sides] =
+        sides === 4 ? prepare(tetrahedron()) :
+        sides === 6 ? prepare(cube()) :
+        sides === 8 ? prepare(octahedron()) :
+        sides === 10 ? prepare(trapezohedron(), true) :
+        sides === 12 ? prepare(dodecahedron()) :
+        prepare(icosahedron());
+    }
+    return SHAPES[sides];
   }
 
-  // The rotation that brings a face to the front. Axis-angle straight from the normal, so
-  // there is no table of twenty orientations to get wrong.
-  function faceToFront(index) {
-    var n = norm(CENTRES[index]), front = [0, 0, 1];
+  /* --- rendering one solid into a host element -------------------------------------- */
+  var PX = 60;   // world units to pixels
+
+  function buildSolid(host, sides) {
+    if (host.dataset.shape === String(sides)) {
+      return Array.prototype.slice.call(host.children);
+    }
+    host.dataset.shape = String(sides);
+    host.innerHTML = "";
+    var s = shape(sides), els = [];
+    s.faces.forEach(function (f) {
+      // The face projected into its own plane gives both the clip-path outline and
+      // the element box; the face basis, column by column, is what matrix3d takes.
+      var z = f.normal;
+      var y0 = norm(sub(s.verts[f.idx[0]], f.centre));
+      var x0 = norm(cross(y0, z));
+      var pts = f.idx.map(function (vi) {
+        var d = sub(s.verts[vi], f.centre);
+        return [dot(d, x0) * PX, dot(d, y0) * PX];
+      });
+      var hw = Math.max.apply(null, pts.map(function (p) { return Math.abs(p[0]); }));
+      var hh = Math.max.apply(null, pts.map(function (p) { return Math.abs(p[1]); }));
+      var el = document.createElement("div");
+      el.className = "f";
+      el.style.width = (hw * 2) + "px";
+      el.style.height = (hh * 2) + "px";
+      el.style.left = (-hw) + "px";
+      el.style.top = (-hh) + "px";
+      el.style.clipPath = "polygon(" + pts.map(function (p) {
+        return ((p[0] + hw) / (hw * 2) * 100).toFixed(2) + "% " +
+               ((p[1] + hh) / (hh * 2) * 100).toFixed(2) + "%";
+      }).join(",") + ")";
+      var t = [f.centre[0] * PX, f.centre[1] * PX, f.centre[2] * PX];
+      el.style.transform = "matrix3d(" + [x0[0], x0[1], x0[2], 0,
+                                          y0[0], y0[1], y0[2], 0,
+                                          z[0], z[1], z[2], 0,
+                                          t[0], t[1], t[2], 1].join(",") + ")";
+      // A fixed light, baked per face — what makes flat polygons read as one object.
+      var lit = dot(z, norm([-0.35, -0.75, 0.56]));
+      el.style.filter = "brightness(" + (0.62 + 0.55 * Math.max(0, lit)).toFixed(3) + ")";
+      host.appendChild(el);
+      els.push(el);
+    });
+    return els;
+  }
+
+  function faceToFront(sides, index) {
+    var n = shape(sides).faces[index].normal, front = [0, 0, 1];
     var d = Math.max(-1, Math.min(1, dot(n, front)));
     var angle = Math.acos(d) * 180 / Math.PI;
     var axis = cross(n, front);
@@ -129,33 +249,7 @@
     return "rotate3d(" + axis[0] + "," + axis[1] + "," + axis[2] + "," + angle + "deg)";
   }
 
-  /* What each face reads, for a die of `sides` showing `result`.
-   *
-   * A d20 is the identity case. Below twenty, the values repeat around the solid; above
-   * twenty — a pooled 2d6 total, say — the neighbouring faces carry other totals that die
-   * could have produced. Either way the face that lands is the true one, which is the only
-   * face anybody reads.
-   */
-  function labels(sides, lo, hi, result, landing) {
-    var out = new Array(FACES.length), span = hi - lo + 1;
-    if (span <= out.length) {
-      // A d8 on twenty faces: its own values, repeated around the solid.
-      for (var i = 0; i < out.length; i++) out[i] = lo + (i % span);
-    } else {
-      // A d100 on twenty faces used to label them 1..20, so an 85 landed on what read
-      // as a d20 — "that is an 85 on a d20". The faces now carry values spread across
-      // the die's whole range, jittered so they do not read as a printed scale, and
-      // every one of them is a number this die could genuinely have rolled.
-      for (var j = 0; j < out.length; j++) {
-        var base = lo + Math.round((span - 1) * (j + 0.5) / out.length);
-        var jit = Math.floor(Math.random() * 5) - 2;
-        out[j] = Math.max(lo, Math.min(hi, base + jit));
-      }
-    }
-    out[landing] = result;
-    return out;
-  }
-
+  /* --- the mat ---------------------------------------------------------------------- */
   var STYLE = [
     "#d3d-mat{position:fixed;inset:0;z-index:60;display:none;align-items:center;",
     "justify-content:center;background:radial-gradient(60% 50% at 50% 40%,",
@@ -168,30 +262,18 @@
     "#d3d-card h3{margin:0 0 2px;color:#d9c08a;text-align:center;letter-spacing:.06em;",
     "font:400 22px/1.2 'Cinzel','Palatino Linotype',Georgia,serif;font-variant:small-caps}",
     "#d3d-why{color:#8e816a;font-style:italic;font-size:13px;text-align:center;margin-bottom:6px}",
-    /* The stage. `perspective` here and `preserve-3d` on the die is what makes the faces
-       hold their places in space instead of flattening into a stack. */
     "#d3d-stage{height:190px;display:flex;align-items:center;justify-content:center;",
     "perspective:760px}",
-    "#d3d-die{position:relative;width:0;height:0;transform-style:preserve-3d}",
-    "#d3d-die2{position:relative;width:0;height:0;transform-style:preserve-3d;",
-    "margin-left:150px}",
+    "#d3d-die,#d3d-die2{position:relative;width:0;height:0;transform-style:preserve-3d}",
     "#d3d-stage.pair #d3d-die{margin-right:150px}",
-    "#d3d-die2 .f{position:absolute;width:120px;height:104px;left:-60px;top:-69px;",
-    "transform-origin:50% 66.667%;clip-path:polygon(50% 0%,0% 100%,100% 100%);",
-    "display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px;",
+    "#d3d-die2{margin-left:150px;display:none}",
+    "#d3d-die .f,#d3d-die2 .f{position:absolute;",
+    "display:flex;align-items:center;justify-content:center;",
     "font:400 26px/1 'Cinzel','Palatino Linotype',Georgia,serif;",
     "background:linear-gradient(#2c2318,#191309);color:#c9b489;",
-    "border-bottom:1px solid rgba(0,0,0,.5);backface-visibility:hidden}",
-    "#d3d-die2 .f.land{background:linear-gradient(#3a2f1d,#241c10);color:#f0dcae}",
-    "#d3d-die .f{position:absolute;width:120px;height:104px;left:-60px;top:-69px;",
-    "transform-origin:50% 66.667%;",
-    "clip-path:polygon(50% 0%,0% 100%,100% 100%);",
-    "display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px;",
-    "font:400 26px/1 'Cinzel','Palatino Linotype',Georgia,serif;",
-    "background:linear-gradient(#2c2318,#191309);color:#c9b489;",
-    "border-bottom:1px solid rgba(0,0,0,.5);backface-visibility:hidden}",
-    /* The landed face lifts out of the crowd; a 1 and a 20 say so in colour. */
-    "#d3d-die .f.land{background:linear-gradient(#3a2f1d,#241c10);color:#f0dcae}",
+    "backface-visibility:hidden}",
+    "#d3d-die .f.land,#d3d-die2 .f.land{background:linear-gradient(#3a2f1d,#241c10);",
+    "color:#f0dcae}",
     "#d3d-die .f.land.crit{color:#6fcf8f;background:linear-gradient(#1d3a28,#122117)}",
     "#d3d-die .f.land.fumble{color:#d9776b;background:linear-gradient(#3a1d1a,#210f0d)}",
     "#d3d-terms{background:rgba(0,0,0,.34);border:1px solid #2b2319;border-radius:2px;",
@@ -221,22 +303,7 @@
     "#d3d-own input:focus{outline:none;border-color:#c9a86a}",
   ].join("");
 
-  var mat, die, faceEls, die2, faceEls2, resolveRoll,
-      DEBUG_KEY = "pfgm.dice.manual";
-
-  function fillSolid(host, scale) {
-    var els = [];
-    for (var i = 0; i < FACES.length; i++) {
-      var el = document.createElement("div");
-      el.className = "f";
-      el.style.transform = facePlacement(i, scale);
-      var lit = dot(norm(CENTRES[i]), norm([-0.35, -0.75, 0.56]));
-      el.style.filter = "brightness(" + (0.62 + 0.55 * Math.max(0, lit)).toFixed(3) + ")";
-      host.appendChild(el);
-      els.push(el);
-    }
-    return els;
-  }
+  var mat, die, die2, DEBUG_KEY = "pfgm.dice.manual";
 
   function debugOn() {
     try { return localStorage.getItem(DEBUG_KEY) === "1"; } catch (e) { return false; }
@@ -254,7 +321,7 @@
       '<div id="d3d-card">' +
       '<h3 id="d3d-title">Roll</h3>' +
       '<div id="d3d-why"></div>' +
-      '<div id="d3d-stage"><div id="d3d-die"></div></div>' +
+      '<div id="d3d-stage"><div id="d3d-die"></div><div id="d3d-die2"></div></div>' +
       '<div id="d3d-terms"></div>' +
       '<div id="d3d-verdict"></div>' +
       '<div id="d3d-note"></div>' +
@@ -265,21 +332,12 @@
       'yourself">my own roll</button>' +
       '</div></div>';
     document.body.appendChild(mat);
-
     die = mat.querySelector("#d3d-die");
-    faceEls = fillSolid(die, 60);
-    // The percentile partner. A real d100 is either a hundred-facet ball nobody could
-    // read at this size or two d10s, and every table rolls the two d10s — tens and
-    // ones. The second solid exists for exactly that and stays hidden otherwise.
-    die2 = document.createElement("div");
-    die2.id = "d3d-die2";
-    die2.style.display = "none";
-    die.parentElement.appendChild(die2);
-    faceEls2 = fillSolid(die2, 60);
+    die2 = mat.querySelector("#d3d-die2");
 
     mat.querySelector("#d3d-debug").addEventListener("click", function () {
       var on = !debugOn();
-      try { localStorage.setItem(DEBUG_KEY, on ? "1" : "0"); } catch (e) { /* private mode */ }
+      try { localStorage.setItem(DEBUG_KEY, on ? "1" : "0"); } catch (e) { /* private */ }
       showOwn(on);
     });
   }
@@ -298,33 +356,10 @@
            (Math.random() * 360 | 0) + "deg) rotateZ(" + (Math.random() * 360 | 0) + "deg)";
   }
 
-  /* Roll the die and settle it on `result`.
-   *
-   * `opts`: {sides, result, lo, hi, title, why, terms, dc, verdict, note}
-   * Resolves when the die has landed. `ask` mode instead resolves with the number the
-   * player wants, having asked for it — either from the die or, with the debug toggle on,
-   * from their own physical roll.
-   */
-  function land(opts) {
-    build();
-    var sides = opts.sides || 20;
-    if (sides === 100) return landPercentile(opts);
-    var lo = opts.lo != null ? opts.lo : 1;
-    var hi = opts.hi != null ? opts.hi : sides;
-    var result = opts.result;
-
-    // The face that will end up facing the viewer. Chosen at random among the twenty so
-    // the same number does not always arrive on the same side of the solid.
-    var landing = Math.floor(Math.random() * FACES.length);
-    var text = labels(sides, lo, hi, result, landing);
-    for (var i = 0; i < faceEls.length; i++) {
-      faceEls[i].textContent = sides === 20 ? NUMBERS[i] : text[i];
-      faceEls[i].className = "f";
-    }
-
+  function resetMat(opts, dieLabel) {
     mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
     mat.querySelector("#d3d-why").textContent =
-      (opts.why || "") + (sides !== 20 ? (opts.why ? " — " : "") + "d" + sides : "");
+      (opts.why || "") + (dieLabel ? (opts.why ? " — " : "") + dieLabel : "");
     mat.querySelector("#d3d-terms").innerHTML = "";
     mat.querySelector("#d3d-verdict").textContent = "";
     mat.querySelector("#d3d-verdict").className = "";
@@ -334,122 +369,16 @@
     mat.querySelector("#d3d-go").textContent = "…";
     mat.querySelector("#d3d-go").disabled = true;
     mat.classList.add("on");
-
-    // For a d20 the landing face is the one already bearing that number, so the solid
-    // reads correctly from every angle rather than only from the front.
-    if (sides === 20) {
-      var found = NUMBERS.indexOf(result);
-      if (found >= 0) landing = found;
-    }
-
-    die.style.transition = "none";
-    return (async function () {
-      for (var g = 0; g < 7; g++) {
-        die.style.transform = spin();
-        await wait([60, 60, 65, 75, 90, 110, 140][g]);
-      }
-      die.style.transition = "transform .85s cubic-bezier(.16,.9,.3,1)";
-      die.style.transform = "rotateY(720deg) " + faceToFront(landing);
-      await wait(880);
-
-      faceEls[landing].classList.add("land");
-      if (sides === 20 && result === 20) faceEls[landing].classList.add("crit");
-      if (sides === 20 && result === 1) faceEls[landing].classList.add("fumble");
-
-      if (opts.terms && opts.terms.length) {
-        mat.querySelector("#d3d-terms").innerHTML = opts.terms.map(function (t) {
-          return '<div class="r' + (t.total ? " tot" : "") + '"><span>' + esc(t.label) +
-                 "</span><b>" + esc(String(t.value)) + "</b></div>";
-        }).join("");
-      }
-      if (opts.verdict) {
-        var v = mat.querySelector("#d3d-verdict");
-        v.textContent = opts.verdict.text;
-        v.className = opts.verdict.good ? "good" : opts.verdict.good === false ? "bad" : "";
-      }
-      if (opts.note) mat.querySelector("#d3d-note").textContent = opts.note;
-      mat.querySelector("#d3d-go").textContent = "Close";
-      mat.querySelector("#d3d-go").disabled = false;
-      mat.querySelector("#d3d-debug").style.display = "none";
-      mat.querySelector("#d3d-own").classList.remove("on");
-      return new Promise(function (done) {
-        mat.querySelector("#d3d-go").onclick = function () {
-          mat.classList.remove("on");
-          done(result);
-        };
-      });
-    })();
   }
 
-  /* The percentile pair: how a table actually rolls a d100. Tens land on the left
-     solid, ones on the right, and the pair reads 00/0 as 100 the way the dice do. The
-     tumble and settle are the shared animation; nothing here decides anything either. */
-  async function landPercentile(opts) {
-    var result = Math.max(1, Math.min(100, opts.result | 0));
-    var tens = Math.floor((result % 100) / 10) * 10;      // 0,10,…,90
-    var ones = result % 10;                                // 0-9
-    var stage = mat.querySelector("#d3d-stage");
-    stage.classList.add("pair");
-    die2.style.display = "";
+  function fillTerms(terms) {
+    mat.querySelector("#d3d-terms").innerHTML += (terms || []).map(function (x) {
+      return '<div class="r' + (x.total ? " tot" : "") + '"><span>' + esc(x.label) +
+             "</span><b>" + esc(String(x.value)) + "</b></div>";
+    }).join("");
+  }
 
-    for (var i = 0; i < faceEls.length; i++) {
-      faceEls[i].textContent = ("0" + ((i % 10) * 10)).slice(-2);
-      faceEls[i].className = "f";
-      faceEls2[i].textContent = i % 10;
-      faceEls2[i].className = "f";
-    }
-    mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
-    mat.querySelector("#d3d-why").textContent =
-      (opts.why || "") + (opts.why ? " — " : "") + "percentile dice";
-    mat.querySelector("#d3d-terms").innerHTML = "";
-    mat.querySelector("#d3d-verdict").textContent = "";
-    mat.querySelector("#d3d-verdict").className = "";
-    mat.querySelector("#d3d-note").textContent = "";
-    mat.querySelector("#d3d-own").classList.remove("on");
-    mat.querySelector("#d3d-debug").style.display = "none";
-    mat.querySelector("#d3d-go").textContent = "…";
-    mat.querySelector("#d3d-go").disabled = true;
-    mat.classList.add("on");
-
-    // Each die lands on a face already wearing its digit, so the pair reads true from
-    // every angle. Ten faces carry each digit; any of them will do.
-    var landA = -1, landB = -1;
-    for (var j = 0; j < faceEls.length; j++) {
-      if (faceEls[j].textContent === ("0" + tens).slice(-2) && landA < 0 &&
-          Math.random() < 0.2) landA = j;
-      if (Number(faceEls2[j].textContent) === ones && landB < 0 &&
-          Math.random() < 0.2) landB = j;
-    }
-    if (landA < 0) landA = faceEls.findIndex(function (f) {
-      return f.textContent === ("0" + tens).slice(-2); });
-    if (landB < 0) landB = faceEls2.findIndex(function (f) {
-      return Number(f.textContent) === ones; });
-
-    die.style.transition = "none";
-    die2.style.transition = "none";
-    for (var g = 0; g < 7; g++) {
-      die.style.transform = spin();
-      die2.style.transform = spin();
-      await wait([60, 60, 65, 75, 90, 110, 140][g]);
-    }
-    die.style.transition = "transform .85s cubic-bezier(.16,.9,.3,1)";
-    die2.style.transition = "transform .95s cubic-bezier(.16,.9,.3,1)";
-    die.style.transform = "rotateY(720deg) " + faceToFront(landA);
-    die2.style.transform = "rotateY(-720deg) " + faceToFront(landB);
-    await wait(980);
-    faceEls[landA].classList.add("land");
-    faceEls2[landB].classList.add("land");
-
-    mat.querySelector("#d3d-terms").innerHTML =
-      '<div class="r"><span>tens</span><b>' + ("0" + tens).slice(-2) + "</b></div>" +
-      '<div class="r"><span>ones</span><b>' + ones + "</b></div>" +
-      '<div class="r tot"><span>d100</span><b>' + result + "</b></div>";
-    if (opts.terms && opts.terms.length) {
-      mat.querySelector("#d3d-terms").innerHTML += opts.terms.map(function (x) {
-        return '<div class="r' + (x.total ? " tot" : "") + '"><span>' + esc(x.label) +
-               "</span><b>" + esc(String(x.value)) + "</b></div>";
-      }).join("");
-    }
+  function finish(opts, result) {
     if (opts.verdict) {
       var v = mat.querySelector("#d3d-verdict");
       v.textContent = opts.verdict.text;
@@ -461,11 +390,121 @@
     return new Promise(function (done) {
       mat.querySelector("#d3d-go").onclick = function () {
         mat.classList.remove("on");
-        stage.classList.remove("pair");
+        mat.querySelector("#d3d-stage").classList.remove("pair");
         die2.style.display = "none";
         done(result);
       };
     });
+  }
+
+  /* Which solid a request rolls on. An exact die uses its own shape; a pooled total —
+     2d6's 2 to 12, say — uses the smallest solid with enough faces for its whole
+     range, labelled with real values from it. */
+  function solidFor(lo, hi) {
+    var span = hi - lo + 1;
+    var order = [4, 6, 8, 10, 12, 20];
+    for (var i = 0; i < order.length; i++) if (span === order[i]) return order[i];
+    for (var j = 0; j < order.length; j++) if (span <= order[j]) return order[j];
+    return 20;
+  }
+
+  function labelFaces(els, sides, lo, hi, result) {
+    var s = shape(sides), span = hi - lo + 1, n = els.length;
+    var landing = -1;
+    for (var i = 0; i < n; i++) {
+      var value;
+      if (span === n) {
+        // The die's own numbering — a d10 wears 0-9, everything else 1..N — shifted
+        // when the range starts somewhere other than the die's own first face.
+        value = s.numbers[i] + (lo - (sides === 10 ? 0 : 1));
+      } else if (span < n) {
+        value = lo + (i % span);
+      } else {
+        // More range than faces: values spread across it, jittered off a printed
+        // scale, every one a number this roll could genuinely have produced.
+        var base = lo + Math.round((span - 1) * (i + 0.5) / n);
+        value = Math.max(lo, Math.min(hi, base + (Math.floor(Math.random() * 5) - 2)));
+      }
+      els[i].textContent = value;
+      els[i].className = "f";
+      if (value === result && landing < 0) landing = i;
+    }
+    if (landing < 0) {
+      landing = Math.floor(Math.random() * n);
+      els[landing].textContent = result;
+    }
+    return landing;
+  }
+
+  async function tumble(el, landTransform, slower) {
+    el.style.transition = "none";
+    for (var g = 0; g < 7; g++) {
+      el.style.transform = spin();
+      await wait([60, 60, 65, 75, 90, 110, 140][g]);
+    }
+    el.style.transition = "transform " + (slower ? ".95s" : ".85s") +
+                          " cubic-bezier(.16,.9,.3,1)";
+    el.style.transform = "rotateY(" + (slower ? "-" : "") + "720deg) " + landTransform;
+    await wait(slower ? 980 : 880);
+  }
+
+  /* Roll and settle on `result`. Resolves when the mat is closed. */
+  function land(opts) {
+    build();
+    var reqSides = opts.sides || 20;
+    if (reqSides === 100) return landPercentile(opts);
+    var lo = opts.lo != null ? opts.lo : 1;
+    var hi = opts.hi != null ? opts.hi : reqSides;
+    var sides = solidFor(lo, hi);
+    var els = buildSolid(die, sides);
+    resetMat(opts, "d" + reqSides);
+
+    var landing = labelFaces(els, sides, lo, hi, opts.result);
+    return (async function () {
+      await tumble(die, faceToFront(sides, landing));
+      els[landing].classList.add("land");
+      if (reqSides === 20 && opts.result === 20) els[landing].classList.add("crit");
+      if (reqSides === 20 && opts.result === 1) els[landing].classList.add("fumble");
+      fillTerms(opts.terms);
+      return finish(opts, opts.result);
+    })();
+  }
+
+  /* The percentile pair: tens and ones, both true d10s, settling a beat apart. */
+  function landPercentile(opts) {
+    var result = Math.max(1, Math.min(100, opts.result | 0));
+    var tens = Math.floor((result % 100) / 10);
+    var ones = result % 10;
+    mat || build();
+    build();
+    mat.querySelector("#d3d-stage").classList.add("pair");
+    die2.style.display = "";
+    var elsA = buildSolid(die, 10), elsB = buildSolid(die2, 10);
+    resetMat(opts, "percentile dice");
+
+    var s = shape(10), landA = 0, landB = 0;
+    for (var i = 0; i < elsA.length; i++) {
+      elsA[i].textContent = ("0" + (s.numbers[i] * 10)).slice(-2);
+      elsA[i].className = "f";
+      elsB[i].textContent = s.numbers[i];
+      elsB[i].className = "f";
+      if (s.numbers[i] === tens) landA = i;
+      if (s.numbers[i] === ones) landB = i;
+    }
+    return (async function () {
+      await Promise.all([
+        tumble(die, faceToFront(10, landA)),
+        tumble(die2, faceToFront(10, landB), true),
+      ]);
+      elsA[landA].classList.add("land");
+      elsB[landB].classList.add("land");
+      mat.querySelector("#d3d-terms").innerHTML =
+        '<div class="r"><span>tens</span><b>' + ("0" + tens * 10).slice(-2) + "</b></div>" +
+        '<div class="r"><span>ones</span><b>' + ones + "</b></div>" +
+        '<div class="r tot"><span>d100</span><b>' + result + "</b></div>";
+      fillTerms(opts.terms);
+      return finish(opts, result);
+    })();
   }
 
   function esc(s) {
@@ -474,53 +513,43 @@
     });
   }
 
-  /* Ask the player for a roll.
-   *
-   * Resolves with a number they rolled themselves, or with null meaning "the table rolls
-   * it" — which is the default, and is what the 3D die is for. The manual entry is behind
-   * the debug toggle because a physical die on the desk is the exception, not the norm.
-   */
+  /* Ask the player for a roll: resolves with their own number (debug toggle) or null,
+     meaning "the table rolls it" — the default, and what the 3D die is for. */
   function ask(opts) {
     build();
+    var reqSides = opts.sides || 20;
     var lo = opts.lo != null ? opts.lo : 1;
-    var hi = opts.hi != null ? opts.hi : (opts.sides || 20);
-
-    for (var i = 0; i < faceEls.length; i++) {
-      faceEls[i].textContent = (opts.sides || 20) === 20 ? NUMBERS[i]
-        : lo + (i % (hi - lo + 1));
-      faceEls[i].className = "f";
+    var hi = opts.hi != null ? opts.hi : reqSides;
+    var sides = reqSides === 100 ? 10 : solidFor(lo, hi);
+    var els = buildSolid(die, sides);
+    var s = shape(sides);
+    for (var i = 0; i < els.length; i++) {
+      els[i].textContent = s.numbers[i];
+      els[i].className = "f";
     }
     die.style.transition = "none";
     die.style.transform = "rotateX(-18deg) rotateY(24deg)";
 
-    mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
-    mat.querySelector("#d3d-why").textContent = opts.why || "";
-    mat.querySelector("#d3d-terms").innerHTML = (opts.terms || []).map(function (t) {
-      return '<div class="r' + (t.total ? " tot" : "") + '"><span>' + esc(t.label) +
-             "</span><b>" + esc(String(t.value)) + "</b></div>";
-    }).join("");
-    mat.querySelector("#d3d-verdict").textContent = "";
-    mat.querySelector("#d3d-note").textContent = opts.note || "";
+    resetMat(opts, opts.die || ("d" + reqSides));
+    fillTerms(opts.terms);
+    if (opts.note) mat.querySelector("#d3d-note").textContent = opts.note;
     var face = mat.querySelector("#d3d-face");
     face.min = lo; face.max = hi; face.value = "";
-    face.placeholder = opts.die || ("d" + (opts.sides || 20));
+    face.placeholder = opts.die || ("d" + reqSides);
     mat.querySelector("#d3d-go").textContent = "Roll";
     mat.querySelector("#d3d-go").disabled = false;
     mat.querySelector("#d3d-debug").style.display = "";
     showOwn(debugOn());
-    mat.classList.add("on");
 
     return new Promise(function (done) {
-      function finish(value) { mat.classList.remove("on"); done(value); }
+      function close(value) { mat.classList.remove("on"); done(value); }
       mat.querySelector("#d3d-go").onclick = function () {
         if (debugOn()) {
           var v = parseInt(face.value, 10);
-          // Refused rather than silently rounded: a value outside the die is a typo, and
-          // accepting it would put an impossible roll in the log.
           if (!(v >= lo && v <= hi)) { face.focus(); return; }
-          finish(v);
+          close(v);
         } else {
-          finish(null);                    // null means "the table rolls it"
+          close(null);
         }
       };
       face.onkeydown = function (e) {
@@ -532,10 +561,10 @@
   window.Dice3D = {
     land: land,
     ask: ask,
-    faces: FACES.length,
-    numbers: NUMBERS.slice(),
-    // Exposed so a test can check the solid is a solid rather than twenty stacked
-    // triangles: every face normal should be a unit vector and opposite pairs sum to 21.
-    _centres: CENTRES,
+    // Exposed for probes: the d20's numbering and geometry, plus every shape by sides.
+    faces: shape(20).faces.length,
+    numbers: shape(20).numbers.slice(),
+    _centres: shape(20).faces.map(function (f) { return f.centre; }),
+    _shape: shape,
   };
 })();
