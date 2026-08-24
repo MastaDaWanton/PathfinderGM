@@ -1,0 +1,2960 @@
+{
+ "source": "Leatherworker world class, built against the shipped bestiary",
+ "note": "Hides carry from_creatures: name fragments matched against bestiary names, so 'skinned' loot can resolve to an entry here. Raw hides spoil (fresh_hours) until cured or tanned. Tier follows the CR of the beast the hide comes off: a deer is common work, a dragon is legendary work.",
+ "materials": [
+  {
+   "id": "deer-hide",
+   "name": "Deer Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Thin, close-grained and forgiving. It cuts quiet and stays soft through tanning, so a finished piece moves with the wearer instead of against them.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Armour or clothing of deer hide never reduces the wearer's maximum Dexterity bonus"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "deer",
+    "stag"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "boar-hide",
+   "name": "Boar Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Thick, bristled and dense enough to turn a glancing blade. It never fully softens: worked into armour it is proof but stubborn.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "against slashing weapons, worked into armour"
+    },
+    {
+     "type": "narrative",
+     "target": "Stiff: the armour check penalty of a piece made from it is one worse"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "boar"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "wolf-pelt",
+   "name": "Wolf Pelt",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A working winter coat. Cloaks and mitts of it keep a traveller moving through weather that stops lesser gear.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "survival",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "to endure cold weather"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "wolf"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "dog-hide",
+   "name": "Dog Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Everyday leather, even-tempered on the rack. The first hide an apprentice ruins, and the second one they do not.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Takes every method without complaint; apprentice work of it sells as journeyman work"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "dog"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "cat-pelt",
+   "name": "Cat Pelt",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Soft enough to line gloves and boot-tops; goods of it make no sound against each other.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "lining boots or gloves — the leather is silent"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "cat"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "horse-hide",
+   "name": "Horse Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Broad, unblemished panels — the only common hide that comes off the beast big enough to cut barding from without a seam.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Large single panels: barding and tents need no joining seams, which is where cheap barding fails"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "horse"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "goat-hide",
+   "name": "Goat Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Fine-pored and thirsty for the vat. Colours come out of goatskin true, where other leathers go muddy.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Takes dye truer than any other common hide; dyed goods of it fetch half again the price"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "goat"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "viper-skin",
+   "name": "Viper Skin",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Supple, patterned and near frictionless once oiled. Sheaths of it draw silent; sleeves of it slide out of a grip.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "escape artist",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "worked into sleeves or bindings"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "viper",
+    "snake"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "crocodile-hide",
+   "name": "Crocodile Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Scaled ridge-plates down the back, soft belly leather beneath — two leathers off one carcass. The back turns a knife; the belly takes tooling.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "back-plate panels, worked into armour"
+    },
+    {
+     "type": "narrative",
+     "target": "The plate panels are stiff as green wood: check penalty one worse unless only belly leather is used"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "crocodile"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "monitor-lizard-hide",
+   "name": "Monitor Lizard Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A cave-and-crag lizard's hide that keeps its suppleness through tanning where mammal hide stiffens. Armour of it bends where the wearer bends.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Keeps its suppleness: armour of it never reduces maximum Dexterity bonus"
+    },
+    {
+     "type": "skill_mod",
+     "target": "acrobatics",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "the leather flexes with the wearer"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "lizard, monitor",
+    "lizard"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "toad-hide",
+   "name": "Toad Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Clammy in the hand and waterproof on the bench. Satchels of it carry powder and paper dry through a river crossing.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sheds water: contents of a toad-hide container stay dry through immersion"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "toad",
+    "frog"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "bat-wing-leather",
+   "name": "Bat-Wing Leather",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Thin as good parchment and nearly as light. Too weak for armour, perfect for fine tooling, map cases and bellows.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Takes the finest tooling; useless for armour — it tears like paper under a blade"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "bat"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "weasel-pelt",
+   "name": "Weasel Pelt",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A trim fur, worth more as border than body. An edging of weasel marks a garment as bought, not bartered.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Trim and edging: raises the finished value of the garment it borders"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "weasel"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "elk-hide",
+   "name": "Elk Hide",
+   "kind": "hide",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Dense winter hide over large panels. Cloaks of it shrug off sleet, and the wearer's blood stays where it belongs.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "note": "on checks against cold weather exposure"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "elk",
+    "dire stag"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "dire-boar-hide",
+   "name": "Dire Boar Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Everything boar hide is, doubled. Plates of gristle under the shoulder turn spear-points that would have gone through the beast's lesser cousin.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "worked into armour"
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 1,
+     "bypass": "slashing"
+    },
+    {
+     "type": "narrative",
+     "target": "Heavy and stubborn: check penalty one worse"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "dire boar",
+    "boar"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "winter-wolf-pelt",
+   "name": "Winter Wolf Pelt",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "The frost never quite leaves the fur. A cloak of it is cold on the outside and warm within, whatever the weather is doing.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2
+    },
+    {
+     "type": "narrative",
+     "target": "The fur stays frost-rimed in any weather; snow does not melt on it"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "winter wolf",
+    "worg"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "boreal-wolf-pelt",
+   "name": "Boreal Wolf Pelt",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Longer-haired than the common wolf and oilier — weather runs off it. The pelt of choice for anyone who works outdoors in the white months.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "survival",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "to endure cold weather"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "boreal wolf",
+    "wolf"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "black-bear-hide",
+   "name": "Black Bear Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Deep-pile warmth. Bedrolls and sleeping furs of it turn a bare camp into a warm one.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sleeping gear of it counts as a warm camp in cold weather"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "black bear",
+    "bear"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "grizzly-hide",
+   "name": "Grizzly Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Worn as a mantle with the head and claws attached, it makes the wearer something other than a person to the people looking at them.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "worn as a mantle, head and claws attached"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "grizzly",
+    "bear"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "polar-bear-hide",
+   "name": "Polar Bear Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "White cold-water fur over thick fat-backed leather. It hides a hunter on the ice and keeps the sea's chill out.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "in snow and ice"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "bear, polar",
+    "polar"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "frostfallen-bison-hide",
+   "name": "Frostfallen Bison Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "A wall of a hide. One beast covers a warhorse in barding or a family in tent-leather, and the cold stays on the correct side of both.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 1
+    },
+    {
+     "type": "narrative",
+     "target": "Huge single panels: the largest seamless barding a tannery can produce below rare work"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "bison"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "glowlizard-hide",
+   "name": "Glowlizard Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "A faint mothlight lingers in the scales for a year after the skinning — enough to read by, too little to be seen by.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sheds dim light in a 5-foot radius for a year; enough to read by, not enough to reveal the carrier at distance"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "glowlizard"
+   ],
+   "source": "skinned",
+   "size": "small",
+   "fresh_hours": 48
+  },
+  {
+   "id": "frilled-lizard-hide",
+   "name": "Giant Frilled Lizard Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "The frill, worked into a collar, snaps open when the wearer squares up. People step back before they decide to.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "the frill worked into a flaring collar"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "lizard, giant frilled",
+    "frilled"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "electric-eel-skin",
+   "name": "Electric Eel Skin",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Dry, it crackles faintly under the thumb. Gloves and grips of it spare the wearer the small revenges of wands, wires and storm-weather rigging.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 2
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "eel, electric",
+    "eel"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "ankheg-shell-leather",
+   "name": "Ankheg Shell Leather",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Chitin plates on a leather backing, the acid-etched channels still visible. It turns blades well and remembers the burrow poorly.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "note": "plates worked over a leather backing"
+    },
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 1
+    },
+    {
+     "type": "narrative",
+     "target": "Plated and rigid: check penalty one worse"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "ankheg"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "snow-leopard-pelt",
+   "name": "Snow Leopard Pelt",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Smoke-grey rosettes that were built for exactly one job. In snow or broken shadow the wearer is a rumour.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "in snow or broken shadow"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "snow leopard",
+    "leopard"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "dire-wolverine-hide",
+   "name": "Dire Wolverine Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "It stinks faintly forever, and it carries the animal's refusal in the grain. Wearers report a stubbornness that is probably their own.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "note": "against fear"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "wolverine"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "owlbear-hide",
+   "name": "Owlbear Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Half plumage, half pelt, all argument. Cloaks of it shed rain like a roof and are impossible to mistake for anyone else's cloak.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sheds rain completely; the wearer and their pack stay dry in any downpour short of immersion"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "owlbear"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "griffon-hide",
+   "name": "Griffon Hide",
+   "kind": "hide",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Feathered forequarters over lion-hide hindquarters. Falconers pay rare-work prices for common-work gloves of it.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "handle animal",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "with birds of prey and flying mounts"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "griffon"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "shadow-mastiff-hide",
+   "name": "Shadow Mastiff Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "It drinks lamplight. Seams vanish in shadow, and so, very nearly, does the wearer.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "in dim light or darkness"
+    },
+    {
+     "type": "narrative",
+     "target": "The leather is always slightly darker than its surroundings"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "shadow mastiff"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "salamander-hide",
+   "name": "Salamander Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Warm to the touch years after the beast died. Fire treats garments of it as a professional courtesy.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "salamander"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "hell-hound-hide",
+   "name": "Hell Hound Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Char-black with a brimstone smell no tannin removes. It keeps fire off and puts the fear of somewhere else into onlookers.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2
+    },
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "it smells faintly of brimstone"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "hell hound"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "cave-bear-hide",
+   "name": "Cave Bear Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "The biggest bear leather there is, thick enough that arrows read as rain. Armour of it is a wall the wearer carries.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "worked into armour"
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 1
+    },
+    {
+     "type": "narrative",
+     "target": "Massive: check penalty one worse, and no piece of it is light"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "cave bear"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "sabre-tooth-hide",
+   "name": "Sabre-Tooth Tiger Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "The fangs, mounted at the collar, do the talking. The striped hide behind them confirms it was not bought.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "fangs mounted at the collar"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "sabre-tooth",
+    "tiger"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "basilisk-hide",
+   "name": "Basilisk Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Stone-grained scale that takes a polish like marble. Heavy, handsome, and harder than leather has any right to be.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "note": "stone-grained scale, worked into armour"
+    },
+    {
+     "type": "narrative",
+     "target": "Polishes like marble; heavy — no piece of it counts as light armour"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "basilisk"
+   ],
+   "source": "skinned",
+   "size": "medium",
+   "fresh_hours": 48
+  },
+  {
+   "id": "bulette-plate",
+   "name": "Bulette Plate",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Landshark plates over boiled backing. Barding of it turns a lance, which is what it will be asked to do.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "untyped",
+     "note": "overlapping plates, worked into armour or barding"
+    },
+    {
+     "type": "narrative",
+     "target": "Rigid plate: check penalty two worse"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "bulette"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "manticore-hide",
+   "name": "Manticore Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Spike-pocked, every scar a socket. Tooled, the pocking patterns into relief work of unusual depth.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The spike-scarred grain takes tooled relief work of unusual depth; masterwork tooling of it is famous"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "manticore"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "chimera-hide",
+   "name": "Chimera Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Three beasts in one hide — mane, scale and goat-shag — and no two panels match. A patchwork that arrives pre-assembled.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1
+    },
+    {
+     "type": "narrative",
+     "target": "No two panels match: the dragon-third resists flame, the goat-third takes dye, the lion-third takes tooling"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "chimera"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "remorhaz-hide",
+   "name": "Remorhaz Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "The beast ran a furnace under polar plating, and the hide keeps both opinions: it insulates against ice and shrugs at flame.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "remorhaz"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "gorgon-hide",
+   "name": "Gorgon Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Iron-scaled and smelling faintly of rust. It takes metal polish rather than oil, and rings when struck.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "note": "iron scale, worked into armour"
+    },
+    {
+     "type": "narrative",
+     "target": "Rings when struck; takes metal polish, refuses oil and dye"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "gorgon"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "shadow-girallon-pelt",
+   "name": "Shadow Girallon Pelt",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Four-armed climber's fur out of the dark places. It grips stone and swallows light in the same motion.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "in darkness"
+    },
+    {
+     "type": "skill_mod",
+     "target": "climb",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "palm-panels grip like the beast did"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "girallon"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "nightmare-hide",
+   "name": "Nightmare Hide",
+   "kind": "hide",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "It smoulders. Whatever colour the vat held, the leather comes out black, and warm, and slightly ashamed of nothing.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2
+    },
+    {
+     "type": "narrative",
+     "target": "Never takes dye: it comes out of any vat black. Faintly warm and smells of smoke"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "nightmare"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "wyvern-hide",
+   "name": "Wyvern Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Wing leather broad enough to cut a full cloak from a single panel, over body-scale dense enough for armour. The sting scars run through everything.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "note": "body scale, worked into armour"
+    },
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "note": "against poison — the venom's memory is in the grain"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "wyvern"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "behir-hide",
+   "name": "Behir Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Storm-blue scale off a beast that breathed lightning. Current refuses to cross it, which the beast never appreciated and the wearer will.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 5
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "behir"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "purple-worm-plate",
+   "name": "Purple Worm Plate",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Ring-segments the size of doors. Armour of it is tunnel-tested against rock, acid and everything the deep places threw at the worm first.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "untyped",
+     "note": "ring-segment plate, worked into armour"
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 2
+    },
+    {
+     "type": "narrative",
+     "target": "Enormously heavy: check penalty two worse"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "purple worm"
+   ],
+   "source": "skinned",
+   "size": "gargantuan",
+   "fresh_hours": 48
+  },
+  {
+   "id": "dragon-turtle-shell",
+   "name": "Dragon Turtle Shell Leather",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Shell-margin leather from the beast that boils harbours. It keeps out steam, sea and swords with equal indifference.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "note": "shell-margin plate, worked into armour"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "dragon turtle"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "couatl-feather-hide",
+   "name": "Couatl Feather Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Iridescent plumage over serpent leather, from a creature that was mostly made of goodness. Working it feels like being watched, kindly.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "note": "against enchantment"
+    },
+    {
+     "type": "narrative",
+     "target": "Iridescent: shifts colour with the light and cannot be dyed, disguised or mistaken"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "couatl"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "hydra-hide",
+   "name": "Hydra Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Scar tissue that remembers regrowing. A rent piece knits itself closed over a week — the garment heals, though the wearer must manage on their own.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Self-mending: damage to the finished piece closes itself over a week"
+    },
+    {
+     "type": "skill_mod",
+     "target": "swim",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "sheds water like the marsh it came from"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "hydra"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "noble-salamander-hide",
+   "name": "Noble Salamander Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "What salamander hide wishes it was. It has opinions about fire, and fire has learned to respect them.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 10
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "noble salamander",
+    "salamander"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "phoenix-feather-hide",
+   "name": "Phoenix Feather Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Feathers that ember at the edges without consuming. A cloak of it warms the dying and has, twice in the histories, refused to let them finish.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "The feathers ember but never burn; the cloak sheds gentle warmth, and firelight through it casts no shadow"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "phoenix"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "unicorn-hide",
+   "name": "Unicorn Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Taking it is a crime the forest remembers. White past whiteness, warm as a living flank, and quietly good at keeping people alive.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "heal",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "wound-dressings and sickbed furs of it"
+    },
+    {
+     "type": "narrative",
+     "target": "The forest that lost the beast knows the wearer on sight"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "unicorn"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "dragonne-hide",
+   "name": "Dragonne Hide",
+   "kind": "hide",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Brass-maned lion-scale from the deep desert. The roar lives somewhere in it still: the mane bristles when the wearer raises their voice.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "the mane bristles when the wearer speaks"
+    },
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "dragonne"
+   ],
+   "source": "skinned",
+   "size": "large",
+   "fresh_hours": 48
+  },
+  {
+   "id": "red-dragonhide",
+   "name": "Red Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Crimson scale off the tyrant of the colour chart. It smoulders in firelight as though remembering. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Crimson scale off the tyrant of the colour chart"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "red dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "gold-dragonhide",
+   "name": "Gold Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Metallic scale that was given, not taken — a gold parts with shed hide as a gift, and the leather knows the difference. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Metallic scale that was given, not taken — a gold parts with shed hide as a gift, and the leather knows the difference"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "gold dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "brass-dragonhide",
+   "name": "Brass Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Talkative desert dragon's scale, warm as sun-struck metal at any hour. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Talkative desert dragon's scale, warm as sun-struck metal at any hour"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "brass dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "white-dragonhide",
+   "name": "White Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Scale the colour of old ice from the smallest and meanest of the chromatics. It frosts in warm rooms. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Scale the colour of old ice from the smallest and meanest of the chromatics"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "white dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "silver-dragonhide",
+   "name": "Silver Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Cloud-bright metallic scale. Snow slides from it; so, generally, does suspicion. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Cloud-bright metallic scale"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "silver dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "blue-dragonhide",
+   "name": "Blue Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Desert-storm scale with sand still singing in the grain. Hair rises near it on dry days. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Desert-storm scale with sand still singing in the grain"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "blue dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "bronze-dragonhide",
+   "name": "Bronze Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Sea-cliff metallic scale, green-shot like weathered statuary. It hums faintly before storms. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Sea-cliff metallic scale, green-shot like weathered statuary"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "bronze dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "black-dragonhide",
+   "name": "Black Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Swamp-black scale, glossy as tar. Acid beads on it and rolls away defeated. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Swamp-black scale, glossy as tar"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "black dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "copper-dragonhide",
+   "name": "Copper Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Trickster's scale, verdigris and bright metal by turns. It refuses to hold a straight seam and looks better for it. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Trickster's scale, verdigris and bright metal by turns"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "copper dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "green-dragonhide",
+   "name": "Green Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Forest-dragon scale smelling of chlorine and old leaves. Nothing rots it, and nothing eats through it. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 5
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    },
+    {
+     "type": "narrative",
+     "target": "Forest-dragon scale smelling of chlorine and old leaves"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "green dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "umbral-dragonhide",
+   "name": "Umbral Dragonhide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Scale from the dragons of the plane of shadow. Light near it gives up early; the grave's own chill runs off it. Takes enchantment as masterwork armour; contains no metal, so a druid may wear it.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "negative",
+     "amount": 5
+    },
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "in dim light or darkness"
+    },
+    {
+     "type": "narrative",
+     "target": "Takes enchantment as masterwork armour; contains no metal, so a druid may wear it"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "umbral dragon",
+    "dragon"
+   ],
+   "source": "skinned",
+   "size": "huge",
+   "fresh_hours": 48
+  },
+  {
+   "id": "tarrasque-plate",
+   "name": "Tarrasque Plate",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 35,
+   "text": "A fragment of the armour of the thing that cannot be killed. Working it blunts tools; wearing it blunts everything else.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "untyped",
+     "note": "carapace plate, worked into armour"
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 3
+    },
+    {
+     "type": "narrative",
+     "target": "Nothing short of legend marks it: the finished piece never shows wear"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "tarrasque"
+   ],
+   "source": "skinned",
+   "size": "gargantuan",
+   "fresh_hours": 48
+  },
+  {
+   "id": "kraken-hide",
+   "name": "Kraken Hide",
+   "kind": "hide",
+   "tier": "legendary",
+   "craft_dc": 32,
+   "text": "Deep-water mantle leather, cold as the trench it ruled. It never dries out, never cracks, and remembers pressure no diver will meet.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2
+    },
+    {
+     "type": "skill_mod",
+     "target": "swim",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "the leather moves like water in water"
+    },
+    {
+     "type": "narrative",
+     "target": "Immune to water damage and rot; the abyssal cold never leaves it"
+    }
+   ],
+   "effects_converted": true,
+   "from_creatures": [
+    "kraken"
+   ],
+   "source": "skinned",
+   "size": "gargantuan",
+   "fresh_hours": 48
+  },
+  {
+   "id": "oak-bark",
+   "name": "Oak Bark",
+   "kind": "tannin",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "The tannery's daily bread. Stripped in spring, stacked to dry, ground and steeped — brown liquor that binds hide into leather.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The standard tanning agent for common and uncommon hides"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "sumac-leaf",
+   "name": "Sumac Leaf",
+   "kind": "tannin",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A pale tannin for pale work. Leather tanned with sumac stays cream-white and takes dye without a brown undertone.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Tans white: the leather takes dye with no brown undertone"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "hemlock-bark",
+   "name": "Hemlock Bark",
+   "kind": "tannin",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Red-brown and fast. It tans in half the time and the leather comes out russet whatever was intended.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Fast: halves tanning time; the leather always comes out russet"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "willow-bark",
+   "name": "Willow Bark",
+   "kind": "tannin",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A soft tannin for soft goods — gloves, linings, anything that touches skin all day.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Tans supple: glove and lining leather of unusual softness"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "tara-pod",
+   "name": "Tara Pod",
+   "kind": "tannin",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Ground pods from dry-country trees, imported by the sack. Nearly colourless and strong — the choice for fine pale work above sumac's reach.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Strong and colourless: fine work that must stay pale"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "bog-liquor",
+   "name": "Bog Liquor",
+   "kind": "tannin",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Black fen-water, drawn where the peat has steeped for centuries. What went into a bog whole comes out leather; the vat merely hurries it.",
+   "risky": true,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Tans deep black-brown through the full thickness; bog-tanned leather never rots"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "mangrove-bark",
+   "name": "Mangrove Bark",
+   "kind": "tannin",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Salt-swamp bark that tans against water. Boat leather, sea-boots, anything that will live wet.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Salt-proof: the leather endures seawater without hardening or cracking"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "ironbark-tannin",
+   "name": "Ironbark Tannin",
+   "kind": "tannin",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Bark off trees that turn axes. The liquor bites hides ordinary bark cannot touch, and the leather comes out with a metallic knock.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Bites monster-grade hide that common bark cannot bind"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "wyrm-gall",
+   "name": "Wyrm Gall",
+   "kind": "tannin",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Rendered gall of the lesser drakes. Sharp enough to open scale that shrugs at bark liquor, foul enough that tanneries using it sit downwind of town.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Opens and binds scaled hide; the stink takes a month to fade"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "salamander-ash-lye",
+   "name": "Salamander Ash Lye",
+   "kind": "tannin",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Lye of ash from an elemental fire, slaked with brine. It tans hides that fire itself could not mark.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Binds fire-natured and planar hide; the vat must be stone — it eats wooden ones"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "styx-mordant",
+   "name": "Styx Mordant",
+   "kind": "tannin",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "River-water that forgets, cut a hundredfold and still dangerous. It fixes what nothing else fixes, and tanners who splash it lose the afternoon.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Fixes shadow-natured and undying hide; a bare-skin splash costs the memory of the working day"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "dragonblood-tannin",
+   "name": "Dragonblood Tannin",
+   "kind": "tannin",
+   "tier": "legendary",
+   "craft_dc": null,
+   "text": "Tanning liquor quickened with the blood of the hide's own kind. Dragonhide accepts no lesser argument.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The only tannin that binds legendary hide; the blood must be dragon's, though not the same dragon's"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "linen-thread",
+   "name": "Linen Thread",
+   "kind": "thread",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Waxed flax cord, the tannery's default. Cheap, strong, replaceable.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "sinew-thread",
+   "name": "Sinew Thread",
+   "kind": "thread",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Split leg sinew, chewed soft and dried taut. It shrinks as it dries and pulls every seam tight against weather.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Shrinks tight: seams sewn with it are weatherproof"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "gut-cord",
+   "name": "Gut Cord",
+   "kind": "thread",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Twisted gut, strong and slightly elastic. The stitch that gives before the leather tears.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Elastic: the seam stretches under load instead of tearing the leather"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "horsehair-cord",
+   "name": "Horsehair Cord",
+   "kind": "thread",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Braided tail-hair for decorative seams and edging. Not load-bearing; handsome.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "waxed-flax",
+   "name": "Waxed Heavy Flax",
+   "kind": "thread",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Triple-laid flax dragged through beeswax. Saddlery thread — it outlives the saddle.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "silk-thread",
+   "name": "Silk Thread",
+   "kind": "thread",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Fine, strong and nearly invisible in a matched seam. Fine goods only; wasted on a satchel.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Invisible seams on fine work; raises the finished value"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "spider-silk-cord",
+   "name": "Spider Silk Cord",
+   "kind": "thread",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Laid cord of giant-spider silk. Stronger than anything its weight has a right to be.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Twice the strength of linen at a fifth the weight"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "wire-silk",
+   "name": "Wire-Silk",
+   "kind": "thread",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Silk served around drawn silver wire — a smith's and a weaver's work meeting in one spool. Seams of it cannot be cut with a knife.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Seams sewn with it cannot be cut by an ordinary blade; the wire is the blacksmith's work, not the tannery's"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "shadow-silk",
+   "name": "Shadow-Silk",
+   "kind": "thread",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Thread spun from the webs of the dark places. Seams sewn with it disappear in poor light, and so does the outline they define.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "every seam of the piece sewn with it, in dim light"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "wyvern-sinew",
+   "name": "Wyvern Sinew",
+   "kind": "thread",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Wing-tendon sinew with a serpent's flex. The only thread that moves enough for hardened plate articulation.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Articulation thread: hardened plate sewn with it flexes at the joints"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "dragon-sinew",
+   "name": "Dragon Sinew",
+   "kind": "thread",
+   "tier": "legendary",
+   "craft_dc": null,
+   "text": "Tendon of the wing that carried a dragon. It does not break. The leather breaks, the needle breaks, the crafter's nerve breaks — the thread holds.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Unbreakable: a seam of dragon sinew outlasts the piece it closes"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "neatsfoot-oil",
+   "name": "Neatsfoot Oil",
+   "kind": "oil",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Rendered from cattle shin and foot. The everyday dressing that keeps leather leather instead of board.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "currier-tallow",
+   "name": "Currier's Tallow",
+   "kind": "oil",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Hard fat for hard service. Boots and harness dubbed with tallow live wet and survive it.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Waterproofs working leather against mud and rain"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "fish-oil",
+   "name": "Fish Oil",
+   "kind": "oil",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Cheap, thin and pungent. The chamois-maker's oil — leather dressed with it comes out soft as cloth, smelling briefly of harbour.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Softens leather to cloth-suppleness; the smell fades in a week"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "mink-oil",
+   "name": "Mink Oil",
+   "kind": "oil",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Fine dressing for fine leather. It feeds the grain without darkening it, which cheaper oils cannot promise.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Conditions without darkening: pale and dyed work keeps its colour"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "troll-fat",
+   "name": "Troll Fat",
+   "kind": "oil",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Grease that remembers knitting flesh. Leather dressed with it closes its own scratches and scuffs overnight.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Self-mending finish: surface damage to the piece closes overnight"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "salamander-oil",
+   "name": "Salamander Oil",
+   "kind": "oil",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Rendered from the fire-beast's fat, always a little above room heat. Dressed leather chars slower and never catches.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "wyvern-fat",
+   "name": "Wyvern Fat",
+   "kind": "oil",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Heavy amber grease rendered from beneath the wing. The traditional dressing for hardened plate: it soaks the boiled leather and keeps cuir bouilli from going brittle with age.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Hardened leather dressed with it never grows brittle; the standard finish for masterwork cuir bouilli"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "umbral-oil",
+   "name": "Umbral Oil",
+   "kind": "oil",
+   "tier": "legendary",
+   "craft_dc": null,
+   "text": "Pressed shadow, or near enough. Leather dressed with it stops reflecting light entirely.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "the finish reflects no light"
+    },
+    {
+     "type": "narrative",
+     "target": "The piece casts no highlights; in darkness it reads as a hole in the world"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "madder-red",
+   "name": "Madder Red",
+   "kind": "dye",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Root-red, the colour of soldiery and signage. Fast in sun and rain.",
+   "risky": false,
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "weld-yellow",
+   "name": "Weld Yellow",
+   "kind": "dye",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Clear bright yellow from a roadside weed. The cheapest colour there is, and the first to show dirt.",
+   "risky": false,
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "woad-blue",
+   "name": "Woad Blue",
+   "kind": "dye",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Fermented leaf-blue, the working person's indigo. Deepens with each dip.",
+   "risky": false,
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "walnut-brown",
+   "name": "Walnut Brown",
+   "kind": "dye",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Hull-brown, needs no mordant, stains everything including the dyer.",
+   "risky": false,
+   "forageable": true,
+   "effects": [],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "iron-gall-black",
+   "name": "Iron Gall Black",
+   "kind": "dye",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Oak gall and old iron. A lawyer's black — it does not fade, it does not forgive.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "murex-purple",
+   "name": "Murex Purple",
+   "kind": "dye",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Sea-snail purple at a thousand snails the ounce. Wearing it is a claim; be ready to defend the claim.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The colour of rank: triples the finished value and gets the wearer noticed"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "vermilion",
+   "name": "Vermilion",
+   "kind": "dye",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Mineral scarlet, brighter than blood and twice the price of madder. Ceremonial work.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "glowcap-green",
+   "name": "Glowcap Green",
+   "kind": "dye",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Fungal green that keeps a breath of the cave-light. Dyed work glimmers faintly in full dark.",
+   "risky": false,
+   "forageable": true,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Glimmers faintly in total darkness — a finger of candle-glow, no more"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "shadow-black",
+   "name": "Shadow Black",
+   "kind": "dye",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Blacker than iron gall by exactly the width of a shadow. Edges of the dyed piece are hard to fix by eye.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "in darkness — the outline will not resolve"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "dragons-blood-crimson",
+   "name": "Dragon's-Blood Crimson",
+   "kind": "dye",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Resin-crimson, nothing to do with dragons, priced as though it were. It reads as embers in low light.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Reads as live embers in low light; horses and dogs shy from the wearer"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "moonlight-silver",
+   "name": "Moonlight Silver",
+   "kind": "dye",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Distilled from flowers that open once a month. The dyed piece is the colour of moonlight in any light, including none.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The piece is moonlit in any light; in true darkness it sheds light enough to read a map by"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "void-dye",
+   "name": "Void Dye",
+   "kind": "dye",
+   "tier": "legendary",
+   "craft_dc": null,
+   "text": "Not a colour. An absence, bottled beyond the last plane and sold by people who will not say how. The dyed piece has no colour to name.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "note": "the eye slides off the dyed piece"
+    },
+    {
+     "type": "narrative",
+     "target": "Viewers cannot afterwards describe the piece or its wearer's outline"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "thread-wax",
+   "name": "Thread Wax",
+   "kind": "wax",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Thread-wax, edge-seal, and the smell of an honest workshop.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "seam-pitch",
+   "name": "Seam Pitch",
+   "kind": "wax",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Seam-seal for wet service. Cheaper than beeswax, stickier, smells of forest fires.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Seals seams fully waterproof; softens and smells in high summer"
+    }
+   ],
+   "effects_converted": true,
+   "source": "foraged"
+  },
+  {
+   "id": "hardening-wax",
+   "name": "Hardening Wax",
+   "kind": "wax",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "The cuir bouilli blend — beeswax cut with resins, ready for the kettle. Leather boiled in it sets like thin steel.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The wax-hardening medium: boiled into leather it sets rigid without the brittleness of water-hardening"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "fireproof-wax",
+   "name": "Fireproof Wax",
+   "kind": "wax",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Mineral wax that will not feed a flame. Finished work sealed in it chars grudgingly and never burns open.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "ghost-wax",
+   "name": "Ghost Wax",
+   "kind": "wax",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Rendered from candles that burned in haunted houses, or so the seller says. Sealed work weighs less than it should.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The sealed piece weighs half what it ought; contents of a sealed container do not smell, even to scent"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "iron-buckle",
+   "name": "Iron Buckle",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "The workaday buckle. Rusts if neglected, outlasts the strap if not.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "brass-buckle",
+   "name": "Brass Buckle",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Sea-service buckle: no rust, soft enough to bend before the leather tears.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "steel-studs",
+   "name": "Steel Studs",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Dome studs for studded leather. The difference between leather armour and studded is a smith's afternoon.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "studding light armour — the studded-leather upgrade"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "bronze-rings",
+   "name": "Bronze Rings",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Harness rings and strap-guides, cast by the gross.",
+   "risky": false,
+   "forageable": false,
+   "effects": [],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "silver-clasps",
+   "name": "Silver Clasps",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Fine-work clasps for fine-work goods. Also the only fitting a lycanthrope's tailor will specify twice.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Silver: the clasp counts as silver for what its touch harms"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "cold-iron-studs",
+   "name": "Cold Iron Studs",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Studs of unworked-cold iron for buyers with fey trouble.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cold iron: the studding counts as cold iron for what its touch harms"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "mithral-fittings",
+   "name": "Mithral Fittings",
+   "kind": "fitting",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Buckles and plates at a feather's weight. The piece stops fighting the wearer's shoulders.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Weightless fittings: the finished piece counts one step lighter to carry"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "adamantine-buckles",
+   "name": "Adamantine Buckles",
+   "kind": "fitting",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Buckles that cannot be cut. A strap fitted with them fails at the leather or not at all.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cannot be cut or sundered; the strap fails at the leather or not at all"
+    }
+   ],
+   "effects_converted": true,
+   "source": "smithed"
+  },
+  {
+   "id": "curing-salt",
+   "name": "Curing Salt",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Coarse salt by the barrel. Rubbed into a green hide it stops the clock that started at the skinning.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cures a raw hide: the spoilage clock stops"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "tawing-alum",
+   "name": "Tawing Alum",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Tawing crystal. Alum-cured hide comes out white and soft but not properly tanned — it reverts if soaked.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Taws white and soft; reverts to rawhide if soaked — not a true tan"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "brain-paste",
+   "name": "Brain Tan Paste",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Every beast carries enough brain to tan its own hide, an economy old as the first knife. Smoke finishes what the paste starts.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The field tan: no vat needed, but the work doubles and the leather must be smoked"
+    }
+   ],
+   "effects_converted": true,
+   "source": "rendered"
+  },
+  {
+   "id": "liming-quicklime",
+   "name": "Liming Quicklime",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "For the liming pit: it burns the hair off a hide in a day. It will do the same to a hand.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Strips hair and epidermis before tanning; caustic — handling it bare-handed is a burn"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "mordant-salts",
+   "name": "Mordant Salts",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Fixing salts that marry dye to leather. Without them, rare colours walk off in the first rain.",
+   "risky": false,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Fixes rare and exotic dyes permanently"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  },
+  {
+   "id": "planar-quench",
+   "name": "Planar Quench",
+   "kind": "treatment",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "A sealed jar of elsewhere, opened over the hardening trough. Leather quenched in it sets with a memory of the plane it met.",
+   "risky": true,
+   "forageable": false,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Hardened leather quenched in it keeps a planar trace: faint chill, faint heat, faint wrongness, dealer's choice"
+    }
+   ],
+   "effects_converted": true,
+   "source": "bought"
+  }
+ ]
+}
