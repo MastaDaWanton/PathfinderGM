@@ -177,3 +177,16 @@ def test_the_cure_tell_names_the_nonlethal_and_the_bank(table):
     assert "temporary vitality" in tells
     assert "already unhurt" not in tells
     assert pc.nonlethal < 8
+
+
+def test_the_bank_takes_only_what_the_cure_did_not_spend(table):
+    """The user's ruling: it functions as 1e does. A 14-point cure on a full-health
+    bender carrying 8 non-lethal clears the 8 and banks 6 — not 8 and 14, which was the
+    first cut double-spending the same points."""
+    scene, engine, pc = table
+    pc.overrides["heal.overflow_temp_hp"] = True
+    pc.hp = pc.hp_max
+    pc.nonlethal = 8
+    pc.heal(14)
+    assert pc.nonlethal == 0
+    assert sum(p.amount for p in pc.temp_pools) == 6
