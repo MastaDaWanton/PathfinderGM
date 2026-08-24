@@ -173,6 +173,16 @@
     "#d3d-stage{height:190px;display:flex;align-items:center;justify-content:center;",
     "perspective:760px}",
     "#d3d-die{position:relative;width:0;height:0;transform-style:preserve-3d}",
+    "#d3d-die2{position:relative;width:0;height:0;transform-style:preserve-3d;",
+    "margin-left:150px}",
+    "#d3d-stage.pair #d3d-die{margin-right:150px}",
+    "#d3d-die2 .f{position:absolute;width:120px;height:104px;left:-60px;top:-69px;",
+    "transform-origin:50% 66.667%;clip-path:polygon(50% 0%,0% 100%,100% 100%);",
+    "display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px;",
+    "font:400 26px/1 'Cinzel','Palatino Linotype',Georgia,serif;",
+    "background:linear-gradient(#2c2318,#191309);color:#c9b489;",
+    "border-bottom:1px solid rgba(0,0,0,.5);backface-visibility:hidden}",
+    "#d3d-die2 .f.land{background:linear-gradient(#3a2f1d,#241c10);color:#f0dcae}",
     "#d3d-die .f{position:absolute;width:120px;height:104px;left:-60px;top:-69px;",
     "transform-origin:50% 66.667%;",
     "clip-path:polygon(50% 0%,0% 100%,100% 100%);",
@@ -211,7 +221,22 @@
     "#d3d-own input:focus{outline:none;border-color:#c9a86a}",
   ].join("");
 
-  var mat, die, faceEls, resolveRoll, DEBUG_KEY = "pfgm.dice.manual";
+  var mat, die, faceEls, die2, faceEls2, resolveRoll,
+      DEBUG_KEY = "pfgm.dice.manual";
+
+  function fillSolid(host, scale) {
+    var els = [];
+    for (var i = 0; i < FACES.length; i++) {
+      var el = document.createElement("div");
+      el.className = "f";
+      el.style.transform = facePlacement(i, scale);
+      var lit = dot(norm(CENTRES[i]), norm([-0.35, -0.75, 0.56]));
+      el.style.filter = "brightness(" + (0.62 + 0.55 * Math.max(0, lit)).toFixed(3) + ")";
+      host.appendChild(el);
+      els.push(el);
+    }
+    return els;
+  }
 
   function debugOn() {
     try { return localStorage.getItem(DEBUG_KEY) === "1"; } catch (e) { return false; }
@@ -242,23 +267,15 @@
     document.body.appendChild(mat);
 
     die = mat.querySelector("#d3d-die");
-    faceEls = [];
-    // 120px triangles: the placement scale is half that, the solid's edge being 2 units.
-    var scale = 60;
-    for (var i = 0; i < FACES.length; i++) {
-      var el = document.createElement("div");
-      el.className = "f";
-      el.style.transform = facePlacement(i, scale);
-      // A fixed light, baked per face. Every face carried the same gradient, so the solid
-      // read as a silhouette with numbers on it rather than as an object with sides —
-      // shading by the angle between each face and one light is what makes twenty flat
-      // triangles look like one thing. The light is on the die, not on the room, so it
-      // turns with the solid the way a facet catches a candle.
-      var lit = dot(norm(CENTRES[i]), norm([-0.35, -0.75, 0.56]));
-      el.style.filter = "brightness(" + (0.62 + 0.55 * Math.max(0, lit)).toFixed(3) + ")";
-      die.appendChild(el);
-      faceEls.push(el);
-    }
+    faceEls = fillSolid(die, 60);
+    // The percentile partner. A real d100 is either a hundred-facet ball nobody could
+    // read at this size or two d10s, and every table rolls the two d10s — tens and
+    // ones. The second solid exists for exactly that and stays hidden otherwise.
+    die2 = document.createElement("div");
+    die2.id = "d3d-die2";
+    die2.style.display = "none";
+    die.parentElement.appendChild(die2);
+    faceEls2 = fillSolid(die2, 60);
 
     mat.querySelector("#d3d-debug").addEventListener("click", function () {
       var on = !debugOn();
@@ -291,6 +308,7 @@
   function land(opts) {
     build();
     var sides = opts.sides || 20;
+    if (sides === 100) return landPercentile(opts);
     var lo = opts.lo != null ? opts.lo : 1;
     var hi = opts.hi != null ? opts.hi : sides;
     var result = opts.result;
@@ -361,6 +379,93 @@
         };
       });
     })();
+  }
+
+  /* The percentile pair: how a table actually rolls a d100. Tens land on the left
+     solid, ones on the right, and the pair reads 00/0 as 100 the way the dice do. The
+     tumble and settle are the shared animation; nothing here decides anything either. */
+  async function landPercentile(opts) {
+    var result = Math.max(1, Math.min(100, opts.result | 0));
+    var tens = Math.floor((result % 100) / 10) * 10;      // 0,10,…,90
+    var ones = result % 10;                                // 0-9
+    var stage = mat.querySelector("#d3d-stage");
+    stage.classList.add("pair");
+    die2.style.display = "";
+
+    for (var i = 0; i < faceEls.length; i++) {
+      faceEls[i].textContent = ("0" + ((i % 10) * 10)).slice(-2);
+      faceEls[i].className = "f";
+      faceEls2[i].textContent = i % 10;
+      faceEls2[i].className = "f";
+    }
+    mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
+    mat.querySelector("#d3d-why").textContent =
+      (opts.why || "") + (opts.why ? " — " : "") + "percentile dice";
+    mat.querySelector("#d3d-terms").innerHTML = "";
+    mat.querySelector("#d3d-verdict").textContent = "";
+    mat.querySelector("#d3d-verdict").className = "";
+    mat.querySelector("#d3d-note").textContent = "";
+    mat.querySelector("#d3d-own").classList.remove("on");
+    mat.querySelector("#d3d-debug").style.display = "none";
+    mat.querySelector("#d3d-go").textContent = "…";
+    mat.querySelector("#d3d-go").disabled = true;
+    mat.classList.add("on");
+
+    // Each die lands on a face already wearing its digit, so the pair reads true from
+    // every angle. Ten faces carry each digit; any of them will do.
+    var landA = -1, landB = -1;
+    for (var j = 0; j < faceEls.length; j++) {
+      if (faceEls[j].textContent === ("0" + tens).slice(-2) && landA < 0 &&
+          Math.random() < 0.2) landA = j;
+      if (Number(faceEls2[j].textContent) === ones && landB < 0 &&
+          Math.random() < 0.2) landB = j;
+    }
+    if (landA < 0) landA = faceEls.findIndex(function (f) {
+      return f.textContent === ("0" + tens).slice(-2); });
+    if (landB < 0) landB = faceEls2.findIndex(function (f) {
+      return Number(f.textContent) === ones; });
+
+    die.style.transition = "none";
+    die2.style.transition = "none";
+    for (var g = 0; g < 7; g++) {
+      die.style.transform = spin();
+      die2.style.transform = spin();
+      await wait([60, 60, 65, 75, 90, 110, 140][g]);
+    }
+    die.style.transition = "transform .85s cubic-bezier(.16,.9,.3,1)";
+    die2.style.transition = "transform .95s cubic-bezier(.16,.9,.3,1)";
+    die.style.transform = "rotateY(720deg) " + faceToFront(landA);
+    die2.style.transform = "rotateY(-720deg) " + faceToFront(landB);
+    await wait(980);
+    faceEls[landA].classList.add("land");
+    faceEls2[landB].classList.add("land");
+
+    mat.querySelector("#d3d-terms").innerHTML =
+      '<div class="r"><span>tens</span><b>' + ("0" + tens).slice(-2) + "</b></div>" +
+      '<div class="r"><span>ones</span><b>' + ones + "</b></div>" +
+      '<div class="r tot"><span>d100</span><b>' + result + "</b></div>";
+    if (opts.terms && opts.terms.length) {
+      mat.querySelector("#d3d-terms").innerHTML += opts.terms.map(function (x) {
+        return '<div class="r' + (x.total ? " tot" : "") + '"><span>' + esc(x.label) +
+               "</span><b>" + esc(String(x.value)) + "</b></div>";
+      }).join("");
+    }
+    if (opts.verdict) {
+      var v = mat.querySelector("#d3d-verdict");
+      v.textContent = opts.verdict.text;
+      v.className = opts.verdict.good ? "good" : opts.verdict.good === false ? "bad" : "";
+    }
+    if (opts.note) mat.querySelector("#d3d-note").textContent = opts.note;
+    mat.querySelector("#d3d-go").textContent = "Close";
+    mat.querySelector("#d3d-go").disabled = false;
+    return new Promise(function (done) {
+      mat.querySelector("#d3d-go").onclick = function () {
+        mat.classList.remove("on");
+        stage.classList.remove("pair");
+        die2.style.display = "none";
+        done(result);
+      };
+    });
   }
 
   function esc(s) {
