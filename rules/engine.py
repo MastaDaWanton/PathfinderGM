@@ -882,6 +882,15 @@ class Engine:
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
         sequence = actor.attack_sequence(weapon_key, full)
+        # One swing at a stated iterative. The combat panel lets a Blood Bender replace
+        # any attack in a full attack with an ability, so the remaining weapon swings
+        # arrive one op each, still carrying their own -5/-10 — a mixed full attack
+        # whose swings all rolled at full BAB would be the panel quietly buffing the
+        # class it was built for.
+        it = intent.params.get("iteration")
+        if it is not None and not full:
+            whole = actor.attack_sequence(weapon_key, True)
+            sequence = [whole[min(int(it), len(whole) - 1)]]
 
         while state["i"] < len(sequence):
             iteration = sequence[state["i"]]

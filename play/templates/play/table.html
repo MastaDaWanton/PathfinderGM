@@ -480,6 +480,41 @@
   #craftpanel .cp-bench { color: var(--dim); font-size: 12.5px; text-decoration: none; }
   #craftpanel .cp-bench:hover { color: var(--accent); }
 
+  /* --- The combat panel ---------------------------------------------------- */
+  #combatbar {
+    margin-bottom: 10px; padding: 12px 14px; border-radius: 3px;
+    border: 1px solid #6b322a; background: rgba(30, 12, 10, .45);
+  }
+  #combatbar .cb-head { display: flex; gap: 12px; align-items: baseline;
+    margin-bottom: 8px; }
+  #combatbar .cb-head b { color: var(--alarm); font: 400 15px/1 var(--display);
+    letter-spacing: .1em; font-variant: small-caps; }
+  #combatbar .cb-head span { color: var(--dim); font-size: 13px; }
+  #combatbar .cb-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .cb-target {
+    padding: 4px 11px; border-radius: 12px; cursor: pointer; font-size: 13px;
+    border: 1px solid var(--edge); background: rgba(0,0,0,.3); color: var(--ink);
+  }
+  .cb-target.on { border-color: var(--alarm); color: #e8b0a8;
+    box-shadow: 0 0 8px rgba(168,68,58,.3); }
+  .cb-target small { color: var(--dim); margin-left: 5px; }
+  #combatbar .cb-acts button { padding: 8px 14px; font-size: 13px; }
+  #combatbar .cb-acts .go { border-color: var(--brew-dim); color: var(--brew); }
+  #cb-plan:empty { display: none; }
+  .cb-step {
+    padding: 4px 10px; border-radius: 2px; font-size: 12.5px; cursor: pointer;
+    border: 1px dashed var(--gold-dim); color: var(--gold); background: rgba(0,0,0,.3);
+  }
+  .cb-step:hover { border-color: var(--alarm); color: #d9a49c; }
+  .cb-menu { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cb-menu button { padding: 6px 11px; font-size: 12.5px; }
+  .cb-menu .cb-note { flex-basis: 100%; color: var(--dim); font-size: 12px; }
+  .cb-slot { display: flex; gap: 6px; align-items: center; flex-basis: 100%; }
+  .cb-slot label { color: var(--dim); font-size: 12px; min-width: 84px; }
+  .cb-slot select { flex: 1; background: var(--sunk); color: var(--ink);
+    border: 1px solid var(--edge); padding: 6px; font: 13px var(--body); }
+  #map .cell.reach, #maptrayinner .cell.reach { cursor: crosshair; pointer-events: all; }
+
   /* --- The glossary popover: what a clicked name actually does ------------- */
   .gloss { cursor: pointer; border-bottom: 1px dotted var(--gold-dim); }
   .gloss:hover { color: var(--gold); border-bottom-color: var(--accent); }
@@ -1207,6 +1242,32 @@
   <div id="err"></div>
   <footer>
     <div id="suggestions"></div>
+    <!-- Combat as its own state: a turn is BUILT here — move, a standard action or a
+         full attack whose every swing can be an ability (Blood Bond's clause), a swift,
+         any frees — then committed once. The say box below stays live the whole time
+         for anything unconventional; a panel that closed the door on "I kick the
+         brazier into his face" would be the wrong kind of order. -->
+    <div id="combatbar" hidden>
+      <div class="cb-head">
+        <b id="cb-round"></b>
+        <span id="cb-turn"></span>
+      </div>
+      <div class="cb-row" id="cb-targets"></div>
+      <div class="cb-row" id="cb-plan"></div>
+      <div class="cb-row cb-acts">
+        <button type="button" id="cb-strike">Strike</button>
+        <button type="button" id="cb-fullatk">Full attack…</button>
+        <button type="button" id="cb-ability">Ability…</button>
+        <button type="button" id="cb-swift">Swift…</button>
+        <button type="button" id="cb-free">Free…</button>
+        <button type="button" id="cb-clear" class="quiet">Clear</button>
+        <button type="button" id="cb-commit" class="go">Commit turn</button>
+        <button type="button" id="cb-end" class="quiet">End turn</button>
+      </div>
+      <div class="cb-menu" id="cb-menu" hidden></div>
+      <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just
+        type below for anything the buttons cannot say.</div>
+    </div>
   <div id="abilities"></div>
     <form id="sayform" autocomplete="off">
       <input type="text" id="input" placeholder="What do you do?" autofocus>
@@ -1465,6 +1526,7 @@ async function post(url, body) {
 
 function render(s) {
   STATE = s;
+  renderCombat(s);
   // `fresh` marks only the beats that were not on the page a moment ago, because this
   // rebuilds the whole transcript each state: without the gate, every line re-ran its
   // ink-bleed entrance on every turn, which reads as the book flickering rather than
@@ -1650,7 +1712,10 @@ function renderMap(s) {
   for (const [c, r] of g.blocked) parts.push(cell(c, r, "blocked"));
   for (const [key, cost] of reach) {
     const [c, r] = key.split(",").map(Number);
-    parts.push(cell(c, r, "reach", `<title>${cost} ft</title>`));
+    // data-sq is what makes the square a *destination* — the combat builder queues a
+    // move op from it. Present whether or not the panel is open, harmless when idle.
+    parts.push(cell(c, r, "reach", `<title>${cost} ft</title>`)
+      .replace('class="cell reach"', `class="cell reach" data-sq="${c},${r}"`));
   }
 
   // Grid lines last of the terrain, so they sit over the fills and under the tokens.
@@ -1852,6 +1917,186 @@ document.addEventListener("click", e => {
   const r = hit.getBoundingClientRect();
   card.style.left = Math.min(innerWidth - 440, Math.max(8, r.left)) + "px";
   card.style.top = Math.min(innerHeight - 160, r.bottom + 8) + "px";
+});
+
+// --- the combat turn builder ---------------------------------------------------------
+// One turn, built then committed: the server runs the ops in order through the same
+// engine path as a spoken turn, and the NPCs answer through the machinery that already
+// existed. Buttons for the mechanical; the say box for everything else.
+const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [] };
+
+function actionKind(text) {
+  const m = /^\s*(?:as an?|an?)?\s*(swift|free|immediate|move|standard|full[- ]round)\b/i
+    .exec(text || "");
+  return m ? m[1].toLowerCase().replace("full ", "full-") : "standard";
+}
+
+function renderCombat(s) {
+  const bar = $("#combatbar");
+  if (!bar) return;
+  const on = s.scene && s.scene.in_encounter;
+  bar.hidden = !on;
+  if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = null;
+             COMBAT.frees = []; return; }
+
+  $("#cb-round").textContent = `Round ${s.scene.round || 1}`;
+  const up = s.scene.turn_ref === (s.pc && s.pc.ref || "pc");
+  $("#cb-turn").textContent = up ? "your turn" :
+    `waiting on ${(s.scene.initiative.find(i => i.up) || {}).name || "…"}`;
+
+  const foes = (s.scene.actors || []).filter(a => !a.is_pc && a.hp > 0);
+  if (COMBAT.target && !foes.some(f => f.ref === COMBAT.target)) COMBAT.target = null;
+  if (!COMBAT.target && foes.length === 1) COMBAT.target = foes[0].ref;
+  $("#cb-targets").innerHTML = foes.map(f =>
+    `<span class="cb-target ${COMBAT.target === f.ref ? "on" : ""}" data-target="${
+      esc(f.ref)}">${esc(f.name)}<small>${
+      (f.conditions || []).join(", ") || (f.hp < f.hp_max ? "wounded" : "unhurt")
+    }</small></span>`).join("")
+    || `<span class="sub">Nobody left standing against you.</span>`;
+
+  renderPlan();
+}
+
+function renderPlan() {
+  const bits = [];
+  if (COMBAT.move) bits.push(`<span class="cb-step" data-unplan="move"
+    title="Remove">Move to ${COMBAT.move.join(",")}</span>`);
+  if (COMBAT.standard) bits.push(`<span class="cb-step" data-unplan="standard"
+    title="Remove">${esc(COMBAT.standard.label)}</span>`);
+  if (COMBAT.swift) bits.push(`<span class="cb-step" data-unplan="swift"
+    title="Remove">Swift: ${esc(COMBAT.swift)}</span>`);
+  COMBAT.frees.forEach((f, i) => bits.push(`<span class="cb-step" data-unplan="free:${i}"
+    title="Remove">Free: ${esc(f)}</span>`));
+  $("#cb-plan").innerHTML = bits.join("");
+}
+
+function targetName() {
+  const f = (STATE.scene.actors || []).find(a => a.ref === COMBAT.target);
+  return f ? f.name : "the enemy";
+}
+
+function combatMenu(html) {
+  const m = $("#cb-menu");
+  m.hidden = !html;
+  m.innerHTML = html || "";
+}
+
+async function commitTurn(endOnly) {
+  const actions = [];
+  const said = [];
+  if (COMBAT.move) {
+    actions.push({ op: "move", params: { zone: "near", square: COMBAT.move } });
+    said.push(`move to (${COMBAT.move.join(",")})`);
+  }
+  if (COMBAT.standard) {
+    actions.push(...COMBAT.standard.actions);
+    said.push(COMBAT.standard.label.toLowerCase());
+  }
+  if (COMBAT.swift) {
+    actions.push({ op: "use_ability",
+                   params: { ability: COMBAT.swift }, target: COMBAT.target });
+    said.push(`swift: ${COMBAT.swift}`);
+  }
+  for (const f of COMBAT.frees) {
+    actions.push({ op: "use_ability", params: { ability: f }, target: COMBAT.target });
+    said.push(`free: ${f}`);
+  }
+  busy(true);
+  try {
+    const d = await post("/api/combat/act", {
+      actions: endOnly ? [] : actions,
+      end_turn: true,
+      label: endOnly ? "" : said.join("; ") || "",
+    });
+    COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
+    combatMenu("");
+    render(d);
+  } catch (e) { $("#err").textContent = e.message; }
+  busy(false);
+}
+
+document.addEventListener("click", async e => {
+  const t = e.target;
+  const chip = t.closest(".cb-target");
+  if (chip) { COMBAT.target = chip.dataset.target; renderCombat(STATE); return; }
+  const un = t.closest("[data-unplan]");
+  if (un) {
+    const what = un.dataset.unplan;
+    if (what === "move") COMBAT.move = null;
+    else if (what === "standard") COMBAT.standard = null;
+    else if (what === "swift") COMBAT.swift = null;
+    else if (what.startsWith("free:")) COMBAT.frees.splice(Number(what.slice(5)), 1);
+    renderPlan(); return;
+  }
+  const sq = t.closest("[data-sq]");
+  if (sq && STATE.scene && STATE.scene.in_encounter) {
+    COMBAT.move = sq.dataset.sq.split(",").map(Number);
+    renderPlan(); return;
+  }
+
+  if (t.closest("#cb-strike")) {
+    if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    COMBAT.standard = { label: `Strike ${targetName()}`,
+      actions: [{ op: "attack", target: COMBAT.target, params: {} }] };
+    combatMenu(""); renderPlan(); return;
+  }
+
+  if (t.closest("#cb-fullatk")) {
+    if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    const seq = (STATE.attacks || {}).sequence || [0];
+    const abil = (STATE.abilities || []).filter(a =>
+      !["swift", "free", "immediate"].includes(actionKind(a.text)));
+    const options = (i) => `<option value="">weapon (${seq[i] >= 0 ? "+" : ""}${
+      seq[i]})</option>` + ((STATE.attacks || {}).replaceable ? abil.map(a =>
+      `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "");
+    combatMenu(seq.map((p, i) =>
+      `<div class="cb-slot"><label>attack ${i + 1}</label>
+       <select data-slot="${i}">${options(i)}</select></div>`).join("") +
+      `<button id="cb-fullok">Set full attack</button>
+       <span class="cb-note">Blood Bond: any swing can be an ability instead —
+       the weapon swings keep their own iterative penalties.</span>`);
+    return;
+  }
+  if (t.closest("#cb-fullok")) {
+    const slots = [...$("#cb-menu").querySelectorAll("select")].map(s => s.value);
+    const actions = slots.map((v, i) => v
+      ? { op: "use_ability", params: { ability: v }, target: COMBAT.target }
+      : { op: "attack", target: COMBAT.target, params: { iteration: i } });
+    const label = "Full attack: " + slots.map(v => v || "weapon").join(", ") +
+                  ` on ${targetName()}`;
+    COMBAT.standard = { label, actions };
+    combatMenu(""); renderPlan(); return;
+  }
+
+  const menuFor = (kinds, slot) => {
+    const list = (STATE.abilities || []).filter(a => kinds.includes(actionKind(a.text)));
+    if (!list.length) { combatMenu(`<span class="cb-note">Nothing ${
+      kinds[0]} to use.</span>`); return; }
+    combatMenu(list.map(a => `<button data-pick="${slot}:${esc(a.name)}"
+      title="${esc((a.text || "").slice(0, 200))}">${esc(a.name)}</button>`).join(""));
+  };
+  if (t.closest("#cb-ability")) { menuFor(["standard", "full-round", "move"], "standard"); return; }
+  if (t.closest("#cb-swift")) { menuFor(["swift", "immediate"], "swift"); return; }
+  if (t.closest("#cb-free")) { menuFor(["free"], "free"); return; }
+
+  const pick = t.closest("[data-pick]");
+  if (pick) {
+    const [slot, ...rest] = pick.dataset.pick.split(":");
+    const name = rest.join(":");
+    if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
+      actions: [{ op: "use_ability", params: { ability: name },
+                  target: COMBAT.target }] };
+    else if (slot === "swift") COMBAT.swift = name;
+    else COMBAT.frees.push(name);
+    combatMenu(""); renderPlan(); return;
+  }
+
+  if (t.closest("#cb-clear")) {
+    COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
+    combatMenu(""); renderPlan(); return;
+  }
+  if (t.closest("#cb-commit")) { commitTurn(false); return; }
+  if (t.closest("#cb-end")) { commitTurn(true); return; }
 });
 
 async function sendRoll(face) {

@@ -64,6 +64,24 @@ def _grid_state(scene) -> dict | None:
     return out
 
 
+def _attack_slots(pc) -> dict:
+    """The shape of this character's full attack, and whether abilities may stand in.
+
+    Replacement is Blood Bond's clause — "Abilities can replace each attack action
+    within a standard action or a full-round action" — so it is keyed off the class
+    having paths, the same fact the ability buttons key off.
+    """
+    if pc is None:
+        return {"sequence": [], "weapon": "", "replaceable": False}
+    from rules.tables import iterative_attacks
+
+    return {
+        "sequence": iterative_attacks(pc.bab),
+        "weapon": (pc.equipped or "unarmed"),
+        "replaceable": bool(getattr(pc, "paths", None)),
+    }
+
+
 def _usable_abilities(pc) -> list[dict]:
     """What this character can use right now, path by path.
 
@@ -135,6 +153,10 @@ def _state(c) -> dict:
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
         "abilities": _usable_abilities(pc),
+        # What a full attack is made of, for the combat panel's slot builder. The
+        # penalties are the display; the engine recomputes them from the same table
+        # when the swing actually happens.
+        "attacks": _attack_slots(pc),
         # The player sees their own rolls and nobody else's. Hidden rolls are stripped
         # here, at the edge, rather than in the template — a number that never reaches
         # the browser cannot be read out of the page source either.
@@ -613,6 +635,78 @@ def say(request):
                             status=502)
 
     return _advance(request, c, agent, plan.narration, plan, text)
+
+
+# The combat panel's whitelist: what a button may emit, and nothing else. The free-text
+# box still exists for everything unconventional, and it goes through the GM like any
+# spoken turn — this path is for the actions whose arithmetic is already the engine's.
+_COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre"}
+
+
+@require_POST
+def combat_act(request):
+    """A turn taken on the combat panel: buttons straight to the engine.
+
+    No model plans this — clicking "attack the thug" has nothing in it for a narrator
+    to decide, and routing it through one made every combat turn cost a model call
+    before the dice came out. The narrator still gets the *outcomes* (through the same
+    `_finish` every spoken turn uses), so the fiction keeps its voice; and the NPC
+    turns that follow run exactly as they always have.
+    """
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    scene = c.scene
+    pc = scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+    if scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    if not scene.in_encounter:
+        return JsonResponse({"error": "No fight is on."}, status=409)
+    if scene.current_ref() != pc.ref:
+        return JsonResponse({"error": "It is not your turn."}, status=409)
+
+    actions = body.get("actions") or []
+    label = str(body.get("label", "")).strip()
+    end_turn = bool(body.get("end_turn"))
+
+    raw = []
+    for a in actions:
+        if not isinstance(a, dict):
+            return JsonResponse({"error": "actions must be objects"}, status=400)
+        op = str(a.get("op", "")).strip().lower()
+        if op not in _COMBAT_OPS:
+            return JsonResponse({"error": f"{op!r} is not a combat-panel action"},
+                                status=400)
+        raw.append({
+            "op": op, "actor": pc.ref,
+            "target": a.get("target"),
+            "because": label or "the combat panel",
+            "params": {k: v for k, v in (a.get("params") or {}).items()
+                       if isinstance(k, str)},
+        })
+
+    engine = c.engine()
+    agent = GMAgent(c.world, engine)
+
+    if not raw:
+        # End turn with nothing declared: the round moves on. Marked as acted so the
+        # first blow of the next fight does not find the PC flat-footed for passing.
+        scene.acted.add(pc.ref)
+        if end_turn:
+            _run_npc_turns(c, agent)
+        c.save()
+        return JsonResponse(_state(c))
+
+    c.transcript.append({"who": "player", "text": label or "(the combat panel)"})
+    try:
+        intents = engine.validate(raw)
+        resolution = engine.run(intents)
+    except (IntentError, ValueError) as exc:
+        c.transcript.pop()
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    return _finish(c, agent, resolution, "", label, plan=None)
 
 
 @require_POST
