@@ -135,3 +135,45 @@ def test_drinking_a_range_healing_jar_works_end_to_end(table):
         "params": {"item": tea.id, "how": "drink"}}]))
     assert pc.hp > before
     assert tea.id not in pc.stock
+
+
+def test_potency_scales_range_notation_too():
+    """"the comfry was x5.something potency so it should have healed way more" — it
+    should have, and did not: "1-4" fell through scale()'s notation match and potency
+    silently never applied. Normalised to 1d4 first, a 506% tea is 1d4+11."""
+    from rules.consumables import scale
+
+    assert scale("1-4", 5.06) == "1d4+11"
+    assert scale("1-4", 1.0) == "1d4"
+    assert scale("2-8", 1.0) == "1d7+1"
+
+
+def test_the_cure_tell_names_the_nonlethal_and_the_bank(table):
+    """"my nonlethal hp did not heal" — it healed, and the tell said "already unhurt",
+    which is a cure lying about two of its three effects. For a class whose entire
+    economy is non-lethal damage, the lie reads as the mechanic being broken."""
+    from rules import crafting
+    from rules.engine import Engine, Scene
+    from rules.dice import Dice
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["class"] = "blood bending"
+    d["ranks"] = {}
+    pc = from_dict(d, ref="pc")
+    pc.hp = pc.hp_max
+    pc.nonlethal = 8
+    s = Scene(location_id="x")
+    s.add(pc)
+    e = Engine(s, Dice(seed=5))
+    tea = crafting.Stock(base="Comfrey Tea", tier="rare", count=1, potency=5.06,
+                         craft="herbalist", effects=["Heals 1-4 hit points"],
+                         specs=[{"type": "heal", "dice": "1-4", "from": "Comfrey"}])
+    pc.add_stock(tea, 1)
+    r = e.run(e.validate([{"op": "use_item", "actor": "pc", "because": "drinks",
+                           "params": {"item": tea.id, "how": "drink"}}]))
+    tells = " ".join(o.tell for o in r.outcomes if o.tell)
+    assert "non-lethal" in tells
+    assert "temporary vitality" in tells
+    assert "already unhurt" not in tells
+    assert pc.nonlethal < 8

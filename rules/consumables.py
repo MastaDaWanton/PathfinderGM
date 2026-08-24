@@ -286,9 +286,19 @@ def scale(dice: str, potency: float) -> str:
     (3.5), rounded the way `crafting` rounds — benefits up, and this is only ever called
     on the thing the player made on purpose.
     """
-    m = _DICE.match(str(dice or ""))
+    text = str(dice or "")
+    # The corpus's range form, normalised to real dice before anything else: "1-4" is
+    # 1d4 and "2-8" is 1d7+1. Left alone, a range fell through the notation match and
+    # potency silently never applied — a 506% Comfrey Tea healed exactly what a plain
+    # one did, which is the player's brewing thrown away without a word.
+    r = re.match(r"^\s*(\d+)\s*-\s*(\d+)\s*$", text)
+    if r and int(r.group(2)) > int(r.group(1)):
+        lo, hi = int(r.group(1)), int(r.group(2))
+        flat0 = lo - 1
+        text = f"1d{hi - lo + 1}" + (f"+{flat0}" if flat0 else "")
+    m = _DICE.match(text)
     if not m or abs(potency - 1.0) < 0.01:
-        return str(dice or "")
+        return text
     count, sides = int(m.group(1)), int(m.group(2))
     flat = int(m.group(4) or 0) * (-1 if m.group(3) == "-" else 1)
     average = count * (sides + 1) / 2

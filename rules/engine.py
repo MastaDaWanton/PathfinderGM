@@ -1232,19 +1232,39 @@ class Engine:
             roll = self.dice.roll(amount, label="healing", visibility="hidden")
             amount = roll.total
 
+        nl_before = target.nonlethal
+        temp_before = sum(p.amount for p in target.temp_pools)
         healed = target.heal(amount)
+        nl_healed = nl_before - target.nonlethal
+        temp_banked = sum(p.amount for p in target.temp_pools) - temp_before
         # The dying stop dying when they are back above zero; nothing else clears it.
         for gone in ("dying", "stable", "unconscious", "disabled"):
             if target.hp > 0 and target.has_condition(gone):
                 target.remove_condition(gone)
 
+        # The tell owns everything the cure did. "Already unhurt" used to be the whole
+        # sentence for a Blood Bender at full hit points, while the same drink was
+        # quietly clearing their non-lethal — the resource their entire class spends —
+        # and banking the spare as temporary hit points. A cure that lies about two of
+        # its three effects reads as a cure that did nothing.
+        parts = []
+        if healed:
+            parts.append(f"recovers {healed} hit points "
+                         f"({target.hp}/{target.hp_max})")
+        if nl_healed:
+            parts.append(f"shakes off {nl_healed} non-lethal"
+                         + (f" ({target.nonlethal} remains)" if target.nonlethal else ""))
+        if temp_banked:
+            parts.append(f"banks {temp_banked} as temporary vitality")
+        tell = (f"{target.name} " + ", ".join(parts) + "."
+                if parts else f"{target.name} is already unhurt.")
+
         return Outcome(
             intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
             effects=[{"ref": target.ref, "kind": "heal", "amount": healed,
+                      "nonlethal_healed": nl_healed, "temp_banked": temp_banked,
                       "hp_after": target.hp, "hp_max": target.hp_max}],
-            tell=(f"{target.name} recovers {healed} hit points "
-                  f"({target.hp}/{target.hp_max})." if healed
-                  else f"{target.name} is already unhurt."),
+            tell=tell,
             because=intent.because,
         )
 
