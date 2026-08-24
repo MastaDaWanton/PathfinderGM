@@ -138,8 +138,19 @@
    */
   function labels(sides, lo, hi, result, landing) {
     var out = new Array(FACES.length), span = hi - lo + 1;
-    for (var i = 0; i < out.length; i++) {
-      out[i] = lo + (i % span);
+    if (span <= out.length) {
+      // A d8 on twenty faces: its own values, repeated around the solid.
+      for (var i = 0; i < out.length; i++) out[i] = lo + (i % span);
+    } else {
+      // A d100 on twenty faces used to label them 1..20, so an 85 landed on what read
+      // as a d20 — "that is an 85 on a d20". The faces now carry values spread across
+      // the die's whole range, jittered so they do not read as a printed scale, and
+      // every one of them is a number this die could genuinely have rolled.
+      for (var j = 0; j < out.length; j++) {
+        var base = lo + Math.round((span - 1) * (j + 0.5) / out.length);
+        var jit = Math.floor(Math.random() * 5) - 2;
+        out[j] = Math.max(lo, Math.min(hi, base + jit));
+      }
     }
     out[landing] = result;
     return out;
@@ -294,11 +305,16 @@
     }
 
     mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
-    mat.querySelector("#d3d-why").textContent = opts.why || "";
+    mat.querySelector("#d3d-why").textContent =
+      (opts.why || "") + (sides !== 20 ? (opts.why ? " — " : "") + "d" + sides : "");
     mat.querySelector("#d3d-terms").innerHTML = "";
     mat.querySelector("#d3d-verdict").textContent = "";
     mat.querySelector("#d3d-verdict").className = "";
     mat.querySelector("#d3d-note").textContent = "";
+    mat.querySelector("#d3d-own").classList.remove("on");
+    mat.querySelector("#d3d-debug").style.display = "none";
+    mat.querySelector("#d3d-go").textContent = "…";
+    mat.querySelector("#d3d-go").disabled = true;
     mat.classList.add("on");
 
     // For a d20 the landing face is the one already bearing that number, so the solid

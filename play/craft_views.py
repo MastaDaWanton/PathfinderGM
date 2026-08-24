@@ -492,10 +492,13 @@ def _narrate(messages, cfg, *, as_json=False, num_predict=220):
     from gm import client as gm_client
 
     try:
-        return gm_client.chat(
+        reply = gm_client.chat(
             messages, cfg["model"], host=cfg["host"], as_json=as_json,
             temperature=0.85, timeout=90, num_predict=num_predict,
             provider=cfg.get("provider", "ollama"), api_key=cfg.get("api_key", ""))
+        # `chat` returns a Reply, not a string — the first live forage wrote
+        # "Reply(text='You push aside…', model='llama3.1:8b')" into the book verbatim.
+        return reply.json() if as_json else reply.text
     except Exception:
         return None
 
