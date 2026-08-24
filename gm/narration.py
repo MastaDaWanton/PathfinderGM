@@ -395,7 +395,51 @@ MAX_CONSEQUENCE_CHARS = 700
 # check can touch, but the nouns give it away. A sentence naming one of these is the
 # example bleeding through, unless the turn itself is genuinely about a ferry — which is
 # what the `context` parameter decides.
-_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel")
+_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel", "old man")
+
+# The NPC-turn examples have a cast of their own, and it bleeds the same way: in a real
+# bear fight the bear's turn was narrated as "The thug, grinning..., swinging the sap" and
+# the consequence call staggered "the old man" — the worked examples playing themselves
+# instead of the scene, in common nouns no capitalised-name check can see. Unlike the
+# ferry, a thug and a guildhand genuinely exist as templates, so the context parameter is
+# what keeps a real thug fight narratable: the caller passes the scene's actual cast.
+_NPC_EXAMPLE_MARKS = ("thug", "guildhand", "old man")
+# Not "sap": it is the thug template's real weapon, so a genuine thug fight talks about
+# it constantly, and every bled sentence observed live named its wielder anyway.
+
+
+def _example_bled(sentence_key: str, marks, low_context: str) -> bool:
+    """Whether a sentence names the worked examples' own cast or scenery.
+
+    Word-boundary matches, not substrings — "sap" must not condemn "sapling", and it was
+    substring matching that would have made this check too eager to ship for the NPC
+    marks at all.
+    """
+    for mark in marks:
+        # A trailing s is allowed — the live ferry catch was the plural "moorings" —
+        # but nothing longer: "sapling" is not "sap".
+        if re.search(rf"\b{re.escape(mark)}s?\b", sentence_key) and mark not in low_context:
+            return True
+    return False
+
+
+def strip_example_cast(text: str, context: str, marks=_NPC_EXAMPLE_MARKS) -> str:
+    """Drop the sentences in which a worked example plays itself.
+
+    Same doctrine as `clean_consequence`, applied to NPC-turn narration: detect
+    mechanically, and cutting too much is safe because the engine's own tell still says
+    what happened. `context` is everything the turn is genuinely about — the scene's
+    cast above all — and a mark found there is not a bleed.
+    """
+    if not text:
+        return ""
+    low_context = (context or "").lower()
+    kept = [(" ".join(s.split())) for s in _SENTENCE.findall(text)
+            if not _example_bled(s.lower().strip(".!? "), marks, low_context)]
+    out = " ".join(kept).strip()
+    if not re.search(r"[a-zA-Z]", out):
+        return ""
+    return out
 
 
 def clean_consequence(text: str, example_answer: str = "", context: str = "") -> str:
@@ -434,7 +478,7 @@ def clean_consequence(text: str, example_answer: str = "", context: str = "") ->
         key = s.lower().strip(".!? ")
         if not key or key in seen:
             continue
-        if any(mark in key and mark not in low_context for mark in _EXAMPLE_MARKS):
+        if _example_bled(key, _EXAMPLE_MARKS, low_context):
             continue
         seen.add(key)
         kept.append(s)

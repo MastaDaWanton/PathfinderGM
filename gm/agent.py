@@ -211,6 +211,13 @@ class GMAgent:
             # Check 4 is the only one that gets a targeted repair, because the narration
             # around the claim is worth keeping.
             narration = judgement.name_refs(narration, self.engine.scene)
+            # The player's own turn bleeds the worked examples' cast the same way NPC
+            # turns do — the player's words join the cast as context, so "I pay the
+            # thug" stays sayable even before the thug is an actor.
+            narration = narration_mod.strip_example_cast(
+                narration,
+                player_input + " "
+                + " ".join(a.name for a in self.engine.scene.actors.values()))
             narration, claim_repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
             narration, prose_repairs, prose_attempts = self.polish(
@@ -275,6 +282,11 @@ class GMAgent:
 
             narration = judgement.name_refs(
                 str(data.get("narration", "")).strip(), self.engine.scene)
+            # The worked examples' own cast, playing themselves: a bear's turn narrated
+            # as "The thug... swinging the sap". The scene's real cast is the context —
+            # a genuine thug keeps his sentences.
+            cast = " ".join(a.name for a in self.engine.scene.actors.values())
+            narration = narration_mod.strip_example_cast(narration, cast)
             narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
             attempts.extend(repair_attempts)
             narration, outsourced = narration_mod.fix_hand_back(narration)
@@ -454,8 +466,11 @@ class GMAgent:
         cleaned = narration_mod.clean_consequence(
             reply.text.strip(), prompts.CONSEQUENCE_EXAMPLE["assistant"],
             # So a turn genuinely about the example's scenery keeps its sentences: the
-            # marker cut only fires on words absent from the turn itself.
-            context=f"{player_input} {narration}")
+            # marker cut only fires on words absent from the turn itself. The scene's
+            # cast counts as the turn — an actor genuinely called "old man" is not the
+            # example's old man bleeding through.
+            context=f"{player_input} {narration} "
+                    + " ".join(a.name for a in self.engine.scene.actors.values()))
         text = judgement.name_refs(cleaned, self.engine.scene)
         # Call 2 says what the dice did; it has even less business asking the player
         # what they perceive than call 1 does.

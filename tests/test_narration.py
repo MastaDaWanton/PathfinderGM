@@ -320,3 +320,47 @@ def test_a_turn_genuinely_about_a_ferry_keeps_its_ferry():
     line = "The ferry noses into the current and the ropes go taut."
     kept = narration.clean_consequence(line, context="I board the ferry at the dock")
     assert kept == line
+
+
+def test_the_examples_cast_cannot_join_a_fight_it_is_not_in():
+    """In a real bear fight the bear's turn came back as "The thug, grinning in a way
+    that doesn't reach his eyes, charges forward, swinging the sap with all his might"
+    and the consequence call staggered "the old man" — the worked examples playing
+    themselves, in common nouns no capitalised-name check can see. The player watched
+    the bear turn into a thug while a man who does not exist spawned mid-fight."""
+    from gm import narration
+
+    bled = ("The bear rakes at your shield. "
+            "The thug, grinning in a way that doesn't reach his eyes, swings the sap "
+            "with all his might. "
+            "The old man stumbles backward in alarm.")
+    out = narration.strip_example_cast(bled, context="Sir Wantonious Maximus bear")
+    assert out == "The bear rakes at your shield."
+
+
+def test_a_real_thug_keeps_his_sentences():
+    """Unlike the ferry, thug and guildhand genuinely exist as templates — the scene's
+    own cast is the context, and a fight against an actual thug stays narratable."""
+    from gm import narration
+
+    line = "The thug shifts his grip on the sap and comes in low."
+    kept = narration.strip_example_cast(line, context="Kesst Vayr the thug")
+    assert kept == line
+
+
+def test_sap_does_not_condemn_sapling():
+    """Word boundaries, not substrings: prose about saplings is not the example's sap."""
+    from gm import narration
+
+    line = "You duck behind a stand of saplings."
+    assert narration.strip_example_cast(line, context="") == line
+
+
+def test_the_old_man_mark_reaches_the_consequence_cut():
+    """The consequence example's own cast member — he was the one staggering on the
+    ferry, and he stumbled into the bear fight by name."""
+    from gm import narration
+
+    bled = ("Your blade bites deep. "
+            "The old man's eyes widen in alarm as he takes in your transformed arms.")
+    assert narration.clean_consequence(bled) == "Your blade bites deep."
