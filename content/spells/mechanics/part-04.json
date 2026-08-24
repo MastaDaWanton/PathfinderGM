@@ -2774,6 +2774,161 @@
    },
    "converted_by": "read",
    "notes": "Roll-twice-take-lower is not a fixed penalty, so no skill_mod could express it without inventing a number; attitude steps have no home in the vocabulary either."
+  },
+  "curse-terrain": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "curse terrain, lesser"
+    },
+    {
+     "type": "narrative",
+     "target": "As lesser curse terrain, except that touching the ground curses a 1-mile radius with four unnatural hazards, using the effects of the major perilous demesne curse."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The hazards belong to the major perilous demesne curse, a curse entry rather than a spell, and are not restated here."
+  },
+  "curse-terrain-greater": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "curse terrain, lesser"
+    },
+    {
+     "type": "narrative",
+     "target": "As lesser curse terrain, except that touching the ground curses a 5-mile radius with six unnatural hazards, using the effects of the greater perilous demesne curse."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Same structure as curse terrain; the hazards belong to the referenced curse entry."
+  },
+  "curse-terrain-lesser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Touching the ground curses a 300-foot radius with three unnatural hazards, as the minor perilous demesne curse. The hazards appear frequently but unpredictably — you control neither when they start or stop nor where in the cursed terrain they appear. Curse terrain spells can be made permanent with permanency and stay dismissible afterwards: lesser at caster level 9 for 2,500 gp, curse terrain at 11 for 7,500 gp, greater at 15 for 17,500 gp, supreme at 19 for 27,500 gp."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The hazards themselves are the minor perilous demesne curse's and are not restated here, so nothing numeric could be emitted."
+  },
+  "curse-terrain-supreme": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "curse terrain, lesser"
+    },
+    {
+     "type": "narrative",
+     "target": "As lesser curse terrain, except that touching the ground curses a 5-mile radius with seven unnatural hazards, using the effects of the grand perilous demesne curse."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Same structure as curse terrain; the hazards belong to the referenced curse entry."
+  },
+  "curse-water": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Imbues a touched 1-pint flask of water with negative energy, turning it into unholy water. Unholy water damages good outsiders the way holy water damages undead and evil outsiders."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Creates an item. The damage unholy water later does is the flask's when thrown, at whoever it is thrown at — not this spell's, and this prose gives no dice for it, so no damage spec is emitted."
+  },
+  "cursed-earth": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Touching the ground blights a 1-mile radius with one effect of your choice. Famine: all normal plants there halve their growth and food production, as the stunt growth effect of diminish plants. Living Death: any creature of Small size or larger killed in the area, and any corpse buried there, rises as an uncontrolled zombie 24 hours after death — burning or dismembering the corpse prevents this. Plague: every day at sundown every creature in the area must make a Fortitude save or immediately contract a disease you chose at casting, with no onset period — blinding sickness, bubonic plague, cackle fever, filth fever, leprosy, mindfire, red ache, shakes or slimy doom — thereafter using that disease's own frequency and DC. This is a disease effect."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Which of the three effects applies is chosen at casting, and only one involves a save. That save repeats daily for everyone in a 1-mile radius rather than gating the casting, and the disease that follows has numbers this prose never states."
+  },
+  "cursed-treasure": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "spell_effect",
+       "target": "bestow curse"
+      },
+      {
+       "type": "narrative",
+       "target": "The creature suffers the curse option you chose at casting, from any option available with bestow curse."
+      }
+     ],
+     "note": "The save is made by the next creature to take the treasure or remove items from the container, not at casting; spell resistance applies."
+    },
+    {
+     "type": "narrative",
+     "target": "You curse an unattended piece of treasure, or a container of treasure, with any option available to bestow curse. The next creature to take the treasure or pull items from the container is cursed. If that creature turns out to be you, the spell instead discharges harmlessly."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Which curse option applies is the caster's choice from bestow curse's list and is not restated here, so spell_effect points at bestow curse rather than duplicating a number. Like curse of burning sleep, the effect fires on a trigger rather than at casting; that timing is written onto the gate's note because the shape cannot carry it, and until_discharged marks it."
+  },
+  "cushioning-bands": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 2,
+     "bypass": "piercing or slashing"
+    },
+    {
+     "type": "narrative",
+     "target": "Invisible bands of force ring the target's vital areas without hindering movement, halving damage from constriction, falling, being buried and similar crushing effects such as crushing hand. Grapple checks for anything other than constricting — pinning, swallowing whole — are unaffected. Once the bands have blocked 12 points of damage per caster level, to a maximum of 120 at 10th level, the spell discharges. They do nothing against incorporeal attacks unless those deal constriction or crushing damage, or would themselves be subject to damage reduction."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "DR 2/piercing or slashing fits damage_reduction exactly, with the bypass field naming what cuts through it. Halving crushing damage is a multiplier rather than a flat reduction and has no spec, and the 12-per-level absorption pool has no home either — the use limits count uses, not points absorbed. Save is Will negates (harmless), so no save_gate. The force element is already derived in the corpus."
   }
  }
 }

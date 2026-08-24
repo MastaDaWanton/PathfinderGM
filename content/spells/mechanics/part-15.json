@@ -2343,6 +2343,246 @@
    },
    "converted_by": "read",
    "notes": ""
+  },
+  "shadow-bomb-admixture": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Drinking this extract changes every bomb you create and throw for the duration. It does not interfere with discoveries that modify your bombs, but only one 'bomb admixture' formula can be active at a time - drinking another ends this one. When a bomb of yours hits a direct target, shadowy substance covers that target and up to three creatures taking splash damage, your choice. Each affected creature must succeed at a Fortitude save or gain concealment while also treating every other creature as having concealment, for the rest of this admixture's duration. This does not ignore spell resistance.",
+     "note": "The effect fires on each bomb thrown during the duration, against whoever that bomb hits - not on any creature at the moment this extract is drunk. Concealment is also not in the condition vocabulary."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Real finding: concealment and total concealment have no representation - they are neither a condition nor a typed modifier, and several spells in this partition grant them."
+  },
+  "shadow-claws": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "a pair of semi-real claws forms over your hands, granting you two primary claw attacks dealing 1d4 points of damage if you are Medium, or 1d3 if you are Small",
+     "note": "Recorded as granted attacks. The dice belong to the claws when they hit, not to the spell when it is cast."
+    },
+    {
+     "type": "narrative",
+     "target": "Each claw that hits also deals 1 point of Strength damage, which a successful Fortitude save against this spell's DC negates.",
+     "note": "Conditional on landing a claw attack, and repeatable on every hit for the whole duration, so it cannot be an ability_damage spec fired at casting."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No damage or ability_damage spec: this is the brief's granted-natural-attack case."
+  },
+  "shadow-conjuration": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Shapes quasi-real illusions from the Plane of Shadow, mimicking any sorcerer or wizard conjuration (summoning) or conjuration (creation) spell of 3rd level or lower. Shadow conjurations are one fifth as strong as the real thing, but work at full strength on anyone who believes them. Any creature interacting with it may make a Will save to see through it; a disbelieving creature takes only 20% damage, and a non-damage special effect is only 20% likely to occur. Whatever the disbelief save does, the creature still gets any save the mimicked spell allows, but at a DC set by this spell's level (4th) rather than the mimicked spell's. Everything created allows spell resistance even if the mimicked spell would not. Shadow objects and substances work normally except against disbelievers, on whom they are 20% likely to work. A shadow creature has one fifth the hit points of the real thing, deals normal damage and has all normal abilities and weaknesses - but against a creature that recognises it, its damage is 20% of normal, its non-lethal special abilities are only 20% likely to work (rolled separately for each use and each character), and its AC bonuses are one fifth as large. A creature that saves sees transparent images over vague shadowy forms. Objects always succeed at their Will saves.",
+     "note": "The spell has no effects of its own - it borrows another spell chosen at casting and scales it by a percentage. There is no damage, condition or duration to convert until that choice is made."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted: the corpus records 'see text' and the real duration is whichever spell is being mimicked."
+  },
+  "shadow-conjuration-greater": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "shadow conjuration",
+     "note": "Duplicates conjuration (summoning) and conjuration (creation) spells of 6th level or lower rather than 3rd."
+    },
+    {
+     "type": "narrative",
+     "target": "The illusory conjurations deal three fifths - 60% - of normal damage to nonbelievers, and nondamaging effects are 60% likely to work against them.",
+     "note": "The only differences from the base spell the prose states."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted for the same reason as the base spell."
+  },
+  "shadow-dragon-aspect": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "you wreathe yourself in a quasi-real dragon form, gaining two primary claw attacks dealing 1d6 plus your caster level in slashing damage and a primary bite dealing 1d8 plus your caster level in piercing damage, plus shadowy wings giving you a fly speed equal to your base speed with good manoeuvrability",
+     "note": "Granted natural attacks; their dice are the attacks', not the spell's. The fly speed copies your own base speed rather than naming a number, so it cannot be a speed spec."
+    },
+    {
+     "type": "narrative",
+     "target": "The shadowy natural weapons are only half as strong as real ones, though they work at full strength against anyone who believes them real. Each creature gets one Will save the first time you strike it; on a success it takes half damage from these attacks for the rest of the spell. If you beat a creature's spell resistance on your first attack against it, it stays vulnerable for the duration; if you do not, it is immune for the duration.",
+     "note": "The disbelief and spell resistance checks happen on first contact with each creature, not at casting."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "shadow-enchantment": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Casts a quasi-real illusory version of any psychic, sorcerer or wizard enchantment spell of 2nd level or lower, drawn from the Shadow Plane. It works normally unless the affected creature succeeds at a Will save. Against a disbeliever a damaging effect is one fifth as strong, or only 20% likely to occur, and a special effect other than damage is likewise one fifth as strong or 20% likely. Whatever the disbelief save does, the creature still gets any save or spell resistance the mimicked spell allows, at a DC set by this spell's level (3rd) rather than the mimicked spell's. Objects, mindless creatures and creatures immune to mind-affecting effects succeed at their Will saves automatically.",
+     "note": "Borrows another spell chosen at casting; nothing fixed to convert."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted: corpus records 'see text' and the duration is the mimicked spell's."
+  },
+  "shadow-enchantment-greater": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "shadow enchantment",
+     "note": "Mimics psychic, sorcerer and wizard enchantment spells of 5th level or lower rather than 2nd."
+    },
+    {
+     "type": "narrative",
+     "target": "If it is recognised for what it is, it is three fifths - 60% - as effective, rather than one fifth.",
+     "note": "The only difference from the base spell the prose states."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted for the same reason as the base spell."
+  },
+  "shadow-endurance": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Wisps of protective darkness wait on you. The moment you drop below 0 hit points or fall unconscious the spell discharges, shunting your body into a hidden alcove on the Shadow Plane. You stabilise immediately but cannot wake or act until the second duration runs out. As you vanish a quasi-real shadow duplicate of you appears where you fell, as though made by shadow conjuration, acting on your initiative under your control. It is one quarter as real as you, appears with 25% of your full hit points, and any creature that fails a Will save believes it is you. It has the same equipment-based bonuses you do but deals only a quarter of your normal damage, and it can cast any spell you can from your own reserve at a caster level one quarter of yours. Whatever your alignment, the duplicate is neutral evil, though it will not harm your friends or allies. When the second duration expires the duplicate vanishes and your body returns to where you disappeared; destroying the duplicate ends the spell at once and returns you the same way.",
+     "note": "A contingency that fires on you dropping, not at casting, and then creates a controlled duplicate. Nothing in the vocabulary expresses either half."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours/level until discharged, then minutes/level'. Recorded the first clock - the hours/level wait for the trigger - and left the post-discharge minutes/level in the prose, since the schema cannot hold two sequential durations. Same limitation as sepia snake sigil."
+  },
+  "shadow-evocation": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Draws energy from the Plane of Shadow to cast a quasi-real version of any sorcerer or wizard evocation spell of 4th level or lower. Damaging spells work normally unless the affected creature succeeds at a Will save; a disbelieving creature takes only one fifth damage, and a special effect other than damage is one fifth as strong or only 20% likely to occur. Recognised for what it is, a damaging spell deals 20% damage. Whatever the disbelief save does, the creature still gets any save or spell resistance the mimicked spell allows, at a DC set by this spell's level (5th) rather than the mimicked spell's. Nondamaging effects work normally except against disbelievers, on whom they have no effect at all. Objects succeed at their Will saves automatically.",
+     "note": "Borrows another spell chosen at casting; there is no damage, condition or duration of its own to convert."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted: corpus records 'see text' and the duration is the mimicked spell's."
+  },
+  "shadow-evocation-greater": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "shadow evocation",
+     "note": "Mimics sorcerer and wizard evocation spells of 7th level or lower rather than 4th."
+    },
+    {
+     "type": "narrative",
+     "target": "Recognised for what it is, a damaging spell deals three fifths - 60% - damage rather than one fifth.",
+     "note": "The only difference from the base spell the prose states."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration omitted for the same reason as the base spell."
+  },
+  "shadow-invasion": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A slashing motion with the focus cuts a rift to the Plane of Shadow, filling a stationary 30-foot emanation with shadowy energy and dropping the light level by one step as darkness does. Shadow subschool spells that have reduced effects when disbelieved, such as shadow evocation, have those reduced effects raised by 20 percentage points, to a maximum of 90%, against targets inside the area. The rift also draws attention from the far side: dismissing the spell as a standard action carries a 5% chance per full round it was active of summoning a single evangelist kyton under your command, as summon monster V, or an interlocutor kyton instead if your caster level is 16th or higher. A kyton called this way stays for as many rounds as the spell's duration would have had left had you not dismissed it. Successfully summoning one is a lawful and evil act, as though you had cast a spell with the lawful and evil descriptors.",
+     "note": "It modifies other shadow spells cast into the area and summons on dismissal by percentile roll; neither has an effect type."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "shadow-jaunt": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You step between shadows to a point within close range without needing line of sight, leaving a shadowy image of yourself behind and arriving wrapped in shadow, with a free Stealth check to hide where you land. Creatures that lose opposed Perception checks usually do not realise you have left, unless they know this spell and recognise it; any attack on your old position scatters the shadows and reveals your absence to anyone who can see it. For 1 round the shadow around you grants concealment, a 20% miss chance. It does not work at all unless there are shadows within 5 feet of where you start, you cannot travel through your own shadow, and choosing a destination with no shadows drops you at the nearest shadow within range - possibly the one you left from.",
+     "note": "Teleportation, plus concealment, which is neither a condition nor a typed modifier in the vocabulary."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'instantaneous and 1 round (see text)'. Recorded the instantaneous travel; the 1 round of concealment that follows is in the prose, the schema having no way to hold two durations at once."
+  },
+  "shadow-of-doubt": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A shadowy aura of doubt settles on one creature per three caster levels. Every target perceives all illumination as one light level darker, to a minimum of darkness though never supernatural darkness, and this happens even on a successful save. Fleeting shadows of regret and anxiety distract them: at the start of each of their turns each must succeed at a Will save or be staggered for 1 round. A good-aligned target takes -4 on those saves; an evil-aligned target gets +4 instead.",
+     "note": "The staggered condition is decided by a fresh save at the start of every one of the target's turns, so it cannot be applied once at casting. The alignment modifiers to that save also have no representation."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Staggered is in the vocabulary but is re-rolled every round; emitting apply_condition would stagger the target for the whole duration with no save."
+  },
+  "shadow-projection": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You pour your life force and psyche into your own shadow, giving it independent life as an undead shadow. Your physical body lies comatose while you project, and has no shadow or reflection for the duration. Projecting, you gain a shadow's darkvision, defensive abilities, fly speed, racial Stealth modifier and Strength damage attack, but not its create spawn ability and not its skill ranks or Hit Dice - your shadow has your own Hit Dice and hit points. The projection has the undead type and can be turned or otherwise affected as undead. If it is slain you snap back to your body at -1 hit points, dying, and must start making Constitution checks to stabilise.",
+     "note": "Becoming a different creature. The borrowed senses, speed and attack are all 'a shadow's', read off that monster's entry rather than stated as numbers here."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No sense or speed specs: darkvision and the fly speed come from the Bestiary shadow entry, and this prose names no ranges or values to emit."
+  },
+  "shadow-step": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Standing in dim light or darkness, you enter a shadow or patch of darkness and are carried along a coiling path of shadowstuff to another dim or dark spot within medium range.",
+     "note": "Teleportation; the vocabulary has no travel type."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
   }
  }
 }

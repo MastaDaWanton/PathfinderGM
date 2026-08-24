@@ -2006,11 +2006,7 @@
       },
       {
        "type": "narrative",
-       "target": "A creature that saves is still affected, but the whole effect lasts only 1 round.",
-       "duration": {
-        "amount": 1,
-        "unit": "round"
-       }
+       "target": "A creature that saves is still affected, but the whole effect lasts only 1 round."
       }
      ]
     }

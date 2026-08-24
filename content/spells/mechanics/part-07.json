@@ -2940,6 +2940,263 @@
     "kind": "instantaneous"
    },
    "notes": "This damage IS emitted as a top-level spec, unlike most in this partition: the spell's own targets line is 'you + creature or object (1 within range)', so the creature the caster aims at is exactly who takes it, at cast time. It is gated on a ranged touch attack rather than a save, which the vocabulary cannot express, so that condition is recorded in the note. `scaling` is omitted because 1 point per caster level has no die, and the scaling schema requires a real die size. The falling damage in the too-small-gap case is taken by the CASTER in an edge case and is not converted. `element` is omitted because the corpus already derives it as force."
+  },
+  "force-sword": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Create a +1 longsword of pure force sized for you, which you may wield or hand to another creature like any other longsword. It becomes a +2 longsword at 8th level and a +3 longsword at 13th."
+    },
+    {
+     "type": "narrative",
+     "target": "It cannot be attacked or harmed by physical attacks, but dispel magic, disintegrate, a sphere of annihilation or a rod of cancellation affects it."
+    },
+    {
+     "type": "narrative",
+     "target": "The first time the sword strikes a creature with spell resistance you must make a caster level check against that SR. Failure dispels the spell; success gives the weapon full effect against that creature for the duration."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The sword's damage is the longsword's, dealt when someone swings it, not damage this spell deals \u2014 so no damage spec. The +1/+2/+3 is a weapon enhancement bonus on a created item rather than a bonus granted to a creature, and it steps with caster level, so no combat_mod either. `element` is omitted because the corpus already derives it as force."
+  },
+  "forcecage": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Create an immobile, invisible prison of force \u2014 your choice of a 20-foot barred cage or a 10-foot windowless cell. Creatures inside are contained; if a creature is too big to fit, the spell automatically fails."
+    },
+    {
+     "type": "narrative",
+     "target": "Barred cage: half-inch bands with half-inch gaps. Anything able to pass through such a gap escapes. You cannot attack a creature inside with a weapon unless it fits between the bars, and even then the creature has cover. All spells and breath weapons pass through freely. Windowless cell: six solid walls of force with no way in or out."
+    },
+    {
+     "type": "narrative",
+     "target": "Teleportation and astral travel escape it, but the barrier extends into the Ethereal Plane and blocks ethereal travel. It resists dispel magic though mage's disjunction works, its walls have hardness 30 and 20 hit points per caster level, disintegrate destroys it automatically, and contact with a sphere of annihilation or rod of cancellation destroys it instantly."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "notes": "Note a corpus discrepancy: the derived save reads 'Reflex negates', but this description never mentions a saving throw \u2014 containment depends on size and on fitting through the gaps. No save_gate is invented on the strength of the derived field alone. `element` is omitted because the corpus derives it as force."
+  },
+  "forced-mutation": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "ability_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "con"
+      },
+      {
+       "type": "ability_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "cha"
+      },
+      {
+       "type": "narrative",
+       "target": "The target also receives one deformity of your choice from the mutant acquired template: blind, deaf, fragile, fractured mind, lame, poor ability (to Strength, Dexterity, Intelligence or Wisdom), spasms, or useless arm."
+      }
+     ],
+     "on_success": []
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "notes": "The -4 penalties are untyped because the prose states no type. The deformity is one option chosen from a list in an external template, so emitting any of them would both pick for the caster and import numbers this description does not state \u2014 for example the lame deformity cannot be applied to a creature with a base speed under 20 feet."
+  },
+  "forced-quiet": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "Sound is muffled around the target so it cannot yell or make loud noises. This does not hinder its spellcasting. It can still use sonic effects, but their save DCs drop by 2."
+      },
+      {
+       "type": "situational_mod",
+       "amount": 2,
+       "bonus_type": "untyped",
+       "target": "saving throws against sonic effects"
+      },
+      {
+       "type": "skill_mod",
+       "amount": 4,
+       "bonus_type": "circumstance",
+       "target": "stealth"
+      }
+     ],
+     "on_success": []
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "notes": "Everything sits inside the gate because Will negates the whole spell, including its two incidental benefits. The +2 is a situational_mod rather than a save_mod because it applies only against sonic effects, and it is untyped because the prose states no type; the +4 Stealth states circumstance and keeps it. The -2 to the target's own sonic DCs is a penalty to effects the target produces, which no spec type expresses. `element` is omitted because the corpus already derives it as sonic."
+  },
+  "forced-repentance": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "prone",
+       "note": "the target immediately drops prone"
+      },
+      {
+       "type": "narrative",
+       "target": "The target loudly confesses all its sins and transgressions to you for the duration."
+      }
+     ],
+     "on_success": []
+    },
+    {
+     "type": "narrative",
+     "target": "The spell ends at once if you move out of line of sight or if the target is attacked."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "notes": "Targets only evil-aligned creatures that lack the evil subtype. `prone` is applied as a condition because the prose states it outright."
+  },
+  "forceful-hand": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As interposing hand, except the hand can also pursue and bull rush one opponent you select, getting one bull rush attack per round that provokes no attack of opportunity. Its CMB uses your caster level in place of a base attack bonus, plus 8 for its Strength of 27 and 1 for being Large."
+    },
+    {
+     "type": "narrative",
+     "target": "It always moves with the opponent to push them as far back as possible, with no movement limit, and prevents the opponent from moving closer to you without first winning a bull rush that drags the hand along too."
+    },
+    {
+     "type": "permission",
+     "target": "Direct the hand at a new target as a move action, or set it to interpose itself as interposing hand does instead."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "notes": "The bull rush CMB belongs to the conjured hand, not to the caster, so it is not emitted as a combat_mod \u2014 doing so would hand the caster a +8 Strength bonus to their own manoeuvres. `element` is omitted because the corpus already derives it as force."
+  },
+  "forceful-strike": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "1d4",
+       "damage_type": "force",
+       "lethality": "lethal",
+       "scales": "full",
+       "note": "scales with caster level"
+      }
+     ],
+     "on_success": [
+      {
+       "type": "damage",
+       "dice": "1d4",
+       "damage_type": "force",
+       "lethality": "lethal",
+       "scales": "half",
+       "note": "half on a successful save, which also negates the bull rush"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Resolve a free bull rush against the creature struck, using a combat manoeuvre check with a bonus equal to your caster level. You do not move as a result, but the target is pushed back if the check beats its CMD. A successful Fortitude save negates the bull rush."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "scaling": {
+    "kind": "damage",
+    "die": 4,
+    "dice_per": 1,
+    "per_levels": 1,
+    "cap_dice": 10,
+    "damage_type": "force"
+   },
+   "notes": "This damage IS converted: the spell's target is the creature you strike, the force damage is explicitly the spell's own and separate from the weapon damage ('you deal normal weapon damage from the blow, but ALSO deal an additional amount of force damage'), and it is dealt once when the spell is cast. The normal weapon damage is NOT converted \u2014 that is the weapon's. `element` is omitted because the corpus already derives it as force."
+  },
+  "foresight": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You receive instant warnings of impending danger or harm to the subject, and a general sense of the best action to protect yourself. You are never surprised or flat-footed."
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "insight",
+     "target": "ac",
+     "note": "the CASTER's bonus, and only when you are the subject; a touched subject never gains it. Lost whenever you would lose your Dexterity bonus to AC."
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "insight",
+     "target": "ref",
+     "note": "the CASTER's bonus, and only when you are the subject; a touched subject never gains it. Lost whenever you would lose your Dexterity bonus to AC."
+    },
+    {
+     "type": "narrative",
+     "target": "When another creature is the subject you receive the warnings about it, and must pass them on \u2014 by shout, by a pull, or telepathically \u2014 for them to help; without a warning the subject can still be caught unprepared."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "FLAGGED FOR REVIEW: the +2 insight bonus always belongs to the CASTER \u2014 the text says plainly that a touched subject does not gain it. The spell's range is 'personal or touch', so in the personal case the target and the caster are the same creature and these specs are exactly right, while in the touch case an engine that applies specs to the target would buff the wrong creature. They are emitted rather than left narrative because the number and the bonus type are both stated outright and personal is the ordinary use, but the exception is recorded on both specs."
   }
  }
 }

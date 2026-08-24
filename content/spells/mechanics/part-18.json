@@ -2458,6 +2458,186 @@
    },
    "converted_by": "read",
    "notes": "Both numbers are restated outright by this spell rather than inherited: -6 on a failure, -3 on a success."
+  },
+  "thoughtsense": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You automatically detect and locate every conscious creature within 60 feet, as though you had blindsight. It tells sentient creatures (Intelligence 3 or higher) from non-sentient ones (Intelligence 1-2) and nothing else about them. Nondetection, mind blank and similar effects block it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the sense vocabulary has blindsense but not blindsight, and they are different rules — blindsight pinpoints a creature outright, blindsense only notes its square and leaves it concealed. Emitting blindsense would be exactly the near-enough the brief forbids, so this is narrative. Worth adding blindsight to the sense vocab."
+  },
+  "threefold-aspect": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Shift your appearance between your natural age and three idealized ages — young adult, adult, elderly — as a standard action, always looking like yourself at that age rather than a stranger. Young adult: +2 enhancement bonus to Dexterity and Constitution, -2 penalty to Wisdom. Adult: +2 enhancement bonus to Wisdom and Intelligence, -2 penalty to Dexterity. Elderly: +4 enhancement bonus to Wisdom and Intelligence, -2 penalty to Strength and Dexterity. Being enhancement bonuses, they stack with the untyped bonuses and penalties of your real age. True seeing shows your natural appearance overlaid with the aspect, both recognisably you, and someone who has met you at another apparent age spots a family resemblance with a DC 20 Perception check. It changes neither your clothing and equipment nor any deformity or injury unrelated to age."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Three mutually exclusive aspects, switchable mid-spell. Every one of the seven bonuses is individually expressible as an ability_mod, but only one aspect is active at a time and emitting them would apply all three at once — the same 'choose one of these' gap as surmount affliction and temporary graft, made worse here because the choice can change during the duration."
+  },
+  "threefold-face": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Two more faces grow around your head, each embodying an aspect of your personality that you choose. You gain all-around vision and cannot be flanked. Anything that would blind you, deafen you, block your mouth or otherwise affect your face — including beneficial effects granting exceptional vision — affects only one face, so it would take three castings of blindness/deafness to blind you, though you lose all-around vision the moment any one face goes blind. It grants no extra magic item slots and no extra heads. When the spell ends you gain all the conditions from all three faces, good and ill alike."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 9,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "All-around vision and immunity to flanking are not in the sense vocabulary, and 'conditions divided across three faces' has no representation at all."
+  },
+  "threefold-form": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You split into three copies of yourself, idealized at different ages. As bilocation, except that there are three bodies rather than two and each is under threefold aspect at a different idealized age — young adult, adult and elderly, with that aspect's ability bonuses and penalties. Beyond those differences each body shares all your other effects, as bilocation."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 9,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Rests on two other spells for its mechanics and states no number of its own. The ability bonuses belong to threefold aspect and differ per body, so there is nothing here a single sheet could hold."
+  },
+  "threefold-sight": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Whenever you roll an attack roll, saving throw or skill check, roll three d20 and use the middle result — the highest if two dice tie for highest, the lowest if two tie for lowest.",
+     "note": "if another ability would have you roll twice and take the higher, roll twice and take the lower, or reroll, that ability does nothing and threefold sight ends immediately"
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 3,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Changes how the die is rolled rather than adding to the result, so there is no bonus to emit — working out an equivalent modifier would be inventing a number."
+  },
+  "thunder-fire": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "deafened",
+       "note": "deafened for 1 minute"
+      }
+     ],
+     "note": "every creature within 15 feet of whoever wields or carries the targeted firearm, the wielder included; the wielder takes a -4 penalty on this save"
+    },
+    {
+     "type": "narrative",
+     "target": "The firearm gives a thunderous report whether or not it is loaded. Its wielder's misfire range increases by 1 for 1d4 rounds, and if the firearm was loaded when targeted, that ammunition is wasted."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Deafened is stated by name for everyone in a 15-foot radius, so the gate is real. The wielder's -4 could not be a save_mod: it applies to one creature within the burst and only to this save, and a spec would hand it to everyone the spell touches."
+  },
+  "thunderous-footfalls": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target's footfalls shake the ground. Its land speed is halved, rounded down to the nearest 5-foot increment, and each time it moves overland adjacent to a creature at least one size category smaller, that creature must succeed at a Fortitude save or be knocked prone."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Neither half fits a spec. The speed spec takes a flat signed number and the reduction is a fraction of a base speed the spell never states, and the prone is inflicted on OTHER creatures — smaller ones the target walks past — each time it happens, not on the spell's target when it lands."
+  },
+  "thunderstomp": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Stomp your foot or strike your weapon on the ground to send out a ripple of power and attempt a trip combat maneuver against one creature, using your caster level in place of your base attack bonus and your spellcasting ability modifier in place of Strength — Intelligence for magi and wizards, Wisdom for druids and rangers, Charisma for bloodragers and sorcerers. The attempt provokes no attack of opportunity. Nothing happens if you cannot reach the ground or floor, or if the target is not touching it."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A combat maneuver with a substituted CMB formula, resolved against CMD rather than a saving throw — no spec type, and the prone that may follow is the trip's result rather than something the spell applies."
+  },
+  "thunderstomp-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As thunderstomp, except that it strikes every creature in a 60-foot line, including creatures more than one size category larger than you. Make the combat maneuver check once and apply its result to each creature in the area."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Same maneuver machinery as thunderstomp, over an area; one check applied to everyone."
+  },
+  "tieldlara-s-feint": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target takes a penalty equal to half your caster level on concentration checks and to its CMD against dirty trick, grapple and steal maneuvers that YOU perform, and is denied its Dexterity bonus to AC against the first melee attack you make against it each round."
+      }
+     ],
+     "note": "a target that would not normally be sexually attracted to you gets a +4 bonus on this saving throw"
+    },
+    {
+     "type": "narrative",
+     "target": "The spell ends at once if you end your turn more than 20 feet from the target, or end your turn somewhere the target cannot see you."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The penalty is half the caster level — a value that changes with the caster — and every modifier spec takes a fixed integer. Writing any single number here would be right at one caster level and wrong at every other. Being denied Dexterity to AC is also narrower than the flat-footed condition, which would apply to every attacker rather than only the caster's first melee attack each round."
   }
  }
 }
