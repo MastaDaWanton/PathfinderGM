@@ -1,0 +1,2008 @@
+{
+ "source": "Pathfinder 1st Edition special materials (Core Rulebook, Ultimate Equipment) and the skymetals (Pathfinder Campaign Setting), with fuels, fluxes, quenchants and fittings authored for the forge chains.",
+ "note": "Tier follows the worldclass ladder: common/uncommon/rare/exotic/legendary. `effects` is what the material contributes to a finished piece, in rules/effectspec.py vocabulary; whatever the vocabulary cannot say stays prose in `text` with no fake spec, the way the creature import handled the same problem. `weight_factor` scales the base item's weight and is not an effect, because the vocabulary has no type for it. `source` is how a smith gets it: mined, bought, harvested or monster.",
+ "materials": [
+  {
+   "id": "iron-ore",
+   "name": "Iron Ore",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": 10,
+   "text": "Red-brown haematite, the commonest ore worth carting. A day's smelting turns a hundredweight into a bloom of workable iron.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "hills"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bog-iron",
+   "name": "Bog Iron",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": 10,
+   "text": "Lumps of ore raked out of marsh beds. Cheap and everywhere, but full of slag: work smelted from it is brittle until the melt is fluxed clean.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "swamp"
+   ],
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "slag-brittle: on work smelted from unfluxed bog iron"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "copper-ore",
+   "name": "Copper Ore",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Green malachite and blue azurite, smelting to the first metal anyone ever worked. Soft alone; the better half of bronze.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "hills"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "tin-ore",
+   "name": "Tin Ore",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Heavy black cassiterite from stream gravels. Worth more than its weight suggests: without tin there is no bronze.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "hills"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "lead-ore",
+   "name": "Lead Ore",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Glittering cubic galena, so heavy a sack of it staggers a mule. Smelts low and easy, and often carries silver in it.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "calamine",
+   "name": "Calamine",
+   "kind": "ore",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Dull zinc earth. Never smelted alone: heaped in the crucible with copper it makes brass without the zinc ever showing itself as metal.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "hills"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "cinnabar-ore",
+   "name": "Cinnabar Ore",
+   "kind": "ore",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Blood-red mercury ore. Roasting it drives off quicksilver as an invisible vapour, and the smith who works it unmasked breathes the vapour.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 13,
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "amount": 1,
+        "unit": "hour"
+       }
+      }
+     ],
+     "note": "roasting fumes, to whoever works it unmasked"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "silver-ore",
+   "name": "Silver Ore",
+   "kind": "ore",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Dark sulphide ore threaded with native wire silver. The moon's metal, and the one the shapechanged fear.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "gold-ore",
+   "name": "Gold Ore",
+   "kind": "ore",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Quartz veined with visible gold, or dust panned from river gravel. Too soft for any working edge and too valuable to care.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "coast"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "nickel-ore",
+   "name": "Nickel Ore",
+   "kind": "ore",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Kupfernickel — 'devil's copper', named by miners it disappointed. Alloyed into steel it fights rust and whitens the metal.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "cold-iron-ore",
+   "name": "Cold Iron Ore",
+   "kind": "ore",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Iron mined deep underground, never touched by the sun. It must be worked at lower temperatures than common iron and forgives no shortcuts, which is why cold iron work costs double.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Smelts to cold iron: bypasses the damage reduction of demons and fey"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "platinum-ore",
+   "name": "Platinum Ore",
+   "kind": "ore",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Grey grains heavier than gold that shrug off every acid in the alchemist's cabinet. Needs a furnace hotter than most smithies own.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "mithral-ore",
+   "name": "Mithral Ore",
+   "kind": "ore",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Silvery ore light enough to surprise the hand that lifts it. Dwarven veins guard it jealously; it smelts to the truesilver of legend.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "adamantine-ore",
+   "name": "Adamantine Ore",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Night-black metal found only in the hearts of fallen stars and the deepest delvings. Ordinary picks blunt against the seam that holds it.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "abysium-ore",
+   "name": "Abysium Ore",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "A skymetal ore that glows blue-green in the dark and warms the hand that holds it. Miners who sleep beside the seam wake sick, and some do not wake.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 15,
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "amount": 1,
+        "unit": "day"
+       }
+      }
+     ],
+     "note": "each day spent carrying or working it unshielded"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "djezet-ore",
+   "name": "Djezet Seep",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Rust-red skymetal that is liquid at every temperature, collected drop by drop where it seeps from volcanic rock. It is carried in wax-stoppered vials, not sacks.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "inubrix-ore",
+   "name": "Inubrix Ore",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "The ghost iron. Seams of it are found threaded through solid iron deposits they have visibly sunk through, and a pick of common steel passes into the ore without biting.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "noqual-ore",
+   "name": "Noqual Ore",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Pale green skymetal crystal, found in crater rims. Detect magic slides off a nugget of it as though there were nothing there, which is exactly the point.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "siccatite-ore",
+   "name": "Siccatite Ore",
+   "kind": "ore",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "A skymetal that comes out of the ground either searing hot or freezing cold and never changes its mind. The two kinds are told apart by which glove burns.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "hot ore, to a bare hand each round it is held; cold ore deals the same in cold"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "horacalcum-ore",
+   "name": "Horacalcum Ore",
+   "kind": "ore",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "The rarest skymetal: a dull coppery ore around which time itself runs a half-step slow. Watches carried into the mine come out wrong, and always in the miner's favour.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "planar"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "iron",
+   "name": "Iron",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": 10,
+   "text": "Bar iron, the smith's daily bread. Everything else in the trade is a variation on knowing what this does under the hammer.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "wrought-iron",
+   "name": "Wrought Iron",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Iron worked soft and fibrous, with the slag hammered into threads. Bends before it breaks; the right metal for hinges, chain and anything that must forgive.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bismuth",
+   "name": "Bismuth",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A brittle white metal that cools into staircase crystals sheened like oil on water. Useless for an edge; alloyers prize it for melts that must pour thin.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "copper",
+   "name": "Copper",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Warm red metal that works cold and greens with age. Too soft for war on its own, and the parent of bronze and brass.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "tin",
+   "name": "Tin",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Soft grey metal that cries when bent. One part in ten turns copper into bronze.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "lead",
+   "name": "Lead",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Dense, dull and obedient: it melts over a candle and holds any shape it is given. A thin lead lining turns aside detection and scrying magic, which is why certain coffers are heavier than they look.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A lead lining blocks detect spells and scrying through the lined surface"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "zinc",
+   "name": "Zinc",
+   "kind": "metal",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Bluish-white and brittle, boiling away out of any careless melt. Married to copper it makes brass; painted over iron it holds rust at bay.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "silver",
+   "name": "Silver",
+   "kind": "metal",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "The moon's metal. Too soft to hold an edge alone — a silver weapon is silver over steel, which is the alchemical plating treatment — but lycanthropes and certain devils fear no other metal so much.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Plated over steel it bypasses the damage reduction of lycanthropes and some devils"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "gold",
+   "name": "Gold",
+   "kind": "metal",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Heavy, incorruptible and useless in a fight. Ceremonial blades, temple fittings and inlay that says more about the buyer than the smith.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "platinum",
+   "name": "Platinum",
+   "kind": "metal",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "White metal that no acid touches and no common furnace melts. Worked only by smiths with a crucible worth boasting about.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "cold-iron",
+   "name": "Cold Iron",
+   "kind": "metal",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Iron mined deep and forged at low heat, never allowed to forget the dark it came from. It bites through the defences of demons and fey, and it costs twice the time and coin of common iron because the metal forgives no reworking.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Bypasses the damage reduction of demons and fey (DR/cold iron)"
+    },
+    {
+     "type": "narrative",
+     "target": "Costs double the forge-time and coin: cold iron forgives no reworking"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "star-iron",
+   "name": "Star Iron",
+   "kind": "metal",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Meteoric iron, sky-fallen and already smelted by its landing. It counts as cold iron against the creatures cold iron bites, and smiths swear the metal remembers falling.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "desert",
+    "tundra",
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Counts as cold iron against damage reduction"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "viridium",
+   "name": "Viridium",
+   "kind": "metal",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "A dull green metal that sheds an invisible taint. Wounds dealt by viridium fester — the struck must save against a wasting sickness — and the smith who grinds it unmasked breathes the same taint.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "underground"
+   ],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 14,
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "amount": 1,
+        "unit": "day"
+       }
+      }
+     ],
+     "note": "any wound from a viridium edge; the sickness is a slow leprosy"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "mithral",
+   "name": "Mithral",
+   "kind": "metal",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Truesilver: as hard as steel at half the weight. Armour of mithral counts one category lighter, lets the wearer keep two more points of Dexterity, and eases the armour check penalty by three.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "weight_factor": 0.5,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Half weight; armour counts one category lighter for movement and proficiency"
+    },
+    {
+     "type": "narrative",
+     "target": "Armour: maximum Dexterity bonus +2, armour check penalty lessened by 3"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "adamantine",
+   "name": "Adamantine",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "The unbreakable night-black metal of fallen stars. A blade of it shears through stone and steel as though they were hide — it ignores hardness less than 20 — and an edge set in adamantine does not lose its masterwork keenness to wear. Armour of it turns blows outright.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A weapon of it ignores hardness less than 20 when sundering or striking objects, and never loses its masterwork edge to wear"
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 3,
+     "bypass": "",
+     "note": "armour: DR 3/— in heavy, 2/— in medium, 1/— in light"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "abysium",
+   "name": "Abysium",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Feverstone: a glowing blue-green skymetal that poisons by nearness. The smith who works it without a lead-lined apron and water between themselves and the metal sickens by the day, and what they forge carries the same slow fire.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 18,
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "amount": 1,
+        "unit": "day"
+       }
+      }
+     ],
+     "note": "each day spent working or wearing unshielded abysium"
+    },
+    {
+     "type": "narrative",
+     "target": "Glows: sheds light as a candle, and cannot be hidden from creatures that see it"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "djezet",
+   "name": "Djezet",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "The quickmetal: rust-red and liquid at every temperature. It cannot be forged into a blade — it is alloyed into other metals, or channelled in sealed veins through a piece, where it quickens spellwork worked through the object.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Veined through a piece it quickens spellcasting focused through it; alone it never holds a shape"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "inubrix",
+   "name": "Inubrix",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Ghost iron. The softest of the skymetals, and it passes through iron and steel as though they were not there — a blade of inubrix ignores armour of those metals entirely, and can never be parried by them.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Passes through iron and steel: a weapon of it strikes as a touch attack against wearers of iron or steel armour"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "noqual",
+   "name": "Noqual",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Pale green and crystalline, and magic slides off it. It cannot be enchanted without extraordinary effort, and armour of it scars spells: the wearer shrugs off magic that would settle on lesser metal.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Resists enchantment; armour of it grants its wearer a +2 bonus on saves against spells and spell-like abilities"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "siccatite",
+   "name": "Siccatite",
+   "kind": "metal",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "The skymetal of extremes: a given piece is forever searing hot or forever freezing cold. A siccatite blade brands what it cuts, and the wielder's own grip pays a toll unless the hilt is fitted in something else.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "hot siccatite, each round of bare contact — including the wielder's ungloved grip"
+    },
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "frigid siccatite, each round of bare contact"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "horacalcum",
+   "name": "Horacalcum",
+   "kind": "metal",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "The rarest skymetal, a dull coppery gold around which time runs slow. The bearer of a horacalcum blade is always a half-beat ahead of the world: strikes land before they are seen coming.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "planar"
+   ],
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "target": "initiative",
+     "note": "time favours the bearer"
+    },
+    {
+     "type": "narrative",
+     "target": "Time runs a half-step slow around the metal: the bearer perceives a fraction more of every moment"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "steel",
+   "name": "Steel",
+   "kind": "alloy",
+   "tier": "common",
+   "craft_dc": 10,
+   "text": "Iron with carbon taken into itself in the fire. The trade's whole ladder — quench, temper, hone — exists because steel answers to it and iron does not.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bronze",
+   "name": "Bronze",
+   "kind": "alloy",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Copper and tin, the metal that named an age. Casts beautifully, keeps at sea where iron rusts, and takes a serviceable edge.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "brass",
+   "name": "Brass",
+   "kind": "alloy",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Copper and zinc, gold's honest cousin. Guards, fittings, instruments and anything meant to shine without a polishing servant.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "pewter",
+   "name": "Pewter",
+   "kind": "alloy",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Tin stiffened with a little copper and less honesty. Tankards, buckles and buttons; nothing that will ever be swung.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "electrum",
+   "name": "Electrum",
+   "kind": "alloy",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Gold and silver as nature sometimes pours them together, pale and moonish. Coinage and ornament; the two metals keep each other honest.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bell-bronze",
+   "name": "Bell Bronze",
+   "kind": "alloy",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Bronze rich in tin, brittle as glass and voiced like an angel. Struck, it rings for a full minute; a bell of it carries across a valley.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Rings when struck: a signal audible far beyond shouting distance"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "high-carbon-steel",
+   "name": "High-Carbon Steel",
+   "kind": "alloy",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Steel fed carbon to the edge of temper's patience. It takes and keeps a keener edge than common steel, and shatters rather than bends when the temper is botched.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Holds its sharpness: an edge of it needs honing half as often"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "pattern-steel",
+   "name": "Pattern Steel",
+   "kind": "alloy",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Billets of hard and soft steel folded and welded until the blade carries water-marks. The pattern is not decoration: it is the folding made visible, spring and edge in one bar.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The watered pattern marks folded work: spring where a plain blade would snap"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "nexavaran-steel",
+   "name": "Nexavaran Steel",
+   "kind": "alloy",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Cold iron drawn out with a measure of common steel. It counts as cold iron against the creatures that fear it, at half again the price rather than cold iron's double — the compromise metal of frontier fey-hunters.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Counts as cold iron against damage reduction, at 1.5 times common cost rather than double"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "elysian-bronze",
+   "name": "Elysian Bronze",
+   "kind": "alloy",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Bronze alloyed with traces of celestial metal, first beaten out for heroes who hunted monsters. Weapons of it remember the hunt: they bite deeper into magical beasts and the monstrous.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "against magical beasts and monstrous humanoids"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "living-steel",
+   "name": "Living Steel",
+   "kind": "alloy",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Steel quickened by waters from trees that will not die. It heals its own notches and hairline cracks overnight, and blades that strike it come away the worse for the exchange.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Self-repairing: the item mends its own damage overnight, and weapons that strike it risk notching themselves"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "fire-forged-steel",
+   "name": "Fire-Forged Steel",
+   "kind": "alloy",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Steel worked with channels that drink heat and carry it away from the wearer. Armour of it turns a furnace into an inconvenience; a blade of it grows hungrier the longer it sits in flame.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "note": "armour, once it has drunk a round of flame"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "frost-forged-steel",
+   "name": "Frost-Forged Steel",
+   "kind": "alloy",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "The winter twin of fire-forged steel, quenched and channelled to shed cold instead. Armour of it keeps a glacier's breath off the skin.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2,
+     "note": "armour, once it has stood a round of cold"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "singing-steel",
+   "name": "Singing Steel",
+   "kind": "alloy",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "A pale gold-green steel that chimes at a touch and holds the note. Performers prize instruments and blades of it alike: the metal carries a voice further than lungs can.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "target": "perform",
+     "note": "when the singing metal itself is part of the performance"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "wyrmsteel",
+   "name": "Wyrmsteel",
+   "kind": "alloy",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Adamantine folded over dragonfire coal and quenched in dragon's blood, an alloy more legend than recipe. The finished metal keeps a dragon's indifference to flame, and smiths who have made it once spend their lives trying to make it twice.",
+   "risky": false,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5,
+     "note": "the metal's own dragon-nature, carried by armour of it"
+    },
+    {
+     "type": "narrative",
+     "target": "Keeps adamantine's contempt for hardness less than 20"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "peat",
+   "name": "Peat",
+   "kind": "fuel",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Cut from the bog and dried through a season. Burns low, slow and smoky — enough for a field forge, an insult to a furnace.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "swamp"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "coal",
+   "name": "Coal",
+   "kind": "fuel",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Black seam-rock that burns hotter and longer than any wood. The smell of a coal fire is the smell of a working smithy.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain",
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "charcoal",
+   "name": "Charcoal",
+   "kind": "fuel",
+   "tier": "common",
+   "craft_dc": 10,
+   "text": "Wood burned slow under turf until only the burning part is left. Clean heat that adds nothing to the melt but temperature, which is exactly what a smith wants.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "coke",
+   "name": "Coke",
+   "kind": "fuel",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Coal baked in an airless oven until its smoke and sulphur are driven off. Burns hotter and cleaner than the coal it came from; the furnace fuel of serious smelting.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bone-char",
+   "name": "Bone Char",
+   "kind": "fuel",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Charred bone, packed around iron in a sealed box to feed carbon into the surface. The old way of making a soft bar hard-skinned, and the fuel of case-hardening.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "dwarven-hearthcoal",
+   "name": "Dwarven Hearthcoal",
+   "kind": "fuel",
+   "tier": "rare",
+   "craft_dc": null,
+   "text": "Coal from seams the dwarves keep secret, dense as ore and slow as grudges. A single scuttle burns a full day and night at forging heat.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [
+    "underground"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "dragonfire-coal",
+   "name": "Dragonfire Coal",
+   "kind": "fuel",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Coal from seams a dragon once slept over, still holding a memory of the sleeper's heat. It burns white where common coal burns orange — hot enough to melt the skymetals — and it does not care whether the smith's beard is in the way.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "salamander-cinder",
+   "name": "Salamander Cinder",
+   "kind": "fuel",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "Embers raked from a slain salamander's own hearth-flesh. They burn without fuel for a month and scorch the tongs that turn them.",
+   "risky": true,
+   "source": "monster",
+   "biomes": [
+    "planar"
+   ],
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "to bare skin within reach of the cinders, each round"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "efreet-brand",
+   "name": "Efreet Brand",
+   "kind": "fuel",
+   "tier": "exotic",
+   "craft_dc": null,
+   "text": "A brand cut from a bonfire on the Plane of Fire and carried home still burning, because it does not know how to stop. Forge-fire from it burns any colour the smith asks.",
+   "risky": false,
+   "source": "monster",
+   "biomes": [
+    "planar"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "phoenix-ash-ember",
+   "name": "Phoenix Ash Ember",
+   "kind": "fuel",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "An ember sifted from the pyre of a phoenix, which never quite dies: smothered, drowned or buried, it relights itself by morning. Work forged over it is said to share the habit.",
+   "risky": false,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Never dies: the ember relights itself however it is put out"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "limestone",
+   "name": "Limestone Flux",
+   "kind": "flux",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Crushed grey stone thrown into the melt, where it gathers the slag to itself and floats it off the good metal. The cheapest honest flux there is.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "hills"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "silica-sand",
+   "name": "Silica Sand",
+   "kind": "flux",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Clean white sand for the forge-weld: scattered on hot metal it melts to glass and keeps the air off the joint until the hammer closes it.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "coast",
+    "desert"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "potash",
+   "name": "Potash",
+   "kind": "flux",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Wood ash leached and boiled down to a white salt. An old fireside flux for small work and soldering.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "borax",
+   "name": "Borax",
+   "kind": "flux",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "White crystal from dry lake beds, the wandering smith's flux of choice: it melts low, spreads thin and leaves a weld clean enough to vanish.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "desert"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bone-ash",
+   "name": "Bone Ash",
+   "kind": "flux",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Calcined bone, white and hungry. Lining a cupel with it lets base metal soak away and leaves silver and gold sitting proud — the assayer's flux.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "crushed-quartz",
+   "name": "Crushed Quartz",
+   "kind": "flux",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Clear crystal ground fine, for melts that must run glassy and pour thin. Finicky, and worth it for fine casting.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "mountain"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "consecrated-flux",
+   "name": "Consecrated Flux",
+   "kind": "flux",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Chalk blessed at a temple altar and ground with silver dust. Fluxed into a melt it leaves no mark the eye can find, but the finished work counts as blessed for rites and oaths sworn on it.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Work fluxed with it counts as blessed for rites, oaths and consecration"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "abyssal-salt",
+   "name": "Abyssal Salt",
+   "kind": "flux",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Salt scraped from the shores of a lake in the Abyss. It strips a melt cleaner than any earthly flux, and the metal remembers where the salt has been: holy water hisses on work fluxed with it.",
+   "risky": true,
+   "source": "mined",
+   "biomes": [
+    "planar"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The finished work registers faintly evil to detection, and holy water hisses on it"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "stardust-flux",
+   "name": "Stardust Flux",
+   "kind": "flux",
+   "tier": "legendary",
+   "craft_dc": 30,
+   "text": "Glittering dust gathered where a star fell, sold by the pinch. In the crucible it persuades the skymetals — which despise one another — to mingle, and no other flux known can.",
+   "risky": false,
+   "source": "mined",
+   "biomes": [
+    "planar"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Makes skymetals miscible in the melt: without it they refuse one another"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "water",
+   "name": "Water",
+   "kind": "quenchant",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "The oldest bath. Quenches fast and hard, and cracks a careless blade for the same reason.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "quenching-brine",
+   "name": "Quenching Brine",
+   "kind": "quenchant",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Salt water bites faster than sweet: the steam blanket collapses and the steel cools all at once. A harder quench, and a less forgiving one.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "coast"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "quenching-oil",
+   "name": "Quenching Oil",
+   "kind": "quenchant",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Rendered fat or seed oil, the gentle bath. Slower than water, kinder to thin sections, and it catches fire exactly as often as the apprentice forgets it will.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "whale-oil",
+   "name": "Whale Oil",
+   "kind": "quenchant",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "The finest quenching oil money buys, even-tempered from first plunge to last. Coastal smithies smell of it and charge accordingly.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [
+    "coast"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "glacier-melt",
+   "name": "Glacier Melt",
+   "kind": "quenchant",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Water from ice older than the kingdom, carried down in casks. Smiths of the far north swear a blade quenched in it keeps winter in the edge.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "tundra"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "mercury-bath",
+   "name": "Mercury Bath",
+   "kind": "quenchant",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Quicksilver quenches with unearthly evenness and gives off a vapour that steals wits. The smiths who use it either work outdoors or do not work long.",
+   "risky": true,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 13,
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "amount": 1,
+        "unit": "hour"
+       }
+      }
+     ],
+     "note": "the hot vapour, each quench performed without wind or mask"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "blessed-water",
+   "name": "Blessed Water",
+   "kind": "quenchant",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Holy water in quantity enough to quench in, which is a conversation with the temple before it is a bath. Steel quenched in it remembers the blessing: the restless dead flinch from the edge.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The edge counts as blessed; undead struck by it flinch, and it can strike home where a plain blade could not"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "troll-blood",
+   "name": "Troll Blood",
+   "kind": "quenchant",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Blood drawn from a troll and kept warm, because it does not accept being dead. Steel quenched in it knits its own hairline cracks, the way the donor knitted worse.",
+   "risky": true,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The metal knits hairline cracks and small notches over a night's rest"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "wyvern-blood",
+   "name": "Wyvern Blood",
+   "kind": "quenchant",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Envenomed blood from a wyvern's tail-stock. A blade quenched in it carries the sting into its first wound, and the smith who splashes it learns why the wyvern never worries about its own tail.",
+   "risky": true,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 17,
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "con",
+       "dice": "1d4"
+      }
+     ],
+     "note": "the venom lingers in the first telling wound the finished blade deals"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "dragon-blood",
+   "name": "Dragon Blood",
+   "kind": "quenchant",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Blood of a true dragon, which quenches steel without ever quite going cold itself. The metal takes on a shadow of the donor's element and shrugs at flame ever after.",
+   "risky": true,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "note": "armour quenched in a fire dragon's blood; other lineages lend their own element"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "styx-water",
+   "name": "Styx Water",
+   "kind": "quenchant",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Water drawn from the river of forgetting, carried in vessels of horn because it eats through everything else. A blade quenched in it steals moments from those it wounds; the smith works fast, and tries not to breathe the steam.",
+   "risky": true,
+   "source": "harvested",
+   "biomes": [
+    "planar"
+   ],
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": 16,
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The struck creature loses its memory of the last minute"
+      }
+     ],
+     "note": "on a telling wound from the quenched blade"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "ash-haft",
+   "name": "Ash Haft",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Straight-grained ash, the spear-wood: springy enough to soak a blow that would crack oak. The default haft of every armoury.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "oak-haft",
+   "name": "Oak Haft",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Heavy, stiff and stubborn. Where ash bends, oak insists — the right wood under an axe or maul that leads with weight.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "bone-grip",
+   "name": "Bone Grip",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Scales of polished bone riveted to the tang. Cheap, hard-wearing and indifferent to weather.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "leather-grip",
+   "name": "Leather Grip",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Wet-wrapped leather that dries to the shape of the hand that will hold it. The commonest grip because it is the best cheap one.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "cord-wrapped-grip",
+   "name": "Cord-Wrapped Grip",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Waxed cord laid in tight courses over the tang. Grips wet or dry, and a field repair needs only more cord.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "brass-guard",
+   "name": "Brass Guard",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A cast brass crossguard or basket, bright and forgiving to file. Turns a blade without ever needing a polish it will not get.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "steel-crossguard",
+   "name": "Steel Crossguard",
+   "kind": "fitting",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Plain forged steel between hand and harm. Nothing about it is clever, which is why it works.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "wire-wrapped-grip",
+   "name": "Wire-Wrapped Grip",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Twisted silver or steel wire laid over leather, the duellist's grip: it does not shift in the hand, and a blade so gripped is hard to take away.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "cmd",
+     "note": "against being disarmed of the fitted weapon"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "sharkskin-grip",
+   "name": "Sharkskin Grip",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Ray or shark hide, rough as a file in one direction. It never slips, wet, bloody or otherwise — the sailor's and the surgeon's grip.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [
+    "coast"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Never slips when wet: no grip penalty in rain, blood or surf"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "mammoth-ivory-grip",
+   "name": "Mammoth Ivory Grip",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Ancient ivory dug from the tundra, dense and cool in the hand. Carves beautifully and outlasts the blade it is fitted to.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [
+    "tundra"
+   ],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "darkwood-haft",
+   "name": "Darkwood Haft",
+   "kind": "fitting",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Wood as dark as coffee and half the weight of oak at the same strength. A darkwood haft halves what the haft contributes to the scales.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "weight_factor": 0.5,
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Half weight for the hafted portion, at no loss of strength"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "ironwood-haft",
+   "name": "Ironwood Haft",
+   "kind": "fitting",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Wood worked by druidic rite until it answers as steel. It is still wood in the eyes of oath and spell — druids may carry it, and rust never will.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Counts as wood for druidic oaths and spells that care, at the strength of steel"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "wyroot-haft",
+   "name": "Wyroot Haft",
+   "kind": "fitting",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Root-wood that refuses to finish dying. A wyroot haft drinks a spark of life from telling blows and gives it back to the wielder's hand — monks and ki-adepts pay dearly for it.",
+   "risky": false,
+   "source": "harvested",
+   "biomes": [
+    "forest"
+   ],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Stores a point of life or ki from a telling blow, returned to the wielder on demand"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "dragonhide-grip",
+   "name": "Dragonhide Grip",
+   "kind": "fitting",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "Hide from a true dragon, supple where scale meets scale. It shrugs sparks and forge-heat, and it makes a statement no gold wire can.",
+   "risky": false,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Proof against incidental flame and spark: the grip never burns in the hand"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "angelskin-binding",
+   "name": "Angelskin Binding",
+   "kind": "fitting",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "Pale leather from a celestial's remains, traded in whispers because owning it is a confession. Bound over armour it muffles the wearer's own darkness: auras of evil read faint or not at all.",
+   "risky": false,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Muffles the wearer's evil aura against detection"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "fiend-bone-core",
+   "name": "Fiend Bone Core",
+   "kind": "fitting",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "A rod of fiend's bone set down the spine of a haft or hilt. The weapon swings a half-thought ahead of the wielder's intent, and it whispers, and it is best not to answer.",
+   "risky": true,
+   "source": "monster",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The weapon anticipates: it whispers to its wielder, and what it wants is not always what they want"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "bluing",
+   "name": "Bluing",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "A controlled black-blue oxide raised over the steel in heat and oil. Rust has nowhere to start, and the finish drinks light instead of throwing it.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Rust-proofed: the treated steel does not corrode under weather or neglect"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "oil-blackening",
+   "name": "Oil Blackening",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "The piece is heated and plunged in oil until the surface carries a dead-black skin. Night workers pay for it: a blackened blade throws no glint.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "target": "stealth",
+     "note": "in darkness, while the treated piece is bared"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "acid-etching",
+   "name": "Acid Etching",
+   "kind": "treatment",
+   "tier": "common",
+   "craft_dc": null,
+   "text": "Wax resist and aqua fortis, biting a design or a maker's mark into the steel. Decoration, provenance and — on pattern steel — the bath that makes the watering show.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "cold-iron-blanching",
+   "name": "Cold Iron Blanching",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Powdered cold iron fused over an ordinary edge. The weapon bites as cold iron until the blanching wears through — a few telling blows — and then it is only steel again. The poor hunter's answer to a fey problem.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Counts as cold iron against damage reduction until the blanching wears off with use"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "ghost-salt-blanching",
+   "name": "Ghost Salt Blanching",
+   "kind": "treatment",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "A white alchemical crust worked over the striking surface. So treated, the weapon bites the bodiless: it deals half damage to incorporeal creatures that plain steel cannot touch at all.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Strikes incorporeal creatures at half damage until the blanching wears off"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "alchemical-silver-plating",
+   "name": "Alchemical Silver Plating",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": 15,
+   "text": "Silver alchemically bonded over a steel core: the whole reason 'silvered weapon' does not mean 'bent weapon'. It bypasses the damage reduction of lycanthropes and devils, and the softer metal costs the blow a little of its weight.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "the softer silver skin, on the treated weapon"
+    },
+    {
+     "type": "narrative",
+     "target": "Bypasses the damage reduction of lycanthropes and some devils (DR/silver)"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "gold-gilding",
+   "name": "Gold Gilding",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Gold leaf burnished onto the finished piece. It stops no blow and turns no rust; it announces the owner across a room, which is sometimes the entire job.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [],
+   "effects_converted": true
+  },
+  {
+   "id": "lead-lining",
+   "name": "Lead Lining",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "craft_dc": null,
+   "text": "Sheet lead beaten into the inner faces of a helm, casket or breastplate. Scrying and detection magic stop at the lead, which is why the paranoid weigh more than they look.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Blocks detect spells and scrying through the lined surface"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "holy-anointing",
+   "name": "Holy Anointing",
+   "kind": "treatment",
+   "tier": "rare",
+   "craft_dc": 20,
+   "text": "The finished work is oiled, censed and blessed at an altar. For its first battle thereafter it counts as a blessed weapon — the rites do not last, and the faithful say that is the point.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Counts as blessed for its first battle after the rite"
+    }
+   ],
+   "effects_converted": true
+  },
+  {
+   "id": "adamantine-edging",
+   "name": "Adamantine Edging",
+   "kind": "treatment",
+   "tier": "exotic",
+   "craft_dc": 25,
+   "text": "A ribbon of adamantine forge-welded along the working edge of a lesser blade. The edge ignores hardness below 20 as true adamantine does; the blade behind it is what it always was, and a hard parry will remind everyone.",
+   "risky": false,
+   "source": "bought",
+   "biomes": [],
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The edge ignores hardness less than 20 when striking objects; the body of the blade remains its base metal"
+    }
+   ],
+   "effects_converted": true
+  }
+ ]
+}
