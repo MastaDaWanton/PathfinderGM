@@ -132,3 +132,49 @@ def test_not_your_turn_is_refused(fight):
     r = _act(client, [{"op": "attack", "target": "c1"}])
     assert r.status_code == 409
     assert "not your turn" in r.json()["error"].lower()
+
+
+def test_a_fight_lays_the_ground_it_promised(fight):
+    """"No ground is mapped. A grid is laid out when a fight starts" — the map tray has
+    said so since the grid shipped, and nothing anywhere ever laid one: Scene.grid was
+    assigned in tests and nowhere else. Every real fight played mapless."""
+    client, cm = fight
+    scene = cm.current().scene
+    assert scene.grid is not None
+    assert "pc" in scene.positions and "c1" in scene.positions
+    # Zones drove the placement: a near foe stands a short walk away, not on top of you.
+    px, py = scene.positions["pc"]
+    fx, fy = scene.positions["c1"]
+    assert abs(px - fx) + abs(py - fy) >= 2
+
+
+def test_the_ground_goes_with_the_fight(fight):
+    client, cm = fight
+    scene = cm.current().scene
+    e = cm.current().engine()
+    e.run(e.validate([{"op": "end_encounter", "params": {}}]))
+    assert scene.grid is None
+    assert not scene.positions
+
+
+def test_a_grid_the_gm_already_laid_is_kept(tmp_path):
+    """`begin_encounter` lays a grid only when none exists: a deliberate battlefield —
+    difficult terrain and all — must not be flattened by the default one."""
+    from play import campaign as cm
+    from rules.bestiary import instantiate
+    from rules.grid import Grid
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))
+        laid = Grid(width=12, height=9)
+        laid.difficult.add((3, 3))
+        c.scene.grid = laid
+        e = c.engine()
+        e.run(e.validate([{
+            "op": "begin_encounter",
+            "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+        assert c.scene.grid is laid
+        assert (3, 3) in c.scene.grid.difficult
+        cm._LIVE.clear()

@@ -244,6 +244,12 @@ class Scene:
         self.round = 0
         self.acted = set()
         self.sides = {}
+        # The battlefield goes with the fight. `begin_encounter` lays a grid when none
+        # exists, and the side panel's own words are "there is no grid outside a fight";
+        # here rather than only in the end_encounter *op*, because most fights end by
+        # a side emptying inside the NPC-turn loop, which calls this directly.
+        self.grid = None
+        self.positions.clear()
 
     def depart(self, ref: str) -> Actor | None:
         """Take one creature out of the scene, and out of every structure that names it.
@@ -2156,6 +2162,34 @@ class Engine:
         # their first turn comes round.
         self.scene.acted = set()
         self.scene.sides = {k: list(v) for k, v in intent.params["sides"].items()}
+        # The ground. The map tray has promised "a grid is laid out when a fight starts"
+        # since the grid shipped, and nothing anywhere ever laid one — Scene.grid was
+        # assigned in tests and nowhere else, so every real fight played on a map that
+        # said no ground was mapped. Laid here, once, and only if the GM has not already
+        # put one down; combatants without positions are placed by their zones, the
+        # player's side on the left and everyone else a zone's worth of squares away.
+        if self.scene.grid is None:
+            from .grid import Grid
+
+            self.scene.grid = Grid()
+            mid = self.scene.grid.height // 2
+            pc_side, foe_row = 4, 0
+            for side, refs in intent.params["sides"].items():
+                has_pc = any(self.scene.actors[r].is_pc for r in refs
+                             if r in self.scene.actors)
+                for i, ref in enumerate(refs):
+                    if ref in self.scene.positions or ref not in self.scene.actors:
+                        continue
+                    zone = self.scene.zones.get(ref, "near")
+                    away = 3 if zone == "near" else 8
+                    if has_pc:
+                        self.scene.positions[ref] = (pc_side, mid + i)
+                    else:
+                        self.scene.positions[ref] = (
+                            min(self.scene.grid.width - 1, pc_side + away),
+                            mid + foe_row)
+                        foe_row += 1
+            self.scene.resync_zones()
         # The turn pointer starts before the first combatant so the first advance lands
         # on whoever won initiative.
         self.scene.turn = -1

@@ -513,7 +513,7 @@
   .cb-slot label { color: var(--dim); font-size: 12px; min-width: 84px; }
   .cb-slot select { flex: 1; background: var(--sunk); color: var(--ink);
     border: 1px solid var(--edge); padding: 6px; font: 13px var(--body); }
-  #map .cell.reach, #maptrayinner .cell.reach { cursor: crosshair; pointer-events: all; }
+  #map .reach, #maptrayinner .reach { cursor: crosshair; pointer-events: all; }
 
   /* --- The glossary popover: what a clicked name actually does ------------- */
   .gloss { cursor: pointer; border-bottom: 1px dotted var(--gold-dim); }
@@ -1718,8 +1718,11 @@ function renderMap(s) {
     const [c, r] = key.split(",").map(Number);
     // data-sq is what makes the square a *destination* — the combat builder queues a
     // move op from it. Present whether or not the panel is open, harmless when idle.
+    // data-sq is what makes the square a destination for the combat builder. The
+    // first cut replaced on 'class="cell reach"', which cell() never writes — the
+    // legend counted 35 lit squares while zero of them were clickable.
     parts.push(cell(c, r, "reach", `<title>${cost} ft</title>`)
-      .replace('class="cell reach"', `class="cell reach" data-sq="${c},${r}"`));
+      .replace('class="reach"', `class="reach" data-sq="${c},${r}"`));
   }
 
   // Grid lines last of the terrain, so they sit over the fills and under the tokens.
