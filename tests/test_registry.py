@@ -220,7 +220,14 @@ def test_every_bench_opens_a_builder_rather_than_two_of_them(client):
     from the kind declaration now, which is the same declaration the form is drawn from."""
     for bench_id in registry.KINDS:
         d = client.get(f"/api/bench/{bench_id}").json()
-        assert d["bench"]["builder"] == "effects", bench_id
+        # "effects" is the generated form every flat kind shares; "page" is a kind whose
+        # shape that form cannot draw — a class has a level table and tiered paths — and
+        # which therefore has an authoring page of its own. What must never happen is
+        # neither, because that is the read-only bench this test was written about.
+        builder = d["bench"]["builder"]
+        assert builder in ("effects", "page"), bench_id
+        if builder == "page":
+            assert d["bench"]["builder_url"], bench_id
 
 
 def test_the_form_is_drawn_from_the_declaration_and_not_written_into_the_page():

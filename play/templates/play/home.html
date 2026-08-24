@@ -1089,6 +1089,13 @@ function paneHomebrew() {
       ${b.id === "spells" ? paneSpells() : ""}
       ${b.id === "rulesets" ? paneRules() : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
+      ${b.builder === "page" ? `<p class="note"><a class="pick" style="display:inline-block;
+        padding:8px 14px;border:1px solid var(--rule);border-radius:2px;
+        background:linear-gradient(#2a2114,#1a140c)"
+        href="${esc(b.builder_url)}">Open the class builder →</a></p>
+        <p class="note">A class is a level table, a set of features and — if it wants
+        them — paths with tiered abilities. Too much shape for the form the other
+        benches share, so it has a page of its own.</p>` : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
              ${r.id ? `data-open="${esc(r.id)}"` : ""}>

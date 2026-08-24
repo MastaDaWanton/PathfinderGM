@@ -233,7 +233,13 @@ def test_there_is_a_bench_for_character_classes(client):
     d = client.get("/api/bench/classes").json()
     assert d["bench"]["ready"]
     assert d["bench"]["shipped"] == 4                # the Core Rulebook four
-    assert "Blood Bending" in d["bench"]["waiting"]
+    # The `waiting` note used to say a class "still cannot declare a path". It can:
+    # Blood Bending's four branches ship in the file and the class builder authors
+    # them, so the note is gone rather than left saying something that is no longer
+    # true. What the bench owes instead is the way in.
+    assert d["bench"]["waiting"] == ""
+    assert d["bench"]["builder"] == "page"
+    assert d["bench"]["builder_url"] == "/homebrew/classes/"
     assert {r["name"] for r in d["rows"]} >= {"Rogue", "Fighter", "Wizard", "Cleric"}
 
 

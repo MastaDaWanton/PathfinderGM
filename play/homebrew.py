@@ -59,6 +59,12 @@ def _count(name: str, key: str) -> int:
     return total
 
 
+# Benches whose authoring lives on a page of its own rather than in the generated
+# form. Keyed by bench id, valued by the URL. One entry today; a second kind with
+# repeating structure would be one line here rather than a branch in the template.
+PAGE_BUILDERS = {"classes": "/homebrew/classes/"}
+
+
 @dataclass
 class Bench:
     id: str
@@ -86,7 +92,18 @@ class Bench:
         editable when its kind says what it holds, not when somebody remembers to add it
         here. A bench with no kind — there are none today — is still a plain listing.
         """
+        # A class is not a flat form. Its level table, its paths and their tiers are
+        # repeating structures the generated effects form cannot draw, so the classes
+        # bench sends you to the builder that can rather than showing a shape that
+        # would quietly lose everything it has no field for.
+        if self.id in PAGE_BUILDERS:
+            return "page"
         return "effects" if registry.KINDS.get(self.id) else ""
+
+    @property
+    def builder_url(self) -> str:
+        """Where `builder == "page"` goes. "" for a bench edited in place."""
+        return PAGE_BUILDERS.get(self.id, "")
 
     @property
     def yours(self) -> int:
@@ -98,7 +115,7 @@ class Bench:
             "yours": self.yours, "shipped": self.shipped,
             "shipped_label": self.shipped_label or "shipped",
             "waiting": self.waiting, "builder": self.builder,
-            "path": str(folder(self.dir)),
+            "builder_url": self.builder_url, "path": str(folder(self.dir)),
         }
 
 
@@ -109,10 +126,7 @@ def benches() -> list[Bench]:
             shipped=len(CLASSES), shipped_label="in the Core Rulebook tables",
             blurb="Full 1e classes: hit dice, BAB, saves, class skills and what each "
                   "level grants. Blood Bending belongs here.",
-            waiting="Blood Bending ships as data now, and the engine has the reactions "
-                    "and the interruptible damage pipeline it was waiting on. What a "
-                    "class still cannot declare here is a path — its Coagulator and "
-                    "Blood Commander branches are not in the file.",
+            waiting="",
         ),
         Bench(
             id="worldclasses", name="World classes", dir="world-classes",
