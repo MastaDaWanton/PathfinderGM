@@ -180,6 +180,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),
+    "buff": (("type", "target", "amount"), ("to", "source", "duration", "note"),
+             "hidden"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.

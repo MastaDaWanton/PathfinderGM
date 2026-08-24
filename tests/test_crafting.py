@@ -71,8 +71,11 @@ def test_a_simple_chain_previews(shelf):
                          Chain("herbalist", ["grind", "brew"], ["woundwort", "comfrey"]))
     assert not r.problems
     assert r.stages == 2 and r.tier == "common"
-    # The mechanic, not the paragraph: Woundwort's bleed reduction and Comfrey's healing.
+    # The mechanic, not the paragraph: Woundwort's bleed reduction and now its authored
+    # heal — "way too many useless herbs" gave every benefit-less herb a runnable one —
+    # and Comfrey's healing.
     assert r.effects == ["Woundwort: Bleeding damage 20% less",
+                         "Woundwort: Heals 1d4 hit points",
                          "Comfrey: Heals 1-4 hit points"]
     assert len(r.described) == 2
 

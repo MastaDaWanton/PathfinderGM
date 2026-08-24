@@ -1169,6 +1169,43 @@ class Engine:
         parts = [one(head)] + [one(e) for e in head.get("also", [])]
         return "; ".join(parts) + "."
 
+    def _op_buff(self, intent: Intent, partial: dict) -> Outcome:
+        """A timed numeric bonus lands on an actor.
+
+        The op `use_item` was missing: a drunk tea's `save_mod` fell through
+        `_spec_to_intents` and the dose was spent for nothing. Duration arrives in the
+        authored unit and is kept in rounds, the clock every other timed thing ticks on.
+        """
+        who = intent.params.get("to") or intent.actor
+        actor = self.scene.actors.get(who)
+        if actor is None:
+            raise IntentError(f"buff: unknown target {who!r}", "refs")
+        kind = str(intent.params.get("type", "save_mod"))
+        target = str(intent.params.get("target", ""))
+        amount = int(intent.params.get("amount", 0) or 0)
+        if not target or not amount:
+            raise IntentError("buff: needs a target and a non-zero amount", "schema")
+        source = str(intent.params.get("source") or "a preparation")
+        duration = intent.params.get("duration") or {}
+        rounds = None
+        if isinstance(duration, dict) and duration.get("amount"):
+            per = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
+            rounds = int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
+        actor.add_buff(kind, target, amount, source=source, rounds=rounds,
+                       note=str(intent.params.get("note", "")))
+        span = ""
+        if rounds:
+            span = f" for {rounds // 600} hour(s)" if rounds >= 600 else \
+                   f" for {rounds // 10} minute(s)" if rounds >= 10 else \
+                   f" for {rounds} round(s)"
+        return Outcome(
+            intent_id=intent.id, op="buff",
+            effects=[{"ref": actor.ref, "kind": "buff", "type": kind, "target": target,
+                      "amount": amount, "rounds": rounds, "source": source}],
+            tell=f"{actor.name} gains {amount:+d} {target}{span} ({source}).",
+            because=intent.because,
+        )
+
     def _op_heal(self, intent: Intent, partial: dict) -> Outcome:
         """Restore hit points. Not damage with the sign flipped.
 

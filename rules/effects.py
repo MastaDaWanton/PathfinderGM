@@ -220,8 +220,18 @@ def _modifier_type(target: str) -> tuple[str, str]:
     for key, name in (("fort", "fortitude"), ("ref", "reflex"), ("will", "will")):
         if re.search(rf"\b(?:{key}|{name})\b", low):
             return "save_mod", key
+    # "+2 save vs poison" names no save because 1e players know which one it is. The
+    # engine does not, so the threat picks it: poison and disease are Fortitude, the
+    # mind-affecting family is Will. A save with no named threat stays situational —
+    # guessing there would put a number on a die it does not belong to.
+    if re.search(r"\bsav(?:e|es|ing)\b", low):
+        if re.search(r"poison|venom|toxi|disease|sicken", low):
+            return "save_mod", "fort"
+        if re.search(r"fear|charm|enchant|compulsion|illusion|mind.affect|sleep", low):
+            return "save_mod", "will"
     for key, words in (("attack", r"attack|to.hit"), ("damage", r"damage roll"),
-                       ("ac", r"\bac\b|armou?r class"), ("cmb", r"\bcmb\b"),
+                       ("ac", r"\bac\b|armou?r class|natural armou?r"),
+                       ("cmb", r"\bcmb\b"),
                        ("cmd", r"\bcmd\b"), ("initiative", r"initiative"),
                        ("caster_level", r"caster level"),
                        ("spell_resistance", r"spell resistance")):
@@ -284,6 +294,76 @@ def extract(text: str) -> list[Effect]:
                   "bonus_type": (btype.group(1).lower() if btype else "untyped"),
                   **({"note": qualifier} if qualifier else {}),
                   **({"duration": dspec} if dspec and not carries_own else {})})
+
+    # The same claim without the word "bonus", which this corpus mostly omits: "adds +1
+    # to any Will saves", "confers a +1 Fortitude save", "use adds +1 Fort save vs
+    # disease". Measured across the shipped herbs: 18 of the 58 with no runnable effect
+    # stated a number in exactly this shape and the loop above never saw it. The target
+    # must name a save, a skill or a combat stat — a bare "+2" with no home is left for a
+    # human, not guessed at — and a match the bonus loop already took is skipped rather
+    # than counted twice.
+    KNOWN_TARGET = (
+        r"(?:will|fort(?:itude)?|ref(?:lex)?|sav(?:e|es|ing)|ac\b|armou?r class"
+        r"|natural armou?r"
+        r"|attack|damage|initiative|cmb|cmd"
+        r"|perception|stealth|heal\b|survival|diplomacy|bluff|intimidate"
+        r"|sense motive|acrobatics|climb|swim|ride|craft|knowledge|concentration)")
+    for m in re.finditer(
+        rf"([+\-–−]\s*\d+)\s+(?!(?:\w+\s+)?(?:bonus|penalty)\s+(?:on|to|against|vs))"
+        rf"(?:(?:to|on)\s+)?((?:any\s+|all\s+)?"
+        rf"(?:[a-z' -]{{0,24}}?{KNOWN_TARGET})[^.;()]{{0,60}}?)"
+        rf"(?=[.;,)]|\s+(?:for|lasting|over|when|while|if|and)\b|$)", text, re.I
+    ):
+        sign = m.group(1).replace(" ", "").replace("–", "-").replace("−", "-")
+        target = _clip(_target(m.group(2)))
+        mtype, mtarget = _modifier_type(target)
+        qualifier = _qualifier(target, mtarget) if mtype != "situational_mod" else ""
+        carries_own = bool(re.search(
+            r"\bfor\s+(?:\d|one|two|three|four|five|six|seven|eight|nine|ten|twelve|"
+            r"twenty|thirty|sixty)", target, re.I))
+        add("penalty" if sign.startswith("-") else "bonus", f"{sign} {target}",
+            spec={"type": mtype, "amount": int(sign), "target": mtarget,
+                  "bonus_type": "untyped",
+                  **({"note": qualifier} if qualifier else {}),
+                  **({"duration": dspec} if dspec and not carries_own else {})})
+
+    # Healing stated without a number: "a poultice that heals wounds", "helps the
+    # wounded regain strength". The corpus is full of it and the engine cannot run a
+    # sentence — so an unnumbered healing claim is read as the smallest die in the game,
+    # 1d4, and says so in its note. A convention rather than a guess: the alternative
+    # was 58 herbs whose cards read "nothing the engine can run", and the author's own
+    # numbered healing herbs sit at 1d4-1d8, so the floor is the honest reading.
+    if not out and re.search(
+        r"\b(?:heals?|healing|mends?|knits?|treats?)\b[^.;]{0,40}?"
+        r"\b(?:wounds?|injur|the wounded|cuts?|hurts?)"
+        r"|poultice that heals|curative for wounds", text, re.I):
+        add("heal", "Heals 1d4 hit points", scales=True,
+            spec={"type": "heal", "dice": "1d4",
+                  "note": "unnumbered healing claim, read as the smallest die"})
+
+    # The number after the save instead of before it: "Fort save at +2 only against
+    # herbal poisons" — Juniper's phrasing, and nothing above reads backwards.
+    for m in re.finditer(
+        r"\b(Fort(?:itude)?|Ref(?:lex)?|Will)\s+sav(?:e|es|ing)\s+at\s+"
+        r"([+\-–−]\s*\d+)\s*((?:only\s+)?(?:against|vs\.?\s|to\s)[^.;)]{2,60})?",
+        text, re.I,
+    ):
+        sign = m.group(2).replace(" ", "").replace("–", "-").replace("−", "-")
+        key = m.group(1).lower()[:4].rstrip("i")
+        key = {"fort": "fort", "ref": "ref", "refl": "ref", "will": "will"}.get(key, "fort")
+        qualifier = _tidy(m.group(3) or "")
+        add("bonus", f"{sign} {SAVES[key]} saves{' ' + qualifier if qualifier else ''}",
+            spec={"type": "save_mod", "amount": int(sign), "target": key,
+                  "bonus_type": "untyped",
+                  **({"note": qualifier} if qualifier else {})})
+
+    # "return 1-4 points as having never been lost" — healing that says "points" and
+    # trusts the reader to know which kind. Only the returning verbs, so "2 points of
+    # Strength damage" cannot wander in.
+    for m in re.finditer(rf"\b(?:returns?|restores?|regains?)\s+({_DIE})\s+points?\b"
+                         rf"(?!\s+of\s+\w)", text, re.I):
+        add("heal", f"Heals {m.group(1)} hit points", scales=True,
+            spec={"type": "heal", "dice": m.group(1)})
 
     # Healing. "restores 1d4 hit points", "heals 1d6 points of fire damage".
     for m in re.finditer(

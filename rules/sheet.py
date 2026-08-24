@@ -51,6 +51,24 @@ class Condition:
         return CONDITIONS.get(self.key, {})
 
 
+@dataclass
+class Buff:
+    """A timed numeric bonus from something consumed or applied.
+
+    The missing half of the consumable pipeline: `save_mod` and its family were
+    "executable" in the taxonomy and had nowhere to land on the actor, so drinking a
+    +1 Will tea produced a card, a dose spent, and no change to any roll. Held apart
+    from conditions because a condition is a named rules state with its own table of
+    penalties, and a buff is one number aimed at one roll.
+    """
+    kind: str                       # save_mod | skill_mod | ability_mod | combat_mod
+    target: str                     # which save/skill/ability/stat
+    amount: int = 0
+    source: str = ""
+    rounds_left: int | None = None  # None = until removed
+    note: str = ""
+
+
 # Rules an actor may be exempted from, by a class feature or a homebrew ruleset. Named
 # and listed so an override can be checked at load: a typo in `temp_hp.stacks` would
 # otherwise be a feature that simply never happens, with nothing anywhere saying why.
@@ -237,6 +255,7 @@ class Actor:
     resistances: dict[str, int] = field(default_factory=dict)
     vulnerabilities: list[str] = field(default_factory=list)
     conditions: list[Condition] = field(default_factory=list)
+    buffs: list[Buff] = field(default_factory=list)
     # Who this creature is being pulled towards, and what defying them costs. Not a
     # condition: a condition is a state the creature is in, while a compulsion is a
     # relationship to a *particular other creature*, and it has to be able to name them.
@@ -416,7 +435,9 @@ class Actor:
         return self.abilities.get(ab, 10)
 
     def ability_mod(self, ab: str) -> int:
-        return ability_modifier(self.ability_score(ab))
+        return ability_modifier(self.ability_score(ab)) + sum(
+            b.amount for b in self.buffs
+            if b.kind == "ability_mod" and b.target == ab)
 
     # --- ability damage ---------------------------------------------------------------
 
@@ -604,6 +625,7 @@ class Actor:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
 
         mods.extend(self._condition_mods("skills"))
+        mods.extend(self._buff_mods("skill_mod", skill))
         return mods
 
     # --- saves ----------------------------------------------------------------------
@@ -638,6 +660,7 @@ class Actor:
                     mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
         mods.extend(self._condition_mods("saves"))
+        mods.extend(self._buff_mods("save_mod", save))
         return mods
 
     # --- initiative -------------------------------------------------------------------
@@ -654,6 +677,7 @@ class Actor:
                 bonus = FEATS.get(self._feat_name(feat), {}).get("initiative")
                 if bonus:
                     mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
+        mods.extend(self._buff_mods("combat_mod", "initiative"))
         return mods
 
     # --- attack and damage --------------------------------------------------------------
@@ -775,6 +799,7 @@ class Actor:
         mods.extend(self._condition_mods("attack"))
         if w["category"] == "melee":
             mods.extend(self._condition_mods("melee_attack"))
+        mods.extend(self._buff_mods("combat_mod", "attack"))
         return mods
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
@@ -848,6 +873,7 @@ class Actor:
 
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
+        mods.extend(self._buff_mods("combat_mod", "ac"))
         return mods
 
     def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
@@ -1372,6 +1398,24 @@ class Actor:
         self.conditions.append(c)
         return c
 
+    def add_buff(self, kind: str, target: str, amount: int, source: str = "",
+                 rounds: int | None = None, note: str = "") -> "Buff":
+        """Grant a timed bonus. Same source on the same roll reapplies, not stacks."""
+        kind, target = str(kind).strip(), str(target).strip().lower()
+        for b in self.buffs:
+            if (b.kind, b.target, b.source) == (kind, target, source):
+                b.amount, b.rounds_left, b.note = int(amount), rounds, note
+                return b
+        b = Buff(kind=kind, target=target, amount=int(amount), source=source,
+                 rounds_left=rounds, note=note)
+        self.buffs.append(b)
+        return b
+
+    def _buff_mods(self, kind: str, target: str) -> list["Modifier"]:
+        return [Modifier(b.amount, b.source or "a preparation")
+                for b in self.buffs
+                if b.kind == kind and b.target == str(target).lower() and b.amount]
+
     def remove_condition(self, key: str) -> None:
         self.conditions = [c for c in self.conditions if c.key != key.strip().lower()]
 
@@ -1397,6 +1441,13 @@ class Actor:
             if p.rounds_left <= 0:
                 ended.append(f"{p.source or 'temporary hit points'} ({p.amount} temp)")
                 self.temp_pools.remove(p)
+        for b in list(self.buffs):
+            if b.rounds_left is None:
+                continue
+            b.rounds_left -= rounds
+            if b.rounds_left <= 0:
+                ended.append(f"{b.source or 'a preparation'} ({b.amount:+d} {b.target})")
+                self.buffs.remove(b)
         return ended
 
     def apply_hp_state(self) -> list[str]:
@@ -1591,6 +1642,9 @@ class Actor:
             "speed": self.speed_feet,
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
                            for c in self.conditions],
+            "buffs": [{"kind": b.kind, "target": b.target, "amount": b.amount,
+                       "source": b.source, "rounds_left": b.rounds_left}
+                      for b in self.buffs],
         }
         if self.is_pc:
             out["class"] = f"{self.class_data.get('name', '')} {self.level}".strip()
@@ -2027,6 +2081,9 @@ def to_dict(actor: Actor) -> dict:
         "resistances": dict(actor.resistances),
         "vulnerabilities": list(actor.vulnerabilities),
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],
+        "buffs": [{"kind": b.kind, "target": b.target, "amount": b.amount,
+                   "source": b.source, "rounds_left": b.rounds_left, "note": b.note}
+                  for b in actor.buffs],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "paths": list(actor.paths),
@@ -2322,6 +2379,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     for c in data.get("conditions", []):
         a.add_condition(c if isinstance(c, str) else c["key"],
                         None if isinstance(c, str) else c.get("rounds_left"))
+    for b in data.get("buffs", []):
+        a.add_buff(b.get("kind", "save_mod"), b.get("target", ""),
+                   b.get("amount", 0), b.get("source", ""),
+                   b.get("rounds_left"), b.get("note", ""))
     validate(a)
 
     # After validate, so an unknown class is reported as an unknown class rather than as

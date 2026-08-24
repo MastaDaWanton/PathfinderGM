@@ -335,6 +335,23 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                                   "unit": duration.get("unit", "round")}
         return [{"op": "condition", "because": because, "params": params}]
 
+    if kind in ("save_mod", "skill_mod", "ability_mod", "combat_mod"):
+        amount = int(spec.get("amount", 0) or 0)
+        # Potency scales benefits the way it scales dice — the author's distill rule is
+        # about the primary effect, not only the numbered ones — and rounds up, per the
+        # house rounding. Penalties are left alone: a stronger brew is not a worse one.
+        if amount > 0 and potency > 1.0:
+            amount = int(amount * potency + 0.999)
+        out = [{"op": "buff", "actor": target, "because": because,
+                "params": {"type": kind, "target": spec.get("target", ""),
+                           "amount": amount, "to": target,
+                           "source": spec.get("from") or "the preparation",
+                           **({"duration": spec["duration"]}
+                              if isinstance(spec.get("duration"), dict) else
+                              {"duration": {"amount": 1, "unit": "hour"}}),
+                           **({"note": spec["note"]} if spec.get("note") else {})}}]
+        return out
+
     if kind == "remove_condition":
         return [{"op": "condition", "because": because,
                  "params": {"condition": spec.get("target") or "", "to": target,
