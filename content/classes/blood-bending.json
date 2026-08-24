@@ -73,6 +73,11 @@
       "rule": "nonlethal.counts_temp_hp",
       "from_level": 1,
       "why": "Blood Bond: 'Non-Lethal damage does not knock you unconscious until it is equal to your current health + your temporary health.' The other half of the same idea."
+    },
+    {
+      "rule": "heal.overflow_temp_hp",
+      "from_level": 1,
+      "why": "Blood Bond: 'Any healing you receive while your health is at max becomes Temporary HP.' The class drinks its own economy."
     }
   ],
   "pools": [
@@ -1063,5 +1068,16 @@
     }
   },
   "_paths_note": "Imported from the author's own document by tools/import_blood_paths.py. Abilities are tiered by Control Blood level (1-5), which is what 'control blood 1a' through '5b' on the progression table refers to — not by character level. Descriptions are the document's own sentences, unedited: the engine executes none of them yet, so what the app shows is what the author wrote rather than a paraphrase of it.",
-  "_effects_note": "Path abilities carry effect specs converted by tools/convert_blood_paths.py from the author's own sentences. `needs` records, per ability, which of three missing engine capabilities it depends on — Control Blood scaling, Blood Pools as scene objects, or a multiple of the class table's Blood die. An ability with effects and no needs is one the engine can resolve today."
+  "_effects_note": "Path abilities carry effect specs converted by tools/convert_blood_paths.py from the author's own sentences. `needs` records, per ability, which of three missing engine capabilities it depends on — Control Blood scaling, Blood Pools as scene objects, or a multiple of the class table's Blood die. An ability with effects and no needs is one the engine can resolve today.",
+  "features": {
+    "blood bond": "Your blood is bonded to you; no other bender can use your blood without first passing a Constitution check (DC 10+LVL+CONmod). When taking damage from using your abilities, damage is received as Non-Lethal. Abilities can replace each attack action within a standard action or a full-round action unless otherwise stated. Permanently increase your Constitution by +2 for every 5 levels in Blood Bending. Any healing you receive while your health is at max becomes Temporary HP. Non-Lethal damage does not knock you unconscious until it is equal to your current health + your temporary health."
+  },
+  "ability_growth": [
+    {
+      "ability": "con",
+      "every": 5,
+      "amount": 2,
+      "why": "Blood Bond: 'Permanently increase your Constitution by +2 for every 5 levels in Blood Bending.'"
+    }
+  ]
 }

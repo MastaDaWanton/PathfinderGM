@@ -356,6 +356,19 @@ def level_up(actor, dice=None) -> dict:
     actor.level = new_level
     actor.hp_max += hp
     actor.hp += hp
+
+    # Permanent ability growth the class states as data — Blood Bond's +2 Con every
+    # five levels. Applied to the base score, so it survives every recompute; the
+    # levels it fires on are the multiples, so a character levelled past several at
+    # once is owed each of them.
+    grown = []
+    for g in cls.get("ability_growth", []) or []:
+        every, amount = int(g.get("every", 0) or 0), int(g.get("amount", 0) or 0)
+        ab = str(g.get("ability", "")).lower()
+        if every > 0 and amount and ab in actor.abilities \
+                and new_level % every == 0:
+            actor.abilities[ab] = int(actor.abilities[ab]) + amount
+            grown.append(f"{ab.title()} +{amount} (permanent)")
     # Pools are formulas in the class file, so they resize themselves against the new
     # level rather than being recomputed here — the whole reason they were written as
     # formulas in the first place.
@@ -363,7 +376,8 @@ def level_up(actor, dice=None) -> dict:
 
     return {
         "ok": True, "level": new_level, "rolled": rolled, "con": con, "hp": hp,
-        "hp_max": actor.hp_max, "grants": gains["grants"], "bab": gains["bab"],
+        "hp_max": actor.hp_max,
+        "grants": gains["grants"] + grown, "bab": gains["bab"],
         "saves": gains["saves"], "skill_ranks": gains["skill_ranks"],
         "pools": refreshed,
     }

@@ -820,3 +820,80 @@ def test_the_forge_says_which_slot_is_which():
 
     page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
     assert "Path A" in page and "Path B" in page
+
+
+# --- Blood Bond, whole -------------------------------------------------------------------
+#
+# "where is this data?" — the user quoting the class document's full Blood Bond paragraph.
+# The honest answer was "mostly nowhere": of its six clauses, two had become overrides,
+# one was baked into each ability's own wording, and three did not exist — including two
+# that are mechanics, not flavour. The text is stored in the class file now and these pin
+# the two mechanics that were missing.
+
+def _bender(level=4):
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["class"] = "blood bending"
+    d["level"] = level
+    d["ranks"] = {}
+    return from_dict(d, ref="pc")
+
+
+def test_blood_bond_grants_con_every_five_levels():
+    """'Permanently increase your Constitution by +2 for every 5 levels.' Applied to the
+    base score so every recompute keeps it, and named in the level's own grants."""
+    from rules.dice import Dice
+
+    pc = _bender(level=4)
+    before = pc.abilities["con"]
+    r = leveling.level_up(pc, dice=Dice(seed=1))
+    assert pc.abilities["con"] == before + 2
+    assert "Con +2 (permanent)" in r["grants"]
+
+
+def test_the_growth_only_fires_on_the_multiples():
+    from rules.dice import Dice
+
+    pc = _bender(level=5)
+    before = pc.abilities["con"]
+    leveling.level_up(pc, dice=Dice(seed=1))  # 6th: not a multiple of five
+    assert pc.abilities["con"] == before
+
+
+def test_healing_at_full_banks_as_temporary_hit_points():
+    """'Any healing you receive while your health is at max becomes Temporary HP.' Gated
+    on the class's own override, applied automatically at load — no other class banks."""
+    pc = _bender()
+    assert pc.allows("heal.overflow_temp_hp")
+    pc.hp = pc.hp_max
+    restored = pc.heal(5)
+    assert restored == 0
+    assert sum(p.amount for p in pc.temp_pools) == 5
+
+
+def test_partial_overflow_banks_only_the_spare():
+    pc = _bender()
+    pc.hp = pc.hp_max - 2
+    pc.heal(5)
+    assert pc.hp == pc.hp_max
+    assert sum(p.amount for p in pc.temp_pools) == 3
+
+
+def test_other_classes_still_waste_nothing_into_temp_hp():
+    """The control: a cure at full on anybody else is still just a cure at full."""
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.hp = pc.hp_max
+    pc.heal(5)
+    assert sum(p.amount for p in pc.temp_pools) == 0
+
+
+def test_the_full_blood_bond_text_is_data_and_the_glossary_serves_it():
+    from rules import glossary
+
+    pc = _bender()
+    entry = glossary.lookup(glossary.build(pc), "blood bond")
+    assert entry["text"].startswith("Your blood is bonded to you")
+    assert "Constitution check (DC 10+LVL+CONmod)" in entry["text"]

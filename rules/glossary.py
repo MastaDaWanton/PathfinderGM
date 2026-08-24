@@ -86,6 +86,10 @@ def build(actor) -> dict:
 
     cls = getattr(actor, "class_data", None) or {}
     cls_name = cls.get("name", "the class")
+    # The class's own stated features win over everything below — the full Blood Bond
+    # paragraph is data now, and a stored text always beats a paraphrase of one.
+    for fname, ftext in (cls.get("features") or {}).items():
+        add(fname, ftext, cls_name)
     if str(cls.get("id", "")) == "blood bending" or "blood" in str(cls_name).lower():
         for key, text in BLOOD_BENDING.items():
             add(key, text, cls_name)

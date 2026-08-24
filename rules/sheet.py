@@ -89,6 +89,11 @@ ACTOR_RULES = {
     "needs.no_water": (
         "This creature does not need to drink, and never makes a thirst check."
     ),
+    "heal.overflow_temp_hp": (
+        "Healing received at full hit points becomes temporary hit points instead of "
+        "vanishing. Blood Bond's own clause: the class pays in hit points, so a cure "
+        "with nowhere to land is banked rather than wasted."
+    ),
     "temp_hp.stacks": (
         "Temporary hit points from different sources add up instead of the best one "
         "applying. Blood Bending needs this from 1st level: its whole economy is hit "
@@ -1046,7 +1051,13 @@ class Actor:
         # 1e: curing hit point damage removes an equal amount of non-lethal damage. Miss
         # this and a character healed to full still lies there unconscious from a beating.
         self.heal_nonlethal(amount)
-        return self.hp - before
+        healed = self.hp - before
+        # Blood Bond: healing with nowhere to land banks as temporary hit points. Gated
+        # on the override so only a class that states the rule gets the bank.
+        spare = amount - healed
+        if spare > 0 and self.allows("heal.overflow_temp_hp"):
+            self.gain_temp_hp(spare, source="overflowing vitality")
+        return healed
 
     # --- immunity, resistance and vulnerability ------------------------------------------
 
