@@ -217,12 +217,72 @@ KINDS: dict[str, Kind] = {
     "spells": Kind(
         id="spells", label="Spells", folder="spells", key="spells",
         shipped_loader="rules.spells:all_spells",
+        # The structured half of a spell — its element, everything that grants it a level,
+        # its range and area as values — is read out of the fields below rather than stored
+        # twice, exactly as a creature's immunities are. `rules.spells:derive` also renders
+        # the two mapping-shaped fields back to the one-per-line text this form can edit,
+        # because there are six field types here and none of them is a mapping.
+        derive="rules.spells:derive",
+        # Five fields before this: school, range, duration, saving throw, effects. A spell
+        # authored through that form had no components, no casting time, no area, no spell
+        # resistance and — the one that mattered — no way to say which class could cast it
+        # at what level, so nothing authored here was ever castable. The list below is the
+        # tag vocabulary the request asked for, as form fields.
+        #
+        # The closed vocabularies are written out rather than imported: this module states
+        # that nothing here imports a rules module, and a Kind names its loader as a string
+        # for that reason. Copies drift, so `tests/test_spells.py` pins each of these
+        # against the tuple in `rules/spells.py` that it copies — the drift is caught by a
+        # test rather than by a player finding a school the filter does not know.
         fields=_named() + [
-            Field("school", "School"),
-            Field("range", "Range"),
+            Field("school", "School", type="choice",
+                  choices=("abjuration", "conjuration", "divination", "enchantment",
+                           "evocation", "illusion", "necromancy", "transmutation",
+                           "universal")),
+            Field("subschool", "Subschool"),
+            Field("element", "Element", type="choice",
+                  choices=("acid", "cold", "electricity", "fire", "force", "negative",
+                           "positive", "sonic", "untyped"),
+                  help="Left empty, the descriptors below decide it."),
+            # Free text and not a checkbox list, because the 28 canonical descriptors live
+            # in the content file and this module cannot read it at import. What is typed
+            # here is checked against that file on save, so a made-up descriptor is refused
+            # rather than quietly accepted — a descriptor is a rules fact, and a guessed one
+            # changes what the spell does.
+            Field("descriptors", "Descriptors", help="Comma separated: fire, curse. Only "
+                                                     "the book's own 28 are accepted."),
+            Field("level_available", "Available at", type="textarea",
+                  help="One per line, ending in the spell level: 'wizard 3', "
+                       "'domain fire 3', 'bloodline efreeti 3', 'patron elements 3', "
+                       "'mystery flame 3', 'elemental school fire 3'. A class line is what "
+                       "makes it castable."),
+            Field("casting_time", "Casting time",
+                  help="standard action, swift action, 1 round, 10 minutes."),
+            Field("components", "Components", type="list",
+                  choices=("V", "S", "M", "F", "DF")),
+            Field("component_cost", "Material cost"),
+            Field("range", "Range",
+                  help="As printed: touch, personal, close (25 feet + 5 feet/2 levels). "
+                       "The distance is read out of this line."),
+            Field("area", "Area",
+                  help="As printed: 20-foot-radius spread. The shape is read out of it."),
+            Field("effect", "Effect"),
+            Field("targets", "Targets"),
             Field("duration", "Duration"),
-            Field("saving_throw", "Saving throw"),
+            Field("dismissible", "Dismissible", type="choice", choices=("no", "yes")),
+            # Free text, not a dropdown: the corpus writes 40 distinct saving-throw lines
+            # and 15 spell-resistance ones — "yes (harmless, object)", "no and yes (see
+            # text)" — and a select that does not offer what a shipped spell already says
+            # blanks the field the moment somebody opens it to change something else.
+            Field("saving_throw", "Saving throw",
+                  help="Reflex half, Will negates (harmless), none."),
+            Field("spell_resistance", "Spell resistance", help="yes, no, yes (harmless)."),
+            Field("scaling", "Damage or healing formula",
+                  help="1d6/level, max 10d6 · 1d8/2 levels, max 5d8 · 2d4 · "
+                       "1d8+1/level, max +5. The effects below use it at the caster's own "
+                       "level."),
             Field("effects", "Effects", type="effects"),
+            Field("source", "Source"),
         ],
     ),
 }
