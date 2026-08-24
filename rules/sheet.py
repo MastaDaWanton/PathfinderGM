@@ -1841,7 +1841,16 @@ def full_sheet(actor: Actor) -> dict:
     armour = ARMOUR.get(actor.armour, ARMOUR["none"])
     shield = SHIELDS.get(actor.shield, SHIELDS["none"])
 
+    # Every named thing the sheet might show, with its text, for the click-popover.
+    # The feats' computed effect lines are merged on top of the static glossary, because
+    # the sheet derives some of those ("+1 AC" for Dodge) from mechanics rather than
+    # carrying prose for them.
+    from . import glossary as glossary_mod
+
+    glossary = glossary_mod.build(actor)
+
     return {
+        "glossary": glossary,
         "identity": {
             "name": actor.name,
             "class": f"{cls.get('name', '')} {actor.level}".strip(),

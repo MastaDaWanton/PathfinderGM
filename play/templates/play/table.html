@@ -480,6 +480,22 @@
   #craftpanel .cp-bench { color: var(--dim); font-size: 12.5px; text-decoration: none; }
   #craftpanel .cp-bench:hover { color: var(--accent); }
 
+  /* --- The glossary popover: what a clicked name actually does ------------- */
+  .gloss { cursor: pointer; border-bottom: 1px dotted var(--gold-dim); }
+  .gloss:hover { color: var(--gold); border-bottom-color: var(--accent); }
+  #glosscard {
+    position: fixed; z-index: 70; max-width: 420px; padding: 14px 16px;
+    border-radius: 3px; border: 1px solid var(--gold-dim);
+    background: linear-gradient(rgba(27,22,17,.97), rgba(18,15,11,.98));
+    box-shadow: 0 12px 40px rgba(0,0,0,.7); display: none;
+  }
+  #glosscard.on { display: block; }
+  #glosscard h4 { margin: 0 0 4px; color: var(--gold);
+    font: 400 16px/1.2 var(--display); letter-spacing: .06em; font-variant: small-caps; }
+  #glosscard .src { color: var(--dim); font-style: italic; font-size: 12px;
+    margin-bottom: 8px; }
+  #glosscard p { margin: 0; font: 14px/1.5 var(--body); color: var(--ink); }
+
   /* --- The full character sheet ------------------------------------------- */
   #sheetpanel {
     position: fixed; inset: 0; z-index: 30;
@@ -1789,6 +1805,55 @@ document.addEventListener("input", e => {
   if (e.target.closest("#cp-h")) $("#cp-hn").textContent = e.target.value;
 });
 
+// The glossary: any named feature on the sheet answers a click with what it does.
+// "there is nowhere the user can look to see what any of the blood bender abilities
+// actually do" — the text was in the class data the whole time; this is the door to it.
+function glossFor(name) {
+  const g = (SHEET && SHEET.glossary) || {};
+  let key = String(name || "").toLowerCase().replace(/\s+/g, " ").trim();
+  while (key) {
+    if (g[key]) return g[key];
+    // The sheet's own computed feat lines answer too ("+1 AC" for Dodge).
+    const feat = (SHEET.feats || []).find(f => f.name.toLowerCase() === key);
+    if (feat && feat.effect) return { name: feat.name, text: feat.effect,
+      source: feat.source || "feat" };
+    const parts = key.split(" ");
+    if (parts.length > 1 && /\d/.test(parts[parts.length - 1])) {
+      key = parts.slice(0, -1).join(" ");
+    } else break;
+  }
+  return null;
+}
+
+function glossify(name) {
+  // A span the click handler recognises; names with no entry stay plain text, so a
+  // dotted underline is a promise the click will be answered.
+  return glossFor(name)
+    ? `<span class="gloss" data-gloss="${esc(name)}">${esc(name)}</span>`
+    : esc(name);
+}
+
+document.addEventListener("click", e => {
+  const hit = e.target.closest("[data-gloss]");
+  let card = document.getElementById("glosscard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "glosscard";
+    document.body.appendChild(card);
+  }
+  if (!hit) { card.classList.remove("on"); return; }
+  const entry = glossFor(hit.dataset.gloss);
+  if (!entry) { card.classList.remove("on"); return; }
+  card.innerHTML = `<h4>${esc(entry.name)}</h4>
+    <div class="src">${esc(entry.source || "")}</div>
+    <p>${esc(entry.text)}</p>`;
+  card.classList.add("on");
+  // Beside the click, kept on screen.
+  const r = hit.getBoundingClientRect();
+  card.style.left = Math.min(innerWidth - 440, Math.max(8, r.left)) + "px";
+  card.style.top = Math.min(innerHeight - 160, r.bottom + 8) + "px";
+});
+
 async function sendRoll(face) {
   $("#veil").classList.remove("on");
   busy(true);
@@ -2246,7 +2311,7 @@ function tabClass(s) {
                   const up = (det.upgrades || {})[n];
                   const core = (det.core || []).includes(n);
                   const text = key ? (det.abilities || {})[key] : "";
-                  return `<div class="ab-line"><span>${esc(n)}</span>
+                  return `<div class="ab-line"><span>${glossify(n)}</span>
                     <em>${up ? `<b>${esc(up)}</b> — upgrade of ${esc(key)}: ${esc(text)}`
                       : text ? esc(text)
                       : core ? "a Core Rulebook ability; see the rules reference"
@@ -2268,7 +2333,7 @@ function tabClass(s) {
           ${Object.entries(p.next.saves || {}).map(([k, v]) =>
             `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
           ${(p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
-            esc(p.next.grants.join(", "))}</b></div>` : ""}
+            p.next.grants.map(glossify).join(", ")}</b></div>` : ""}
         </div>
         <button class="go" id="levelup" style="margin-top:14px">Take level ${
           p.next.level}</button>
@@ -2284,7 +2349,7 @@ function tabClass(s) {
           <td><b>${r.level}</b>${r.level === p.level
             ? ' <span class="pill now">here</span>' : ""}</td>
           ${cols.map(c => `<td>${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
-          <td class="why">${esc((r.grants || []).join(", ") || "—")}</td>
+          <td class="why">${(r.grants || []).map(glossify).join(", ") || "—"}</td>
         </tr>`).join("")}
       </table>
     </div>
@@ -2316,7 +2381,7 @@ function tabFeats(s) {
         <table class="sheet">
           <tr><th>Trait</th><th>From</th></tr>
           ${s.traits.map(t => `<tr>
-            <td><b>${esc(t.name)}</b></td>
+            <td><b>${glossify(t.name)}</b></td>
             <td class="why">${esc(t.source)}</td></tr>`).join("")}
         </table>` : ""}
       ${(s.class_features && s.class_features.length) ? `
@@ -2324,7 +2389,7 @@ function tabFeats(s) {
         <table class="sheet">
           <tr><th>Feature</th><th>From</th></tr>
           ${s.class_features.map(f => `<tr>
-            <td><b>${esc(f)}</b></td>
+            <td><b>${glossify(f)}</b></td>
             <td class="why">${esc(s.identity.class)}</td></tr>`).join("")}
         </table>` : ""}
     </div>
