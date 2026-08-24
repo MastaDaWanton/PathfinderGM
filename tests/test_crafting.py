@@ -309,15 +309,22 @@ def test_the_shelf_shows_what_is_out_of_reach_rather_than_hiding_it(client):
     assert by_id["phoenix-feather"]["tier"] == "legendary"
 
 
-def test_a_discipline_with_no_rules_says_so(client):
+def test_a_live_track_without_a_bench_says_which_half_is_missing(client):
+    """Enchanting was the example of a discipline with no rules at all; now its track,
+    materials and chain module are real and only the bench UI is unfitted. The shelf
+    serves its own catalogue (not herbs), and preview refuses with the actual state
+    of things rather than the old "no rules yet"."""
     d = client.get("/api/craft/ingredients?craft=enchanting").json()
-    assert d["track"]["available"] is False
+    assert d["track"]["available"] is True
+    ids = {m["id"] for m in d["ingredients"]}
+    assert "woundwort" not in ids            # the herb shelf stays at the herb bench
+    assert any(m.get("kind") == "essence" for m in d["ingredients"])
 
     r = client.post("/api/craft/preview",
                     data=json.dumps({"craft": "enchanting", "ingredients": ["woundwort"]}),
                     content_type="application/json")
-    assert r.status_code == 400
-    assert "no rules yet" in r.json()["error"]
+    assert r.status_code == 409
+    assert "still being fitted" in r.json()["error"]
 
 
 def test_crafting_advances_the_track(client):

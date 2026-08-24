@@ -27,15 +27,54 @@ from . import campaign as campaign_mod
 DISCIPLINES = [
     {"id": "herbalism", "name": "Herbalism", "track": "herbalist",
      "blurb": "Foraging, harvesting and brewing — poultices, teas, tinctures, elixirs."},
-    {"id": "alchemy", "name": "Alchemy", "track": None,
+    {"id": "alchemy", "name": "Alchemy", "track": "alchemist",
      "blurb": "Reagents, reactions, and bottled consequences."},
-    {"id": "blacksmithing", "name": "Blacksmithing", "track": None,
+    {"id": "blacksmithing", "name": "Blacksmithing", "track": "blacksmith",
      "blurb": "Forge work: weapons, armour, and the tools every other craft needs."},
-    {"id": "leatherworking", "name": "Leatherworking", "track": None,
+    {"id": "leatherworking", "name": "Leatherworking", "track": "leatherworker",
      "blurb": "Hides into armour, straps, cases and bindings."},
-    {"id": "enchanting", "name": "Enchanting", "track": None,
+    {"id": "enchanting", "name": "Enchanting", "track": "enchanter",
      "blurb": "Binding lasting magic into objects that will hold it."},
 ]
+
+# Each discipline's own shelf. Herbalism reads the herb corpus through `ingredients`;
+# the four newer tracks each carry a materials module with the same as_dict shape.
+# Chains for these benches are the next slice — the guard in preview/do says so
+# rather than letting `crafting.preview` misread a forge chain as a brew.
+_MATERIALS_OF = {
+    "alchemist": "rules.alchemist",
+    "blacksmith": "rules.blacksmith",
+    "leatherworker": "rules.leatherworker",
+    "enchanter": "rules.enchanter",
+}
+
+
+def _craft_materials(track_id: str) -> list[dict]:
+    """This bench's shelf. The modules read the whole folder as one shared shelf, so
+    the bench filters to its own shipped catalogue — a forge listing hides under its
+    default kind would mislabel them. A homebrew entry belongs to no shipped file and
+    shows on every bench, which errs toward visible rather than lost."""
+    import importlib
+    import json as json_mod
+    from pathlib import Path
+
+    from django.conf import settings
+
+    shipped: dict[str, set[str]] = {}
+    for p in (Path(settings.BASE_DIR) / "content" / "materials").glob("*.json"):
+        try:
+            data = json_mod.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        shipped[p.stem] = {str(m.get("id", "")).strip().lower()
+                           for m in data.get("materials", [])}
+    own = shipped.get(f"{track_id}-materials", set())
+    elsewhere = set().union(*(v for k, v in shipped.items()
+                              if k != f"{track_id}-materials")) if shipped else set()
+
+    mod = importlib.import_module(_MATERIALS_OF[track_id])
+    return [m.as_dict() for mid, m in sorted(mod.materials().items())
+            if mid in own or mid not in elsewhere]
 
 
 def _discipline(disc_id: str) -> dict:
@@ -135,6 +174,19 @@ def craft_ingredients(request):
 
     state = _track_state(c, disc)
     ceiling = state.get("max_rank", 0)
+
+    if disc["track"] in _MATERIALS_OF:
+        # This bench's own catalogue, tier-marked the same way the herb shelf is.
+        # No satchel counts yet: acquisition (mining, skinning, markets) is the next
+        # slice, and a count of zero on everything would read as a bug rather than
+        # a not-yet.
+        mats = _craft_materials(disc["track"])
+        for d in mats:
+            d["usable"] = bool(ceiling) and int(d.get("rank", 1)) <= ceiling
+        return JsonResponse({"ingredients": mats, "stock": [], "track": state,
+                             "biome": c.biome,
+                             "biome_describe": biomes.describe(c.biome)})
+
     out = []
     for ing in sorted(ingredients.all_ingredients().values(), key=lambda i: i.name):
         d = ing.as_dict()
@@ -186,6 +238,15 @@ def craft_preview(request):
     state = _track_state(c, disc)
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
+
+    if disc["track"] in _MATERIALS_OF:
+        # The track is real — levels, materials and chain rules all load — but this
+        # bench's chain UI is not fitted yet. Said plainly rather than letting
+        # `crafting.preview` misread a forge chain as a brew.
+        return JsonResponse(
+            {"error": f"The {disc['name'].lower()} bench is still being fitted: its "
+                      f"materials and rules are in, and chain-crafting arrives next."},
+            status=409)
 
     chain = _chain_from(body, state["track"])
     pc = c.scene.pc()
@@ -274,6 +335,15 @@ def craft_do(request):
     state = _track_state(c, disc)
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
+
+    if disc["track"] in _MATERIALS_OF:
+        # The track is real — levels, materials and chain rules all load — but this
+        # bench's chain UI is not fitted yet. Said plainly rather than letting
+        # `crafting.preview` misread a forge chain as a brew.
+        return JsonResponse(
+            {"error": f"The {disc['name'].lower()} bench is still being fitted: its "
+                      f"materials and rules are in, and chain-crafting arrives next."},
+            status=409)
 
     wanted = max(1, min(MAX_BATCH, int(body.get("batch", 1) or 1)))
     chain = _chain_from(body, state["track"])
