@@ -2638,6 +2638,136 @@
    },
    "converted_by": "read",
    "notes": "The penalty is half the caster level — a value that changes with the caster — and every modifier spec takes a fixed integer. Writing any single number here would be right at one caster level and wrong at every other. Being denied Dexterity to AC is also narrower than the flat-footed condition, which would apply to every attacker rather than only the caster's first melee attack each round."
+  },
+  "time-shudder": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A ripple in time washes over every creature in the 30-foot emanation. At the start of each creature's turn there is a 50% chance it is hasted, as haste; otherwise it is slowed, as slow."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Which of two opposite effects a creature gets is rerolled at the start of every one of its turns, and both are other spells' rules. Neither hasted nor slowed is in the condition vocabulary, and nothing expresses a coin flip that re-resolves each round."
+  },
+  "time-stop": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You speed up so greatly that everyone else seems frozen, and act freely for 1d4+1 rounds of apparent time. Fire, cold, gas and the like, magical or not, can still harm you. Other creatures are invulnerable to your attacks and spells while it lasts and you cannot target them at all, though an area spell whose duration outlasts the time stop has its normal effects on them once time resumes. You cannot move or harm anything held, carried or worn by a creature stuck in normal time, but you can affect any item nobody possesses. You are undetectable throughout, and you cannot enter an antimagic field while it lasts."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "No duration emitted: it is 1d4+1 rounds of APPARENT time, both a rolled value the integer-only shape cannot hold and a span measured on a different clock from everyone else's. Flattening it to 3 rounds would be an invented number."
+  },
+  "timely-inspiration": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 1,
+     "bonus_type": "competence",
+     "target": "one attack roll or skill check the target has just failed, applied retroactively",
+     "uses": "once",
+     "uses_count": 1,
+     "note": "+1 per five caster levels, maximum +3; cast in response to the failure, and if the bonus is enough to turn the failure into a success, the roll succeeds"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A single retroactive bonus to one roll already made, so a one-use situational_mod rather than a standing modifier. The +1 is what the spell grants at its lowest caster level and the per-five-levels step is in the note; the scaling block only expresses damage and healing progressions."
+  },
+  "tiny-hut": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An unmoving opaque sphere of force in any colour you like forms around you, half above ground and half below. Up to nine other Medium creatures can shelter inside and pass in and out freely without harming it, but the spell ends if you leave. Inside it is 70 F while the outside is between 0 and 100 F, and beyond that range the interior shifts one degree for each degree outside. It keeps out rain, dust and sandstorms and withstands any wind short of hurricane force, though a hurricane of 75 mph or more destroys it. You can light the hemispherical interior dimly or darken it at will. The field is opaque from outside and transparent from within, so the occupants have total concealment; missiles, weapons and most spell effects pass through it without affecting it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 2,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Creating a structure of force has no spec type, and the total concealment it gives belongs to the hut rather than to any creature's sheet. Element force is already derived in the corpus."
+  },
+  "tireless-pursuers": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "fatigue caused by hustling or a forced march",
+     "note": "applies to you and one touched creature per 3 levels"
+    },
+    {
+     "type": "narrative",
+     "target": "As tireless pursuit, on a group: each target halves the nonlethal damage caused by hustling and forced marching. When the spell ends, any target still carrying nonlethal damage from that travel becomes fatigued, or exhausted if it was already fatigued."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "'Functions as tireless pursuit, except as noted above' — the only changes are range and target count, both already in the corpus, so the effects are tireless pursuit's."
+  },
+  "tireless-pursuit": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "fatigue caused by hustling or a forced march",
+     "note": "only for as long as the spell lasts"
+    },
+    {
+     "type": "narrative",
+     "target": "You halve the nonlethal damage caused by hustling and forced marching. Once the spell ends, if you still have any nonlethal damage from that travel, you become fatigued — or exhausted, if you were already fatigued."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Ignoring travel fatigue is a genuine immunity and is emitted. Halving damage is a fraction of a value the spell never states, and the fatigue that lands when the spell ENDS is the opposite of what an apply_condition on casting would do."
+  },
+  "titanic-anchoring": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "the pull and push special abilities"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 10,
+     "bonus_type": "untyped",
+     "target": "cmd",
+     "note": "only against bull rush, grapple, overrun, reposition and trip attempts made by creatures LARGER than you"
+    },
+    {
+     "type": "narrative",
+     "target": "Bull rush, grapple, overrun, reposition and trip maneuvers attempted against you by creatures of your own size or smaller always fail, whatever they roll."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Three separate clauses, two of them executable. The +10 to CMD is flat and stated, with its restriction on the spec. Automatic failure against smaller and same-size creatures is not a bonus at all — no number would express it, and a large enough CMD bonus would still leave a natural 20 succeeding. Untyped because no bonus type is named."
   }
  }
 }

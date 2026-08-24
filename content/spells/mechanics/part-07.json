@@ -3197,6 +3197,394 @@
     "dismissible": false
    },
    "notes": "FLAGGED FOR REVIEW: the +2 insight bonus always belongs to the CASTER \u2014 the text says plainly that a touched subject does not gain it. The spell's range is 'personal or touch', so in the personal case the target and the caster are the same creature and these specs are exactly right, while in the touch case an engine that applies specs to the target would buff the wrong creature. They are emitted rather than left narrative because the number and the bonus type are both stated outright and personal is the ordinary use, but the exception is recorded on both specs."
+  },
+  "forest-friend": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "circumstance",
+     "target": "Acrobatics checks made moving in and among trees"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "circumstance",
+     "target": "Climb checks made moving in and among trees"
+    },
+    {
+     "type": "permission",
+     "target": "Move through forested terrain without hindrance, and ignore the penalties undergrowth imposes on Acrobatics and Stealth checks there."
+    },
+    {
+     "type": "narrative",
+     "target": "Forested overgrowth imposes a miss chance 10% lower than normal against the targets."
+    },
+    {
+     "type": "narrative",
+     "target": "A ranger in his favoured terrain may also add his favoured terrain bonus on those Acrobatics and Climb checks."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The +5s are situational_mods rather than skill_mods because they apply only among trees; a skill_mod would grant a flat +5 Climb everywhere. Affects one willing creature per three caster levels."
+  },
+  "forest-s-sense": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sense the location of a target creature within range as long as it is within 10 feet of a living plant or fungus, which acts as a scrying sensor. You must be able to identify the creature by tangible qualities such as build, clothing texture, size or tracks, but need no line of effect."
+    },
+    {
+     "type": "narrative",
+     "target": "Your hearing, smell and touch extend to every plant and fungus within 10 feet of the target, letting you gauge the size and shape of nearby objects and possibly overhear conversations it takes part in. Your scent and tremorsense reach through the sensor if you have them; no other special sense does."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "insight",
+     "target": "Survival checks to track creatures you sensed with this spell",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "day"
+     },
+     "note": "lasts 1 day after casting, outliving the spell itself, and you may dismiss it"
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "notes": "The +5 outlasts the spell \u2014 it runs for 1 day from casting while the spell lasts minutes/level \u2014 so its own duration is carried on the spec rather than inherited from the spell."
+  },
+  "foretell-failure": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Cast immediately before taking an action that needs a d20 roll and can be completed in one round; the spell tells you whether that action would succeed on a roll of 10 or better.",
+     "uses": "once",
+     "uses_count": 1
+    },
+    {
+     "type": "narrative",
+     "target": "If the action would succeed under those circumstances you must take it. If it would not, you are free to do something else instead."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "instantaneous"
+   }
+  },
+  "forgetful-slumber": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "unconscious",
+       "note": "as deeper slumber; affects only a single living creature of 10 Hit Dice or fewer"
+      },
+      {
+       "type": "narrative",
+       "target": "The target awakens with no knowledge of what led to the casting, having lost all memory of the 5 minutes before it fell asleep. Nothing short of miracle or wish restores those memories."
+      }
+     ],
+     "on_success": []
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "`unconscious` is applied here although eyebite's coma was left narrative, and the difference is in the two texts. This description says outright that the target falls asleep and later awakens, and asleep is the unconscious condition; eyebite's prose insists its coma is explicitly NOT sleep and that nothing short of dispelling wakes it, so mapping that one would have let the engine wake it normally."
+  },
+  "form-of-the-alien-dragon-i": {
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "size",
+     "target": "str"
+    },
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "bonus_type": "size",
+     "target": "con"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "natural armour",
+     "target": "ac"
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 60,
+     "note": "poor maneuverability"
+    },
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 60
+    },
+    {
+     "type": "narrative",
+     "target": "You become a Medium esoteric or outer dragon \u2014 psychics are limited to the esoteric forms: astral, dream, etheric, nightmare or occult."
+    },
+    {
+     "type": "narrative",
+     "target": "You gain one bite (1d8), two claws (1d6) and two wing attacks (1d4), plus a breath weapon usable once per casting that deals 6d8 damage unless noted otherwise and allows a Reflex save for half."
+    },
+    {
+     "type": "narrative",
+     "target": "Each dragon adds its own breath shape, resistance and extras \u2014 for example the occult dragon raises the natural armour bonus to +6, the solar and vortex dragons add vulnerability to cold, and the astral and etheric dragons roll their breath damage in d4s rather than d8s."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. Note that the occult dragon raises the natural armour bonus from +4 to +6; the +4 is emitted because it is the general case, and the exception is recorded in the narrative."
+  },
+  "form-of-the-alien-dragon-ii": {
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 6,
+     "bonus_type": "size",
+     "target": "str"
+    },
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "size",
+     "target": "con"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 6,
+     "bonus_type": "natural armour",
+     "target": "ac"
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 90,
+     "note": "poor maneuverability"
+    },
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 60
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 5,
+     "bypass": "magic"
+    },
+    {
+     "type": "narrative",
+     "target": "As form of the alien dragon I, but you may become a Large esoteric or outer dragon; psychics are still limited to the esoteric forms."
+    },
+    {
+     "type": "narrative",
+     "target": "You gain one bite (2d6), two claws (1d8), a tail slap (1d8) and two wing attacks (1d6). Breath weapons still deal 6d8 with a Reflex save for half, but lines extend to 80 feet and cones to 40 feet."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
+  },
+  "form-of-the-alien-dragon-iii": {
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 10,
+     "bonus_type": "size",
+     "target": "str"
+    },
+    {
+     "type": "ability_mod",
+     "amount": 8,
+     "bonus_type": "size",
+     "target": "con"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 8,
+     "bonus_type": "natural armour",
+     "target": "ac"
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 120,
+     "note": "poor maneuverability"
+    },
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 120
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "magic"
+    },
+    {
+     "type": "sense",
+     "target": "blindsense",
+     "range": 60
+    },
+    {
+     "type": "narrative",
+     "target": "As form of the alien dragon II, but you may become a Huge esoteric or outer dragon, and you gain frightful presence at this spell's save DC and immunity to one form of energy or effect."
+    },
+    {
+     "type": "narrative",
+     "target": "You gain one bite (2d8), two claws (2d6), two wing attacks (1d8) and a tail slap (2d6). The breath weapon may be used as often as you like with 1d4 rounds between uses, deals 12d8 unless noted otherwise with a Reflex save for half, and its lines extend to 100 feet and cones to 50 feet."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The immunity is to 'one form of energy or effect' chosen with the dragon, and `immunity` requires a named target, so it is not emitted."
+  },
+  "form-of-the-dragon-i": {
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "size",
+     "target": "str"
+    },
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "bonus_type": "size",
+     "target": "con"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "natural armour",
+     "target": "ac"
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 60,
+     "note": "poor maneuverability"
+    },
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 60
+    },
+    {
+     "type": "narrative",
+     "target": "You become a Medium chromatic or metallic dragon."
+    },
+    {
+     "type": "narrative",
+     "target": "You gain one bite (1d8), two claws (1d6) and two wing attacks (1d4), plus a breath weapon usable once per casting that deals 6d8 damage and allows a Reflex save for half."
+    },
+    {
+     "type": "narrative",
+     "target": "Each dragon brings its own breath shape and resistance \u2014 black 60-ft line of acid, resist acid 20, swim 60; blue 60-ft line of electricity, resist electricity 20, burrow 20; green 30-ft cone of acid, resist acid 20, swim 40; red 30-ft cone of fire, resist fire 30, vulnerable to cold; white 30-ft cone of cold, resist cold 20, swim 60, vulnerable to fire; brass 60-ft line of fire, resist fire 20, burrow 30, vulnerable to cold; bronze 60-ft line of electricity, resist electricity 20, swim 60; copper 60-ft line of acid, resist acid 20, spider climb; gold 30-ft cone of fire, resist fire 20, swim 60; silver 30-ft cone of cold, resist cold 30, vulnerable to fire."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'. The swim, burrow and vulnerability entries vary by dragon too, so none of them is emitted as a speed or vulnerability spec."
+  },
+  "form-of-the-dragon-ii": {
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 6,
+     "bonus_type": "size",
+     "target": "str"
+    },
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "size",
+     "target": "con"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 6,
+     "bonus_type": "natural armour",
+     "target": "ac"
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 90,
+     "note": "poor maneuverability"
+    },
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 60
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 5,
+     "bypass": "magic"
+    },
+    {
+     "type": "narrative",
+     "target": "As form of the dragon I, but you may become a Large chromatic or metallic dragon."
+    },
+    {
+     "type": "narrative",
+     "target": "You gain one bite (2d6), two claws (1d8), two wing attacks (1d6) and a tail slap (1d8). The breath weapon may be used twice per casting with 1d4 rounds between uses, deals 8d8 with a Reflex save for half, and its lines extend to 80 feet and cones to 40 feet."
+    }
+   ],
+   "converted_by": "read",
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "notes": "The breath weapon's shape, energy type and the resistance you gain all depend on which dragon you become, so neither the breath weapon nor the resistance is emitted as a spec \u2014 `resistance` requires a damage_type that cannot be known until the caster chooses. The breath weapon's dice are not emitted either: they are dealt by an ability the form grants, against an area, when the caster later uses it, not by this spell at casting. The bite, claw, wing and tail dice are likewise the granted natural attacks'."
   }
  }
 }
