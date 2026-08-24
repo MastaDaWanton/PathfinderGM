@@ -99,6 +99,37 @@ def control_blood_for(actor, path: str) -> int:
     return control_blood(actor)["a" if taken.index(key) == 0 else "b"]
 
 
+def is_passive(actor, name: str) -> bool:
+    """Whether this ability is an always-active passive in a path the actor follows.
+
+    Declared in the class data (`paths.<path>.passive`) rather than guessed from prose:
+    Swift Strikes was on the abilities bar as a button, and "using" it swallowed the
+    attack it was supposed to be modifying — a passive is never used, it simply happens.
+    """
+    want = " ".join(str(name or "").split()).strip().lower()
+    if not want:
+        return False
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        if want in {str(n).lower() for n in (det.get("passive") or [])}:
+            return True
+    return False
+
+
+def has_passive(actor, name: str) -> bool:
+    """`is_passive`, and the actor has actually reached its tier."""
+    want = " ".join(str(name or "").split()).strip().lower()
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        if want not in {str(n).lower() for n in (det.get("passive") or [])}:
+            continue
+        reached = control_blood_for(actor, path)
+        for tier, names in (det.get("tiers") or {}).items():
+            if want in {str(n).lower() for n in names} and int(tier) <= reached:
+                return True
+    return False
+
+
 def find_ability(actor, wanted: str) -> tuple[str, str, list[dict]]:
     """The ability this character has by that name: its path, its real name, its effects.
 

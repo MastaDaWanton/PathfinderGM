@@ -75,6 +75,10 @@ class Scene:
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
     acted: set[str] = field(default_factory=set)
+    # Who has already attacked whom this encounter, as "attacker>defender". Swift
+    # Strikes keys off it: the passive grants its extra swings only on *subsequent*
+    # attacks against the same target, so the fight has to remember first blood.
+    attacked: set[str] = field(default_factory=set)
     round: int = 0
     clock_minutes: int = 0
     log: list[dict] = field(default_factory=list)
@@ -243,6 +247,7 @@ class Scene:
         self.turn = -1
         self.round = 0
         self.acted = set()
+        self.attacked = set()
         self.sides = {}
         # The battlefield goes with the fight. `begin_encounter` lays a grid when none
         # exists, and the side panel's own words are "there is no grid outside a fight";
@@ -898,6 +903,24 @@ class Engine:
             whole = actor.attack_sequence(weapon_key, True)
             sequence = [whole[min(int(it), len(whole) - 1)]]
 
+        # Swift Strikes: an always-active passive, never an ability to spend. On any
+        # attack after the first against the same target this encounter, the swing
+        # strikes again at the same bonus — +1 on a standard action, +2 on a declared
+        # full attack, which is the printed rule and also makes a panel-split full
+        # attack (each swing its own op) add up to the same total. Decided from the
+        # scene's memory of *completed* attacks, so it is stable across the suspension
+        # round-trips of the dice popup.
+        from . import leveling as leveling_mod
+
+        if (leveling_mod.has_passive(actor, "swift strikes")
+                and f"{actor.ref}>{defender.ref}" in self.scene.attacked):
+            extra = 2 if full else 1
+            sequence = list(sequence) + [sequence[0]] * extra
+            if state["i"] == 0 and not state["rolls"]:
+                state["tells"].append(
+                    f"Swift Strikes: {actor.name} strikes "
+                    f"{'twice more' if extra == 2 else 'again'} at {defender.name}.")
+
         while state["i"] < len(sequence):
             iteration = sequence[state["i"]]
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
@@ -975,6 +998,9 @@ class Engine:
         rolls = [_roll_from_dict(r) for r in state["rolls"]]
         effects = list(state["effects"]) + self._hp_state_effects(defender)
         any_hit = any(e.get("kind") == "damage" for e in effects)
+        # First blood is remembered only once the attack completes, so the decision
+        # "is this a subsequent attack?" cannot flip between a suspension and its resume.
+        self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
         return Outcome(
             intent_id=intent.id, op="attack", rolls=rolls,
             dc={"value": target_ac, "explain": ac_note, "flat_footed": flat_footed},
@@ -2377,6 +2403,13 @@ class Engine:
             raise IntentError(
                 f"use_ability: {actor.name} has no ability called {wanted!r}. "
                 f"Their paths are {', '.join(actor.paths) or 'none'}.", "legality")
+        if leveling.is_passive(actor, found):
+            # "Using" a passive was worse than a wasted action: Swift Strikes stood in
+            # for the attack it exists to modify, and the fight went a round with no
+            # to-hit rolled at all.
+            raise IntentError(
+                f"use_ability: {found} is always active — it is never used, it simply "
+                f"happens. Attack, and it does its work on the attack.", "legality")
         if not effects:
             tier = leveling.tier_needed(actor, wanted)
             return Outcome(

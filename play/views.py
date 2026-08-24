@@ -97,8 +97,13 @@ def _usable_abilities(pc) -> list[dict]:
     for path in pc.paths:
         det = leveling.path_detail(pc.char_class or "", path)
         reached = leveling.control_blood_for(pc, path)
+        passives = {str(n).lower() for n in (det.get("passive") or [])}
         for tier, names in sorted((det.get("tiers") or {}).items()):
             for name in names:
+                # A passive is not "usable": Swift Strikes sat on this bar as a button,
+                # and clicking it stood in for the attack it exists to modify.
+                if name.lower() in passives:
+                    continue
                 if int(tier) <= reached:
                     key = (det.get("resolves") or {}).get(name, "")
                     out.append({"name": name, "path": path, "tier": int(tier),
