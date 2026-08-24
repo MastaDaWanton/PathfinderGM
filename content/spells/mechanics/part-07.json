@@ -1744,7 +1744,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "notes": "The 1d6/1d10 is NOT emitted as a damage spec: it repeats at the start of every turn and again on every attack the target makes, and the vocabulary has no repeating or triggered damage type. Will partial only shortens the duration, so on_failure is empty by design."
+   "element": "positive",
+   "notes": "`element` IS emitted here, unlike elsewhere in this partition: the prose says the target is engulfed in 'flames of positive energy' and the corpus derived no element for this spell, so nothing is being restated. Note the damage itself is described as divine rather than as positive energy, which is consistent with the spell hitting undead harder. The 1d6/1d10 is NOT emitted as a damage spec: it repeats at the start of every turn and again on every attack the target makes, and the vocabulary has no repeating or triggered damage type. Will partial only shortens the duration, so on_failure is empty by design."
   },
   "fire-s-friend": {
    "effects": [

@@ -387,6 +387,13 @@ _DUR_UNITS = {"round": "round", "rounds": "round", "minute": "minute",
               "minutes": "minute", "hour": "hour", "hours": "hour",
               "day": "day", "days": "day"}
 _DUR_PER_LEVEL = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*/\s*level\s*\((\d+)\)")
+# "minutes/2 levels (1)", "hours/2 levels (1)" — one unit per N caster levels. Matched
+# before the plain per-level form, which would otherwise read the same line and drop the
+# divisor: surelife came out twice as long as it is, and nothing on screen would have
+# looked wrong. A reader flagged the shape at the merge, which is the only reason it was
+# caught before it shipped.
+_DUR_PER_N_LEVELS = re.compile(
+    r"\b(rounds?|minutes?|hours?|days?)\s*/\s*(\d+)\s*levels\s*\((\d+)\)")
 _DUR_FIXED = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*\((\d+)\)")
 
 
@@ -423,6 +430,15 @@ def parse_duration(text: str) -> dict:
     # can time, and concentration is why it may end sooner.
     concentrating = s.startswith("concentration")
 
+    # The divisor form first: "minutes/2 levels" also matches the plain per-level
+    # pattern, and reading it there would silently drop the 2.
+    m = _DUR_PER_N_LEVELS.search(s)
+    if m:
+        got = {"kind": "per_level", "amount": int(m.group(3)),
+               "unit": _DUR_UNITS[m.group(1)], "per_levels": int(m.group(2))}
+        if concentrating:
+            got["concentration"] = True
+        return {**out, **got}
     m = _DUR_PER_LEVEL.search(s)
     if m:
         got = {"kind": "per_level", "amount": int(m.group(2)),
@@ -464,7 +480,12 @@ def duration_rounds(spell, caster_level: int = 1) -> int | None:
     if not per:
         return None
     if kind == "per_level":
-        return max(1, int(d.get("amount", 1)) * max(1, int(caster_level)) * per)
+        # `per_levels` is "one unit per N caster levels". Ignoring it doubled surelife
+        # and terrain bond, and nothing on screen would have looked wrong — a reader
+        # flagged the key at the merge rather than letting it through.
+        every = max(1, int(d.get("per_levels", 1) or 1))
+        levels = max(1, int(caster_level) // every)
+        return max(1, int(d.get("amount", 1)) * levels * per)
     if kind == "fixed":
         return max(1, int(d.get("amount", 1)) * per)
     return None

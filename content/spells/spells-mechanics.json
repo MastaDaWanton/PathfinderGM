@@ -496,31 +496,13 @@
    "id": "betraying-sting"
   },
   {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "base_dice": 1,
-    "damage_type": "untyped"
-   },
    "effects": [
     {
-     "type": "save_gate",
-     "target": "fort",
-     "dc": "10 + spell level + casting ability modifier",
-     "on_failure": [
-      {
-       "type": "damage",
-       "dice": "1d6",
-       "damage_type": "untyped",
-       "lethality": "lethal",
-       "scales": "full",
-       "note": "scales with caster level"
-      }
-     ],
-     "on_success": []
+     "type": "narrative",
+     "target": "Earth and stone become difficult terrain for the target, and it takes 1d6 damage for each 5 feet it moves through such ground. Creatures with a burrow speed or earth glide are unaffected."
     }
    ],
-   "effects_converted": true,
+   "effects_converted": false,
    "id": "binding-earth"
   },
   {
@@ -3888,23 +3870,13 @@
    "id": "flurry-of-snowballs"
   },
   {
-   "scaling": {
-    "kind": "damage",
-    "die": 6,
-    "base_dice": 1,
-    "damage_type": "untyped"
-   },
    "effects": [
     {
-     "type": "damage",
-     "dice": "1d6",
-     "damage_type": "untyped",
-     "lethality": "lethal",
-     "scales": "full",
-     "note": "scales with caster level"
+     "type": "narrative",
+     "target": "When the duration expires while aloft, the subject floats downward 60 feet per round for 1d6 rounds; if it does not reach the ground in that time it falls the rest of the way."
     }
    ],
-   "effects_converted": true,
+   "effects_converted": false,
    "id": "fly"
   },
   {

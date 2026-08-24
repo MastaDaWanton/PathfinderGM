@@ -696,3 +696,40 @@ def test_most_of_the_corpus_now_carries_a_clock():
 
     timed = [s for s in spells.all_spells().values() if s.duration_value]
     assert len(timed) >= 2900, len(timed)
+
+
+def test_a_duration_per_two_levels_is_not_doubled():
+    """"minutes/2 levels (1)" also matches the plain per-level pattern, so reading it
+    there silently dropped the divisor and surelife came out twice as long as it is.
+    Nothing on screen would have looked wrong. A reader flagged the shape at the merge,
+    which is the only reason it was caught before it shipped."""
+    from rules import spells
+
+    got = spells.parse_duration("minutes/2 levels (1)")
+    assert got == {"kind": "per_level", "amount": 1, "unit": "minute", "per_levels": 2}
+    assert spells.duration_rounds(spells.get("surelife"), 10) == 50      # not 100
+    # The plain shape is untouched.
+    assert spells.duration_rounds(spells.get("bless"), 10) == 100
+
+
+def test_two_machine_misreadings_that_only_reading_caught():
+    """A regex found "1d6" in both and wrote a damage spec. Neither spell deals damage
+    of the kind it claimed.
+
+    Fly's 1d6 is a *descent timer* — "floats downward 60 feet/round for 1d6 rounds" —
+    the same class of mistake as teleport's mishap table. Binding earth's 1d6 is dealt
+    "for each 5 feet a creature moves" and the spell states no per-level progression at
+    all, so it was wrong twice over: a damage spec and a scaling block, neither real.
+
+    Both were invisible for as long as nothing executed them, and both were found by
+    somebody reading the sentence."""
+    from rules import spells
+
+    for sid in ("fly", "binding-earth"):
+        s = spells.get(sid)
+        flat = list(s.effects or [])
+        for spec in s.effects or []:
+            flat.extend(spec.get("on_failure") or [])
+            flat.extend(spec.get("on_success") or [])
+        assert not [x for x in flat if x.get("type") == "damage"], sid
+        assert not spells.scaling_dice(s, 10), f"{sid} still claims a damage progression"
