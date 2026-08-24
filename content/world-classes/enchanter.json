@@ -1,0 +1,75 @@
+{
+  "id": "enchanter",
+  "name": "Enchanter",
+  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — attuning, scribing and binding — unlocking ritual methods and higher tiers of essence, from elemental motes chalked into a practice circle to legendary bindings that wake an item into something with opinions.",
+  "grantable_at_creation": true,
+
+  "_thresholds_note": "Mastery to reach levels 2, 3, 4 and 5. Modelled on the Herbalist's curve rather than copied from it: a qualifying level-1 enchantment is worth about 5 MP (3 first-time, +2 for a second stage), and the early rituals are two- and three-stage chains by nature — attune, scribe, and later focus — so the same 25/65 openings hold. The top is flat at 100 for the same reason the Herbalist's is: the unlocks stop where the table stops and the price of a level does not climb past it.",
+  "thresholds": [25, 65, 60, 100],
+
+  "milestones": {
+    "5": "legendary-binding"
+  },
+
+  "_deeds_note": "The deed for Enchanter 5 is binding a legendary essence — and read literally that gate could never open, which is the exact trap the Herbalist's deed note records: legendary essence is level-5 material, so the deed would require the level it gates. The Enchanter's ladder to it is `empower`, learned at 4: empowering an exotic binding raises the result one tier band, so an Enchanter 4 who empowers an exotic working produces a legendary-tier binding, at +5 DC, and that success is the deed. Same shape as the Herbalist reaching legendary through the concentration ladder.",
+  "deeds": {
+    "legendary-binding": {
+      "min_tier": "legendary",
+      "note": "Any successful binding at legendary tier, however it was reached — an empowered exotic working counts."
+    }
+  },
+
+  "_levels_note": "Bind and seal are level 1 on purpose, and the herbalist is why: a track whose only real craft sits at level 3 can never earn the mastery to reach level 3 — the deadlock the herbalist's own deed note records, one level down. The heart of the craft is learned first in its smallest form, a mote bound into a quartz in a quiet room, and the danger scales with the tier ceiling rather than being withheld as a verb.",
+  "levels": [
+    {
+      "level": 1,
+      "tools": ["chalk and a quiet room"],
+      "methods": ["attune", "scribe", "bind", "seal"],
+      "max_tier": "common",
+      "note": "The whole ritual in miniature: sense the essence, chalk the circle, bind a mote into a quartz, seal it. Small work — but complete work, which is how mastery is earned."
+    },
+    {
+      "level": 2,
+      "tools": ["inscription set", "jeweller's loupe"],
+      "methods": ["focus", "channel"],
+      "max_tier": "uncommon",
+      "note": "Setting a gemstone properly as the vessel's anchor and pouring essence into it without spilling. First real properties: slick leathers, shadowed cloaks."
+    },
+    {
+      "level": 3,
+      "tools": ["attunement circle"],
+      "methods": ["imbue"],
+      "max_tier": "rare",
+      "note": "The dangerous widening of the craft: imbue lets more than one essence share a working, which is where flaming +1 blades — and mishaps worth the name — begin."
+    },
+    {
+      "level": 4,
+      "tools": ["binding braziers", "silvered bell"],
+      "methods": ["empower"],
+      "max_tier": "exotic",
+      "note": "Raising a finished binding one band beyond itself. This is the ladder to legendary work — and the way the level-5 deed is reached."
+    },
+    {
+      "level": 5,
+      "tools": ["enchanter's sanctum"],
+      "methods": ["awaken"],
+      "max_tier": "legendary",
+      "note": "The sanctum station for intelligent and legendary work: dancing blades, vorpal edges, items that answer when spoken to."
+    }
+  ],
+
+  "method_descriptions": {
+    "attune": "Reads an essence and the vessel it is meant for: what the material wants, what it will refuse, and how the two sit together. Every ritual opens with it.",
+    "scribe": "Chalks and inks the working circle and the vessel's own sigils. The ink and the circle materials are consumed; the words remain in the metal.",
+    "focus": "Sets a gemstone into the working as the binding's anchor. The focus gates how much essence a single binding can hold — quartz takes a mote, a diamond takes anything.",
+    "channel": "Draws the essence out of its phial and through the circle into the focus, slowly enough that none of it grounds out through the enchanter.",
+    "bind": "Fixes the channelled essence to the vessel. The dangerous step: everything the essence is passes through the enchanter's hands on the way in, and a mishap here is what cracks foci.",
+    "seal": "Closes a binding so it holds. Always the last method in a chain — an unsealed binding bleeds away by morning, and nothing may follow the seal.",
+    "imbue": "Lets more than one essence share a single working. Without it a vessel takes one essence per ritual; with it, as many as the focus can hold — one per family, always.",
+    "empower": "Raises a binding one tier band beyond its essence, at +5 DC. An empowered exotic working is legendary-tier work, which is how the level-5 deed is reached at level 4.",
+    "awaken": "The sanctum ritual for legendary and intelligent work: bindings that move on their own, edges that end things, items that wake with a voice."
+  },
+
+  "_fixed_tools_note": "The circle is chalked into a floor and the sanctum is a room; neither travels. Whether a ritual can be attempted is therefore partly a question of where the character is standing — scene state, not sheet state — exactly as the Herbalist's workbench is.",
+  "fixed_tools": ["enchanter's sanctum", "attunement circle"]
+}

@@ -1,0 +1,2195 @@
+{
+ "source": "Enchanter world class — authored for Pathfinder GM against the PF1e magic item rules.",
+ "note": "Kinds: essence (what is bound; carries the effect family), focus (the gem that anchors a binding and gates how much essence it holds — `capacity` is the highest tier rank it takes AND the total ranks it holds), ink / chalk / salt (circle materials, consumed by scribing), vessel (what the item being enchanted must be — prose plus a `requires` field), catalyst (eases the working; `dc_mod` applies to the chain DC), treatment (preparation of the vessel). Effects are rules/effectspec.py specs and every one must validate; what the vocabulary cannot express is prose in `text` and, where the item still costs its bearer something, a `narrative` spec so the GM sees it at the table. Weapon-property essences carry `adjective` for naming; the enhancement ladders carry `plus`. `prefers` names the vessel kind the essence wants — binding it elsewhere is +5 DC, the material resisting. `binds_at`: \"night\" means the essence will not bind under the sun.",
+ "materials": [
+  {
+   "id": "fire-mote",
+   "name": "Fire Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "fire",
+   "adjective": "Smouldering",
+   "prefers": "weapon",
+   "text": "A pinch of captured flame in a wax-stoppered phial. It wants an edge: fire motes leap gladly into steel and sulk in leather and plate — binding one to armour is working against the grain (+5 DC).",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "frost-mote",
+   "name": "Frost Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "cold",
+   "adjective": "Rimed",
+   "prefers": "weapon",
+   "text": "Winter kept small. Frost motes settle into weapons; pressed into armour they weep meltwater through the ritual and fight the binding (+5 DC).",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "spark-mote",
+   "name": "Spark Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "electricity",
+   "adjective": "Crackling",
+   "prefers": "weapon",
+   "text": "A thumb of bottled lightning that stands the enchanter's hair on end through the glass. Wants a weapon; grounds out through armour (+5 DC).",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "stone-mote",
+   "name": "Stone Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "earth",
+   "adjective": "Stoneskin",
+   "prefers": "armour",
+   "text": "Grit from a place that has never moved. It wants to be worn, not swung: bound to a weapon it drags at the wrist (+5 DC).",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "natural armour",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "gale-mote",
+   "name": "Gale Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "air",
+   "adjective": "Whistling",
+   "prefers": "",
+   "text": "A breath of high wind that never quite stops circling its phial. Indifferent to what it is bound to, which makes it a favourite for practice work.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "competence",
+     "target": "initiative",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "tide-mote",
+   "name": "Tide Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "water",
+   "adjective": "Brinebound",
+   "prefers": "armour",
+   "text": "Seawater that remembers the moon. Bound to armour or a cloak it carries its bearer through water like a friend.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "competence",
+     "target": "swim",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "glow-mote",
+   "name": "Glow Mote",
+   "kind": "essence",
+   "tier": "common",
+   "family": "light",
+   "adjective": "Glimmering",
+   "prefers": "",
+   "text": "Lamplight skimmed off a temple candle. The classic first binding: it asks nothing and refuses nothing.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sheds light as a candle, always"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "hearth-ember",
+   "name": "Hearth Ember",
+   "kind": "essence",
+   "tier": "common",
+   "family": "fire",
+   "adjective": "Hearthwarm",
+   "prefers": "armour",
+   "text": "An ember from a hearth that burned unbroken for a generation. The one fire essence that prefers to be worn: it keeps the cold out rather than putting the heat in.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "arcane-essence-i",
+   "name": "Arcane Essence I",
+   "kind": "essence",
+   "tier": "common",
+   "family": "enhancement",
+   "plus": 1,
+   "prefers": "weapon",
+   "text": "Raw magic settled into liquid, the first rung of the +1 to +5 ladder. Bound to a weapon it is the book's +1: +1 enhancement on attack and damage rolls. One rung only per vessel — enhancement essences are one family, and a vessel takes one.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "arcane-essence-ii",
+   "name": "Arcane Essence II",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "enhancement",
+   "plus": 2,
+   "prefers": "weapon",
+   "text": "The second rung: the book's +2 weapon. Denser than the first — it needs at least an amethyst to anchor it.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "arcane-essence-iii",
+   "name": "Arcane Essence III",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "enhancement",
+   "plus": 3,
+   "prefers": "weapon",
+   "text": "The third rung: the book's +3 weapon. From here up the essence has a pulse.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 3,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 3,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "arcane-essence-iv",
+   "name": "Arcane Essence IV",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "enhancement",
+   "plus": 4,
+   "prefers": "weapon",
+   "text": "The fourth rung: the book's +4 weapon. It hums against the phial glass and needs a ruby at least.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "arcane-essence-v",
+   "name": "Arcane Essence V",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "enhancement",
+   "plus": 5,
+   "prefers": "weapon",
+   "text": "The top of the ladder: the book's +5 weapon. Only a diamond holds it, and only a sanctum keeps the working quiet enough to try.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 5,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 5,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-essence-i",
+   "name": "Warding Essence I",
+   "kind": "essence",
+   "tier": "common",
+   "family": "enhancement",
+   "plus": 1,
+   "prefers": "armour",
+   "text": "The armour ladder's first rung: the book's +1 armour, +1 enhancement to AC. Same family as the arcane essences — a vessel takes one enhancement essence, never two.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-essence-ii",
+   "name": "Warding Essence II",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "enhancement",
+   "plus": 2,
+   "prefers": "armour",
+   "text": "The book's +2 armour.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "enhancement",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-essence-iii",
+   "name": "Warding Essence III",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "enhancement",
+   "plus": 3,
+   "prefers": "armour",
+   "text": "The book's +3 armour.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 3,
+     "bonus_type": "enhancement",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-essence-iv",
+   "name": "Warding Essence IV",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "enhancement",
+   "plus": 4,
+   "prefers": "armour",
+   "text": "The book's +4 armour.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-essence-v",
+   "name": "Warding Essence V",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "enhancement",
+   "plus": 5,
+   "prefers": "armour",
+   "text": "The book's +5 armour. Diamond-and-sanctum work.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 5,
+     "bonus_type": "enhancement",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "merciful-essence",
+   "name": "Merciful Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "mercy",
+   "adjective": "Merciful",
+   "prefers": "weapon",
+   "text": "Distilled restraint, milky and warm. The book's merciful weapon: +1d6 damage, and all the weapon's damage is nonlethal.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "untyped",
+     "lethality": "nonlethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "narrative",
+     "target": "All of the weapon's damage is nonlethal"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "vicious-essence",
+   "name": "Vicious Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "vicious",
+   "adjective": "Vicious",
+   "prefers": "weapon",
+   "text": "Spite, bottled. The book's vicious weapon: a flare of destructive energy on every hit — +2d6 to the target and 1d6 to the wielder. The first essence most enchanters meet whose binding costs the bearer something, and the cheap ferocity is exactly why apprentices reach for it.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "to the wielder, each hit"
+    }
+   ]
+  },
+  {
+   "id": "flaming-essence",
+   "name": "Flaming Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "fire",
+   "adjective": "Flaming",
+   "prefers": "weapon",
+   "text": "A fire mote grown up: it roars when the phial is unstoppered. The book's flaming weapon — the blade is sheathed in fire on command and deals +1d6 fire damage on a hit. It wants steel; bound to armour it fights the working (+5 DC).",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "frost-essence",
+   "name": "Frost Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "cold",
+   "adjective": "Frost",
+   "prefers": "weapon",
+   "text": "The book's frost weapon: the blade sweats rime and deals +1d6 cold damage on a hit. Cross-craft favourite — a winter wolf pelt from the leatherworker takes it without complaint.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "shock-essence",
+   "name": "Shock Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "electricity",
+   "adjective": "Shock",
+   "prefers": "weapon",
+   "text": "The book's shock weapon: +1d6 electricity damage on a hit, and the smell of a storm about to break.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "corrosive-essence",
+   "name": "Corrosive Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "acid",
+   "adjective": "Corrosive",
+   "prefers": "weapon",
+   "text": "The corrosive weapon: +1d6 acid damage on a hit. Stored in wax-lined glass because it ate the first three phials.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "acid",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "keen-essence",
+   "name": "Keen Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "keen",
+   "adjective": "Keen",
+   "prefers": "weapon",
+   "text": "The idea of sharpness, extracted. The book's keen weapon: doubles the threat range of a piercing or slashing weapon; does not stack with Improved Critical. The engine has no vocabulary for threat ranges, so this stays the GM's to apply — which is why the effect is narrative rather than a guessed spec.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Doubles the weapon's threat range (piercing or slashing only; does not stack with Improved Critical)"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "bane-essence",
+   "name": "Bane Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "bane",
+   "adjective": "Bane",
+   "prefers": "weapon",
+   "text": "Old grudge rendered down; the enchanter names the foe at the binding. The book's bane weapon: against the designated foe the weapon's enhancement is +2 better and it deals +2d6 damage.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "unit": "permanent"
+     },
+     "note": "against the designated foe"
+    },
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "against the designated foe"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "thundering-essence",
+   "name": "Thundering Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "sonic",
+   "adjective": "Thundering",
+   "prefers": "weapon",
+   "text": "The book's thundering weapon: on a confirmed critical hit, a cannon-crack — +1d8 sonic damage per point of the weapon's critical multiplier beyond one, and the struck creature must save or be deafened.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d8",
+     "damage_type": "sonic",
+     "lethality": "lethal",
+     "note": "on a confirmed critical, per multiplier step"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "flaming-burst-essence",
+   "name": "Flaming Burst Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "fire",
+   "adjective": "Blazing",
+   "prefers": "weapon",
+   "text": "Flaming essence wound spring-tight. The book's flaming burst: +1d6 fire on every hit, and on a confirmed critical an extra +1d10 fire per point of critical multiplier beyond two.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "damage",
+     "dice": "1d10",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a confirmed critical"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "icy-burst-essence",
+   "name": "Icy Burst Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "cold",
+   "adjective": "Icebound",
+   "prefers": "weapon",
+   "text": "The book's icy burst: +1d6 cold on every hit, +1d10 cold on a confirmed critical.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "damage",
+     "dice": "1d10",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "on a confirmed critical"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "shocking-burst-essence",
+   "name": "Shocking Burst Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "electricity",
+   "adjective": "Stormlit",
+   "prefers": "weapon",
+   "text": "The book's shocking burst: +1d6 electricity on every hit, +1d10 electricity on a confirmed critical.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "damage",
+     "dice": "1d10",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a confirmed critical"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "holy-essence",
+   "name": "Holy Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "holy",
+   "adjective": "Holy",
+   "prefers": "weapon",
+   "text": "Light that fell somewhere sanctified and never got up. The book's holy weapon: +2d6 damage against evil creatures. It judges the hand that holds it — an evil wielder gains a negative level while it is carried, and the essence refuses outright to be bound by an enchanter of evil deeds; the working simply dies in the circle. That refusal is a fact about the material, not a rule the engine rolls.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "against evil creatures"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "An evil wielder gains a negative level while carrying it"
+    }
+   ]
+  },
+  {
+   "id": "unholy-essence",
+   "name": "Unholy Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "unholy",
+   "adjective": "Unholy",
+   "prefers": "weapon",
+   "text": "The mirror of holy essence, cold to the touch in a way that has nothing to do with temperature. +2d6 damage against good creatures; a good wielder gains a negative level while carrying it.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "against good creatures"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "A good wielder gains a negative level while carrying it"
+    }
+   ]
+  },
+  {
+   "id": "anarchic-essence",
+   "name": "Anarchic Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "anarchic",
+   "adjective": "Anarchic",
+   "prefers": "weapon",
+   "text": "Chaos that agreed, briefly, to sit in a phial. The book's anarchic weapon: +2d6 damage against lawful creatures; a lawful wielder gains a negative level.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "against lawful creatures"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "A lawful wielder gains a negative level while carrying it"
+    }
+   ]
+  },
+  {
+   "id": "axiomatic-essence",
+   "name": "Axiomatic Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "axiomatic",
+   "adjective": "Axiomatic",
+   "prefers": "weapon",
+   "text": "Perfect order in suspension; the phial's contents form the same lattice every dawn. The book's axiomatic weapon: +2d6 damage against chaotic creatures; a chaotic wielder gains a negative level.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "against chaotic creatures"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "A chaotic wielder gains a negative level while carrying it"
+    }
+   ]
+  },
+  {
+   "id": "wounding-essence",
+   "name": "Wounding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "wounding",
+   "adjective": "Wounding",
+   "prefers": "weapon",
+   "text": "The book's wounding weapon: a hit deals 1 point of bleed damage each round until the wound is bound or healed.",
+   "effects": [
+    {
+     "type": "bleed",
+     "amount": 1,
+     "stopped_by": "DC 15 Heal check or any magical healing"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "ghost-touch-essence",
+   "name": "Ghost Touch Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "ghost",
+   "adjective": "Ghost Touch",
+   "prefers": "weapon",
+   "binds_at": "night",
+   "text": "Refined ghost residue, thin as regret. The book's ghost touch weapon: it strikes incorporeal creatures as though they were solid, and an incorporeal creature can wield it. Like the residue it is refined from, it will only bind after dark.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Strikes incorporeal creatures as if they were corporeal; incorporeal creatures can wield or wear it"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "defending-essence",
+   "name": "Defending Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "defending",
+   "adjective": "Defending",
+   "prefers": "weapon",
+   "text": "The book's defending weapon: each round, the wielder may shift some or all of the weapon's enhancement bonus to AC until their next turn. A choice, so it stays the wielder's to declare and the GM's to apply.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The wielder may transfer any part of the weapon's enhancement bonus to AC each round"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "speed-essence",
+   "name": "Speed Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "speed",
+   "adjective": "Swift",
+   "prefers": "weapon",
+   "text": "Time, shaved thin and folded. The book's speed weapon: on a full attack, one extra attack at the wielder's full base attack bonus. The extra attack is an action-economy fact the engine's buff vocabulary cannot carry, so it stays narrative.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "One extra attack at full base attack bonus when making a full attack"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "dancing-essence",
+   "name": "Dancing Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "dancing",
+   "adjective": "Dancing",
+   "prefers": "weapon",
+   "text": "Will without a body, humming against the stopper. The book's dancing weapon: loosed as a standard action, it fights on its own for four rounds before falling. Sanctum work — awaken is the only method that persuades it into steel.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As a standard action the weapon fights on its own for 4 rounds (wielder's base attack), then falls"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "vorpal-essence",
+   "name": "Vorpal Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "vorpal",
+   "adjective": "Vorpal",
+   "prefers": "weapon",
+   "text": "Nobody agrees what it is distilled from and the ones who know do not say. The book's vorpal weapon: on a natural 20 followed by a confirmed critical, it severs the opponent's head. Slashing weapons only.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "On a natural 20 and a confirmed critical, severs the opponent's head (slashing weapons only)"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "brilliant-energy-essence",
+   "name": "Brilliant Energy Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "light",
+   "adjective": "Brilliant",
+   "prefers": "weapon",
+   "text": "The book's brilliant energy weapon: the blade becomes light itself, ignoring armour and shield bonuses to AC — but it cannot harm undead, constructs, or objects.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Ignores armour and shield bonuses to AC; cannot harm undead, constructs or objects"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "slick-essence",
+   "name": "Slick Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "slick",
+   "adjective": "Slick",
+   "prefers": "armour",
+   "text": "Oil that refuses to be anywhere in particular. The book's slick armour: +5 competence on Escape Artist checks.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "bonus_type": "competence",
+     "target": "escape artist",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "improved-slick-essence",
+   "name": "Improved Slick Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "slick",
+   "adjective": "Slick",
+   "prefers": "armour",
+   "text": "The book's improved slick: +10 competence on Escape Artist checks.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "competence",
+     "target": "escape artist",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "greater-slick-essence",
+   "name": "Greater Slick Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "slick",
+   "adjective": "Slick",
+   "prefers": "armour",
+   "text": "The book's greater slick: +15 competence on Escape Artist checks.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 15,
+     "bonus_type": "competence",
+     "target": "escape artist",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "shadow-essence",
+   "name": "Shadow Essence",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "shadow",
+   "adjective": "Shadowed",
+   "prefers": "armour",
+   "text": "The book's shadow armour: +5 competence on Stealth checks. Refined from raw shadowstuff, with the dimming worked out of it — the raw material still dims its bearer; this does not.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "bonus_type": "competence",
+     "target": "stealth",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "improved-shadow-essence",
+   "name": "Improved Shadow Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "shadow",
+   "adjective": "Shadowed",
+   "prefers": "armour",
+   "text": "The book's improved shadow: +10 competence on Stealth checks.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "competence",
+     "target": "stealth",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "greater-shadow-essence",
+   "name": "Greater Shadow Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "shadow",
+   "adjective": "Shadowed",
+   "prefers": "armour",
+   "text": "The book's greater shadow: +15 competence on Stealth checks.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 15,
+     "bonus_type": "competence",
+     "target": "stealth",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "fortification-light-essence",
+   "name": "Light Fortification Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "fortification",
+   "adjective": "Fortified",
+   "prefers": "armour",
+   "text": "The book's light fortification: a 25% chance that any critical hit or sneak attack against the wearer is negated and resolved as a normal hit. A percentage roll on the attacker's dice, which the buff vocabulary cannot carry — narrative, for the GM's table.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "25% chance to negate a critical hit or sneak attack (resolved as a normal hit)"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "fortification-moderate-essence",
+   "name": "Moderate Fortification Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "fortification",
+   "adjective": "Fortified",
+   "prefers": "armour",
+   "text": "The book's moderate fortification: a 50% chance to negate critical hits and sneak attacks.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "50% chance to negate a critical hit or sneak attack"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "fortification-heavy-essence",
+   "name": "Heavy Fortification Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "fortification",
+   "adjective": "Fortified",
+   "prefers": "armour",
+   "text": "The book's heavy fortification: a 75% chance to negate critical hits and sneak attacks.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "75% chance to negate a critical hit or sneak attack"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "spell-resistance-essence",
+   "name": "Spell Resistance Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "abjuration",
+   "adjective": "Spellguard",
+   "prefers": "armour",
+   "text": "The book's spell resistance armour, at the 15 rating: hostile spells must beat SR 15 to affect the wearer. SR is a defence the engine does not compute yet, so it is recorded for the GM.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Grants the wearer spell resistance 15"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "invulnerability-essence",
+   "name": "Invulnerability Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "invulnerability",
+   "adjective": "Invulnerable",
+   "prefers": "armour",
+   "text": "The book's armour of invulnerability: DR 5/magic against ordinary blows.",
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 5,
+     "bypass": "magic",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "etherealness-essence",
+   "name": "Etherealness Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "ghost",
+   "adjective": "Ethereal",
+   "prefers": "armour",
+   "binds_at": "night",
+   "text": "Ghost residue's final refinement. The book's etherealness armour: on command, once per day, the wearer becomes ethereal as the ethereal jaunt spell. It keeps the residue's habit — night bindings only.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "On command, once per day, become ethereal (as ethereal jaunt)"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-fire-essence",
+   "name": "Fire Warding Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "fire",
+   "adjective": "Fire-Warded",
+   "prefers": "armour",
+   "text": "The book's energy resistance armour, tuned to flame: the wearer ignores the first 10 points of fire damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 10,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-cold-essence",
+   "name": "Frost Warding Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "cold",
+   "adjective": "Frost-Warded",
+   "prefers": "armour",
+   "text": "Energy resistance, tuned to cold: ignore the first 10 points of cold damage per attack. The natural partner of a winter wolf pelt cloak from the leatherworker — the pelt half-wants the binding already.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 10,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-electricity-essence",
+   "name": "Storm Warding Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "electricity",
+   "adjective": "Storm-Warded",
+   "prefers": "armour",
+   "text": "Energy resistance, tuned to lightning: ignore the first 10 points of electricity damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 10,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-acid-essence",
+   "name": "Acid Warding Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "acid",
+   "adjective": "Acid-Warded",
+   "prefers": "armour",
+   "text": "Energy resistance, tuned to acid: ignore the first 10 points of acid damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 10,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-sonic-essence",
+   "name": "Silence Warding Essence",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "sonic",
+   "adjective": "Storm-Quiet",
+   "prefers": "armour",
+   "text": "Energy resistance, tuned to thunder: ignore the first 10 points of sonic damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "sonic",
+     "amount": 10,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-fire-essence-improved",
+   "name": "Improved Fire Warding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "fire",
+   "adjective": "Fire-Warded",
+   "prefers": "armour",
+   "text": "The improved rating: ignore the first 20 points of fire damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 20,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-cold-essence-improved",
+   "name": "Improved Frost Warding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "cold",
+   "adjective": "Frost-Warded",
+   "prefers": "armour",
+   "text": "The improved rating: ignore the first 20 points of cold damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 20,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-electricity-essence-improved",
+   "name": "Improved Storm Warding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "electricity",
+   "adjective": "Storm-Warded",
+   "prefers": "armour",
+   "text": "The improved rating: ignore the first 20 points of electricity damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 20,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-acid-essence-improved",
+   "name": "Improved Acid Warding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "acid",
+   "adjective": "Acid-Warded",
+   "prefers": "armour",
+   "text": "The improved rating: ignore the first 20 points of acid damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 20,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-sonic-essence-improved",
+   "name": "Improved Silence Warding Essence",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "sonic",
+   "adjective": "Storm-Quiet",
+   "prefers": "armour",
+   "text": "The improved rating: ignore the first 20 points of sonic damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "sonic",
+     "amount": 20,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-fire-essence-greater",
+   "name": "Greater Fire Warding Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "fire",
+   "adjective": "Fire-Warded",
+   "prefers": "armour",
+   "text": "The greater rating: ignore the first 30 points of fire damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-cold-essence-greater",
+   "name": "Greater Frost Warding Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "cold",
+   "adjective": "Frost-Warded",
+   "prefers": "armour",
+   "text": "The greater rating: ignore the first 30 points of cold damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-electricity-essence-greater",
+   "name": "Greater Storm Warding Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "electricity",
+   "adjective": "Storm-Warded",
+   "prefers": "armour",
+   "text": "The greater rating: ignore the first 30 points of electricity damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-acid-essence-greater",
+   "name": "Greater Acid Warding Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "acid",
+   "adjective": "Acid-Warded",
+   "prefers": "armour",
+   "text": "The greater rating: ignore the first 30 points of acid damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "resist-sonic-essence-greater",
+   "name": "Greater Silence Warding Essence",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "sonic",
+   "adjective": "Storm-Quiet",
+   "prefers": "armour",
+   "text": "The greater rating: ignore the first 30 points of sonic damage per attack.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "sonic",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "ghost-residue",
+   "name": "Ghost Residue",
+   "kind": "essence",
+   "tier": "rare",
+   "family": "ghost",
+   "adjective": "Haunted",
+   "prefers": "",
+   "binds_at": "night",
+   "text": "What is left on the flagstones after a haunting ends: a film like cold breath that only exists convincingly after dark. It will not bind under the sun — the working simply finds nothing in the phial. Bound to a weapon it lets the edge find things that are not entirely there.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The weapon deals half damage to incorporeal creatures even when unenhanced"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "shadowstuff",
+   "name": "Shadowstuff",
+   "kind": "essence",
+   "tier": "uncommon",
+   "family": "shadow",
+   "adjective": "Shadowdrunk",
+   "prefers": "armour",
+   "text": "Raw shadow, skimmed where two torches disagree. Cheaper than refined shadow essence and it shows: the shadow does not come from nowhere — it is borrowed from the bearer's own eyes, and the world sits a shade darker for whoever wears the binding. Enchanting's materials can cost.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "bonus_type": "competence",
+     "target": "stealth",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "skill_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "perception",
+     "duration": {
+      "unit": "permanent"
+     },
+     "note": "the world is a shade darker to the bearer"
+    }
+   ]
+  },
+  {
+   "id": "red-dragon-ichor",
+   "name": "Red Dragon Ichor",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "fire",
+   "adjective": "Wyrmfire",
+   "prefers": "weapon",
+   "text": "Ichor keeps the colour's temper: red binds fire and nothing else — offer it a frost working and it boils the circle dry. Bound true it gives flame with a memory of the wyrm behind it.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 5,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "blue-dragon-ichor",
+   "name": "Blue Dragon Ichor",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "electricity",
+   "adjective": "Wyrmstorm",
+   "prefers": "weapon",
+   "text": "Blue binds lightning and only lightning; the phial crackles when storms pass. The matching-energy rule is the colour's pride, not the enchanter's choice.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "resistance",
+     "target": "electricity",
+     "amount": 5,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "white-dragon-ichor",
+   "name": "White Dragon Ichor",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "cold",
+   "adjective": "Wyrmfrost",
+   "prefers": "weapon",
+   "text": "White binds cold. The phial frosts over from the inside when it is ready to work.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "cold",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 5,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "green-dragon-ichor",
+   "name": "Green Dragon Ichor",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "acid",
+   "adjective": "Wyrmbile",
+   "prefers": "weapon",
+   "text": "Green binds acid, and the stopper is replaced monthly whether it needs it or not.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "acid",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 5,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "black-dragon-ichor",
+   "name": "Black Dragon Ichor",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "acid",
+   "adjective": "Wyrmrot",
+   "prefers": "weapon",
+   "text": "Black binds acid, like green, but meaner about it — the two colours share a family and a vessel will not take both.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "acid",
+     "lethality": "lethal",
+     "note": "on a hit"
+    },
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 5,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "celestial-tears",
+   "name": "Celestial Tears",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "holy",
+   "adjective": "Blessed",
+   "prefers": "",
+   "text": "Grief from somewhere better than here, and it has standards: celestial essence refuses a wielder of evil deeds — the binding holds, and simply goes quiet in an unworthy hand until the item finds a better one. That refusal is the material's own judgement, prose and not a save.",
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "will",
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "fiend-ash",
+   "name": "Fiend Ash",
+   "kind": "essence",
+   "tier": "exotic",
+   "family": "unholy",
+   "adjective": "Ashen",
+   "prefers": "weapon",
+   "text": "What is left when something from below is unmade above. It binds eagerly — too eagerly — and it never entirely stops talking to whoever carries the result.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "note": "on a hit; the flame is the wrong colour"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "The item whispers to its bearer in quiet moments; sleeping within arm's reach of it brings poor dreams"
+    }
+   ]
+  },
+  {
+   "id": "phoenix-ember",
+   "name": "Phoenix Ember",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "fire",
+   "adjective": "Phoenix",
+   "prefers": "armour",
+   "text": "An ember from the pyre that is also a nest. The one legendary fire essence that wants to be worn: it keeps its bearer the way the fire keeps the bird.",
+   "effects": [
+    {
+     "type": "fast_healing",
+     "amount": 1,
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 30,
+     "duration": {
+      "unit": "permanent"
+     }
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "lich-dust",
+   "name": "Lich Dust",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "negative",
+   "adjective": "Grave-Cold",
+   "prefers": "weapon",
+   "text": "Swept from a phylactery chamber after the end. It binds death into an edge, and it remembers being someone — the vessel is never quite warm again.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "negative",
+     "lethality": "lethal",
+     "note": "on a hit; living creatures only"
+    }
+   ],
+   "drawbacks": [
+    {
+     "type": "narrative",
+     "target": "The vessel is cold to the touch and animals refuse to be near it"
+    }
+   ]
+  },
+  {
+   "id": "storm-heart",
+   "name": "Storm Heart",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "electricity",
+   "adjective": "Stormheart",
+   "prefers": "weapon",
+   "text": "The middle of a storm that never found its way out. The reference legendary essence: a quartz cannot hold a storm — nothing below a diamond can.",
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "electricity",
+     "lethality": "lethal",
+     "note": "on a hit"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "angel-feather",
+   "name": "Angel Feather",
+   "kind": "essence",
+   "tier": "legendary",
+   "family": "holy",
+   "adjective": "Winged",
+   "prefers": "armour",
+   "text": "Given, never taken — a taken feather is just a feather. Like all celestial material it refuses a wielder of evil deeds, and the refusal is its own, not a rule the dice know.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "deflection",
+     "target": "ac",
+     "duration": {
+      "unit": "permanent"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "Once per day, on command, feather fall for one minute"
+    }
+   ],
+   "drawbacks": []
+  },
+  {
+   "id": "quartz-focus",
+   "name": "Quartz Focus",
+   "kind": "focus",
+   "tier": "common",
+   "capacity": 1,
+   "text": "A clear thumb of quartz, polished on a trouser leg. It anchors exactly one common essence and not a scrap more — a quartz cannot hold a storm, and the refusal happens in the circle, before anything is risked. Survives most mishaps with a new internal flaw and a story.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "moonstone-focus",
+   "name": "Moonstone Focus",
+   "kind": "focus",
+   "tier": "common",
+   "capacity": 1,
+   "text": "Milky and faintly lit from inside. Holds one common essence, like quartz; enchanters keep one anyway because night-binding materials — ghost residue and its refinements — sit calmer against it.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "amethyst-focus",
+   "name": "Amethyst Focus",
+   "kind": "focus",
+   "tier": "uncommon",
+   "capacity": 2,
+   "text": "Holds essence up to uncommon, and two ranks of it in total — an uncommon essence alone, or a pair of motes bound side by side.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "sapphire-focus",
+   "name": "Sapphire Focus",
+   "kind": "focus",
+   "tier": "rare",
+   "capacity": 3,
+   "text": "Holds essence up to rare, three ranks in total. The working stone of most journeyman enchanters: a flaming binding lives on a sapphire.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "ruby-focus",
+   "name": "Ruby Focus",
+   "kind": "focus",
+   "tier": "exotic",
+   "capacity": 4,
+   "text": "Holds essence up to exotic, four ranks in total. Warm even in a cold room once something is bound through it.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "black-opal-focus",
+   "name": "Black Opal Focus",
+   "kind": "focus",
+   "tier": "exotic",
+   "capacity": 4,
+   "text": "A ruby's equal in capacity with a temperament of its own: shadow and ghost workings settle into it a little too comfortably, and enchanters who use nothing else get a reputation.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "diamond-focus",
+   "name": "Diamond Focus",
+   "kind": "focus",
+   "tier": "legendary",
+   "capacity": 5,
+   "fragile": true,
+   "text": "Holds anything — a storm, a lich's dust, the top of the enhancement ladder. Its price is how it fails: where a lesser stone is scorched and survives, a diamond under a mishap cracks through and is lost outright. Lost, not spent — a successful working returns it to the pouch as every focus is returned; only the mishap takes it.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "silver-ink",
+   "name": "Silver Ink",
+   "kind": "ink",
+   "tier": "common",
+   "consumed": true,
+   "text": "Silver filings in gum and lamp-water. The scribing ink for common work; the sigils stay faintly visible in moonlight forever, which apprentices consider a feature.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "iron-gall-ink",
+   "name": "Octopus-and-Iron Gall Ink",
+   "kind": "ink",
+   "tier": "uncommon",
+   "consumed": true,
+   "text": "Octopus ink cut with iron gall, stirred widdershins. Uncommon scribing: it grips a sigil the way plain silver cannot, and it stains the fingers for a week.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "quicksilver-ink",
+   "name": "Quicksilver Ink",
+   "kind": "ink",
+   "tier": "rare",
+   "consumed": true,
+   "text": "Alive on the page until the seal sets it. Rare scribing; the pen must keep moving or the line walks off on its own.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "auric-ink",
+   "name": "Auric Ink",
+   "kind": "ink",
+   "tier": "exotic",
+   "consumed": true,
+   "text": "Gold dissolved by a method the guild does not write down. Exotic scribing — the sigils it draws are warm to the touch for a year.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "phoenix-quill-ink",
+   "name": "Phoenix-Quill Ink",
+   "kind": "ink",
+   "tier": "legendary",
+   "consumed": true,
+   "text": "Any ink, laid by a phoenix quill — the quill is the material, and it burns to nothing at the last stroke of a legendary scribing. One working per quill.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "white-chalk",
+   "name": "White Chalk",
+   "kind": "chalk",
+   "tier": "common",
+   "consumed": true,
+   "text": "Plain cliff chalk, and nothing wrong with it: half the circles ever drawn were drawn in this. Consumed — a circle is swept away when the working ends, whichever way it ended.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "consecrated-chalk",
+   "name": "Consecrated Chalk",
+   "kind": "chalk",
+   "tier": "uncommon",
+   "consumed": true,
+   "text": "Chalk blessed at a shrine of any honest god. Uncommon circle work, and the polite minimum for binding anything with opinions about virtue.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "bone-chalk",
+   "name": "Bone Chalk",
+   "kind": "chalk",
+   "tier": "rare",
+   "consumed": true,
+   "text": "Burnt bone, ground and pressed. Rare circle work; ghost and shadow essences read a bone circle as home ground and fight the binding less.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "silver-circle-salt",
+   "name": "Silver Circle Salt",
+   "kind": "salt",
+   "tier": "uncommon",
+   "consumed": true,
+   "text": "Salt cut with silver filings, poured in an unbroken line outside the chalk. The circle's insurance: what a mishap spills, the salt line catches.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "void-chalk",
+   "name": "Void Chalk",
+   "kind": "chalk",
+   "tier": "exotic",
+   "consumed": true,
+   "text": "Chalk that fell somewhere it should not have been and was retrieved at cost. Exotic circle work: lines drawn in it are slightly more real than the floor they are drawn on.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "diamond-dust-line",
+   "name": "Diamond Dust Line",
+   "kind": "salt",
+   "tier": "legendary",
+   "consumed": true,
+   "text": "A poured line of diamond dust, the legendary circle's outer ring. Consumed like any salt, which is why legendary work is priced the way it is.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "masterwork-weapon-vessel",
+   "name": "Masterwork Weapon (vessel)",
+   "kind": "vessel",
+   "tier": "common",
+   "requires": "a masterwork weapon, from the smith",
+   "text": "The book's own gate, kept: only a masterwork weapon can hold an enchantment. An ordinary blade has nowhere in it for the essence to live — the binding runs off it like water. This is the cross-craft handoff: the smith's masterwork output is the enchanter's raw material.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "masterwork-armour-vessel",
+   "name": "Masterwork Armour (vessel)",
+   "kind": "vessel",
+   "tier": "common",
+   "requires": "masterwork armour, from the smith",
+   "text": "Masterwork armour, as the book requires for any armour enchantment. The smith's finishing marks are, to an enchanter's eye, half a sigil already.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "masterwork-shield-vessel",
+   "name": "Masterwork Shield (vessel)",
+   "kind": "vessel",
+   "tier": "uncommon",
+   "requires": "a masterwork shield, from the smith",
+   "text": "A masterwork shield, taking armour essences by the armour rules.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "masterwork-cloak-vessel",
+   "name": "Masterwork Cloak or Hide (vessel)",
+   "kind": "vessel",
+   "tier": "uncommon",
+   "requires": "a masterwork cloak, hide or leather piece, from the leatherworker",
+   "text": "The leatherworker's masterwork output as an enchanting vessel: a winter wolf cloak, a drake-hide jerkin. Takes armour-family essences; a pelt often keeps a preference from the animal it was — winter wolf hide takes frost workings a shade easier than the DC suggests, which is the GM's colour to grant, not a number here.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "ring-vessel",
+   "name": "Ring Blank (vessel)",
+   "kind": "vessel",
+   "tier": "rare",
+   "requires": "a masterwork ring blank, from the jeweller",
+   "text": "A masterwork ring blank. Small vessels are honest vessels: a ring holds what its focus holds and nothing rides along.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "wand-vessel",
+   "name": "Wand Blank (vessel)",
+   "kind": "vessel",
+   "tier": "rare",
+   "requires": "a masterwork wand blank of coldwood or bone",
+   "text": "A masterwork wand blank. Wand work leans on the spell side of the craft, which this bench does not model yet; the vessel is listed so the material exists when it does.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "amulet-vessel",
+   "name": "Amulet Blank (vessel)",
+   "kind": "vessel",
+   "tier": "exotic",
+   "requires": "a masterwork amulet blank, from the jeweller",
+   "text": "A masterwork amulet blank, for workings worn at the throat.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "powdered-pearl",
+   "name": "Powdered Pearl",
+   "kind": "catalyst",
+   "tier": "uncommon",
+   "consumed": true,
+   "dc_mod": -2,
+   "text": "A pearl ground to dust and cast across the circle at the channelling. It smooths the essence's temper: -2 to the working's DC. Consumed whatever happens.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "true-silver-shavings",
+   "name": "True-Silver Shavings",
+   "kind": "catalyst",
+   "tier": "uncommon",
+   "consumed": true,
+   "dc_mod": -2,
+   "text": "Mithral offcuts begged from the smith. Scattered on the vessel they carry the essence in like a channel cut for water: -2 DC.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "pixie-dust",
+   "name": "Pixie Dust",
+   "kind": "catalyst",
+   "tier": "rare",
+   "consumed": true,
+   "dc_mod": -2,
+   "text": "Bought, never taken; taken dust curdles a working instead of helping it. -2 DC, and the circle glitters for days.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "mithral-filings",
+   "name": "Mithral Filings",
+   "kind": "catalyst",
+   "tier": "rare",
+   "consumed": true,
+   "dc_mod": -2,
+   "text": "Finer than the smith's shavings and twice the price. -2 DC; the sigils take a moon-colour sheen.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "adamantine-dust",
+   "name": "Adamantine Dust",
+   "kind": "catalyst",
+   "tier": "exotic",
+   "consumed": true,
+   "dc_mod": -3,
+   "text": "Dust from the hardest thing there is, and the working borrows the stubbornness: -3 DC.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "dragon-scale-catalyst",
+   "name": "Dragon Scale Catalyst",
+   "kind": "catalyst",
+   "tier": "exotic",
+   "consumed": true,
+   "dc_mod": -3,
+   "text": "A single scale, burnt at the channelling. -3 DC, and by long observation the smoke leans toward whichever essence shares the scale's colour.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "sealing-wax",
+   "name": "Sealing Wax",
+   "kind": "treatment",
+   "tier": "common",
+   "consumed": true,
+   "text": "Beeswax and resin, pressed over the final sigil at the seal. Not strictly required and always used: an unwaxed seal weathers.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "etching-acid",
+   "name": "Etching Acid",
+   "kind": "treatment",
+   "tier": "common",
+   "consumed": true,
+   "text": "Bites the scribed sigils a hair's depth into metal before the ink goes down, so the working is in the vessel and not merely on it.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "resonant-polish",
+   "name": "Resonant Polish",
+   "kind": "treatment",
+   "tier": "uncommon",
+   "consumed": true,
+   "text": "A polish that leaves the vessel very faintly ringing. Channelling into a polished vessel spills less; enchanters apply it out of habit more than arithmetic.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "moonlit-varnish",
+   "name": "Moonlit Varnish",
+   "kind": "treatment",
+   "tier": "rare",
+   "consumed": true,
+   "lifts": "night",
+   "text": "Varnish steeped a full month under open moonlight. A vessel treated with it carries its own midnight: night-binding essences — ghost residue and its refinements — will bind by day through the varnish. The bottled workaround for a rule the material otherwise enforces itself.",
+   "effects": [],
+   "drawbacks": []
+  },
+  {
+   "id": "warding-oil",
+   "name": "Warding Oil",
+   "kind": "treatment",
+   "tier": "rare",
+   "consumed": true,
+   "text": "Worked into the vessel before the circle is drawn. It does nothing for the enchantment and everything for the enchanter: a mishap through an oiled vessel burns the circle, not the hands.",
+   "effects": [],
+   "drawbacks": []
+  }
+ ]
+}
