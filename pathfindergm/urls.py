@@ -1,6 +1,6 @@
 from django.urls import path
 
-from play import craft_views, home_views, views
+from play import class_views, craft_views, home_views, views
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -54,4 +54,14 @@ urlpatterns = [
     path("api/craft/actions", craft_views.craft_actions, name="craft_actions"),
     path("api/craft/excursion", craft_views.craft_excursion, name="craft_excursion"),
     path("api/travel", craft_views.travel_to, name="travel_to"),
+    # The class builder. A page rather than a bench tab because a class is not a flat
+    # form: its level table and its paths are repeating structures, and the effect
+    # builder's one-card-per-thing shape cannot hold either.
+    path("homebrew/classes/", class_views.class_builder, name="class_builder"),
+    path("api/classes/catalogue", class_views.class_catalogue, name="class_catalogue"),
+    path("api/classes/scaffold/<str:kind>", class_views.class_scaffold,
+         name="class_scaffold"),
+    path("api/classes/open/<str:class_id>", class_views.class_open, name="class_open"),
+    path("api/classes/validate", class_views.class_validate, name="class_validate"),
+    path("api/classes/save", class_views.class_save, name="class_save"),
 ]
