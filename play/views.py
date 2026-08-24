@@ -957,6 +957,53 @@ def _log_turn(c, plan, resolution, replace: bool = False):
 
 
 @require_POST
+def wear_item(request):
+    """Put on or take off something the character is carrying.
+
+    Crafted gear was landing in the pack and staying there: a forged breastplate, a
+    tanned cloak and a bound ring were all records with real effect specs and no way to
+    say you were wearing them. The item's own record names its slot — the maker already
+    answered that question, so the player is not asked to classify their own loot.
+
+    A player action on their own property, so it goes straight to the sheet rather than
+    through the GM, exactly as drinking does.
+    """
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    item_id = str(body.get("item", "")).strip().lower()
+    off = bool(body.get("off"))
+    held = pc.stock.get(item_id)
+    if held is None:
+        return JsonResponse({"error": f"you are not carrying {item_id!r}"}, status=400)
+
+    record = held.as_dict()
+    try:
+        if off:
+            if not pc.take_off(record["name"]):
+                return JsonResponse(
+                    {"error": f"{record['name']} is not being worn"}, status=400)
+            tell = f"{pc.name} takes off {record['name']}."
+        else:
+            if not record.get("wearable") or not record.get("slot"):
+                return JsonResponse(
+                    {"error": f"{record['name']} is not something you wear"}, status=400)
+            slot = pc.wear(record, int(body.get("index", 0) or 0))
+            tell = f"{pc.name} puts on {record['name']} ({slot})."
+    except Exception as exc:
+        # Slot rules refuse with a sentence — already occupied, no such slot. A 400 with
+        # the reason, because the page prints it verbatim beside the button.
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    return JsonResponse(_state(c))
+
+
+@require_POST
 def use_item(request):
     """Drink, throw or coat a blade with something the character crafted.
 

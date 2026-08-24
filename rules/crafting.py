@@ -80,6 +80,36 @@ class Stock:
     # narration — which is exactly what it was.
     specs: list[dict] = field(default_factory=list)
 
+    # --- what kind of thing this is, once four more crafts made things -----------------
+    #
+    # Herbalism makes one shape: a dose in a jar, which you drink, throw or paint on a
+    # blade. A forge makes a sword, a tannery makes a cloak and an enchanter makes a
+    # ring, and none of those is drunk. Rather than a second container per craft — four
+    # more save formats, four more inventory panels — the jar learned the handful of
+    # facts the other shapes need. Every field defaults to the herbalism answer, so a
+    # jar saved before any of this loads unchanged and behaves identically.
+    kind: str = "crafted"
+    # Body slot, from `tables.SLOTS`. None for anything not worn.
+    slot: str | None = None
+    wearable: bool = False
+    # Whether it can be consumed at all, and how. Herbalism's own jars answer this from
+    # their effects (see `consumables.plan`), so the default of None means "ask the old
+    # way" and a list means the maker has said outright.
+    how: list[str] = field(default_factory=list)
+    # A forge's output points at the base item it really is, so wielding it is the
+    # weapon the rules already know rather than a new one invented at the bench.
+    weapon: str | None = None
+    armour: str | None = None
+    masterwork: bool = False
+    enhancement: int = 0
+    properties: list[str] = field(default_factory=list)
+    # A potion that holds a spell: the spell's own id, verified against the spell list
+    # by whoever brewed it. This is the field the enchanter reads when a potion stands
+    # in for knowing the spell.
+    holds_spell: str | None = None
+    caster_level: int | None = None
+    from_materials: list[str] = field(default_factory=list)
+
     @property
     def id(self) -> str:
         slug = "".join(c if c.isalnum() else "-" for c in self.base.lower()).strip("-")
@@ -103,7 +133,13 @@ class Stock:
             "potency": round(self.potency, 2), "count": self.count, "craft": self.craft,
             "effects": self.effects, "drawbacks": self.drawbacks,
             "specs": self.specs, "from_ingredients": self.from_ingredients,
-            "kind": "crafted", "crafted": True,
+            "kind": self.kind, "crafted": True,
+            "slot": self.slot, "wearable": self.wearable, "how": list(self.how),
+            "weapon": self.weapon, "armour": self.armour,
+            "masterwork": self.masterwork, "enhancement": self.enhancement,
+            "properties": list(self.properties),
+            "holds_spell": self.holds_spell, "caster_level": self.caster_level,
+            "from_materials": list(self.from_materials),
         }
 
 
@@ -239,6 +275,17 @@ def from_stock_dict(d: dict) -> Stock:
         effects=list(d.get("effects", [])), drawbacks=list(d.get("drawbacks", [])),
         specs=[dict(x) for x in specs],
         from_ingredients=list(d.get("from_ingredients", [])),
+        kind=d.get("kind") or "crafted",
+        slot=(d.get("slot") or None),
+        wearable=bool(d.get("wearable", False)),
+        how=list(d.get("how") or []),
+        weapon=(d.get("weapon") or None), armour=(d.get("armour") or None),
+        masterwork=bool(d.get("masterwork", False)),
+        enhancement=int(d.get("enhancement", 0) or 0),
+        properties=list(d.get("properties") or []),
+        holds_spell=(d.get("holds_spell") or None),
+        caster_level=(int(d["caster_level"]) if d.get("caster_level") else None),
+        from_materials=list(d.get("from_materials") or []),
     )
 
 
@@ -270,6 +317,60 @@ class Chain:
     @property
     def stages(self) -> int:
         return len(self.methods)
+
+
+# Herbalism's half of the acquisition hub. Foraging was a panel inside the crafting
+# page; it belongs beside mining and skinning on the play page's craft-action button,
+# because they are all the same kind of thing — going out and coming back with material
+# — and only one of them was ever narrated into the scene.
+ACQUISITION: dict[str, dict] = {
+    "forage": {
+        "id": "forage",
+        "label": "Forage for herbs",
+        "obtain": "gathered",
+        "requires": "biome",
+        "verb": "foraging",
+        "blurb": "Walk the ground you are standing on and take what grows there. "
+                 "What turns up is what the biome holds, hour by hour, against a "
+                 "Survival check that gets no easier for wanting it.",
+    },
+}
+
+
+def obtainable(obtain_kind: str, *, biome=None, creature=None) -> list:
+    """What foraging could turn up here.
+
+    Delegates to the foraging table rather than answering itself: the biome tables are
+    where "what grows in a marsh" is decided, and a second answer here would be a
+    second thing to keep level with the first.
+    """
+    if str(obtain_kind or "").lower() != "gathered":
+        return []
+    return [i for i in ing_mod.all_ingredients().values()
+            if i.forageable and (not biome or biome in (i.biomes or []))]
+
+
+def chain_from_body(body: dict) -> Chain:
+    """The bench's POST body as a chain.
+
+    Herbalism's half of the interface `rules/benches.py` routes on. It lived in
+    `play/craft_views.py` as a private helper, which was fine while one craft had rules
+    and wrong the moment five did: the view would have needed to know each craft's chain
+    shape. The craft knows its own shape; the view asks for it.
+
+    Tolerant by design — a missing key is an empty chain, not an error — because the
+    problems list is where a chain is judged, and a half-built chain is the normal state
+    of the page while somebody is still clicking.
+    """
+    return Chain(
+        track=str(body.get("track") or "herbalist"),
+        methods=[str(m).strip().lower() for m in body.get("methods") or []],
+        ingredient_ids=[str(i).strip().lower()
+                        for i in (body.get("materials") or body.get("ingredients") or [])],
+        name=str(body.get("name", "")).strip(),
+        stock_used={str(k): int(v) for k, v in (body.get("stock") or {}).items()
+                    if int(v) > 0},
+    )
 
 
 @dataclass

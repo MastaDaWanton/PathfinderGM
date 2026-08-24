@@ -48,6 +48,10 @@ urlpatterns = [
     path("api/craft/recipes", craft_views.craft_recipes, name="craft_recipes"),
     path("api/forage/table", craft_views.forage_table, name="forage_table"),
     path("api/forage", craft_views.forage_do, name="forage_do"),
+    path("api/wear", views.wear_item, name="wear_item"),
     path("api/craftaction", craft_views.craft_action, name="craft_action"),
+    # The acquisition hub: what can be gone out and got, here, and the doing of it.
+    path("api/craft/actions", craft_views.craft_actions, name="craft_actions"),
+    path("api/craft/excursion", craft_views.craft_excursion, name="craft_excursion"),
     path("api/travel", craft_views.travel_to, name="travel_to"),
 ]

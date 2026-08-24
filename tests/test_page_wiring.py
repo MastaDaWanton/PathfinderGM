@@ -38,11 +38,17 @@ WIRING = {
         "dice3d.js", "Dice3D.ask",                      # the dice
         "[data-gloss]",                                 # the glossary popover
         "The body", "Experience",                       # the ledger and the needs
+        "/api/craft/actions", "/api/craft/excursion",   # the acquisition hub
+        "cp-biomepick",                                 # the debug picker, moved here
+        "/api/wear", "[data-wear]",                     # wearing what you crafted
     ],
     "/craft/": [
         "/api/craft/preview", "/api/craft/do", "/api/forage",
         "dice3d.js", "showRoll",
         "batch",                                        # the batch count
+        "stationTip", "method_help",                    # the station tooltips
+        "adoptGlyphs",                                  # per-craft icons
+        "renderModes",                                  # the secondary rulebook tab
     ],
     "/": [
         "/api/worlds/import", "#worldfile",             # the import button

@@ -371,6 +371,16 @@ class Actor:
     # A None is an empty slot that exists — the sheet shows it as a blank to fill, which
     # is the point of drawing the slots at all.
     slots: dict[str, list] = field(default_factory=dict)
+    # Crafted gear that is being worn, keyed by the item's own name. The slot lists
+    # above stay plain strings — every save written so far holds strings, and the sheet
+    # page draws them — so the mechanical half lives here beside them rather than
+    # replacing them. A string in a slot with no record contributes nothing, which is
+    # exactly what a worn item did before this existed; a record whose name has been
+    # taken out of every slot contributes nothing either, because `worn_items` asks the
+    # slots and not this dict. That is the whole reason to keep them apart: taking a
+    # cloak off has to stop the cloak working, and one dict cannot express "owned but
+    # not worn" without a second flag nobody would remember to clear.
+    worn: dict[str, dict] = field(default_factory=dict)
 
     # --- body slots ----------------------------------------------------------------
 
@@ -407,6 +417,80 @@ class Actor:
         if not 0 <= index < len(current):
             raise IllegalSheet(f"{key}: no slot {index}")
         current[index] = (item or "").strip() or None
+
+    # --- worn gear that does something ------------------------------------------------
+
+    def worn_items(self) -> list[dict]:
+        """The crafted records for everything currently in a slot.
+
+        Asks the slots, not the record dict: a cloak in the wardrobe is not a cloak on
+        your shoulders, and the difference has to be readable from the sheet's own
+        state rather than from a flag somebody has to remember to clear.
+        """
+        names = {str(w).strip().lower()
+                 for slot in self.slots.values() for w in slot if w}
+        return [rec for key, rec in self.worn.items() if key in names]
+
+    def wear(self, record: dict, index: int = 0) -> str:
+        """Put a crafted item on. Returns the slot it went into.
+
+        The record says which slot it belongs in — a crafted cloak knows it is worn at
+        the shoulders — because the alternative is asking the player to classify their
+        own loot, which is a question the maker already answered.
+        """
+        slot = str(record.get("slot") or "").strip().lower()
+        name = str(record.get("name") or "").strip()
+        if not name:
+            raise IllegalSheet("this item has no name to wear")
+        if slot not in SLOTS:
+            raise IllegalSheet(f"{name} is not something you wear")
+        current = self.slot_list(slot)
+        if not 0 <= index < len(current):
+            raise IllegalSheet(f"{SLOTS[slot]['label']}: no slot {index}")
+        if current[index]:
+            raise IllegalSheet(
+                f"{SLOTS[slot]['label']} is already holding {current[index]} — "
+                f"take that off first")
+        current[index] = name
+        self.worn[name.strip().lower()] = dict(record)
+        return slot
+
+    def take_off(self, name: str) -> bool:
+        """Remove a worn item from whatever slot holds it. The record is kept: the
+        thing still exists, it is simply not being worn, and its effects stop because
+        `worn_items` reads the slots."""
+        key = str(name or "").strip().lower()
+        found = False
+        for slot in self.slots.values():
+            for i, w in enumerate(slot):
+                if w and str(w).strip().lower() == key:
+                    slot[i] = None
+                    found = True
+        return found
+
+    def _standing_mods(self, kind: str, target: str) -> list["Modifier"]:
+        """Modifiers from worn gear — permanent while worn, so not buffs.
+
+        Held apart from `buffs` because a buff has a clock and expires; a ring of
+        protection does not, and putting it in the buff list would mean either a
+        never-ending buff nothing could clear or a cloak that stopped working after an
+        hour. Same four modifier families the effect vocabulary defines, so anything
+        an enchantment or a hide can say lands here without a translation table.
+        """
+        want = str(target).lower()
+        out: list[Modifier] = []
+        for rec in self.worn_items():
+            for spec in rec.get("specs") or []:
+                if not isinstance(spec, dict):
+                    continue
+                if spec.get("type") != kind:
+                    continue
+                if str(spec.get("target", "")).lower() != want:
+                    continue
+                amount = int(spec.get("amount", 0) or 0)
+                if amount:
+                    out.append(Modifier(amount, str(rec.get("name") or "worn gear")))
+        return out
 
     # --- basics ------------------------------------------------------------------
 
@@ -445,9 +529,13 @@ class Actor:
         return self.abilities.get(ab, 10)
 
     def ability_mod(self, ab: str) -> int:
+        # Ability scores read the buff list directly rather than through `_buff_mods`,
+        # so worn gear has to be added here too — a belt of giant strength that moved
+        # every roll except the Strength modifier would be the worst kind of half-fix.
         return ability_modifier(self.ability_score(ab)) + sum(
             b.amount for b in self.buffs
-            if b.kind == "ability_mod" and b.target == ab)
+            if b.kind == "ability_mod" and b.target == ab) + sum(
+            m.value for m in self._standing_mods("ability_mod", ab))
 
     # --- ability damage ---------------------------------------------------------------
 
@@ -1449,9 +1537,17 @@ class Actor:
         return b
 
     def _buff_mods(self, kind: str, target: str) -> list["Modifier"]:
+        """Everything timed or worn that moves this number.
+
+        Worn gear joins here rather than at each call site because this is the one
+        funnel every roll already goes through — saves, skills, attack, AC, initiative.
+        Adding it in one place is the difference between an enchanted cloak working
+        everywhere and working wherever somebody remembered to ask.
+        """
         return [Modifier(b.amount, b.source or "a preparation")
                 for b in self.buffs
-                if b.kind == kind and b.target == str(target).lower() and b.amount]
+                if b.kind == kind and b.target == str(target).lower() and b.amount] \
+            + self._standing_mods(kind, target)
 
     def remove_condition(self, key: str) -> None:
         self.conditions = [c for c in self.conditions if c.key != key.strip().lower()]
@@ -1725,6 +1821,12 @@ class Actor:
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "world_classes": _world_class_summary(self),
             "satchel": _satchel_summary(self),
+            # Everything crafted, on the side panel rather than only the full sheet:
+            # four more crafts now make things, and a forged blade the player cannot
+            # see is a blade they cannot wear.
+            "stock": [_stock_row(item) for _, item in
+                      sorted(self.stock.items(), key=lambda kv: kv[1].name.lower())],
+            "worn": [w["name"] for w in self.worn_items()],
             # The side panel is the only sheet most turns ever show, so what the
             # character is carrying and what is in their purse belong on it.
             "carrying": [{"name": n, "count": c} for n, c in sorted(self.goods.items())],
@@ -1776,9 +1878,19 @@ def _stock_row(item) -> dict:
 
     d = item.as_dict()
     d["poisons"] = [p.as_dict() for p in con.poisons(item.specs, source=item.base)]
-    d["drinkable"] = con.plan(item, how="drink").ok
-    d["throwable"] = con.plan(item, how="throw").ok
-    d["coatable"] = con.plan(item, how="coat").ok
+    # A maker that stated how its work is used is believed; herbalism's jars state
+    # nothing and are asked, which is how they have always been judged. This is the
+    # difference between a brewed tea (ask the effects) and a forged breastplate (the
+    # smith already said: not drinkable, worn at the armour slot).
+    declared = list(getattr(item, "how", []) or [])
+    if declared:
+        d["drinkable"] = "drink" in declared
+        d["throwable"] = "throw" in declared
+        d["coatable"] = "coat" in declared
+    else:
+        d["drinkable"] = con.plan(item, how="drink").ok
+        d["throwable"] = con.plan(item, how="throw").ok
+        d["coatable"] = con.plan(item, how="coat").ok
     return d
 
 
@@ -2196,6 +2308,10 @@ def to_dict(actor: Actor) -> dict:
         "flat_damage": actor.flat_damage, "flat_initiative": actor.flat_initiative,
         "flat_cmd": actor.flat_cmd, "notes": actor.notes,
         "slots": {k: list(v) for k, v in actor.slots.items()},
+        # The mechanical half of worn gear. Saved beside the slots rather than inside
+        # them so every save written before this feature still loads: a slot is a name,
+        # and a name with no record here is exactly the inert string it always was.
+        "worn": {k: dict(v) for k, v in actor.worn.items()},
     }
 
 
@@ -2481,6 +2597,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         notes=data.get("notes", ""),
         slots={k: list(v) for k, v in (data.get("slots") or {}).items()
                if k in SLOTS},
+        worn={str(k).strip().lower(): dict(v)
+              for k, v in (data.get("worn") or {}).items() if isinstance(v, dict)},
     )
     for c in data.get("conditions", []):
         a.add_condition(c if isinstance(c, str) else c["key"],

@@ -16,7 +16,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes, consumables, crafting, foraging, ingredients, worldclass
+from rules import (benches, biomes, consumables, crafting, foraging, ingredients,
+                   worldclass)
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -77,6 +78,17 @@ def _craft_materials(track_id: str) -> list[dict]:
             if mid in own or mid not in elsewhere]
 
 
+def _is_night(campaign) -> bool:
+    """Whether it is dark, from the scene's own clock.
+
+    Asked here rather than by each bench: the world clock is campaign state, and a
+    binding circle should not have to know how this app stores time. Dusk to dawn, the
+    same window the survival rules treat as night.
+    """
+    minutes = int(getattr(campaign.scene, "clock_minutes", 0) or 0) % 1440
+    return minutes >= 18 * 60 or minutes < 6 * 60
+
+
 def _discipline(disc_id: str) -> dict:
     found = next((d for d in DISCIPLINES if d["id"] == disc_id), None)
     if found is None:
@@ -114,7 +126,61 @@ def _track_state(campaign, disc: dict) -> dict:
         ],
         "tools": track.unlocked_tools(progress.level),
         "known_recipes": len(progress.crafted),
+        # What each station does and what it wants, for the tooltip on every method
+        # chip: "what bonus it gives and what you need it for". Authored beside the
+        # method in the track's own file, so a craft that invents a station documents
+        # it in the same edit rather than in a second place nobody remembers.
+        "method_help": _method_help(track),
+        "descriptions": _raw_track(track).get("method_descriptions") or {},
+        # Secondary tabs — the enchanter's book-faithful magic-item mode is the first.
+        "modes": benches.modes_for(track.id),
+        "glyphs": benches.glyphs().get(track.id, {}),
     }
+
+
+def _raw_track(track) -> dict:
+    """The track's own JSON, for the fields the `Track` dataclass does not model.
+
+    `method_help` and `method_descriptions` are documentation rather than rules, so
+    `worldclass.Track` has no field for them and adding one would make every consumer of
+    a Track carry prose it never reads. Loaded from the file instead, shipped or
+    homebrew, by the same precedence `worldclass.tracks()` uses.
+    """
+    import json as json_mod
+    from pathlib import Path
+
+    from django.conf import settings
+
+    for folder in (Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "world-classes",
+                   Path(settings.BASE_DIR) / "content" / "world-classes"):
+        path = folder / f"{track.id}.json"
+        if path.is_file():
+            try:
+                return json_mod.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return {}
+    return {}
+
+
+def _method_help(track) -> dict:
+    """`{method: {does, needs, for}}` for every method the track names.
+
+    A method with no authored help still gets an entry, so the tooltip is never empty
+    on screen: an unexplained station is the thing the player is complaining about.
+    """
+    raw = _raw_track(track)
+    help_table = raw.get("method_help") or {}
+    described = raw.get("method_descriptions") or {}
+    out = {}
+    for lvl in track.levels:
+        for m in lvl.methods:
+            entry = dict(help_table.get(m) or {})
+            entry.setdefault("does", described.get(m, ""))
+            entry.setdefault("needs", "")
+            entry.setdefault("for", "")
+            entry["level"] = lvl.level
+            out[m] = entry
+    return out
 
 
 def _chain_from(body: dict, track_id: str) -> crafting.Chain:
@@ -126,6 +192,28 @@ def _chain_from(body: dict, track_id: str) -> crafting.Chain:
         stock_used={str(k): int(v) for k, v in (body.get("stock") or {}).items()
                     if int(v) > 0},
     )
+
+
+def _bench_stock(campaign, disc: dict) -> dict:
+    """What this bench can reach for, in the shape its own module expects.
+
+    Herbalism's pot takes crafted jars — a tea goes back in to be concentrated — and
+    reads raw herbs separately through `satchel`. The four newer benches make no such
+    distinction: an ore and a masterwork blade are both "stock", counted, and their
+    `_stock_entry` readers accept a bare number. So the satchel is folded in for them
+    and left alone for herbalism, rather than teaching four modules a split that only
+    one craft has a reason for.
+    """
+    pc = campaign.scene.pc()
+    if pc is None:
+        return {}
+    crafted = _stock_of(campaign, disc["id"])
+    if disc["track"] == "herbalist":
+        return crafted
+    merged: dict = {mid: int(n) for mid, n in pc.inventory.items() if n}
+    for key, item in crafted.items():
+        merged[key] = item
+    return merged
 
 
 def _stock_of(campaign, craft_id: str) -> dict:
@@ -174,6 +262,20 @@ def craft_ingredients(request):
 
     state = _track_state(c, disc)
     ceiling = state.get("max_rank", 0)
+
+    mode = str(request.GET.get("mode", "")).strip().lower()
+    if mode and benches.supports(disc["track"], mode):
+        # A secondary mode brings its own shelf — the magic-item mode's is a catalogue
+        # of named properties and wondrous items, not the essences next door.
+        mod = benches.module_for(disc["track"], mode)
+        listing = getattr(mod, "catalogue", None) or getattr(mod, "materials", None)
+        mats = [m.as_dict() for _, m in sorted((listing() or {}).items())] if listing else []
+        for d in mats:
+            d["usable"] = bool(ceiling) and int(d.get("rank", 1)) <= ceiling
+        state = dict(state, glyphs=getattr(mod, "KIND_GLYPH", {}) or state.get("glyphs", {}))
+        return JsonResponse({"ingredients": mats, "stock": [], "track": state,
+                             "mode": mode, "biome": c.biome,
+                             "biome_describe": biomes.describe(c.biome)})
 
     if disc["track"] in _MATERIALS_OF:
         # This bench's own catalogue, tier-marked the same way the herb shelf is.
@@ -239,27 +341,36 @@ def craft_preview(request):
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
-    if disc["track"] in _MATERIALS_OF:
-        # The track is real — levels, materials and chain rules all load — but this
-        # bench's chain UI is not fitted yet. Said plainly rather than letting
-        # `crafting.preview` misread a forge chain as a brew.
+    mode = str(body.get("mode", "")).strip().lower()
+    if not benches.supports(state["track"], mode):
         return JsonResponse(
-            {"error": f"The {disc['name'].lower()} bench is still being fitted: its "
-                      f"materials and rules are in, and chain-crafting arrives next."},
+            {"error": f"The {disc['name'].lower()} bench cannot take a chain yet."},
             status=409)
 
-    chain = _chain_from(body, state["track"])
     pc = c.scene.pc()
-    result = crafting.preview(state["track"], state["level"], chain,
-                              stock=_stock_of(c, disc["id"]),
-                              satchel=dict(pc.inventory) if pc else {},
-                              carrier=pc, now_minute=c.scene.clock_minutes)
+    try:
+        chain = benches.chain_from_body(state["track"], body, mode)
+        result = benches.preview(
+            state["track"], state["level"], chain, mode=mode,
+            stock=_stock_of(c, disc["id"]),
+            satchel=dict(pc.inventory) if pc else {},
+            carrier=pc, actor=pc, now_minute=c.scene.clock_minutes,
+            at_night=_is_night(c), item=body.get("item"), vessel=body.get("item"))
+    except benches.UnknownBench as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+    except (ValueError, KeyError) as exc:
+        # A chain naming a material that does not exist is a bad request, not a crash:
+        # the page can say so and the player can pick something else.
+        return JsonResponse({"error": str(exc)}, status=400)
     out = result.as_dict()
     # Why each jar on the shelf would be refused by the chain as it currently stands, so
     # the shelf can grey them before one is picked up. The preparation rules were being
     # enforced correctly and saying nothing until you had already built a chain and
     # pressed Craft — which reads exactly like the rules not working at all.
-    out["refused"] = _shelf_refusals(chain.methods)
+    # Herbalism's own shelf-greying, which reads the herb preparation rules. The other
+    # crafts state their refusals in `problems` instead, one chain at a time.
+    out["refused"] = (_shelf_refusals(chain.methods)
+                      if state["track"] == "herbalist" else {})
     # How many the materials allow, so the bench can offer "all 47" rather than making the
     # player count it out and then find they were three short halfway through the batch.
     out["batch_max"] = batch_max(result, pc)
@@ -336,17 +447,17 @@ def craft_do(request):
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
 
-    if disc["track"] in _MATERIALS_OF:
-        # The track is real — levels, materials and chain rules all load — but this
-        # bench's chain UI is not fitted yet. Said plainly rather than letting
-        # `crafting.preview` misread a forge chain as a brew.
+    mode = str(body.get("mode", "")).strip().lower()
+    if not benches.supports(state["track"], mode):
         return JsonResponse(
-            {"error": f"The {disc['name'].lower()} bench is still being fitted: its "
-                      f"materials and rules are in, and chain-crafting arrives next."},
+            {"error": f"The {disc['name'].lower()} bench cannot take a chain yet."},
             status=409)
 
     wanted = max(1, min(MAX_BATCH, int(body.get("batch", 1) or 1)))
-    chain = _chain_from(body, state["track"])
+    try:
+        chain = benches.chain_from_body(state["track"], body, mode)
+    except benches.UnknownBench as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
 
     attempts, made_all, spent_all = [], [], {}
     stopped = ""
@@ -355,10 +466,19 @@ def craft_do(request):
         # spent, and a concentration puts its output back on it — so a preview taken once
         # and reused would be describing a pot that no longer exists by attempt three.
         pc = c.scene.pc()
-        result = crafting.preview(state["track"], state["level"], chain,
-                                  stock=_stock_of(c, disc["id"]),
-                                  satchel=dict(pc.inventory) if pc else {},
-                                  carrier=pc, now_minute=c.scene.clock_minutes)
+        try:
+            result = benches.preview(
+                state["track"], state["level"], chain, mode=mode,
+                stock=_bench_stock(c, disc),
+                satchel=dict(pc.inventory) if pc else {},
+                carrier=pc, actor=pc, now_minute=c.scene.clock_minutes,
+                at_night=_is_night(c), item=body.get("item"),
+                vessel=body.get("item"))
+        except (ValueError, KeyError) as exc:
+            if not attempts:
+                return JsonResponse({"error": str(exc)}, status=400)
+            stopped = str(exc)
+            break
         if result.problems:
             if not attempts:
                 return JsonResponse({"error": " ".join(result.problems)}, status=400)
@@ -431,7 +551,8 @@ def _one_craft(c, disc, state, result) -> dict:
     # chain and then thrown away in favour of a chance-to-hit; now the die is added to the
     # crafter's own bonus and compared to it, the way every other roll in the game works.
     # Natural 1 and natural 20 keep their usual authority over the arithmetic.
-    total = face + result.bonus
+    bonus = int(benches.result_field(result, "bonus", 0) or 0)
+    total = face + bonus
     succeeded = face != 1 and (face == 20 or total >= result.dc)
 
     # The deed a milestone-locked level waits on, recorded when it is actually done.
@@ -454,7 +575,10 @@ def _one_craft(c, disc, state, result) -> dict:
             "milestone": milestone,
             # Two doses in, one of the next band out: the ceiling is checked against
             # what went in, so the engine has to be told which kind of craft this is.
-            "concentrating": result.concentrating,
+            # Only herbalism concentrates — two doses in, one of the next band out.
+            # Read with a default rather than demanded of every craft: a forge has no
+            # opinion about concentration and should not have to declare one.
+            "concentrating": benches.result_field(result, "concentrating", False),
         },
     }]))
 
@@ -468,23 +592,30 @@ def _one_craft(c, disc, state, result) -> dict:
         if took:
             spent[sid] = took
 
-    for iid, n in result.consumes_raw.items():
+    for iid, n in benches.result_field(result, "consumes_raw", {}).items():
         took = pc.spend(iid, n)
         if took:
             spent[iid] = spent.get(iid, 0) + took
 
     made = None
-    if succeeded and result.output:
-        item = crafting.from_stock_dict(result.output)
+    output = benches.result_field(result, "output", None)
+    if succeeded and output:
+        # Every craft's output lands in the same pack. `Stock` grew the handful of
+        # fields the other four shapes need — slot, wearable, how, masterwork, the
+        # weapon or armour row it really is — so a forged blade and a brewed tea are
+        # one kind of record on the sheet rather than five inventory panels.
+        item = crafting.from_stock_dict(dict(output, craft=state["track"]))
         pc.add_stock(item, 1)
         made = item.as_dict()
 
     return {
         "name": result.name, "succeeded": succeeded, "roll": face,
-        "chance": result.chance, "result": result.as_dict(), "made": made,
+        "chance": benches.result_field(result, "chance", 0),
+        "result": result.as_dict(), "made": made,
         "spent": spent,
         # The whole check, so the bench can show the arithmetic rather than a verdict.
-        "total": total, "bonus": result.bonus, "dc": result.dc, "terms": result.terms,
+        "total": total, "bonus": bonus, "dc": result.dc,
+        "terms": benches.result_field(result, "terms", []),
         "tell": " ".join(o.tell for o in resolution.outcomes if o.tell),
     }
 
@@ -579,6 +710,174 @@ def _forage_scene(c):
     minutes = c.scene.clock_minutes
     day, rem = minutes // 1440 + 1, minutes % 1440
     return place, f"day {day}, {rem // 60} hours in"
+
+
+def _fallen(c) -> list[dict]:
+    """Creatures in the scene that can be skinned or salvaged. The dead only."""
+    return [{"ref": r, "name": a.name}
+            for r, a in c.scene.actors.items()
+            if not a.is_pc and a.hp <= 0]
+
+
+def _at_market(c) -> bool:
+    """Whether there is anybody here to buy from.
+
+    Read off the world's own entity kind rather than a list of place names: World Bible
+    says what a settlement is, and a second opinion here would disagree with it the
+    first time somebody wrote a new kind of town.
+    """
+    loc = getattr(c, "location", None)
+    kind = str(getattr(loc, "kind", "") or "").upper()
+    return kind in ("CITY", "TOWN", "VILLAGE", "SETTLEMENT")
+
+
+def _excursions(c) -> list[dict]:
+    """Every way of obtaining material, and whether it can be done standing here.
+
+    One list for the play page's craft-action button — the hub for "mining, skinning,
+    etc... all the actions that obtain world class materials/reagents". A craft the
+    character has no levels in is still listed: an excursion you cannot run yet is a
+    reason to take up the trade, and one that is simply absent is not.
+    """
+    pc = c.scene.pc()
+    fallen = _fallen(c)
+    out = []
+    for spec in benches.acquisitions():
+        entry = dict(spec)
+        needs = str(spec.get("requires") or "")
+        why = ""
+        if needs == "biome" and not c.biome:
+            why = "The ground here has not been named yet."
+        elif needs == "biome" and _forage_blocked(c):
+            why = _forage_blocked(c)
+        elif needs != "biome" and c.scene.in_encounter:
+            why = "You are in a fight. This can wait until it is over."
+        elif needs in ("creature", "carcass") and not fallen:
+            why = "Nothing has fallen here to work on."
+        elif needs == "market" and not _at_market(c):
+            why = "There is nobody here selling."
+        if pc is not None:
+            progress = pc.track(spec["track"])
+            entry["level"] = progress.level
+        entry["available"] = not why
+        entry["why"] = why
+        entry["targets"] = fallen if needs in ("creature", "carcass") else []
+        out.append(entry)
+    return out
+
+
+@require_GET
+def craft_actions(request):
+    """What the craft-action button offers, here, now."""
+    c = campaign_mod.current()
+    return JsonResponse({
+        "actions": _excursions(c),
+        "biome": c.biome,
+        "biome_describe": biomes.describe(c.biome),
+        # The biome picker moved here from the crafting page, where it was a debug
+        # control on a bench that has no business claiming to be somewhere else. You
+        # forage where you stand; this is the one place that says where that is.
+        "biomes": list(biomes.EVERYWHERE),
+        "blocked": _forage_blocked(c),
+    })
+
+
+@require_POST
+def craft_excursion(request):
+    """Go out and come back with material — mining, skinning, gathering, buying.
+
+    The generic half of the hub. Foraging keeps its own endpoint because it has a
+    bespoke hourly Survival loop in the engine that predates this; everything else runs
+    the same shape: one check the player rolls, a haul drawn from what this craft says
+    is obtainable *here*, and the hours it cost. The materials land in the satchel the
+    benches already read, so a prospected ore is at the forge the moment it is dug.
+    """
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    key = str(body.get("action", "")).strip().lower()
+    spec = next((e for e in _excursions(c) if e["key"] == key), None)
+    if spec is None:
+        return JsonResponse({"error": f"{key!r} is not something you can go and do"},
+                            status=404)
+    if not spec["available"]:
+        return JsonResponse({"error": spec["why"]}, status=409)
+    # Wandering off and working where you stand are different problems. Prospecting or
+    # gathering means hours out of the scene, so it takes the same test foraging does;
+    # skinning happens over the carcass at your feet and buying happens at the stall in
+    # front of you, and neither is impossible because somebody is talking to you. A
+    # fight stops all of it either way.
+    if str(spec.get("requires")) == "biome":
+        blocked = _forage_blocked(c)
+        if blocked:
+            return JsonResponse({"error": blocked}, status=409)
+    elif c.scene.in_encounter:
+        return JsonResponse(
+            {"error": "You are in a fight. This can wait until it is over."},
+            status=409)
+
+    creature = str(body.get("creature", "")).strip()
+    if spec.get("requires") in ("creature", "carcass") and not creature:
+        creature = (spec["targets"][0]["name"] if spec["targets"] else "")
+
+    track = spec["track"]
+    level = pc.track(track).level
+    found = benches.obtainable(track, str(spec.get("obtain") or ""),
+                               biome=c.biome or None, creature=creature or None)
+    ceiling = worldclass.tier_rank(worldclass.get(track).at(level).max_tier)
+    within = [m for m in found if getattr(m, "rank", 1) <= ceiling]
+    if not within:
+        return JsonResponse(
+            {"error": f"Nothing here is within a {track} of level {level}."
+                      if found else "There is nothing of that kind to be had here."},
+            status=409)
+
+    hours = max(1, min(12, int(body.get("hours", 1) or 1)))
+    engine = c.engine()
+    roll = engine.dice.d20(label=spec.get("label", "Excursion"), visibility="player")
+    face = roll.faces[0]
+    # The same arithmetic the bench uses for a craft check, so going out for material
+    # and working it are scored on one formula rather than two.
+    bonus = benches.module_for(track).check_bonus(pc, level)         if hasattr(benches.module_for(track), "check_bonus") else level
+    dc = 10 + max(0, ceiling - 1) * 3
+    total = face + bonus
+    ok = face != 1 and (face == 20 or total >= dc)
+
+    haul: list[dict] = []
+    if ok:
+        # Better rolls reach further up the shelf, and more of it. The margin is the
+        # only thing that decides quality, so a lucky prospect is a real find rather
+        # than more of the same gravel.
+        margin = total - dc
+        reach = min(ceiling, 1 + margin // 5)
+        pool = [m for m in within if getattr(m, "rank", 1) <= reach] or within
+        take = min(len(pool), 1 + hours // 2 + margin // 8)
+        picks = [pool[(face * (i + 3)) % len(pool)] for i in range(max(1, take))]
+        counted: dict[str, int] = {}
+        for m in picks:
+            counted[m.id] = counted.get(m.id, 0) + 1
+        for mid, n in counted.items():
+            pc.carry(mid, n)
+        names = {m.id: m.name for m in pool}
+        haul = [{"id": mid, "name": names.get(mid, mid), "count": n}
+                for mid, n in sorted(counted.items())]
+
+    c.scene.clock_minutes += hours * 60
+    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing."
+    verb = spec.get("verb") or spec.get("label", "working")
+    line = (f"{pc.name} spends {hours} hour{'s' if hours != 1 else ''} "
+            f"{verb}{' the ' + creature if creature else ''}. "
+            f"{'Found: ' + tally if haul else 'Nothing worth carrying.'}")
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
+    c.save()
+    return JsonResponse({
+        "action": key, "label": spec.get("label", ""), "found": haul,
+        "roll": face, "bonus": bonus, "dc": dc, "total": total, "succeeded": ok,
+        "hours": hours, "tell": line, "clock_minutes": c.scene.clock_minutes,
+    })
 
 
 @require_POST

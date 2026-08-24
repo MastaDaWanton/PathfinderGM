@@ -403,16 +403,33 @@ def plan(stock, how: str = "drink", target: str = "pc",
         use.problems.append(f"{how!r} is not a way to use something; "
                             f"drink, throw or coat")
         return use
-    if how in ("throw", "coat") and not is_harmful(stock):
+    # Throwing needs something to hurt whoever it lands on. Painting a blade does not:
+    # a weapon oil that sharpens the edge or makes it count as magic is the whole
+    # point of oils, and gating `coat` on harm refused four of the alchemist's own
+    # recipes — oil of magic weapon, magic fang, align weapon and keen edge — with
+    # "does nothing harmful, so there is nothing to put on a blade". A benign coating
+    # is declared by its maker (`how` says coat) and buffs the wielder rather than
+    # poisoning the target.
+    declared = [str(x).lower() for x in (_field(stock, "how", []) or [])]
+    benign_coat = how == "coat" and "coat" in declared
+    if how == "throw" and not is_harmful(stock):
         use.problems.append(
-            f"{name} does nothing harmful, so there is nothing to "
-            + ("throw at anybody" if how == "throw" else "put on a blade"))
+            f"{name} does nothing harmful, so there is nothing to throw at anybody")
+        return use
+    if how == "coat" and not is_harmful(stock) and not benign_coat:
+        use.problems.append(
+            f"{name} does nothing harmful, so there is nothing to put on a blade")
         return use
     if not _field(stock, "count", 1):
         use.problems.append(f"no {name} left")
         return use
 
     why = because or f"{name}, {how}"
+    if benign_coat:
+        # The oil is on your own weapon, so its bonuses are yours. Aimed at the wielder
+        # rather than the target — the opposite of a poison, and the reason `coat` could
+        # not simply be let through unchanged.
+        target = "pc"
     # Each poison's own save, rolled before the harm it gates. Grouped rather than "the
     # first gate in the list", so a compound made of two poisonous ingredients rolls both
     # saves; before, the second one's save was never rolled at all.

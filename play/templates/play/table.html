@@ -479,6 +479,19 @@
   #craftpanel .cp-row { display: flex; align-items: center; gap: 12px; }
   #craftpanel .cp-bench { color: var(--dim); font-size: 12.5px; text-decoration: none; }
   #craftpanel .cp-bench:hover { color: var(--accent); }
+  #cp-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 6px; margin: 8px 0; }
+  #cp-actions button { display: flex; flex-direction: column; align-items: flex-start;
+                       gap: 2px; padding: 7px 9px; cursor: pointer;
+                       border: 1px solid rgba(150,120,60,.35); border-radius: 2px;
+                       background: linear-gradient(rgba(60,48,26,.5), rgba(32,25,14,.55));
+                       color: #e8c9a0; font: 400 13px/1.15 Palatino, serif; }
+  #cp-actions button:hover:not(:disabled) { border-color: var(--gold);
+                       color: #ffe7b4; box-shadow: 0 0 12px rgba(150,120,60,.3); }
+  #cp-actions button:disabled { opacity: .45; cursor: default; }
+  #cp-actions small { color: var(--dim); font-size: 10.5px; letter-spacing: .04em;
+                      text-transform: uppercase; }
+  #craftpanel .cp-ground select { margin-left: 8px; }
 
   /* --- The combat panel ---------------------------------------------------- */
   #combatbar {
@@ -1287,21 +1300,32 @@
       <button type="button" id="carryon" class="quiet"
               title="Let the scene continue without acting">Continue</button>
       <button type="button" id="craftaction" class="quiet"
-              title="Forage, and later mine and skin — without leaving the scene"
+              title="Forage, prospect, skin, gather, buy — every way of getting material"
               >Craft action</button>
     </form>
     <!-- The excursion panel. Foraging lived only on the bench page, where it was a
          button and a table: no narration, no time, no way back into the fiction. -->
     <div id="craftpanel" hidden>
-      <div class="cp-ground"><b id="cp-biome">…</b> <em id="cp-desc"></em></div>
+      <div class="cp-ground"><b id="cp-biome">…</b> <em id="cp-desc"></em>
+        <!-- The debug teleport moved here from the bench, where a workbench was
+             claiming to be somewhere else. You forage where you stand; this is the
+             one control that says where that is. -->
+        <select id="cp-biomepick" hidden></select>
+        <button type="button" class="cp-bench" id="cp-debug"
+                title="Move the ground underfoot without walking there. For testing."
+                >debug</button>
+      </div>
       <div class="cp-busy" id="cp-busy" hidden></div>
       <div class="cp-hours">
         <label for="cp-h">Hours</label>
         <input type="range" id="cp-h" min="1" max="48" value="1">
         <b id="cp-hn">1</b>
       </div>
+      <!-- Every way of obtaining material, from every craft: "craft action should be
+           the hub for mining, skinning, etc". Each declares its own; what is possible
+           here is the scene's answer. -->
+      <div id="cp-actions"></div>
       <div class="cp-row">
-        <button type="button" id="cp-forage">Forage</button>
         <a class="cp-bench" href="/craft/">open the full bench →</a>
       </div>
     </div>
@@ -1603,6 +1627,33 @@ function render(s) {
       ${(pc.satchel && pc.satchel.length) ? `<h2>Satchel</h2>${
         pc.satchel.map(i => `<div class="row"><span>${esc(i.name)}</span><span>${
           i.count}</span></div>`).join("")}` : ""}
+      ${(pc.stock && pc.stock.length) ? `<h2>Crafted</h2>${
+        pc.stock.map(j => {
+          // Everything five crafts make, in one place, each with what can be done to
+          // it. A forged breastplate and a brewed tea are the same kind of record now,
+          // so the buttons are asked of the record rather than of the craft: worn if
+          // it names a slot, drunk or thrown or painted if its maker said so.
+          const worn = (pc.worn || []).includes(j.name);
+          const acts = [
+            j.wearable && j.slot
+              ? `<button class="mini" data-wear="${esc(j.id)}"${worn ? ' data-off="1"' : ""}
+                   >${worn ? "take off" : "wear"}</button>` : "",
+            j.drinkable ? `<button class="mini" data-use="${esc(j.id)}"
+                   data-how="drink">drink</button>` : "",
+            j.throwable ? `<button class="mini" data-use="${esc(j.id)}"
+                   data-how="throw">throw</button>` : "",
+            j.coatable ? `<button class="mini" data-use="${esc(j.id)}"
+                   data-how="coat">coat</button>` : "",
+          ].filter(Boolean).join(" ");
+          const note = [j.masterwork ? "masterwork" : "",
+                        j.enhancement ? `+${j.enhancement}` : "",
+                        worn ? "worn" : ""].filter(Boolean).join(" · ");
+          return `<div class="row" title="${esc((j.effects || []).join("
+"))}">
+            <span>${esc(j.name)}${j.count > 1 ? ` ×${j.count}` : ""}${
+              note ? ` <small>${esc(note)}</small>` : ""}</span>
+            <span>${acts}</span></div>`;
+        }).join("")}` : ""}
       ${(pc.world_classes && pc.world_classes.length) ? `<h2>World classes</h2>${
         pc.world_classes.map(w => `
           <div class="row"><span>${esc(w.name)} ${w.level}</span><span>${
@@ -1838,6 +1889,38 @@ function showPopup(p) {
   }).then(sendRoll);
 }
 
+// Everything that can be gone out and got, here, now — one list from every craft.
+// Foraging keeps its own button because it has the narrated hourly run behind it; the
+// rest share the plain excursion path.
+async function loadCraftActions() {
+  try {
+    const d = await (await fetch("/api/craft/actions", { cache: "reload" })).json();
+    $("#cp-biome").textContent = d.biome || "nowhere in particular";
+    $("#cp-desc").textContent = d.biome_describe || "";
+    const busyWhy = d.blocked || "";
+    $("#cp-busy").hidden = !busyWhy;
+    $("#cp-busy").textContent = busyWhy;
+    $("#cp-biomepick").innerHTML = (d.biomes || []).map(b =>
+      `<option value="${esc(b)}" ${b === d.biome ? "selected" : ""}>${esc(b)}</option>`
+    ).join("");
+    $("#cp-actions").innerHTML = (d.actions || []).map(a => {
+      // Foraging goes through the narrated endpoint it always did.
+      const id = a.key === "herbalist:forage" ? "cp-forage" : "";
+      const attr = id ? `id="cp-forage"` :
+        `data-excursion="${esc(a.key)}" data-label="${esc(a.label)}"` +
+        (a.targets && a.targets.length
+          ? ` data-creature="${esc(a.targets[0].name)}"` : "");
+      const tip = [a.blurb || "", a.requires_note || "",
+                   a.available ? "" : a.why].filter(Boolean).join("
+
+");
+      return `<button type="button" ${attr} ${a.available ? "" : "disabled"}
+        title="${esc(tip)}">${esc(a.label)}<small>${esc(a.track)}${
+        a.level ? ` ${a.level}` : ""}</small></button>`;
+    }).join("") || `<div class="cp-busy">No craft actions here.</div>`;
+  } catch (err) { $("#err").textContent = err.message; }
+}
+
 // The craft-action excursion. The server narrates the setting-out, rolls the same
 // forage op the bench uses, narrates the finding and hands back three suggestions;
 // this only sequences what the player sees — opening first, the die landing on a real
@@ -1846,19 +1929,40 @@ document.addEventListener("click", async e => {
   if (e.target.closest("#craftaction")) {
     const panel = $("#craftpanel");
     panel.hidden = !panel.hidden;
-    if (!panel.hidden) {
-      try {
-        const f = await (await fetch("/api/forage/table")).json();
-        $("#cp-biome").textContent = f.here || "nowhere in particular";
-        $("#cp-desc").textContent = (f.table && f.table.describe) || "";
-        const busy = f.busy || "";
-        $("#cp-busy").hidden = !busy;
-        $("#cp-busy").textContent = busy;
-        $("#cp-forage").disabled = !!busy;
-      } catch (err) { $("#err").textContent = err.message; }
-    }
+    if (!panel.hidden) await loadCraftActions();
     return;
   }
+
+  // The debug teleport, on the hub rather than the bench.
+  if (e.target.closest("#cp-debug")) {
+    const pick = $("#cp-biomepick");
+    pick.hidden = !pick.hidden;
+    return;
+  }
+
+  // Everything that is not foraging: one excursion, one check, a haul into the pack.
+  const go = e.target.closest("[data-excursion]");
+  if (go) {
+    const hours = Math.max(1, Math.min(12, Number($("#cp-h").value) || 1));
+    $("#craftpanel").hidden = true;
+    busy(true);
+    try {
+      const d = await post("/api/craft/excursion",
+        { action: go.dataset.excursion, hours, creature: go.dataset.creature || "" });
+      busy(false);
+      await Dice3D.land({
+        title: go.dataset.label || "Excursion",
+        why: `DC ${d.dc}${d.bonus ? ` · your bonus +${d.bonus}` : ""}`,
+        sides: 20, result: d.roll,
+        note: d.found && d.found.length
+          ? d.found.map(h => `${h.name} ×${h.count}`).join(" · ")
+          : "Nothing worth carrying.",
+      });
+      render(await (await fetch("/api/state")).json());
+    } catch (err) { busy(false); $("#err").textContent = err.message; }
+    return;
+  }
+
   if (!e.target.closest("#cp-forage")) return;
 
   const hours = Math.max(1, Math.min(48, Number($("#cp-h").value) || 1));
@@ -1897,6 +2001,19 @@ document.addEventListener("click", async e => {
     $("#err").textContent = err.message;
   }
 });
+// The debug teleport itself. `travel` is the real op — the ground moves, and the
+// scene's own clock and biome move with it.
+document.addEventListener("change", async e => {
+  if (!e.target.closest("#cp-biomepick")) return;
+  busy(true);
+  try {
+    await post("/api/travel", { biome: e.target.value });
+    await loadCraftActions();
+    render(await (await fetch("/api/state")).json());
+  } catch (err) { $("#err").textContent = err.message; }
+  finally { busy(false); }
+});
+
 document.addEventListener("input", e => {
   if (e.target.closest("#cp-h")) $("#cp-hn").textContent = e.target.value;
 });
@@ -2305,6 +2422,21 @@ const TABS = [
 // tests/test_page_wiring.py pins /api/use into the served page so the next
 // disappearance fails a test instead of a player.
 document.addEventListener("click", async e => {
+  const wearBtn = e.target.closest("[data-wear]");
+  if (wearBtn) {
+    busy(true);
+    try {
+      render(await post("/api/wear", { item: wearBtn.dataset.wear,
+                                       off: !!wearBtn.dataset.off }));
+      $("#sheeterr") && ($("#sheeterr").textContent = "");
+    } catch (err) {
+      // Beside the sheet, not behind it: slot refusals are the reason a click did
+      // nothing, and the full-screen sheet hides #err completely.
+      const box = $("#sheeterr") || $("#err");
+      if (box) box.textContent = err.message;
+    } finally { busy(false); }
+    return;
+  }
   const btn = e.target.closest("[data-use]");
   if (!btn) return;
   btn.disabled = true;

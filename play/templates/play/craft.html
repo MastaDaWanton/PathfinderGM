@@ -55,6 +55,14 @@
   }
   .back:hover { color: var(--accent); border-bottom-color: var(--gold-dim); }
   nav { display: flex; gap: 2px; align-self: flex-end; flex-wrap: wrap; }
+  /* A craft may be practised by more than one rulebook. The second row is quieter
+     than the craft tabs on purpose: it is the same world class at the same level. */
+  #modes { display: flex; gap: 6px; padding: 4px 18px 0; }
+  #modes .mode { padding: 3px 10px; cursor: pointer; border-radius: 2px;
+                 border: 1px solid rgba(150,120,60,.3); background: transparent;
+                 color: var(--dim); font: 400 12px/1.2 Palatino, serif; }
+  #modes .mode.on { color: #ffe7b4; border-color: var(--gold);
+                    background: linear-gradient(rgba(60,48,26,.5), rgba(32,25,14,.5)); }
   .tab {
     background: linear-gradient(#171209, #100d08); color: var(--dim); cursor: pointer;
     border: 1px solid var(--edge); border-bottom: none; padding: 10px 18px 9px;
@@ -530,6 +538,7 @@ let REFUSED = {};
 // accept, rather than being counted twice in two places that can disagree.
 let BATCH_MAX = 0;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
+let MODE = "";                 // a secondary rulebook for this craft, if one is picked
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
 // Why foraging is refused right now, in the engine's own words, or "". Asked for with
@@ -561,7 +570,22 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
 
 // A glyph per kind and per method. Deliberately emoji rather than image files: the app
 // ships as one executable and must work offline, so anything fetched is a liability.
-const KIND_GLYPH = { "herb": "🌿", "fungus": "🍄", "monster part": "🦴", "poison": "☠️" };
+// The shelf's icons are per craft, sent with the track: a hide must not render as a
+// herb, and an ore must not either. Each craft declares its own map beside its
+// materials, so a new kind of material gets an icon in the same edit that invents it.
+// The fallback is a crate rather than a sprig — an unlabelled thing should look like a
+// thing, not like somebody else's herb.
+let KIND_GLYPH = { "herb": "🌿", "fungus": "🍄", "monster part": "🦴", "poison": "☠️" };
+const FALLBACK_GLYPH = "📦";
+
+// Adopt a craft's icons when its shelf arrives. Guarded: a response that carries no
+// map leaves the current one standing, because blanking the shelf to fall back on a
+// default is how every material ended up looking like a herb in the first place.
+function adoptGlyphs(track) {
+  if (track && track.glyphs && Object.keys(track.glyphs).length) {
+    KIND_GLYPH = Object.assign({}, track.glyphs);
+  }
+}
 const METHOD_GLYPH = {
   "grind": "⚗️", "mix": "🥣", "brew": "🫖", "preserve": "🧊", "extract": "🔪",
   "distill": "⚱️", "purify": "💧", "infuse": "✨", "neutralize": "🧪",
@@ -575,17 +599,38 @@ function tabs() {
     return `<button class="tab ${d.id === CRAFT ? "on" : ""}" data-craft="${d.id}">
       ${esc(d.name)}<small>${sub}</small></button>`;
   }).join("");
+  renderModes();
 }
 
-async function selectCraft(id) {
+// A craft may work by more than one rulebook. Enchanting is the first: the essence and
+// focus system it was built with, and Pathfinder's own +1 ladder beside it. Drawn as a
+// second row rather than more top-level tabs, because they are the same world class at
+// the same level — one trade, two ways of practising it.
+function renderModes() {
+  const row = $("#modes");
+  if (!row) return;
+  const t = STATE.tracks[CRAFT] || {};
+  const modes = t.modes || [];
+  if (!modes.length) { row.innerHTML = ""; row.hidden = true; return; }
+  row.hidden = false;
+  const own = `<button class="mode ${MODE ? "" : "on"}" data-mode=""
+    title="${esc(t.summary || "This craft's own system.")}">${esc(t.name || CRAFT)}</button>`;
+  row.innerHTML = own + modes.map(m =>
+    `<button class="mode ${MODE === m.id ? "on" : ""}" data-mode="${esc(m.id)}"
+      title="${esc(m.blurb || "")}">${esc(m.name)}</button>`).join("");
+}
+
+async function selectCraft(id, mode) {
   CRAFT = id;
+  MODE = mode || "";
   CHOSEN = []; USING = {}; CHAIN = []; PREVIEW = null;
   $("#err").textContent = "";
   tabs();
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
   const [r, ft] = await Promise.all([
-    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}${
+      MODE ? `&mode=${encodeURIComponent(MODE)}` : ""}`),
     fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
   ]);
   const d = await r.json();
@@ -598,6 +643,7 @@ async function selectCraft(id) {
   TABLE = d.table || null;
   if (STOCK.length) CONC_COST = STOCK[0].concentrates_to.cost;
   STATE.tracks[CRAFT] = d.track;
+  adoptGlyphs(d.track);
   renderBench();
   refresh();
 }
@@ -658,18 +704,11 @@ function renderGround() {
   g.innerHTML = `<div class="ground">
     <b>${esc(HERE || "nowhere in particular")}</b>
     <em>${esc(t.describe || "")}</em>
-    ${DEBUG ? `<select id="biomepick">${opts}</select>` : ""}
-    <div class="hours">
-      <label for="foragehours">Hours</label>
-      <input type="range" id="foragehours" min="1" max="48" value="${FORAGE_HOURS}">
-      <b id="hourlabel">${FORAGE_HOURS}</b>
-    </div>
-    <div class="sub" id="hourwarn">${BUSY ? "" : hourWarning(FORAGE_HOURS)}</div>
-    ${BUSY ? `<div class="sub busy">${esc(BUSY)}</div>` : ""}
+    <div class="sub">Going out for material — foraging, prospecting, skinning — is a
+      craft action at the table now, not a panel on the bench. The bench is for
+      working what you have.</div>
     <div class="row2">
-      <button class="mini" id="forage" ${BUSY ? "disabled" : ""}>Forage</button>
       <button class="mini" id="showtable">${SHOWTABLE ? "hide" : "roll table"}</button>
-      <button class="mini ghost" id="debugtoggle" title="Move the ground underfoot without walking there. For testing.">${DEBUG ? "hide debug" : "debug"}</button>
     </div>
     ${SHOWTABLE ? `<div id="tablewrap">${
       t.rows.length ? `<table>${t.rows.map(r =>
@@ -746,7 +785,7 @@ function renderShelf() {
               i.usable ? "" : ", beyond your tier"}${
               no ? `\n\n${esc(CHAIN.join(" → "))}: ${esc(no)}.` : ""
             }\n\n${esc(i.text).slice(0, 400)}">
-      <span class="glyph">${KIND_GLYPH[i.kind] || "🌿"}</span>
+      <span class="glyph">${KIND_GLYPH[i.kind] || FALLBACK_GLYPH}</span>
       <b>${esc(i.name)}</b>
       ${i.held ? `<span class="held">×${i.held}</span>` : ""}
       ${no ? `<span class="nomark" aria-hidden="true">✕</span>` : ""}
@@ -756,12 +795,31 @@ function renderShelf() {
     || `<div class="problems">Nothing on the shelf matches that.</div>`;
 }
 
+function stationTip(t, method, level, known) {
+  // "what bonus it a gives and what you need it for" — the three sentences the track
+  // authored, plus the level that unlocks it when it is still out of reach. Built here
+  // rather than in the template string so an absent field leaves no dangling label.
+  const h = (t.method_help || {})[method] || {};
+  const lines = [];
+  if (h.does) lines.push(`Does: ${h.does}`);
+  if (h.needs) lines.push(`Needs: ${h.needs}`);
+  if (h.for) lines.push(`For: ${h.for}`);
+  if (!lines.length && (t.descriptions || {})[method]) {
+    lines.push((t.descriptions || {})[method]);
+  }
+  if (!known) lines.push(`Learned at ${t.name} ${level}.`);
+  return lines.join("
+
+") || method;
+}
+
 function renderStations() {
   const t = STATE.tracks[CRAFT];
   $("#stations").innerHTML = (t.all_methods || []).map(m => `
     <button class="station ${m.known ? "" : "locked"}" data-method="${esc(m.method)}"
-            ${m.known ? "" : "disabled"}>
-      <span class="glyph">${METHOD_GLYPH[m.method] || "⚗️"}</span>
+            ${m.known ? "" : "disabled"}
+            title="${esc(stationTip(t, m.method, m.level, m.known))}">
+      <span class="glyph">${METHOD_GLYPH[m.method] || FALLBACK_GLYPH}</span>
       ${esc(m.method)}
       ${m.known ? "" : `<em>${esc(t.name)} ${m.level}</em>`}
     </button>`).join("");
@@ -770,7 +828,11 @@ function renderStations() {
 function renderChain() {
   $("#chainrow").innerHTML = CHAIN.length
     ? CHAIN.map((m, i) => `${i ? '<span class="arrow">→</span>' : ""}
-        <button class="step" data-step="${i}" title="Remove">${esc(m)}</button>`).join("")
+        <button class="step" data-step="${i}" title="${
+          esc(stationTip(STATE.tracks[CRAFT] || {}, m, 1, true))}
+
+Click to remove."
+          >${esc(m)}</button>`).join("")
     : `<span class="empty">No method chosen — pick stations above, in the order you work them.</span>`;
   const raw = CHOSEN.map(id => {
     const i = SHELF.find(x => x.id === id) || { name: id };
@@ -884,7 +946,7 @@ async function refresh() {
   let answer = null;
   try {
     answer = await post("/api/craft/preview",
-      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING });
+      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, methods: CHAIN, stock: USING });
   } catch (e) { $("#err").textContent = e.message; }
   REFUSED = (answer && answer.refused) || {};
   BATCH_MAX = (answer && answer.batch_max) || 0;
@@ -952,6 +1014,8 @@ document.addEventListener("input", e => {
 
 document.addEventListener("click", async e => {
   const tab = e.target.closest("[data-craft]");
+  const modeBtn = e.target.closest("[data-mode]");
+  if (modeBtn) { await selectCraft(CRAFT, modeBtn.dataset.mode); return; }
   if (tab) { await selectCraft(tab.dataset.craft); return; }
 
   const jar = e.target.closest("[data-ing]");
@@ -1022,9 +1086,10 @@ $("#craft").addEventListener("click", async () => {
   try {
     const asked = Math.max(1, Math.floor(Number($("#batch")?.value) || 1));
     const d = await post("/api/craft/do",
-      { craft: CRAFT, ingredients: CHOSEN, methods: CHAIN, stock: USING,
+      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, methods: CHAIN, stock: USING,
         name: PREVIEW?.name, batch: asked });
     STATE.tracks[CRAFT] = d.track;
+    adoptGlyphs(d.track);
     // Spent doses are gone; leaving them selected offers the player stock they no
     // longer have and the next preview refuses it.
     USING = {};
@@ -1106,7 +1171,8 @@ document.addEventListener("change", async e => {
 
 async function reloadShelf() {
   const [r, ft] = await Promise.all([
-    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}`),
+    fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}${
+      MODE ? `&mode=${encodeURIComponent(MODE)}` : ""}`),
     fetch(`/api/forage/table?craft=${encodeURIComponent(CRAFT)}`),
   ]);
   const d = await r.json();
@@ -1115,6 +1181,7 @@ async function reloadShelf() {
   TABLE = d.table || null; BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
   BUSY = f.busy || "";
   STATE.tracks[CRAFT] = d.track;
+  adoptGlyphs(d.track);
   renderShelf();
   await refresh();
 }
