@@ -134,8 +134,43 @@ def _track_state(campaign, disc: dict) -> dict:
         "descriptions": _raw_track(track).get("method_descriptions") or {},
         # Secondary tabs — the enchanter's book-faithful magic-item mode is the first.
         "modes": benches.modes_for(track.id),
+        # What this craft can be told to make, if it needs telling. A forge shapes a
+        # base item and a tannery cuts a pattern; herbalism names its output from what
+        # went in the pot and answers with an empty list, which is how the page knows
+        # not to draw the row at all.
+        "shapes": _shapes_for(track.id),
         "glyphs": benches.glyphs().get(track.id, {}),
+        "method_glyphs": benches.method_glyphs(track.id),
     }
+
+
+def _shapes_for(track_id: str) -> list[str]:
+    """The base items or patterns this craft can be asked for.
+
+    Asked of the module rather than listed here, so a craft that learns to make a new
+    kind of thing does not need this file edited. A craft that names its own output —
+    herbalism — declares nothing and the bench draws no row.
+    """
+    try:
+        mod = benches.module_for(track_id)
+    except benches.UnknownBench:
+        return []
+    for attr in ("SHAPES", "PRODUCTS", "BASE_ITEMS"):
+        got = getattr(mod, attr, None)
+        if isinstance(got, dict):
+            return sorted(got)
+        if isinstance(got, (list, tuple)):
+            return sorted(str(x) for x in got)
+    # A craft that resolves a base item against the real weapon and armour tables can
+    # be asked for anything in them — the forge is the case: it declares no list of its
+    # own because the list is the rulebook's, and duplicating 456 weapon names into the
+    # module would be a second copy to keep level with the first.
+    if hasattr(mod, "base_item"):
+        from rules.tables import ARMOUR
+        from rules.weapons import all_weapons
+
+        return sorted({str(w) for w in all_weapons()} | {str(a) for a in ARMOUR})
+    return []
 
 
 def _raw_track(track) -> dict:
@@ -283,10 +318,20 @@ def craft_ingredients(request):
         # slice, and a count of zero on everything would read as a bug rather than
         # a not-yet.
         mats = _craft_materials(disc["track"])
+        # What is actually in the satchel, the same way the herb shelf reports it. Left
+        # off, every forge material read as "none carried" and the "only what I am
+        # carrying" filter emptied the shelf — the bench could not tell you that you
+        # were holding the very ore you had just dug up.
+        pc = c.scene.pc()
+        satchel = dict(pc.inventory) if pc else {}
         for d in mats:
             d["usable"] = bool(ceiling) and int(d.get("rank", 1)) <= ceiling
-        return JsonResponse({"ingredients": mats, "stock": [], "track": state,
-                             "biome": c.biome,
+            d["held"] = int(satchel.get(d["id"], 0))
+        return JsonResponse({"ingredients": mats,
+                             "stock": [s.as_dict() for s in
+                                       sorted(_stock_of(c, disc["id"]).values(),
+                                              key=lambda s: s.name.lower())],
+                             "track": state, "biome": c.biome,
                              "biome_describe": biomes.describe(c.biome)})
 
     out = []
@@ -352,7 +397,7 @@ def craft_preview(request):
         chain = benches.chain_from_body(state["track"], body, mode)
         result = benches.preview(
             state["track"], state["level"], chain, mode=mode,
-            stock=_stock_of(c, disc["id"]),
+            stock=_bench_stock(c, disc),
             satchel=dict(pc.inventory) if pc else {},
             carrier=pc, actor=pc, now_minute=c.scene.clock_minutes,
             at_night=_is_night(c), item=body.get("item"), vessel=body.get("item"))
@@ -594,7 +639,13 @@ def _one_craft(c, disc, state, result) -> dict:
     pc = c.scene.pc()
     spent = {}
     for sid, n in result.consumes.items():
+        # A material may be a crafted jar on the shelf or a raw thing in the satchel.
+        # Herbalism keeps those in two fields and spends them separately; the four newer
+        # crafts put everything in `consumes`, so asking only the shelf spent nothing at
+        # all — a forge chain could be attempted forever on the same four bars of steel.
         took = pc.take_stock(sid, n)
+        if not took:
+            took = pc.spend(sid, n)
         if took:
             spent[sid] = took
 

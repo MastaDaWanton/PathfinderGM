@@ -1089,8 +1089,9 @@ function paneHomebrew() {
       ${b.id === "spells" ? paneSpells() : ""}
       ${b.id === "rulesets" ? paneRules() : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
-      ${b.builder === "page" ? `<p class="note"><a class="pick" style="display:inline-block;
-        padding:8px 14px;border:1px solid var(--rule);border-radius:2px;
+      ${b.builder === "page" ? `<p class="note"><a style="display:inline-block;
+        padding:8px 14px;border:1px solid var(--gold-dim);border-radius:2px;
+        color:var(--gold);text-decoration:none;cursor:pointer;
         background:linear-gradient(#2a2114,#1a140c)"
         href="${esc(b.builder_url)}">Open the class builder →</a></p>
         <p class="note">A class is a level table, a set of features and — if it wants

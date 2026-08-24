@@ -317,6 +317,14 @@
      the slack in this column sat *outside* it and the pot had no room to centre in. The
      empty space belongs to the inner box or the centring does nothing. */
   .panel .inner.chainside { display: flex; flex-direction: column; flex: 1; }
+  /* The shaping row. Same sunken well as the forge's own inputs. */
+  .shape { display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; }
+  .shape label { color: var(--dim); font: 400 12px/1 var(--body); letter-spacing: .05em;
+                 text-transform: uppercase; }
+  .shape input { flex: 1; padding: 5px 8px; border-radius: 2px;
+                 border: 1px solid rgba(150,120,60,.35); background: var(--sunk, #0c0a08);
+                 color: #e8c9a0; font: 400 13px/1.2 Palatino, serif; }
+  .shape input:focus { outline: none; border-color: var(--gold); }
   .pot { text-align: center; padding: 16px 0 10px; flex: 1;
          display: flex; flex-direction: column; justify-content: center; }
   .cauldron { font-size: 54px; line-height: 1; filter: drop-shadow(0 0 14px rgba(111,207,143,.30)); }
@@ -542,6 +550,7 @@ let REFUSED = {};
 let BATCH_MAX = 0;
 let CONC_COST = 2;             // server's rule; refreshed with the shelf
 let MODE = "";                 // a secondary rulebook for this craft, if one is picked
+let SHAPE = "";                // what is being made, for the crafts that shape things
 let HERE = "";                 // the biome underfoot
 let BIOMES = [];               // everywhere the party could be
 // Why foraging is refused right now, in the engine's own words, or "". Asked for with
@@ -588,8 +597,11 @@ function adoptGlyphs(track) {
   if (track && track.glyphs && Object.keys(track.glyphs).length) {
     KIND_GLYPH = Object.assign({}, track.glyphs);
   }
+  if (track && track.method_glyphs && Object.keys(track.method_glyphs).length) {
+    METHOD_GLYPH = Object.assign({}, track.method_glyphs);
+  }
 }
-const METHOD_GLYPH = {
+let METHOD_GLYPH = {
   "grind": "⚗️", "mix": "🥣", "brew": "🫖", "preserve": "🧊", "extract": "🔪",
   "distill": "⚱️", "purify": "💧", "infuse": "✨", "neutralize": "🧪",
   "refine": "💎", "catalyst crafting": "🌟",
@@ -681,6 +693,16 @@ function renderBench() {
       <div class="inner chainside">
         <div class="stations" id="stations"></div>
         <div class="chain" id="chainrow"></div>
+        <!-- What is being made, for the crafts that need to be told. A forge shapes
+             metal into a *thing* — "Forging needs a shape: say what is being made" was
+             the refusal with nowhere to answer it — and a tannery cuts a pattern. Hidden
+             for herbalism, which names its output from what went in the pot. -->
+        <div class="shape" id="shaperow" hidden>
+          <label for="shape">Shaping</label>
+          <input id="shape" type="text" list="shapes" autocomplete="off"
+                 placeholder="longsword, breastplate, cloak…">
+          <datalist id="shapes"></datalist>
+        </div>
         <div class="pot" id="pot">
           <div class="cauldron">🍲</div>
           <div class="in" id="potin"></div>
@@ -826,6 +848,21 @@ function renderStations() {
     </button>`).join("");
 }
 
+// Which crafts need to be told what they are making, and what they may be told. Read
+// off the track's own answer rather than hard-coded here: a craft that shapes things
+// says so, and one that names its output from its inputs never shows the row.
+function renderShape() {
+  const row = $("#shaperow");
+  if (!row) return;
+  const t = STATE.tracks[CRAFT] || {};
+  const shapes = t.shapes || [];
+  row.hidden = !shapes.length;
+  if (!shapes.length) { SHAPE = ""; return; }
+  $("#shapes").innerHTML = shapes.map(s =>
+    `<option value="${esc(s)}"></option>`).join("");
+  $("#shape").placeholder = shapes.slice(0, 3).join(", ") + "…";
+}
+
 function renderChain() {
   $("#chainrow").innerHTML = CHAIN.length
     ? CHAIN.map((m, i) => `${i ? '<span class="arrow">→</span>' : ""}
@@ -850,7 +887,13 @@ function renderPreview(p) {
   if (!el) return;
   if (!p) { el.innerHTML = `<div class="problems">Put something in the pot.</div>`; return; }
 
-  const inferred = p.ingredients.some(i => i.tier_inferred);
+  // Herbalism's Result calls them `ingredients`, the four newer crafts call them
+  // `materials`, and this line read one of the two. `p.ingredients.some` threw on every
+  // forge chain, the exception left the panel showing whatever it said before, and the
+  // bench looked like it was ignoring a pot with two things visibly in it — a preview
+  // the server had already answered correctly.
+  const parts = p.ingredients || p.materials || [];
+  const inferred = parts.some(i => i && i.tier_inferred);
   // A line naming the source, dimmed, then the mechanic: "Leechwort: +2 Heal checks to
   // staunch bleeding" reads as one card entry rather than two.
   const sourced = x => {
@@ -870,22 +913,27 @@ function renderPreview(p) {
   // Purify's own sentences are appended to the effect list so they survive into the jar's
   // card in inventory. On the bench they have a section of their own, so the Effects list
   // shows only what the thing still does.
-  const benefits = p.effects.filter(x => !removed.includes(x));
+  const benefits = (p.effects || []).filter(x => !removed.includes(x));
   el.innerHTML = `
     <div class="out-title"><b>${esc(p.name)}</b></div>
     <div class="meta">
       <span>Rarity</span><div>${esc(p.tier)}</div>
       <span>Stages</span><div>${p.stages}</div>
-      <span>Potency</span><div>×${p.potency.toFixed(2)}</div>
+      ${typeof p.potency === "number"
+        ? `<span>Potency</span><div>×${p.potency.toFixed(2)}</div>` : ""}
+      ${p.quality && p.quality !== "plain"
+        ? `<span>Quality</span><div>${esc(p.quality)}</div>` : ""}
       <span>Difficulty</span><div>DC ${p.dc}</div>
       <span>Chance</span><div>${p.chance}%</div>
     </div>
     ${Object.keys(p.consumes || {}).length ? `<h3>Spends</h3>
       <ul class="fx">${Object.entries(p.consumes).map(([id, n]) => {
-        const s = STOCK.find(x => x.id === id) || { name: id };
+        const s = STOCK.find(x => x.id === id)
+                || SHELF.find(x => x.id === id)
+                || { name: id.replace(/-/g, " ") };
         return `<li class="bad">${n}× ${esc(s.name)}</li>`;
       }).join("")}</ul>` : ""}
-    ${p.problems.length ? `<h3>Cannot be made</h3>
+    ${(p.problems || []).length ? `<h3>Cannot be made</h3>
       <ul class="fx problems">${p.problems.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
     <h3>Effects</h3>
     ${benefits.length
@@ -937,6 +985,7 @@ function renderMastery() {
 
 async function refresh() {
   renderChain();
+  renderShape();
   renderMastery();
   // An empty pot used to return here, which meant choosing "brew" first — the order most
   // people work in — greyed nothing at all and the rules read as broken. An empty pot is
@@ -945,7 +994,8 @@ async function refresh() {
   let answer = null;
   try {
     answer = await post("/api/craft/preview",
-      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, methods: CHAIN, stock: USING });
+      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, materials: CHOSEN,
+        base: SHAPE, item: SHAPE, product: SHAPE, pattern: SHAPE, methods: CHAIN, stock: USING });
   } catch (e) { $("#err").textContent = e.message; }
   REFUSED = (answer && answer.refused) || {};
   BATCH_MAX = (answer && answer.batch_max) || 0;
@@ -990,6 +1040,16 @@ function buttons() {
 
 // Typing in the count re-labels Craft without going back to the server: the chain has not
 // changed, only how many times it is to be worked.
+// Typing a shape re-previews: the refusal "say what is being made" must clear as soon
+// as it is answered, not on the next click somewhere else.
+let _shapeTimer = null;
+document.addEventListener("input", e => {
+  if (!e.target.closest("#shape")) return;
+  SHAPE = e.target.value.trim();
+  clearTimeout(_shapeTimer);
+  _shapeTimer = setTimeout(refresh, 300);
+});
+
 document.addEventListener("input", e => {
   if (e.target.closest("#batch")) buttons();
 });
@@ -1085,7 +1145,8 @@ $("#craft").addEventListener("click", async () => {
   try {
     const asked = Math.max(1, Math.floor(Number($("#batch")?.value) || 1));
     const d = await post("/api/craft/do",
-      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, methods: CHAIN, stock: USING,
+      { craft: CRAFT, mode: MODE, ingredients: CHOSEN, materials: CHOSEN,
+        base: SHAPE, item: SHAPE, product: SHAPE, pattern: SHAPE, methods: CHAIN, stock: USING,
         name: PREVIEW?.name, batch: asked });
     STATE.tracks[CRAFT] = d.track;
     adoptGlyphs(d.track);

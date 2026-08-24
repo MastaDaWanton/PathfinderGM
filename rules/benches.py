@@ -163,6 +163,53 @@ def glyphs() -> dict[str, dict[str, str]]:
     return out
 
 
+# A glyph for every station, per craft. Materials got their icons from each craft's own
+# module; methods did not, so every forge, tannery, laboratory and circle station on the
+# bench rendered as the fallback crate — eleven identical boxes where the herb bench has
+# a still, a mortar and a teapot. Kept here rather than in four modules because a method
+# name is the bench's vocabulary and this is the bench's routing table; a craft that
+# wants to override declares its own `METHOD_GLYPH` and it wins.
+METHOD_GLYPHS: dict[str, dict[str, str]] = {
+    "herbalist": {
+        "grind": "⚗️", "mix": "🥣", "brew": "🫖", "preserve": "🧊", "extract": "🔪",
+        "distill": "⚱️", "purify": "💧", "infuse": "✨", "neutralize": "🧪",
+        "refine": "💎", "catalyst crafting": "🌟",
+    },
+    "blacksmith": {
+        "smelt": "🔥", "forge": "🔨", "quench": "💧", "flux": "🧱", "rivet": "🔩",
+        "alloy": "⚗️", "temper": "🌡️", "draw": "🧲", "fold": "📐", "hone": "🪒",
+        "polish": "✨",
+    },
+    "leatherworker": {
+        "skin": "🔪", "flense": "🪒", "cure": "🧂", "tan": "🛢️", "oil": "🧴",
+        "dye": "🎨", "cut": "✂️", "tool": "🖋️", "stitch": "🧵", "harden": "🔥",
+        "line": "🧶",
+    },
+    "alchemist": {
+        "calcine": "🔥", "dissolve": "💧", "filter": "🧫", "precipitate": "🧂",
+        "react": "💥", "stabilize": "⚖️", "sublime": "☁️", "catalyze": "💠",
+        "seal": "🧴",
+    },
+    "enchanter": {
+        "attune": "🧿", "scribe": "🖋️", "bind": "🔗", "seal": "📿", "focus": "💎",
+        "channel": "⚡", "imbue": "✨", "empower": "⭐", "awaken": "👁️",
+    },
+}
+
+
+def method_glyphs(track_id: str) -> dict[str, str]:
+    """The station icons for one craft. A module's own map wins over the table above."""
+    key = (track_id or "").strip().lower()
+    try:
+        mod = module_for(key)
+    except UnknownBench:
+        return dict(METHOD_GLYPHS.get(key, {}))
+    own = getattr(mod, "METHOD_GLYPH", None)
+    if isinstance(own, dict) and own:
+        return dict(own)
+    return dict(METHOD_GLYPHS.get(key, {}))
+
+
 def acquisitions() -> list[dict]:
     """Every excursion every craft offers, each tagged with the track that owns it.
 

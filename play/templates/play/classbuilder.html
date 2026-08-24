@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,106 +6,309 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Class builder — Pathfinder GM</title>
 <style>
+  /* The bench's own vocabulary, not a second one. Everything below is the craft page's
+     and the shelf's: the same two faces, the same palette, the same leather writing
+     surface, the same tabs, the same alarm and confirm colours. A page that authors a
+     class should not look like a different application from the page that brews a tea. */
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
+  }
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
+    src: local("Cinzel SemiBold"), url("{% static 'fonts/Cinzel-SemiBold.woff2' %}") format("woff2");
+  }
   :root {
-    --ink: #e8e2d4; --dim: #a89f8c; --line: #3b332a; --bg: #17130f; --card: #1f1a14;
-    --accent: #c9a227; --bad: #d4705e; --ok: #7fa66b;
+    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --bg: #0f0d0b; --panel: #17130f; --edge: #3a2f22; --ink: #e6dcc6;
+    --dim: #8e816a; --accent: #c9a86a; --alarm: #a8443a;
+    --gold: #d9c08a; --gold-dim: #7a6543; --sunk: #0c0a08;
+    --brew: #6fcf8f; --brew-dim: #2f5f42;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.5 Georgia, "Times New Roman", serif; }
-  a { color: var(--accent); }
-  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-           padding: 14px 20px; border-bottom: 1px solid var(--line); background: #120f0c; }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: .04em; }
-  header .why { color: var(--dim); font-size: 13px; margin: 0; flex: 1 1 320px; }
-  .layout { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 58px); }
-  nav { border-right: 1px solid var(--line); padding: 14px 0; background: #14100c; }
-  nav button { display: block; width: 100%; text-align: left; background: none;
-               border: 0; border-left: 3px solid transparent; color: var(--ink);
-               padding: 8px 16px; font: inherit; cursor: pointer; }
-  nav button:hover { background: #1d1813; }
-  nav button.on { border-left-color: var(--accent); background: #221c15; }
-  nav button .badge { float: right; background: var(--bad); color: #1a1209;
-                      border-radius: 9px; padding: 0 7px; font-size: 12px; }
-  nav .adv { color: var(--dim); font-size: 12px; padding: 12px 16px 4px;
-             text-transform: uppercase; letter-spacing: .1em; }
-  main { padding: 18px 24px 80px; max-width: 1100px; }
-  h2 { font-size: 19px; margin: 0 0 4px; }
-  .blurb { color: var(--dim); font-size: 14px; margin: 0 0 18px; }
-  .field { margin: 0 0 16px; }
-  .field > label { display: block; font-size: 14px; letter-spacing: .02em; }
-  .field .help { color: var(--dim); font-size: 12.5px; margin: 2px 0 5px; }
-  .field .consumer { color: #6f6857; font-size: 11.5px; font-family: monospace;
-                     margin: 3px 0 0; }
-  input, textarea, select { background: #120f0b; color: var(--ink);
-    border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px;
-    font: 14px/1.4 Georgia, serif; width: 100%; }
-  input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
-  textarea { min-height: 66px; }
-  .req { color: var(--accent); }
-  button.act { background: #2a2219; color: var(--ink); border: 1px solid var(--line);
-               border-radius: 3px; padding: 6px 12px; font: 14px Georgia, serif;
-               cursor: pointer; }
-  button.act:hover { border-color: var(--accent); }
-  button.act.go { background: var(--accent); color: #17130f; border-color: var(--accent); }
-  button.small { padding: 2px 8px; font-size: 13px; }
-  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-  .card { border: 1px solid var(--line); background: var(--card); border-radius: 4px;
-          padding: 12px 14px; margin: 0 0 12px; }
-  .card h4 { margin: 0 0 8px; font-size: 15px; }
-  table.levels { width: 100%; border-collapse: collapse; font-size: 14px; }
-  table.levels th, table.levels td { border: 1px solid var(--line); padding: 3px 5px; }
-  table.levels th { color: var(--dim); font-weight: normal; font-size: 12.5px; }
-  table.levels td.lv { text-align: center; width: 44px; color: var(--dim); }
-  #problems { position: sticky; top: 0; z-index: 5; background: #1b120f;
-              border: 1px solid #4a2a22; border-radius: 4px; padding: 10px 12px;
-              margin: 0 0 16px; font-size: 13.5px; }
-  #problems.clean { background: #131a11; border-color: #2f4425; }
-  #problems ul { margin: 6px 0 0; padding-left: 18px; }
-  #problems li { margin: 3px 0; cursor: pointer; }
-  #problems code { color: var(--dim); font-family: monospace; }
-  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 10px;
-          padding: 0 8px; font-size: 12px; color: var(--dim); }
-  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
-  .ability { display: grid; grid-template-columns: 1.4fr 1.2fr 90px 1fr 34px; gap: 6px;
-             align-items: center; margin-bottom: 5px; }
-  .ability .lbl { color: var(--dim); font-size: 11.5px; }
-  .tier { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 8px; }
-  .kv { display: grid; grid-template-columns: 1fr 2fr 34px; gap: 6px; margin-bottom: 5px; }
-  .note { color: var(--dim); font-size: 12.5px; }
+  body {
+    /* Fixed frame, scrolling panes — the rule the table, the bench and the shelf all
+       needed. A grid child will not shrink below its content without `min-height: 0`. */
+    margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+    background:
+      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
+      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
+  }
+
+  /* --- banner ------------------------------------------------------------------ */
+  header {
+    border-bottom: 1px solid var(--gold-dim); padding: 0 30px;
+    background:
+      linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
+      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+    background-size: auto, 340px auto;
+    display: flex; align-items: flex-end; gap: 26px; flex-wrap: wrap;
+  }
+  h1 {
+    margin: 16px 0; color: var(--gold); white-space: nowrap;
+    font: 400 27px/1 var(--display); letter-spacing: .09em; font-variant: small-caps;
+  }
+  h1 small { display: block; margin-top: 6px; color: var(--dim);
+             font: italic 12px/1 var(--body); letter-spacing: .02em;
+             font-variant: normal; }
+  .who {
+    margin-bottom: 17px; color: var(--gold); font: 400 15px/1 var(--display);
+    letter-spacing: .06em; font-variant: small-caps;
+  }
+  .who span { color: var(--dim); font: italic 12px/1 var(--body);
+              font-variant: normal; letter-spacing: 0; }
+  .back {
+    margin-left: auto; margin-bottom: 18px; color: var(--dim); text-decoration: none;
+    font: 14px/1 var(--body); border-bottom: 1px solid transparent; white-space: nowrap;
+  }
+  .back:hover { color: var(--accent); border-bottom-color: var(--gold-dim); }
+
+  /* --- the strip that opens and keeps a class --------------------------------- */
+  .strip {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 30px; border-bottom: 1px solid #2b2319;
+    background: linear-gradient(rgba(20, 15, 9, .35), rgba(10, 8, 5, .55));
+  }
+  .strip label { color: var(--dim); font: 400 12px/1 var(--display);
+                 letter-spacing: .12em; font-variant: small-caps; }
+  .strip .grow { flex: 1; }
+  .strip select {
+    padding: 6px 9px; font: 13px var(--body); color: var(--ink);
+    background: var(--sunk); border: 1px solid var(--edge); border-radius: 2px;
+    max-width: 250px;
+  }
+  .strip select:focus { outline: none; border-color: var(--gold-dim); }
+  #saved { color: var(--dim); font: italic 12.5px/1.4 var(--body); }
+  #saved.done { color: var(--brew); font-style: normal; }
+
+  button.quiet {
+    cursor: pointer; font: 400 13px/1 var(--display); letter-spacing: .08em;
+    font-variant: small-caps; padding: 8px 15px; border-radius: 2px;
+    color: var(--gold); background: linear-gradient(#2a2114, #1a140c);
+    border: 1px solid var(--gold-dim);
+  }
+  button.quiet:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  button.quiet:disabled { opacity: .35; cursor: not-allowed; }
+  button.go {
+    cursor: pointer; font: 400 15px/1 var(--display); letter-spacing: .1em;
+    font-variant: small-caps; padding: 10px 22px; border-radius: 2px; color: var(--brew);
+    background: linear-gradient(#1f3327, #16241c); border: 1px solid var(--brew-dim);
+  }
+  button.go:hover { border-color: var(--brew); color: #b6f0ca; }
+  .mini {
+    background: linear-gradient(#22190f, #150f09); border: 1px solid var(--edge);
+    border-radius: 2px; padding: 4px 10px; cursor: pointer; color: var(--gold);
+    font: 400 12px/1.3 var(--display); letter-spacing: .05em; font-variant: small-caps;
+  }
+  .mini:hover { border-color: var(--accent); color: #f0dcae; }
+  .mini.drop { color: var(--dim); padding: 2px 8px; }
+  .mini.drop:hover { border-color: var(--alarm); color: #d9a49c; }
+  .mini.add { border-style: dashed; }
+  .mini.add:hover { border-style: solid; }
+
+  /* --- the rail of sections, which is the craft page's tabs stood on end ------- */
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: 246px 1fr;
+         gap: 26px; padding: 18px 30px 0; }
+  nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+        padding-bottom: 30px; }
+  .tab {
+    background: linear-gradient(#171209, #100d08); color: var(--dim); cursor: pointer;
+    border: 1px solid var(--edge); border-right: none; padding: 9px 14px;
+    border-radius: 3px 0 0 3px; font: 400 15px/1.2 var(--display);
+    letter-spacing: .06em; font-variant: small-caps; text-align: left;
+    position: relative; left: 1px; display: flex; align-items: center; gap: 8px;
+  }
+  .tab:hover:not(.on) { color: var(--ink); }
+  .tab.on {
+    color: var(--gold);
+    background:
+      linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 340px auto;
+    border-color: var(--gold-dim); box-shadow: inset 2px 0 0 rgba(217,192,138,.22);
+  }
+  .tab .grow { flex: 1; }
+  /* A section with something wrong in it, in the alarm colour the bench already uses
+     for a chain it will not make — so a refusal reads the same wherever it comes from. */
+  .tab .badge {
+    background: rgba(110,31,31,.35); border: 1px solid #6b322a; color: #d9a49c;
+    border-radius: 9px; padding: 0 7px; font: 600 11px/1.6 var(--body);
+    letter-spacing: 0; font-variant: normal;
+  }
+  .railhead {
+    margin: 16px 0 5px; color: var(--gold); font: 400 11px/1.4 var(--display);
+    letter-spacing: .14em; font-variant: small-caps; padding: 0 0 5px 2px;
+    border-bottom: 1px solid #2b2319;
+  }
+  .railhead em { display: block; color: var(--dim); font: italic 10.5px/1.4 var(--body);
+                 letter-spacing: 0; font-variant: normal; margin-top: 3px; }
+
+  /* --- the writing surface ------------------------------------------------------
+     A leather page, not a bound cover: the same treatment the effect builder and the
+     forge use, and for the reason stated there — a form is a page in the book, so it
+     takes the grain and the gold edge but none of the ironmongery. */
+  .leaf {
+    overflow-y: auto; margin-bottom: 0; padding: 20px 26px 60px;
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
+  }
+  h2.sect {
+    margin: 0 0 4px; color: var(--gold); font: 400 20px/1.2 var(--display);
+    letter-spacing: .1em; font-variant: small-caps; padding-bottom: 7px;
+    border-bottom: 1px solid #2b2319;
+  }
+  h3.sub {
+    margin: 20px 0 9px; color: var(--gold); font: 400 13px/1 var(--display);
+    letter-spacing: .12em; font-variant: small-caps; padding-bottom: 5px;
+    border-bottom: 1px solid #2b2319;
+  }
+  .note { color: var(--dim); font: italic 14px/1.6 var(--body); margin: 9px 0 18px; }
+
+  /* --- one field --------------------------------------------------------------- */
+  .field { margin: 0 0 17px; }
+  .field > label, .kvhead {
+    display: block; color: var(--gold); font: 400 13px/1.5 var(--display);
+    letter-spacing: .08em; font-variant: small-caps;
+  }
+  .field .req { color: var(--accent); }
+  .field .help { color: var(--dim); font: italic 12.5px/1.5 var(--body);
+                 margin: 1px 0 6px; }
+  .field .help i { color: var(--gold-dim); font-style: italic; }
+  /* The half of this page that is the point: which engine mechanism reads the value,
+     or the honest admission that nothing does. Quiet, monospace, always there. */
+  .consumer {
+    margin-top: 4px; color: var(--gold-dim);
+    font: 11px/1.4 ui-monospace, Consolas, monospace;
+  }
+  .consumer.none { color: #7a6a5a; font-style: italic;
+                   font-family: var(--body); font-size: 11.5px; }
+
+  input, textarea, select {
+    width: 100%; padding: 7px 10px; font: 14px var(--body); color: var(--ink);
+    background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a;
+    border-radius: 2px; box-shadow: inset 0 2px 6px rgba(0,0,0,.5);
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 72px; resize: vertical; line-height: 1.55; }
+  input[type=checkbox] { width: auto; box-shadow: none; accent-color: #c9a86a; }
+
+  /* --- the validation banner --------------------------------------------------- */
+  #problems {
+    border: 1px solid #4a2620; background: rgba(110,31,31,.14);
+    border-left: 3px solid var(--alarm); border-radius: 2px;
+    padding: 11px 15px; margin: 0 0 18px; color: #d08a7c; font-size: 14px;
+  }
+  #problems.clean {
+    border-color: rgba(47,95,66,.7); border-left-color: var(--brew);
+    background: rgba(111,207,143,.07); color: var(--ink);
+  }
+  #problems b { color: var(--alarm); font: 400 15px/1.4 var(--display);
+                letter-spacing: .06em; font-variant: small-caps; }
+  #problems.clean b { color: var(--brew); }
+  #problems .note { margin: 0; display: inline; }
+  #problems ul { margin: 7px 0 0; padding-left: 17px; }
+  #problems li { margin: 3px 0; cursor: pointer; line-height: 1.5; }
+  #problems li:hover { color: #f0b9ad; }
+  #problems code { color: var(--gold-dim);
+                   font: 11.5px/1.4 ui-monospace, Consolas, monospace; }
+
+  /* --- the level table --------------------------------------------------------- */
+  table.levels { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.levels th {
+    color: var(--gold); font: 400 11.5px/1.4 var(--display); letter-spacing: .1em;
+    font-variant: small-caps; text-align: left; font-weight: 400;
+    padding: 3px 6px; border-bottom: 1px solid #2b2319;
+  }
+  table.levels td { padding: 2px 4px; border-bottom: 1px solid #241d15; }
+  table.levels td.lv { width: 34px; text-align: center; color: var(--gold-dim);
+                       font-variant-numeric: tabular-nums; }
+  table.levels input { padding: 4px 7px; font-size: 13px; }
+  table.levels td.col input { width: 82px; }
+  table.levels tr:hover td.lv { color: var(--gold); }
+  .toolrow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
+             flex-wrap: wrap; }
+
+  /* --- repeating structures ----------------------------------------------------- */
+  .rowcard {
+    border: 1px solid rgba(201,168,106,.22); border-left: 2px solid var(--gold-dim);
+    border-radius: 2px; padding: 13px 16px; margin-bottom: 12px;
+    background: rgba(0,0,0,.22);
+  }
+  .rowcard > h4 {
+    margin: 0 0 10px; color: var(--gold); font: 400 15px/1.2 var(--display);
+    letter-spacing: .07em; font-variant: small-caps;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .rowcard > h4 .grow { flex: 1; }
+  .rowcard > h4 code { color: var(--dim);
+                       font: 12px/1.4 ui-monospace, Consolas, monospace; }
+  .kv { display: grid; grid-template-columns: minmax(140px, 1fr) 2.2fr auto;
+        gap: 7px; margin-bottom: 6px; align-items: start; }
+  .pathcard { margin-bottom: 18px; padding: 16px 18px; }
+  .pathcard > h4 { font-size: 18px; border-bottom: 1px solid #2b2319;
+                   padding-bottom: 8px; }
+
+  /* One ability, and the four separate maps it lives in shown as one line: what it is
+     called on the tier, what it resolves to, whether it is a passive, what it toggles. */
+  .tier { margin-top: 12px; padding-top: 9px; border-top: 1px dashed rgba(201,168,106,.2); }
+  .tier > b { color: var(--gold); font: 400 13px/1 var(--display);
+              letter-spacing: .1em; font-variant: small-caps; }
+  .tier .when { color: var(--dim); font: italic 12px/1.5 var(--body); }
+  .ability { display: grid; grid-template-columns: 1.4fr 1.2fr 66px 1fr 32px;
+             gap: 7px; align-items: center; margin-bottom: 5px; }
+  .ability .lbl { color: var(--dim); font: 400 10.5px/1.4 var(--display);
+                  letter-spacing: .12em; font-variant: small-caps; }
+  .ability input { padding: 5px 8px; font-size: 13px; }
+  .ability .mid { text-align: center; }
+  .mono { font: 12.5px/1.55 ui-monospace, Consolas, monospace; }
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 10px;
+    background: rgba(217,192,138,.07); border: 1px solid var(--gold-dim);
+    color: var(--dim); font: 12px/1.5 var(--body);
+  }
+  @media (max-width: 1080px) {
+    body { height: auto; min-height: 100vh; overflow: visible; }
+    main { grid-template-columns: 1fr; }
+    .leaf { overflow-y: visible; }
+    .ability { grid-template-columns: 1fr; }
+    .ability .lbl { display: none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Class builder</h1>
-  <p class="why">Everything a Pathfinder class is, as fields. A simple class fills in the
-    first two sections and stops; Blood Bending fills in all nine.</p>
-  <span id="where" class="pill"></span>
-  <a href="/">← home</a>
+  <h1>Class builder
+    <small>Everything a Pathfinder class is, as fields. A simple class fills in the first
+      sections and stops; Blood Bending fills in all nine.</small></h1>
+  <div class="who" id="where"></div>
+  <a class="back" href="/">← the shelf</a>
 </header>
 
-<div class="layout">
+<div class="strip">
+  <label>Start from</label>
+  <select id="scaffold"></select>
+  <button class="quiet" id="load-scaffold">Load template</button>
+  <label>or open</label>
+  <select id="existing"></select>
+  <button class="quiet" id="load-existing">Open</button>
+  <span class="grow"></span>
+  <span id="saved"></span>
+  <button class="go" id="save">Keep this class</button>
+</div>
+
+<main>
   <nav id="nav"></nav>
-  <main>
-    <div id="topbar" class="card">
-      <div class="row">
-        <label style="flex:0 0 auto">Start from</label>
-        <select id="scaffold" style="flex:1 1 260px"></select>
-        <button class="act" id="load-scaffold">Load template</button>
-        <label style="flex:0 0 auto">or open</label>
-        <select id="existing" style="flex:1 1 200px"></select>
-        <button class="act" id="load-existing">Open</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <span class="note" id="saved"></span>
-        <span style="flex:1"></span>
-        <button class="act go" id="save">Save to my homebrew</button>
-      </div>
-    </div>
+  <section class="leaf">
     <div id="problems" class="clean">Checking…</div>
     <div id="body"></div>
-  </main>
-</div>
+  </section>
+</main>
 
 <script>
 const CAT = {{ state_json|safe }};
@@ -146,17 +350,19 @@ function drawNav() {
     const id = SECTION_OF[rootOf(p)];
     if (id) counts[id] = (counts[id] || 0) + 1;
   });
+  const tab = (id, title) => `<button class="tab ${id === current ? "on" : ""}"
+      data-sec="${id}"><span class="grow">${esc(title)}</span>${
+      counts[id] ? `<span class="badge">${counts[id]}</span>` : ""}</button>`;
   let plain = "", adv = "";
   SECTIONS.forEach(s => {
-    const badge = counts[s.id] ? `<span class="badge">${counts[s.id]}</span>` : "";
-    const html = `<button data-sec="${s.id}" class="${s.id === current ? "on" : ""}">
-      ${esc(s.title)}${badge}</button>`;
+    const html = tab(s.id, s.title);
     if (s.advanced) adv += html; else plain += html;
   });
   $("#nav").innerHTML = plain
-    + `<div class="adv">Advanced — a simple class needs none of these</div>` + adv
-    + `<div class="adv">Raw</div>`
-    + `<button data-sec="__json" class="${current === "__json" ? "on" : ""}">JSON</button>`;
+    + `<div class="railhead">Advanced<em>A simple class needs none of these</em></div>`
+    + adv
+    + `<div class="railhead">Raw<em>The file as it will be written</em></div>`
+    + tab("__json", "JSON");
   $("#nav").querySelectorAll("button").forEach(b =>
     b.onclick = () => { current = b.dataset.sec; draw(); });
 }
@@ -169,13 +375,13 @@ function drawProblems() {
   const box = $("#problems");
   if (!PROBLEMS.length) {
     box.className = "clean";
-    box.innerHTML = `<b>This class is valid.</b> <span class="note">It will load, a
-      character can be made in it, and it levels to 20.</span>`;
+    box.innerHTML = `<b>This class is sound.</b> <span class="note">It will load, a
+      character can be made in it, and it levels to twenty.</span>`;
     return;
   }
   box.className = "";
   box.innerHTML = `<b>${PROBLEMS.length} thing${PROBLEMS.length > 1 ? "s" : ""} to
-    fix.</b> <span class="note">Nothing is saved until they are gone.</span>
+    put right.</b> <span class="note">Nothing is kept until they are gone.</span>
     <ul>${PROBLEMS.map((p, i) => {
       const head = String(p).split(":")[0];
       const rest = String(p).slice(head.length + 1);
@@ -187,15 +393,20 @@ function drawProblems() {
   });
 }
 
+function drawWho() {
+  $("#where").innerHTML = `${esc(CLS.name || "unnamed")}
+    <span>${esc(CLS.id || "no id")}</span>`;
+}
+
 function draw() {
   drawNav();
   drawProblems();
-  $("#where").textContent = (CLS.name || "unnamed") + " · " + (CLS.id || "no id");
+  drawWho();
   if (current === "__json") return drawJson();
   const sec = SECTIONS.find(s => s.id === current);
   const host = $("#body");
-  host.innerHTML = `<h2>${esc(sec.title)}</h2><p class="blurb">${esc(sec.blurb)}</p>
-    <div id="fields"></div>`;
+  host.innerHTML = `<h2 class="sect">${esc(sec.title)}</h2>
+    <p class="note">${esc(sec.blurb)}</p><div id="fields"></div>`;
   const fields = $("#fields");
   sec.fields.forEach(f => fields.appendChild(drawField(f)));
 }
@@ -219,17 +430,18 @@ function drawField(f) {
   else if (f.type === "map") wrap.appendChild(drawMap(f));
   else wrap.appendChild(drawInput(f, value, v => setField(f.name, v)));
 
+  // Which engine mechanism reads this, or the honest admission that none does. The
+  // second line is the reason the first exists: a field the app silently ignores is
+  // exactly the thing an author has to be told about, not shielded from.
+  const c = document.createElement("div");
   if (f.consumer) {
-    const c = document.createElement("div");
     c.className = "consumer";
     c.textContent = "read by " + f.consumer;
-    wrap.appendChild(c);
-  } else if (f.type !== "table" && f.type !== "paths") {
-    const c = document.createElement("div");
-    c.className = "consumer";
+  } else {
+    c.className = "consumer none";
     c.textContent = "recorded only — no engine mechanism reads this";
-    wrap.appendChild(c);
   }
+  wrap.appendChild(c);
   return wrap;
 }
 
@@ -275,9 +487,9 @@ function drawGroup(f) {
   const rows = Array.isArray(CLS[f.name]) ? CLS[f.name] : [];
   rows.forEach((row, i) => {
     const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<h4>${esc(f.label)} ${i + 1}
-      <button class="act small" data-del="${i}" style="float:right">remove</button></h4>`;
+    card.className = "rowcard";
+    card.innerHTML = `<h4><span class="grow">${esc(f.label)} ${i + 1}</span>
+      <button class="mini drop" data-del="${i}">remove</button></h4>`;
     (f.of || []).forEach(sub => {
       const line = document.createElement("div");
       line.className = "field";
@@ -295,7 +507,7 @@ function drawGroup(f) {
     host.appendChild(card);
   });
   const add = document.createElement("button");
-  add.className = "act";
+  add.className = "mini add";
   add.textContent = "Add " + f.label.toLowerCase().replace(/s$/, "");
   add.onclick = () => {
     CLS[f.name] = rows.concat([{}]);
@@ -307,7 +519,7 @@ function drawGroup(f) {
 
 function drawSubObject(f, parent) {
   const host = document.createElement("div");
-  host.className = "card";
+  host.className = "rowcard";
   const obj = parent[f.name] && typeof parent[f.name] === "object" ? parent[f.name] : {};
   (f.of || []).forEach(sub => {
     const line = document.createElement("div");
@@ -327,7 +539,7 @@ function drawObject(f) {
   const host = document.createElement("div");
   const on = CLS[f.name] && typeof CLS[f.name] === "object";
   const toggle = document.createElement("button");
-  toggle.className = "act";
+  toggle.className = on ? "mini drop" : "mini add";
   toggle.textContent = on ? "Remove this block" : "Add this block";
   toggle.onclick = () => {
     if (on) delete CLS[f.name]; else CLS[f.name] = {};
@@ -335,7 +547,7 @@ function drawObject(f) {
   };
   if (on) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "rowcard";
     (f.of || []).forEach(sub => {
       const line = document.createElement("div");
       line.className = "field";
@@ -357,16 +569,24 @@ function drawObject(f) {
 function drawMap(f, obj, onchange) {
   const host = document.createElement("div");
   const target = obj || (CLS[f.name] && typeof CLS[f.name] === "object" ? CLS[f.name] : {});
-  Object.entries(target).forEach(([k, v]) => {
+  const entries = Object.entries(target);
+  if (entries.length) {
+    const head = document.createElement("div");
+    head.className = "kv";
+    head.innerHTML = `<span class="lbl kvhead">${esc(f.key_label || "Name")}</span>
+      <span class="lbl kvhead">${esc(f.value_label || "Text")}</span><span></span>`;
+    host.appendChild(head);
+  }
+  entries.forEach(([k, v]) => {
     const line = document.createElement("div");
     line.className = "kv";
     const key = document.createElement("input");
     key.value = k;
     key.placeholder = f.key_label || "Name";
     key.onchange = () => {
-      const entries = Object.entries(target);
+      const was = Object.entries(target);
       for (const kk of Object.keys(target)) delete target[kk];
-      entries.forEach(([ek, ev]) => { target[ek === k ? key.value : ek] = ev; });
+      was.forEach(([ek, ev]) => { target[ek === k ? key.value : ek] = ev; });
       commitMap(f, target, onchange); draw();
     };
     const val = document.createElement(String(v || "").length > 60 ? "textarea" : "input");
@@ -374,14 +594,14 @@ function drawMap(f, obj, onchange) {
     val.placeholder = f.value_label || "Text";
     val.oninput = () => { target[key.value] = val.value; commitMap(f, target, onchange); };
     const del = document.createElement("button");
-    del.className = "act small";
+    del.className = "mini drop";
     del.textContent = "×";
     del.onclick = () => { delete target[k]; commitMap(f, target, onchange); draw(); };
     line.append(key, val, del);
     host.appendChild(line);
   });
   const add = document.createElement("button");
-  add.className = "act";
+  add.className = "mini add";
   add.textContent = "Add entry";
   add.onclick = () => {
     target[""] = "";
@@ -424,23 +644,24 @@ function drawLevels() {
   const byLevel = {};
   rows.forEach(r => { if (r && r.level != null) byLevel[Number(r.level)] = r; });
 
-  let head = `<tr><th>Lv</th><th>Grants (comma separated)</th>`
-    + cols.map(c => `<th>${esc(c)} <button class="act small" data-dropcol="${esc(c)}"
-        >×</button></th>`).join("") + `</tr>`;
+  let head = `<tr><th>Lv</th><th>What this level grants</th>`
+    + cols.map(c => `<th>${esc(c)}
+        <button class="mini drop" data-dropcol="${esc(c)}">×</button></th>`).join("")
+    + `</tr>`;
   let body = "";
   for (let n = 1; n <= CAT.max_level; n++) {
     const r = byLevel[n];
     body += `<tr><td class="lv">${n}</td>
       <td><input data-lv="${n}" data-key="grants" value="${
         esc((r && r.grants || []).join(", "))}"></td>`
-      + cols.map(c => `<td><input data-lv="${n}" data-key="${esc(c)}" value="${
-          esc(r && r[c] || "")}" style="width:80px"></td>`).join("")
+      + cols.map(c => `<td class="col"><input data-lv="${n}" data-key="${esc(c)}"
+          value="${esc(r && r[c] || "")}"></td>`).join("")
       + `</tr>`;
   }
-  host.innerHTML = `<div class="row">
-      <button class="act" id="addcol">Add a die column</button>
-      <span class="note">A column is any name you like — Fist, Blood, Squall. Effects can
-        read one and multiply it.</span></div>
+  host.innerHTML = `<div class="toolrow">
+      <button class="mini add" id="addcol">Add a die column</button>
+      <span class="help" style="margin:0">A column is any name you like — Fist, Blood,
+        Squall. An effect can read one and multiply it.</span></div>
     <table class="levels"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 
   host.querySelectorAll("input[data-lv]").forEach(inp => {
@@ -496,10 +717,10 @@ function drawPaths() {
 
   Object.entries(paths).forEach(([pid, path]) => {
     const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<h4>Path <span class="mono">${esc(pid)}</span>
-      <button class="act small" data-delpath="1" style="float:right">remove path</button>
-      </h4>`;
+    card.className = "rowcard pathcard";
+    card.innerHTML = `<h4><span class="grow">${esc(path.name || pid)}
+      <code>${esc(pid)}</code></span>
+      <button class="mini drop" data-delpath="1">remove path</button></h4>`;
 
     ["name", "role", "summary", "global_rule"].forEach(key => {
       const line = document.createElement("div");
@@ -522,11 +743,12 @@ function drawPaths() {
       const names = Array.isArray(path.tiers[String(t)]) ? path.tiers[String(t)] : [];
       const tier = document.createElement("div");
       tier.className = "tier";
-      tier.innerHTML = `<b>Tier ${t}</b> <span class="note">usable once the character has
+      tier.innerHTML = `<b>Tier ${t}</b> <span class="when">usable once the character has
         reached ${esc(CAT.track_phrase)} ${t} on this path</span>
-        <div class="ability"><span class="lbl">Name on the tier</span>
-          <span class="lbl">Resolves to</span><span class="lbl">Passive</span>
-          <span class="lbl">Toggles condition</span><span></span></div>`;
+        ${names.length ? `<div class="ability" style="margin-top:6px">
+          <span class="lbl">Name on the tier</span><span class="lbl">Resolves to</span>
+          <span class="lbl mid">Passive</span><span class="lbl">Toggles condition</span>
+          <span></span></div>` : ""}`;
       names.forEach((name, i) => {
         const line = document.createElement("div");
         line.className = "ability";
@@ -540,9 +762,10 @@ function drawPaths() {
         res.setAttribute("list", "abilitylist");
         res.onchange = () => { path.resolves[name] = res.value; check(); };
 
+        const holder = document.createElement("span");
+        holder.className = "mid";
         const pas = document.createElement("input");
         pas.type = "checkbox";
-        pas.style.width = "auto";
         pas.checked = (path.passive || []).includes(name);
         pas.onchange = () => {
           const set = new Set(path.passive || []);
@@ -550,6 +773,7 @@ function drawPaths() {
           if (set.size) path.passive = [...set]; else delete path.passive;
           check();
         };
+        holder.appendChild(pas);
 
         const tog = document.createElement("input");
         tog.value = (path.toggles || {})[name] || "";
@@ -563,18 +787,18 @@ function drawPaths() {
         };
 
         const del = document.createElement("button");
-        del.className = "act small";
+        del.className = "mini drop";
         del.textContent = "×";
         del.onclick = () => {
           names.splice(i, 1);
           if (!names.length) delete path.tiers[String(t)];
           check(); draw();
         };
-        line.append(nm, res, pas, tog, del);
+        line.append(nm, res, holder, tog, del);
         tier.appendChild(line);
       });
       const add = document.createElement("button");
-      add.className = "act small";
+      add.className = "mini add";
       add.textContent = "Add an ability at tier " + t;
       add.onclick = () => {
         const name = prompt("What is it called?", "");
@@ -590,11 +814,11 @@ function drawPaths() {
       card.appendChild(tier);
     }
 
-    ["abilities", "resolves", "upgrades", "toggles", "core", "needs"].forEach(key => {
-      if (key === "resolves" || key === "toggles") return;   // edited on the lines above
+    ["abilities", "upgrades", "core", "needs"].forEach(key => {
       const line = document.createElement("div");
       line.className = "field";
-      line.innerHTML = labelFor(spec[key]);
+      line.innerHTML = `<h3 class="sub">${esc(spec[key].label)}</h3>
+        ${spec[key].help ? `<div class="help">${esc(spec[key].help)}</div>` : ""}`;
       if (spec[key].type === "list") {
         line.appendChild(drawInput(spec[key], path[key], v => {
           if (!v || !v.length) delete path[key]; else path[key] = v;
@@ -605,6 +829,12 @@ function drawPaths() {
           if (Object.keys(target).length) path[key] = target; else delete path[key];
         }));
       }
+      const c = document.createElement("div");
+      c.className = spec[key].consumer ? "consumer" : "consumer none";
+      c.textContent = spec[key].consumer
+        ? "read by " + spec[key].consumer
+        : "recorded only — no engine mechanism reads this";
+      line.appendChild(c);
       card.appendChild(line);
     });
 
@@ -613,10 +843,11 @@ function drawPaths() {
     // the honest shape: the text the file holds, checked live by the same validator.
     const fx = document.createElement("div");
     fx.className = "field";
-    fx.innerHTML = labelFor(spec.effects);
+    fx.innerHTML = `<h3 class="sub">${esc(spec.effects.label)}</h3>
+      <div class="help">${esc(spec.effects.help)}</div>`;
     const area = document.createElement("textarea");
     area.className = "mono";
-    area.style.minHeight = "140px";
+    area.style.minHeight = "150px";
     area.value = JSON.stringify(path.effects || {}, null, 1);
     area.onchange = () => {
       try {
@@ -625,10 +856,14 @@ function drawPaths() {
         area.style.borderColor = "";
         check();
       } catch (e) {
-        area.style.borderColor = "var(--bad)";
+        area.style.borderColor = "var(--alarm)";
       }
     };
     fx.appendChild(area);
+    const fxc = document.createElement("div");
+    fxc.className = "consumer";
+    fxc.textContent = "read by " + spec.effects.consumer;
+    fx.appendChild(fxc);
     card.appendChild(fx);
 
     card.querySelector("[data-delpath]").onclick = () => {
@@ -640,7 +875,7 @@ function drawPaths() {
   });
 
   const add = document.createElement("button");
-  add.className = "act";
+  add.className = "mini add";
   add.textContent = "Add a path";
   add.onclick = () => {
     const id = prompt("Path id — lower case, it is what the sheet stores:", "");
@@ -684,12 +919,13 @@ function renameAbility(path, was, now) {
 
 function drawJson() {
   const host = $("#body");
-  host.innerHTML = `<h2>JSON</h2><p class="blurb">The file exactly as it will be saved.
-    Paste one in and press Apply to bring an existing class into the form.</p>
-    <textarea id="raw" class="mono" style="min-height:60vh"></textarea>
-    <div class="row" style="margin-top:8px">
-      <button class="act" id="apply">Apply</button>
-      <span class="note" id="rawnote"></span></div>`;
+  host.innerHTML = `<h2 class="sect">JSON</h2>
+    <p class="note">The file exactly as it will be written. Paste one in and press Apply
+      to bring an existing class into the form.</p>
+    <textarea id="raw" class="mono" style="min-height:56vh"></textarea>
+    <div class="toolrow" style="margin-top:9px">
+      <button class="quiet" id="apply">Apply</button>
+      <span class="help" style="margin:0" id="rawnote"></span></div>`;
   $("#raw").value = JSON.stringify(CLS, null, 1);
   $("#apply").onclick = () => {
     try {
@@ -720,7 +956,7 @@ function check() {
     PROBLEMS = data.problems || [];
     drawNav();
     drawProblems();
-    $("#where").textContent = (CLS.name || "unnamed") + " · " + (CLS.id || "no id");
+    drawWho();
   }, 350);
 }
 
@@ -731,13 +967,16 @@ async function save() {
     body: JSON.stringify({ class: CLS }),
   });
   const data = await res.json();
+  const saved = $("#saved");
   if (data.ok) {
-    $("#saved").textContent = "Saved to " + data.path
-      + " — it is playable now; the creation forge will offer it.";
+    saved.className = "done";
+    saved.textContent = "Kept — it is playable now, and the forge will offer it.";
+    saved.title = data.path;
     if (data.existing) fillExisting(data.existing);
   } else {
     PROBLEMS = data.problems || ["The save failed and said nothing, which is a bug."];
-    $("#saved").textContent = "Not saved.";
+    saved.className = "";
+    saved.textContent = "Not kept.";
     drawNav(); drawProblems();
   }
 }
@@ -751,7 +990,7 @@ function fillExisting(rows) {
 // --- start ---------------------------------------------------------------------------
 
 $("#scaffold").innerHTML = CAT.scaffolds.map(s =>
-  `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join("");
+  `<option value="${esc(s.id)}" title="${esc(s.blurb)}">${esc(s.label)}</option>`).join("");
 fillExisting(CAT.existing);
 $("#saved").textContent = "Yours are written to " + CAT.homebrew_dir;
 

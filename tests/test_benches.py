@@ -192,3 +192,61 @@ def test_something_that_is_not_worn_refuses_with_the_reason(client):
                     content_type="application/json")
     assert r.status_code == 400
     assert "not something you wear" in r.json()["error"]
+
+
+def test_a_forge_chain_spends_what_it_names(client):
+    """Measured at the bench with a real click: a Steel Longsword chain rolled 10+2
+    against DC 14, spoiled, awarded its mishap mastery — and reported `spent: {}`. The
+    four newer crafts put raw material in `consumes`, and `_one_craft` only asked the
+    crafted-jar shelf, so a forge chain could be attempted forever on the same four bars
+    of steel. Failure has to cost the inputs; that is the rule failure is *for*."""
+    from play import campaign as cm
+
+    c = cm.current()
+    pc = c.scene.pc()
+    pc.carry("steel", 3)
+    pc.carry("charcoal", 3)
+    c.save()
+    before = dict(cm.current().scene.pc().inventory)
+
+    r = client.post("/api/craft/do", data=json.dumps({
+        "craft": "blacksmithing", "materials": ["steel", "charcoal"],
+        "ingredients": ["steel", "charcoal"], "methods": ["smelt", "forge"],
+        "base": "longsword", "stock": {}, "batch": 1,
+    }), content_type="application/json")
+    assert r.status_code == 200, r.content[:300]
+
+    after = dict(cm.current().scene.pc().inventory)
+    assert after.get("steel", 0) == before.get("steel", 0) - 1, "the steel was not spent"
+    assert after.get("charcoal", 0) == before.get("charcoal", 0) - 1
+    assert r.json()["spent"], "the craft reported spending nothing"
+
+
+def test_every_bench_says_what_it_shapes(client):
+    """"Forging needs a shape: say what is being made" was a refusal with nowhere on the
+    page to answer it. A craft that shapes things offers its list; one that names its
+    output from what went in the pot offers none, and the row stays hidden."""
+    shapes = {}
+    for craft in ("herbalism", "blacksmithing", "leatherworking", "enchanting"):
+        d = client.get(f"/api/craft/ingredients?craft={craft}").json()
+        shapes[craft] = d["track"]["shapes"]
+    assert shapes["herbalism"] == []
+    assert "longsword" in shapes["blacksmithing"]
+    assert "cloak" in shapes["leatherworking"]
+
+
+def test_every_station_has_an_icon_of_its_own(client):
+    """The stations rendered as eleven identical fallback crates: material icons were
+    per craft and method icons were not, so every forge, tannery and laboratory station
+    fell through to the same box."""
+    from rules import benches
+
+    for track in benches.BENCHES:
+        d = client.get("/api/craft/ingredients?craft="
+                       + {"herbalist": "herbalism", "blacksmith": "blacksmithing",
+                          "leatherworker": "leatherworking", "alchemist": "alchemy",
+                          "enchanter": "enchanting"}[track]).json()
+        glyphs = d["track"]["method_glyphs"]
+        methods = {m["method"] for m in d["track"]["all_methods"]}
+        assert methods <= set(glyphs), f"{track} has stations with no icon"
+        assert len(set(glyphs.values())) == len(glyphs), f"{track} reuses an icon"
