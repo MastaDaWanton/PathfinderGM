@@ -1002,7 +1002,14 @@ class Engine:
                                 for m in dmg_mods]
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
-                    f"Damage ({weapon['name']}{' — CRITICAL' if mult > 1 else ''})",
+                    # The armament's damage is three named things — Blood DMG + Fist DMG
+                    # + STR — and the label said only "armed punch", so a player watching
+                    # 8 damage land could not tell whether the blood die was in it. It
+                    # was; it is the weapon's own die. Naming it is the whole fix.
+                    f"Damage ({weapon['name']}"
+                    + (f": blood {weapon['damage']} + fist"
+                       if weapon["name"] == "armed punch" else "")
+                    + (" — CRITICAL" if mult > 1 else "") + ")",
                     None, partial, state, dice_notation,
                 )
                 state["rolls"].append(dmg.as_dict())
@@ -2348,6 +2355,19 @@ class Engine:
             return ""
         total, names = xp_mod.award_for_fallen(self.scene, pc)
         if not total:
+            # A fight that killed something and paid nothing has to say so. Silence
+            # reads as "this fight was not worth anything", and the real reason is
+            # usually that the creature carries no price — which is the GM's cue to
+            # award it with the `xp` op rather than a thing to wonder about. Measured
+            # in play: a bear died, the tally said nothing, and the ledger did not move.
+            fallen = [a.name for side, refs in self.scene.sides.items()
+                      if pc.ref not in refs
+                      for a in (self.scene.actors.get(r) for r in refs)
+                      if a is not None and a.hp <= 0]
+            if fallen:
+                return (f" No experience: {', '.join(sorted(set(fallen)))} "
+                        f"{'carries' if len(set(fallen)) == 1 else 'carry'} no price in "
+                        f"the bestiary, so the award is the GM's to make.")
             return ""
         pc.xp = int(getattr(pc, "xp", 0) or 0) + total
         nxt = xp_mod.total_for(min(20, pc.level + 1))

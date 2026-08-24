@@ -130,3 +130,69 @@ def test_a_need_turns_dangerous_when_the_clock_runs_out(tmp_path):
     rest = next(n for n in pc.summary()["needs"] if n["label"] == "Rest")
     assert rest["danger"] is True
     assert "Will save" in rest["state"]
+
+
+def test_a_renamed_creature_still_knows_what_it_is_worth():
+    """"I got 0 Exp from killing the bear."
+
+    `instantiate` overwrites `name` with whatever the GM calls the creature, so "a bear"
+    spawned from `black-bear` lost every link back to its stat block — and `worth` reads
+    the stat block. A creature was worth nothing the moment anybody named it. The
+    template is kept now, because the display name is the GM's to change and the
+    template is not."""
+    from rules import xp
+    from rules.bestiary import instantiate
+
+    bear = instantiate("black-bear", name="a bear")
+    assert bear.from_template == "black-bear"
+    assert xp.worth(bear) == 800
+
+
+def test_a_creature_from_an_older_save_is_recovered_by_name():
+    """Healed on read rather than migrated, the way `Campaign.biome` heals a save
+    written before biomes existed: every creature already in a scene when `xp_value`
+    arrived carries a zero."""
+    from rules import xp
+    from rules.sheet import from_dict
+
+    old = from_dict({"name": "black bear", "kind": "npc", "hp": 1,
+                     "abilities": {"str": 10, "dex": 10, "con": 10,
+                                   "int": 2, "wis": 10, "cha": 5}}, ref="c1")
+    assert old.xp_value == 0            # nothing was stored
+    assert xp.worth(old) == 800         # and it is recovered anyway
+
+
+def test_a_name_that_names_no_creature_is_worth_nothing_and_says_so():
+    """"a bear" is not a creature in the corpus — there are black bears and dire bears
+    and guessing which would be inventing a number. Zero is the honest answer, and the
+    fight's tell has to say the award is the GM's to make rather than staying silent."""
+    from rules import xp
+    from rules.sheet import from_dict
+
+    lost = from_dict({"name": "a bear", "kind": "npc", "hp": 1,
+                      "abilities": {"str": 10, "dex": 10, "con": 10,
+                                    "int": 2, "wis": 10, "cha": 5}}, ref="c1")
+    assert xp.worth(lost) == 0
+
+
+def test_a_fight_that_pays_nothing_explains_itself(tmp_path):
+    from django.test import override_settings
+
+    from play import campaign as cm
+    from rules.sheet import from_dict
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
+        nameless = from_dict({"name": "a bear", "kind": "npc", "hp": 0,
+                              "abilities": {"str": 10, "dex": 10, "con": 10,
+                                            "int": 2, "wis": 10, "cha": 5}}, ref="c1")
+        c.scene.add(nameless)
+        e = c.engine()
+        e.run(e.validate([{"op": "begin_encounter",
+                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+        line = e._settle_xp()
+        cm._LIVE.clear()
+    assert "No experience" in line and "GM's to make" in line

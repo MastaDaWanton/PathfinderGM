@@ -1547,7 +1547,19 @@ async function post(url, body) {
     headers: {"Content-Type": "application/json", "X-CSRFToken": csrf()},
     body: JSON.stringify(body || {}),
   });
-  const data = await r.json();
+  // A response that is not JSON is a server error page, and `r.json()` on it throws
+  // "JSON.parse: unexpected character at line 1 column 1" — which is what the player
+  // sees instead of the actual failure. Measured in play: that string appeared in the
+  // transcript with no way to tell what had gone wrong. Read the body once as text and
+  // decide, so a 500 reports itself as a 500.
+  const raw = await r.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    const first = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(`The server failed (HTTP ${r.status}). ${first || "No detail."}`);
+  }
   // 422 is the table pushing a turn back across the table rather than an error: the
   // player said what the world does, which is the GM's half. The text they typed is
   // deliberately left in the box so they can rewrite it.
@@ -1624,35 +1636,11 @@ function render(s) {
             esc(purseLine(pc.purse, s.coinage))}</span></div>` : ""}${
           (pc.carrying || []).map(i => `<div class="row"><span>${esc(i.name)}</span>
             <span>${i.count}</span></div>`).join("")}` : ""}
-      ${(pc.satchel && pc.satchel.length) ? `<h2>Satchel</h2>${
-        pc.satchel.map(i => `<div class="row"><span>${esc(i.name)}</span><span>${
-          i.count}</span></div>`).join("")}` : ""}
-      ${(pc.stock && pc.stock.length) ? `<h2>Crafted</h2>${
-        pc.stock.map(j => {
-          // Everything five crafts make, in one place, each with what can be done to
-          // it. A forged breastplate and a brewed tea are the same kind of record now,
-          // so the buttons are asked of the record rather than of the craft: worn if
-          // it names a slot, drunk or thrown or painted if its maker said so.
-          const worn = (pc.worn || []).includes(j.name);
-          const acts = [
-            j.wearable && j.slot
-              ? `<button class="mini" data-wear="${esc(j.id)}"${worn ? ' data-off="1"' : ""}
-                   >${worn ? "take off" : "wear"}</button>` : "",
-            j.drinkable ? `<button class="mini" data-use="${esc(j.id)}"
-                   data-how="drink">drink</button>` : "",
-            j.throwable ? `<button class="mini" data-use="${esc(j.id)}"
-                   data-how="throw">throw</button>` : "",
-            j.coatable ? `<button class="mini" data-use="${esc(j.id)}"
-                   data-how="coat">coat</button>` : "",
-          ].filter(Boolean).join(" ");
-          const note = [j.masterwork ? "masterwork" : "",
-                        j.enhancement ? `+${j.enhancement}` : "",
-                        worn ? "worn" : ""].filter(Boolean).join(" · ");
-          return `<div class="row" title="${esc((j.effects || []).join("\n"))}">
-            <span>${esc(j.name)}${j.count > 1 ? ` ×${j.count}` : ""}${
-              note ? ` <small>${esc(note)}</small>` : ""}</span>
-            <span>${acts}</span></div>`;
-        }).join("")}` : ""}
+      <!-- The satchel and the drink/throw/coat buttons used to live here. Raw material
+           belongs at the bench that consumes it, and using an item belongs in the
+           inventory panel where the player already goes for it: two places to do one
+           thing is clutter, and the side panel is the one thing on screen every turn. -->
+
       ${(pc.world_classes && pc.world_classes.length) ? `<h2>World classes</h2>${
         pc.world_classes.map(w => `
           <div class="row"><span>${esc(w.name)} ${w.level}</span><span>${
@@ -1715,18 +1703,35 @@ function renderAbilities(s) {
   $("#abilities").innerHTML = `<div class="abrow-label">Your abilities</div>` +
     list.map(a => `<button class="abilitybtn${a.active ? " on" : ""}"
       data-ability="${esc(a.name)}"
+      data-free="${(a.toggle || actionKind(a.text) === "free") ? "1" : "0"}"
       title="${esc(a.path)} · Control Blood ${a.tier}${
         a.toggle ? (a.active ? " · ACTIVE — click to dismiss" : " · off — click to form") : ""}${
         a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}${
         a.toggle ? (a.active ? " ●" : " ○") : ""}</button>`).join("");
 }
 
-document.addEventListener("click", e => {
+document.addEventListener("click", async e => {
   const btn = e.target.closest("[data-ability]");
   if (!btn) return;
   const foe = (STATE.scene.actors || []).find(a => !a.is_pc && a.hp > 0);
-  takeTurn({ text: `I use ${btn.dataset.ability}${
-    foe ? " on " + foe.name : ""}.` }, false);
+  const name = btn.dataset.ability;
+
+  // A free action does not cost you the round. Forming the armament went through the
+  // spoken-turn path, which ends the turn and runs every NPC after it — so a free
+  // action handed the bear a swing. Toggles and free actions go straight to the engine
+  // with the turn left open; everything else is a turn as it always was.
+  if (btn.dataset.free === "1" && STATE.scene && STATE.scene.in_encounter) {
+    busy(true);
+    try {
+      render(await post("/api/combat/act", {
+        actions: [{ op: "use_ability", params: { ability: name },
+                    target: foe ? foe.ref : null }],
+        label: `free: ${name}`, end_turn: false }));
+    } catch (err) { $("#err").textContent = err.message; }
+    finally { busy(false); }
+    return;
+  }
+  takeTurn({ text: `I use ${name}${foe ? " on " + foe.name : ""}.` }, false);
 });
 
 // --- what the GM offered -----------------------------------------------------------

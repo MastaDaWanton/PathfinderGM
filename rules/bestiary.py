@@ -120,6 +120,11 @@ def instantiate(
     # becomes the actor's `xp_value`, and its own ledger starts at zero.
     data["xp_value"] = int(data.pop("xp", 0) or 0)
     data["xp"] = 0
+    # The template this creature came from, kept because `name` is about to be
+    # overwritten with whatever the GM called it. "a bear" spawned from `black-bear`
+    # lost every link back to its stat block, so a creature that died was worth nothing
+    # the moment anybody named it — measured in real play: a bear awarded 0 XP.
+    data["from_template"] = key
     if name:
         data["name"] = name
     data["world_entity_id"] = world_entity_id

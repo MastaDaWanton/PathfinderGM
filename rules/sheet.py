@@ -290,6 +290,9 @@ class Actor:
     # finished fight can settle up without a lookup into a book the scene may not have.
     xp: int = 0
     xp_value: int = 0
+    # The bestiary key this creature was made from, when it was made from one. Its
+    # display name is the GM's to change; this is not.
+    from_template: str = ""
     # Of the raw material carried, how much of each came back perfect. A subset of
     # `inventory`, never larger than it, and spent first when the pot asks for that herb.
     pristine: dict[str, int] = field(default_factory=dict)
@@ -839,6 +842,13 @@ class Actor:
         from . import weapons as weapons_mod
 
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        # The armament is your own fists with blood over them, so proficiency is the
+        # proficiency you have with your fists. It is not in the weapons table — it is
+        # built on the wearer from the class's blood die — so the table lookup found
+        # nothing, `prof` was None, and a Blood Bender was told they were not proficient
+        # with their own hands: a −4 on every armed punch, visible in the dice popup.
+        if key in ("armed punch", "armed punches", "blood gauntlets"):
+            key = "unarmed"
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
@@ -2261,6 +2271,7 @@ def to_dict(actor: Actor) -> dict:
         "watered_minutes": actor.watered_minutes,
         "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
         "xp": actor.xp, "xp_value": actor.xp_value,
+        "from_template": actor.from_template,
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
         "picked_at": dict(actor.picked_at),
         "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
@@ -2551,6 +2562,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         hunger_checks=int(data.get("hunger_checks", 0) or 0),
         xp=int(data.get("xp", 0) or 0),
         xp_value=int(data.get("xp_value", 0) or 0),
+        from_template=str(data.get("from_template", "") or ""),
         pristine={k: int(v) for k, v in (data.get("pristine") or {}).items()
                   if int(v) > 0},
         spellbook=list(data.get("spellbook") or []),

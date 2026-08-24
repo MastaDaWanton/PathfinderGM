@@ -724,7 +724,9 @@ def combat_act(request):
         c.transcript.pop()
         return JsonResponse({"error": str(exc)}, status=400)
 
-    return _finish(c, agent, resolution, "", label, plan=None)
+    # A turn the player has not finished does not pass to anybody. This is what
+    # `end_turn` was always supposed to mean.
+    return _finish(c, agent, resolution, "", label, plan=None, hand_over=end_turn)
 
 
 @require_POST
@@ -804,7 +806,14 @@ def _advance(request, c, agent, narration, plan, player_input):
     return _finish(c, agent, resolution, narration, player_input, plan)
 
 
-def _finish(c, agent, resolution, narration, player_input, plan):
+def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True):
+    """Narrate what the engine decided, then let the world answer.
+
+    `hand_over` is False for an action that does not end your turn — a free action, a
+    toggle, a swift. The combat panel accepted `end_turn: false` and this ran the NPC
+    turns anyway, so forming the blood armament (a free action) handed the bear a swing:
+    the round moved on while the player still had their standard action in hand.
+    """
     if resolution.awaiting:
         c.save()
         return JsonResponse(_state(c))
@@ -828,7 +837,8 @@ def _finish(c, agent, resolution, narration, player_input, plan):
         c.turn_log.append({"kind": "resolution",
                            "outcomes": [o.as_dict() for o in resolution.outcomes]})
 
-    _run_npc_turns(c, agent)
+    if hand_over:
+        _run_npc_turns(c, agent)
     if plan is not None:
         c.last_intent_signature = judgement._signature(plan.intents)
     c.save()

@@ -43,6 +43,30 @@ def worth(actor) -> int:
     stated = int(getattr(actor, "xp_value", 0) or 0)
     if stated:
         return stated
+
+    # Healed on read rather than migrated, the same way `Campaign.biome` heals a save
+    # written before biomes existed. Every creature already in a scene when `xp_value`
+    # was added carries a zero, and the fight that killed it paid nothing — measured in
+    # real play: a bear died and awarded 0 XP. Looking the creature up by the name it is
+    # still carrying recovers the number without touching the save.
+    from . import bestiary
+
+    # The template first, which is exact: a creature keeps the stat block it was made
+    # from however the GM renames it.
+    tried = [str(getattr(actor, "from_template", "") or "").strip().lower()]
+    # Then the display name, slugified, for creatures spawned before the link existed.
+    # Best effort and nothing more — "a bear" is not a creature in the corpus, and
+    # guessing which bear would be inventing a number.
+    name = str(getattr(actor, "name", "") or "").strip().lower()
+    for bare in (name, name.removeprefix("the ").strip(), name.removeprefix("a ").strip()):
+        if bare:
+            tried.append(bare.replace(" ", "-"))
+    for key in tried:
+        if not key:
+            continue
+        found = bestiary.lookup(key)
+        if found and found.get("xp"):
+            return int(found["xp"])
     return 0
 
 

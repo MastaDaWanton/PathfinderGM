@@ -117,3 +117,76 @@ def test_the_ability_button_reports_its_state():
     entry = next(a for a in _usable_abilities(pc)
                  if a["name"].lower() == "extracorporeal blood armament")
     assert entry["active"] is True
+
+
+# --- what real play found ---------------------------------------------------------------
+
+def test_the_armament_does_not_make_you_unskilled_with_your_own_hands():
+    """"i have proficiency with my fists but I am getting a -4."
+
+    The armed punch is built on the wearer from the class's blood die, so it is not in
+    the weapons table — the proficiency lookup found nothing, `prof` came back None, and
+    a Blood Bender took the non-proficiency penalty for punching. Visible in the dice
+    popup as "not proficient with armed punch −4"."""
+    pc = _bender()
+    pc.add_condition("blood armament", rounds=None, source="test")
+    assert pc.is_proficient("armed punch") is True
+    sources = [m.source for m in pc.attack_modifiers("armed punch", 0)]
+    assert not any("not proficient" in s for s in sources), sources
+
+
+def test_the_blood_die_is_named_in_the_damage_roll():
+    """"my blood dmg looks like its not applying." It was applying — the blood die *is*
+    the weapon's die — but the label said only "armed punch", so nothing on screen said
+    so. Naming it is the fix; the arithmetic was already right."""
+    scene, e = _fight()
+    _use(e)
+    out = e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                             "visibility": "hidden",
+                             "params": {"weapon": "armed punch"},
+                             "because": "test"}])).outcomes[-1]
+    dmg = [r for r in out.rolls if r.label.startswith("Damage")]
+    if dmg:
+        assert "blood" in dmg[0].label, dmg[0].label
+        assert any("fist die" in m.source for m in dmg[0].modifiers)
+
+
+def test_a_free_action_does_not_hand_the_round_to_the_enemy(tmp_path):
+    """"my blood armament is a free action but it is progressing the turn."
+
+    `combat_act` accepted `end_turn: false` and `_finish` ran the NPC turns regardless,
+    so forming the armament — a free action — gave the bear a swing while the player
+    still held their standard action."""
+    import json as _json
+
+    from django.test import Client, override_settings
+
+    from play import campaign as cm
+    from rules.bestiary import instantiate
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.begin_with(_bender())
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
+        c.scene.add(instantiate("black-bear", scene=c.scene, name="a bear"))
+        e = c.engine()
+        e.run(e.validate([{"op": "begin_encounter",
+                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+        while c.scene.current_ref() != "pc":
+            c.scene.advance_turn()
+        c.save()
+        was_round, was_turn = c.scene.round, c.scene.current_ref()
+
+        r = Client().post("/api/combat/act", data=_json.dumps({
+            "actions": [{"op": "use_ability",
+                         "params": {"ability": "Extracorporeal Blood Armament"},
+                         "target": "c1"}],
+            "label": "free: armament", "end_turn": False}),
+            content_type="application/json")
+        after = cm.current()
+        assert r.status_code == 200, r.content[:200]
+        assert after.scene.round == was_round, "a free action advanced the round"
+        assert after.scene.current_ref() == was_turn, "a free action passed the turn"
+        assert after.scene.pc().has_condition("blood armament")
+        cm._LIVE.clear()

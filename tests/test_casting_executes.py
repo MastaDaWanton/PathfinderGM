@@ -209,7 +209,12 @@ def test_a_prose_only_spell_narrates_and_changes_no_hit_points():
     before = s.actors["c1"].hp
     out = cast(e, "teleport").outcomes[0]
 
-    assert spells_mod.get("teleport").effects == []
+    # "Prose-only" now means "carries no effect the engine executes", not "carries
+    # nothing at all". Every spell has a floor of one `narrative` spec so that casting
+    # it produces something rather than silence — teleport says what teleporting does
+    # and still moves no hit points, which is the thing this test is about.
+    fx = spells_mod.get("teleport").effects or []
+    assert fx and all(e.get("type") == "narrative" for e in fx)
     assert [x["kind"] for x in out.effects] == ["cast"]
     assert out.rolls == []
     assert s.actors["c1"].hp == before
