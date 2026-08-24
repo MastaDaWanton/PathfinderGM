@@ -242,16 +242,52 @@ def test_a_flaming_binding_carries_its_fire_rider():
                         "white-chalk"]),
         item=MASTERWORK_SWORD)
     assert result.problems == []
-    riders = [s for s in result.effects
+    riders = [s for s in result.specs
               if s.get("type") == "damage" and s.get("damage_type") == "fire"]
     assert riders and riders[0]["from"] == "Flaming Essence"
     assert result.name == "Flaming Longsword"
-    assert all(not effectspec.validate(s) for s in result.effects)
+    assert all(not effectspec.validate(s) for s in result.specs)
+
+
+def test_effects_are_prose_and_specs_are_structure():
+    """The split the shared bench spine expects, and the one this module did not have
+    when it was written alone: `effects` held structured dicts under a name the spine
+    renders as strings. A card shows `effects`; the engine runs `specs`; both come off
+    one walk so they cannot disagree about what the item does."""
+    result = en.preview(
+        3, _full_chain(["flaming-essence", "sapphire-focus", "quicksilver-ink",
+                        "white-chalk"]),
+        item=MASTERWORK_SWORD)
+    assert all(isinstance(line, str) for line in result.effects)
+    assert all(isinstance(spec, dict) for spec in result.specs)
+    assert len(result.effects) == len(result.specs)
+    assert "1d6 fire damage" in " ".join(result.effects)
+    # And as_dict carries everything the spine reads, by name.
+    d = result.as_dict()
+    for key in ("name", "tier", "rank", "stages", "dc", "risky", "problems",
+                "effects", "specs", "consumes", "output", "bonus", "terms", "chance"):
+        assert key in d, f"as_dict is missing {key}"
+
+
+def test_the_output_is_an_inventory_item():
+    """`Result.output` is what the player receives, in the shape the sheet stores:
+    identified, masterwork, with its standing specs and what it was made of. Without
+    it the bench can only describe an enchantment it cannot hand over."""
+    result = en.preview(
+        3, _full_chain(["flaming-essence", "sapphire-focus", "quicksilver-ink",
+                        "white-chalk"]),
+        item={"masterwork": True, "kind": "weapon", "weapon": "longsword"})
+    out = result.output
+    assert out["kind"] == "crafted" and out["craft"] == "enchanter"
+    assert out["masterwork"] is True and out["count"] == 1
+    assert out["weapon"] == "longsword" and out["usable"] and not out["wearable"]
+    assert out["properties"] == ["Flaming Essence"]
+    assert all(isinstance(line, str) for line in out["effects"])
 
 
 def test_a_drawback_rides_in_the_standing_effects():
     """Shadowstuff dims its bearer, and the dimming is part of the binding: the
-    drawback spec appears in the finished effect list, marked, so an enchantment
+    drawback spec appears in the finished spec list, marked, so an enchantment
     cannot quietly drop its price on the way to the sheet."""
     result = en.preview(
         2, _full_chain(["shadowstuff", "amethyst-focus", "iron-gall-ink",
@@ -259,8 +295,9 @@ def test_a_drawback_rides_in_the_standing_effects():
                        item="cloak"),
         item={"masterwork": True, "kind": "armour"})
     assert result.problems == []
-    dims = [s for s in result.effects if s.get("drawback")]
+    dims = [s for s in result.specs if s.get("drawback")]
     assert dims and dims[0]["target"] == "perception" and dims[0]["amount"] == -2
+    assert dims[0] in result.drawbacks
 
 
 def test_off_type_binding_costs_five_dc_not_a_refusal():
@@ -305,6 +342,132 @@ def test_a_mishap_on_a_diamond_loses_the_stone():
     # And a focus is never on the consumed list: success returns it to the pouch.
     assert "diamond-focus" not in fragile.consumes
     assert "storm-heart" in fragile.consumes
+
+
+# --- dispatch, acquisition, glyphs -------------------------------------------------------
+
+def test_chain_from_body_is_tolerant_about_shape():
+    """The spine posts one body to whichever mode is active, so the parse must survive
+    a list, a comma-joined string, and keys meant for the other mode. A 500 on a form
+    that looked fine is the failure this prevents; real validation is `preview`'s job,
+    where a problem can be shown."""
+    listed = en.chain_from_body({
+        "methods": ["attune", "scribe", "bind", "seal"],
+        "materials": ["fire-mote", "quartz-focus"], "item": "dagger"})
+    joined = en.chain_from_body({
+        "methods": "attune, scribe, bind, seal",
+        "materials": "Fire-Mote, Quartz-Focus", "vessel": "dagger",
+        "enhancement": "+3"})
+    assert listed.methods == joined.methods == ["attune", "scribe", "bind", "seal"]
+    assert listed.material_ids == joined.material_ids == ["fire-mote", "quartz-focus"]
+    assert joined.item == "dagger"
+    assert en.chain_from_body({}).methods == []
+
+
+def test_check_terms_are_itemised_and_intelligence_based():
+    """d20 + track level + half character level + Int, itemised. Enchanting imposes a
+    structure rather than reading one, which is the Intelligence half of the sheet —
+    and the terms are listed rather than summed because "+9" says nothing about which
+    of the three to go and improve."""
+    class Stub:
+        level = 6
+
+        def ability_mod(self, which):
+            return 3 if which == "int" else 0
+
+    terms = en.check_terms(Stub(), 4)
+    assert [t["value"] for t in terms] == [4, 3, 3]
+    assert en.check_bonus(Stub(), 4) == 10
+    assert "Intelligence" in terms[-1]["label"]
+
+
+def test_every_material_says_where_it_comes_from():
+    """The craft-action button is the hub for obtaining materials, so a material with
+    no `obtain` is one the hub can never offer — invisible, with nothing to say why.
+    Gathered and mined entries must name biomes and harvested ones a creature, or the
+    excursion has no way to decide what turns up."""
+    mats = en.materials()
+    mine = [m for m in mats.values()
+            if m.id in _shipped_ids()]
+    assert mine, "the shipped catalogue did not load"
+    for m in mine:
+        assert m.obtain in ("bought", "mined", "harvested", "gathered"), \
+            f"{m.id}: {m.obtain!r} is not an acquisition kind"
+        if m.obtain in ("gathered", "mined"):
+            assert m.biomes, f"{m.id} is {m.obtain} but names no biome"
+        if m.obtain == "harvested":
+            assert m.biomes or m.from_creature, \
+                f"{m.id} is harvested but names neither creature nor place"
+
+
+def test_the_shelf_walk_skips_files_that_are_not_shelves():
+    """`content/materials` is a shared folder, not a homogeneous shelf, and this module
+    reads all of it. Measured when the second mode's catalogue landed there: all 170
+    priced magic-item entries loaded as enchanting materials, every one of them honestly
+    carrying `obtain: "bought"` — so `obtainable("bought")` offered to sell the player a
+    Ring of Protection +1 as a crafting material. Found by driving the loader, not by
+    reading it. A neighbour's file in another shape (the alchemist's spell potions, whose
+    list lives under `potions`) must also load as nothing rather than raising."""
+    loaded = en.materials()
+    assert "mi-flaming" not in loaded and "mi-ring-protection-1" not in loaded
+    assert "fire-mote" in loaded, "skipping went too far and took the shelf with it"
+    for m in en.obtainable("bought"):
+        assert not m.id.startswith("mi-"), f"{m.id} is a magic item, not a material"
+
+
+def test_obtainable_narrows_to_where_you_are_standing():
+    """A fire mote is skimmed off a forge or a lava vent, not out of a bog. The filter
+    is what makes an excursion a place rather than a shop with weather."""
+    mountain = {m.id for m in en.obtainable("gathered", biome="mountain")}
+    swamp = {m.id for m in en.obtainable("gathered", biome="swamp")}
+    assert "fire-mote" in mountain and "fire-mote" not in swamp
+    assert "ghost-residue" in swamp
+    dragons = {m.id for m in en.obtainable("harvested", creature="red dragon")}
+    assert "red-dragon-ichor" in dragons and "lich-dust" not in dragons
+
+
+def test_acquisition_excursions_are_declared():
+    """The play layer wires the UI; the track declares the data. Every excursion needs
+    an id, a label, a real obtain kind and what it needs, or the hub cannot draw it."""
+    assert en.ACQUISITION
+    for excursion in en.ACQUISITION:
+        assert excursion["obtain"] in ("bought", "mined", "harvested", "gathered")
+        for key in ("id", "label", "needs", "blurb"):
+            assert excursion.get(key), f"{excursion.get('id')}: missing {key}"
+
+
+def test_every_kind_has_a_distinct_glyph():
+    """One emoji per kind, none of them herbalism's 🌿🍄🦴☠️. A shared glyph makes two
+    benches look like one shelf at a glance, which is the whole thing icons are for."""
+    glyphs = en.KIND_GLYPH
+    kinds = {m.kind for m in en.materials().values() if m.id in _shipped_ids()}
+    assert kinds <= set(glyphs), f"kinds with no glyph: {kinds - set(glyphs)}"
+    assert len(set(glyphs.values())) == len(glyphs), "two kinds share a glyph"
+    assert not (set(glyphs.values()) & {"🌿", "🍄", "🦴", "☠️"}), \
+        "herbalism's glyphs must never be reused"
+
+
+def test_method_help_matches_method_descriptions(track):
+    """Both sets are authored by hand in one file, and a method that gains a tooltip
+    while losing its description (or the reverse) is a bench that explains half of
+    itself. Each entry needs all three fields — does, needs, for — because the tooltip
+    has three jobs and a player scanning for the DC should not have to read prose."""
+    data = json.loads(Path("content/world-classes/enchanter.json")
+                      .read_text(encoding="utf-8"))
+    described = set(data["method_descriptions"])
+    helped = set(data["method_help"])
+    assert described == helped, f"only described: {described - helped}; " \
+                                f"only helped: {helped - described}"
+    assert described == {m for l in track.levels for m in l.methods}
+    for method, help_text in data["method_help"].items():
+        for key in ("does", "needs", "for"):
+            assert help_text.get(key), f"{method}: method_help has no {key!r}"
+
+
+def _shipped_ids() -> set[str]:
+    """The ids from this track's own file. `materials()` reads the whole folder as one
+    shared shelf, so a test that measures 'my catalogue' has to say which is mine."""
+    return {m["id"] for m in json.loads(SHIPPED.read_text(encoding="utf-8"))["materials"]}
 
 
 # --- homebrew ----------------------------------------------------------------------------

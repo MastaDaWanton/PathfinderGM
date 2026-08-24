@@ -20,8 +20,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import effectspec
 from . import worldclass as wc
-from .registry import read_folder
 
 TRACK_ID = "enchanter"
 
@@ -77,12 +77,24 @@ class Material:
     dc_mod: int = 0             # catalysts: applied to the chain DC
     lifts: str = ""             # treatments: a restriction this lifts ("night")
     text: str = ""
+    # Where it comes from, for the play page's acquisition hub: bought | mined |
+    # harvested | gathered. `biomes` narrows a gathering, `from_creature` a harvest,
+    # `price_gp` prices a purchase. Unstated means "bought", because a material nobody
+    # has said how to find is one you can at least try to buy.
+    obtain: str = "bought"
+    biomes: list[str] = field(default_factory=list)
+    from_creature: list[str] = field(default_factory=list)
+    price_gp: int = 0
     effects: list = field(default_factory=list)
     drawbacks: list = field(default_factory=list)
 
     @property
     def rank(self) -> int:
         return wc.tier_rank(self.tier)
+
+    @property
+    def glyph(self) -> str:
+        return KIND_GLYPH.get(self.kind, "✨")
 
     def as_dict(self) -> dict:
         return {
@@ -92,6 +104,9 @@ class Material:
             "capacity": self.capacity, "fragile": self.fragile,
             "requires": self.requires, "consumed": self.consumed,
             "dc_mod": self.dc_mod, "lifts": self.lifts, "text": self.text,
+            "obtain": self.obtain, "biomes": self.biomes,
+            "from_creature": self.from_creature, "price_gp": self.price_gp,
+            "glyph": self.glyph,
             "effects": self.effects, "drawbacks": self.drawbacks,
         }
 
@@ -106,12 +121,25 @@ def from_dict(d: dict) -> Material:
         requires=d.get("requires", ""), consumed=bool(d.get("consumed")),
         dc_mod=int(d.get("dc_mod", 0) or 0), lifts=d.get("lifts", ""),
         text=d.get("text", ""),
+        obtain=str(d.get("obtain") or "bought").strip().lower(),
+        biomes=[str(b).strip().lower() for b in (d.get("biomes") or [])],
+        from_creature=[str(c).strip().lower() for c in (d.get("from_creature") or [])],
+        price_gp=int(d.get("price_gp", 0) or 0),
         effects=list(d.get("effects") or []),
         drawbacks=list(d.get("drawbacks") or []),
     )
 
 
 _MATERIALS: dict[str, Material] | None = None
+
+# Files in the shared shelf folder that are **not** shelf materials. `magic-items.json`
+# is the second mode's priced rules table — properties and finished wondrous items — and
+# reading it here made "Ring of Protection +1" a buyable enchanting material in
+# `obtainable()`, because every entry in it honestly carries `obtain: "bought"`. Found
+# when a sibling craft dropped another non-shelf file into the folder and the shelf test
+# went red; the shelf is a folder by convention, so a catalogue that is not a shelf has
+# to say so somewhere, and here is the only place that reads them all.
+NOT_SHELF = {"magic-items"}
 
 
 def materials() -> dict[str, Material]:
@@ -126,9 +154,9 @@ def materials() -> dict[str, Material]:
 
     Walked here rather than through `registry.KINDS` because materials are not a
     registered kind yet — registering one means touching `rules/registry.py`, which this
-    module deliberately does not do. `read_folder` is still borrowed from it so the two
-    file shapes it accepts (one file holding a list, one file per entry) are accepted
-    here too.
+    module deliberately does not do. `_entries` reproduces the two file shapes
+    `registry.read_folder` accepts, per file rather than per folder, so `NOT_SHELF` can
+    be honoured.
     """
     global _MATERIALS
     if _MATERIALS is None:
@@ -138,10 +166,40 @@ def materials() -> dict[str, Material]:
         shipped = Path(settings.BASE_DIR) / "content" / "materials"
         user = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "materials"
         for folder in (shipped, user):
-            for key, entry in read_folder(folder, "materials").items():
-                raw.setdefault(key, {}).update(entry)
+            if not folder.is_dir():
+                continue
+            # Per file rather than one `read_folder` over the folder, so `NOT_SHELF` can
+            # be honoured — the folder is a shared shelf, and one file in it is a priced
+            # rules table that only `rules/magicitem.py` should read.
+            for path in sorted(folder.glob("*.json")):
+                if path.stem in NOT_SHELF:
+                    continue
+                for key, entry in _entries(path):
+                    raw.setdefault(key, {}).update(entry)
         _MATERIALS = {k: from_dict({**v, "id": k}) for k, v in raw.items()}
     return _MATERIALS
+
+
+def _entries(path: Path):
+    """One file's entries as (id, dict), whatever shape it is in.
+
+    The two shapes `registry.read_folder` accepts — a file holding a list under
+    `materials`, and a file holding one entry — kept here because the shelf has to be
+    read file by file to skip the ones that are not shelves. A file whose list lives
+    under another key (the alchemist's spell potions) yields nothing rather than
+    raising: the shelf folder holds more than shelves now, and a loader that dies on a
+    neighbour's file is a loader that takes the bench down with it.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    entries = data.get("materials") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        entries = [data] if isinstance(data, dict) and data.get("id") else []
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("id"):
+            yield str(entry["id"]).strip().lower(), entry
 
 
 def get(material_id: str) -> Material:
@@ -164,14 +222,43 @@ class Chain:
         return len(self.methods)
 
 
+def chain_from_body(body: dict) -> Chain:
+    """A Chain from whatever the page posted, tolerantly.
+
+    The same signature `rules/magicitem.py` carries, so the bench spine can hand one
+    posted body to whichever mode is active without knowing which it is. Forgiving on
+    shape — a list or a comma-joined string for `methods` and `materials` — because the
+    real validation happens in `preview`, where a problem can be *shown* rather than
+    raised as a 500 on a form that looked fine.
+    """
+    body = dict(body or {})
+
+    def as_list(value):
+        if isinstance(value, str):
+            return [p.strip().lower() for p in value.split(",") if p.strip()]
+        return [str(v).strip().lower() for v in (value or [])]
+
+    return Chain(
+        methods=as_list(body.get("methods")),
+        material_ids=as_list(body.get("materials", body.get("material_ids"))),
+        item=str(body.get("item", body.get("vessel", "")) or "").strip(),
+        name=str(body.get("name", "") or "").strip(),
+    )
+
+
 @dataclass
 class Result:
     """What the chain would bind, and what could go wrong — nothing rolled.
 
-    `effects` is the finished item's standing effect list: the essences' specs plus
-    their drawbacks, each marked `from` so the sheet can say which binding a cost
-    belongs to. `mishap` says what a failed check does to the focus, because that is
-    the one consequence a player should see before choosing the stone.
+    `effects` is prose and `specs` is the executable list — the split the shared bench
+    spine expects, and worth stating because this class carried structured dicts under
+    the name `effects` when it was written alone. A card shows strings; the engine runs
+    specs; neither re-derives the other. `drawbacks` keeps the harmful specs listed
+    separately as well as inside `specs`, so a panel can show what the binding costs
+    without filtering the whole list.
+
+    `mishap` says what a failed check does to the focus, because that is the one
+    consequence a player should see before choosing the stone.
     """
     name: str
     item: str
@@ -179,13 +266,16 @@ class Result:
     rank: int
     stages: int
     dc: int
-    effects: list[dict] = field(default_factory=list)
+    effects: list[str] = field(default_factory=list)
+    specs: list[dict] = field(default_factory=list)
     drawbacks: list[dict] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     mishap: str = ""
+    risky: bool = False
     materials: list[dict] = field(default_factory=list)
     consumes: dict[str, int] = field(default_factory=dict)
+    output: dict | None = None
     bonus: int = 0
     terms: list[dict] = field(default_factory=list)
     chance: int = 0
@@ -194,10 +284,12 @@ class Result:
     def as_dict(self) -> dict:
         return {
             "name": self.name, "item": self.item, "tier": self.tier, "rank": self.rank,
-            "stages": self.stages, "dc": self.dc, "effects": self.effects,
+            "stages": self.stages, "dc": self.dc, "risky": self.risky,
+            "effects": self.effects, "specs": self.specs,
             "drawbacks": self.drawbacks, "problems": self.problems,
             "notes": self.notes, "mishap": self.mishap, "materials": self.materials,
-            "consumes": self.consumes, "bonus": self.bonus, "terms": self.terms,
+            "consumes": self.consumes, "output": self.output,
+            "bonus": self.bonus, "terms": self.terms,
             "chance": self.chance, "empowered": self.empowered,
         }
 
@@ -267,7 +359,7 @@ def _derived_name(chain: Chain, essences: list[Material]) -> str:
     return f"{name} +{plus}" if plus else name
 
 
-def preview(level: int, chain: Chain, stock: dict | None = None,
+def preview(level: int, chain: Chain, stock: dict | None = None, actor=None,
             item: dict | None = None, *, at_night: bool | None = None,
             carrier=None) -> Result:
     """What this working would bind, and how hard it is — without rolling.
@@ -451,18 +543,28 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
     # drawbacks, each marked with where it came from. The drawback rides in the same
     # list because it is part of the binding — shadowstuff's dimming does not wear off
     # when the stealth does not.
-    effects: list[dict] = []
+    specs: list[dict] = []
     drawbacks: list[dict] = []
     for e in essences:
         for spec in e.effects:
-            effects.append({**spec, "from": spec.get("from") or e.name})
+            specs.append({**spec, "from": spec.get("from") or e.name})
         for spec in e.drawbacks:
             marked = {**spec, "from": spec.get("from") or e.name, "drawback": True}
             drawbacks.append(marked)
-            effects.append(marked)
+            specs.append(marked)
+
+    # Prose beside the structure, rendered through `effectspec.render` so a bound
+    # essence and an authored ingredient read in one voice — the player should not be
+    # able to tell which side of the app wrote a line.
+    effects = [f"{s['from']}: {effectspec.render(s)}" if s.get("from")
+               else effectspec.render(s) for s in specs]
 
     name = chain.name or _derived_name(chain, essences)
-    terms = check_terms(carrier, level)
+    # `actor` is the name the spine and `rules/magicitem.py` use; `carrier` is what
+    # this module shipped with and what the herbalism bench calls the same argument.
+    # Both are accepted rather than one renamed, because a signature the spine calls
+    # positionally and a keyword an existing caller passes must not fight.
+    terms = check_terms(actor if actor is not None else carrier, level)
     bonus = sum(t["value"] for t in terms)
 
     # What a successful working spends. Essences always; consumables (inks, chalks,
@@ -474,15 +576,139 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
         if m.kind == "essence" or m.consumed:
             consumes[mid] = n
 
+    worn = kind in ("armour", "shield", "cloak", "jewelry", "ring", "amulet")
+    output = {
+        "id": _slug(name), "name": name, "kind": "crafted", "craft": TRACK_ID,
+        "tier": tier, "rank": rank, "count": 1,
+        "effects": effects, "specs": specs,
+        "from_materials": list(wanted),
+        # The vessel had to be masterwork to take the binding, so the result is one.
+        "masterwork": True,
+        "wearable": worn, "usable": not worn, "how": [],
+        "slot": target.get("slot") or None,
+        "weapon": target.get("weapon") if not worn else None,
+        "armour": target.get("armour") if worn else None,
+        # The essence mode has no +N ladder of its own except through the enhancement
+        # family, so the number is read off whichever essence carries one.
+        "enhancement": max((e.plus for e in essences), default=0),
+        "properties": [e.name for e in essences],
+    }
+
     return Result(
         name=name, item=chain.item, tier=tier, rank=rank, stages=chain.stages,
-        dc=dc, effects=effects, drawbacks=drawbacks, problems=problems, notes=notes,
+        dc=dc, effects=effects, specs=specs, drawbacks=drawbacks,
+        problems=problems, notes=notes,
+        # A binding that stakes a fragile focus is the one that can cost more than it
+        # spends. That is what `risky` means everywhere else in the app: a working with
+        # a consequence beyond wasted material.
+        risky=bool(focus is not None and focus.fragile),
         mishap=_mishap(focus), materials=[m.as_dict() for m in mats],
-        consumes=consumes, bonus=bonus, terms=terms,
+        consumes=consumes, output=output, bonus=bonus, terms=terms,
         chance=_chance(dc, bonus, problems), empowered=empowered,
     )
 
 
-__all__ = ["Chain", "CraftError", "EMPOWER_DC", "FINISHING", "Material", "OFF_TYPE_DC",
-           "Result", "TRACK_ID", "check_bonus", "check_terms", "from_dict", "get",
-           "materials", "preview"]
+def _slug(name: str) -> str:
+    out = "".join(c if c.isalnum() else "-" for c in str(name).lower()).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out
+
+
+# --- what the bench shows -----------------------------------------------------------------
+
+# One glyph per material kind, from the Enchanter's reserved pool. Herbalism owns
+# 🌿 🍄 🦴 ☠️ and none of them appear here; a shared glyph would make two benches look
+# like one shelf at a glance, which is the whole thing icons are for.
+#
+# `catalyst` is 📿 rather than the candle it started as. Measured through
+# `benches.glyphs()` once the five tracks were loaded together: 🕯️ was on the
+# leatherworker's `wax` as well, and a candle is the more literal thing for wax to be.
+# The clash was invisible from inside this file — one craft cannot see another's map —
+# which is exactly why the spine asserts across all five rather than each craft
+# asserting about itself.
+KIND_GLYPH: dict[str, str] = {
+    "essence": "✨",
+    "focus": "💎",
+    "ink": "🖋️",
+    "chalk": "🜏",
+    "salt": "⭐",
+    "vessel": "🔮",
+    "catalyst": "📿",
+    "treatment": "🧿",
+}
+
+
+# --- acquisition ---------------------------------------------------------------------------
+#
+# The play page's craft-action button is the single hub for *obtaining* materials, and
+# this is what the Enchanter offers it. Declared as data rather than wired here: the
+# excursion is the play layer's to run, and the track's job is to say what it yields.
+#
+# `obtain` on each material answers "where does this actually come from" — the question
+# the essences most needed answered. A fire mote is skimmed off a forge or a lava vent;
+# ghost residue is gathered where something died badly, after dark. Saying so turns the
+# shelf from a shop into a place.
+
+ACQUISITION: list[dict] = [
+    {"id": "essence-hunt", "label": "Skim essence", "obtain": "gathered",
+     "needs": {"biome": True},
+     "blurb": "Motes and residues are skimmed where the world runs thin — a forge's "
+              "heart, a storm's tail, the flagstones of a bad death. What is out "
+              "depends on where you are standing and, for some of it, on the hour.",
+     "yields_kind": "essence"},
+    {"id": "gem-cutting", "label": "Mine and cut foci", "obtain": "mined",
+     "needs": {"biome": True},
+     "blurb": "Quartz from any hillside, amethyst from a geode seam, diamond from "
+              "somewhere that will cost you. A focus is mined rough and cut at the "
+              "bench; the cutting is the cheap half.",
+     "yields_kind": "focus"},
+    {"id": "reliquary-harvest", "label": "Harvest from the slain", "obtain": "harvested",
+     "needs": {"creature": True},
+     "blurb": "Dragon ichor, fiend ash, a lich's dust, a feather given rather than "
+              "taken. The strongest essences in the catalogue are cut from something "
+              "that was recently alive and objected.",
+     "yields_kind": "essence"},
+    {"id": "scriptorium-order", "label": "Buy inks, chalks and catalysts",
+     "obtain": "bought", "needs": {"market": True},
+     "blurb": "Silver ink, consecrated chalk, powdered pearl, a phoenix quill if the "
+              "shop is lying about what it has. Circle materials are consumed by every "
+              "working, so this is the errand an enchanter runs most.",
+     "yields_kind": "ink"},
+    {"id": "vessel-commission", "label": "Commission a vessel", "obtain": "bought",
+     "needs": {"market": True, "craft": ("blacksmith", "leatherworker")},
+     "blurb": "The masterwork item itself, from the smith or the leatherworker — or "
+              "from their own bench, if the character has the track. Nothing is bound "
+              "to anything less.",
+     "yields_kind": "vessel"},
+]
+
+
+def obtainable(obtain_kind: str, *, biome: str | None = None,
+               creature: str | None = None) -> list[Material]:
+    """Every material this excursion could turn up, filtered to where you are.
+
+    `biome` and `creature` narrow a gathering or a harvest; passing neither answers
+    everything of that obtain kind, which is what a catalogue page wants. Matched on the
+    material's own `biomes` and `from_creature` fields — a fire mote does not appear in
+    a bog, and dragon ichor does not appear off a rat.
+    """
+    want = (obtain_kind or "").strip().lower()
+    out: list[Material] = []
+    for _, m in sorted(materials().items()):
+        if m.obtain != want:
+            continue
+        if biome and m.biomes and biome.strip().lower() not in m.biomes:
+            continue
+        if creature and m.from_creature:
+            said = creature.strip().lower()
+            if not any(part in said or said in part for part in m.from_creature):
+                continue
+        out.append(m)
+    return out
+
+
+__all__ = ["ACQUISITION", "Chain", "CraftError", "EMPOWER_DC", "FINISHING",
+           "KIND_GLYPH", "Material", "OFF_TYPE_DC", "Result", "TRACK_ID",
+           "chain_from_body", "check_bonus", "check_terms", "from_dict", "get",
+           "materials", "obtainable", "preview"]

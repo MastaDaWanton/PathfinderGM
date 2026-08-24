@@ -221,6 +221,147 @@ chain is the item. All are sealed, because an unsealed preparation is bench-work
 Eighteen named outputs against the CRB's eleven classics — the shelf out-writes the book,
 which was the target.
 
+## Potions that hold spells
+
+The trade's real product is not acid. It is a spell in a bottle, and that is what makes
+alchemy matter to a party with no caster in it.
+
+`content/materials/alchemist-spell-potions.json` holds **44 hand-converted potions** of
+1st-3rd level spells. It is a *curated* conversion, not a bulk one, because
+`content/spells/spells.json` carries 3,040 spells as **prose only** — no structured
+effects — so every entry here was read and encoded by hand.
+
+**Every `spell` id is verified against that corpus by test.** This is not ceremony: the
+check caught three wrong names on the first run. The brief asked for `lesser-restoration`,
+`mage-armour` and `eagle-s-splendour`; the corpus spells them `restoration-lesser`,
+`mage-armor` and `eagle-s-splendor`. A potion of a spell the app has never heard of is
+exactly the "ground every name" failure CLAUDE.md records.
+
+**`holds_spell` is a cross-craft contract.** A brewed potion's `Result.output` carries
+`holds_spell: "<spell-id>"`, `caster_level`, `usable: True` and `how`. The enchanter reads
+`holds_spell` to decide that a potion of X stands in for knowing X. The field name is
+fixed — nothing else on the item identifies the spell.
+
+**Caster level is 1e's minimum** for the spell level (CL 1 / 3 / 5 for 1st / 2nd / 3rd),
+and every duration and die in the file is *that caster level already worked out*. A card
+reading "minutes/level" makes the player do arithmetic the bench already knows.
+
+**Materials are the spell's own printed component** wherever 1e prints one — enlarge
+person is brewed with the powdered iron the spell itself calls for, spider climb with
+bitumen and a live spider, comprehend languages with soot and salt. The medium sets the
+tier and therefore the level gate:
+
+| Spell level | Caster level | Medium | Tier | Needs |
+|---|---|---|---|---|
+| 1st (15 potions) | CL 1 | rectified spirits / font water | uncommon | Alchemist 3 |
+| 2nd (20 potions) | CL 3 | + a rare catalyst (philosopher's wool, mithral dust) | rare | Alchemist 3 |
+| 3rd (9 potions) | CL 5 | azoth, in a crystal retort | exotic | Alchemist 4 |
+
+React is in every potion chain, which is why potion-brewing is a laboratory art rather
+than roadside work. A recipe **cannot lie about its tier** — a test derives the tier from
+the materials and asserts the declaration matches, because the tier is what gates who may
+brew it.
+
+**Matching is strict**: the exact set of materials *and* the exact method sequence. A
+near-match produces an ordinary preparation, never a different potion. "You got blur
+because you were one reagent short of invisibility" is a bug report nobody could write.
+
+### The user's example, end to end
+
+Potion of Enlarge Person: `rectified-spirits + iron-filings + glass-vial`, chain
+`dissolve → react → seal`. It produces **live specs, not prose** — +2 Strength and −2
+Dexterity as *size* modifiers, −1 attack and −1 AC, with the reach and space change as the
+one narrative line the vocabulary genuinely cannot hold. The engine applies the numbers
+through `consumables.plan`'s `buff` op; only the reach sentence is narrated.
+
+Where a spell's mechanic has no home in the vocabulary it stays `narrative` and is never
+guessed at. Two cases recur: **drinker-chosen targets** (lesser restoration mends "one
+ability score of your choice" — picking one here would invent a fact the spell never gave)
+and **effects with no vocabulary counterpart at all** (gaseous form, water breathing,
+blur's miss chance). All 44 potions' specs validate; zero are invented.
+
+## Acquisition — where materials come from
+
+The craft-action button is becoming the single hub for *obtaining* materials, replacing
+the foraging panel inside the crafting menu. Alchemy has no forage panel of its own
+because gathering is one of four ways in, not the way in.
+
+Every one of the 137 materials declares `obtain`, authored per material rather than
+derived from `kind` — a heuristic on kind would have said "buy a basilisk eye at the
+apothecary".
+
+| Excursion | `obtain` | Needs | Count | Examples |
+|---|---|---|---|---|
+| `market-run` | bought | a market | 71 | quicksilver 25 gp (apothecary), azoth 1,500 gp (planar broker) |
+| `quarry` | mined | a biome | 13 | brimstone (mountain/underground, DC 12), star-iron dust (desert/tundra, DC 20) |
+| `field-gathering` | gathered | a biome | 17 | pine pitch (forest, DC 8), ghost salt (underground, DC 18) |
+| `harvest-reagents` | harvested | a creature | 36 | ankheg acid sac (DC 15), tarrasque humour (DC 35) |
+
+Markets are named, not generic: `market`, `apothecary`, `glassblower`, `smith`, `temple`,
+`planar broker`. An apothecary sells brimstone; a planar broker sells azoth and asks no
+questions.
+
+The **shape is the one the other three crafts use** — flat `obtain` string with `biomes`,
+`from_creatures`, `market`, `price_gp` and `obtain_dc` beside it. This track started with
+a nested dict and conformed: the shelf is shared and one hub reads all four catalogues, so
+the odd craft out changes rather than making the hub learn two shapes. `Material.from_dict`
+still reads both, and reads the enchanter's singular `from_creature` as well as the
+leatherworker's plural `from_creatures`.
+
+`ACQUISITION` (in `rules/alchemist.py`) declares the four excursions as data — id, label,
+which `obtain` kind it serves, what it needs, and a blurb — so the page asks *what the
+track offers* rather than knowing what alchemy is. `obtainable(kind, biome=, creature=)`
+answers with the matching materials, shelf-wide, sorted by tier.
+
+## Icons
+
+`KIND_GLYPH` maps each kind to one glyph from this track's reserved pool. Herbalism owns
+🌿 herb, 🍄 fungus, 🦴 monster part and ☠️ poison; none of them appear here, because a
+repeated glyph on a shared shelf makes two different things look like the same thing.
+
+| 🜂 reagent | 🧪 solvent | 🧂 salt | 💠 catalyst | 🔆 essence |
+|---|---|---|---|---|
+| **🩸 gland** | **🫙 vessel** | **🧫 treatment** | **🧊 intermediate** | **⚱️ potion** |
+
+## Method help
+
+`alchemist.json` carries `method_help` beside `method_descriptions` — one entry per
+method, with three fields, because a player mid-chain is only ever asking one of three
+questions:
+
+- **does** — the mechanical effect in numbers (×1.25 potency, +3 DC per extra volatile,
+  what gets removed)
+- **needs** — what must be in the vessel for the method to be legal
+- **for** — what a player reaches for it to accomplish
+
+`method_descriptions` stays: it is the rulebook voice, where `method_help` is the bench
+voice. A test asserts every method has both.
+
+## The dispatchable surface
+
+`rules/alchemist.py` mirrors `rules/crafting.py` so the shared bench can route a chain by
+track without learning two vocabularies:
+
+- `TRACK_ID`, `CraftError`, `Chain`, `Result`, `materials()`, `preview()`
+- `chain_from_body(body)` — parses `methods`, `materials`, `name`, `stock`, tolerant of
+  every key being absent. A missing key becomes an empty list, never a 500; the refusal
+  belongs in `problems` where the page can show it.
+- `check_terms(actor, level)` / `check_bonus(actor, level)` — **d20 + track level + half
+  character level + Intelligence**. Int rather than herbalism's Wis because Craft is
+  Int-based in PF1e, and that single substitution is what makes an alchemist a different
+  character from a herbalist rather than the same one with two shelves.
+- `preview(level, chain, stock=None, actor=None)` — with an actor it sets `bonus`, `terms`
+  and `chance`; without one it answers "is this legal" rather than "will I make it", and
+  `chance` stays 0 so no page can show a tempting percentage on a refused chain.
+
+`Result.output` is the inventory item: `id, name, kind="crafted", craft, tier, rank,
+count, effects, specs, from_materials, usable, how, wearable=False, slot=None,
+holds_spell, caster_level`. **How an item is used is read off what is in it**, not
+declared per recipe, because the rule has to answer for chains nobody wrote down: *a
+vessel is what makes a thing throwable* — harmful in a vessel is a splash weapon
+(alchemist's fire, acid flask), harmful without one is a coating (grease, holy balm), and
+anything not harmful is drunk.
+
 ## Worked examples
 
 ### Alchemist's fire (level 3, the trade's handshake)
@@ -271,35 +412,55 @@ the mishap line reading like an obituary. Potency 1.25 × 1.25 × 1.5 ≈ ×2.34
 the deed `legendary-work` unlocks Alchemist 5 for whoever was still 4; the output is a
 sealed arcanum that hits like the falling star it politely used to be.
 
-## Integration notes — wanted from shared code, deliberately not touched
+## Integration notes — wanted from the shared spine, deliberately not touched
 
-Written for whoever wires the bench next; none of these files were modified.
+None of `play/*`, `rules/sheet.py`, `rules/crafting.py`, `rules/consumables.py`,
+`rules/casting.py` or any sibling track's files were modified.
 
-1. **Bench UI** (`play/` templates and views). Herbalism's bench renders
-   `crafting.Result`; `alchemist.Result` is the same shape plus `dc_terms`, `volatiles`
-   and `mishap`, which want three small additions: the itemised DC beside the button
-   (the way `terms` itemises the bonus), a volatility marker on each jar, and the mishap
-   sentence under the chance label. Nothing in the Result requires new page machinery.
+1. **Bench UI** (`play/` templates and views). `alchemist.Result.as_dict()` carries every
+   key the brief specified plus `dc_terms`, `volatiles` and `mishap`, which want three
+   small additions: the itemised DC beside the button (the way `terms` itemises the
+   bonus), a volatility marker on each jar, and the mishap sentence under the chance
+   label. Nothing in the Result requires new page machinery.
 
-2. **The craft-action excursion** (`rules/craft_action.py`, foraging). Herbs are
-   foraged; materials are *bought, mined or harvested from kills*. The catalogue
-   deliberately has no `biomes`/`forageable` fields. Gathering wants the excursion
-   verb pointed at markets and carcasses — an ankheg acid sac should come from an
-   ankheg the table actually killed, through the same "GM hands it over" path
-   `ingredients.by_name` serves.
+2. **The acquisition hub** (craft-action excursion). `ACQUISITION` declares four
+   excursions and `obtainable(kind, biome=, creature=)` answers them; the data is in
+   place for all 137 materials. What the hub still needs from the spine is the *scene*
+   half — which market the party is standing in, which biome they are in, and which
+   corpse is in front of them. `obtainable` takes those as arguments and has no opinion
+   about where they come from.
 
 3. **Consumables wiring** (`rules/consumables.py`). A sealed flask should be throwable
-   exactly like a tincture: build a `crafting.Stock` (or its dispatcher-generalised
-   successor) from `alchemist.Result.specs` with `craft="alchemist"`, and
-   `consumables.plan` already handles drink/throw/coat, splash radius, per-source
-   poison gates and potency scaling. The specs are already `from`-marked per material
-   for exactly that grouping.
+   exactly like a tincture. `Result.output` already carries `specs` (`from`-marked per
+   material, which is what `consumables.poisons` groups on), `potency` and `how`, so
+   building a `Stock`-alike from it and calling `consumables.plan` should just work.
 
-4. **Engine dispatch** (`rules/engine.py` craft op). The `craft` intent currently
-   assumes herbalism's preview. `TRACK_ID`, `CraftError`, `Chain`, `preview` here
-   mirror crafting.py's names so the dispatcher can be a two-entry table rather than
-   an if-ladder.
+   **One real gap found**: `consumables.plan` refuses `coat` unless `is_harmful(stock)`,
+   and a *beneficial* weapon oil is not harmful. Oil of magic weapon, oil of align weapon
+   and oil of keen edge are `how: ["coat"]` and would all be refused today with "does
+   nothing harmful, so there is nothing to put on a blade". The spine needs a benign-
+   coating path — a coating whose specs buff the *wielder's weapon* rather than poisoning
+   the target. Four of the 44 potions are affected. I have not touched `consumables.py`,
+   so the declaration stands and the refusal is real until that path exists.
 
-5. **Mastery scoring**. `worldclass.award` needs nothing new — stages, risky and tier
-   all fall out of `Result` (`stages`, `risky`, `tier`), and the volatile surcharge is
-   already reflected in the DC rather than needing its own award row.
+4. **Engine dispatch** (`rules/engine.py` craft op). `TRACK_ID`, `CraftError`, `Chain`,
+   `chain_from_body`, `check_terms`, `check_bonus` and `preview` all mirror crafting.py's
+   names, so the dispatcher can be a table keyed on track rather than an if-ladder.
+
+5. **Spell potions and the caster spine** (`rules/casting.py`, the enchanter).
+   `holds_spell` is the contract and is populated. What it needs from the spine is a
+   consumer: something that reads `holds_spell` off an inventory item and treats it as
+   access to that spell. I have deliberately not guessed at that API.
+
+6. **Mastery scoring**. `worldclass.award` needs nothing new — stages, risky and tier all
+   fall out of `Result`, and the volatile surcharge is already reflected in the DC rather
+   than needing its own award row.
+
+7. **A shared-shelf hazard, now pinned by test.** `content/materials` is one directory and
+   `load_dir` merges by id in filename order, so a duplicate id means the alphabetically
+   later craft silently wins. My `blessed-water` (uncommon solvent) was being shadowed by
+   the blacksmith's `blessed-water` (rare quenchant): it moved four potions up a tier and
+   removed the reaction medium from three chains, with nothing anywhere reporting a
+   problem. Mine are renamed `font-water` and `standing-oak-bark`, and
+   `test_no_material_id_is_claimed_by_two_crafts` now checks the whole shelf, not just
+   this track — the next collision will not be mine either.

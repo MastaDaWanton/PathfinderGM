@@ -1,6 +1,7 @@
 {
  "source": "Leatherworker world class, built against the shipped bestiary",
- "note": "Hides carry from_creatures: name fragments matched against bestiary names, so 'skinned' loot can resolve to an entry here. Raw hides spoil (fresh_hours) until cured or tanned. Tier follows the CR of the beast the hide comes off: a deer is common work, a dragon is legendary work.",
+ "craft": "leatherworker",
+ "note": "Hides carry from_creatures: name fragments matched against bestiary names, so skinned loot can resolve to an entry here. Raw hides spoil (fresh_hours) until cured or tanned. Tier follows the CR of the beast the hide comes off: a deer is common work, a dragon is legendary work. Every entry carries `obtain` — harvested off a carcass, gathered where it grows, mined out of the ground, or bought with a price_gp — which is what the play page's acquisition hub offers as an excursion.",
  "materials": [
   {
    "id": "deer-hide",
@@ -24,7 +25,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "boar-hide",
@@ -54,7 +56,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "wolf-pelt",
@@ -80,7 +83,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "dog-hide",
@@ -103,7 +107,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "cat-pelt",
@@ -129,7 +134,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "horse-hide",
@@ -152,7 +158,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "goat-hide",
@@ -175,7 +182,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "viper-skin",
@@ -202,7 +210,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "crocodile-hide",
@@ -232,7 +241,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "monitor-lizard-hide",
@@ -263,7 +273,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "toad-hide",
@@ -287,7 +298,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "bat-wing-leather",
@@ -310,7 +322,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "weasel-pelt",
@@ -333,7 +346,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "elk-hide",
@@ -360,7 +374,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "dire-boar-hide",
@@ -396,7 +411,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "winter-wolf-pelt",
@@ -425,7 +441,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "boreal-wolf-pelt",
@@ -452,7 +469,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "black-bear-hide",
@@ -476,7 +494,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "grizzly-hide",
@@ -503,7 +522,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "polar-bear-hide",
@@ -535,7 +555,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "frostfallen-bison-hide",
@@ -563,7 +584,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "glowlizard-hide",
@@ -586,7 +608,8 @@
    ],
    "source": "skinned",
    "size": "small",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "frilled-lizard-hide",
@@ -613,7 +636,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "electric-eel-skin",
@@ -638,7 +662,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "ankheg-shell-leather",
@@ -673,7 +698,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "snow-leopard-pelt",
@@ -700,7 +726,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "dire-wolverine-hide",
@@ -726,7 +753,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "owlbear-hide",
@@ -749,7 +777,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "griffon-hide",
@@ -775,7 +804,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "shadow-mastiff-hide",
@@ -805,7 +835,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "salamander-hide",
@@ -829,7 +860,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "hell-hound-hide",
@@ -860,7 +892,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "cave-bear-hide",
@@ -894,7 +927,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "sabre-tooth-hide",
@@ -921,7 +955,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "basilisk-hide",
@@ -951,7 +986,8 @@
    ],
    "source": "skinned",
    "size": "medium",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "bulette-plate",
@@ -981,7 +1017,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "manticore-hide",
@@ -1004,7 +1041,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "chimera-hide",
@@ -1032,7 +1070,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "remorhaz-hide",
@@ -1061,7 +1100,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "gorgon-hide",
@@ -1091,7 +1131,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "shadow-girallon-pelt",
@@ -1124,7 +1165,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "nightmare-hide",
@@ -1152,7 +1194,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "wyvern-hide",
@@ -1185,7 +1228,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "behir-hide",
@@ -1209,7 +1253,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "purple-worm-plate",
@@ -1243,7 +1288,8 @@
    ],
    "source": "skinned",
    "size": "gargantuan",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "dragon-turtle-shell",
@@ -1274,7 +1320,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "couatl-feather-hide",
@@ -1304,7 +1351,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "hydra-hide",
@@ -1334,7 +1382,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "noble-salamander-hide",
@@ -1359,7 +1408,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "phoenix-feather-hide",
@@ -1387,7 +1437,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "unicorn-hide",
@@ -1417,7 +1468,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "dragonne-hide",
@@ -1448,7 +1500,8 @@
    ],
    "source": "skinned",
    "size": "large",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "red-dragonhide",
@@ -1481,7 +1534,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "gold-dragonhide",
@@ -1514,7 +1568,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "brass-dragonhide",
@@ -1547,7 +1602,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "white-dragonhide",
@@ -1580,7 +1636,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "silver-dragonhide",
@@ -1613,7 +1670,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "blue-dragonhide",
@@ -1646,7 +1704,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "bronze-dragonhide",
@@ -1679,7 +1738,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "black-dragonhide",
@@ -1712,7 +1772,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "copper-dragonhide",
@@ -1745,7 +1806,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "green-dragonhide",
@@ -1778,7 +1840,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "umbral-dragonhide",
@@ -1814,7 +1877,8 @@
    ],
    "source": "skinned",
    "size": "huge",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "tarrasque-plate",
@@ -1848,7 +1912,8 @@
    ],
    "source": "skinned",
    "size": "gargantuan",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "kraken-hide",
@@ -1883,7 +1948,8 @@
    ],
    "source": "skinned",
    "size": "gargantuan",
-   "fresh_hours": 48
+   "fresh_hours": 48,
+   "obtain": "harvested"
   },
   {
    "id": "oak-bark",
@@ -1901,7 +1967,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "forest"
+   ]
   },
   {
    "id": "sumac-leaf",
@@ -1919,7 +1989,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "hills",
+    "grassland"
+   ]
   },
   {
    "id": "hemlock-bark",
@@ -1937,7 +2012,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "forest",
+    "mountain"
+   ]
   },
   {
    "id": "willow-bark",
@@ -1955,7 +2035,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "swamp",
+    "coast"
+   ]
   },
   {
    "id": "tara-pod",
@@ -1973,7 +2058,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 8
   },
   {
    "id": "bog-liquor",
@@ -1991,7 +2078,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "swamp"
+   ]
   },
   {
    "id": "mangrove-bark",
@@ -2009,7 +2100,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "coast",
+    "swamp"
+   ]
   },
   {
    "id": "ironbark-tannin",
@@ -2027,7 +2123,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 60
   },
   {
    "id": "wyrm-gall",
@@ -2045,7 +2143,13 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "drake",
+    "wyrm",
+    "wyvern"
+   ]
   },
   {
    "id": "salamander-ash-lye",
@@ -2063,7 +2167,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "salamander"
+   ]
   },
   {
    "id": "styx-mordant",
@@ -2081,7 +2189,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 700
   },
   {
    "id": "dragonblood-tannin",
@@ -2099,7 +2209,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "dragon"
+   ]
   },
   {
    "id": "linen-thread",
@@ -2112,7 +2226,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "sinew-thread",
@@ -2130,7 +2246,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "gut-cord",
@@ -2148,7 +2266,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "horsehair-cord",
@@ -2161,7 +2281,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "waxed-flax",
@@ -2174,7 +2296,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 2
   },
   {
    "id": "silk-thread",
@@ -2192,7 +2316,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 10
   },
   {
    "id": "spider-silk-cord",
@@ -2210,7 +2336,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "bought",
+   "price_gp": 25
   },
   {
    "id": "wire-silk",
@@ -2228,7 +2356,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 150
   },
   {
    "id": "shadow-silk",
@@ -2249,7 +2379,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 200
   },
   {
    "id": "wyvern-sinew",
@@ -2267,7 +2399,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "wyvern"
+   ]
   },
   {
    "id": "dragon-sinew",
@@ -2285,7 +2421,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "dragon"
+   ]
   },
   {
    "id": "neatsfoot-oil",
@@ -2298,7 +2438,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "currier-tallow",
@@ -2316,7 +2458,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "fish-oil",
@@ -2334,7 +2478,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "mink-oil",
@@ -2352,7 +2498,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "weasel",
+    "mink"
+   ]
   },
   {
    "id": "troll-fat",
@@ -2370,7 +2521,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "troll"
+   ]
   },
   {
    "id": "salamander-oil",
@@ -2389,7 +2544,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "salamander"
+   ]
   },
   {
    "id": "wyvern-fat",
@@ -2407,7 +2566,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": [
+    "wyvern"
+   ]
   },
   {
    "id": "umbral-oil",
@@ -2432,7 +2595,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 4000
   },
   {
    "id": "madder-red",
@@ -2445,7 +2610,12 @@
    "forageable": true,
    "effects": [],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "farmland",
+    "grassland"
+   ]
   },
   {
    "id": "weld-yellow",
@@ -2458,7 +2628,12 @@
    "forageable": true,
    "effects": [],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "grassland",
+    "urban"
+   ]
   },
   {
    "id": "woad-blue",
@@ -2471,7 +2646,11 @@
    "forageable": true,
    "effects": [],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "farmland"
+   ]
   },
   {
    "id": "walnut-brown",
@@ -2484,7 +2663,12 @@
    "forageable": true,
    "effects": [],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "forest",
+    "farmland"
+   ]
   },
   {
    "id": "iron-gall-black",
@@ -2497,7 +2681,12 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "forest"
+   ]
   },
   {
    "id": "murex-purple",
@@ -2515,7 +2704,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 120
   },
   {
    "id": "vermilion",
@@ -2528,7 +2719,12 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ]
   },
   {
    "id": "glowcap-green",
@@ -2546,7 +2742,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "underground"
+   ]
   },
   {
    "id": "shadow-black",
@@ -2567,7 +2767,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 90
   },
   {
    "id": "dragons-blood-crimson",
@@ -2585,7 +2787,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 75
   },
   {
    "id": "moonlight-silver",
@@ -2603,7 +2807,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 600
   },
   {
    "id": "void-dye",
@@ -2628,7 +2834,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 6000
   },
   {
    "id": "thread-wax",
@@ -2638,10 +2846,15 @@
    "craft_dc": null,
    "text": "Thread-wax, edge-seal, and the smell of an honest workshop.",
    "risky": false,
-   "forageable": false,
+   "forageable": true,
    "effects": [],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "gathered",
+   "biomes": [
+    "farmland",
+    "forest"
+   ]
   },
   {
    "id": "seam-pitch",
@@ -2651,7 +2864,7 @@
    "craft_dc": null,
    "text": "Seam-seal for wet service. Cheaper than beeswax, stickier, smells of forest fires.",
    "risky": false,
-   "forageable": false,
+   "forageable": true,
    "effects": [
     {
      "type": "narrative",
@@ -2659,7 +2872,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "foraged"
+   "source": "foraged",
+   "obtain": "gathered",
+   "biomes": [
+    "forest"
+   ]
   },
   {
    "id": "hardening-wax",
@@ -2677,7 +2894,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 6
   },
   {
    "id": "fireproof-wax",
@@ -2696,7 +2915,11 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground"
+   ]
   },
   {
    "id": "ghost-wax",
@@ -2714,7 +2937,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 450
   },
   {
    "id": "iron-buckle",
@@ -2727,7 +2952,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "brass-buckle",
@@ -2740,7 +2967,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 2
   },
   {
    "id": "steel-studs",
@@ -2761,7 +2990,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 10
   },
   {
    "id": "bronze-rings",
@@ -2774,7 +3005,9 @@
    "forageable": false,
    "effects": [],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "silver-clasps",
@@ -2792,7 +3025,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 25
   },
   {
    "id": "cold-iron-studs",
@@ -2810,7 +3045,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 40
   },
   {
    "id": "mithral-fittings",
@@ -2828,7 +3065,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 500
   },
   {
    "id": "adamantine-buckles",
@@ -2846,7 +3085,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "smithed"
+   "source": "smithed",
+   "obtain": "bought",
+   "price_gp": 3000
   },
   {
    "id": "curing-salt",
@@ -2864,7 +3105,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "coast"
+   ]
   },
   {
    "id": "tawing-alum",
@@ -2882,7 +3128,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "mountain"
+   ]
   },
   {
    "id": "brain-paste",
@@ -2900,7 +3151,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "rendered"
+   "source": "rendered",
+   "obtain": "harvested",
+   "from_creatures": []
   },
   {
    "id": "liming-quicklime",
@@ -2918,7 +3171,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "hills"
+   ]
   },
   {
    "id": "mordant-salts",
@@ -2936,7 +3194,12 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "mined",
+   "biomes": [
+    "underground",
+    "desert"
+   ]
   },
   {
    "id": "planar-quench",
@@ -2954,7 +3217,9 @@
     }
    ],
    "effects_converted": true,
-   "source": "bought"
+   "source": "bought",
+   "obtain": "bought",
+   "price_gp": 800
   }
  ]
 }

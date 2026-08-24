@@ -318,3 +318,295 @@ def test_skinning_belongs_to_the_field_not_the_bench():
 def test_an_unknown_product_pattern_raises_rather_than_guessing():
     with pytest.raises(lw.CraftError):
         lw.preview(1, _chain(["cut"], ["deer-hide"], product="codpiece"))
+
+
+# --- phase two: the dispatchable surface ----------------------------------------------------
+
+class _Crafter:
+    """A stand-in for a sheet Actor: the two attributes `check_terms` reads."""
+
+    def __init__(self, level=5, int_mod=2):
+        self.level = level
+        self._int = int_mod
+
+    def ability_mod(self, which):
+        return self._int if which == "int" else 0
+
+
+def test_chain_from_body_is_tolerant_of_a_partial_bench_post():
+    """The bench previews on every click, including the first one when nothing has been
+    chosen. A missing key must be an empty chain, not a 500 — `preview` already answers
+    an empty chain with readable problems, and a stack trace would replace them."""
+    empty = lw.chain_from_body({})
+    assert empty.methods == [] and empty.material_ids == []
+    assert lw.preview(1, empty).problems  # readable, not an exception
+
+    full = lw.chain_from_body({
+        "methods": ["Flense", " cure "], "materials": ["Deer-Hide"],
+        "name": "Hunting Bag", "product": "SATCHEL",
+    })
+    assert full.methods == ["flense", "cure"]
+    assert full.material_ids == ["deer-hide"]
+    assert full.product == "satchel"
+    assert full.name == "Hunting Bag"
+    # Both spellings, because five benches are being written in parallel.
+    assert lw.chain_from_body({"material_ids": ["deer-hide"],
+                               "pattern": "cloak"}).product == "cloak"
+
+
+def test_stock_from_body_keeps_dict_entries_and_coerces_counts():
+    """Stock is inventory, not recipe — parsed by its own function so two identical
+    chains are not unequal because one crafter was richer."""
+    got = lw.stock_from_body({"stock": {"Deer-Hide": "2",
+                                        "linen-thread": {"count": 1, "age_hours": 3},
+                                        "junk": "not a number"}})
+    assert got["deer-hide"] == 2
+    assert got["linen-thread"]["age_hours"] == 3
+    assert "junk" not in got
+
+
+def test_check_terms_are_itemised_and_intelligence_based():
+    """Craft is Int-based in PF1e. Herbalism reads Wisdom for its own authored reason,
+    and copying that here would have made the tannery a wisdom craft by accident.
+    Itemised because '+9' says nothing and 'Leatherworker 5, half level +2, Int +2'
+    says which of the three to improve."""
+    terms = lw.check_terms(_Crafter(level=5, int_mod=2), 5)
+    assert [t["value"] for t in terms] == [5, 2, 2]
+    assert terms[-1]["label"] == "Intelligence"
+    assert lw.check_bonus(_Crafter(level=5, int_mod=2), 5) == 9
+    # No actor is still a legal question: the chain's legality never depends on who
+    # is standing at the bench.
+    assert lw.check_bonus(None, 3) == 3
+
+
+def test_preview_carries_bonus_terms_and_chance_only_with_an_actor():
+    chain = _chain(["flense", "cure", "cut", "stitch"],
+                   ["deer-hide", "linen-thread"])
+    bare = lw.preview(1, chain)
+    assert (bare.bonus, bare.terms, bare.chance) == (0, [], 0)
+
+    withact = lw.preview(5, chain, actor=_Crafter(level=5, int_mod=2))
+    assert withact.bonus == 9
+    # DC 16 against +9 needs a 7 on the die: 14 faces in 20, so 70%.
+    assert withact.chance == 70
+    # A chain with problems is never attempted, so it is never a percentage.
+    broken = lw.preview(1, _chain(["stitch"], ["deer-hide"]),
+                        actor=_Crafter(level=1, int_mod=2))
+    assert broken.problems and broken.chance == 0
+
+
+def test_result_as_dict_carries_the_whole_bench_contract():
+    """The dispatcher reads one shape for five crafts; a field missing here is a blank
+    panel on the bench with nothing to explain it."""
+    d = lw.preview(5, _chain(["flense", "tan", "cut", "stitch", "tool"],
+                             ["deer-hide", "oak-bark", "linen-thread"],
+                             product="armour piece"),
+                   actor=_Crafter()).as_dict()
+    for key in ("name", "tier", "rank", "stages", "dc", "risky", "problems",
+                "effects", "specs", "consumes", "output", "bonus", "terms",
+                "chance"):
+        assert key in d, f"as_dict is missing {key}"
+
+
+# --- phase two: the output contract ---------------------------------------------------------
+
+def test_masterwork_is_reachable_and_is_read_off_the_chain():
+    """**The enchanting economy depends on this.** The enchanter requires a masterwork
+    vessel and armour is one of its item classes, so if masterwork leather were
+    unreachable the whole chain would dead-end.
+
+    Measured: the cheapest masterwork leather armour is Leatherworker 5 (tool is a
+    level-5 method), DC 18 — deer hide + oak bark + linen thread, flense → tan → cut →
+    stitch → tool, five stages, base 10 + 8. A level-5 character with Int +2 crafts it
+    at 60%. It is read off the *chain*, not the tier: a legendary hide left untooled is
+    not masterwork, and a common hide tooled by a master is.
+    """
+    mw = lw.preview(5, _chain(["flense", "tan", "cut", "stitch", "tool"],
+                              ["deer-hide", "oak-bark", "linen-thread"],
+                              product="armour piece"))
+    assert mw.problems == []
+    assert mw.dc == 18
+    assert mw.output["masterwork"] is True
+    assert mw.output["armour"] == "leather"
+    assert lw.preview(5, _chain(["flense", "tan", "cut", "stitch", "tool"],
+                                ["deer-hide", "oak-bark", "linen-thread"],
+                                product="armour piece"),
+                      actor=_Crafter(level=5, int_mod=2)).chance == 60
+
+    # Untooled: everything else identical, no masterwork.
+    plain = lw.preview(5, _chain(["flense", "tan", "cut", "stitch"],
+                                 ["deer-hide", "oak-bark", "linen-thread"],
+                                 product="armour piece"))
+    assert plain.output["masterwork"] is False
+    # And a legendary hide left untooled is still not masterwork.
+    legendary = lw.preview(5, _chain(["flense", "tan", "cut", "stitch"],
+                                     ["red-dragonhide", "dragonblood-tannin",
+                                      "dragon-sinew"], product="armour piece"))
+    assert legendary.tier == "legendary"
+    assert legendary.output["masterwork"] is False
+
+
+def test_masterwork_is_unreachable_below_level_five():
+    """Tool is the masterwork finish and it is learned at 5 — so the enchanter's vessel
+    requirement is a real progression gate, not a formality."""
+    r = lw.preview(4, _chain(["flense", "tan", "cut", "stitch", "tool"],
+                             ["deer-hide", "oak-bark", "linen-thread"],
+                             product="armour piece"))
+    assert any("Tool is learned at Leatherworker 5" in p for p in r.problems)
+
+
+def test_studs_make_it_studded_leather_and_the_key_is_a_real_armour_row():
+    """The armour key is read off the bench, not the pattern: studs are what turn
+    leather armour into studded leather. Verified against `tables.ARMOUR` because a key
+    the sheet has never heard of would equip as nothing and report no error."""
+    from rules.tables import ARMOUR
+
+    studded = lw.preview(5, _chain(["flense", "tan", "cut", "stitch", "tool"],
+                                   ["deer-hide", "oak-bark", "linen-thread",
+                                    "steel-studs"], product="armour piece"))
+    assert studded.output["armour"] == "studded leather"
+    assert studded.output["armour"] in ARMOUR
+
+    # Every pattern's key, whatever it is, must exist in the table or be None.
+    for product in lw.PRODUCTS:
+        out = lw.preview(5, _chain(["flense", "tan", "cut", "stitch"],
+                                   ["horse-hide", "oak-bark", "linen-thread"],
+                                   product=product)).output
+        assert out["armour"] is None or out["armour"] in ARMOUR
+
+
+def test_untanned_work_carries_no_armour_row():
+    """PF1e's leather armour is leather. Cured rawhide is a garment — still craftable,
+    but it must not claim an armour row it cannot fill."""
+    raw = lw.preview(5, _chain(["flense", "cure", "cut", "stitch", "tool"],
+                               ["deer-hide", "curing-salt", "linen-thread"],
+                               product="armour piece"))
+    assert raw.problems == []
+    assert raw.output["tanned"] is False
+    assert raw.output["armour"] is None
+    assert raw.output["masterwork"] is True   # tooled rawhide is still fine work
+
+
+def test_every_product_maps_to_a_body_slot_or_is_carried():
+    """A satchel that occupied the shoulders slot would fight a cloak for it. Carried
+    goods say so — slot None, wearable False — rather than leaving the bench to guess
+    from the absence of a slot."""
+    expected = {"cloak": "shoulders", "boots": "feet", "bracers": "wrists",
+                "gloves": "hands", "belt": "belt", "cap": "head",
+                "armour piece": "armor"}
+    for product, slot in expected.items():
+        out = lw.preview(5, _chain(["flense", "tan", "cut", "stitch"],
+                                   ["horse-hide", "oak-bark", "linen-thread"],
+                                   product=product)).output
+        assert out["slot"] == slot, product
+        assert out["wearable"] is True
+        assert out["how"] == ["wear"]
+
+    for carried in ("satchel", "sheath", "straps"):
+        out = lw.preview(1, _chain(["flense", "cure", "cut", "stitch"],
+                                   ["deer-hide", "curing-salt", "linen-thread"],
+                                   product=carried)).output
+        assert out["slot"] is None and out["wearable"] is False
+        assert out["how"] == ["carry"]
+        # Nothing the tannery makes is spent by using it.
+        assert out["usable"] is False
+
+
+# --- phase two: icons -----------------------------------------------------------------------
+
+def test_every_kind_has_its_own_glyph_and_none_is_herbalism_s():
+    """A hide must never render as a herb — the reported bug, caused by one icon for
+    'content'. Herbalism owns 🌿 herb, 🍄 fungus, 🦴 monster part, ☠️ poison."""
+    kinds = {m["kind"] for m in _shipped()}
+    missing = kinds - set(lw.KIND_GLYPH)
+    assert not missing, f"kinds with no glyph: {sorted(missing)}"
+
+    glyphs = list(lw.KIND_GLYPH.values())
+    assert len(glyphs) == len(set(glyphs)), "two kinds share a glyph"
+    assert not set(glyphs) & {"🌿", "🍄", "🦴", "☠️"}, "herbalism's glyphs reused"
+
+    # And the material carries it, so the shelf needs no lookup table of its own.
+    assert lw.get("deer-hide").glyph == lw.KIND_GLYPH["hide"]
+    assert lw.get("oak-bark").glyph == lw.KIND_GLYPH["tannin"]
+
+
+# --- phase two: method tooltips --------------------------------------------------------------
+
+def test_every_method_has_structured_help():
+    """The tooltip's three questions: what it does to my numbers, what it needs on the
+    bench, and what I would reach for it to accomplish. A method with prose but no
+    structured help renders an empty tooltip and teaches nothing."""
+    data = json.loads((TRACK_FILE_DIR / "leatherworker.json")
+                      .read_text(encoding="utf-8"))
+    track = wc.load_dir(TRACK_FILE_DIR)["leatherworker"]
+    every = track.unlocked_methods(track.max_level)
+    help_ = data.get("method_help") or {}
+    for method in every:
+        assert method in help_, f"{method} has no method_help"
+        for key in ("does", "needs", "for"):
+            assert help_[method].get(key), f"{method}.{key} is empty"
+        assert method in data["method_descriptions"], method
+    # No orphans either: help for a method the track does not have is a stale copy.
+    assert set(help_) == set(every)
+
+
+# --- phase two: acquisition ------------------------------------------------------------------
+
+def test_every_material_says_how_it_is_obtained():
+    """The acquisition hub dispatches on `obtain`; an entry without one is a material
+    no excursion can ever turn up, invisible rather than merely rare."""
+    kinds = {"harvested", "gathered", "mined", "bought"}
+    for m in _shipped():
+        assert m.get("obtain") in kinds, f"{m['id']}: {m.get('obtain')!r}"
+        if m["obtain"] == "bought":
+            assert m.get("price_gp"), f"{m['id']} is bought with no price"
+        if m["obtain"] in ("gathered", "mined"):
+            assert m.get("biomes"), f"{m['id']} is {m['obtain']} from nowhere"
+
+
+def test_skinning_a_winter_wolf_offers_its_pelt_and_no_other_beast_s_hide():
+    """The flagship excursion. Without the creature filter, skinning a deer offered
+    dragonhide — the whole point of asking the scene rather than listing the shelf."""
+    got = [m.id for m in lw.obtainable("harvested", creature="worg, winter wolf")]
+    assert "winter-wolf-pelt" in got
+    assert got[0] == "winter-wolf-pelt", "the specific pelt must lead"
+    assert "deer-hide" not in got
+    assert "red-dragonhide" not in got
+    # Any carcass yields the general goods, which is why sinew is not creature-tagged.
+    assert "sinew-thread" in got
+    # And no carcass in the scene yields nothing at all, rather than the whole shelf.
+    assert lw.obtainable("harvested") == []
+
+
+def test_gathering_a_forest_offers_bark_not_hide():
+    got = [m.id for m in lw.obtainable("gathered", biome="forest")]
+    assert "oak-bark" in got
+    assert not any(lw.get(i).kind == "hide" for i in got)
+    # The ground is asked: mangrove is a salt-coast tannin and does not grow inland.
+    assert "mangrove-bark" not in got
+    assert "mangrove-bark" in [m.id for m in lw.obtainable("gathered", biome="coast")]
+
+
+def test_acquisition_excursions_declare_what_the_scene_must_provide():
+    for key, spec in lw.ACQUISITION.items():
+        assert spec["id"] == key
+        assert spec["label"] and spec["requires_note"]
+        assert spec["obtain"] in ("harvested", "gathered", "mined", "bought")
+        assert spec["requires"] in ("creature", "biome", "market")
+    assert lw.ACQUISITION["skin"]["label"] == "Skin the carcass"
+
+
+def test_the_shared_shelf_does_not_leak_another_craft_s_materials():
+    """`content/materials/` is one shelf for five benches. Measured before the craft
+    filter: `obtainable("gathered", biome="forest")` answered with six blacksmith
+    entries out of eleven — ash haft, living steel and friends. Worse than clutter, an
+    inert haft on the bench raised the result's tier and DC, because the rank rule
+    reads the rarest thing present."""
+    mine = lw.materials()
+    for foreign in ("living-steel", "oak-haft", "darkwood-haft"):
+        assert foreign not in mine, f"{foreign} leaked onto the tannery shelf"
+    # Shared kind names are exactly why the filter is by craft and not by kind:
+    # `treatment` appears in all four shelf files and `fitting` in two.
+    assert "curing-salt" in mine
+    with pytest.raises(KeyError):
+        lw.get("living-steel")

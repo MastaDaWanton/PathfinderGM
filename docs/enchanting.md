@@ -16,6 +16,23 @@ through `rules/worldclass.py` unchanged; the chain rules (`rules/enchanter.py`) 
 `problems` **before** anything is rolled, homebrew layered over shipped. Costs round
 down, benefits round up, as everywhere.
 
+## Two modes, one bench
+
+Enchanting has **two tabs**, and they are different crafts wearing one track.
+
+| | **The circle** (`rules/enchanter.py`) | **The book** (`rules/magicitem.py`) |
+|---|---|---|
+| What it is | The house craft: essences, foci, chalk on a floor | Pathfinder's own Craft Magic Arms and Armor / Craft Wondrous Item |
+| What you spend | Essences, gems, ink, chalk — things you go and find | Gold and time, at the book's rates |
+| The ladder | Essence tiers, common to legendary | +1 to +5, plus named properties as bonus equivalents |
+| The check | d20 + Enchanter + ½ level + Int vs 10 + 5×tier | The same roll, vs **5 + caster level** |
+| Its own risk | A mishap cracks the focus | None: patient workshop work, nothing explodes |
+| Prerequisite | The materials, and the hour | The prerequisite **spell** — known, or held in a potion |
+
+Both end in the same place: a standing effect list on an item, `Result.output` in the
+same shape, `craft: "enchanter"` on both, and the same three-term check. A player who
+switches tabs does not find their bonus quietly changing.
+
 ---
 
 ## The track
@@ -251,26 +268,162 @@ working, +5 DC — and that success is the level-5 deed, `legendary-binding`.
 
 ---
 
+## The second mode: the book
+
+`rules/magicitem.py`, `MODE_ID = "magic-item"`, catalogue in
+`content/materials/magic-items.json` — 170 entries: 26 weapon properties, 32 armour and
+shield properties, 112 wondrous and slot items.
+
+### The +1 system
+
+Enhancement runs **+1 to +5**. Named properties are priced as **bonus equivalents** and
+added on top: flaming +1, frost +1, shock +1, keen +1, bane +1, holy +2, wounding +2,
+speed +3, dancing +4, vorpal +5. Three rules govern them, and each refuses with the
+arithmetic spelled out:
+
+1. **At least +1 before any property.** Properties are priced on top of an enhancement
+   bonus, so there has to be one to be on top of. A flaming sword that is not at least
+   +1 cannot be priced at all.
+2. **Enhancement never past +5.** The budget above that goes on properties.
+3. **Enhancement + properties never past +10.** A +5 vorpal sword is exactly the whole
+   budget; anything else added to it is refused.
+
+**Price** is the square of the total bonus: N² × 2,000 gp for weapons, N² × 1,000 gp for
+armour and shields. The squaring is the entire reason a high-end item is a campaign goal
+rather than a shopping trip — a +1 flaming sword is a *+2 item*, 8,000 gp, not 4,000.
+Crafting costs **half** the market price (rounded down, as costs do) and takes **8 hours
+per 1,000 gp** (rounded up to whole thousands, because time is a cost too, and a 400 gp
+trinket still takes a working day). The check is **DC 5 + caster level**.
+
+### Vessels, and the masterwork asymmetry
+
+Weapons and armour **must be masterwork** — the book's own gate, and an item nobody has
+vouched for counts as not masterwork, because assuming it would wave every rusty sword
+through. **Jewelry and wondrous items require no masterwork vessel.** That asymmetry is
+the book's, not an oversight: a ring blank is a ring blank, and Craft Wondrous Item never
+asks a crafter to commission a masterwork one. It is stated here, encoded in
+`magicitem.VESSEL_RULES`, and pinned by a test, so nobody "fixes" it later.
+
+Wondrous items are made **whole** — a ring is not a property laid over an enhancement
+bonus, and a working that mixes the two would be priced on two tables at once. Slots come
+from `rules/tables.py SLOTS`; a slotless item carries `slot: None`.
+
+### House rule 1 — a potion stands in for knowing the spell
+
+The book requires the item's creator to know the prerequisite spell. **In a solo game
+that does not gate power, it deletes the feature**: the party is one person, and a
+fighter who wants a flaming sword can never qualify, no matter how much gold or time
+they have.
+
+So: **a potion holding that spell, consumed in the making, stands in for knowing it.**
+The alchemist track brews them; the contract is `holds_spell` (a spell id) and
+`caster_level` on the stock entry, and this mode reads only those two fields. Knowing the
+spell still works, through `rules/casting.knows`, read-only, and costs nothing.
+
+The refusal names the spell and both routes out, because a refusal that only says "you
+cannot" sends the player to a rulebook they do not have:
+
+> Keen needs Keen Edge, and you neither know it nor carry a potion holding it. Brew or
+> buy a potion of Keen Edge and it will be consumed in the making.
+
+Every prerequisite spell in the catalogue is a real id in `content/spells` — grounded and
+tested, because a misspelled one would refuse a working for a spell no potion could ever
+hold.
+
+### House rule 2 — permanency is not required
+
+Several book prerequisites read "…and *permanency*", which is a service bought from a
+5th-level caster. A solo campaign cannot farm one. **Dropped outright** rather than
+fudged, and every working says so in its notes, so the house rule is visible at the bench
+and not only in this file.
+
+### Worked example: a +1 flaming longsword, the book's way
+
+Masterwork longsword from the smith. Enhancement +1, one property (flaming, +1) — total
+bonus **+2**. Market price 2² × 2,000 = **8,000 gp**; crafting cost **4,000 gp**; time
+**64 hours**. Flaming's caster level is 10, so **DC 15**. The prerequisite is *flame
+blade*: a wizard who knows it pays nothing extra, anyone else consumes a potion of it.
+Output: a `Flaming Longsword +1`, masterwork, with the +1 enhancement on attack and
+damage and the 1d6 fire rider, all validated specs.
+
+---
+
+## Getting the materials
+
+The play page's craft-action button is the hub for **obtaining** materials, and it
+replaces the foraging panel that used to sit inside the crafting menu. Every material
+says where it comes from, because "where does a fire mote actually come from" is the
+question that turns a shelf into a place.
+
+| `obtain` | Count | What it means | Examples |
+|---|---|---|---|
+| `gathered` | 11 | Skimmed where the world runs thin; `biomes` narrows it | Fire mote (mountain, underground, urban), ghost residue (ruins, underground, swamp) |
+| `mined` | 9 | Dug rough and cut at the bench; `biomes` narrows it | Every focus; white chalk from coastal cliffs |
+| `harvested` | 18 | Cut from something that recently objected; `from_creature` narrows it | Dragon ichor by colour, lich dust, phoenix quill, angel feather |
+| `bought` | 79 | An errand, with a `price_gp` | Inks, chalks, catalysts, vessels, the guild's refined essences |
+
+`rules/enchanter.ACQUISITION` declares five excursions the play layer can wire — skim
+essence, mine and cut foci, harvest from the slain, buy inks and catalysts, commission a
+vessel — each with the obtain kind it uses and what it needs (a biome, a creature, a
+market). `obtainable(kind, biome=…, creature=…)` answers what a given excursion turns up:
+a fire mote is not in a bog, and dragon ichor does not come off a rat.
+
+## Icons and tooltips
+
+`rules/enchanter.KIND_GLYPH`, one per material kind, none of them herbalism's 🌿🍄🦴☠️:
+
+| Kind | ✨ essence | 💎 focus | 🖋️ ink | 🜏 chalk | ⭐ salt | 🔮 vessel | 📿 catalyst | 🧿 treatment |
+|---|---|---|---|---|---|---|---|---|
+
+Catalyst was a candle (🕯️) until the five tracks were loaded together and
+`benches.glyphs()` showed the leatherworker's `wax` on the same glyph — a candle being
+the more literal thing for wax to be, the catalyst moved. The clash was invisible from
+inside one craft's file, which is why the assertion belongs in the spine.
+
+`rules/magicitem.KIND_GLYPH` covers the second mode's three: 🪄 weapon property,
+🧿 armour property, 📿 wondrous. Two of those appear in the essence map as well — the
+reserved pool is ten glyphs and enchanting has eleven kinds across its two tabs. Reuse
+*within* one craft is legible (🧿 is a warded thing in both places, 📿 a strung-together
+working); reuse across two crafts would make one shelf look like another, and does not
+happen.
+
+`content/world-classes/enchanter.json` carries `method_help`, one entry per method beside
+`method_descriptions` (a test asserts the two sets match — a method that gains a tooltip
+and loses its description is a bench that explains half of itself). Each has three
+fields, because the tooltip has three jobs: **does** (the mechanical effect in numbers —
+DC change, tier step, capacity), **needs** (what must be in the circle for it to be
+legal), **for** (what a player reaches for it to accomplish). The magic-item mode has no
+ritual stations — the book's making is one long patient session, not a chain of verbs —
+so `magicitem.STATIONS` is empty *explicitly*, since an empty dict and a forgotten one
+look identical from outside.
+
+---
+
 ## Integration notes
 
 *What this slice wanted from shared code and deliberately did not touch — for whoever
 wires the bench.*
 
-1. **Attaching a standing enchantment to an inventory item.** `rules/sheet.py` carries
-   weapons as plain strings and consumables as `Stock` dicts; a finished binding needs a
-   third shape — an item entry with a permanent `specs` list. The natural move is the
-   one `consumables.Coating` made: a structure on the actor keyed by item name,
-   `{"item": "Flaming Longsword", "specs": [...], "from_materials": [...]}`, consulted
-   wherever buffs are summed. `Result.effects` is already exactly that list, each spec
-   marked `from` and drawbacks marked `drawback: true` — nothing needs re-deriving, it
-   only needs a home. The drawback specs must ride along or shadowstuff stops costing.
+1. **Attaching a standing enchantment to an inventory item — still the one real gap.**
+   `rules/sheet.py` carries weapons as plain strings and consumables as `Stock` dicts; a
+   finished enchantment needs a third shape, an item entry with a permanent `specs`
+   list. Both modes now emit exactly that as `Result.output`, in the contract shape:
+   `id, name, kind: "crafted", craft: "enchanter", tier, rank, count, effects[str],
+   specs[validated], from_materials[ids], masterwork, wearable, usable, how[], slot,
+   weapon, armour, enhancement, properties[str]`. Nothing needs re-deriving; it needs a
+   home on the actor and a summing pass wherever buffs are totalled. The drawback specs
+   (marked `drawback: true`, and also listed separately in `Result.drawbacks`) must ride
+   along, or shadowstuff stops costing and vicious stops biting.
 
-2. **Bench UI.** The crafting page's shape transfers whole: materials shelf (grey a
-   material the chain would refuse, via the same problems list), method chips in order,
-   the preview card with DC/terms/chance — plus one panel crafting does not have: the
+2. **Bench UI, two tabs.** The crafting page's shape transfers whole for the circle
+   mode: materials shelf (grey a material the chain would refuse, via the same problems
+   list), method chips in order, the preview card with DC/terms/chance — plus the
    **mishap line**, shown before the roll, because which focus to risk is a player
    choice and `Result.mishap` already writes the sentence. The scene must supply
-   `at_night` (the world clock exists for foraging) and the item's masterwork fact.
+   `at_night` (the world clock exists for foraging) and the item's masterwork fact. The
+   book mode's tab is a different form: a vessel picker, a +N stepper capped at 5, a
+   property list filtered by `magicitem.properties_for(vessel_kind)`, and a running
+   total-bonus/price/hours readout — every number of which is already on `Result`.
 
 3. **Cross-craft handoff.** The masterwork gate is asserted by the caller
    (`item={"masterwork": True, "kind": "weapon"}`). When the smith and leatherworker
@@ -280,19 +433,22 @@ wires the bench.*
    to accept. Until then, the GM vouches, and an unvouched item is refused — assuming
    masterwork would wave every rusty sword through.
 
-4. **Uniform dispatch.** `TRACK_ID`, `CraftError`, `Chain`, `preview`, `check_terms`,
-   `check_bonus` deliberately mirror `rules/crafting.py`, and `materials()` mirrors
-   `worldclass.tracks()`. A later `rules/benches.py` that maps track id → module can
-   treat herbalism and enchanting as two entries in a dict. The one signature drift:
-   enchanting's `preview(level, chain, ...)` does not take `track_id` first, because the
-   module *is* the track; dispatch should pass through `TRACK_ID` rather than a free
-   string.
+4. **Uniform dispatch.** Both modules now carry the same surface: `TRACK_ID`,
+   `CraftError`, `Chain`, `chain_from_body(body)`, `preview(level, chain, stock=None,
+   actor=None, item=None)`, `check_terms`/`check_bonus`, and a `Result.as_dict()`
+   carrying name, tier, rank, stages, dc, risky, problems, effects, specs, consumes,
+   output, bonus, terms, chance. A `rules/benches.py` mapping `(track, mode) → module`
+   can treat herbalism, the circle and the book as three entries in a dict. Two things
+   to know: `preview` does not take `track_id` first (the module *is* the track — pass
+   `TRACK_ID` rather than a free string), and `enchanter.preview` accepts both `actor`
+   and the older `carrier` for the same argument, so an existing caller does not break.
 
-5. **Awarding mastery.** `worldclass.award` works unchanged: `tier` from
-   `Result.tier`, `stages` from `Result.stages`, `milestone` from
-   `track.deed_done(tier=result.tier, success=True)`. A `risky` flag analogous to
-   herbalism's could reasonably be "the working staked a fragile focus", but that is a
-   design call for whoever wires the award, not a rule invented here.
+5. **Awarding mastery.** `worldclass.award` works unchanged: `tier` from `Result.tier`,
+   `stages` from `Result.stages`, `milestone` from `track.deed_done(tier=result.tier,
+   success=True)`. `Result.risky` is now populated honestly by both modes — the circle
+   sets it when the working stakes a fragile focus, the book mode leaves it False
+   because patient workshop crafting has no hazard — so the award's risky term can read
+   it directly.
 
 6. **Registry.** Materials are not a `registry.KINDS` entry because registering one
    means touching `rules/registry.py`, which this slice must not. When someone adds a
@@ -300,4 +456,23 @@ wires the bench.*
    `rules.enchanter:materials`), the homebrew editor pages come free and
    `rules/enchanter.py.materials()` can collapse onto `registry.load_raw` — its own
    overlay walk is the seventh copy of the pattern the registry was written to delete,
-   kept only because the alternative was editing a shared file in a parallel build.
+   kept only because the alternative was editing a shared file in a parallel build. A
+   second Kind for `magic-items` would want a different folder key, since that
+   catalogue is a priced rules table rather than a shelf.
+
+7. **The acquisition hub needs a scene and a purse.** `ACQUISITION` and `obtainable()`
+   declare what each excursion yields; what they cannot answer is *how much* turns up,
+   what a gathering roll is against, or whether the character can afford a 20,000 gp
+   diamond. Those are scene and economy questions — the biome comes from the scene, the
+   creature from a corpse in it, and `price_gp` is a number waiting for a purse the
+   sheet does not carry yet. The excursion should also be able to hand back a
+   `from_creature` match by *creature id* rather than the substring match used here,
+   once the bestiary's ids are what the play layer passes.
+
+8. **What the potion contract needs from alchemy.** This mode reads exactly two fields
+   off a stock entry — `holds_spell` and `caster_level` — and consumes one dose. It does
+   not yet check that the potion's caster level meets the item's minimum, because the
+   book's rule there ("the caster level of the item") is about the *creator*, not the
+   potion, and inventing a stricter rule would have been a house rule nobody asked for.
+   If the alchemist track wants that gate, it is one comparison and belongs in the same
+   refusal sentence.

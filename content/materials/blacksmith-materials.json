@@ -16,7 +16,8 @@
     "hills"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "bog-iron",
@@ -39,7 +40,8 @@
      "note": "slag-brittle: on work smelted from unfluxed bog iron"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "copper-ore",
@@ -55,7 +57,8 @@
     "hills"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "tin-ore",
@@ -70,7 +73,8 @@
     "hills"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "lead-ore",
@@ -86,7 +90,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "calamine",
@@ -101,7 +106,8 @@
     "hills"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "cinnabar-ore",
@@ -133,7 +139,8 @@
      "note": "roasting fumes, to whoever works it unmasked"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "silver-ore",
@@ -149,7 +156,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "gold-ore",
@@ -165,7 +173,8 @@
     "coast"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "nickel-ore",
@@ -180,7 +189,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "cold-iron-ore",
@@ -200,7 +210,8 @@
      "target": "Smelts to cold iron: bypasses the damage reduction of demons and fey"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "platinum-ore",
@@ -215,7 +226,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "mithral-ore",
@@ -231,7 +243,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "adamantine-ore",
@@ -246,7 +259,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "abysium-ore",
@@ -278,7 +292,8 @@
      "note": "each day spent carrying or working it unshielded"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "djezet-ore",
@@ -293,7 +308,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "inubrix-ore",
@@ -308,7 +324,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "noqual-ore",
@@ -323,7 +340,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "siccatite-ore",
@@ -346,7 +364,8 @@
      "note": "hot ore, to a bare hand each round it is held; cold ore deals the same in cold"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "horacalcum-ore",
@@ -362,7 +381,8 @@
     "planar"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "iron",
@@ -375,7 +395,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "wrought-iron",
@@ -388,7 +410,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "bismuth",
@@ -401,7 +425,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 3
   },
   {
    "id": "copper",
@@ -414,7 +440,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 5
   },
   {
    "id": "tin",
@@ -427,7 +455,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 5
   },
   {
    "id": "lead",
@@ -445,7 +475,9 @@
      "target": "A lead lining blocks detect spells and scrying through the lined surface"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "zinc",
@@ -458,7 +490,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 4
   },
   {
    "id": "silver",
@@ -476,7 +510,9 @@
      "target": "Plated over steel it bypasses the damage reduction of lycanthropes and some devils"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 25
   },
   {
    "id": "gold",
@@ -489,7 +525,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 500
   },
   {
    "id": "platinum",
@@ -502,7 +540,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1000
   },
   {
    "id": "cold-iron",
@@ -524,7 +564,9 @@
      "target": "Costs double the forge-time and coin: cold iron forgives no reworking"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 4
   },
   {
    "id": "star-iron",
@@ -546,7 +588,8 @@
      "target": "Counts as cold iron against damage reduction"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "viridium",
@@ -579,7 +622,8 @@
      "note": "any wound from a viridium edge; the sickness is a slow leprosy"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "mithral",
@@ -602,7 +646,9 @@
      "target": "Armour: maximum Dexterity bonus +2, armour check penalty lessened by 3"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 500
   },
   {
    "id": "adamantine",
@@ -626,7 +672,9 @@
      "note": "armour: DR 3/— in heavy, 2/— in medium, 1/— in light"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 3000
   },
   {
    "id": "abysium",
@@ -662,7 +710,8 @@
      "target": "Glows: sheds light as a candle, and cannot be hidden from creatures that see it"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "djezet",
@@ -682,7 +731,8 @@
      "target": "Veined through a piece it quickens spellcasting focused through it; alone it never holds a shape"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "inubrix",
@@ -702,7 +752,8 @@
      "target": "Passes through iron and steel: a weapon of it strikes as a touch attack against wearers of iron or steel armour"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "noqual",
@@ -722,7 +773,8 @@
      "target": "Resists enchantment; armour of it grants its wearer a +2 bonus on saves against spells and spell-like abilities"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "siccatite",
@@ -752,7 +804,8 @@
      "note": "frigid siccatite, each round of bare contact"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "horacalcum",
@@ -780,7 +833,8 @@
      "target": "Time runs a half-step slow around the metal: the bearer perceives a fraction more of every moment"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "steel",
@@ -793,7 +847,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 2
   },
   {
    "id": "bronze",
@@ -806,7 +862,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 6
   },
   {
    "id": "brass",
@@ -819,7 +877,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 6
   },
   {
    "id": "pewter",
@@ -832,7 +892,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 4
   },
   {
    "id": "electrum",
@@ -845,7 +907,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 250
   },
   {
    "id": "bell-bronze",
@@ -863,7 +927,9 @@
      "target": "Rings when struck: a signal audible far beyond shouting distance"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 30
   },
   {
    "id": "high-carbon-steel",
@@ -881,7 +947,9 @@
      "target": "Holds its sharpness: an edge of it needs honing half as often"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 15
   },
   {
    "id": "pattern-steel",
@@ -899,7 +967,9 @@
      "target": "The watered pattern marks folded work: spring where a plain blade would snap"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 40
   },
   {
    "id": "nexavaran-steel",
@@ -917,7 +987,9 @@
      "target": "Counts as cold iron against damage reduction, at 1.5 times common cost rather than double"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 20
   },
   {
    "id": "elysian-bronze",
@@ -938,7 +1010,9 @@
      "note": "against magical beasts and monstrous humanoids"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 300
   },
   {
    "id": "living-steel",
@@ -958,7 +1032,8 @@
      "target": "Self-repairing: the item mends its own damage overnight, and weapons that strike it risk notching themselves"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "fire-forged-steel",
@@ -978,7 +1053,9 @@
      "note": "armour, once it has drunk a round of flame"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 250
   },
   {
    "id": "frost-forged-steel",
@@ -998,7 +1075,9 @@
      "note": "armour, once it has stood a round of cold"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 250
   },
   {
    "id": "singing-steel",
@@ -1019,7 +1098,9 @@
      "note": "when the singing metal itself is part of the performance"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1500
   },
   {
    "id": "wyrmsteel",
@@ -1043,7 +1124,12 @@
      "target": "Keeps adamantine's contempt for hardness less than 20"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "dragon",
+    "wyrm"
+   ]
   },
   {
    "id": "peat",
@@ -1058,7 +1144,8 @@
     "swamp"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "coal",
@@ -1074,7 +1161,8 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "charcoal",
@@ -1087,7 +1175,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "coke",
@@ -1100,7 +1190,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 3
   },
   {
    "id": "bone-char",
@@ -1113,7 +1205,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 5
   },
   {
    "id": "dwarven-hearthcoal",
@@ -1128,7 +1222,9 @@
     "underground"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 50
   },
   {
    "id": "dragonfire-coal",
@@ -1143,7 +1239,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "salamander-cinder",
@@ -1166,7 +1263,11 @@
      "note": "to bare skin within reach of the cinders, each round"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "salamander"
+   ]
   },
   {
    "id": "efreet-brand",
@@ -1181,7 +1282,12 @@
     "planar"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "efreeti",
+    "efreet"
+   ]
   },
   {
    "id": "phoenix-ash-ember",
@@ -1199,7 +1305,11 @@
      "target": "Never dies: the ember relights itself however it is put out"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "phoenix"
+   ]
   },
   {
    "id": "limestone",
@@ -1214,7 +1324,8 @@
     "hills"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "silica-sand",
@@ -1230,7 +1341,8 @@
     "desert"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "potash",
@@ -1243,7 +1355,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "borax",
@@ -1258,7 +1372,8 @@
     "desert"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "bone-ash",
@@ -1271,7 +1386,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 5
   },
   {
    "id": "crushed-quartz",
@@ -1286,7 +1403,8 @@
     "mountain"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "consecrated-flux",
@@ -1304,7 +1422,9 @@
      "target": "Work fluxed with it counts as blessed for rites, oaths and consecration"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 100
   },
   {
    "id": "abyssal-salt",
@@ -1324,7 +1444,8 @@
      "target": "The finished work registers faintly evil to detection, and holy water hisses on it"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "stardust-flux",
@@ -1344,7 +1465,8 @@
      "target": "Makes skymetals miscible in the melt: without it they refuse one another"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "mined"
   },
   {
    "id": "water",
@@ -1357,7 +1479,8 @@
    "source": "harvested",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "quenching-brine",
@@ -1372,7 +1495,8 @@
     "coast"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "quenching-oil",
@@ -1385,7 +1509,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "whale-oil",
@@ -1400,7 +1526,9 @@
     "coast"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 10
   },
   {
    "id": "glacier-melt",
@@ -1415,7 +1543,8 @@
     "tundra"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "mercury-bath",
@@ -1445,7 +1574,9 @@
      "note": "the hot vapour, each quench performed without wind or mask"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 30
   },
   {
    "id": "blessed-water",
@@ -1463,7 +1594,9 @@
      "target": "The edge counts as blessed; undead struck by it flinch, and it can strike home where a plain blade could not"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 100
   },
   {
    "id": "troll-blood",
@@ -1481,7 +1614,11 @@
      "target": "The metal knits hairline cracks and small notches over a night's rest"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "troll"
+   ]
   },
   {
    "id": "wyvern-blood",
@@ -1508,7 +1645,11 @@
      "note": "the venom lingers in the first telling wound the finished blade deals"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "wyvern"
+   ]
   },
   {
    "id": "dragon-blood",
@@ -1528,7 +1669,13 @@
      "note": "armour quenched in a fire dragon's blood; other lineages lend their own element"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "dragon",
+    "wyrm",
+    "drake"
+   ]
   },
   {
    "id": "styx-water",
@@ -1556,7 +1703,8 @@
      "note": "on a telling wound from the quenched blade"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "ash-haft",
@@ -1571,7 +1719,8 @@
     "forest"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "oak-haft",
@@ -1586,7 +1735,8 @@
     "forest"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "bone-grip",
@@ -1599,7 +1749,15 @@
    "source": "harvested",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "ox",
+    "elk",
+    "deer",
+    "boar",
+    "aurochs"
+   ]
   },
   {
    "id": "leather-grip",
@@ -1612,7 +1770,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "cord-wrapped-grip",
@@ -1625,7 +1785,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1
   },
   {
    "id": "brass-guard",
@@ -1638,7 +1800,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 3
   },
   {
    "id": "steel-crossguard",
@@ -1651,7 +1815,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 3
   },
   {
    "id": "wire-wrapped-grip",
@@ -1672,7 +1838,9 @@
      "note": "against being disarmed of the fitted weapon"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 15
   },
   {
    "id": "sharkskin-grip",
@@ -1692,7 +1860,9 @@
      "target": "Never slips when wet: no grip penalty in rain, blood or surf"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 20
   },
   {
    "id": "mammoth-ivory-grip",
@@ -1707,7 +1877,9 @@
     "tundra"
    ],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 40
   },
   {
    "id": "darkwood-haft",
@@ -1728,7 +1900,8 @@
      "target": "Half weight for the hafted portion, at no loss of strength"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "ironwood-haft",
@@ -1748,7 +1921,8 @@
      "target": "Counts as wood for druidic oaths and spells that care, at the strength of steel"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "wyroot-haft",
@@ -1768,7 +1942,8 @@
      "target": "Stores a point of life or ki from a telling blow, returned to the wielder on demand"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "gathered"
   },
   {
    "id": "dragonhide-grip",
@@ -1786,7 +1961,13 @@
      "target": "Proof against incidental flame and spark: the grip never burns in the hand"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "dragon",
+    "wyrm",
+    "drake"
+   ]
   },
   {
    "id": "angelskin-binding",
@@ -1804,7 +1985,15 @@
      "target": "Muffles the wearer's evil aura against detection"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "angel",
+    "archon",
+    "deva",
+    "planetar",
+    "solar"
+   ]
   },
   {
    "id": "fiend-bone-core",
@@ -1822,7 +2011,14 @@
      "target": "The weapon anticipates: it whispers to its wielder, and what it wants is not always what they want"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "harvested",
+   "from_creatures": [
+    "devil",
+    "demon",
+    "daemon",
+    "fiend"
+   ]
   },
   {
    "id": "bluing",
@@ -1840,7 +2036,9 @@
      "target": "Rust-proofed: the treated steel does not corrode under weather or neglect"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 2
   },
   {
    "id": "oil-blackening",
@@ -1861,7 +2059,9 @@
      "note": "in darkness, while the treated piece is bared"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 2
   },
   {
    "id": "acid-etching",
@@ -1874,7 +2074,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 5
   },
   {
    "id": "cold-iron-blanching",
@@ -1892,7 +2094,9 @@
      "target": "Counts as cold iron against damage reduction until the blanching wears off with use"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 30
   },
   {
    "id": "ghost-salt-blanching",
@@ -1910,7 +2114,9 @@
      "target": "Strikes incorporeal creatures at half damage until the blanching wears off"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 200
   },
   {
    "id": "alchemical-silver-plating",
@@ -1935,7 +2141,9 @@
      "target": "Bypasses the damage reduction of lycanthropes and some devils (DR/silver)"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 90
   },
   {
    "id": "gold-gilding",
@@ -1948,7 +2156,9 @@
    "source": "bought",
    "biomes": [],
    "effects": [],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 50
   },
   {
    "id": "lead-lining",
@@ -1966,7 +2176,9 @@
      "target": "Blocks detect spells and scrying through the lined surface"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 20
   },
   {
    "id": "holy-anointing",
@@ -1984,7 +2196,9 @@
      "target": "Counts as blessed for its first battle after the rite"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 150
   },
   {
    "id": "adamantine-edging",
@@ -2002,7 +2216,9 @@
      "target": "The edge ignores hardness less than 20 when striking objects; the body of the blade remains its base metal"
     }
    ],
-   "effects_converted": true
+   "effects_converted": true,
+   "obtain": "bought",
+   "price_gp": 1500
   }
  ]
 }

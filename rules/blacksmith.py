@@ -94,6 +94,21 @@ ALLOY_RARITY_STEP = 1
 # Material kinds that count as metal for alloying and for "is there anything to work".
 METAL_KINDS = ("ore", "metal", "alloy")
 
+# One glyph per kind in the catalogue, for the shelf and the chain builder. Distinct
+# within the track and distinct across all five crafts — herbalism owns the plant and
+# carcass symbols, so nothing here reuses them. Picked from the forge's own vocabulary
+# so a player reading a mixed shelf can tell a fuel from a flux without reading a word.
+KIND_GLYPH: dict[str, str] = {
+    "ore": "⛏️",         # what you dig
+    "metal": "🪨",        # what it smelts to
+    "alloy": "⚙️",        # two metals answering to each other
+    "fuel": "🔥",         # what feeds the fire
+    "flux": "🧱",         # what cleans the melt
+    "quenchant": "💧",    # the bath
+    "fitting": "🔩",      # what gets riveted on
+    "treatment": "🛠️",    # what is done to the finished surface
+}
+
 
 def round_cost(x: float) -> int:
     """Costs and penalties round down — the direction that favours the character."""
@@ -133,6 +148,20 @@ class Material:
     # `effectspec` has no vocabulary for it — it is a property of the object, applied
     # with the rounding rule (weight is a cost, so it rounds down).
     weight_factor: float = 1.0
+    # How a character comes by it. `source` is the older, prose-ish field and is kept
+    # because the shelf and the book both read it; `obtain` is the shared vocabulary the
+    # acquisition excursions dispatch on — mined | bought | harvested | gathered.
+    obtain: str = ""
+    price_gp: float | None = None
+    # Creature-name fragments, matched as substrings the way the leatherworker matches
+    # its hides: "dragon" catches a red dragon, and a wyvern needs its own fragment.
+    from_creatures: list[str] = field(default_factory=list)
+    # Which shipped file this came out of, as a filename stem. `content/materials` is
+    # one shelf shared by all five crafts, and `kind` cannot tell them apart —
+    # "treatment" appears in all four shipped catalogues and "fitting" in two. Empty
+    # means homebrew, which belongs to no shipped file and so shows everywhere, exactly
+    # as the shelf's own commit settled it.
+    catalogue: str = ""
 
     @property
     def rank(self) -> int:
@@ -148,20 +177,50 @@ class Material:
             "rank": self.rank, "craft_dc": self.craft_dc, "text": self.text,
             "risky": self.risky, "source": self.source, "biomes": self.biomes,
             "effects": self.effects, "effects_converted": self.effects_converted,
-            "weight_factor": self.weight_factor,
+            "weight_factor": self.weight_factor, "glyph": self.glyph,
+            "obtain": self.obtain, "price_gp": self.price_gp,
+            "from_creatures": self.from_creatures,
         }
+
+    @property
+    def glyph(self) -> str:
+        return KIND_GLYPH.get(self.kind, "🪨")
+
+
+# The old `source` words mapped onto the shared `obtain` vocabulary, for any entry
+# written before `obtain` existed — a homebrew metal dropped in with only `source` still
+# lands in the right excursion instead of silently belonging to none.
+_OBTAIN_FROM_SOURCE = {"mined": "mined", "bought": "bought",
+                       "monster": "harvested", "harvested": "gathered"}
 
 
 def from_dict(d: dict) -> Material:
+    source = d.get("source", "bought")
+    # Two shapes of `obtain` exist on the shared shelf: this track writes a flat word
+    # beside `price_gp`/`from_creatures`/`biomes`, and a sibling writes a nested
+    # {"how": ..., "market": ..., "price_gp": ...}. Both are read rather than one being
+    # declared correct, because the shelf is shared and a loader that understands only
+    # its own dialect silently drops every neighbour's acquisition data.
+    raw_obtain = d.get("obtain")
+    nested = raw_obtain if isinstance(raw_obtain, dict) else {}
+    obtain = str(nested.get("how") or (raw_obtain if isinstance(raw_obtain, str) else "")
+                 or _OBTAIN_FROM_SOURCE.get(source, "bought"))
+    price = d.get("price_gp", nested.get("price_gp"))
+    creatures = d.get("from_creatures") or nested.get("from_creatures") or []
+    biomes = d.get("biomes") or nested.get("biomes") or []
     return Material(
         id=d["id"], name=d["name"], kind=d.get("kind", "metal"),
         tier=d.get("tier", "common"), craft_dc=d.get("craft_dc"),
         text=d.get("text", ""), risky=bool(d.get("risky")),
-        source=d.get("source", "bought"),
-        biomes=list(d.get("biomes") or []),
+        source=source,
+        biomes=list(biomes),
         effects=list(d.get("effects") or []),
         effects_converted=bool(d.get("effects_converted")),
         weight_factor=float(d.get("weight_factor", 1.0)),
+        obtain=obtain,
+        price_gp=price,
+        from_creatures=[str(x).lower() for x in creatures],
+        catalogue=str(d.get("catalogue") or ""),
     )
 
 
@@ -188,7 +247,9 @@ def load_dir(path: str | Path) -> dict[str, dict]:
             entries = [data] if isinstance(data, dict) and data.get("id") else []
         for raw in entries:
             if isinstance(raw, dict) and raw.get("id"):
-                out[str(raw["id"]).strip().lower()] = raw
+                # Stamped with the file it came from, because the folder is one shelf
+                # shared by five crafts and nothing else in the entry says whose it is.
+                out[str(raw["id"]).strip().lower()] = {**raw, "catalogue": file.stem}
     return out
 
 
@@ -222,6 +283,10 @@ def materials(refresh: bool = False) -> dict[str, Material]:
             for key, entry in load_dir(user).items():
                 merged = dict(raw.get(key, {}))
                 merged.update(entry)
+                # Homebrew is attributable to no shipped catalogue, so it belongs to
+                # every bench rather than none — unless it is correcting a shipped
+                # entry, which keeps the catalogue it is correcting.
+                merged["catalogue"] = raw.get(key, {}).get("catalogue", "")
                 raw[key] = merged
         _MATERIALS = {k: from_dict({**v, "id": k}) for k, v in raw.items()}
     return _MATERIALS
@@ -232,6 +297,108 @@ def get(material_id: str) -> Material:
     if m is None:
         raise KeyError(f"no material {material_id!r}")
     return m
+
+
+# The shipped file this track's own materials live in. `content/materials` is one shelf
+# for five crafts, so "everything on the shelf" and "everything a smith works with" are
+# different questions and only one of them is this track's.
+CATALOGUE = "blacksmith-materials"
+
+
+def mine() -> dict[str, Material]:
+    """This track's own shelf: what shipped in the blacksmith catalogue, plus homebrew.
+
+    `materials()` deliberately stays shelf-wide — a smith may rivet a leatherworker's
+    grip onto a blade, and a chain naming one must resolve it. This is the narrower
+    question the bench and the excursions ask: what is *ours* to list and to go and
+    find. Without the split, prospecting for ore turned up wyvern hide.
+    """
+    return {k: m for k, m in materials().items()
+            if m.catalogue in (CATALOGUE, "")}
+
+
+# --- acquisition -----------------------------------------------------------------------
+#
+# The craft-action button is the one hub for *obtaining* material, replacing the foraging
+# panel that used to live inside the crafting menu. A track supplies the data — which
+# excursions it offers and what each could turn up here — and the page supplies the UI.
+#
+# Mining is the flagship and the reason `biomes` was populated on every ore in the first
+# place: a smith standing in mountains prospects and comes back with mountain ore, the
+# same way foraging answers to the ground underfoot.
+ACQUISITION: dict[str, dict] = {
+    "prospect": {
+        "id": "prospect",
+        "label": "Prospect for ore",
+        "obtain": "mined",
+        "requires": "biome",
+        "verb": "prospecting",
+        "blurb": "Read the rock for colour and float, and dig where it promises. What "
+                 "the ground holds is what the ground is: no seam of sea-salt in a "
+                 "mountain, and no skymetal in a ploughed field.",
+    },
+    "buy": {
+        "id": "buy",
+        "label": "Buy from the market",
+        "obtain": "bought",
+        "requires": "market",
+        "verb": "buying",
+        "blurb": "Bar stock from the ironmonger, charcoal from the collier, fittings "
+                 "from the joiner. Anything with a price and a settlement to pay it in.",
+    },
+    "salvage": {
+        "id": "salvage",
+        "label": "Harvest from a carcass",
+        "obtain": "harvested",
+        "requires": "carcass",
+        "verb": "harvesting",
+        "blurb": "Blood, bone, hide and stranger things, taken off what was killed. "
+                 "What can be had depends entirely on what is lying there.",
+    },
+    "gather": {
+        "id": "gather",
+        "label": "Gather from the land",
+        "obtain": "gathered",
+        "requires": "biome",
+        "verb": "gathering",
+        "blurb": "Peat from the bog, brine from the tideline, a straight ash pole from "
+                 "the wood. The materials the land gives up without a shaft sunk.",
+    },
+}
+
+
+def obtainable(obtain_kind: str, *, biome: str | None = None,
+               creature: str | None = None) -> list[Material]:
+    """What one excursion could actually turn up, here, given this ground or this corpse.
+
+    Filtered rather than ranked: this answers "what is possible", and which of them the
+    character actually finds is a roll the excursion makes, not a question the catalogue
+    can settle.
+
+    A material with no biomes listed is available on any ground — water is water
+    wherever you are standing — and that is deliberately not the same as a material
+    listing biomes that exclude here. "Empty is not the same as absent" applies to
+    ground as much as to form fields.
+
+    A creature is matched on name fragments, longest first, the way the leatherworker
+    matches hides: "young red dragon" must find the dragon entries without a bestiary
+    lookup, because the GM types what they killed rather than an id.
+    """
+    kind = (obtain_kind or "").strip().lower()
+    out = [m for m in mine().values() if m.obtain == kind]
+
+    if biome:
+        want = str(biome).strip().lower()
+        out = [m for m in out if not m.biomes or want in m.biomes]
+    if creature:
+        said = str(creature).strip().lower()
+        out = [m for m in out
+               if any(frag in said for frag in m.from_creatures)]
+    elif kind == "harvested":
+        # No carcass named means no harvest: every harvested entry is off something
+        # specific, and returning all of them would let a player skin thin air.
+        out = []
+    return sorted(out, key=lambda m: (m.rank, m.name))
 
 
 # --- the base item -------------------------------------------------------------------------
@@ -279,21 +446,93 @@ class Chain:
         return len(self.methods)
 
 
+def chain_from_body(body: dict) -> Chain:
+    """The bench's POST JSON as a Chain.
+
+    Tolerant by design: a missing key is an empty chain, not an error, because this is
+    the first thing that touches user input and `preview` is already the place that says
+    what is wrong with a chain in sentences. A parser that raises here would turn "you
+    have not chosen a method yet" into a 500.
+
+    `base` is accepted under three names because three things can send it — the chain
+    builder posts `base`, an item page posts `item`, and the weapons picker posts
+    `weapon`. Reading only one of them is the shape of bug that makes a form submit
+    silently do nothing.
+    """
+    body = body if isinstance(body, dict) else {}
+
+    def _list(key: str) -> list[str]:
+        value = body.get(key)
+        if isinstance(value, str):
+            # A comma-joined string is what a plain HTML form sends when JavaScript is
+            # off, and dropping it would make the bench work only with scripting.
+            return [p.strip() for p in value.split(",") if p.strip()]
+        if isinstance(value, (list, tuple)):
+            return [str(p).strip() for p in value if str(p).strip()]
+        return []
+
+    base = ""
+    for key in ("base", "item", "weapon", "armour"):
+        if str(body.get(key) or "").strip():
+            base = str(body[key]).strip()
+            break
+
+    return Chain(
+        track=TRACK_ID,
+        methods=_list("methods"),
+        material_ids=_list("materials") or _list("material_ids"),
+        base=base,
+        name=str(body.get("name") or "").strip(),
+    )
+
+
+def stock_from_body(body: dict) -> dict[str, int]:
+    """What the bench says the smith is carrying, as {material id: count}.
+
+    Separate from the chain because it is a fact about the character rather than about
+    the work, and `preview` takes it separately for the same reason: passing None means
+    "assume they have it", which every rules test wants and no live bench does.
+    """
+    raw = (body or {}).get("stock")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, int] = {}
+    for key, value in raw.items():
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            out[str(key).strip().lower()] = n
+    return out
+
+
 # The quality ladder, decided by which methods the chain contains. Masterwork is the
 # book's own rule made procedural: Craft says a masterwork component is its own DC-20
-# piece of work, and here that work is named — the steel must be tempered, shaped past
-# plain forging (fold or draw), and finished (hone or polish). Fine is the honest step
-# between: tempered and finished, but not pattern-worked.
+# piece of work, and here that work is named — the steel must be tempered and the
+# working surface finished. Fine is the honest step between: one of the two, not both.
+#
+# The shaping methods (fold, draw) were originally required for masterwork as well, and
+# that was measured to be a dead end. `rules/enchanter.py` gates every binding on a
+# masterwork vessel at Enchanter *1* — "Commission one from the smith" — while fold and
+# draw are Blacksmith 4, so the whole enchanting economy sat behind 140 MP of a track
+# the enchanter may never have taken. Masterwork is professional work in 1e, not
+# legendary work: DC 20, purchasable in any city. It belongs where the professional
+# methods are, which is Blacksmith 3. Fold and draw stay at 4 as what they always
+# were — pattern-welding and wire-drawing, which make named steels and mail, not
+# quality on their own.
 MASTERWORK_DC = 20
+
+SHAPING = ("fold", "draw")
+FINISHING_QUALITY = ("hone", "polish")
 
 
 def quality_of(methods: list[str]) -> str:
     tempered = "temper" in methods
-    shaped = "fold" in methods or "draw" in methods
-    finished = "hone" in methods or "polish" in methods
-    if tempered and shaped and finished:
-        return "masterwork"
+    finished = any(m in FINISHING_QUALITY for m in methods)
     if tempered and finished:
+        return "masterwork"
+    if tempered or finished:
         return "fine"
     return "plain"
 
@@ -330,6 +569,15 @@ class Result:
     removed: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     consumes: dict[str, int] = field(default_factory=dict)
+    # What the successful craft puts in the player's pack. The whole point of the
+    # contract: a forged sword that cannot be wielded is a paragraph, which is what
+    # every crafted item was before `specs` reached the engine.
+    output: dict | None = None
+    # The crafter's own bonus on this chain and what it is made of. Empty when no actor
+    # was supplied — the rules tests ask what a chain *is*, not who is attempting it.
+    bonus: int = 0
+    terms: list[dict] = field(default_factory=list)
+    chance: int = 0
 
     def as_dict(self) -> dict:
         return {
@@ -338,10 +586,109 @@ class Result:
             "risky": self.risky, "weight_lb": self.weight_lb, "base": self.base,
             "effects": self.effects, "specs": self.specs, "removed": self.removed,
             "problems": self.problems, "consumes": self.consumes,
+            "output": self.output, "bonus": self.bonus, "terms": self.terms,
+            "chance": self.chance,
         }
 
 
-def preview(level: int, chain: Chain, stock: dict | None = None) -> Result:
+# Which body slot a finished piece occupies, by what it is. `tables.SLOTS` owns the
+# vocabulary; these are the three a forge can fill.
+def _slot_for(base: dict | None) -> str | None:
+    if not base:
+        return None
+    if base.get("family") == "armour":
+        return "armor"
+    if base.get("family") == "weapon":
+        return "shield" if "shield" in str(base.get("id", "")) else "hands"
+    return None
+
+
+def _slug(text: str) -> str:
+    out = "".join(c if c.isalnum() else "-" for c in str(text).lower()).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out
+
+
+def _output(name: str, tier: str, rank: int, quality: str, base: dict | None,
+            effects: list[str], specs: list[dict], materials_used: list[str],
+            weight_lb: int | None) -> dict:
+    """The finished piece as an inventory item.
+
+    Shaped so the pack, the equip screen and the engine can all read it without knowing
+    which craft made it: `kind: "crafted"` and `craft` say where it came from, `weapon`
+    and `armour` point back at the real tables so it can actually be wielded or worn,
+    and `specs` are the validated effects the engine already knows how to apply.
+
+    `masterwork` is surfaced as its own boolean rather than left implicit in `quality`,
+    because it is the fact another track asks about: the enchanter refuses a vessel that
+    does not assert it, and reading a quality string from a sibling module would be a
+    second copy of this rule waiting to drift.
+    """
+    slot = _slot_for(base)
+    family = (base or {}).get("family")
+    return {
+        "id": _slug(name), "name": name, "kind": "crafted", "craft": TRACK_ID,
+        "tier": tier, "rank": rank, "count": 1,
+        "effects": list(effects), "specs": [dict(s) for s in specs],
+        "from_materials": list(materials_used),
+        "masterwork": quality == "masterwork",
+        "quality": quality,
+        "weight_lb": weight_lb,
+        "weapon": (base or {}).get("id") if family == "weapon" else None,
+        "armour": (base or {}).get("id") if family == "armour" else None,
+        "slot": slot,
+        "wearable": slot is not None,
+        # A forged piece is equipment, not a consumable: nothing is drunk or thrown, so
+        # `usable` is false and `how` is empty. Both are stated rather than omitted, so
+        # a pack rendering every craft's output does not have to special-case this one.
+        "usable": False,
+        "how": [],
+    }
+
+
+def check_terms(actor, level: int) -> list[dict]:
+    """What a smith adds to the die, itemised — crafting's formula with the mental stat
+    the skill actually uses: **d20 + track level + half character level + Intelligence**.
+
+    Int, because Craft is an Intelligence skill in 1e and smithing is Craft (weapons) or
+    Craft (armour). Herbalism's authored Wisdom is *not* the precedent here: that number
+    came from the Herbalist document's own text, which is an authored source for that
+    track and says nothing about any other. Where a track has no author telling us
+    otherwise, the skill's own ability governs.
+
+    Itemised rather than summed for the reason every roll in this app is: "+9" says
+    nothing, "Blacksmith 3, half level +4, Int +2" says which of the three to improve.
+    """
+    track_level = max(0, int(level or 0))
+    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
+    intel = int(actor.ability_mod("int")) if actor is not None else 0
+    return [
+        {"label": f"Blacksmith {track_level}", "value": track_level},
+        {"label": f"half character level ({char_level})", "value": char_level // 2},
+        {"label": "Intelligence", "value": intel},
+    ]
+
+
+def check_bonus(actor, level: int) -> int:
+    return sum(t["value"] for t in check_terms(actor, level))
+
+
+def _chance(dc: int, bonus: int, problems=()) -> int:
+    """Percent chance the check makes the DC, for the label on the button.
+
+    Same clamp as crafting's, for the same reason: a natural 1 always fails and a
+    natural 20 always succeeds, so no craft is ever certain either way and the number
+    should not claim otherwise.
+    """
+    if problems:
+        return 0
+    need = dc - bonus
+    return max(5, min(95, int(round(100 * (21 - need) / 20))))
+
+
+def preview(level: int, chain: Chain, stock: dict | None = None,
+            actor=None) -> Result:
     """What this chain would forge, and everything wrong with attempting it.
 
     Never raises for a chain that is merely bad — an unknown method, metal above the
@@ -352,6 +699,11 @@ def preview(level: int, chain: Chain, stock: dict | None = None) -> Result:
     `stock` is what the smith is carrying, as {material id: count}. Passing None means
     "assume they have it" — what every caller wants until acquisition (mining, buying)
     exists, and what the tests of the chain rules want forever.
+
+    `actor` is the character attempting it. Supplied, the result carries the itemised
+    bonus and the percentage chance; omitted, those stay at zero and the result is a
+    statement about the chain rather than about anybody's odds — which is what the rules
+    tests ask for and what a shelf preview shows before a character is chosen.
     """
     track = wc.get(TRACK_ID)
     level = max(1, min(int(level), track.max_level))
@@ -499,11 +851,17 @@ def preview(level: int, chain: Chain, stock: dict | None = None) -> Result:
         weight = max(0, round_cost(float(base["weight_lb"]) * factor))
 
     name = chain.name or _name_for(items, base, quality)
+    terms = check_terms(actor, level) if actor is not None else []
+    bonus = sum(t["value"] for t in terms)
     return Result(
         name=name, tier=tier, rank=rank, quality=quality, stages=chain.stages,
         dc=dc, risky=risky, weight_lb=weight, base=base,
         effects=effects, specs=specs, removed=removed, problems=problems,
         consumes=dict(wanted),
+        output=_output(name, tier, rank, quality, base, effects, specs,
+                       list(wanted), weight),
+        bonus=bonus, terms=terms,
+        chance=_chance(dc, bonus, problems) if actor is not None else 0,
     )
 
 

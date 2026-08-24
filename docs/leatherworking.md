@@ -85,6 +85,48 @@ warhorse.
 - **Rounding**: costs and penalties round down, benefits round up — the wearer is never
   surprised in the direction that hurts them. Resistance ratings are never scaled: the
   book says dragonhide resists 5, and potency does not un-book the book.
+- **The crafter's bonus** = d20 + track level + half character level + **Intelligence**.
+  Int because Craft is Int-based in PF1e; herbalism reads Wisdom for its own authored
+  reason, and copying that here would have made the tannery a wisdom craft by accident.
+  Itemised, so "+9" is instead "Leatherworker 5, half level +2, Int +2".
+
+## What comes off the bench
+
+`Result.output` is the contract the rest of the app reads. Beyond the obvious
+(`name`, `tier`, `specs`, `from_materials`) it carries:
+
+| Field | Meaning |
+|---|---|
+| `masterwork` | True when the chain ran `tool`. **The enchanter's vessel requirement reads this.** |
+| `tanned` | Leather, rather than cured rawhide |
+| `armour` | A verified `tables.ARMOUR` key (`leather`, `studded leather`) or None |
+| `slot` | `armor`, `shoulders`, `feet`, `wrists`, `hands`, `belt`, `head`, or None |
+| `wearable` / `usable` / `how` | Worn or carried; nothing here is spent by use |
+
+Three rules decide those:
+
+- **Masterwork is read off the chain, not the tier.** A legendary hide left untooled is
+  not masterwork; a common hide tooled by a master is.
+- **The armour key is read off the bench, not the pattern.** Studs on the bench make it
+  studded leather. The key is checked against `tables.ARMOUR` before it is emitted,
+  because a key the sheet has never heard of would equip as nothing and report no error.
+- **Untanned work carries no armour row.** PF1e's leather armour is leather; cured
+  rawhide is a garment. It still crafts, it simply claims nothing it cannot fill.
+
+### Is masterwork actually reachable?
+
+Measured, because the enchanting economy dead-ends if it is not:
+
+| Piece | Level | Chain | DC | Odds |
+|---|---|---|---|---|
+| Masterwork leather armour | **5** | flense → tan → cut → stitch → tool, over deer hide + oak bark + linen thread | **18** | 60% for a level-5 crafter with Int +2 (+9) |
+| Masterwork studded leather | 5 | as above, plus steel studs | 18 | 60% |
+| Masterwork red-dragonhide armour | 5 | flense → tan → cut → stitch → tool, dragonblood tannin + dragon sinew | 38 | 5% floor at +9 — a career piece, as intended |
+
+So: **masterwork is a level-5 gate and nothing else.** The cheapest masterwork vessel
+the enchanter can be handed costs one deer, a sack of bark and a spool of linen, at DC
+18 — reachable the day the track hits 5, with common material and no monster hunted.
+The dragonhide version is deliberately at the far end of the same ladder.
 
 ## The hide catalogue
 
@@ -270,6 +312,30 @@ one, and the blacksmith track is where they will eventually be made rather than 
 | Mordant Salts | treatment | uncommon | Fixes rare and exotic dyes permanently |
 | Planar Quench | treatment | exotic | Hardened leather keeps a planar trace |
 
+## Getting the material
+
+Every material says how it is come by, and the play page's acquisition hub turns each
+answer into an excursion. `ACQUISITION` in `rules/leatherworker.py` declares four, and
+`obtainable(kind, biome=…, creature=…)` answers what this place and this carcass could
+actually yield.
+
+| Excursion | Serves | Needs | Yields |
+|---|---|---|---|
+| **Skin the carcass** | `harvested` | a fallen creature in the scene | 80 entries — the hide the beast actually carries, plus the sinew, gut and tallow any carcass gives |
+| Strip bark and gather | `gathered` | a biome | 13 — tannins, plant dyes, pitch, beeswax |
+| Dig for salt and mineral | `mined` | a biome | 7 — curing salt, alum, quicklime, the mineral colours |
+| Buy from the market | `bought` | a settlement that trades | 27, each with a gp price |
+
+Skinning is the flagship, and it is the one that must not be generous: asked without a
+creature it returns **nothing**, not the shelf. Asked with one it reads the creature's
+name through the same fragment match `hides_from` uses, longest fragment first — a
+winter wolf leads with the winter wolf pelt, and never offers a deer hide.
+
+Material glyphs, so a hide never renders as a herb:
+
+| 🦬 hide | 🛢️ tannin | 🧵 thread | 🧴 oil | 🎨 dye | 🕯️ wax | 🔘 fitting | 🪢 treatment |
+|---|---|---|---|---|---|---|---|
+
 ## Worked examples
 
 ### A deer-hide satchel (Leatherworker 1)
@@ -328,14 +394,13 @@ Everything this track wants from shared code but deliberately did not touch — 
 rules of engagement were "write only your five files", and these are the seams left
 ready:
 
-1. **Skinning as a craft action.** `rules/leatherworker.py` exposes
-   `hides_from(creature_name)` — fragment-matched against bestiary names, longest
-   fragment winning — precisely so the engine's craft-action path can offer "skin the
-   winter wolf" over any fallen creature in the scene and drop the right hide into
-   stock with `age_hours: 0`. The foraging module's excursion shape (`rules/foraging.py`)
-   is the model: skinning is to a carcass what foraging is to a biome. Wiring the
-   action, the time cost and the Survival/Craft check into `rules/intents.py` and the
-   scene is engine work this track did not do.
+1. **Skinning as a craft action.** The data half is now done: `ACQUISITION["skin"]` and
+   `obtainable("harvested", creature=…)` answer what a given carcass yields, and every
+   material carries `obtain`. What is still engine work — and not this track's file —
+   is the action itself: the time cost, the Survival or Craft check, dropping the hide
+   into stock with `age_hours: 0`, and putting the button on the scene.
+   `rules/foraging.py` is the model; skinning is to a carcass what foraging is to a
+   biome.
 
 2. **Salt stops the clock automatically.** `rules/herbprep.py` already implements
    `preserve_automatically` — carrying salt cures on pickup, potency is the price. A
@@ -343,13 +408,14 @@ ready:
    `herbprep.ANIMAL_HOURS` by the tests so the two clocks cannot drift apart, but the
    automatic-cure hook is not wired.
 
-3. **Bench UI.** `preview` returns the same shape the herbalism bench draws — problems
-   list to grey the button, DC, tier, itemised effects — and takes `stock` in the same
-   spirit as `crafting.preview`'s satchel. A leatherworking bench page is a rendering
-   job, not a rules job. The check-terms formula (d20 + track level + half character
-   level + ability) was left out of this module because the ability for leatherwork
-   (Wis to match herbalism? Str for the beam? Int for the pattern?) is a design call
-   the dispatcher should make once, for all tracks, not per module.
+3. **Bench UI.** The dispatch surface is now in place: `chain_from_body`,
+   `stock_from_body`, `check_terms`, `check_bonus`, `preview(level, chain, stock,
+   actor)` and a `Result.as_dict()` carrying bonus, terms and chance. A leatherworking
+   bench page is a rendering job, not a rules job. Two seams remain open: the ability
+   choice is settled here as **Int** (Craft is Int-based) rather than centrally, so if
+   the spine ever wants one answer for five crafts it should override rather than
+   assume; and `stock` is parsed by its own function rather than living on the `Chain`,
+   because inventory is not recipe.
 
 4. **Fittings come from the blacksmith.** Every `fitting` material carries
    `source: "smithed"` — buckles, studs, wire-silk's silver core. When the blacksmith
@@ -362,6 +428,15 @@ ready:
    `rules/registry.py` would have touched a shared file. Folding this loader into the
    registry — one entry in `KINDS`, with the fields this module's `Material` declares —
    gives the homebrew editor a materials bench for free and deletes the local overlay.
+
+7. **One shelf, four claims.** `content/materials/` is shared by all five benches, and
+   two kind names (`treatment`, `fitting`) appear in more than one file, so a bench
+   cannot scope the shelf by kind. This module scopes by a `"craft": "leatherworker"`
+   claim on its own file and keeps homebrew unfiltered. That is a local fix for a
+   shelf-wide problem: the tidy version is one claim field agreed across all four
+   files, read by the spine, so no track has to defend itself from its neighbours.
+   Until then, a sibling file that starts claiming its craft costs nothing here, and
+   one that does not is excluded by name.
 
 6. **Worn-item effects.** The output's `specs` are validated effect specs, but nothing
    yet *applies* a worn item's specs to an Actor the way drunk consumables apply —

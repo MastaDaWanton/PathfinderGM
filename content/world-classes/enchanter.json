@@ -70,6 +70,55 @@
     "awaken": "The sanctum ritual for legendary and intelligent work: bindings that move on their own, edges that end things, items that wake with a voice."
   },
 
+  "_method_help_note": "One entry per method, and the set must match method_descriptions exactly — a test asserts it, because a method that gains a tooltip and loses its description (or the reverse) is a bench that explains half of itself. `does` is the mechanical effect in numbers, `needs` is what must be in the circle for the method to be legal, and `for` is what a player reaches for it to accomplish. Three fields rather than one paragraph because the tooltip has three jobs and a player scanning for the DC should not have to read prose to find it.",
+  "method_help": {
+    "attune": {
+      "does": "No DC change. Reads the essence and the vessel and reports the working's true DC before anything is spent.",
+      "needs": "An essence and the item on the bench. Always the first method in a chain.",
+      "for": "Seeing what the binding will cost — the off-type +5, a night restriction, a focus that is too small — while it is still free to change your mind."
+    },
+    "scribe": {
+      "does": "No DC change. Consumes one ink and one chalk or salt; without them the circle is not drawn and nothing else in the chain is legal.",
+      "needs": "Ink and circle material on the bench.",
+      "for": "Making the circle real. Every working passes through it, which is why circle materials are the errand an enchanter runs most."
+    },
+    "bind": {
+      "does": "Sets the working's DC: 10 + 5 per tier rank of the rarest essence, +5 for each essence past the first. A failure here spends the essence and scorches the focus — or cracks it, if it is a diamond.",
+      "needs": "At least one essence and a focus. Refused without a focus: the essence has nowhere to live.",
+      "for": "The binding itself. Everything before it prepares and everything after it closes."
+    },
+    "seal": {
+      "does": "No DC change. Without it the binding bleeds away by morning and the working is wasted.",
+      "needs": "A bind earlier in the same chain. Nothing may follow a seal.",
+      "for": "Making the enchantment permanent. It is the last method in every chain that has one."
+    },
+    "focus": {
+      "does": "No DC change on its own; it is what lets the focus's full capacity be used — top essence rank and total ranks both.",
+      "needs": "A focus on the bench. Enchanter 2.",
+      "for": "Working with a stone larger than a quartz — an amethyst holding two motes, a sapphire holding a rare essence."
+    },
+    "channel": {
+      "does": "No DC change. Required before bind for any essence above common: without it the essence grounds out through the enchanter instead of reaching the stone.",
+      "needs": "An essence and a focus. Enchanter 2.",
+      "for": "Handling anything stronger than a mote without wearing it yourself."
+    },
+    "imbue": {
+      "does": "No DC change of its own; it is what makes a second essence legal, and each essence past the first is already +5 DC through bind.",
+      "needs": "Two or more essences, of different families, within the focus's total capacity. Enchanter 3.",
+      "for": "Compound items — a flaming sword that is also +1, a cloak both shadowed and warded."
+    },
+    "empower": {
+      "does": "+5 DC, and raises the finished working one tier band above its essence: an exotic binding comes out legendary.",
+      "needs": "At least one essence in the chain. Enchanter 4.",
+      "for": "Legendary-tier work before legendary essence is within reach — and the way the Enchanter 5 deed is earned at Enchanter 4."
+    },
+    "awaken": {
+      "does": "No DC change. Permits legendary essences that will not sit in an ordinary circle — dancing, vorpal, etherealness.",
+      "needs": "The sanctum, a diamond focus, and a legendary essence. Enchanter 5.",
+      "for": "The items that have a name and, sometimes, a voice."
+    }
+  },
+
   "_fixed_tools_note": "The circle is chalked into a floor and the sanctum is a room; neither travels. Whether a ritual can be attempted is therefore partly a question of where the character is standing — scene state, not sheet state — exactly as the Herbalist's workbench is.",
   "fixed_tools": ["enchanter's sanctum", "attunement circle"]
 }
