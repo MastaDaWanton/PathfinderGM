@@ -485,6 +485,164 @@ def _forage_blocked(c) -> str:
     return c.engine()._too_busy_to_forage(pc)
 
 
+def _narrate(messages, cfg, *, as_json=False, num_predict=220):
+    """One short narration call, or None. The craft action must survive the model being
+    down — a forage that cannot happen because Ollama is not running would be the bench
+    breaking immersion in the opposite direction."""
+    from gm import client as gm_client
+
+    try:
+        return gm_client.chat(
+            messages, cfg["model"], host=cfg["host"], as_json=as_json,
+            temperature=0.85, timeout=90, num_predict=num_predict,
+            provider=cfg.get("provider", "ollama"), api_key=cfg.get("api_key", ""))
+    except Exception:
+        return None
+
+
+def _forage_scene(c):
+    """Where and when, for the narrator's benefit."""
+    place = c.location.name if c.location else "the open country"
+    minutes = c.scene.clock_minutes
+    day, rem = minutes // 1440 + 1, minutes % 1440
+    return place, f"day {day}, {rem // 60} hours in"
+
+
+@require_POST
+def craft_action(request):
+    """A crafting-related excursion, narrated into the scene it happens in.
+
+    Foraging lived only on the bench page, where it was a button and a table: no
+    narration, no sense of time passing, no way back into the fiction. "crafting related
+    actions like foraging or mining or skinning don't break immersion" — so the run is
+    told like a turn: the narrator opens it, the die lands where everyone can see it, the
+    finding is told before the tally, and it ends the way every GM turn ends — what do
+    you do, and three ways to answer.
+
+    The engine still decides everything. Both narration calls are decoration around the
+    same `forage` op the bench uses, and either call failing falls back to plain prose
+    built from the facts — a model being down costs colour, never the herbs.
+    """
+    body = json.loads(request.body or "{}")
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+    action = str(body.get("action", "forage")).strip().lower()
+    if action != "forage":
+        return JsonResponse(
+            {"error": f"{action!r} is not a craft action yet — foraging only."},
+            status=400)
+
+    hours = max(1, min(48, int(body.get("hours", 1) or 1)))
+    place, when = _forage_scene(c)
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("narrator")
+
+    # 1. The setting out. Written to the transcript before the roll, because that is
+    # the order it happens in at a table.
+    opening = _narrate([
+        {"role": "system",
+         "content": "You narrate a solo Pathfinder game. Two or three sentences, second "
+                     "person, present tense. Never invent named people or places. Never "
+                     "ask a question. Stop before anything is found."},
+        {"role": "user",
+         "content": f"{pc.name} sets out to forage for herbs. Terrain: {c.biome}. "
+                     f"Near {place}, {when}. They mean to spend {hours} hour(s) "
+                     f"searching. Narrate them beginning the search."},
+    ], cfg, num_predict=140)
+    if not opening or not str(opening).strip():
+        opening = (f"You shoulder your satchel and work away from {place}, eyes on "
+                   f"the ground, the {c.biome} closing in around you. {hours} hour"
+                   f"{'s' if hours != 1 else ''} of searching lie ahead.")
+    opening = str(opening).strip()
+    c.transcript.append({"who": "gm", "text": opening})
+
+    # 2. The dice decide. Same op as the bench; the client lands the visible die on the
+    # first real d100 this rolled.
+    try:
+        resolution = c.engine().run(c.engine().validate([{
+            "op": "forage", "actor": "pc",
+            "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
+            "params": {"hours": hours},
+        }]))
+    except IntentError as exc:
+        # The opening already happened in the fiction; take it back out rather than
+        # narrating a search the engine refused.
+        c.transcript.pop()
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    effects = [e for o in resolution.outcomes for e in o.effects
+               if e.get("kind") == "forage"]
+    found: dict[str, int] = {}
+    rolls: list[int] = []
+    for e in effects:
+        for iid, n in (e.get("found") or {}).items():
+            found[iid] = found.get(iid, 0) + n
+        rolls.extend(int(r["roll"]) for r in e.get("rolls", []) if r.get("roll"))
+    names = {i.id: i.name for i in ingredients.all_ingredients().values()}
+    haul = [{"id": iid, "name": names.get(iid, iid), "count": n}
+            for iid, n in sorted(found.items())]
+
+    # 3. The finding, told before the tally, ending in the question and three answers.
+    listed = ", ".join(f"{h['count']}x {h['name']}" for h in haul) or "nothing"
+    closing_json = _narrate([
+        {"role": "system",
+         "content": "You narrate a solo Pathfinder game. Answer as JSON: "
+                     '{"narration": "...", "suggestions": ["...", "...", "..."]}. '
+                     "The narration is two or three sentences, second person, of the "
+                     "character finding (or failing to find) exactly what is listed — "
+                     "name only things from the list, invent nothing else, no numbers. "
+                     "The suggestions are three short next actions a player might take, "
+                     "each under eight words, imperative."},
+        {"role": "user",
+         "content": f"{pc.name} spent {hours} hour(s) foraging the {c.biome} near "
+                     f"{place} and found: {listed}. Narrate the finding, then suggest "
+                     f"three next actions."},
+    ], cfg, as_json=True, num_predict=260)
+
+    closing, suggestions = "", []
+    if isinstance(closing_json, dict):
+        closing = str(closing_json.get("narration") or "").strip()
+        raw = closing_json.get("suggestions")
+        if isinstance(raw, list):
+            suggestions = [str(s).strip() for s in raw if str(s).strip()][:3]
+        # Checked, not trusted: a narration that names a herb the ground did not give
+        # is the GM inventing loot. Grounding is the same rule the main loop enforces.
+        said = closing.lower()
+        invented = [n for n in names.values()
+                    if n.lower() in said and n not in [h["name"] for h in haul]]
+        if invented:
+            closing = ""
+    if not closing:
+        closing = ("The hours pass in stooping and sifting. " if haul else
+                   "The hours pass in stooping and sifting, and the ground gives "
+                   "nothing back. ")
+        if haul:
+            closing += ("Piece by piece the satchel takes on weight: " +
+                        ", ".join(h["name"].lower() for h in haul[:4]) +
+                        ("," if len(haul) > 4 else "") + " earth still on the roots.")
+    if len(suggestions) != 3:
+        suggestions = ["Keep foraging", f"Head back toward {place}",
+                       "Unpack the crafting bench"]
+
+    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing gathered."
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{closing}\n\nGathered: {tally}. {tell}".strip()})
+    c.transcript.append({"who": "gm", "text": "What do you do?"})
+    c.suggestions = suggestions
+    c.save()
+
+    return JsonResponse({
+        "opening": opening, "closing": closing, "tell": tell,
+        "found": haul, "rolls": rolls, "hours": hours,
+        "suggestions": suggestions,
+        "clock_minutes": c.scene.clock_minutes,
+    })
+
+
 @require_POST
 def forage_do(request):
     """Walk the ground and see what turns up. Routed through the engine's `forage` op so

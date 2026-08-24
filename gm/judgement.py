@@ -731,6 +731,66 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
+# A declared risky action, by the verb that declares it. The same shape as the goods
+# and survival injections and for the same reason: "I was able to sneak out of the
+# tavern without a roll" — the narrator narrated the slipping-out and emitted
+# `narrate_only`, and instructing it to demand checks is the fix that has never held
+# here. The verbs are conservative: each one is an action 1e genuinely rolls for, and
+# a sentence that merely mentions the word ("I could sneak…" is caught by the question
+# guard; "the sneak thief" has no leading I-verb) does not fire.
+_CHECK_VERBS = (
+    ("stealth", r"sneak|slip\s+(?:out|past|away|by|through)|creep|skulk|tip.?toe"
+                r"|hide|steal\s+(?:past|away|through)"),
+    ("sleight of hand", r"pick\s+(?:\w+\s)?pockets?|pickpocket|palm|filch"),
+    ("disable device", r"pick\s+the\s+lock|pick\s+(?:\w+\s)?locks?|disarm\s+the\s+trap"
+                       r"|jimmy"),
+    ("climb", r"climb|scale\s+the|clamber"),
+    ("swim", r"swim"),
+    ("acrobatics", r"leap|jump\s+(?:across|over|down|the)|vault|tumble|somersault"),
+    ("escape artist", r"slip\s+(?:my|the|these)\s+(?:ropes?|bonds?|manacles?|chains?)"
+                      r"|wriggle\s+(?:free|out)"),
+    ("bluff", r"bluff|lie\s+to|deceive|trick\s+(?:him|her|them|the)|fool\s+(?:him|her|them|the)"),
+    ("intimidate", r"intimidate|threaten|menace"),
+    ("diplomacy", r"persuade|negotiate|talk\s+(?:him|her|them)\s+(?:down|into|out)"),
+    ("disguise", r"disguise\s+(?:myself|as)|pose\s+as|pass\s+myself\s+off"),
+    ("perception", r"search\s+(?:the|for|his|her|their)|eavesdrop|listen\s+at"),
+    ("survival", r"track\s+(?:him|her|them|the)|follow\s+the\s+(?:trail|tracks)"),
+)
+
+_DECLARES = r"\bi\s+(?:try\s+to\s+|attempt\s+to\s+|carefully\s+|quietly\s+|quickly\s+)?"
+
+
+def inject_checks(raw_intents, player_text: str, scene) -> list:
+    """A declared risky action reaches the dice.
+
+    Only when the GM's own plan rolled nothing: a turn that already carries a check,
+    an attack or a manoeuvre is a turn where the dice are coming out anyway, and a
+    second roll for the same sentence would be the injection double-charging. The DC
+    is left to the engine's own default band rather than invented here.
+    """
+    import re as _re
+
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if present & {"check", "attack", "manoeuvre", "save"}:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    for skill, verbs in _CHECK_VERBS:
+        if _re.search(_DECLARES + r"(?:" + verbs + r")", player_text, _re.I):
+            return list(raw_intents) + [{
+                "op": "check", "actor": pc.ref,
+                "because": "the player declared it; the dice decide it",
+                "params": {"skill": skill},
+            }]
+    return raw_intents
+
+
 def inject_ability(raw_intents, player_text: str, scene) -> list:
     """A named class ability the player reached for reaches the engine.
 

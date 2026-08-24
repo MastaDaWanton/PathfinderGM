@@ -462,6 +462,24 @@
   .popup .acts button { flex: 1; }
   #busy, #err { font-family: var(--body); }
 
+  /* --- The craft-action panel -------------------------------------------- */
+  #craftpanel {
+    margin-top: 8px; padding: 12px 14px; border: 1px solid var(--gold-dim);
+    border-radius: 3px; background: rgba(0, 0, 0, .38);
+  }
+  #craftpanel .cp-ground b { color: var(--brew, #6fcf8f); font: 400 15px/1.2 var(--display);
+    letter-spacing: .06em; font-variant: small-caps; }
+  #craftpanel .cp-ground em { color: var(--dim); font-size: 12.5px; margin-left: 8px; }
+  #craftpanel .cp-busy { color: var(--alarm); font-size: 13px; margin-top: 6px; }
+  #craftpanel .cp-hours { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  #craftpanel .cp-hours label { color: var(--dim); font-size: 12px; }
+  #craftpanel .cp-hours input { flex: 1; accent-color: var(--gold); }
+  #craftpanel .cp-hours b { min-width: 22px; text-align: right; color: var(--gold);
+    font-variant-numeric: tabular-nums; }
+  #craftpanel .cp-row { display: flex; align-items: center; gap: 12px; }
+  #craftpanel .cp-bench { color: var(--dim); font-size: 12.5px; text-decoration: none; }
+  #craftpanel .cp-bench:hover { color: var(--accent); }
+
   /* --- The full character sheet ------------------------------------------- */
   #sheetpanel {
     position: fixed; inset: 0; z-index: 30;
@@ -1183,7 +1201,25 @@
            an action you did not want to take. -->
       <button type="button" id="carryon" class="quiet"
               title="Let the scene continue without acting">Continue</button>
+      <button type="button" id="craftaction" class="quiet"
+              title="Forage, and later mine and skin — without leaving the scene"
+              >Craft action</button>
     </form>
+    <!-- The excursion panel. Foraging lived only on the bench page, where it was a
+         button and a table: no narration, no time, no way back into the fiction. -->
+    <div id="craftpanel" hidden>
+      <div class="cp-ground"><b id="cp-biome">…</b> <em id="cp-desc"></em></div>
+      <div class="cp-busy" id="cp-busy" hidden></div>
+      <div class="cp-hours">
+        <label for="cp-h">Hours</label>
+        <input type="range" id="cp-h" min="1" max="48" value="1">
+        <b id="cp-hn">1</b>
+      </div>
+      <div class="cp-row">
+        <button type="button" id="cp-forage">Forage</button>
+        <a class="cp-bench" href="/craft/">open the full bench →</a>
+      </div>
+    </div>
   </footer>
 </main>
 
@@ -1698,6 +1734,60 @@ function showPopup(p) {
     note: lo === hi ? "" : `${die} (${lo}–${hi})`,
   }).then(sendRoll);
 }
+
+// The craft-action excursion. The server narrates the setting-out, rolls the same
+// forage op the bench uses, narrates the finding and hands back three suggestions;
+// this only sequences what the player sees — opening first, the die landing on a real
+// d100 from the run, then the full turn with the tally and the question.
+document.addEventListener("click", async e => {
+  if (e.target.closest("#craftaction")) {
+    const panel = $("#craftpanel");
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) {
+      try {
+        const f = await (await fetch("/api/forage/table")).json();
+        $("#cp-biome").textContent = f.here || "nowhere in particular";
+        $("#cp-desc").textContent = (f.table && f.table.describe) || "";
+        const busy = f.busy || "";
+        $("#cp-busy").hidden = !busy;
+        $("#cp-busy").textContent = busy;
+        $("#cp-forage").disabled = !!busy;
+      } catch (err) { $("#err").textContent = err.message; }
+    }
+    return;
+  }
+  if (!e.target.closest("#cp-forage")) return;
+
+  const hours = Math.max(1, Math.min(48, Number($("#cp-h").value) || 1));
+  $("#craftpanel").hidden = true;
+  busy(true);
+  try {
+    const d = await post("/api/craftaction", { action: "forage", hours });
+    busy(false);
+    // The opening lands in the book at once, so the die falls inside the fiction
+    // rather than in front of it.
+    $("#story").insertAdjacentHTML("beforeend",
+      `<p class="beat fresh">${esc(d.opening)}</p>`);
+    // Counted as seen, or the full render a moment later re-runs its entrance.
+    window._beatsSeen = (window._beatsSeen || 0) + 1;
+    $("#story").scrollTop = $("#story").scrollHeight;
+    if (d.rolls && d.rolls.length) {
+      await Dice3D.land({
+        title: "Foraging", why: `${d.hours} hour${d.hours === 1 ? "" : "s"} on the ground`,
+        sides: 100, lo: 1, hi: 100, result: d.rolls[0],
+        note: d.rolls.length > 1
+          ? `The first of ${d.rolls.length} sweeps — the log has the rest.` : "",
+      });
+    }
+    render(await (await fetch("/api/state")).json());
+  } catch (err) {
+    busy(false);
+    $("#err").textContent = err.message;
+  }
+});
+document.addEventListener("input", e => {
+  if (e.target.closest("#cp-h")) $("#cp-hn").textContent = e.target.value;
+});
 
 async function sendRoll(face) {
   $("#veil").classList.remove("on");
