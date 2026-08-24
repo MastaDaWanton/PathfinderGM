@@ -581,10 +581,16 @@ def craft_action(request):
                if e.get("kind") == "forage"]
     found: dict[str, int] = {}
     rolls: list[int] = []
+    checks: list[dict] = []
     for e in effects:
         for iid, n in (e.get("found") or {}).items():
             found[iid] = found.get(iid, 0) + n
         rolls.extend(int(r["roll"]) for r in e.get("rolls", []) if r.get("roll"))
+        # The d100 picks only exist for hours whose Survival check earned any. A barren
+        # day rolled real dice too — the checks themselves — and a die the player was
+        # promised must land on *something* true, so the checks travel as the fallback.
+        checks.extend({"roll": int(h["roll"]), "dc": int(h.get("dc", 0))}
+                      for h in e.get("hourly", []) if h.get("roll") is not None)
     names = {i.id: i.name for i in ingredients.all_ingredients().values()}
     haul = [{"id": iid, "name": names.get(iid, iid), "count": n}
             for iid, n in sorted(found.items())]
@@ -640,7 +646,7 @@ def craft_action(request):
 
     return JsonResponse({
         "opening": opening, "closing": closing, "tell": tell,
-        "found": haul, "rolls": rolls, "hours": hours,
+        "found": haul, "rolls": rolls, "checks": checks, "hours": hours,
         "suggestions": suggestions,
         "clock_minutes": c.scene.clock_minutes,
     })

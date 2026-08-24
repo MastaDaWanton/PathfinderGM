@@ -558,6 +558,9 @@
     box-shadow: 0 1px 0 #0a0806, 0 2px 0 rgba(221,196,142,.10);
   }
   .sigil { width: 46px; height: 62px; flex: none; color: var(--blood); }
+  #sheeterr { color: var(--alarm); font: 13px/1.4 var(--body); margin-left: auto;
+    margin-right: 16px; max-width: 40%; }
+
   .sheethead h1 {
     margin: 0; color: var(--gold); font: 400 38px/1.05 var(--display);
     letter-spacing: .045em; font-variant: small-caps;
@@ -1361,6 +1364,7 @@
   <div class="sheethead">
     <h1 id="sheetname"></h1>
     <div class="meta" id="sheetmeta"></div>
+    <span id="sheeterr"></span>
     <button class="close" id="closesheet">Close  ·  Esc</button>
   </div>
   <div class="tabs" id="sheettabs" role="tablist"></div>
@@ -1859,6 +1863,15 @@ document.addEventListener("click", async e => {
         note: d.rolls.length > 1
           ? `The first of ${d.rolls.length} sweeps — the log has the rest.` : "",
       });
+    } else if (d.checks && d.checks.length) {
+      // A barren day found nothing to pick, so there is no d100 — but the Survival
+      // checks were real dice, and the first of them is what lands.
+      await Dice3D.land({
+        title: "Foraging", why: `Survival check, DC ${d.checks[0].dc}`,
+        sides: 20, result: Math.min(20, Math.max(1, d.checks[0].roll)),
+        note: d.checks.length > 1
+          ? `The first of ${d.checks.length} hours — none of them found a thing.` : "",
+      });
     }
     render(await (await fetch("/api/state")).json());
   } catch (err) {
@@ -2244,6 +2257,43 @@ const TABS = [
   ["background","Background",s => tabBackground(s)],
   ["adventures","Adventures",s => tabEmpty("No adventure log yet. Sessions will be recorded here.")],
 ];
+
+// Using something you made, from the Inventory tab. Straight to the engine — nothing
+// in drinking your own tea for a model to decide. This handler was lost once already:
+// it lived in the slice a later rewrite replaced wholesale, and the buttons kept
+// rendering over nothing. It lives beside the sheet code it serves now, and
+// tests/test_page_wiring.py pins /api/use into the served page so the next
+// disappearance fails a test instead of a player.
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-use]");
+  if (!btn) return;
+  btn.disabled = true;
+  const say = document.getElementById("sheeterr");
+  if (say) say.textContent = "";
+  try {
+    const r = await fetch("/api/use", {
+      method: "POST",
+      headers: { "Content-Type": "application/json",
+                 "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: JSON.stringify({ item: btn.dataset.use, how: btn.dataset.how }),
+    });
+    // Text first: a 500 returns an HTML page, and json() on that throws a parse error
+    // that says nothing — the exact shape of every silent button this app has had.
+    const raw = await r.text();
+    let d = {};
+    try { d = JSON.parse(raw); } catch { d = { error: `HTTP ${r.status}` }; }
+    if (!r.ok) { if (say) say.textContent = d.error || `HTTP ${r.status}`; return; }
+    SHEET = d.sheet;
+    $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
+    if (say) say.textContent = "";
+    $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
+    render(await (await fetch("/api/state")).json());
+  } catch (err) {
+    if (say) say.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 async function openSheet() {
   $("#sheetpanel").classList.add("on");

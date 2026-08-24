@@ -85,6 +85,15 @@ class Dice:
         self._rng = random.Random(seed)
 
     def parse(self, notation: str) -> tuple[int, int, int]:
+        # The herb corpus states some rolls as a range — "Heals 1-4 hit points" — and
+        # the extractor keeps that form. A range is exact dice arithmetic: a-b is
+        # 1d(b-a+1) shifted up by a-1, so 1-4 is a d4 and 2-8 is 1d7+1. Refusing it was
+        # a 500 on the drink button for every jar authored in the corpus's own words.
+        r = re.match(r"^\s*(\d+)\s*-\s*(\d+)\s*$", str(notation or ""))
+        if r:
+            lo, hi = int(r.group(1)), int(r.group(2))
+            if hi > lo:
+                return 1, hi - lo + 1, lo - 1
         m = DICE_RE.match(notation)
         if not m:
             raise BadDice(f"cannot read dice notation {notation!r}")

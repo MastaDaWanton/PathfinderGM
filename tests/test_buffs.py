@@ -103,3 +103,35 @@ def test_no_herb_is_inert_any_more():
         if not specs:
             inert.append(i.name)
     assert inert == [], inert
+
+
+def test_range_notation_rolls_as_exact_dice():
+    """"Heals 1-4 hit points" is the corpus's own phrasing and the extractor keeps it.
+    `Dice.parse` refused it, which made the drink button a 500 for every jar authored in
+    those words — the second bug under "clicking the drink button does nothing"."""
+    from rules.dice import Dice
+
+    d = Dice(seed=7)
+    assert d.parse("1-4") == (1, 4, 0)
+    assert d.parse("2-8") == (1, 7, 1)
+    rolls = [d.roll("1-4").total for _ in range(300)]
+    assert min(rolls) == 1 and max(rolls) == 4
+
+
+def test_drinking_a_range_healing_jar_works_end_to_end(table):
+    """Comfrey Tea, as the user's shelf actually holds it."""
+    scene, engine, pc = table
+    from rules import crafting
+
+    tea = crafting.Stock(
+        base="Comfrey Tea", tier="common", count=1, potency=1.0, craft="herbalist",
+        effects=["Comfrey: Heals 1-4 hit points"],
+        specs=[{"type": "heal", "dice": "1-4", "from": "Comfrey"}])
+    pc.add_stock(tea, 1)
+    pc.hp = max(1, pc.hp_max - 4)
+    before = pc.hp
+    engine.run(engine.validate([{
+        "op": "use_item", "actor": "pc", "because": "drinks",
+        "params": {"item": tea.id, "how": "drink"}}]))
+    assert pc.hp > before
+    assert tea.id not in pc.stock

@@ -67,9 +67,14 @@ def test_three_suggestions_always_arrive(client):
 
 
 def test_the_die_the_player_sees_is_a_die_the_engine_rolled(client):
+    """Flaked twice before it was chased: a barren day rolls no d100 picks at all —
+    only the hourly Survival checks — and the endpoint used to come back with an empty
+    rolls list and nothing for the promised die to land on. The checks travel now, and
+    one or the other must always be there."""
     d = _forage(client, hours=3).json()
-    assert d["rolls"], "no d100s came back to land the die on"
+    assert d["rolls"] or d["checks"], "nothing for the die to land on"
     assert all(1 <= r <= 100 for r in d["rolls"])
+    assert all(c["roll"] >= 1 and c["dc"] > 0 for c in d["checks"])
 
 
 def test_time_actually_passes(client):

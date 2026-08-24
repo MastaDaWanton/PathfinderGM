@@ -963,6 +963,11 @@ def use_item(request):
         }]))
     except IntentError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        # A jar with authored effects the engine chokes on must be a sentence in the
+        # sheet, not a 500 with an invisible error — "clicking the drink button does
+        # nothing" was exactly this, twice over.
+        return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
