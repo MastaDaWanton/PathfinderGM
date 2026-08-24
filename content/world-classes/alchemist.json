@@ -1,0 +1,76 @@
+{
+  "id": "alchemist",
+  "name": "Alchemist",
+  "summary": "A Universal World Class any character may take regardless of their class. It levels through the bench — dissolving, reacting and sealing — unlocking the laboratory's verbs and higher tiers of material, from brimstone and saltpetre to dragon bile and philosophic mercury.",
+  "grantable_at_creation": true,
+
+  "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist — by doing the work. The two namespaces never meet in code.",
+
+  "_thresholds_note": "The Herbalist's curve, unchanged, because the two tracks pay mastery the same way (rules/worldclass.py MP_AWARDS is shared) and a chain here is worth what a chain there is worth. The dip at level 4 is the Herbalist's deliberate dip; see herbalist.json for the measured pacing that produced it — do not 'fix' it in one file and not the other.",
+  "thresholds": [25, 65, 50, 100],
+
+  "milestones": {
+    "5": "legendary-work"
+  },
+
+  "_deeds_note": "The same trap the Herbalist's deed walked into is avoided the same way: the deed is the MATERIAL, not the method. If the deed required catalyze — a Level 5 method — the gate could never open. Any successful craft at legendary tier is the great work, however it was reached, and catalyze is the mastery that follows it.",
+  "deeds": {
+    "legendary-work": {
+      "min_tier": "legendary",
+      "note": "Any successful craft at legendary tier, however it was reached."
+    }
+  },
+
+  "levels": [
+    {
+      "level": 1,
+      "tools": ["travelling alchemy kit", "iron crucible"],
+      "methods": ["calcine", "dissolve", "seal"],
+      "max_tier": "common / mundane",
+      "note": "Roadside work: burning to ash, dissolving in a jar, corking the result."
+    },
+    {
+      "level": 2,
+      "tools": ["glass alembic", "filter frames and papers"],
+      "methods": ["filter", "precipitate"],
+      "max_tier": "uncommon / volatile",
+      "note": "Real glassware: separating a mixture into what it was hiding."
+    },
+    {
+      "level": 3,
+      "tools": ["alchemical laboratory"],
+      "methods": ["react", "stabilize"],
+      "max_tier": "rare / magical",
+      "note": "The dangerous heart of the craft: making substances fight, and living through it."
+    },
+    {
+      "level": 4,
+      "tools": ["athanor"],
+      "methods": ["sublime"],
+      "max_tier": "exotic / planar",
+      "note": "The slow furnace: vapour to crystal, matter refined past what a flame can do."
+    },
+    {
+      "level": 5,
+      "tools": ["philosopher's bench"],
+      "methods": ["catalyze"],
+      "max_tier": "legendary / mythic",
+      "note": "The great work: catalysts that transform without being consumed."
+    }
+  ],
+
+  "method_descriptions": {
+    "calcine": "Roasts a material in the crucible until only its essential salt remains. Strips water and rot; the ash keeps indefinitely.",
+    "dissolve": "Takes a material up into a solvent so it can be worked as a liquid. Most chains start here — the bench works solutions, not lumps.",
+    "seal": "Closes the work into its vessel: flask, bladder or clay pot. The finishing method — nothing follows a seal, and an unsealed preparation is bench-work, not an item you can carry and throw.",
+    "filter": "Passes a solution through frame and paper, holding back what does not belong. Removes impurities, penalties and secondary toxicities while keeping the beneficial traits.",
+    "precipitate": "Drives a dissolved substance back out of its solvent as a concentrated solid. The reverse of dissolve, and the way a solution becomes a powder worth keeping.",
+    "react": "Sets two prepared substances against each other and keeps what the violence produces. The heart of the craft: +25% to the primary effect, and every classic of the trade — fire that clings, acid that eats, smoke that blinds — is a reaction. A reaction needs a solvent as its medium.",
+    "stabilize": "Buffers a reaction so it spends itself in the product instead of in your face. Required before two volatile materials may share a vessel, and the only answer to a material that attacks its own flask.",
+    "sublime": "Vaporises a substance in the athanor and recovers it as crystal, leaving everything gross behind. +25% to the primary effect; the exotic tiers are worked almost entirely as sublimates.",
+    "catalyze": "Uses legendary material to drive a transformation it does not take part in. Permanent works, philosophic salts, and preparations at 150% of base strength."
+  },
+
+  "_portable_note": "The laboratory and athanor are furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split herbalist.json declares for its still and workbench.",
+  "fixed_tools": ["alchemical laboratory", "athanor", "philosopher's bench"]
+}
