@@ -1,0 +1,2522 @@
+{
+ "partition": 20,
+ "source": "read from the spell descriptions in content/spells/spells.json",
+ "spells": {
+  "vermin-shape-ii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You take the form of a Tiny or Large creature of the vermin type, gaining any of that form's burrow 30 ft., climb 60 ft., fly 60 ft. (good), swim 60 ft., darkvision 60 ft., low-light vision, tremorsense 30 ft., scent, blood drain, constrict, grab, lunge, poison, pull, trample or web. A Tiny form gives a +4 size bonus to Dexterity, a -2 penalty to Strength and a +1 natural armour bonus; a Large form gives a +4 size bonus to Strength, a -2 penalty to Dexterity and a +5 natural armour bonus."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "untyped",
+     "target": "saving throws against mind-affecting effects",
+     "note": "You do not gain full immunity to mind-affecting effects, only this bonus."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Tiny and Large ability adjustments are mutually exclusive, so they stay inside the narrative spec; emitting both as ability_mod specs would apply +4 Str and +4 Dex at once. The mind-affecting bonus is untyped in the prose and spans all three saves, so it is a situational_mod rather than a save_mod."
+  },
+  "versatile-weapon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The affected weapon (or 50 projectiles) bypasses damage reduction of one type chosen at casting: bludgeoning, cold iron, piercing, silver or slashing. It still inflicts damage of its normal type and its hardness and hit points are unchanged. It can be cast on a natural weapon or unarmed strike."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose says it functions like greater magic weapon 'except that' it alters physical properties for damage reduction; no enhancement bonus is stated in this description, so none is emitted."
+  },
+  "vestment-of-the-champion": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions as magic vestment, but only on armour or a shield you are wearing or carrying. While anyone else wears or carries it the spell has no effect, and it resumes when you wear or carry it again."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Declined to emit magic vestment's enhancement bonus: this description never states the number, and guessing it would be a bonus the engine stacks wrongly."
+  },
+  "vex-giant": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Choose a focused foe within 60 feet that is at least one size category larger than you as a free action when you cast. Switching focus to another foe within 60 feet is a move action; a foe that moves beyond 60 feet is lost as a focus until you move within 60 feet and spend a move action."
+    },
+    {
+     "type": "permission",
+     "target": "Move through your focused foe's threatened area without provoking attacks of opportunity from it."
+    },
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "insight",
+     "target": "cmb",
+     "note": "on all combat maneuver checks made against your focused foe"
+    },
+    {
+     "type": "narrative",
+     "target": "The first successful melee attack you make against your focused foe each round deals an additional 1d6 points of damage."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 is narrative rather than a damage spec: it lands only on a later successful melee attack against the focused foe, and the engine rolls and applies a damage spec at resolution, which would fire it at cast time against the wrong creature."
+  },
+  "vexing-miscalculation": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target cannot score critical threats. A natural 20 still hits regardless of AC, but the hit is not eligible for a critical confirmation roll. The spell is discharged the first time a threat is foiled this way."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'minutes/level (1) or until discharged'; the per-level term is emitted and the discharge condition is stated in the narrative spec, since the duration shape cannot hold both."
+  },
+  "vicarious-view": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You plant a scrying sensor on a creature, object or point in space you touch, and can see and hear it and roughly 10 feet in all directions. The sensor moves with a creature or object that moves. Magically or supernaturally enhanced senses do not work through this sensor."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Scrying has no home in the effect vocabulary."
+  },
+  "vigilant-rest": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 10,
+     "bonus_type": "untyped",
+     "target": "Perception checks attempted while asleep",
+     "note": "The target does not take the normal +10 modifier to the DC of Perception checks made while asleep; recorded here as the equivalent bonus on the check."
+    },
+    {
+     "type": "permission",
+     "target": "On detecting a threat or unexplained noise while asleep, wake immediately and stand up from your sleeping position as a free action."
+    },
+    {
+     "type": "permission",
+     "target": "If roused and you return to sleep during the duration, you fall asleep immediately and do not count as having your sleep interrupted, even if you fought while awake."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 8,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The spell removes a +10 penalty to a DC rather than granting a bonus; the situational_mod's note records which direction the prose states, because a situational_mod is narrated to the GM rather than applied by the engine."
+  },
+  "vigor": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "competence",
+     "target": "damage",
+     "uses": "once",
+     "uses_count": 1,
+     "note": "A single melee damage roll; the creature must choose to use the bonus before making the roll. Ranged and spell attacks are unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'minutes (1) or until discharged'; the discharge is carried by the once-only use limit."
+  },
+  "vile-dog-transformation": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Each dog saves separately. A dog that trusts you (trained by you for a purpose, or in your care at least 30 days and generally well treated) takes a -4 penalty on this save.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The dog becomes an evil monstrous creature with a hell hound's statistics, except that it has acid, cold and fire resistance 5 instead of fire immunity and cold vulnerability, its bite deals an extra 1d6 points of acid damage rather than fire, and its breath weapon becomes a 10-foot cone of vapour dealing 2d4 points of acid damage. It cannot understand Infernal but understands any language you know, and is neutral evil (lawful evil if you are lawful, chaotic evil if you are chaotic). You command it as you would a creature summoned by a summon monster spell. You can transform one dog per 3 caster levels, to a maximum of five at 15th level. When the duration ends the dogs dissolve into a stinking pile of gore and bones."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 acid bite and the 2d4 cone belong to the transformed dog's own attacks, not to the spell, so they are described rather than emitted as damage. The one-dog-per-3-levels progression counts targets, not dice, so `scaling` is omitted."
+  },
+  "village-veil": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Will disbelief. A creature with reason for suspicion that chooses to investigate gets a second save with a +2 bonus as it enters and interacts with the illusion.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature perceives the affected area (one 10-foot cube per caster level) as having suffered a disaster you named at casting and as holding absolutely nothing of interest or worth to it, and moves on without investigating. Creatures with clearly identifiable physical traits you nominate at casting are immune and perceive the area truly. Casting the spell again can extend the area only if you use the same disaster and grant the same creatures immunity; otherwise the entire illusion disappears."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Illusion with a per-viewer disbelief save; the vocabulary has no illusion type."
+  },
+  "vine-strike": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "One of your natural attacks or unarmed strikes deals an additional 1d6 points of damage, and each creature hit with that weapon must succeed at a Reflex save or be entangled for the spell's duration. A creature that saves is immune to the entangling for 1 round. An entangled creature can spend a standard action to tear the vines off, but further strikes can entangle it again."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Both the 1d6 and the Reflex-or-entangled apply on each later successful strike, not at cast time. A damage spec would roll immediately and a save_gate would resolve the save at casting, so the whole rider stays narrative."
+  },
+  "vinetrap": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Success means the vines fail to take root and the spell has no effect.",
+     "on_failure": [
+      {
+       "type": "speed",
+       "target": "land",
+       "amount": -5,
+       "note": "Immediate reduction to base speed on the first failed save."
+      },
+      {
+       "type": "narrative",
+       "target": "Each round thereafter the subject must save again or lose another 5 feet of speed, down to half its original speed; the vines can never reduce a creature below 5 feet. As a full-round action the subject or an adjacent creature can tear the vines off, resetting the penalty to 5 feet, though the vines keep growing for the duration. Dealing at least 20 points of fire damage to the subject ends the effect early. Choose one version at casting. Blessed Thorns: at the start of your turn each round the subject takes 2d4 points of damage plus 1 point per round since it last took a full-round action to tear the vines off, and the thorns may be made cold iron or silver for overcoming damage reduction. Noxious Vines: the subject and each adjacent creature must attempt a DC 15 Fortitude save at the start of its turn or be blinded for that round and unable to cast spells with verbal components. Swift Vines: the vines slow the subject 10 feet per round instead of 5, and it becomes staggered once reduced to half speed."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Blessed Thorns 2d4 repeats every round, so it is narrative — the vocabulary has no repeating-damage type. The escalating speed loss depends on a fresh save each round, so only the first, stated -5 is emitted as a speed spec."
+  },
+  "violent-accident": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target is cursed to suffer a violent accident at an uncontrolled moment within the next 24 hours. The accident deals 1d8 points of damage per caster level (maximum 5d8) of a type appropriate to its source — fire for an explosion, bludgeoning for a falling object — and the target may attempt a Reflex save when the accident occurs to halve it. Spell resistance can prevent the curse when it is cast; there is no saving throw against being cursed. The accident damages only the target, however much it inconveniences others."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Declined to emit a damage spec despite a stated formula: the damage lands at a GM-chosen moment within 24 hours, not when the spell is cast, and the engine rolls and applies a damage spec at resolution. The damage type is also explicitly variable, so no damage_type would be truthful. Corpus duration is 'days (1) or until discharged'; the discharge is the accident, so until_discharged is the honest kind."
+  },
+  "violent-misfire": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Will negates (object); the firearm, not its wielder, is the target.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The next time the target firearm fires during the duration it automatically misfires. If the misfire makes the firearm explode, the radius of the explosion is doubled and it deals maximum damage to every creature in the radius. The firearm's wielder also takes 1d6 additional points of fire damage per 2 caster levels (maximum 10d6). If the target is an advanced firearm and it misfires a second time in a row during the duration, it does not explode but still deals the additional damage to the wielder."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6-per-2-levels is not the spell's own damage in the engine's sense: it lands on the wielder — a creature other than the target, which is the firearm — and only when the weapon is next fired. Emitted as narrative with the formula intact rather than as a damage spec that would fire at cast time."
+  },
+  "violent-misfire-greater": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Will negates (object), per firearm.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "As violent misfire, except that it affects one firearm per caster level, no two of which can be more than 30 feet apart, at medium range."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The description is only 'functions as violent misfire except as noted above'; the differences named above it are range and target count, which the corpus already holds. Nothing further is stated, so nothing further is emitted."
+  },
+  "viper-bomb-admixture": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Every bomb you create and throw during the duration releases up to four vipers on a direct hit: one attacks the creature struck directly and the others attack up to three creatures caught by the splash. The vipers make melee touch attacks using your base attack bonus + Intelligence modifier and deal 1d4 + your Intelligence modifier damage on a hit, and the target is poisoned as if by a venomous snake. The vipers vanish after attacking, hit or miss, and your own bombs do not harm them. This does not interfere with bomb discoveries, but only one bomb admixture can be active at a time — drinking another ends this one."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d4 + Int belongs to the conjured vipers' attacks, not to the spell, and only occurs on a later bomb hit; it is not emitted as damage."
+  },
+  "virtue": {
+   "effects": [
+    {
+     "type": "temp_hp",
+     "dice": "1",
+     "source": "virtue"
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "One temporary hit point, stated flatly; no scaling of any kind in the prose."
+  },
+  "virtuoso-performance": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Start a second bardic performance while maintaining another. Starting the second costs 2 rounds of bardic performance instead of 1, and maintaining both costs a total of 3 rounds of bardic performance per round. When the spell ends one performance of your choice ends immediately. This does not stack with any other method of maintaining simultaneous bardic performances."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Purely a permission to hold two performances; no numbers to apply beyond the round costs, which are stated in the permission text."
+  },
+  "virulence": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Every living creature in the 40-foot-radius burst centred on you, including you, must immediately attempt a saving throw against every disease it has contracted, even if the onset time has not yet elapsed. On a failed save the affliction has its usual effect; a successful save does not count toward curing the affliction."
+    },
+    {
+     "type": "situational_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "the forced saving throw against each contracted disease",
+     "note": "The -2 applies to the saves this spell forces, not to saves generally."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose says 'a saving throw' without naming which; disease saves are conventionally Fortitude but the spell does not say so, so no save is named and the corpus's own 'see text' stands."
+  },
+  "virulent-miasma": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates fog as fog cloud, except that the vapours carry the taint of disease."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "A creature that succeeds, or that ignores the fog through spell resistance, is unaffected and makes no further saves even if it stays in the fog.",
+     "on_failure": [
+      {
+       "type": "situational_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "saving throws against disease effects",
+       "note": "Applies while the living creature remains within the cloud and for 1d4+1 rounds after it leaves."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Only the disease-save penalty allows the Fortitude save and is subject to spell resistance; the fog itself is not, so the fog is a separate narrative spec outside the gate."
+  },
+  "vision": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As legend lore but faster: you pose a question about a person, place or object and receive a vision by succeeding at a caster level check (1d20 + 1 per caster level, maximum +25). The DC is 20 if the person or object is at hand or you are in the place in question; 25 if only detailed information is known, and the vision is incomplete; 30 if only rumours are known, and the vision is vague."
+    },
+    {
+     "type": "apply_condition",
+     "target": "fatigued",
+     "note": "You are fatigued after the spell completes; this lands on the caster, not on any subject."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Corpus duration is 'see text' and the prose states none, so duration is omitted rather than guessed. The caster level check DCs are quoted in the narrative spec because the vocabulary has no divination type."
+  },
+  "vision-of-hell": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A realistic illusion of a hellscape overlays the area. Structures, equipment and creatures within it are not hidden, but environmental features take on an infernal appearance. You are prepared for the images and unaffected. Devils and any lawful evil creatures suffer no negative effects."
+    },
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Every creature in the area other than you saves; no spell resistance.",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "shaken",
+       "note": "Persists as long as the creature remains in the area."
+      },
+      {
+       "type": "situational_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "saving throws against fear effects",
+       "note": "Persists as long as the creature remains in the area."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The shaken condition and the -2 both last only while the creature stays inside the area, which the duration shape cannot express, so it is recorded on both specs."
+  },
+  "vision-of-lamashtu": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions exactly as nightmare, and in addition lets a second spell ride along and strike the target the moment it wakes. The second spell must already be prepared and cast immediately after this one, must be 6th level or lower, must affect one target (always the nightmare's recipient) and must not deal hit point damage. Its range is irrelevant, and even touch attacks can be delivered this way, though you must still succeed at the touch attack, the touch occurring within the victim's nightmare. The target may save against the second spell if it normally allows one."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Bestow curse, blade barrier, destruction and inflict moderate wounds appear in the prose only as a worked example of what may and may not ride along; none of them is an effect of this spell and none is emitted."
+  },
+  "visualization-of-the-body": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Choose one physical ability score at casting. Strength or Dexterity: you gain a +5 bonus on skill checks associated with that ability score. Constitution: your maximum and current hit points increase by an amount equal to your Hit Dice. At any time during the duration you may expend the remaining duration as an immediate action for a one-time enhancement matching your choice, after which the spell ends — Constitution: regain hit points equal to 1d8 + your total character level. Dexterity: gain a +4 dodge bonus to Armor Class for 3 rounds. Strength: gain a +6 bonus on all Strength checks to break objects and on checks to escape or establish grapples for 1 minute."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Three mutually exclusive branches, each with a standing effect and a different discharge. Emitting them as separate specs would apply all three at once — the +5 skill bonus, the hit point increase, the 1d8 heal, the +4 dodge and the +6 Strength bonus together — so the whole choice tree stays in one narrative spec. Corpus duration is 'hours (24) or until discharged'; the discharge is the immediate action described."
+  },
+  "visualization-of-the-mind": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "untyped",
+     "target": "ability checks and skill checks associated with the mental ability score you chose",
+     "note": "Choose Charisma, Intelligence or Wisdom when you cast; the bonus applies to that score's checks only."
+    },
+    {
+     "type": "narrative",
+     "target": "At any time during the duration you may expend the remaining duration as an immediate action for a one-time enhancement matching your choice, ending the spell. Charisma: a +2 luck bonus on all d20 rolls for 1 minute. Intelligence: a number of ranks equal to your Hit Dice in any one skill in which you have no ranks, for 1 minute, treating it as a class skill for that time. Wisdom: when you fail a Will save you may immediately attempt that save again with a +4 bonus on the new roll."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Unlike visualization of the body, the standing +5 is the same whichever mental score you pick, so it is emitted as a real modifier; only the three mutually exclusive discharges stay narrative. The bonus is untyped in the prose. Corpus duration is 'hours (24) or until discharged'."
+  },
+  "vitriolic-mist": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As fire shield, except that yellow or green acidic mist wreathes you instead of hot or cold flames. It deals acid damage to creatures that attack you and protects you against acid damage. It sheds no light."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The damage is retributive — it strikes whoever strikes you, not a target you choose — so it is not emitted as a damage spec. fire shield's own numbers are not restated in this description and are not guessed. The corpus already derives element 'acid'."
+  },
+  "vocal-alteration": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You alter a humanoid target's voice to anything you choose — high-pitched, husky, nasal, or a different accent you are familiar with. The target can vary the disguised voice just as it could vary its own."
+    },
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "untyped",
+     "target": "disguise",
+     "note": "Only when the spell is used as part of a disguise, and only when trying to fool a listener."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Not wrapped in a save_gate: the Fortitude save is there for an unwilling target, and gating would make the spell fail to help the willing ally it is normally cast on. The +10 has no stated bonus type."
+  },
+  "voluminous-vocabulary": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target gains the ability to speak, understand, read and write one language you choose, excluding secret languages such as Druidic. When you cast the spell you may attempt a DC 15 Linguistics check; on a success choose an additional language, plus one more for every 10 by which the result exceeded the DC. Written material is read at one page (250 words) per minute. As with comprehend languages, this conveys only literal meaning, not insight, and does not allow reading magical writing or deciphering codes. A target without the mental capacity to grasp a language still gains enough to respond to and carry out even extremely complex commands, so instructions to nonsentient creatures must avoid metaphor and ambiguity."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 8,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Languages have no home in the effect vocabulary."
+  },
+  "vomit-swarm": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You vomit forth a spider swarm that attacks every other creature in its area. It begins adjacent to you; with no living creature in its area it moves in a direction of your choosing at its normal speed, continuing that way unless you spend a standard action concentrating to move or redirect it. At caster level 7th or higher you may vomit a wasp swarm instead, and at 13th or higher a swarm of army ants."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A conjured swarm; its damage is the swarm's, not the spell's. The caster level thresholds change which creature is summoned, not any number the engine rolls, so no scaling."
+  },
+  "vomit-twin": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You vomit an ooze copy of yourself into an adjacent square. Whenever you take a move action to move, the twin may move as well; it need not follow you and can take no other action. At the start of your turn on later rounds you may instantaneously exchange places with it as if by teleport — this is not an action and does not provoke attacks of opportunity. The twin has speed 30 feet, provokes attacks of opportunity from movement as normal, has AC equal to 10 + 1/2 your caster level and hit points equal to your caster level. Reduced to 0 hit points it is destroyed, though you may create a new one as a standard action while the duration lasts. You can never have more than one vomit twin at a time."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The AC and hit point formulas belong to the conjured twin, not to the caster, so they stay described rather than emitted as modifiers to your own sheet."
+  },
+  "vortex": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You create a powerful, immobile whirlpool in any body of liquid large enough to contain it."
+    },
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any Large or smaller creature that comes in contact with the whirlpool saves.",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "3d6",
+       "damage_type": "bludgeoning",
+       "lethality": "lethal"
+      }
+     ],
+     "on_success": []
+    },
+    {
+     "type": "narrative",
+     "target": "A Medium or smaller creature that fails that first save must succeed at a second or be pulled into the whirlpool and held suspended in its currents, taking 1d8 points of damage each round on your turn with no save allowed. You may direct the whirlpool to eject any creature it carries whenever you wish. A boat equal in length to the vortex's width or shorter that passes through takes 6d6 points of damage and is caught up by the current; if its captain succeeds at a DC 25 Profession (sailor) check, or the boat is longer than the vortex is wide, it takes half damage and is not caught."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Only the 3d6 on contact is emitted as damage — that is one hit on the creature that touched it, the same shape blade barrier and spike growth already use. The 1d8 repeats every round with no save and the 6d6 lands on a boat, so both stay narrative. The prose states no per-level progression, so no scaling."
+  },
+  "waft": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The targets become light enough to be carried by wind. Each takes cumulative penalties for attacking as if under levitate unless it has a fly speed, and is treated as two size categories lighter for being checked or blown away by wind. A target with a fly speed can fly overland at the wind's speed and in the wind's direction by succeeding at a DC 20 Fly check, but risks being blown away as usual if it tries to change direction. By linking hands or joining with rope, affected creatures can be towed through the air by a flying creature as if each weighed one-eighth its actual weight."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Not gated on the Will save: the spell is a mixed blessing cast on allies as often as enemies, and the corpus already records 'Will negates'. The levitate attack penalty is cumulative and not quantified here, so no combat_mod is emitted."
+  },
+  "wail-of-the-banshee": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Fortitude negates. You are never affected by your own wail; creatures closest to the point of origin are affected first.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature takes 10 points of damage per caster level. The spell affects up to one creature per caster level within the 40-foot-radius spread."
+      }
+     ]
+    }
+   ],
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the damage is flat 10 points per caster level with no die, and the scaling schema requires a `die` — scaling_dice() returns nothing without one, and there is no dieless per-level form. Emitting `dice: \"10\"` would deal 10 points at every caster level, wrong at every level above 1st, so the formula is stated in a narrative spec instead. Duration omitted: the corpus says instantaneous, which the shape supports, but the damage is the whole spell and needs no timing."
+  },
+  "wake-of-light": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You and your mount lay a trail of glowing heavenly mist behind you: a path 10 feet wide and up to 120 feet long, floating up to a foot above the ground, running from where you cast the spell to where your mount ends its movement, and persisting 1 round per level thereafter. Good creatures may walk along the top of the mist as if it were solid and treat difficult terrain containing it as normal terrain; evil creatures find it thick and cloying and treat normal terrain containing it as difficult terrain; neutral creatures are unaffected. It does not affect obstacles or impassable terrain, block sight or give concealment. Mounts use their rider's alignment unless they are celestial or fiendish. You must stay mounted — dismounting, being knocked off or otherwise separating from your mount ends the spell, though the mist remains for its normal duration. The wake cannot follow across water, underwater, or through the air."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Terrain modification has no home in the effect vocabulary; the effect is on squares, not on creatures' sheets."
+  },
+  "walk-the-plank": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As create pit, except that all but the top 10 feet of the hole is filled with saltwater. Fall damage for anyone falling in is reduced to 1d3 points of nonlethal damage, and Huge or larger creatures at the water's surface can pull themselves out as part of a normal move action with no Climb check. The pit holds one advanced shark per 4 caster levels, to a maximum of four; at casting you may substitute two of those sharks for one great white shark. The sharks immediately attack any creature that falls into the pit, including you, and attack randomly if several fall in. When the spell ends, creatures inside rise up with the bottom of the pit as normal for create pit, but the water and sharks vanish."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d3 nonlethal is fall damage taken by whoever later falls in, and the sharks' attacks are the sharks'; neither is emitted as the spell's damage. Corpus duration is 'rounds (1) + rounds/level (1)' — the shape cannot hold a fixed term plus a per-level term, so the per-level term is emitted and the extra round is recorded here."
+  },
+  "walk-through-space": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Teleport up to 30 feet as a move action, ending in an unoccupied space you can stand on within line of sight; or spend a move action to teleport from lying prone to standing. This teleporting does not provoke attacks of opportunity."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A repeatable teleport permission rather than a one-shot movement, so it is a permission spec held for the duration."
+  },
+  "wall-of-blindness-deafness": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A translucent wall of energy showing indistinct faces with their eyes or ears sewn shut. Decide when you create it whether it blinds or deafens. It must be vertical and either rectangular or a ring, need not touch the ground, and must be continuous and unbroken when formed; if its surface is broken by any object or creature as it is cast, the spell fails."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any creature that passes through the wall saves.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature is permanently blinded or permanently deafened — whichever you chose when you created the wall — as blindness/deafness."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Blinded and deafened are mutually exclusive here, chosen at creation, so emitting both apply_condition specs would inflict both at once; the choice stays in a narrative spec inside the gate. Corpus duration is 'concentration + rounds/level (1)' — the duration shape cannot hold a concentration term plus a per-level term, so the per-level term is emitted."
+  },
+  "wall-of-bone": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A vertical wall of skeletal arms attached to a solid surface, working as wall of stone except as noted. It is 1 inch thick per 4 caster levels, up to one 5-foot square per level, must be vertical and rest on a firm foundation, and cannot bridge a chasm or act as a ramp. Each 5-foot square has hardness 4 and 7 hit points per inch of thickness; a section reduced to 0 hit points is breached, and breaking through with a single attack is a Strength check against DC 15 + 2 per inch of thickness. The skeletal hands attempt a combat maneuver check to grapple each adjacent creature, without provoking attacks of opportunity, at the start of your turn, when the wall is summoned, and when an enemy first moves adjacent. Their CMB equals your caster level and they grapple a Huge or smaller creature without penalty; their CMD for escaping is 10 + that CMB. A foe the wall grapples takes 1d6 points of damage and gains the grappled condition, and takes another 1d6 each round the wall succeeds at a further grapple check. Grappled opponents cannot move until they break the grapple. The wall cannot move or pin foes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 comes from the wall's own grapple check and repeats each round it succeeds — a granted attack that repeats, on both counts not the spell's own damage, so it is not emitted as a damage spec."
+  },
+  "wall-of-brine": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A 5-foot-thick wall of seawater with a powerful current flowing toward one side that you select. Swimming against the current costs 4 squares of movement to enter a square of the wall, and a creature that begins its turn in the wall is ejected in the current's direction just before it acts. The wall gives cover against attacks from out of the water as a body of water usually does, and the water and currents deflect physical ranged attacks into or through it unless the weapon is exceptionally massive, such as a siege engine. A creature submerged in the wall takes the usual penalties for underwater combat. The wall blocks gases and liquids and stops water mixing at its edges."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No damage and no save. Corpus duration is 'concentration + rounds/level (1)'; only the per-level term is representable."
+  },
+  "wall-of-clockwork": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An immobile vertical wall of spinning cogs and gears, always a flat plane though you may shape its edges to the available space, which cannot be conjured into the space of a creature or object. It gives cover (+4 to AC, +2 on Reflex saves) against attacks made through it. It is 1 inch thick per 4 caster levels, and you may double its area by halving its thickness. Each 5-foot square has hardness 9 and 30 hit points per inch of thickness; a section at 0 hit points is breached, and breaking through with one attack is a Strength check against DC 25 + 2 per inch of thickness. An attacker who rolls a natural 20 — only a natural 20, whatever the weapon's threat range — and confirms the critical gives that section the broken condition, or destroys it if it was already broken. The bronze this spell creates cannot be used to make other objects, even briefly, and cannot be sold."
+    },
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any creature passing through the wall; a successful save halves the damage.",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "1d6",
+       "damage_type": "piercing",
+       "lethality": "lethal",
+       "scales": "full",
+       "note": "The prose says piercing and slashing damage; the damage_type vocabulary holds one type, so piercing is recorded and the slashing half is noted here."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "damage",
+       "dice": "1d6",
+       "damage_type": "piercing",
+       "lethality": "lethal",
+       "scales": "half",
+       "note": "half on a successful save"
+      }
+     ]
+    }
+   ],
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "dice_per": 1,
+    "per_levels": 2,
+    "cap_dice": 10,
+    "damage_type": "piercing"
+   },
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the damage is 'piercing and slashing' — two types at once, which damage_type cannot express. Recorded as piercing rather than untyped, because untyped would silently ignore damage reduction that the real damage is subject to. The 1d6 per 2 caster levels, maximum 10d6, is a stated progression and goes in scaling."
+  },
+  "wall-of-ectoplasm": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A massive veil of ectoplasm roiling with restless spirits, immovable once formed, 1 inch thick per caster level and covering up to one 10-foot square per caster level in any combination of length and height. It may be oriented any way and need not be anchored, but must be created continuous and unbroken, and cannot include squares holding creatures, even creatures on the Ethereal Plane. It exists on both the Material and Ethereal Planes and blocks ethereal and incorporeal creatures. Each 10-foot square has 2 hit points per inch of thickness; a section at 0 hit points is breached, but the remaining ectoplasm immediately fills the hole, shrinking the wall by one 10-foot square while staying contiguous. It can instead take the form of a sphere or hemisphere with a maximum radius of 1 foot per caster level, equally hard to break."
+    },
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "One side of the wall that you select radiates a mind-affecting fear aura 10 feet from its surface. Creatures in range when the wall is created, or that later approach within 10 feet, must save.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature becomes shaken — or panicked instead if it has 4 Hit Dice or fewer — for 1 round per your caster level."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Shaken and panicked are chosen by the victim's Hit Dice, so an apply_condition spec would inflict the wrong one on low-Hit-Dice creatures; the branch stays narrative. The fear effect's own duration (1 round/caster level) differs from the wall's (1 minute/level), and only the wall's is emitted as the spell duration."
+  },
+  "wall-of-fire": {
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "2d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "Taken by any creature passing through the wall, and by any creature the wall is evoked on top of. Double against undead."
+    },
+    {
+     "type": "narrative",
+     "target": "One side of the wall, selected by you, sends forth waves of heat dealing 2d4 points of fire damage to creatures within 10 feet and 1d4 points of fire damage to those past 10 feet but within 20 feet. It deals this heat damage when it appears and again to every creature in the area on your turn each round. All of this spell's damage is doubled against undead. If any 5-foot length of wall takes 20 or more points of cold damage in 1 round that length goes away, and cold damage is not halved as it normally is against objects. Wall of fire can be made permanent with permanency; a permanent wall extinguished by cold goes inactive for 10 minutes, then reforms at full strength."
+    }
+   ],
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 2,
+    "bonus_per_level": 1,
+    "bonus_cap": 20,
+    "damage_type": "fire"
+   },
+   "converted_by": "read",
+   "notes": "The pass-through damage (2d6 + 1 per caster level, maximum +20) is emitted because the prose states outright that creatures the wall is evoked on top of take it as if passing through — so it does land at resolution, on the creature at the wall, with no save. The 2d4/1d4 heat repeats every round on your turn, which the vocabulary has no type for, so it stays narrative. Corpus duration is 'concentration + rounds/level (1)'; the shape cannot hold both terms and the concentration prefix is the load-bearing half of a wall you sustain, so duration is omitted rather than emitted as half a truth. The corpus already derives element 'fire'."
+  },
+  "wall-of-force": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An invisible, immobile wall of pure force, formed as a flat vertical plane of up to one 10-foot square per level, continuous and unbroken when formed — if its surface is broken by any object or creature the spell fails. It has hardness 30 and 20 hit points per caster level. It is immune to dispel magic though a mage's disjunction dispels it, is automatically destroyed by disintegrate or by contact with a sphere of annihilation or rod of cancellation, and can otherwise be damaged by spells, weapons and supernatural abilities. Breath weapons and spells cannot pass through it in either direction, though dimension door, teleport and similar effects bypass it and gaze attacks operate through it. It blocks ethereal creatures as well as material ones, though ethereal creatures can usually go around it through material floors and ceilings. It can be made permanent with permanency."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A barrier with no effect on any creature's sheet; the vocabulary has no type for created structures. The corpus already derives element 'force'."
+  },
+  "wall-of-light": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An immobile, blinding curtain of white light that blocks line of sight and sheds bright light 60 feet in all directions. It can be made permanent with permanency, at a minimum caster level of 13th and a cost of 11,000 gp."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "A creature adjacent to the wall may close its eyes or succeed at this save to negate the blindness for 1 round. A creature that passes through the wall is automatically blinded even with its eyes closed, with no save.",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "blinded",
+       "note": "Lasts as long as the creature remains adjacent to the wall, plus 1d4 rounds after it leaves."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "A creature from the Plane of Shadow gains 1d4 negative levels for each round it spends within 5 feet of the wall (Fortitude negates), and passing through the wall imposes a -4 penalty on that save for that round. Twenty-four hours after gaining them the subject attempts a new Fortitude save for each negative level; each success removes one, and each failure makes that negative level permanent."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: negative levels (energy drain) have no effect type — ability_drain only takes an ability score — so the Plane of Shadow clause is narrative. It also only affects one narrow kind of creature, so it would be wrong to apply it from a gate that every creature rolls."
+  },
+  "wall-of-mist": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A stationary vertical wall of misty vapour, straight, 1 foot thick and up to 10 feet long per caster level. It obscures vision, granting concealment (20% miss chance) against creatures on the other side; a creature sharing a square with the wall counts as on neither side and neither gains nor suffers from that concealment. You may instead create a denser wall, halving its maximum length to 5 feet per caster level: the denser wall also hinders movement, and any creature moving into or trying to pass through it must succeed at a DC 15 Strength check or be entangled and unable to move until the start of its next turn. A creature that starts its turn in the wall can move freely within it or out of either side. Only a severe or stronger wind (31+ mph) disperses the wall, and takes 1 round to do it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The entangling is gated on a Strength check made when a creature later enters the wall, not on a save at casting, so it is not emitted as an apply_condition. Miss-chance concealment has no effect type."
+  },
+  "wall-of-nausea": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A transparent shimmering wall that makes creatures and objects seen through it appear wildly distorted, granting partial concealment (20% miss chance) against creatures on the other side. It must be vertical and rectangular, need not touch the ground, and must be continuous and unbroken when formed; if its surface is broken by any object or creature when it is cast, the spell fails."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any creature that passes through the wall is assailed by overwhelming vertigo and saves.",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "nauseated",
+       "duration": {
+        "kind": "fixed",
+        "amount": 1,
+        "unit": "round"
+       }
+      },
+      {
+       "type": "narrative",
+       "target": "A creature nauseated this way must also succeed at a DC 12 Acrobatics check or fall prone."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The corpus save field reads 'see text'; the text names Fortitude plainly, so the gate uses it. The prone is a second, conditional check after the nausea lands, so it is not emitted as a second apply_condition."
+  },
+  "wall-of-split-illumination": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An immobile curtain of illumination. One side, designated by you, radiates bright light 60 feet from that side while the other radiates darkness an equal distance, altering the illumination level by up to two steps toward bright light on the light side or toward darkness on the dark side. The wall obstructs vision through it from either side."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Illumination levels have no effect type and the wall touches no creature's sheet."
+  },
+  "wall-of-stone": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates a wall of rock that merges into adjoining rock surfaces, 1 inch thick per four caster levels and up to one 5-foot square per level; you may double its area by halving its thickness. It cannot occupy the space of a creature or object. It may take almost any shape and need not be vertical or rest on a firm foundation, but must merge with and be solidly supported by existing stone, so it can bridge a chasm or serve as a ramp — a span of more than 20 feet must be arched and buttressed, halving the area, and crenellations or battlements cost area likewise. Each 5-foot square has hardness 8 and 15 hit points per inch of thickness; a section at 0 hit points is breached, and breaking through with a single attack is a Strength check against DC 20 + 2 per inch of thickness. It can be destroyed by disintegrate or by ordinary breaking and chipping. Mobile opponents can be trapped within or under the wall if it is shaped to hold them, but they avoid entrapment with a successful Reflex save."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A created structure; the Reflex save avoids entrapment rather than an effect the vocabulary can name, so no save_gate is emitted."
+  },
+  "wall-of-suppression": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A wall of glittering motes with no substance that does not obstruct movement but suppresses magic. Any magic item, spell or magical effect of your caster level or lower that passes through it is suppressed for 1 round per level; durations continue to expire while suppressed, and an effect that outlasts the suppression resumes normally. It affects spells, spell-like abilities, magic items and anything stemming from them. It does not suppress a creature's ability to cast spells or use spell-like or limited-use abilities, but a creature with constant or always-active magical abilities that passes through has those suppressed for the normal duration. The wall blocks line of effect, so no spell or effect can pass through it, but it does not block line of sight. Magic items and spell effects of higher caster level than yours are unaffected, as are artifacts, anything stemming from the direct action of a deity, and similarly powerful magic."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "suppress_condition covers conditions only, not spells and magic items, so suppression of magic has no effect type."
+  },
+  "wall-of-thorns": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A barrier of tough, pliable, tangled brush bearing finger-length thorns. Any creature forced into the wall or trying to move through it takes piercing damage per round of movement equal to 25 minus the creature's AC, ignoring Dexterity and dodge bonuses to AC — a creature whose AC is 25 or higher without those bonuses takes no damage from contact. Any creature within the area when the wall is cast takes that damage as if it had moved into the wall and is caught inside. A creature can force its way through slowly with a Strength check as a full-round action, moving 5 feet for every 5 points by which the check exceeds 20, up to its normal land speed, taking the damage as it goes; a creature trapped in the thorns can stay motionless to take no further damage. You may make the wall as thin as 5 feet, shaping it as a number of 10-by-10-by-5-foot blocks equal to twice your caster level — this does not change the damage but shortens the time to force through. Creatures able to pass through overgrown areas unhindered cross at normal speed without damage. Edged weapons cut a safe passage 1 foot deep per 10 minutes of work. Normal fire cannot harm the barrier; magical fire burns it away in 10 minutes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the damage is '25 minus the creature's AC', computed from the victim's own defences rather than rolled, and the dice field has no way to say that. It also repeats per round of movement. Both reasons keep it narrative."
+  },
+  "wandering-star-motes": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Sparkling motes of bright light swirl around the target in a complex pattern, clearly outlining it and radiating light as a sunrod, which negates any concealment the target has. The spell affects only enemies; your allies are never affected."
+    },
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "dazed",
+       "duration": {
+        "kind": "fixed",
+        "amount": 1,
+        "unit": "round"
+       }
+      },
+      {
+       "type": "narrative",
+       "target": "The target must save again on its next turn or be dazed for another round, and keeps saving each round while the motes stay on it."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "narrative",
+       "target": "The motes jump to the nearest enemy within 30 feet, who then saves each round or is dazed in turn. A creature that has once saved against the motes can never be affected by them again, and if no new target is within 30 feet of a creature that saves, the spell immediately ends."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The first Will save happens when the spell is cast, so the gate is correct here; the repeated saves and the jump to a new victim are described rather than emitted, since nothing in the vocabulary re-targets a spell."
+  },
+  "wandering-trail": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The trail left by the targets automatically reroutes, taking any course you choose within the area, and can be made at least half or up to twice its original length. A trail continuing beyond the spell's range must be left connected at that point on the edge of the range. A tracker who beats the DC of the check to follow the trail by an amount equal to your caster level recognises that the trail has been manipulated by magic, but cannot see its true course without magical means such as true seeing."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Alters tracks in the world rather than any creature; nothing in the vocabulary addresses it."
+  },
+  "wandering-weather": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions as control weather, except that you may choose to have the weather remain centred on you as you move."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the corpus duration is 'hours (4d12) (see text)' — a rolled duration. The duration shape takes an integer amount, so 4d12 hours cannot be written; duration is omitted rather than guessed at a fixed number."
+  },
+  "ward-of-the-season": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Choose one of four effects at casting; you may change which one as a standard action that reduces the total remaining duration by 1 hour. Spring: light vines and a crown of flowers — the target is immune to bleed effects and regains 1 hit point per round whenever it is below 0 hit points and still alive, which stabilizes it, each hit point restored costing 1 hour of the spell's remaining duration. Summer: motes of light — the target's base speed increases by 10 feet, or it may instead increase its base speed by 30 feet for 1 round at a cost of 1 hour of remaining duration. Fall: a cloak of autumn leaves — the target gains a +2 morale bonus on Fortitude saves, and may roll twice and take the higher result on any save against disease or poison at a cost of 1 hour of remaining duration. Winter: snow and crisp air — the target automatically succeeds at Acrobatics checks to avoid falling while moving across slick or narrow surfaces, and may move freely through difficult terrain for 1 round at a cost of 1 hour of remaining duration, though magically created difficult terrain still affects it normally."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Four mutually exclusive seasons, switchable mid-spell. Emitting them as specs would give the target bleed immunity, +10 speed and a +2 morale bonus on Fortitude saves simultaneously, so the whole choice stays in one narrative spec."
+  },
+  "ward-shield": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The shield grants its wielder spell resistance 10 + your caster level against spells, so long as the shield can be interposed between the wielder and the spell effect. It gives no spell resistance against area spells such as fireball."
+    },
+    {
+     "type": "save_mod",
+     "amount": 5,
+     "bonus_type": "untyped",
+     "target": "ref",
+     "note": "Against area effect spells, which the shield's spell resistance does not stop."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: there is no effect type that grants spell resistance to a creature — combat_mod's 'spell_resistance' target is the caster's check to overcome someone else's SR, the opposite direction — so SR 10 + caster level is narrative. The +5 on Reflex saves has no stated bonus type."
+  },
+  "ward-the-faithful": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "ac",
+     "note": "Only for creatures in the emanation who worship the same god, or share the faith, as you. Increases to +3 at caster level 12th and +4 at 18th."
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "fort",
+     "note": "Increases to +3 at caster level 12th and +4 at 18th."
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "ref",
+     "note": "Increases to +3 at caster level 12th and +4 at 18th."
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "will",
+     "note": "Increases to +3 at caster level 12th and +4 at 18th."
+    },
+    {
+     "type": "narrative",
+     "target": "If you worship no specific deity the bonuses apply to those who share your faith, and if you have no specific faith or religion the spell benefits only you. Enemies who worship your god or share your faith gain the benefits too, however heretical you consider them."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the bonus grows from +2 to +3 at 12th level and +4 at 18th, and `scaling` only describes damage and healing dice — there is no way to scale a modifier by caster level. The base +2 is emitted, correct up to 11th level, with the progression recorded on every spec's note."
+  },
+  "warding-weapon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The focus weapon flies above your head and takes a defensive position within your space, lunging at opponents as if martially trained, parrying and turning back melee attacks aimed at you. It never strikes back and deals no damage; it defends only."
+    },
+    {
+     "type": "permission",
+     "target": "Cast spells without provoking attacks of opportunity and without needing to cast defensively. A creature with the Disruptive feat bypasses this: you provoke attacks of opportunity for casting against such creatures even while warded, though you may still choose to cast defensively."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose says outright that the weapon does not strike back and deals no damage, so there is nothing here to convert as damage."
+  },
+  "warp-metal": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Metal bends and warps, permanently destroying its straightness, form and strength. A warped door springs open, or becomes stuck and needs a successful Strength check to open, at your option; a vehicle grinds to a halt and stops working; warped ranged weapons are useless; a warped melee weapon imposes a -4 penalty on attack rolls. You warp one Small or smaller object per caster level, a Medium object counting as two Small, a Large as four, a Huge as eight, a Gargantuan as 16 and a Colossal as 32. You may instead unwarp metal, warping it back to normal; make whole does nothing to repair a warped item. Consecutive castings can be combined to warp or unwarp an object too large for one casting, and the object suffers no ill effects until it is completely warped."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -4 is a property of the ruined weapon, carried by whoever later wields it, not a modifier this spell places on a creature, so it is not emitted as a combat_mod."
+  },
+  "warp-wood": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Wood bends and warps, permanently destroying its straightness, form and strength. A warped door springs open, or becomes stuck and needs a Strength check to open, at your option; a boat or ship springs a leak; warped ranged weapons are useless; a warped melee weapon causes a -4 penalty on attack rolls. You warp one Small or smaller object per caster level, a Medium object counting as two Small, a Large as four, a Huge as eight, a Gargantuan as 16 and a Colossal as 32. You may instead unwarp wood, warping it back to normal; make whole does no good in repairing a warped item. Consecutive castings can be combined to warp or unwarp an object too large for one spell, and the object suffers no ill effects until it is completely warped."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Same as warp metal: the -4 belongs to the ruined weapon, not to a creature this spell targets."
+  },
+  "wartrain-mount": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target animal gains the combat training general purpose from the Handle Animal skill. This supersedes the animal's previous trained purpose and every trick it knows; when the spell ends it reverts to its previous purpose and tricks."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Animal training has no effect type."
+  },
+  "watchful-animal": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You place a scrying sensor on your animal companion or familiar, letting it function as an insect summoned by greater insect spy. It does not change shape and does not lose the ability to make its own decisions, but it receives orders and gives answers as those insects do, and you can sense its direction and distance and receive sensory input from it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Scrying has no home in the effect vocabulary."
+  },
+  "watchful-eye": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions as shield other, except that you must maintain line of effect to the target."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "shield other's damage transfer and its +1 AC and saves are not restated in this description, so no numbers are emitted."
+  },
+  "water-breathing": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Breathe water freely. The spell does not make you unable to breathe air."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 2,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The duration is divided evenly among all the creatures touched, which the duration shape cannot express; the per-creature share is the emitted duration divided by the number touched."
+  },
+  "water-shield": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A spout of rushing water surrounds you, deflecting attacks. You take half damage from acid and fire-based attacks, and if such an attack allows a Reflex save for half damage you take none at all on a success. Any creature that strikes you with its body or a handheld weapon deals normal damage but immediately takes 1d6 points of acid damage + 1 point per 2 caster levels (maximum +10); the attacker's spell resistance applies to this. Creatures wielding weapons with exceptional reach are not subject to it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 + 1 per 2 levels is retributive — it lands on whoever attacks you, not on a target you choose — so it is not emitted as damage. This is the thorn body defect exactly. The acid and fire protection is 'half damage', not a flat point value, and the resistance type takes an integer amount, so it cannot be emitted either."
+  },
+  "water-walk": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Tread on any liquid as if it were firm ground — mud, oil, snow, quicksand, running water, ice, even lava — walking, running, charging or otherwise moving across the surface as if it were normal ground, with your feet hovering an inch or two above it. Crossing molten lava still means taking damage from the heat of being near it."
+    },
+    {
+     "type": "narrative",
+     "target": "If the spell is cast underwater, or while the subjects are partly or wholly submerged, they are borne toward the surface at 60 feet per round until they can stand on it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The heat damage near lava is environmental and unquantified here, so nothing is emitted for it."
+  },
+  "water-walk-communal": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Tread on any liquid as if it were firm ground, as water walk."
+    },
+    {
+     "type": "narrative",
+     "target": "You divide the duration in 10-minute intervals among the creatures touched."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The emitted duration is the whole pool; each creature's share is whatever part of it you allot in 10-minute intervals, which the duration shape cannot express."
+  },
+  "waterproof": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The touched object, no larger than 10 pounds per caster level, becomes waterproof, protected from any mundane liquid such as alcohol or oil but not from magically created liquids. Cast on a creature, it waterproofs all of that creature's equipment for as long as the creature carries it; an item dropped or discarded loses the protection permanently, even if the target picks it up again. Mundane combustibles still need exposure to air to ignite."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Protection from mundane liquid is not damage resistance and has no effect type."
+  },
+  "waters-of-lamashtu": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates roughly 2 ounces of what appears to be clear pure water but is a foul secretion that functions in every way as unholy water. That is one dose, or one use as a thrown weapon if bottled. It can be stored indefinitely but cannot be created inside a creature. Extensive exposure — drinking nothing else for months — can bring on monstrous deformities or even total transformation into a beast at the GM's discretion, and these mutations are rarely if ever beneficial."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any creature anointed with or drinking the fluid saves. A creature that drinks it takes a -4 penalty on the save.",
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "int",
+       "dice": "1d6",
+       "note": "The water wreaks havoc on the victim's mind. Intelligence cannot drop below 1 from this effect."
+      },
+      {
+       "type": "ability_damage",
+       "target": "dex",
+       "dice": "1d6",
+       "note": "The water twists and deforms the victim's body. Dexterity cannot drop below 1 from this effect."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "note": "The creature becomes violently ill and vomits up the fluid; sickened for 1d4 rounds. The duration is rolled, which the duration shape cannot hold."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The ability damage lands on the creature exposed to the fluid, which the spell's own 'Fortitude partial' entry treats as the subject, so it is emitted. Note that in play the exposure can come later, when the stored dose is drunk or thrown."
+  },
+  "wave-shield": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A rushing torrent of water in the rough outline of a shield protects you from one physical or fire attack, granting you DR/- and fire resistance each equal to half your caster level (minimum 1) against that single attack. Once the spell has reduced the damage of one attack against you, it is discharged."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: damage_reduction and resistance both take an integer amount, and this spell's amount is 'half your caster level (minimum 1)' — a formula. Emitting any fixed number would be wrong at every level but one, so both stay narrative. Corpus duration is 'rounds (1) or until discharged'."
+  },
+  "waves-of-blood": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Torrents of roiling blood attempt a bull rush against every creature in the cone, regardless of size. Make a single combat maneuver check and apply the result to each creature; your CMB for it equals your caster level plus your Intelligence, Wisdom or Charisma modifier, whichever is highest. This bull rush does not provoke attacks of opportunity."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Every creature in the area saves against the tide of blood.",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "note": "For 1d6 rounds. The duration is rolled, which the duration shape cannot hold."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "The area covered by the cone stays slick for 1 round, so any creature trying to move within it must succeed at a DC 10 Acrobatics check as if moving on uneven ground. A creature that falls prone from failing that check must succeed at a Fortitude save or be sickened until it stands back up."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'instantaneous and rounds (1) (see text)'; the 1 round is the slick ground left behind, and that is what the emitted duration times. The second Fortitude save happens only if a creature later falls prone, so it is described rather than gated."
+  },
+  "waves-of-ecstasy": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Will partial; every creature in the 30-foot cone.",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "stunned",
+       "duration": {
+        "kind": "fixed",
+        "amount": 1,
+        "unit": "round"
+       }
+      },
+      {
+       "type": "apply_condition",
+       "target": "staggered",
+       "note": "For the remainder of the spell's duration, after the first round of being stunned."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "apply_condition",
+       "target": "staggered",
+       "duration": {
+        "kind": "fixed",
+        "amount": 1,
+        "unit": "round"
+       },
+       "note": "Staggered for the first round only; the creature can act normally thereafter."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A genuine partial save: failure is stunned then staggered, success is staggered for one round only, and both branches are emitted."
+  },
+  "waves-of-exhaustion": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "exhausted",
+     "note": "All living creatures in the 60-foot cone; no saving throw is allowed. The spell has no effect on a creature that is already exhausted."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No save and no scaling — the prose is one sentence and it is entirely executable."
+  },
+  "waves-of-fatigue": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "fatigued",
+     "note": "All living creatures in the 30-foot cone; no saving throw is allowed. The spell has no effect on a creature that is already fatigued."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "One sentence of prose, entirely executable."
+  },
+  "weaken-powder": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "Taken by whoever fires the altered ammunition from the target firearm."
+    },
+    {
+     "type": "narrative",
+     "target": "The target firearm's range increment is halved while it fires the altered ammunition. A user who is aware of the spell's effect before firing — a DC 16 Spellcraft check to identify the spell as it is cast, or a similar effect — can spend a standard action to clear the altered ammunition from the firearm, destroying that ammunition."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -2 is emitted as a real modifier because this spell is about one firearm and the creature firing it, unlike warp metal where the weapon penalty is one item on a list of ways an arbitrary object can be ruined. The halved range increment is a multiplier, not an additive modifier, so it has no spec. The penalty has no stated bonus type."
+  },
+  "weapon-of-awe": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "damage",
+     "note": "On damage rolls with the transformed weapon. A ranged weapon applies this to its ammunition."
+    },
+    {
+     "type": "narrative",
+     "target": "If the weapon scores a critical hit, the target of that critical hit becomes shaken for 1 round with no saving throw. This is a mind-affecting fear effect. You cannot cast this spell on a natural weapon, but you can cast it on an unarmed strike."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The shaken is deliberately not an apply_condition: the spell's target is the weapon, so an apply_condition would shake the wielder at cast time, when in fact it lands on whoever is later struck by a critical hit."
+  },
+  "weapons-against-evil": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Each affected weapon shines with pale light that dimly illuminates a 5-foot square, and ignores the damage reduction of evil creatures whose DR is 5 or lower, so long as that damage reduction is not DR/epic."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Ignoring someone else's damage reduction is the opposite direction from the damage_reduction type, which grants DR; there is no spec for bypassing it."
+  },
+  "weaponwand": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Part of the weapon opens like a partly peeled apple, revealing a space for a single wand, which you may insert as part of casting; the weapon then closes around it with no harm to its integrity. For the duration, whoever wields the weapon counts as wielding the wand as well, and can attack normally with the weapon or use it as if it were the encased wand. If the wand's effect requires an attack roll, you may make that roll as an attack with the weapon at its highest bonus, including any bonuses the weapon would normally receive — this does not add the weapon's damage to the wand's effect, it only lends your skill with the weapon to the chance of hitting. When the duration ends the wand is ejected; you may catch it as a free action if you have a hand free, otherwise it drops to the ground. If the weapon housing the wand is broken or destroyed during the duration, the wand is broken or destroyed with it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Item combination has no effect type."
+  },
+  "web-bolt": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "The spell has no effect at all if the target is not on or adjacent to a solid surface that can support the webbing.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target is affected as if by a web spell occupying only its own space."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "narrative",
+       "target": "The remaining webs dissolve and the square does not count as difficult terrain. The same happens once a caught creature breaks free."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose defers entirely to web for what being caught means and never restates it, so nothing is emitted for the entangling itself."
+  },
+  "web-cloud": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A cloud of flame-resistant adhesive webbing billows and flows much as cloudkill does, moving away from you at 10 feet per round and rolling along the ground; each round work out its new spread from a point of origin 10 feet farther from where you cast it. Being heavier than air it sinks to the lowest ground, even pouring down dens and sinkholes, cannot penetrate liquids and cannot be cast underwater. A creature in the cloud at the start of its turn must save against it or be affected; it otherwise acts as a web spell. Creatures trapped in the webbing stay trapped after the cloud passes, but the area it leaves behind does not count as difficult terrain. The webbing is flammable as web is, but has fire resistance 5."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Reflex save happens at the start of each creature's turn inside a cloud that moves on its own, not at casting, so no save_gate is emitted. The fire resistance 5 belongs to the webbing, not to a creature, so it is not a resistance spec."
+  },
+  "web-shelter": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You create a shelter of slightly sticky webbing with a hinged door large enough for a Medium creature. Its opaque walls are 1 inch thick and give total cover to anyone inside. Only Fine creatures with negligible Strength, including swarms, can be caught in the webbing; every other creature pulls free without a Strength check and without spending an action. The webbing holds twigs, leaves, dirt and other light items, so the shelter can be concealed, and it is watertight and insulated with the door closed. Its surface has hardness 0 and 2 hit points per 5-foot square of web surface, takes normal damage from fire and burns as easily as wood. When the spell ends the webbing decays rapidly and disappears."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A created structure; the total cover it gives is a property of the shelter rather than a modifier on a creature."
+  },
+  "what-grows-within": {
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 3,
+     "bonus_type": "profane",
+     "target": "will"
+    },
+    {
+     "type": "narrative",
+     "target": "While the spell lasts your mind-affecting spells carry a supernatural taint. Whenever you successfully affect a creature with one of them — the target failing its save, or the spell allowing none — that target must also succeed at a Fortitude save against what grows within or be afflicted by a lesser seeded infestation. Lesser seeded infestation: save Fortitude at this spell's save DC; onset immediate; frequency 1/day; effect 1d4 Constitution drain; cure none, curable by magic alone. A creature whose Constitution is reduced to 0 by it dies and rises 1d4 rounds later as a seeded creature. Each creature so afflicted reduces this spell's remaining duration by 1 round, and if you affect several in a round you choose the order in which they save. The infestation does not expose its victim to Xhamen-Dor's infectious dreams. Preparing this spell for the first time, or first using it from a spell-completion or spell-trigger item, makes you a possible target of Xhamen-Dor's infected dreams ability thereafter."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The +3 profane on Will saves is the only thing that happens to you at casting and is emitted. The 1d4 Constitution drain lands on a third party — a creature your later mind-affecting spells affect — and recurs daily, so it is not an ability_drain spec."
+  },
+  "whip-of-spiders": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Wield a whip of hundreds of Diminutive spiders sized for you, attacking with it as a whip except that you make a melee touch attack instead of a regular attack. Any creature you strike takes swarm damage as if attacked by a spider swarm — 1d6 points of damage plus poison and distraction. The swarm whip can damage creatures with armour or natural armour where a normal whip could not, but cannot make bull rush, grapple or trip attacks, and unlike a swarm it is subject to miss chances for concealment and cover."
+    },
+    {
+     "type": "narrative",
+     "target": "The whip is immune to all weapon damage, is never staggered or reduced to a dying state by damage, and is immune to any spell or effect that targets a specific number of creatures, including single-target spells such as disintegrate. It takes half again as much damage from area spells and effects, but counts as part of your gear, so it takes damage only when you fail a saving throw on a natural 1 or when an opponent specifically targets it. It has none of a swarm's vulnerability to high winds. As a standard action you can transform the whip into a spider swarm, all of whose squares must be within 15 feet of you, after which it functions as summon swarm; that swarm has 3 hit points and lasts 2 rounds or until this spell ends, whichever comes first."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 is dealt by an attack the spell grants, on a later melee touch attack, so it is not emitted as damage — the brief's exclusion for granted natural attacks covers it exactly. The 3 hit points belong to the summoned swarm."
+  },
+  "whip-of-ants": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Wield a whip of army ants, as whip of spiders, attacking with a melee touch attack. Any creature you strike takes swarm damage as if attacked by an army ant swarm — 3d6 points of damage plus poison and distraction."
+    },
+    {
+     "type": "narrative",
+     "target": "As whip of spiders in all other respects, except that transforming the whip into an army ant swarm gives that swarm 16 hit points."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 3d6 is the army ant swarm's damage, dealt by an attack the spell grants on a later touch attack, so it is not a damage spec."
+  },
+  "whip-of-centipedes": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Wield a whip of centipedes, as whip of spiders, attacking with a melee touch attack. Any creature you strike takes swarm damage as if attacked by a centipede swarm — 2d6 points of damage plus poison and distraction."
+    },
+    {
+     "type": "narrative",
+     "target": "As whip of spiders in all other respects, except that transforming the whip into a centipede swarm gives that swarm 10 hit points."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 2d6 is the centipede swarm's damage, dealt by an attack the spell grants on a later touch attack, so it is not a damage spec."
+  },
+  "whirlwind": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A powerful cyclone of raging wind moves through the air, along the ground or over water at 60 feet per round. You may concentrate on its every movement or give it a simple program; directing it or changing that program is a standard action, and it always moves during your turn. If it leaves the spell's range it moves randomly and uncontrolled for 1d3 rounds and then dissipates, and you cannot regain control of it even if it returns within range."
+    },
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Any Large or smaller creature that comes in contact with the cyclone saves.",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "3d6",
+       "damage_type": "untyped",
+       "lethality": "lethal",
+       "note": "The prose states no damage type for this."
+      }
+     ],
+     "on_success": []
+    },
+    {
+     "type": "narrative",
+     "target": "A Medium or smaller creature that fails that first save must succeed at a second or be picked up bodily and held suspended in the winds, taking 1d8 points of damage each round on your turn with no save allowed. You may direct the cyclone to eject any creature it carries whenever you wish, dropping it wherever the cyclone happens to be."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Same shape as vortex: the 3d6 on contact is one hit on the creature that touched it and is emitted; the 1d8 repeats every round with no save and stays narrative. Unlike vortex the prose names no damage type, so untyped is recorded rather than borrowing vortex's bludgeoning."
+  },
+  "whispering-lore": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "insight",
+     "target": "Knowledge checks of the single type appropriate to the terrain you are currently in"
+    },
+    {
+     "type": "narrative",
+     "target": "Cold, desert, forest, jungle, mountain, plains, swamp and water environments give the bonus on Knowledge (nature); underground gives it on Knowledge (dungeoneering); urban gives it on Knowledge (local); any plane other than the Material Plane gives it on Knowledge (planes). Entering new terrain loses the old bonus and gains the new one."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Emitted as a situational_mod rather than four skill_mod specs: which Knowledge skill it applies to changes with the terrain and changes again as you walk, so four skill_mods would grant all four bonuses at once."
+  },
+  "whispering-wind": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You send a message or sound on the wind to a specific location within range that is familiar to you, provided the wind can find a way there. It travels as gently and unnoticed as a zephyr, then delivers its whisper-quiet message or sound whether or not anyone is present to hear it, and dissipates. You may give it a message of no more than 25 words, have it deliver other sounds for 1 round, or have it seem merely a faint stirring of the air, and you may set its speed anywhere from 1 mile per hour to 1 mile per 10 minutes. On reaching its objective it swirls and remains in place until the message is delivered. As with magic mouth, it cannot speak verbal components, use command words or activate magical effects."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Message delivery has no effect type. Corpus duration is 'hours/level (1) or until discharged'; delivering the message is the discharge."
+  },
+  "wicker-horse": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Reeds, grasses, creepers or thin tree branches you touch animate into a wicker horse complete with riding saddle, keeping a wickerlike appearance. It has the statistics of a light horse or a pony, except that it gains construct traits and counts as both an animal and a construct for spells and effects, and gains extra hit points equal to your caster level. It has no skills or feats except these: reeds give Swim ranks equal to your caster level; grasses give the Run feat and Acrobatics ranks equal to your caster level; creepers give ranks in Climb and Stealth equal to your caster level; tree branches leave it continually affected by barkskin at your caster level. It obeys no Handle Animal commands and only you can ride it. You can cast this spell only where suitable plant material is available. When the spell ends or the horse loses all its hit points, it falls apart."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "All the numbers belong to the animated horse, not to the caster."
+  },
+  "widen-auras": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The range of your antipaladin or paladin auras doubles — a paladin's aura of courage, for instance, affects allies within 20 feet instead of 10."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Doubling the radius of an existing class feature is not something the vocabulary can express; the 20 feet in the prose is a worked example of the doubling, not a number this spell sets."
+  },
+  "wild-instinct": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "untyped",
+     "target": "Perception checks to act in a surprise round"
+    },
+    {
+     "type": "narrative",
+     "target": "You become aware of sounds and smells you would normally overlook, and take no penalty on Perception checks while sleeping."
+    },
+    {
+     "type": "permission",
+     "target": "Choose to wake if you notice a threat while asleep."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 8,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The sleeping clause says only 'you don't take a penalty' and never names the number, so unlike vigilant rest — which states the +10 outright — no modifier is emitted for it. The +5 has no stated bonus type."
+  },
+  "wilderness-soldiers": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Nearby plants fight for you; the spell does nothing if no plants you can direct are within the area. On each of your turns you may spend a swift action and/or a standard action to direct one attack. The attack bonus or CMB for these attacks equals your base attack bonus + your Wisdom modifier, and the spell grants a +1 bonus per 3 caster levels (maximum +5) on their damage rolls. Your wilderness soldiers never provoke attacks of opportunity and do not count as allies for flanking or any other purpose. Tree: a melee attack with 10-foot reach from its trunk dealing 1d8 points of damage + your Wisdom modifier, or instead a bull rush, drag or reposition combat maneuver at the same reach; the tree cannot move itself. Undergrowth or hedgerow: acting as a Medium creature, one square attempts a grapple against an opponent within or adjacent to it, heavy undergrowth gaining +2 to its CMD. It cannot move the grapple or pin a foe, but a successful grapple check against a foe it holds deals 1d4 points of damage + your Wisdom modifier. Its CMD is 5 + its CMB, and it releases its opponent if you do not direct it to maintain the grapple."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d8 and 1d4 are dealt by the plants the spell animates, on attacks you direct on later turns, so neither is a damage spec. The +1 per 3 levels applies to those plants' damage rolls, not yours, so it is deliberately not a combat_mod — that would add it to the caster's own weapon damage."
+  },
+  "wind-walk": {
+   "effects": [
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 10,
+     "note": "Perfect maneuverability. If the subject wishes, a magical wind instead wafts it along at up to 600 feet per round (60 mph) with poor maneuverability."
+    },
+    {
+     "type": "narrative",
+     "target": "You and the creatures you touch become cloudlike vapor as gaseous form and move through the air, each acting independently. Wind walkers are not invisible but appear misty and translucent, and one fully clothed in white is 80% likely to be mistaken for cloud, fog or vapor. A wind walker can regain its physical form at will and later resume cloud form; each change takes 5 rounds, which counts against the spell's duration, as does any time spent in physical form. For the last minute of the duration a wind walker in cloud form automatically descends 60 feet per round, 600 feet in all, though it may descend faster — this descent is the warning that the spell is about to end."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The only spell in this partition whose prose states it is dismissible, and it can be dismissed for individual wind walkers and not others — which the duration flag cannot express. The 10-foot fly speed is stated plainly and is emitted; the 600-feet-per-round option is the subject's alternative, recorded on the same spec rather than as a second speed."
+  },
+  "wind-wall": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An invisible vertical curtain of wind 2 feet thick and of considerable strength — a roaring blast that blows away any bird smaller than an eagle and tears papers and similar materials from unsuspecting hands, though a Reflex save lets a creature keep hold of an object. Tiny and Small flying creatures cannot pass through it. Loose materials and cloth garments caught in it fly upward. Arrows and bolts are deflected upward and miss, and any other normal ranged weapon passing through has a 30% miss chance, though giant-thrown boulders, siege engine projectiles and other massive ranged weapons are unaffected. Gases, most gaseous breath weapons and creatures in gaseous form cannot pass it, but it is no barrier to incorporeal creatures. It must be vertical, but you can shape it in any continuous path along the ground, including cylinders or squares that enclose a point."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Miss chances and movement barriers have no effect type; the Reflex save is only to keep hold of an object, not against an effect the vocabulary can name."
+  },
+  "windy-escape": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "magic",
+     "uses": "once",
+     "uses_count": 1,
+     "note": "Against the single attack you respond to by becoming vaporous."
+    },
+    {
+     "type": "immunity",
+     "target": "poison, sneak attack and critical hit effects from the attack you respond to",
+     "uses": "once",
+     "uses_count": 1
+    },
+    {
+     "type": "narrative",
+     "target": "You cannot use windy escape against an attack of opportunity you provoked by casting a spell, using a spell-like ability, or using any other magical ability that provokes when used."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Both the DR and the immunity are stated flatly and apply to exactly one attack, which the once-only use limit carries."
+  },
+  "wing-bounty": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Your wings sprout colourful, flavourful berries, each functioning as if affected by goodberry. You may choose for one of them to be poisonous instead, as striped toadstool; only you and druids of 5th level or higher can tell which is which without magic."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "goodberry's healing and the toadstool's poison are both deferred to by name and never restated here, so no numbers are emitted."
+  },
+  "wing-thorns": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Use the poisonous thorns on your wings like armour spikes, and make two wing attacks as primary natural weapons. If you are Small the wings deal 1d3 points of bludgeoning and piercing damage plus your Strength modifier — or count as secondary natural weapons if you also attack with a weapon."
+    },
+    {
+     "type": "narrative",
+     "target": "A creature damaged by your wing thorns experiences intense itching and gains the sickened condition for as long as the spell lasts, unless it succeeds at a Fortitude saving throw."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d3 is a natural attack the spell grants, which the brief excludes from damage specs outright. The sickened lands on a creature your wings later damage, after its own Fortitude save, so it is not an apply_condition — that would sicken the caster at cast time. The prose gives damage only for a Small caster and never states the Medium figure; nothing is invented to fill that in."
+  },
+  "winged-sword": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The targeted melee weapon grows small feathered wings and acts as if it had the throwing weapon special ability. This spell can stand in for magic stone as a prerequisite for the throwing weapon special ability."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Weapon special abilities have no effect type; the spell states no bonus of its own."
+  },
+  "winter-feathers": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "harm from cold environments down to -50 degrees Fahrenheit, and the Fortitude saves such conditions require",
+     "note": "The target's equipment is protected as well."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "circumstance",
+     "target": "Stealth checks to hide in ice and snow, if you chose at casting to turn the target's feathers white"
+    },
+    {
+     "type": "narrative",
+     "target": "This gives no protection from cold damage, nor from other environmental hazards of cold weather such as slipping on ice or snow blindness."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The white feathers are optional at casting, so the +4 is a situational_mod — which the GM reads and applies — rather than a skill_mod the engine would grant every casting whether or not the caster chose it. The prose is explicit that this is environmental protection and not cold resistance, so no resistance spec is emitted."
+  },
+  "wish": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "By speaking aloud you alter reality, producing any one of these effects. Duplicate any sorcerer/wizard spell of 8th level or lower, or any non-sorcerer/wizard spell of 7th level or lower, provided it is not from one of your opposition schools; or any sorcerer/wizard spell of 7th level or lower, or non-sorcerer/wizard spell of 6th level or lower, even from an opposition school. Undo the harmful effects of many other spells, such as geas/quest or insanity. Grant a creature a +1 inherent bonus to an ability score — two to five wishes cast in immediate succession grant +2 to +5, inherent bonuses are instantaneous and cannot be dispelled, may never exceed +5 for one score, and do not stack, so only the best applies. Remove injuries and afflictions, aiding one creature per caster level, all cured of the same kind of affliction — heal all the damage you and your companions have taken, or remove all poison from everyone in the party, but not both with one wish. Revive the dead by duplicating resurrection; reviving a creature whose body was destroyed takes two wishes, one to recreate the body and one to infuse it with life, and no wish prevents the permanent negative level. Transport travellers, lifting one creature per caster level from anywhere on any plane to anywhere else on any plane regardless of local conditions, an unwilling target getting a Will save and spell resistance. Undo misfortune, forcing a reroll of any roll made within the last round including your last turn — an opponent's successful save, a foe's successful critical hit or its confirmation, a friend's failed save — though the reroll may be as bad or worse, and an unwilling target gets a Will save and spell resistance. Attempting greater effects is dangerous: the wish may pervert your intent into a literal but undesirable fulfilment, or fulfil it only partly, at the GM's discretion. Duplicated spells allow saves and spell resistance as normal, but their save DCs are those of a 9th-level spell, and duplicating a spell with a material component costing more than 10,000 gp means providing that component too, on top of this spell's 25,000 gp diamond."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "A menu of nine alternatives, exactly one of which happens per casting; any spec emitted would be the wrong one eight times out of nine. Corpus duration is 'see text' and the prose states none, so duration is omitted."
+  },
+  "with-the-wind": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "being checked or blown away by winds of less than windstorm force",
+     "note": "The target can still choose to be moved by such winds if it wishes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "One clause of prose and it fits the immunity type cleanly."
+  },
+  "withdraw-affliction": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You push your hand into the subject and withdraw an affliction from its body as a tangible object, a slimy mass of flesh. The target is cured as if by remove disease, remove curse or neutralize poison. The slimy mass then lets you deliver that affliction to another creature with a touch attack, as if holding the charge for a touch spell, with the same effect, saving throw and DC as the original affliction."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the condition vocabulary has no diseased, cursed or poisoned entry, so remove_condition cannot express curing an affliction — the whole spell is about afflictions the vocabulary cannot name. Transferring the affliction to a new victim has no type either."
+  },
+  "witness": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Shift your senses from yourself to the target or back as a move action. While using the target's senses you are blind and deaf, and you perceive with its normal and special senses — its darkvision, for instance — rather than your own."
+    },
+    {
+     "type": "narrative",
+     "target": "You link your senses to a living target, seeing and hearing through its eyes and ears."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The sense type names specific senses a creature gains, not a link to another creature's senses, so the link itself is a permission."
+  },
+  "wizened-appearance": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target appears to be an older version of itself, by however much you select — '10 years older', 'as an adult'. You cannot change its appearance in any way not directly associated with ageing, though hair may grey and liver spots appear. Children of creatures that are Medium or smaller when fully grown may grow one size category to the normal adult size for their kind; otherwise the age increase does not alter size, and a change in size does not alter ability scores. The spell causes no age-based modifications to ability scores and no other age-related effects such as dragon age categories or natural metamorphoses. Wizened appearance and youthful appearance counter and dispel each other."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Not gated on the Fortitude save, for the same reason as vocal alteration: it is normally cast on a willing subject for disguise, and gating would make it fail to work on that subject. The prose says outright that ability scores do not change, so nothing is emitted."
+  },
+  "wood-shape": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You form one existing piece of wood — no larger than 10 cubic feet plus 1 cubic foot per caster level — into any shape that suits your purpose. Crude coffers, doors and the like are possible but fine detail is not, and any shape that includes moving parts has a 30% chance of simply not working."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Shaping matter has no effect type."
+  },
+  "wooden-phalanx": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You create 1d4+2 wood golems with the advanced template. They willingly aid you in combat, perform a specific mission, or serve as bodyguards. You can have only one wooden phalanx in effect at a time; casting it again while an earlier casting persists dispels the earlier one."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Summoning has no effect type, and 1d4+2 is a count of golems, not damage or healing dice, so it does not belong in scaling."
+  },
+  "wooden-wing-shield": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "shield",
+     "target": "ac",
+     "note": "Your wings become a wooden barrier resembling a tower shield. If you move, the spell ends immediately."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'rounds/level (1) or until you move'; the movement clause cannot be expressed by the duration shape and is recorded on the spec."
+  },
+  "woodland-rune": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You inscribe a rune on any surface. It triggers when any non-plant creature other than you moves within 30 feet of it. In all other respects the spell functions as symbol of death."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Every creature caught in the 30-foot burst when the rune triggers. Plant creatures and creatures under woodland stride or freedom of movement are not affected at all.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "Roots and branches sprout from the ground and hinder the creature's movement as if it were moving through heavy undergrowth. They give no concealment."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose says movement is hindered 'as if moving through heavy undergrowth', which is difficult terrain rather than the entangled condition, so no apply_condition is emitted — entangled would also impose a Dexterity penalty and an attack penalty the spell never mentions. Corpus duration is 'permanent until discharged'."
+  },
+  "word-of-beckoning": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions as sending, except that the subject also learns a command word which, if spoken within 1 round of learning it, summons you to the open space nearest the subject. The subject is not obliged to speak it. You can be transported any distance within a plane but never between planes, and may bring objects up to your maximum load, plus one additional willing Medium or smaller creature — carrying gear up to its own maximum load — or its equivalent per 3 caster levels, a Large creature counting as two Medium, a Huge as four and so on. Every creature transported must be in contact with the others, and at least one of them in contact with you."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Teleportation has no effect type."
+  },
+  "word-of-chaos": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Only nonchaotic creatures in the 40-foot-radius spread are affected, and creatures whose Hit Dice exceed your caster level are unaffected entirely. A creature subject to several of the effects below makes only one save and applies the result to all of them.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The effects are cumulative and concurrent, by the creature's Hit Dice compared to your caster level. Hit Dice equal to your caster level: deafened for 1d4 rounds. Up to caster level -1: stunned for 1 round, and deafened. Up to caster level -5: confused for 1d10 minutes (a mind-affecting enchantment effect), stunned and deafened. Up to caster level -10: killed — living creatures die and undead are destroyed — as well as confused, stunned and deafened."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "narrative",
+       "target": "The save negates the deafness, the stunning and the death, and reduces the confusion to 1 round. A creature in the lowest Hit Dice band, which would have been killed, instead takes 3d6 points of damage + 1 point per caster level (maximum +25) on a successful save."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "If you are on your home plane when you cast this spell, nonchaotic extraplanar creatures in the area are instantly banished to their home planes and cannot return for at least 24 hours. This happens whether or not they hear the word, and allows a separate Will save at a -4 penalty to negate."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "The 3d6 + 1 per caster level is deliberately not a damage spec and gets no scaling entry: it is dealt only on a SUCCESSFUL save, and only to creatures in the lowest Hit Dice band. Reading it as the spell's damage would deal it to everyone on a failed save — the inverse of the rule. Which band a creature falls into depends on its Hit Dice against your caster level, which cannot be known at conversion time, so the whole table stays narrative. Corpus duration is instantaneous. The corpus already derives element 'sonic'."
+  },
+  "word-of-recall": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You are teleported instantly back to a sanctuary you designated when you prepared the spell, which must be a very familiar place; the arrival point is a designated area no larger than 10 feet by 10 feet. You can travel any distance within a plane but never between planes, and may bring any objects you carry up to your maximum load, plus one additional willing Medium or smaller creature — carrying gear up to its own maximum load — or its equivalent per 3 caster levels, a Large creature counting as two Medium and a Huge as two Large. All creatures transported must be in contact with one another and at least one in contact with you; exceeding the limit makes the spell fail. An unwilling creature cannot be teleported, and a creature's Will save or spell resistance stops items in its possession from being teleported. Unattended nonmagical objects get no save."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Teleportation has no effect type."
+  },
+  "word-of-resolve": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "The target ally immediately rerolls one failed saving throw against a charm or fear effect."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "sacred",
+     "target": "the rerolled saving throw against a charm or fear effect"
+    },
+    {
+     "type": "narrative",
+     "target": "If you do not have the aura of courage class ability, this spell has no effect on the target's fear. If you do not have the aura of resolve class ability, it has no effect on any charm effects on the target."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose never names which saving throw a charm or fear effect calls for, so the +4 is a situational_mod against the reroll rather than a save_mod against a guessed Will."
+  },
+  "world-wave": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Natural terrain surges beneath you and carries you across great distances. Choose the wave's type at casting: a tsunami, a 30-foot-high tidal wave of earth or water lasting 1 round per level, or a swell, a controlled 5-foot-high wave lasting 1 hour per level. Either way the crest extends 10 feet in front of and behind you and 5 feet per level to each side, moves at eight times your base land speed, and you may stand, sit, lie down, sleep or take any action on it that you could take on solid ground. You may grant up to one additional creature per level the ability to ride it safely. You choose its path by facing a direction when you create it and can never change that decision, nor alter the wave's dimensions. Anything strongly connected to or part of the natural world simply rises and falls with the wave unharmed; anything else that contacts it takes 6d6 points of bludgeoning damage from a tsunami or 1d6 from a swell. The wave damages any manufactured object or structure, and on the Material Plane any aberration, construct, outsider or undead creature or creature with the extraplanar subtype — constructs and undead taking double damage. Any other creature, and any creature with even one druid class level whatever its type, is part of the natural world and unaffected; on other planes what counts as natural is the GM's call. The wave can climb or descend natural features up to a 45-degree angle. Terrain it cannot incorporate — anything primarily of fire such as lava, of air such as an open cliff face, or man-made such as a city — is flowed over or around, riders being harmlessly displaced sideways, unless that terrain fills half or more of the crest, in which case the spell ends in 1d6 rounds as the wave falters and collapses, its momentum carrying you on unharmed until it does, whereupon you suffer the normal effects of the terrain you are deposited in. You can create the wave only while standing on the ground, never underground or on terrain it cannot incorporate."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "The 6d6 and 1d6 belong to two mutually exclusive versions chosen at casting, land on whatever later contacts a moving wave rather than on a target at cast time, and apply only to particular creature types while sparing everything else — three separate reasons not to emit them as damage. Duration is omitted for the same reason: the corpus says 'rounds/level (1) or hours/level (1)', which are the tsunami and the swell, and the shape cannot hold a choice between two."
+  },
+  "wracking-ray": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Make a ranged touch attack with a ray of sickly greenish-gray negative energy. A creature hit is wracked by painful spasms as its muscles and sinews wither."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Fortitude halves the ability damage.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The subject takes 1d4 points of Dexterity damage and 1d4 points of Strength damage per 3 caster levels, to a maximum of 5d4 each. This spell cannot reduce an ability score below 1."
+      }
+     ]
+    }
+   ],
+   "converted_by": "read",
+   "notes": "VOCABULARY GAP: the ability damage scales at 1d4 per 3 caster levels to a cap, and nothing can express that — `scaling` drives damage and healing dice only (no corpus spell scales an ability_damage spec), and one spell-level scaling entry could not drive two separate scores anyway. Emitting ability_damage with dice '1d4' would be right only up to caster level 5 and wrong at every level above, so both scores stay in a narrative spec with the formula intact. Corpus duration is instantaneous."
+  },
+  "wrath": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "attack",
+     "note": "Only against one enemy creature you can see and designate at casting. +1 per three caster levels, minimum +1, maximum +3."
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "damage",
+     "note": "Weapon damage rolls against the designated creature only. +1 per three caster levels, minimum +1, maximum +3."
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "spell_resistance",
+     "note": "Caster level checks made to overcome the designated creature's spell resistance. +1 per three caster levels, minimum +1, maximum +3."
+    },
+    {
+     "type": "narrative",
+     "target": "At 12th level you gain the benefits of the Improved Critical feat on attack rolls made against the designated creature. This does not stack with any other effect that expands a weapon's threat range."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The base +1 is emitted, correct through caster level 5, with the per-three-levels progression to a maximum of +3 recorded on every spec — the same modifier-scaling gap as ward the faithful."
+  },
+  "wrathful-weapon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You grant the touched melee weapon one of these weapon special abilities: anarchic, axiomatic, holy or unholy. The spell takes the matching descriptor — chaos for anarchic, law for axiomatic, good for holy, evil for unholy. If you try to place a special ability on a weapon that already has it, the spell fails. A warpriest casting this on his sacred weapon doubles the duration, and a warpriest whose sacred weapon is the unarmed strike can cast it on his unarmed strike."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Four mutually exclusive weapon special abilities, none of whose numbers this description states — it defers to the abilities by name. The warpriest duration doubling is a conditional the duration shape cannot hold."
+  },
+  "yellow-sign": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Functions as symbol of death, except that creatures which succumb become dominated by Hastur, as dominate monster. They seek to aid any obvious minion or worshiper of Hastur in sight, and any true worshiper of Hastur can command them as if that worshiper had dominated them; conflicting commands from different true worshipers are settled by opposed Charisma checks, the winner commanding the targets that round. With no worshiper or agent of Hastur in sight, an affected creature acts normally. The domination lasts 1 round per level, and once triggered the Yellow Sign itself remains active for 10 minutes per caster level. There is a 1% chance when a creature fails its save that Hastur takes note and decides to control the target personally: the dominated creature's actions are then the GM's to determine, the effects persist for 1 day per level, and no other creature can countermand the commands, not even a Hastur worshiper. However long the effects last, and whether or not Hastur controls the victim directly, any creature that failed to resist this spell can be targeted by Hastur's fulvous dreams ability for the rest of its life, should the Great Old One ever choose to. Yellow Sign can be made permanent with permanency by a caster of 18th level or higher for 40,000 gp."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Domination has no effect type, and the three different durations here (1 round/level for the domination, 10 minutes/caster level for the sign, 1 day/level if Hastur intervenes) are why the corpus duration reads 'see text'; no single duration would be true, so it is omitted."
+  },
+  "youthful-appearance": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target looks like a younger version of itself, by however much you select — '10 years', 'as a young adult'. You cannot change any detail of its appearance not directly associated with ageing, though grey hair returns to its original colour, and it cannot appear so much younger that its size changes. The spell does not affect any age-based modifications to ability scores or other age-related effects."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose says explicitly that ability scores are untouched, so nothing is emitted. Counters and is countered by wizened appearance."
+  },
+  "zephyr-s-fleetness": {
+   "effects": [
+    {
+     "type": "speed",
+     "target": "land",
+     "amount": 30,
+     "note": "An enhancement bonus; the speed type has no bonus_type field."
+    },
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 30,
+     "note": "An enhancement bonus, and only if the target already has a fly speed — the spell grants no flight of its own."
+    },
+    {
+     "type": "permission",
+     "target": "Move and charge through difficult terrain without penalty."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The fly bonus is conditional on the target already having a fly speed, which the spec cannot express, so it is recorded in the note — applying +30 fly to a creature that cannot fly would invent a movement mode the spell never grants."
+  },
+  "zone-of-foul-flames": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "circumstance",
+     "target": "saving throws against fire effects",
+     "note": "All creatures in the zone gain this, except a creature saving against fire damage from its own magic."
+    },
+    {
+     "type": "narrative",
+     "target": "The zone looks unremarkable, though a Perception check against DC 20 + the caster's level reveals a faint rippling in the air like heat distortion. Whenever a creature inside casts a spell with the fire descriptor or activates a magical fire effect, from a magic item or a special attack, that creature takes full fire damage from its own effect; if the effect allows a saving throw to reduce the damage, the creature may attempt that same save. Nonmagical fire in the zone burns half as brightly but is otherwise unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The backlash damage is retributive in the strictest sense — it is the victim's own fire effect turned on them, with an amount that depends entirely on whatever spell they cast — so there is no number here to emit and nothing that lands at cast time."
+  },
+  "zone-of-silence": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You manipulate sound waves around you so that you and everyone within the 5-foot-radius emanation can converse normally while no one outside hears your voices or any other noise from within, including language-dependent and sonic spell effects. The zone is centred on you and moves with you; anyone entering it immediately becomes subject to it and anyone leaving is no longer affected. A successful DC 20 Linguistics check to read lips can still reveal what is said inside."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Containing sound has no effect type; it is not the silence condition, since creatures inside can speak and cast normally."
+  },
+  "zone-of-truth": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "note": "Each potentially affected creature saves when the spell is cast, or when it first enters the emanation. Creatures who leave the area are free to speak as they choose.",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature cannot speak any deliberate and intentional lie while within the emanation. Affected creatures know they are enchanted, so they may refuse to answer questions they would normally lie about, or be evasive while staying within the bounds of the truth."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Compelled honesty has no effect type; apply_condition has nothing close, so the compulsion is narrative inside a gate that does model the Will save correctly."
+  }
+ }
+}

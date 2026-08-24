@@ -1,0 +1,2809 @@
+{
+ "partition": 17,
+ "source": "read from the spell descriptions in content/spells/spells.json",
+ "spells": {
+  "spellcasting-contract-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser spellcasting contract, but a target with 13 HD or more can be imbued with one or two 4th-level spells and one 5th-level spell."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Inherits the lesser spell's profane bonus to AC, saves and checks equal to the highest-level spell imbued. That number depends on what the caster chooses to imbue, so it is not a fixed value and is not emitted as a combat_mod. Duration is 'permanent until contractually terminated'; the prose says explicitly you cannot dismiss it."
+  },
+  "spellcasting-contract-lesser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Imbue a willing touched creature with spells you have prepared, on agreed contract terms; the caster's slot stays expended until the contract ends."
+    },
+    {
+     "type": "narrative",
+     "target": "While the contract holds, the caster gains a profane bonus to AC, saving throws and checks equal to the highest-level spell imbued."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The profane bonus is deliberately left as narrative: its size equals the highest spell level imbued, which is chosen at casting, so no single number is correct. The worked example's '+2 profane bonus' is a worked example (2nd-level spell imbued) and was not converted. Not dismissible by the prose's own statement."
+  },
+  "spellcrash": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser spellcrash, but strips 5th-level or lower prepared spells or spell slots."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spellcrash-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser spellcrash, but strips 7th-level or lower prepared spells or spell slots."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spellcrash-lesser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "At the start of each of the target's turns it loses one prepared 3rd-level spell or 3rd-level slot (stepping down to 2nd then 1st if none is available), wasted as a failed concentration check; a Will save at the end of each of its turns ends the spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No initial save. The per-round Will save is the ongoing save, not a gate on the spell landing, so it is not emitted as a save_gate. No effect on spell-like abilities."
+  },
+  "spellscar": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Within the area, any spell, spell-like ability or magic item activation triggers a primal magic event unless the user makes a concentration check (DC 15 + twice the spell's level); non-spellcasters activating items get no check."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "insight",
+     "target": "concentration checks to avoid triggering a primal magic event inside a spellscar you created"
+    },
+    {
+     "type": "permission",
+     "target": "When you trigger a primal magic event inside your own spellscar, roll d% twice and choose which result occurs."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The DC 15 + twice spell level is the concentration DC for creatures using magic in the area, not a saving throw against the spell, so it is not a save_gate."
+  },
+  "spellstaff": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Store one spell you can cast in a touched wooden quarterstaff; you may later cast it as if prepared without it counting against your daily allotment. One spell per staff, one spellstaff at a time."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Material components are spent at storage time, not at casting."
+  },
+  "spellsteal": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target loses one prepared 3rd-level spell or 3rd-level slot (stepping down to 2nd then 1st if none is available), wasted as a failed concentration check; if that spell is on your list you may cast it with your own caster level on your next turn, providing its components yourself."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Will negates (already in the corpus's save field). No effect on spell-like abilities. Nothing here is expressible as a number the engine can apply."
+  },
+  "sphere-of-warding": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A sphere that blocks incorporeal creatures as a wall of force unless they make a Will save to enter; an incorporeal creature that ends its turn inside takes 1d6 + 1 per caster level (maximum +10) force damage."
+    },
+    {
+     "type": "narrative",
+     "target": "A creature possessing another's body that enters the sphere is immediately ejected, takes that force damage with no save, and is shunted outside; the host's spirit returns and the possession ends."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The force damage is deliberately narrative, not a damage spec: it repeats every round the creature ends its turn inside, and it only lands on incorporeal or possessing creatures, not on a target the caster picks. The vocabulary has no repeating-damage type and no way to condition damage on a creature subtype."
+  },
+  "spherescry": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "View and listen to everything within 20 feet of a sphere that has previously consumed part of your body; the sensor follows the sphere. No other spell works through it, and it gives no sign to those observed and cannot be found by normal magical detection."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spider-climb": {
+   "effects": [
+    {
+     "type": "speed",
+     "target": "climb",
+     "amount": 20
+    },
+    {
+     "type": "skill_mod",
+     "amount": 8,
+     "bonus_type": "racial",
+     "target": "climb"
+    },
+    {
+     "type": "permission",
+     "target": "Climb and traverse vertical surfaces and ceilings without Climb checks, keeping your Dexterity bonus to AC and granting attackers no bonus; hands must be free and you cannot run while climbing."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spider-climb-communal": {
+   "effects": [
+    {
+     "type": "speed",
+     "target": "climb",
+     "amount": 20
+    },
+    {
+     "type": "skill_mod",
+     "amount": 8,
+     "bonus_type": "racial",
+     "target": "climb"
+    },
+    {
+     "type": "permission",
+     "target": "Climb and traverse vertical surfaces and ceilings without Climb checks, keeping your Dexterity bonus to AC and granting attackers no bonus; hands must be free and you cannot run while climbing."
+    },
+    {
+     "type": "narrative",
+     "target": "The duration is divided among all creatures touched in 10-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Duration given is the total pool, which the caster splits between recipients in 10-minute blocks; the engine cannot express a divided pool, hence the narrative spec alongside."
+  },
+  "spiked-pit": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "2d6",
+       "damage_type": "piercing",
+       "lethality": "lethal",
+       "note": "the spikes at the bottom, on top of normal falling damage for the pit's depth"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "A spiked pit up to 50 feet deep opens; a creature that falls in takes normal falling damage for the depth as well as the spikes' damage."
+    },
+    {
+     "type": "narrative",
+     "target": "Anything touching the spiked walls — a climbing creature, a rope, climbing gear — takes 1d6 piercing damage each round of contact. The walls have a Climb DC of 20."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'rounds (1) + rounds/level (1)' — one flat round plus one per level. The shared duration format cannot express a composite, so the per-level part is emitted and the extra round is recorded here. Falling damage is not converted: it depends on the depth the caster chooses. The 1d6 wall damage repeats every round of contact and so is narrative, not a damage spec."
+  },
+  "spindrift-spritz": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Cast as an immediate action when the target is about to roll a save against an effect that would leave it fatigued, shaken, sickened or staggered: it rolls that save twice and takes the higher result."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Rolling twice and keeping the higher is not a modifier, so it cannot be a save_mod — there is no number to add. Recorded as a permission."
+  },
+  "spindrift-spritz-mass": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Cast as an immediate action when the targets are about to roll a save against an effect that would leave them fatigued, shaken, sickened or staggered: each rolls that save twice and takes the higher result."
+    },
+    {
+     "type": "narrative",
+     "target": "Affects one creature per caster level, no two more than 30 feet apart."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spiral-ascent": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Teleport yourself and carried objects up to your maximum load straight upward to a square within range and within 10 feet of a point directly above you, seen or familiar. You can take no further action until your next turn."
+    },
+    {
+     "type": "narrative",
+     "target": "Arriving in an occupied space shunts you to a random open space in range; if there is none the spell fails. It does not work on a plane without gravity."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spiral-descent": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As spiral ascent, but you travel downward: teleport yourself and carried objects up to your maximum load straight down to a square within range and within 10 feet of a point directly below you. You can take no further action until your next turn."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spirit-bonds": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Bond with up to one willing creature or object per 3 caster levels that stayed within 30 feet for the whole hour of casting. Concentrating on one as a full-round action tells you its direction and rough distance on the same plane."
+    },
+    {
+     "type": "narrative",
+     "target": "A further full-round action reads a bonded creature's emotion or health aura, an object's damage, or when a bonded activated magic item was last used."
+    },
+    {
+     "type": "narrative",
+     "target": "Once per bonded creature you may send a telepathic message of up to 25 words at any range; doing so severs that bond but leaves the others intact."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is '24 hours or until discharged'; the fixed 24 hours is emitted because the discharge is per bond, not for the whole spell."
+  },
+  "spirit-bound-blade": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The touched weapon becomes a ghost touch weapon and gains one further special ability chosen by the emotion infused: anger/vicious, dedication/returning, despair/cruel, fear/menacing, hatred/cunning, jealousy/mimetic, zeal/keen. An ability that cannot apply to that weapon is simply not gained."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "skill checks with both skills your phantom's emotional focus grants Skill Focus in",
+     "note": "spiritualist wielder only, and only when the infused emotion matches the phantom's emotional focus"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The +2 is written with no bonus type, so it is recorded untyped rather than guessed. Which two skills it applies to depends on the caster's phantom, so it cannot be a skill_mod with a fixed target."
+  },
+  "spirit-call": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Every spell from your shaman spirit magic list or druid domain list cast inside the area is cast at +1 caster level, for any caster."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "insight",
+     "target": "concentration checks for spells from that spirit or domain list cast inside the area"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A +1 to caster level itself is not the same as the combat_target 'caster_level', which is a bonus on caster level *checks*; writing it as a combat_mod would silently apply it to dispel and SR checks only. Left narrative."
+  },
+  "spirit-share": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "As a standard action, touch a willing creature to deliver one dose of a potable liquid you carry — a drink, potion or elixir, but nothing primarily harmful to drink — directly into her."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spiritual-ally": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A force servant of your god appears in one 5-foot square in range. Each round on your turn it attacks a foe you designate within its reach, using your base attack bonus (with iterative attacks) plus your Wisdom bonus, dealing 1d10 force damage +1 per 3 caster levels (maximum +5 at 15th)."
+    },
+    {
+     "type": "narrative",
+     "target": "It threatens adjacent squares, can flank and takes attacks of opportunity. It strikes as a spell, bypassing DR and harming incorporeal creatures. Move it 30 feet (or fly 30 feet, perfect) as a swift action each round after the first."
+    },
+    {
+     "type": "narrative",
+     "target": "Immune to physical attacks; dispel magic, disintegrate, a sphere of annihilation or a rod of cancellation destroy it. Its touch AC is 10. Against a creature with spell resistance you make one caster level check on its first strike; if resisted, the spell is dispelled."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 1d10+X is the ally's attack damage, rolled after an attack roll and repeated every round — not the spell's own damage — so it is stated in the narrative rather than emitted as a damage spec with scaling. Converting it would have the engine deal 1d10 force to a target the moment the spell is cast."
+  },
+  "spiritual-squire": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A force servant appears in one 5-foot square in range. It cannot attack and threatens nothing. Each round it can do one of: retrieve a stowed item of yours, carry an object of up to 10 pounds per caster level, hand you something it carries, aid another for you or an ally, or help someone don armour in half the usual time."
+    },
+    {
+     "type": "narrative",
+     "target": "Its attack bonus when aiding another in combat equals your base attack bonus plus your Wisdom modifier. Move it 30 feet as a swift action each round after the first. Immune to physical attacks; dispel magic, disintegrate, a sphere of annihilation or a rod of cancellation destroy it. Touch AC 10."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "spiritual-weapon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A force weapon favoured by your deity appears and attacks a foe you designate each round, using your base attack bonus (with iterative attacks) plus your Wisdom modifier, dealing 1d8 force damage per hit +1 per 3 caster levels (maximum +5 at 15th), with that weapon's threat range and critical multiplier."
+    },
+    {
+     "type": "narrative",
+     "target": "Redirect it to a new target as a move action; on a round it switches targets it gets one attack only. It always strikes from your direction, never flanks, and your feats do not affect it. Strikes as a spell, so it ignores DR and strikes incorporeal creatures at full damage."
+    },
+    {
+     "type": "narrative",
+     "target": "It cannot be attacked or harmed physically; dispel magic, disintegrate, a sphere of annihilation or a rod of cancellation affect it. Touch AC 12. Against a creature with spell resistance you make one caster level check on its first strike; if resisted, the spell is dispelled."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Same reason as spiritual ally: the 1d8+X is per successful attack, every round, not damage the spell deals on casting."
+  },
+  "spit-venom": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Spit venom at a target as a ranged touch attack."
+    },
+    {
+     "type": "apply_condition",
+     "target": "blinded",
+     "duration": {
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "on a hit, no save"
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target is poisoned by black adder venom; the DC for its later rounds equals this spell's DC."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Black adder venom's own frequency, effect and cure numbers are not written in this description, so none are invented here — the poison is named and left to be looked up. The blindness follows the touch attack, not the save; the Fortitude save is against the poison only."
+  },
+  "spite": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Bind one touch-range spell of 4th level or lower with a casting time of one standard action or less into a ward on your body. The next time a melee attack hits you or a combat maneuver succeeds against you, the stored spell triggers on that foe with no touch attack needed."
+    },
+    {
+     "type": "narrative",
+     "target": "If the attacker is not a valid target for the stored spell it is lost with no effect. Only one spite can be active; casting it again ends the earlier one."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours/level (1) or until discharged'; the per-level part is emitted and the discharge is described in the effect text, since the shared format cannot hold both."
+  },
+  "splinter-spell-resistance": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The first time each round the warded weapon damages a creature with spell resistance, that creature's SR drops by 5 for 1 round. It does not stack across several attacks in the same round, but can be reapplied on later rounds."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -5 lands on whoever the weapon hits, not on the weapon's wielder or the spell's target, and only after a hit — so it is not emitted as a modifier the engine would apply to the touched weapon's bearer."
+  },
+  "spore-burst": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A willing plant creature sprouts puffy mushrooms for 1 round per caster level or until used."
+    },
+    {
+     "type": "narrative",
+     "target": "As a standard action the mushroomed creature bursts them, filling a 20-foot-radius spread with toxic spores: everyone caught must make a Fortitude save or be sickened for 1d6 rounds. You and all plant creatures are immune."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The sickened condition is deliberately not a save_gate: the spell's target is the willing plant ally, while the save is made later by everyone else in a burst the ally chooses to set off. Gating it here would have the engine sicken the creature the spell was cast on. Corpus duration is 'see text'; the prose states 1 round/caster level, which is what is emitted."
+  },
+  "spotlight": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "ref",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "skill_mod",
+       "amount": -20,
+       "bonus_type": "untyped",
+       "target": "stealth"
+      },
+      {
+       "type": "narrative",
+       "target": "The light follows the target: its space is bright light (with any penalties that brings) and it cannot benefit from concealment given by darkness, as if under faerie fire."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "narrative",
+       "target": "The spotlight forms in the target's square but does not follow it, and hinders the Stealth checks only of creatures standing in that square."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "All mundane light sources, and magical light of 3rd spell level or lower, within 20 feet of the lit space are suppressed while they remain in the area."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -20 is written as a penalty with no type named, so it is untyped."
+  },
+  "squeeze": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Move through any space at least half your size with no squeezing penalty, and through a space at least a quarter of your width using only the penalties for squeezing through a half-width space."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stabilize": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "stable",
+     "note": "a living creature at -1 hp or fewer; it stops losing hit points, but resumes dying normally if damaged again"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stabilize-powder": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Reduce the misfire range of the ammunition currently loaded in the target firearm by 1, plus 1 per five caster levels, to a maximum reduction of 5 and a minimum misfire range of 0."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Misfire range is not in the effect vocabulary. The progression is per-level but not dice-shaped, so no `scaling` block is emitted; the formula is stated in the effect text instead."
+  },
+  "stabilize-pressure": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The touched creature adjusts instantly and completely to the pressure it is currently under. It gives no help with future pressure changes."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stage-fright": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "situational_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "ability checks, skill checks, and any check that requires concentration"
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Written as a blanket penalty on ability checks, skill checks and concentration checks at once; skill_mod can only name one skill, so it is a situational_mod. No bonus type is stated, hence untyped."
+  },
+  "staggering-fall": {
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "untyped",
+     "lethality": "lethal",
+     "note": "additional damage from the fall itself; no save"
+    },
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "staggered"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Each round the staggered effect lasts, the creature may attempt a new Will save as a free action to end it early, and it must spend a standard action to stand up."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The corpus's save line reads 'Fortitude partial (see text)' but the description says plainly the staggered condition is avoided with a *Will* save; the description was followed and the disagreement is flagged here rather than silently resolved. The 1d6 is not typed in the prose, so it is untyped rather than assumed to be bludgeoning falling damage. It lands once, on the falling target, when it hits the ground."
+  },
+  "stalwart-resolve": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The recipient ignores all ability damage and penalties to one ability score of your choice, from any number of sources, whether taken before or during the spell — except that damage equal to or above the score still causes unconsciousness or death. No effect on ability drain."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Ignoring existing ability damage is not ability_restore (nothing is healed) and ability damage is not in the condition vocabulary, so suppress_condition cannot say it either. This is a real gap: there is no way to express 'suppress ability damage to one score'."
+  },
+  "starsight": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "See the night sky and every celestial body as if on a clear night, through weather, nonmagical light pollution and forest canopy — for stargazing only. Does not work in daylight, indoors or underground."
+    },
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "insight",
+     "target": "knowledge (geography)",
+     "note": "checks relating to the stars and planets"
+    },
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "insight",
+     "target": "survival",
+     "note": "checks to avoid getting lost"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "statue": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The subject and everything it wears or carries turn to solid stone with hardness 8, keeping its own hit points. It sees, hears and smells normally but feels only what can affect granite, and needs no food or air."
+    },
+    {
+     "type": "permission",
+     "target": "While the spell lasts, the subject may return to flesh, act, and revert to stone again as a free action, as often as it likes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Hardness is not damage reduction and has no effect type; it is stated in the narrative rather than mis-emitted as damage_reduction 8, which would subtract from every hit instead of every damage roll against an object."
+  },
+  "status": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You stay aware of the direction, distance and general condition — unharmed, wounded, disabled, staggered, unconscious, dying, nauseated, panicked, stunned, poisoned, diseased, confused and the like — of one touched living creature per three caster levels, at any distance on the same plane. The link ends for a subject that leaves the plane or dies."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "status-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As status, and you may also cast a limited selection of spells through the link as though you were touching the subject."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The corpus description is truncated: it ends at 'You can cast any spell that meets all of the following conditions:' and the conditions themselves are missing. They are not invented here — the GM will need the source book for which spells qualify. Worth reporting as a corpus defect."
+  },
+  "stave-off-corruption": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "target": "saving throws against the advancement of the target's corruption",
+     "note": "does not stack with itself, nor with morale, profane or sacred bonuses on the same saves"
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Duration deliberately omitted: the corpus says '1 day per 2 caster levels' and the shared duration format has only 'amount per caster level', with no per-N-levels divisor. Emitting {per_level, 1, day} would have doubled it. This is a gap in the format worth reporting."
+  },
+  "stay-the-hand": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target does not follow through with the melee attack and its entire action for that round is wasted."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "combat_mod",
+       "amount": -5,
+       "bonus_type": "untyped",
+       "target": "attack",
+       "note": "on the strike it forces through the compulsion"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -5,
+       "bonus_type": "untyped",
+       "target": "damage",
+       "note": "on the strike it forces through the compulsion"
+      }
+     ]
+    },
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "attack",
+     "note": "against the creature it originally targeted, whether or not it saved"
+    },
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "against the creature it originally targeted, whether or not it saved"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -5 applies only to the interrupted attack; the -2 lasts the spell's duration and applies on a save or a failure alike. Neither penalty is given a type in the prose, so both are untyped."
+  },
+  "steady-saddle": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "ranged attacks made while mounted in this saddle",
+     "note": "written as a 2-point reduction of the mounted ranged-weapon penalty; it stacks with Mounted Archery and similar effects"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "concentration checks forced by the mount's movement",
+     "note": "written as the check's DC dropping by 2"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Both benefits are written as reductions — of a penalty and of a DC — not as bonuses. They are recorded as situational_mods (which the engine narrates rather than rolls) with the original wording kept in the note, so nothing is silently added to a roll."
+  },
+  "steal-book": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Copy the whole contents of one touched book, folio or scroll into a blank one of equal or greater capacity, wiping the original pages blank; covers and binding are untouched, and any text that overflows the new document is lost forever."
+    },
+    {
+     "type": "narrative",
+     "target": "Cannot transfer magical writing such as a spellbook or a scroll. At the GM's discretion it can restore text lost to spilled wine, erasure, fire or similar damage. Cast from a scroll, the stolen text glitters on the scroll until you choose a book for it."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "steal-power": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The mythic target loses 1d4 uses of mythic power, and if you can expend mythic power yourself you regain one use for each one it loses."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Mythic power is not a resource the effect vocabulary knows, so the transfer stays narrative. The 1d4 is a count of uses, not dice of damage or healing, and is not emitted as either."
+  },
+  "steal-size": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The humanoid target shrinks one size category as if by reduce person, and you grow one size category as if by enlarge person (if you are a legal target for it). If the spell ends for either of you, both return to normal size."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The size change carries reduce person's and enlarge person's own package of Strength, Dexterity, AC and attack changes, which this description does not restate; none of those numbers are invented here. Target must be a humanoid one size larger than you."
+  },
+  "steal-voice": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target's throat constricts and it gains the caster croak spellblight."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Spellblights are a separate subsystem and caster croak's own effects are not written in this description, so they are named rather than guessed."
+  },
+  "steal-years": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target physically ages 1d4 years per 2 caster levels (maximum 5d4) and you become younger by the same number of years. If either of you crosses an age category, adjust physical ability scores only. You cannot drop below your race's minimum adult age."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Neither age change is real: you still die at your allotted time and the target cannot be made to die of old age. When the spell ends you are fatigued for 1d4 hours."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The fatigue at the end lands on the *caster*, after the duration expires — emitting apply_condition fatigued would have the engine fatigue the touched target at casting, which is the wrong creature at the wrong time. The physical ability score changes depend on which age categories are crossed, which the description does not enumerate, so no numbers are invented."
+  },
+  "steal-years-greater": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "As steal years, but the target ages 1d6 years per 2 caster levels (maximum 10d6) and you become younger by the same amount."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "As steal years: the ageing is not real for either of you, and you are fatigued for 1d4 hours when the spell ends."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stench-of-prey": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target reeks of helpless prey. The nearest 1d4+1 predatory creatures within 30 feet (60 feet for animals with scent) must succeed at a Will save or start attacking it."
+    },
+    {
+     "type": "narrative",
+     "target": "An affected animal can be called off by a handler using the 'down' trick, or by anything that suspends or dispels emotion or rage effects. No effect on constructs, undead, creatures with an unnatural aura, or anything that repels animals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Two different saves are in play: the target's Fortitude save against the odour, and a Will save made by each nearby predator — a third party the caster never chose. Neither is emitted as a save_gate, because a gate here would attach the predators' save to the spell's own target."
+  },
+  "stinking-cloud": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A bank of fog as fog cloud, but nauseating."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "nauseated",
+       "note": "lasts while the creature is in the cloud and for 1d4+1 rounds after it leaves, rolled separately per creature"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "A living creature that saves but stays in the cloud must save again each round on your turn. This is a poison effect. Made permanent with permanency, a cloud dispersed by wind reforms after 10 minutes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Only living creatures are affected; the vocabulary cannot condition a gate on creature type, so it is stated in the effect text."
+  },
+  "stoke-the-inner-fire": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As a swift action, give one natural or manufactured weapon you hold the flaming special ability for 1 round — flaming burst instead if you have the fire subtype. It lapses if the weapon leaves your hand, and only one weapon at a time can carry it."
+    },
+    {
+     "type": "narrative",
+     "target": "Heat builds between your armour and your skin: anyone who strikes you with a natural weapon or unarmed strike takes 1 point of fire damage, and a creature grappling you or grappled by you takes 1 point of fire damage each round the grapple lasts. Both become 1d6 if you have the fire subtype. Removing your armour ends this."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The fire damage here is retributive — it lands on whoever strikes or grapples the caster, and the grapple damage repeats every round. Emitting it as a damage spec would burn the spell's own target, which is the caster. Kept narrative for exactly the reason the brief names."
+  },
+  "stolen-light": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Trap in a touched transparent gem worth at least 500 gp an image of everything visible in a 30-foot cone from the gem, or a less detailed image of one object in sight. The gem turns opaque and holds the image until released or dispelled."
+    },
+    {
+     "type": "narrative",
+     "target": "Touching the gem and speaking the command word as a standard action makes the image visible for 1 minute per caster level, as clear as it was when captured. Darkvision reveals nothing in it; low-light vision may show what you did not see. Light brighter than bright light is recorded as bright light. Once released, the image is gone."
+    },
+    {
+     "type": "narrative",
+     "target": "Permanency cast by a 10th-level caster for 5,000 gp leaves the gem projecting the image indefinitely on its command word until destroyed or dispelled."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'permanent or minutes/level (1) (see text)' — two durations for two phases. The storage phase (until the image is released) is what is emitted; the 1 minute/caster level viewing window is stated in the effect text, since the shared format holds only one duration."
+  },
+  "stone-shape": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Reshape up to 10 cubic feet of touched stone, plus 1 cubic foot per caster level, into any crude form you like — coffers, doors and the like. Fine detail is impossible, and any shape with moving parts has a 30% chance of simply not working."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stone-shield": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "untyped",
+     "target": "ac",
+     "note": "cover from the one opponent the slab interposes against"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "ref",
+     "note": "cover from the one opponent the slab interposes against"
+    },
+    {
+     "type": "narrative",
+     "target": "A 1-inch slab of stone rises between you and a chosen opponent until the start of your next turn. If that opponent's attack misses you by 4 or less it hits the shield instead. The shield has hardness 8 and 15 hit points, and area damage hits it; if it is destroyed the spell ends. You must be adjacent to a large area of earth or stone to cast it."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Both bonuses are cover bonuses and the prose names no bonus type, so they are untyped. They apply only against the chosen opponent, which the note records."
+  },
+  "stone-tell": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Speak with natural or worked stone. Stones tell you who or what has touched them and what lies covered or concealed behind or under them, in complete descriptions if asked — limited by what a stone's own perspective and perception can know."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "stone-throwing": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The subject gains the rock throwing and rock catching abilities, usable with any solid, mostly inflexible object of hardness 5 or more, up to two size categories smaller than itself."
+    },
+    {
+     "type": "narrative",
+     "target": "Thrown rocks have a 20-foot range increment to a maximum of 5 increments, and deal 1d8 for a Large thrower, 1d6 for Medium or 1d4 for Small, plus 1-1/2 times the thrower's Strength bonus."
+    },
+    {
+     "type": "narrative",
+     "target": "For each size category smaller than Large the subject is, it takes a cumulative -5 penalty on Reflex saves to catch rocks or similar projectiles."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The rock damage belongs to the granted attack, not to the spell, and its size depends on the subject — so it is not a damage spec. The catching penalty likewise has no single value: it is -5 per size category below Large, which situational_mod cannot express without knowing the subject's size."
+  },
+  "stone-to-flesh": {
+   "effects": [
+    {
+     "type": "remove_condition",
+     "target": "petrified",
+     "note": "any petrified creature regardless of size; life and goods are restored"
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 15,
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The creature does not survive the process."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Alternatively, convert a cylinder of stone 1 to 3 feet across and up to 10 feet long into inert flesh — animate only if a life force or magical energy is already there, so an animated stone statue becomes an animated flesh statue while an ordinary one becomes a mass of inert flesh."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "DC 15 is stated plainly in the prose and is a flat DC, not the usual 10 + level + ability formula, so it is written as 15. What failure does is left in the prose's own words ('to survive the process') rather than converted to apply_condition dead, which the description never says."
+  },
+  "stoneskin": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "adamantine",
+     "note": "discharges once it has prevented 10 points of damage per caster level, to a maximum of 150"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 10/caster level (max 150) discharge pool is a cap on total damage prevented, not a damage or healing progression, so no `scaling` block is emitted; it is recorded in the note. Corpus duration is '10 minutes/level or until discharged'; the timed part is emitted."
+  },
+  "stoneskin-communal": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "adamantine",
+     "note": "ends for a subject once it has prevented 10 points of damage per caster level for that subject, to a maximum of 150"
+    },
+    {
+     "type": "narrative",
+     "target": "The duration is divided among all creatures touched in 10-minute intervals, and the damage pool is tracked per subject."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Duration given is the total pool the caster splits between recipients in 10-minute blocks; the format cannot express a divided pool."
+  },
+  "storm-of-blades": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Create one floating sword per 2 caster levels, to a maximum of five at 10th level, of the type used as the material component, and hurl them at one target in range and line of effect."
+    },
+    {
+     "type": "narrative",
+     "target": "Make a ranged attack roll for each sword, with no range-increment penalty and no penalty for throwing a melee weapon. Each has that sword type's own threat range, critical multiplier and damage. The swords vanish after they hit or miss."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The damage is 'the same damage as a standard sword of the type expended' — it depends on which weapon the caster spent as a component, so there is no die to emit. The number of swords is a per-level progression but not of dice, so it is stated rather than put in `scaling`."
+  },
+  "storm-of-vengeance": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "deafened",
+       "note": "1d4 x 10 minutes; every creature under the cloud saves when the storm forms"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Round 2: acid rains over the area for 1d6 acid damage, no save. Round 3: six lightning bolts you aim, no two at the same target, each 10d6 electricity with a Reflex save for half. Round 4: hailstones for 5d6 bludgeoning damage, no save."
+    },
+    {
+     "type": "narrative",
+     "target": "Rounds 5 to 10: rain and wind obscure all sight including darkvision past 5 feet — concealment at 5 feet (20% miss chance), total concealment beyond (50% and no locating by sight). Speed drops by three-quarters, ranged attacks in the storm are impossible, and a spell cast inside is disrupted unless its caster makes a concentration check against this spell's save DC + that spell's level."
+    }
+   ],
+   "duration": {
+    "kind": "concentration",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Only the first round's deafening is emitted as a mechanical effect: it happens once, to everyone under the cloud, the moment the spell lands. Rounds 2, 3 and 4 each deal their own damage on a later round of concentration — scheduled repeating damage the vocabulary cannot express, and converting any of it would have the engine deal 10d6 the instant the spell is cast. Corpus duration is 'concentration, up to 10 rounds'; the 10-round cap is recorded here because the shared format has no cap field for concentration."
+  },
+  "storm-sight": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "While inside a storm you need no concentration checks against wind or storms for spells you cast or concentrate on, including the casting of this spell itself."
+    },
+    {
+     "type": "narrative",
+     "target": "Concentrating for 1 minute inside the storm tells you whether other living creatures of Intelligence 3 or higher are caught in it within 400 feet. One more round of concentration reveals the presence of each Small or larger such creature, 2 consecutive rounds their approximate distance, 3 rounds their approximate direction."
+    },
+    {
+     "type": "narrative",
+     "target": "After 3 rounds of concentrating this way you gain a bonus equal to half your caster level on your next initiative check during the spell's duration."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The initiative bonus is half the caster level, so there is no fixed number to put in a combat_mod, and it applies only to the next initiative check after three rounds of concentration. Left in words rather than emitted at a guessed value."
+  },
+  "straitjacket": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A straitjacket appears around the target. Make a combat maneuver check against its CMD with a CMB of your caster level + 5; this provokes no attack of opportunity. On a success the target is restrained: as grappled, except it moves at full speed, needs no concentration checks, and can take no action needing a hand or arm — including any spell with a somatic or material component."
+    },
+    {
+     "type": "narrative",
+     "target": "After it has been restrained for 1 round, the target gets one extra saving throw, of your choosing, against a confusion effect, a curse, a fear effect or a madness currently on it — only for effects lasting 10 minutes/level or less, never instantaneous ones, and only once per casting."
+    },
+    {
+     "type": "narrative",
+     "target": "Escape needs a combat maneuver check or Escape Artist check against DC 10 + your caster level + your highest of Intelligence, Wisdom or Charisma modifier."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Not emitted as apply_condition grappled: the prose lists three ways the restraint differs from grappled, and applying the real condition would impose the speed loss and concentration checks the spell explicitly removes."
+  },
+  "strand-of-the-tangled-knot": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The next single attack made against you takes a -10 penalty, and if that attack is a critical hit it is treated as a normal hit instead.",
+     "uses": "once",
+     "uses_count": 1
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -10 is a penalty on the *attacker's* roll, not a bonus to the caster's AC. A combat_mod on 'attack' would penalise the caster's own attacks, and one on 'ac' would apply to every attack rather than the next one and would not carry the critical-to-normal clause. Left narrative on purpose."
+  },
+  "strangling-hair": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Your hair animates and makes a grapple check against one target, using your caster level as base attack bonus plus your Intelligence bonus (witch or wizard) or Charisma bonus (sorcerer), provoking nothing."
+    },
+    {
+     "type": "narrative",
+     "target": "On a success the target takes 1d6 damage or your unarmed strike damage, whichever is greater, and is grappled; each further round the hair wins a grapple check it deals another 1d6. The hair gets +5 on grapple checks against a foe it already holds, but can neither move nor pin. Its CMD for escaping is 10 + its CMB."
+    },
+    {
+     "type": "narrative",
+     "target": "The hair keeps attacking its chosen target on its own; naming a new target is a move action and releases the old one. The hair cannot be attacked separately but can be dispelled."
+    }
+   ],
+   "duration": {
+    "kind": "concentration",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Damage lands only after a successful grapple check and again every round the grapple holds, so it is not a damage spec. The 'grappled' condition likewise follows the check rather than the casting, so it is not an apply_condition. Corpus duration is 'concentration, up to 1 round/level'; the per-level cap is recorded here, since the format cannot hold a cap on a concentration duration."
+  },
+  "strip-scales": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The living target's racial natural armour bonus drops by 1 point per 3 caster levels."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The size of the penalty is 1 per 3 caster levels, so there is no fixed amount for a combat_mod, and `scaling` only describes dice progressions. A real gap: the vocabulary cannot express a modifier whose size scales with caster level."
+  },
+  "strong-jaw": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Each natural attack the touched creature makes deals damage as though the creature were two sizes larger; a Gargantuan or Colossal creature instead doubles its natural attack damage. Nothing else about the creature changes — this is not a size change."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The new damage depends on the subject's own natural attack dice, which the spell never names, so no dice are emitted."
+  },
+  "strong-wings": {
+   "effects": [
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 10,
+     "note": "an enhancement bonus; no effect on a wingless creature or a winged creature that cannot fly"
+    },
+    {
+     "type": "narrative",
+     "target": "The target's fly maneuverability improves by one category, to a maximum of good."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose calls the increase an enhancement bonus, but the speed effect type has no bonus_type field, so it is recorded in the note. Maneuverability is not in the vocabulary at all."
+  },
+  "stunning-barrier": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "deflection",
+     "target": "ac"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "target": "fort"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "target": "ref"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "resistance",
+     "target": "will"
+    },
+    {
+     "type": "narrative",
+     "target": "Any creature that strikes you with a melee attack is stunned for 1 round unless it makes a Will save. The spell is discharged as soon as the field stuns one opponent."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The stun is retributive — it happens to whoever strikes the caster, not to the caster or a chosen target — so it is narrative and not an apply_condition under a save_gate, which would have stunned the spell's own subject. 'A +1 resistance bonus on saves' with no save named is emitted as all three saves separately, since save_mod names exactly one."
+  },
+  "stunning-barrier-greater": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "ac"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "fort"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "ref"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "will"
+    },
+    {
+     "type": "narrative",
+     "target": "As stunning barrier: any creature that strikes you in melee is stunned for 1 round unless it makes a Will save. This version is not discharged until it has stunned a number of creatures equal to your caster level."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The greater version only restates the size of the bonuses ('+2 to AC and on saving throws'), not their types; deflection and resistance are carried over from stunning barrier, which this spell explicitly functions as."
+  },
+  "stunning-finale": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You must have a bardic performance running; casting this ends it immediately with a flourish."
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "stunned",
+       "duration": {
+        "amount": 1,
+        "unit": "round"
+       }
+      }
+     ],
+     "on_success": [
+      {
+       "type": "apply_condition",
+       "target": "staggered",
+       "duration": {
+        "amount": 1,
+        "unit": "round"
+       }
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "sturdy-tree-fort": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Grow a tree in the touched 5-foot square, 1 foot thick per 4 caster levels and up to 5 feet high per caster level (less if a ceiling is in the way). The tree has hardness 5 and 20 hp per caster level; destroying it destroys the fort."
+    },
+    {
+     "type": "narrative",
+     "target": "Anywhere along the trunk, create a wooden building of one 10-foot cube per 4 caster levels. Every part must touch the trunk; contiguous cubes merge with ladders between levels. Each cube is a secure shelter of hardness 5, with shuttered arrow slits giving improved cover when open and total cover when closed."
+    },
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "untyped",
+     "target": "climb",
+     "note": "for up to your caster level in creatures you designate, and only on the fort's own structure"
+    },
+    {
+     "type": "permission",
+     "target": "Designated creatures are not denied their Dexterity bonus to AC while climbing on the fort's structure."
+    },
+    {
+     "type": "narrative",
+     "target": "Cannot be cast in worked stone, but works anywhere natural — cavern, desert, glacier. In forest or jungle the fort is camouflaged while doors and windows are shut (or open, if those inside stay quiet and do nothing violent), needing a DC 25 Perception or Survival check to spot."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The +10 Climb is written with no bonus type, hence untyped, and applies only to designated creatures on this structure — recorded in the note because skill_mod has nowhere else to put it."
+  },
+  "subjective-reality": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Convince yourself that one object, creature or force you can see within 400 feet + 40 feet/level is an illusion. To you it becomes transparent, silent and scentless; you and it pass through each other freely."
+    },
+    {
+     "type": "narrative",
+     "target": "Its nonmagical attacks cannot harm you and its magical attacks deal half damage to you; its non-damaging magical abilities have a 50% chance of not affecting you. In exchange your attacks deal it no damage and your magical abilities do not affect it at all."
+    },
+    {
+     "type": "immunity",
+     "target": "the chosen target's sonic, language-dependent and scent-based attacks"
+    },
+    {
+     "type": "narrative",
+     "target": "You and it can still affect each other through intermediaries — it is immune to your earthquake, but not to the ceiling your earthquake drops on it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "submerge-ship": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The touched vessel sinks inside a bubble of endlessly replenished breathable air and sails underwater as easily as on the surface, with magical propulsion giving it a maximum speed of 120 feet and acceleration of 30 feet. The pilot uses the normal sailing skill and can dive or ascend as part of the ship's movement; the crew still works the ship."
+    },
+    {
+     "type": "narrative",
+     "target": "The bubble protects ship and crew from drowning and pressure but not from obstacles or creatures, cannot be used offensively, and will not let the ship rise into a space too small for it. Creatures may enter or leave freely but none can be forced in."
+    },
+    {
+     "type": "narrative",
+     "target": "When the duration ends the bubble pops, and a ship still underwater gains the sinking condition. No effect on a ship in water too shallow to cover it. An unwilling ship resists with its own Will save."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "substitute-trail": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Alter the trails left by up to one creature per caster level that you interacted with in the last 24 hours, so that the tracks appear to belong to another creature you have actually met."
+    },
+    {
+     "type": "narrative",
+     "target": "A tracker who beats the DC to follow the trail by your caster level or more realises the trail has been tampered with, though only magic such as true seeing shows what really passed."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "suffocation": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The air is pulled from the target's lungs and it begins to suffocate: on its next turn it falls unconscious at 0 hit points, one round later it drops to -1 and is dying, and one round after that it dies."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "apply_condition",
+       "target": "staggered",
+       "duration": {
+        "amount": 1,
+        "unit": "round"
+       },
+       "note": "gasping for breath"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Each round the target may make a further Fortitude save to delay that round's step; the spell runs 3 rounds and every failed save moves it one step further along the track. Only living creatures that must breathe are affected, and holding one's breath is no defence once the first save is failed."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 3,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The unconscious / dying / dead steps are not emitted as apply_condition: each lands a round later than the last and only if that round's save also fails. Emitting them would have the engine knock the target unconscious the instant the spell resolved."
+  },
+  "suffocation-instant": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "slay living",
+     "note": "kills by immediate suffocation instead of slay living's own death effect"
+    },
+    {
+     "type": "narrative",
+     "target": "Creatures that need not breathe are immune. The target counts as having taken a dose of pesh for addiction and withdrawal."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "slay living's own damage-on-a-successful-save is not restated here; the spell_effect points at it by name rather than copying numbers this description does not give."
+  },
+  "suffocation-mass": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "suffocation",
+     "note": "one creature per 2 caster levels, no two more than 30 feet apart"
+    },
+    {
+     "type": "narrative",
+     "target": "The duration is far longer than suffocation's, so victims must make many more Fortitude saves to stave off suffocating."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "suffocation-slow": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target cannot breathe and is treated as holding her breath, following the normal suffocation rules."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Strong stimulants, anything that raises the target's Constitution, or physical trauma such as 10 or more damage from one attack ends the spell at once. Creatures that need not breathe are immune. The target counts as having taken a dose of pesh for addiction and withdrawal, so the death looks like an overdose."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "suggestion": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target follows a course of activity of a sentence or two that you suggest, provided it sounds reasonable; an obviously harmful suggestion negates the spell outright. You may instead name a condition that triggers the activity later — if it never occurs, nothing is done."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "A very reasonable suggestion imposes a penalty on the save, such as -1 or -2, at the GM's judgement. The spell ends early if the suggested activity is finished sooner than the duration."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The save penalty for a very reasonable suggestion is written as an example range ('such as -1 or -2'), not a rule, so no number is emitted for it. Corpus duration is 'hours/level or until completed'; the timed part is emitted and the early end is in the effect text."
+  },
+  "suggestion-mass": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "suggestion",
+     "note": "one creature per caster level, no two more than 30 feet apart, all given the same suggestion"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-accuser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon one accuser devil (a zebub) from Hell to obey you, as a summon monster spell. Accuser devils fly, and can grant others visions of what they have witnessed, which makes them excellent spies."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Summoning has no effect type; the creature's own stat block is in Bestiary 2 and is not restated here."
+  },
+  "summon-ancestral-guardian": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Call two ancestral dwarf spirits, each armed with a traditional dwarven weapon of your choice. Each has the abilities of a spiritual weapon, except that the two may attack different targets and deal that weapon's physical damage — bludgeoning, piercing or slashing — instead of force damage."
+    },
+    {
+     "type": "narrative",
+     "target": "As with a summon monster spell, the real ancestors come to no harm if these manifestations are destroyed."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Damage is spiritual weapon's, rolled per attack every round; see that spell's entry. Not emitted as a damage spec here for the same reason it is not emitted there."
+  },
+  "summon-barghest-i": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single barghest from Basalfeyst to serve you, as a summon monster spell. It lacks the feed ability, but at caster level 9th or higher it arrives with 2 growth points and the attack, CMB, save, skill, hit point and caster level bonuses those bring."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-barghest-ii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon barghest I, but summons either 1 greater barghest or 1d3 ordinary barghests, each with 2 growth points."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-cacodaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single cacodaemon to serve you, as a summon monster spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-cacodaemon-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon cacodaemon, but summons 1d4+1 cacodaemons."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-ceustodaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single ceustodaemon to serve you, as a summon monster spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-derghodaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single derghodaemon to serve you, as a summon monster spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-eidolon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon your own eidolon as if you had called it normally, except that it stays only for this spell's duration. It works even if the eidolon was sent home by damage, and does nothing at all if the eidolon is already on your plane."
+    },
+    {
+     "type": "narrative",
+     "target": "While summoned this way the eidolon cannot touch a creature warded by protection from evil or the like, and dispel magic sends it back to its home plane."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-elder-worm": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon nature's ally VIII, except that what you summon is a purple worm with the giant creature simple template."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-elemental-steed": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a greater air, earth, fire or water elemental bound into the shape of a chariot that moves at your command and carries up to nine Medium creatures."
+    },
+    {
+     "type": "narrative",
+     "target": "Passengers are unharmed by the elemental and can see, breathe and act normally, taking no environmental damage while it flies, swims, burrows or earth glides; they get a normal chariot's cover but no other protection."
+    },
+    {
+     "type": "narrative",
+     "target": "The elemental keeps all its own statistics and abilities, but loses its slam attacks and gains a trample attack. Because it summons an elemental creature, this counts as a spell of that element's type."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "No `element` is emitted: the caster chooses air, earth, fire or water at casting, so no single energy is correct for the spell."
+  },
+  "summon-erodaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single erodaemon to serve you, as a summon monster spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-flight-of-eagles": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon 1d4+1 giant eagles that serve as you direct. They will fight, and they can also be ridden as mounts."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-froghemoth": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon nature's ally IX, except that what you summon is a froghemoth."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-genie": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser summon genie, except that you summon either one djinni or 1d3 jann."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-genie-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser summon genie, except that you summon one shaitan, 1d3 djinn, or 1d4+1 jann."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-genie-lesser": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster i",
+     "note": "except that what is summoned is one janni"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-giant-ally-i": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon nature's ally VI but with a standard-action casting time, summoning one cave, hill, marsh, river, slag, stone or wood giant."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-giant-ally-ii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon giant ally I, except that you summon one desert, fire, frost or jungle giant, or 1d3 cave, hill, marsh, river, slag, stone or wood giants."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-giant-ally-iii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon giant ally I, except that you summon one ash or cloud giant; 1d3 desert, fire, frost or jungle giants; or 1d4+1 cave, hill, marsh, river, slag, stone or wood giants."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-greater-demon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As a summon monster spell, except that you summon a single coloxus, a single omox demon, or 1d3 kalavakus demons."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-infernal-host": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster v",
+     "note": "except that it can only summon host devils — gaavs and magaavs"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-instrument": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon one typical handheld musical instrument of your choice, appearing in your hands or at your feet. It plays only for you, nothing too large to hold in two hands can be summoned, and it vanishes when the spell ends."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-kami": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon nature's ally V, except that you summon one kodama, 1d3 fukujin, or 1d4+1 shikigami."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-laborers": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon one humanoid petitioner per caster level from a plane of your choice. They work at your direction but will not fight and will not travel anywhere dangerous."
+    },
+    {
+     "type": "narrative",
+     "target": "They assist your downtime activities within a settlement, increasing the effect of Influence or Labor you spend by 50%, to a maximum of 1 extra point per 2 caster levels. This stacks with any increase your followers in that settlement already give."
+    },
+    {
+     "type": "narrative",
+     "target": "The spell takes the alignment type of the plane the petitioners come from — chaotic and evil for the Abyss, lawful and good for Heaven. Effects that increase how many creatures a spell summons, such as Superior Summoning, do not apply."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 8,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Influence/Labor boost is a downtime subsystem the effect vocabulary does not cover, and it is a percentage rather than a flat modifier, so no situational_mod is emitted."
+  },
+  "summon-lesser-demon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As a summon monster spell, except that you summon a single brimorak, one incubus, one thoxel demon, 1d3 schir demons, or 1d4+1 vermlek demons."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-lesser-psychopomp": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As a summon monster spell, except that you summon 1d3 esobok psychopomps or 1d4+1 nosoi psychopomps."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-meladaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single meladaemon to serve you, as a summon monster spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-minor-ally": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon nature's ally I, except that you summon 1d3 Tiny or smaller animals — bats, lizards, monkeys, rats, ravens, toads, weasels and the like — all of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-minor-monster": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As summon monster 1, except that you summon 1d3 Tiny or smaller animals — bats, lizards, monkeys, rats, ravens, toads, weasels and the like — all of the same kind. As with summon monster 1's animals, you may apply one alignment-appropriate template to them."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-1": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon one extraplanar creature of your choice from the 1st-level list. It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
+    },
+    {
+     "type": "narrative",
+     "target": "A summoned creature cannot summon or conjure anything itself, cannot teleport or planar travel, cannot be summoned into an environment that will not support it, and cannot use spells or spell-like abilities that duplicate spells with expensive material components."
+    },
+    {
+     "type": "narrative",
+     "target": "Summoning a creature with an alignment or elemental subtype makes this a spell of that type. Creatures marked '*' on the table arrive with the celestial template if you are good or the fiendish template if you are evil (your choice if neutral), always match your alignment, and make the spell's type match your alignment too."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The creature lists themselves (Table 10-1) are not in the description and are not reproduced here."
+  },
+  "summon-monster-2": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 2nd-level list, or 1d3 creatures of the same kind from the 1st-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-3": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 3rd-level list, 1d3 of the same kind from the 2nd-level list, or 1d4+1 of the same kind from the 1st-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-4": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 4th-level list, 1d3 of the same kind from the 3rd-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-5": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 5th-level list, 1d3 of the same kind from the 4th-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-6": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 6th-level list, 1d3 of the same kind from the 5th-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-7": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 7th-level list, 1d3 of the same kind from the 6th-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-8": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 8th-level list, 1d3 of the same kind from the 7th-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-monster-9": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon monster 1",
+     "note": "all of summon monster 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one creature from the 9th-level list, 1d3 of the same kind from the 8th-level list, or 1d4+1 of the same kind from any lower-level list."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-1": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon one natural creature of your choice from the 1st-level list — animal, fey, magical beast, elemental outsider or giant. It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
+    },
+    {
+     "type": "narrative",
+     "target": "A summoned creature cannot summon or conjure anything itself, cannot teleport or planar travel, cannot be summoned into an environment that will not support it, and cannot use spells or spell-like abilities that duplicate spells with expensive material components."
+    },
+    {
+     "type": "narrative",
+     "target": "Every creature on the table is neutral unless noted. Summoning one with an alignment or elemental subtype makes this a spell of that type; any summoned without an alignment subtype instead matches your alignment, which makes the spell's type match yours."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The creature lists themselves (Table 10-2) are not in the description and are not reproduced here."
+  },
+  "summon-nature-s-ally-2": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 2nd-level creature, or 1d3 1st-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-3": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 3rd-level creature, 1d3 2nd-level creatures of the same kind, or 1d4+1 1st-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-4": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 4th-level creature, 1d3 3rd-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-5": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 5th-level creature, 1d3 4th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-6": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 6th-level creature, 1d3 5th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-7": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 7th-level creature, 1d3 6th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-8": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 8th-level creature, 1d3 7th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-nature-s-ally-9": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 1",
+     "note": "all of summon nature's ally 1's standing rules apply"
+    },
+    {
+     "type": "narrative",
+     "target": "Summon one 9th-level creature, 1d3 8th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-ship": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Holding an elaborately carved model worth 10% of the ship's price, conjure a full ship of that shape from planar raw materials, complete with all gear needed to sail or row it — but no crew and no cargo."
+    },
+    {
+     "type": "narrative",
+     "target": "It fails if there is not enough water to float it, or if the space is occupied by anything other than water and Medium or smaller aquatic animals, which it displaces. Recasting replaces the remaining duration with a fresh one. When the spell ends or is dismissed the ship stops dead and falls apart over the following minute."
+    },
+    {
+     "type": "narrative",
+     "target": "The largest ship you can summon depends on your caster level, on a table the description refers to but does not include."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The ship-size-by-caster-level table is referenced but absent from the corpus description, so no sizes are invented. Marked dismissible because the prose says the spell can be dismissed."
+  },
+  "summon-stampede": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Conjure a herd of aurochs or similar herd animals filling a 20-foot radius, which stampedes 120 feet per round in a straight line in the direction you indicate."
+    },
+    {
+     "type": "narrative",
+     "target": "Any creature caught in the herd's path that round takes 4d6+9 damage from the hooves, halved by a successful Reflex save."
+    },
+    {
+     "type": "narrative",
+     "target": "If the path would take the herd somewhere obviously dangerous — over a cliff, through fire — or through a solid barrier, it stops at the obstacle and sets off again in a random direction, until it meets another obstacle or the spell ends."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The 4d6+9 is deliberately not a damage spec under a Reflex gate. It lands on whoever happens to be in the herd's path on a given round, not on a target the caster designates, and the herd keeps running for the whole duration, so it can trample again on later rounds. The description also never names a damage type, so emitting one would mean guessing between bludgeoning and untyped."
+  },
+  "summon-swarm": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a swarm of bats, rats or spiders — your choice — which attacks every other creature in its area, and which you may place so that it shares another creature's space."
+    },
+    {
+     "type": "narrative",
+     "target": "With no living creature in its area, the swarm attacks or chases the nearest creature as best it can. You have no control over its target or its direction of travel."
+    }
+   ],
+   "duration": {
+    "kind": "concentration",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'concentration + 2 rounds'; the format cannot express a tail after concentration ends, so the extra 2 rounds are recorded here. The swarm's own damage belongs to its stat block, which this description does not give."
+  },
+  "summon-thanadaemon": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Summon a single thanadaemon to serve you, as a summon monster spell. It can only be cast where there is open water enough for the daemon's skiff, or on the Astral or Ethereal Plane."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  },
+  "summon-totem-creature": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "summon nature's ally 3",
+     "note": "except that only the caster's own quah's totem creatures may be summoned"
+    },
+    {
+     "type": "narrative",
+     "target": "You must have been raised Shoanti and belong to a quah to cast this at all, and may summon only your own quah's revered creatures: Lyrune-Quah — small air elemental, 1d3 bats, wolf, 1d3 owls. Shadde-Quah — 1d3 eagles, small earth elemental, small water elemental. Shriikirri-Quah — small air elemental, 1d3+1 hawks, horse. Shundar-Quah — small air elemental, small earth elemental, 1d3 eagles."
+    },
+    {
+     "type": "narrative",
+     "target": "Sklar-Quah — 1d3 fire beetles, small fire elemental, horse. Skoan-Quah — 1d3+1 vultures, 1d3 fire beetles, 1d3 giant centipedes. Tamiir-Quah — small air elemental, 1d3 eagles, small earth elemental."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read"
+  }
+ }
+}

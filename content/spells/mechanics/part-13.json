@@ -1,0 +1,3019 @@
+{
+ "partition": 13,
+ "source": "read from the spell descriptions in content/spells/spells.json",
+ "spells": {
+  "peace-bond": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates one glowing rune of peace, plus one per two caster levels above 1st (maximum five at 9th level), each lighting a 5-foot cube. Your own area spells of 3rd level or lower cannot enter or affect a warded cube; spells with an effect or targets pass through normally."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The fireball mentioned in the prose is a worked example of what the runes block, not damage this spell deals. Rune count scales but no effect type can hold 'number of runes', so it lives in the narrative sentence."
+  },
+  "peacebond": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Locks a sheathed or slung weapon in place. Drawing it takes a standard action and a Strength check against the spell's save DC, provoking attacks of opportunity whether or not the check succeeds."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Strength check DC is stated only as 'equal to the saving throw DC', so no fixed number is emitted."
+  },
+  "peacebond-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Locks one weapon per caster level in place as peacebond; drawing one takes a standard action and a Strength check against the spell's save DC. A drawn weapon instead tries to sheathe itself (Strength check to prevent, or it falls to the ground); unattended loose weapons are anchored and need a Strength check and a standard action to pick up."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "All DCs are stated as 'equal to the spell's save DC' only."
+  },
+  "peacemaker-s-parley": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "After casting, make a Diplomacy check as a free action against every creature in the area to alter its attitude toward you. Affected creatures revert to their former attitude quickly if threatened or treated poorly."
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "the Diplomacy check made by this spell, against creatures that failed their save"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The Will save does not itself inflict anything; failing it only denies the creature protection from the +2 sacred bonus, so it is not modelled as a save_gate."
+  },
+  "peasant-armaments": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Wield each affected improvised weapon as the simple or martial weapon it resembles, with proficiency and no improvised-weapon penalty. Its shape and appearance are unchanged, and items that are not improvised weapons are unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The chair leg / butter knife / pitchfork passage is a worked example, not a fixed list."
+  },
+  "peerless-integrity": {
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "target": "bluff"
+    },
+    {
+     "type": "skill_mod",
+     "amount": 2,
+     "bonus_type": "circumstance",
+     "target": "diplomacy"
+    },
+    {
+     "type": "narrative",
+     "target": "Every creature in the 10-foot emanation, including you, reads as lawful good to alignment-detecting divinations. A caster of such a divination who succeeds at a Will save knows the reading is false. Other divinations and alignment-based harmful effects are unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Will save belongs to the diviner probing the area, not to anyone in it, so it is not a save_gate on this spell."
+  },
+  "penumbra": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "penalties and blindness caused by bright light, including light sensitivity and light blindness"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Only one penumbra may be active at a time; a second casting dispels the first. No field holds that, so it is left to the prose."
+  },
+  "penumbral-disguise": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Gain a competence bonus equal to your caster level on Disguise checks and on Stealth checks made in normal light, dim light, or darkness."
+    },
+    {
+     "type": "narrative",
+     "target": "Creatures that see you in dim light or darkness learn only your general shape and the gist of your actions, never your precise actions, appearance, or identity. Bright light reveals you normally."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The bonus is 'equal to your caster level' with no base number; skill_mod.amount must be an integer, so emitting one would mean inventing a value. Left as narrative deliberately."
+  },
+  "perceive-betrayal": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You are alerted, without learning the source, whenever a creature harbouring traitorous intent toward the person you designated at casting comes within 200 feet. Concentrating reveals the strength of the greatest threat as Ill Will, Plotting, or Imminent. Creatures immune to mind-affecting or thought-detecting effects are invisible to it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "perceive-cues": {
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "bonus_type": "competence",
+     "target": "perception"
+    },
+    {
+     "type": "skill_mod",
+     "amount": 5,
+     "bonus_type": "competence",
+     "target": "sense motive"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "perfect-placement": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "insight",
+     "target": "ac"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "insight",
+     "target": "ref"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 3,
+     "bonus_type": "insight",
+     "target": "AC against attacks of opportunity"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The +3 against attacks of opportunity is the same insight bonus raised, not an extra one; because both are insight-typed they correctly do not stack."
+  },
+  "permanency": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cast immediately after another spell, this makes that spell's duration permanent, if it is on the spell's list. Each entry has its own minimum caster level and diamond-dust gp cost. Personal-only list: arcane sight, comprehend languages, darkvision, detect magic, read magic, see invisibility, tongues. Self, another creature or object: enlarge person, magic fang, greater magic fang, reduce person, resistance, telepathic bond (two creatures per casting). Objects or areas only: alarm, animate objects, dancing lights, ghost sound, gust of wind, invisibility, mage's private sanctum, magic mouth, phase door, prismatic sphere, prismatic wall, shrink item, solid fog, stinking cloud, the symbol spells, teleportation circle, wall of fire, wall of force, web. A permanency on yourself can be dispelled only by a caster of higher level than you were; permanency on other targets is dispellable normally. The GM may allow other spells."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The caster levels and gp costs are per-spell prerequisites for casting, not effects this spell produces, so none of them are emitted as numbers."
+  },
+  "permanent-hallucination": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As audiovisual hallucination, but the phantasm carries visual, auditory, olfactory, tactile and thermal components and runs a complex script on its own without concentration, reacting to what the target perceives. A target who disbelieves may end the effect entirely at any time thereafter."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The Will disbelief save is a disbelief check against an illusion, not a gate on a mechanical effect the vocabulary can express."
+  },
+  "permanent-image": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As silent image, but the figment carries visual, auditory, olfactory and thermal elements and is permanent. Concentrating moves the image within range; without concentration it is static."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "pernicious-poison": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": -4,
+     "bonus_type": "untyped",
+     "target": "saving throws against poison"
+    },
+    {
+     "type": "situational_mod",
+     "amount": -4,
+     "bonus_type": "untyped",
+     "target": "attempts to cure the target's poison with a skill or with magic"
+    },
+    {
+     "type": "narrative",
+     "target": "Poisons affecting the target run for two additional frequency increments."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Black adder venom at 8 rounds and arsenic at 6 minutes are worked examples of the two-increment extension, not fixed durations. The penalties are untyped because the prose names no bonus type."
+  },
+  "pernicious-pranksters": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Each round on your turn, including the round you cast it, the invisible pranksters make one dirty trick, disarm, steal or trip combat maneuver against a random foe in range, with a combat maneuver bonus equal to your caster level + your casting ability modifier, and a further +4 unless the target can see invisible creatures. A DC 20 Bluff, Diplomacy or Intimidate check as a standard action lets you choose the target and the maneuver for that round."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The maneuver repeats every round and its bonus is caster-level derived, so no fixed number is emitted."
+  },
+  "persistent-image": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As silent image, but the figment carries visual, auditory, olfactory and thermal components, may include intelligible speech, and follows a script you set without your concentration."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "persistent-vigor": {
+   "effects": [
+    {
+     "type": "fast_healing",
+     "amount": 2
+    },
+    {
+     "type": "immunity",
+     "target": "bleed effects"
+    },
+    {
+     "type": "immunity",
+     "target": "the sickened condition"
+    },
+    {
+     "type": "immunity",
+     "target": "the nauseated condition"
+    },
+    {
+     "type": "narrative",
+     "target": "Succeeding at a saving throw against a disease or poison effect ends that effect outright. Failing one lets you instantly dismiss this spell to reroll the save with a +4 bonus; you must keep the reroll even if it is worse."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The +4 reroll bonus is conditional on dismissing the spell, so it is described rather than emitted as a standing save_mod."
+  },
+  "pesh-addiction": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "geas/quest",
+     "note": "the only allowed command is 'use pesh or refined pesh'"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'days/level (1) or until discharged'; the per_level form is emitted and the discharge condition is the geas being fulfilled."
+  },
+  "pesh-addiction-lesser": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "lesser geas",
+     "note": "the only allowed command is 'use pesh or refined pesh'"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'days/level (1) or until discharged'."
+  },
+  "pessimism": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "attack"
+    },
+    {
+     "type": "combat_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "weapon damage rolls"
+    },
+    {
+     "type": "save_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "fort"
+    },
+    {
+     "type": "save_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "ref"
+    },
+    {
+     "type": "save_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "will"
+    },
+    {
+     "type": "situational_mod",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "target": "ability checks and skill checks"
+    },
+    {
+     "type": "narrative",
+     "target": "The target cannot gain morale bonuses of any kind while this lasts. On a natural 1 on an attack roll or save, on failing an ability or skill check by more than 5, or on taking extra damage from a confirmed critical hit, the penalty worsens to -3 for 1 round; the worsened penalty does not stack with itself."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -3 is a temporary replacement for the -2, not an additional penalty, so it stays in prose rather than becoming a second spec."
+  },
+  "petulengro-s-validation": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Touching a creature while holding a hair, nail clipping or other sample of a creature no more than one week old per caster level, you instantly know whether the touched creature is the one the sample came from. It works on a corpse or on partial remains too, and the touch can be held as a charge so the casting goes unnoticed."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "phantasmal-affliction": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target believes it has an affliction of your choosing. It first attempts a Will save to recognise the affliction as unreal; only on a failure does the chosen affliction below take hold. Choose exactly one."
+    },
+    {
+     "type": "narrative",
+     "target": "Curse: a -4 penalty on attack rolls, saves, ability checks and skill checks for 1 hour per caster level. After the disbelief save the target attempts a second Will save to negate this."
+    },
+    {
+     "type": "narrative",
+     "target": "Poison: choose a physical ability score. Each round for 6 rounds, plus 1 round per five caster levels, the target takes 1d3 points of damage to that score. A Fortitude save on its turn negates that round's damage and ends the ongoing damage."
+    },
+    {
+     "type": "narrative",
+     "target": "Wasting: each day the target takes 1d4 Constitution damage and becomes fatigued. A successful Fortitude save prevents that day's damage, and two consecutive successes end the effect."
+    },
+    {
+     "type": "narrative",
+     "target": "The affliction is entirely mental: neutralize poison, remove disease, delay poison and the Heal skill do nothing, and ordinary immunities do not apply (though a creature immune to the real affliction gets +4 on the Will save to disbelieve). Constitution damage from it cannot kill, only knock the target unconscious. It is dispellable, and placebo effect counters and dispels it."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Three mutually exclusive modes the caster picks between; the vocabulary has no way to say 'choose one of these effect groups', so emitting all three as live specs would apply effects the caster did not choose. Both the poison and wasting damage repeat every round or day, which the vocabulary also cannot express. Corpus duration is 'see text', so no duration is emitted."
+  },
+  "phantasmal-asphyxiation": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target must succeed at a Will save or believe it cannot breathe. Thereafter it attempts a Fortitude save at the start of each of its turns. The first failure leaves it staggered until its next save; a second consecutive failure drops it unconscious for the rest of the duration, breathing normally but shaken for 1 minute on waking. Two consecutive successes end the spell entirely. Creatures that do not breathe are unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The staggered/unconscious outcome depends on a running tally of consecutive saves each round, which no spec type can hold."
+  },
+  "phantasmal-putrefaction": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "wis",
+       "dice": "1d4",
+       "note": "occurs once only, on failing the initial save to disbelieve"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Each round at the start of its turn an affected target gets another Will save to disbelieve; a target that fails must then succeed at a Fortitude save or faint, falling asleep as sleep (though not as a magical sleep effect). Waking does not end the spell — the saves continue each round until the spell ends or the target disbelieves. Onlookers see nothing and can tell allies, giving them +4 on the save to disbelieve."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The 1d4 Wisdom damage is the target's own, once, on the initial failed disbelief — so it is converted. The 1d8 sanity damage variant is an optional-subsystem substitution and sanity is not in the vocabulary, so it is not emitted."
+  },
+  "phantasmal-reminder": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "save_gate",
+       "target": "fort",
+       "dc": "10 + spell level + casting ability modifier",
+       "on_failure": [
+        {
+         "type": "damage",
+         "dice": "1d6",
+         "damage_type": "untyped",
+         "lethality": "lethal",
+         "scales": "full",
+         "note": "1d6 per caster level, maximum 10d6; a quasi-real memory of existing wounds, so it cannot be reduced or prevented, by shield other or anything else"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Castable only on a creature that has taken damage since the end of your last turn. If the target disbelieves and either has natural telepathy or wears a helm of telepathy, the memory rebounds on you: attempt a Will save at once or take half the spell's damage yourself."
+    }
+   ],
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "dice_per": 1,
+    "per_levels": 1,
+    "cap_dice": 10,
+    "damage_type": "untyped"
+   },
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The rebound damage lands on the caster, not the target, so it is described rather than emitted as this spell's damage."
+  },
+  "phantasmal-web": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "web",
+     "note": "a target that fails to disbelieve is treated as though in a web spell; being illusory it cannot be burned or destroyed, gives concealment but no cover against the target's own attacks, and cannot be escaped by moving or teleporting"
+    },
+    {
+     "type": "narrative",
+     "target": "At the beginning of each of its turns an affected target must succeed at a Fortitude save or be nauseated for that round by the phantasmal spiders. Freedom of movement allows unobstructed movement but negates neither the concealment nor the nausea. Other creatures see nothing and may help allies disbelieve."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "phantom-blood": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "If losing hit points at the end of a temporary Constitution-boosting effect — a barbarian's rage, a bloodrager's bloodrage — would knock you unconscious or kill you, you gain temporary hit points equal to your caster level, maximum 10. Each casting grants this once."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The temporary hit points equal caster level with no fixed base, and they are conditional on a trigger that may never fire, so temp_hp would both invent a number and apply it unconditionally."
+  },
+  "phantom-chariot": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Conjures a quasi-real heavy chariot and a silent four-creature draft team, appearance to taste. It carries six including the driver, who must be you or someone you named at casting; the team never fights. Chariot and team are one entity with AC 19 and 10 hit points + 2 per caster level (maximum 50); at 0 hit points it vanishes, treating everyone aboard as in a wrecked vehicle. It gains powers by caster level as a phantom steed mount does."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The AC and hit points belong to the conjured entity, not to any creature the spell targets, so they are not emitted as modifiers or temporary hit points."
+  },
+  "phantom-driver": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Conjures a Small or Medium quasi-real humanlike creature that will drive any vehicle you command it to. It never fights; draft animals obey it while it drives but otherwise shun it and will not attack it. AC 20 if Small, AC 19 if Medium, 7 hit points + 1 per caster level, land speed 30 feet, and it makes every driving check — whatever skill the vehicle needs — at your caster level + your Intelligence modifier. At 0 hit points it disappears."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "All the numbers describe the conjured driver, not the caster."
+  },
+  "phantom-hunt": {
+   "effects": [
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 100
+    },
+    {
+     "type": "sense",
+     "target": "tremorsense",
+     "range": 20
+    },
+    {
+     "type": "speed",
+     "target": "land",
+     "amount": 40,
+     "note": "enhancement bonus to movement"
+    },
+    {
+     "type": "permission",
+     "target": "Track while moving at full speed with no penalty."
+    },
+    {
+     "type": "narrative",
+     "target": "If you could already track at full speed without penalty, you instead gain a +4 bonus on Survival checks while tracking. The spell ends at once if you or the animal companion attacks or is attacked."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The prose says a '40-foot enhancement bonus to movement' without naming which modes; only land speed is emitted, since assuming it also grants fly or swim would be inventing movement the creature may not have. Both the caster and one animal companion within 30 feet get all of this."
+  },
+  "phantom-limb": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates semi-visible psychic replacements for missing body parts — a finger, a limb, a set of wings — usable exactly as the creature's own, including natural attacks and any extraordinary abilities they grant, though not supernatural ones. This use lasts 24 hours."
+    },
+    {
+     "type": "narrative",
+     "target": "A creature that needs no replacement limb may instead choose exactly one of the four options below, in which case the spell lasts only 10 minutes per caster level."
+    },
+    {
+     "type": "narrative",
+     "target": "Extra Arms: two phantom arms granting two extra natural claw attacks, usable for nothing else."
+    },
+    {
+     "type": "narrative",
+     "target": "Extra Legs: horselike hindquarters granting a +30-foot enhancement bonus to speed and a +4 bonus to CMD against overrun and trip."
+    },
+    {
+     "type": "narrative",
+     "target": "Mermaid's Tail: a phantom tail granting a swim speed of 60 feet."
+    },
+    {
+     "type": "narrative",
+     "target": "Phantom Wings: phantom wings granting a fly speed of 60 feet with good maneuverability."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Four mutually exclusive options plus the limb-replacement use; the vocabulary cannot express 'choose one', so emitting speed/permission specs for all of them would stack a swim speed, a fly speed and two claw attacks onto one creature at once. The claws are also a granted natural attack, whose damage belongs to the attack rather than the spell. Duration emitted is the 24 hours of the default use; the option modes last 10 minutes per caster level instead."
+  },
+  "phantom-steed": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Conjures a Large quasi-real horselike mount, silent and saddled, ridable only by you or the one person you made it for. It never fights and animals refuse to attack it. AC 18, 7 hit points + 1 per caster level, speed 20 feet per two caster levels to a maximum of 100 feet at 10th, carrying its rider plus 10 pounds per caster level. At 0 hit points it vanishes."
+    },
+    {
+     "type": "narrative",
+     "target": "Powers by caster level, each including the lower ones. 8th: crosses sand, mud or swamp at full speed. 10th: water walk at will, no action. 12th: air walk at will, no action, for up to 1 round at a time before falling. 14th: flies at its speed with a bonus on Fly checks equal to your caster level."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "All numbers describe the conjured mount, not the caster or rider."
+  },
+  "phantom-steed-communal": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As phantom steed, except you conjure up to six steeds and divide the total duration among them in 1-hour intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The per_level duration is the pool that gets divided between steeds; the vocabulary has no way to say 'divided among targets'."
+  },
+  "phantom-trap": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A touched small mechanism — lock, hinge, hasp, cork, cap, ratchet — reads as trapped to anyone able to detect traps by skill, spell or device, and they are certain the trap is real. Nothing happens if it is 'sprung'. The casting fails if another phantom trap is active within 50 feet."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "phase-door": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates an invisible ethereal passage through wood, plaster or stone — no other material — 5 by 8 feet and 10 feet deep plus 5 feet per three caster levels. Only you can find or use it; you vanish on entering and reappear on exiting, and may bring one Medium or smaller creature at the cost of two uses. It passes no light, sound or spell effects and cannot be seen through. True seeing reveals it but does not grant use. Dispel magic ejects anyone inside harmlessly, as passwall. You may set a triggering condition letting others use it, based on name, identity, alignment or observable actions and qualities — never on level, class, HD or hit points. Permanency can make it permanent."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'use/2 levels (1)' — a charge count, not a span of time, so until_discharged is the only honest kind. The count is one use per two caster levels."
+  },
+  "phase-step": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "dimension door",
+     "note": "transfers the touched willing creature to a point you designate within range; unlike dimension door you must have line of sight and line of effect to the destination"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "phasic-challenge": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Pick one enemy and one willing ally. Both stay visible and audible and can see and hear everyone, but can physically interact only with each other: their spells and weapon attacks land only on one another, though spells may still affect terrain and other non-creature factors. The enemy gets a fresh Will save at the start of each of its turns and the spell ends on a success. It also ends for both if either falls unconscious or dies, or if it is dispelled."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "phobia": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Name the subject of the phobia when casting: an energy type (acid, cold, electricity, fire or sonic), a hazard such as an avalanche or earthquake, a single animal-type creature or all vermin, or one of the environments darkness, enclosed spaces, heights (ten times the target's height) or water. Darkness cannot be used on a creature with racial darkvision, see in darkness or blindsight; heights cannot be used on a creature with a natural fly speed; water cannot be used on an aquatic creature or one with a natural swim speed."
+    },
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The phobia takes hold. Whenever the target takes damage of the named energy type, or perceives the named creature, environment or hazard, it must attempt a DC 20 Will save: on a failure it is panicked, and even on a success it is shaken and deeply uncomfortable. While shaken this way it rolls no further saves against the phobia even under continued exposure. Panic subsides 1 minute after it can no longer perceive the phobia (or after taking the energy damage); the shaken condition ends the moment it can no longer perceive it. Break enchantment, heal, limited wish, miracle or wish removes the phobia."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The DC 20 save and the panicked/shaken outcome fire on later exposure, not at casting, so they are not emitted as apply_condition specs that would take effect the moment the spell resolves. The corpus duration is instantaneous even though the implanted phobia persists until removed."
+  },
+  "pick-your-poison": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Any poison effect that starts affecting the subject while this lasts is converted into strong drink instead: rather than the poison's normal effect she is intoxicated and takes a -2 penalty on attacks, saves and checks for the rest of the spell's duration. When the spell ends the penalty lifts and the poison's real effects begin. Poison effects already in place before casting are untouched."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The -2 penalty only exists once a poison lands, so emitting it as standing combat/save mods would penalise an unpoisoned subject for the whole duration."
+  },
+  "pied-piping": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Name at casting one identifiable physical trait — type, subtype, age, gender, hair colour and so on, never a voluntary criterion like alignment, religion, nationality or class — and the choice is fixed. Eligible creatures in the 90-foot emanation save each round; once one fails it walks to you at its normal speed, stands as close as it can without entering an occupied square, follows if you move, and can do nothing but listen and follow. Creatures entering the area later must save too."
+    },
+    {
+     "type": "narrative",
+     "target": "The compulsion never makes a creature endanger itself: blocked by hazards it simply waits, swaying, until you leave range, then comes to its senses after 1 round per caster level. If it can resume following before the spell lapses, it does. An attacked creature may defend itself and even leave the area to escape a threat, but cannot attack or act otherwise. The effect persists for 1 round per caster level after you stop concentrating, and affected creatures stay near you until it wears off."
+    }
+   ],
+   "duration": {
+    "kind": "concentration",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'concentration + rounds/level (1)'; the shape has no way to express a fixed tail after concentration ends, so the 1 round per caster level tail is stated in the prose above."
+  },
+  "pierce-disguise": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You see through magical disguises — illusion or polymorph — of this spell's level or lower, the creature's true form showing as a ghostly overlay on its disguised appearance."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Not true_seeing or see_invisible: it is limited to disguises of equal or lower spell level, which the sense vocabulary cannot qualify."
+  },
+  "pierce-facade": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 5,
+     "bonus_type": "insight",
+     "target": "Perception checks to see through disguises",
+     "note": "increases to +10 at caster level 7th"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "piercing-shriek": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "staggered"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Only the target hears the shriek; everyone else sees you screaming silently. Deaf creatures are unaffected and the spell cannot cross an area of silence."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "pilfering-hand": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You create an invisible telekinetic force and use it in one of two ways, chosen when you cast."
+    },
+    {
+     "type": "narrative",
+     "target": "Abrupt Maneuver: instantaneously attempt a disarm or steal combat maneuver against a target in range, using your caster level as your Combat Maneuver Bonus and your casting ability modifier (Charisma, Intelligence or Wisdom by class) in place of Strength or Dexterity. It provokes no attack of opportunity from the target, though casting the spell may. On a success the object flies to you and you catch it if a hand is free, otherwise it lands in your square as if dropped."
+    },
+    {
+     "type": "narrative",
+     "target": "Careful Maneuver: attempt a Disable Device check, or a Sleight of Hand check to pick a pocket, against a target in range. The spell lasts as long as the task takes and demands your full concentration, ending when the check resolves. A successful Sleight of Hand pulls the object to you as above, and the target gets a +2 bonus on its Perception check to notice."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Two mutually exclusive modes. Corpus duration is 'see text' (as long as the careful maneuver takes), so no duration is emitted."
+  },
+  "pillow-talk": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cast only on a sleeping creature present for the whole casting time. It seems awake enough to answer one question per two caster levels, limited to what it actually knows and the languages it speaks; answers are brief, cryptic or repetitive, especially from a creature that would have opposed you awake. On a successful Will save it wakes (unless magic or drugs keep it under) and remembers the first question. A creature subjected to pillow talk within the past week is immune to a new casting. Your questions do not wake the target but nothing else is muffled; a target that sleeps through it remembers nothing, while one that wakes early remembers every question and its own answers."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "placebo-effect": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The subject stops feeling one ongoing affliction or condition of your choosing from this list: blinded, cursed, dazed, deafened, diseased, fatigued, frightened, nauseated, panicked, paralyzed, poisoned, shaken, sickened, staggered or stunned. If it has a duration, that duration is suspended until this spell expires. Only one instance can be suspended per casting even if the subject has several of the same kind. Damage the affliction already caused is not undone, and the subject gains no protection against catching it again."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Exactly one condition off a fifteen-item list is suspended, and the vocabulary cannot express a choice; emitting fifteen suppress_condition specs would suspend every one of them at once. Three of the fifteen (cursed, diseased, poisoned) are not in the condition vocabulary at all."
+  },
+  "plague-bearer": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target becomes an asymptomatic carrier and takes no harm itself. Any creature that ends its turn adjacent to the target must succeed at a Fortitude save or be affected as by contagion. When the spell ends the target stops being contagious, but anyone already infected stays diseased."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The contagion effect lands on bystanders each round, never on the spell's own target, so it is not emitted as a spell_effect on the target."
+  },
+  "plague-carrier": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target's natural attacks carry filth fever, at a save DC of 10 + half the target's Hit Dice + the target's Constitution modifier."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The disease rides a natural attack the target already has, and its DC is derived from that creature's own statistics, so no fixed number is emitted."
+  },
+  "plague-storm": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A grey cloud like fog cloud, crackling with sickly green lightning. Creatures in it must save or immediately contract one disease you chose at casting — blinding sickness, bubonic plague, cackle fever, demon fever, devil chills, filth fever, leprosy, mindfire, red ache, shakes or slimy doom — with no onset period, as an instantaneous effect; use the disease's own frequency thereafter, but at +2 to its save DC. The cloud rolls away from you along the ground at 10 feet per round, re-spreading each round from a point of origin 10 feet farther out, sinking to the lowest ground and pouring into dens and sinkholes. It cannot pass through liquid and cannot be cast underwater."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "One disease off an eleven-item list, chosen at casting; the contracted disease is a separate instantaneous effect the vocabulary has no type for. Corpus duration is 'minutes/level (1) and instantaneous (see text)' — the per_level part is the cloud, the instantaneous part is the disease."
+  },
+  "planar-adaptation": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "the harmful environmental effects of one chosen plane, including toxicity, extreme temperatures and lack of air"
+    },
+    {
+     "type": "narrative",
+     "target": "You also gain energy resistance 20 against a single energy type prevalent on that plane; if several are equally prevalent, choose one. The spell does nothing on your own native plane."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The resistance is 20 against an energy type chosen at casting; resistance.target must name a damage type, so picking one here would invent the plane the caster travelled to."
+  },
+  "planar-adaptation-mass": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "the harmful environmental effects of one chosen plane, including toxicity, extreme temperatures and lack of air"
+    },
+    {
+     "type": "narrative",
+     "target": "Each target also gains energy resistance 20 against a single energy type prevalent on that plane; if several are equally prevalent, choose one. The spell does nothing on a creature's own native plane. Affects one creature per caster level, no two more than 30 feet apart."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "As planar adaptation; same reason the resistance is left in prose."
+  },
+  "planar-aegis": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Choose an essence trait, matching the material component's plane of origin, and its damage type: Air-Dominant/electricity, Earth-Dominant/acid, Fire-Dominant/fire, Positive-Dominant/positive, Negative-Dominant/negative, Water-Dominant/cold. Any creature that hits you with a non-reach melee weapon, a natural weapon or an unarmed attack takes 3d6 points of that damage type plus 1 point per caster level, maximum +20."
+    },
+    {
+     "type": "narrative",
+     "target": "You take only half damage from attacks and effects of the chosen damage type, and take none at all when such an attack or effect allows a save for half damage and you succeed at it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The 3d6 + 1/level is retributive — it lands on whoever strikes the caster, never on a target the caster aims at — so it is deliberately not a damage spec. The half-damage clause is a fractional reduction against a damage type chosen at casting, which neither resistance (a flat number) nor damage_reduction can express."
+  },
+  "planar-ally": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser planar ally, except you call either one outsider of 12 HD or less or two of the same kind whose Hit Dice total no more than 12. They agree to help and negotiate their return payment together."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "planar-ally-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser planar ally, except you call either one outsider of 18 HD or less or up to three of the same kind whose Hit Dice total no more than 18. They agree to help and negotiate their return payment together."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "planar-ally-lesser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Your deity — or, if you serve none, a creature of your philosophical alignment — sends an outsider of 6 HD or less, chosen by them, though you may name an individual and hope. You must be able to communicate with it to bargain. It performs one task for a payment agreed and made in advance: gold or magic items to an allied temple, a gift to the creature, or an action matching its alignment and goals."
+    },
+    {
+     "type": "narrative",
+     "target": "Bargaining takes at least 1 round, so it acts from the round after it arrives. A task of up to 1 minute per caster level costs 100 gp per HD; up to 1 hour per caster level, 500 gp per HD; up to 1 day per caster level, 1,000 gp per HD. A nonhazardous task costs half; an especially hazardous one may cost more, and few creatures accept a suicidal task, since a called creature that dies is really dead. A task strongly matching its ethos may halve or waive the payment. When the task or the bargained time ends it reports back if it can and returns home. Calling an air, chaotic, earth, evil, fire, good, lawful or water creature makes this a spell of that type."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The gp-per-HD figures are the price of a service negotiated in play, not anything the engine resolves."
+  },
+  "planar-binding": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser planar binding, except you may call one creature of 12 HD or less or up to three of the same kind whose Hit Dice total no more than 12. Each saves separately, tries to escape separately, and must be persuaded separately."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "planar-binding-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser planar binding, except you may call one creature of 18 HD or less or up to three of the same kind whose Hit Dice total no more than 18. Each saves separately, tries to escape separately, and must be persuaded separately."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "planar-binding-lesser": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Lures a named kind of outsider or elemental of 6 HD or less into a trap you prepared in range — a magic circle focused inward — and holds it there until it agrees to one service in exchange for freedom. Name the individual to call a specific one. A successful Will save resists the spell entirely; on a failure the creature is drawn to the trap, and spell resistance does not stop the calling."
+    },
+    {
+     "type": "narrative",
+     "target": "Once a day the trapped creature may try one escape route: its spell resistance against your caster level check, dimensional travel, or a Charisma check at DC 15 + half your caster level + your Charisma modifier. Dimensional anchor blocks the dimensional route; a calling diagram makes the trap more secure. If it breaks loose it may flee or attack you."
+    },
+    {
+     "type": "narrative",
+     "target": "To compel a service, describe it and any reward and make a Charisma check opposed by the creature's, with a +0 to +6 bonus for the nature of the offer. If it wins it refuses; you may re-offer every 24 hours until it agrees, breaks free, or you dismiss it by other magic. Impossible or unreasonable demands are never accepted. A natural 1 on your Charisma check frees the creature outright. When the service is done it need only tell you to be sent home instantly — and may come back for revenge later. An open-ended task it cannot finish by its own actions holds it for at most 1 day per caster level, and it gets an immediate fresh chance to break free. Calling an air, chaotic, earth, evil, fire, good, lawful or water creature makes this a spell of that type."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The DC 15 + half caster level + Charisma modifier is the bound creature's escape check, not this spell's saving throw, so it is not emitted as a save_gate dc."
+  },
+  "planar-inquiry": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As lesser planar ally, but the only task you may ask is that the called outsider answer questions or gather information on one specific person, place or thing. If it has a fitting Knowledge skill it may check at once; otherwise it leaves for 1d4 hours to find out. On its return roll 1d20 + your caster level and read the result as a Diplomacy check to gather information. It stays up to 10 minutes relaying what it learned, then goes home. Attacking or damaging it ends the spell and sends it back immediately."
+    },
+    {
+     "type": "narrative",
+     "target": "You may name the kind of outsider, or an individual by name; the kind does not change the effect, but calling one with an alignment or elemental subtype gives the spell that descriptor. You cannot call an outsider whose Hit Dice exceed your caster level (maximum 18 HD), nor a unique outsider such as a deity's herald, nor one with mythic ranks."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'instantaneous (see text)'; the creature's 10-minute stay is part of the called service, not a spell duration."
+  },
+  "planar-orientation": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As know direction, except that instead of true north it gives the direction of the palace or demesne of the ruling god or demigod of the plane or demiplane you are currently on, plus a brief generic vision of that entity's appearance or holy symbol. It reads only the plane you are actually standing on — inside a demon lord's Abyssal realm it points to that lord's seat, not Lamashtu's. Where a plane has several rulers it gives the directions of the nearest three so you can triangulate. It finds the official seat of power only, never the entity, fails automatically if that seat is magically hidden, and does not work on the Material Plane."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "planar-refuge": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Cast on any plane but the Material, this grows a 50-foot-radius sphere of wilderness that overrides the local climate and planar traits, suppressing harmful environmental effects such as toxicity, extreme temperatures and lack of air — but not gravity. It fills with edible plants coloured and flavoured by the host plane; on a negative-dominant plane they grow ghastly white and taste bitter. It needs a body of solid matter at least as large as its area. Permanency at caster level 11th and 7,500 gp makes it permanent."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The environmental suppression is a property of an area, not of a creature, so immunity — which attaches to a target — is not the right type."
+  },
+  "plane-shift": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Moves you or a touched creature to another plane or alternate dimension; up to eight willing creatures linking hands go together. Arrival is imprecise — from the Material Plane you can reach any other plane but land 5d% (5 to 500) miles from where you meant to. The transport is instantaneous and then the spell ends; getting back needs its own means."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The 5d% is scatter distance on arrival, not damage."
+  },
+  "planeslayer-s-call": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "target": "caster level checks to overcome the spell resistance of outsiders with the chosen alignment subtype"
+    },
+    {
+     "type": "narrative",
+     "target": "Choose one alignment subtype — chaotic, evil, good or lawful. Against outsiders with that alignment component or subtype, spells cast by your allies in the burst ignore the first 10 points of energy resistance, though not energy immunity. The spell takes the alignment descriptor opposite the one chosen."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The bonus is untyped because the prose names no bonus type. Ignoring the first 10 points of an enemy's energy resistance is a caster-side piercing effect with no matching type — resistance and damage_reduction both grant protection rather than defeat it."
+  },
+  "planetarium": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Projects a 15-foot-radius sphere showing the night sky as it stands at your location and local time, so you can read the heavens and every celestial body in daylight, indoors or underground. Anyone inside the sphere sees it clearly; from outside it looks grainy and indistinct."
+    }
+   ],
+   "duration": {
+    "kind": "concentration",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'concentration + rounds (3)'; the shape cannot express a fixed tail after concentration, so the 3-round tail is recorded here."
+  },
+  "planetary-adaptation": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "the harmful environmental effects of one chosen world of the Material Plane, including toxicity, extreme temperatures and lack of air"
+    },
+    {
+     "type": "narrative",
+     "target": "As planar adaptation, but only for worlds of the Material Plane. The cold void of space counts as a single world, so this lets you survive vacuum. You also gain energy resistance 20 against a single energy type prevalent there."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Same reason as planar adaptation for leaving the resistance 20 in prose: the energy type is chosen at casting."
+  },
+  "planetary-adaptation-mass": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "the harmful environmental effects of one chosen world of the Material Plane, including toxicity, extreme temperatures and lack of air"
+    },
+    {
+     "type": "narrative",
+     "target": "As planetary adaptation, but affecting one creature per caster level, no two more than 30 feet apart. Each also gains energy resistance 20 against a single energy type prevalent on that world. The cold void of space counts as one world, so this permits survival in vacuum."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Energy type is chosen at casting, so the resistance 20 stays in prose."
+  },
+  "planned-assault": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "ac",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "+4 at caster level 10th, +6 at 15th; applies only to the first round of the declared plan"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "fort",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "+4 at caster level 10th, +6 at 15th; first round of the declared plan only"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "ref",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "+4 at caster level 10th, +6 at 15th; first round of the declared plan only"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "will",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "+4 at caster level 10th, +6 at 15th; first round of the declared plan only"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "sacred",
+     "target": "checks made as part of the declared plan",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "+4 at caster level 10th, +6 at 15th"
+    },
+    {
+     "type": "narrative",
+     "target": "The bonuses arrive only if the targets first spend at least 1 minute studying the situation and declare in advance what they intend to do, and only for the first round in which they carry that plan out. Deviating from the declared actions forfeits them."
+    }
+   ],
+   "duration": {
+    "kind": "until_discharged",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The rule sentence says a sacred bonus; the worked example that follows calls it a morale bonus and names the spell 'tactical assault'. The rule text is followed, and the discrepancy is flagged here rather than resolved by guessing. Corpus duration is 'minutes/level (1) or until discharged'; until_discharged is emitted because the effect is a single-round payout, and each mod carries its own 1-round window so the engine does not hold the bonus up for the whole span."
+  },
+  "plant-growth": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Choose one of two versions when you cast."
+    },
+    {
+     "type": "narrative",
+     "target": "Overgrowth: normal vegetation within long range (400 feet + 40 feet per caster level) thickens into a jungle that must be hacked or forced through; speed there drops to 5 feet, or 10 feet for Large and larger creatures. The area needs existing brush and trees. Any DC belonging to another plant-enhancing spell or effect already in the area — entangle, wall of thorns — rises by 4 for 1 day. The shape may be a 100-foot-radius circle, a 150-foot-radius semicircle or a 200-foot-radius quarter circle, and you may exempt places inside it."
+    },
+    {
+     "type": "narrative",
+     "target": "Enrichment: plants within half a mile become up to one-third more productive over the coming year. Plant growth counters diminish plants, and neither version affects plant creatures."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "Two mutually exclusive versions. The speed reduction is imposed on anyone in the area rather than on a target of the spell, so speed specs would attach it to the wrong creature."
+  },
+  "plant-shape-i": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You take the form of any Small or Medium plant creature. If that form has darkvision 60 feet, low-light vision, constrict, grab or poison, you gain it; if it has vulnerability to an element, you gain that too. If the form cannot move, your speed drops to 5 feet and you lose every other movement mode."
+    },
+    {
+     "type": "narrative",
+     "target": "Small plant: +2 size bonus to Constitution and a +2 natural armor bonus."
+    },
+    {
+     "type": "narrative",
+     "target": "Medium plant: +2 size bonus to Strength, +2 enhancement bonus to Constitution, and a +2 natural armor bonus."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The Small and Medium packages are mutually exclusive and the granted senses and vulnerabilities depend on which creature is copied, so emitting ability_mod and sense specs would apply both packages and abilities the chosen form may not have."
+  },
+  "plant-shape-ii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As plant shape I, and you may also take the form of a Large plant creature. If the form has immunity or resistance to any element you gain resistance 20 to it; if it has a vulnerability you gain that."
+    },
+    {
+     "type": "narrative",
+     "target": "Large plant: +4 size bonus to Strength, +2 size bonus to Constitution, and a +4 natural armor bonus."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Size package is one of three (Small, Medium, Large) and the resistance 20 depends on the copied creature's own element, so neither can be emitted without inventing the form."
+  },
+  "plant-shape-iii": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As plant shape II, and you may also take the form of a Huge plant creature. If that form has DR, regeneration 5 or trample, you gain it."
+    },
+    {
+     "type": "narrative",
+     "target": "Huge plant: +8 size bonus to Strength, -2 penalty to Dexterity, +4 size bonus to Constitution, and a +6 natural armor bonus."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The DR granted is 'whatever the copied creature has', with no amount or bypass stated, so damage_reduction cannot be emitted."
+  },
+  "plant-voice": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "One plant creature can speak, hear and understand languages you know — one language per two caster levels if you know several, chosen at casting. It is not made friendly, but you can now use Charisma-based skills on it normally. A plant creature of Intelligence 2 or lower grasps only the simplest ideas: friend, food, danger. Ordinary plants and fungus are unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "play-instrument": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Play one instrument of your choice as though you had 1 rank in the matching Perform skill. An ordinary object may serve as an improvised instrument — a barrel as a drum, a bow as a harp — played as if it had been built for music."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The '1 rank' is a floor on a skill you may not have, not a bonus added to one, so skill_mod would be wrong."
+  },
+  "plundered-power": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You sacrifice a creature as the casting finishes; its blood hardens into a red bloodstone holding that creature's essence. Anyone holding the stone may activate the creature's highest-level activated racial spell-like ability, taking whatever actions that ability needs, once per day or at the ability's own frequency, whichever is less. If it had several racial abilities of that spell level, roll randomly among them."
+    },
+    {
+     "type": "narrative",
+     "target": "Only racial spell-like abilities that emulate a spell can be stored, including altered ones such as invisibility (self only), never unique abilities, and never anything duplicating a spell with material components costing over 250 gp. Alterations persist: greater teleport (self only) still affects only the user, summon monster II (Small fire elemental only) still summons only that. Save DC, caster level and other attributes stay as they were in life, but the user picks targets, area and shape and makes the choices, and may spend up to a full round's worth of actions concentrating on or redirecting the spell. If the sacrifice does not actually die during the casting — a summoned creature, say — or is raised before the duration ends, the stone goes inert. The trapped spirit fragment does not hinder raising the creature."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "pocketful-of-vipers": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Wards a container — pouch, bag, backpack, pocket. A creature that opens it without first speaking the command word is attacked by 1d3 summoned venomous snakes, which pour out and fight it for 1 round per caster level before vanishing. They attack anyone else only if attacked first."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours/level (1) or until discharged' — the ward lasts that long or until it fires. Whatever damage follows is the summoned snakes' bites, not the spell's, and it lands on whoever opens the container."
+  },
+  "poison": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "On a successful melee touch attack you infect a living creature with a poison dealing 1d3 Constitution damage per round for 6 rounds. The victim may attempt a Fortitude save each round to negate that round's damage and end the affliction."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The Constitution damage repeats every round for six rounds; ability_damage resolves once, so emitting 1d3 there would understate the spell roughly sixfold. Corpus duration is 'instantaneous (see text)'."
+  },
+  "poison-breath": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "poison",
+     "note": "everyone caught in the 15-foot cone is subjected to the poison spell's toxin: 1d3 Constitution damage per round for 6 rounds, with a Fortitude save each round to negate that round's damage and end it"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The Constitution damage repeats each round, so it is carried as a reference to the poison spell rather than as an ability_damage spec that would resolve once."
+  },
+  "poisoned-egg": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Turns the contents of one whole egg, raw or cooked, into a single dose of small centipede poison — injury, save DC 11, frequency 1 per round for 4 rounds, effect 1 Dex, cure 1 save. At the end of the duration it reverts to ordinary harmless egg. Applying the dose to a weapon carries no risk of poisoning yourself, as though you had the poison use class feature."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The spell creates a dose of poison on an object; the DC 11 and the 1 Dex belong to that poison when someone later applies it, not to anything this spell does to a creature."
+  },
+  "poisonous-balm": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "heal",
+       "dice": "3d8",
+       "lethality": "lethal",
+       "scales": "full",
+       "note": "as cure serious wounds, 3d8 + 1 point per caster level to a maximum of +15; the hidden toxin remains"
+      }
+     ],
+     "on_success": [
+      {
+       "type": "heal",
+       "dice": "3d8",
+       "lethality": "lethal",
+       "scales": "half",
+       "note": "a target that chooses to save and succeeds is healed half and negates the toxin"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "While the toxin lies inert you may activate it by concentrating as a standard action; the victim then takes 1d3 Strength damage per round for 6 rounds, with a Fortitude save each round to negate that round's damage and end it. If you do not trigger it within 1 hour the spell simply ends and the target is unharmed."
+    },
+    {
+     "type": "narrative",
+     "target": "Detect poison finds the inert toxin only on a caster level check against DC 15 + your caster level, and any skill check to identify the spell reports it as cure serious wounds; a fooled viewer reads its aura as the lingering aura of an instantaneous effect."
+    }
+   ],
+   "scaling": {
+    "kind": "healing",
+    "die": 8,
+    "base_dice": 3,
+    "bonus_per_level": 1,
+    "bonus_cap": 15,
+    "damage_type": "positive"
+   },
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The healing is real and lands on the target at once, so it is converted despite the spell being a trap. The Strength damage repeats every round and only after the caster triggers it, so it stays narrative. Corpus duration is 'instantaneous, then hours (1) or until triggered + rounds (6)'; the 1 hour emitted is the window in which the toxin can be triggered."
+  },
+  "poisonous-cloud": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A bank of toxic fog as fog cloud. Living creatures in it that fail a Fortitude save take 1d2 Constitution damage per round; one that saves but stays in the cloud must save again each round on your turn. Permanency at caster level 13th and 12,500 gp makes it permanent, and a permanent cloud blown apart by wind re-forms in 10 minutes."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The Constitution damage repeats every round for as long as a creature stays in the cloud, which ability_damage cannot express."
+  },
+  "polar-midnight": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Illumination in the 30-foot spread drops two steps, but only as far as darkness, never supernatural darkness. Creatures in the area take 5d6 cold damage and 1d6 Dexterity damage per round; a successful Fortitude save each round negates the Dexterity damage but never the cold. Any creature that does not move on its turn is sheathed in ice equivalent to wall of ice, becoming helpless and unable to breathe. A corpse left in the area more than 1 round is transmuted to solid ice and needs true resurrection, miracle or wish to revive. As a move action you may slide the area up to 10 feet in any direction."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The prose reads '5d6 points of cold damage and 1d6 points of Dexterity damage/round' — whether the '/round' governs both halves or only the Dexterity damage is genuinely ambiguous, and the following sentence ('a successful Fortitude save each round') implies a per-round cycle for both. Rather than pick a reading and hard-code 5d6 as either a one-shot or a repeat, the whole thing is left narrative. Element cold is already derived from the descriptor."
+  },
+  "polymorph": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Turns a willing creature into an animal, humanoid or elemental of your choosing; unwilling creatures are unaffected and the subject cannot pick its own form beyond telling you what it would like. An animal or magical beast form works as beast shape II, an elemental form as elemental body I, a humanoid form as alter self. The subject may resume its own shape as a full-round action, ending the spell for it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Which spell it becomes depends on the form chosen at casting, so no single spell_effect target is correct."
+  },
+  "polymorph-any-object": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As greater polymorph, but it changes any one object or creature into another — you are not limited to living forms. Duration depends on how radical the change is: add +5 if the new form is the same kingdom (animal, vegetable, mineral), +2 each for same class (mammals, fungi, metals), same size, related subject (twig to tree, wolf fur to wolf), and same or lower Intelligence. Total factor 0 lasts 20 minutes (pebble to human), 2 lasts 1 hour, 4 lasts 3 hours, 5 lasts 12 hours, 6 lasts 2 days, 7 lasts 1 week, 9 or more is permanent."
+    },
+    {
+     "type": "narrative",
+     "target": "A target lacking physical ability scores is given 10 in each missing one; a target lacking mental scores is given 5. Damage to the new form can injure or kill the polymorphed creature, generally when the new form is changed by physical force. It cannot make a nonmagical object into a magic item, cannot affect magic items, cannot create materials of great intrinsic value (copper, silver, gems, silk, gold, platinum, mithral, adamantine) and cannot reproduce cold iron's ability to beat damage reduction. It can also duplicate baleful polymorph, greater polymorph, flesh to stone, stone to flesh, transmute mud to rock, transmute metal to wood or transmute rock to mud."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Corpus duration is 'see text' and the real duration is computed from a table of similarity factors at cast time, so no duration is emitted."
+  },
+  "polymorph-familiar": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "beast shape I",
+     "note": "your familiar takes the form of any Small animal; at caster level 7th this becomes beast shape II, at 9th beast shape III, at 11th beast shape IV"
+    },
+    {
+     "type": "narrative",
+     "target": "The familiar keeps all its own special abilities and still grants you the benefit tied to its normal shape, such as a bat familiar's bonus on Fly checks."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "polymorph-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As polymorph, and the subject may also take the form of a dragon or a plant creature. An animal or magical beast form works as beast shape IV, an elemental as elemental body III, a humanoid as alter self, a plant as plant shape II, a dragon as form of the dragon I. The subject may resume its own shape as a full-round action, ending the spell."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Which spell it becomes depends on the form chosen at casting."
+  },
+  "polypurpose-panacea": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Choose exactly one of the following cantrip-level effects when you cast. None has any side effect — the intoxication panacea causes no hangover."
+    },
+    {
+     "type": "narrative",
+     "target": "Analgesic: minor aches and pains — arthritis, a cold, a hangover — stop being felt for 1 hour, and you gain a +2 resistance bonus against pain-related spells."
+    },
+    {
+     "type": "narrative",
+     "target": "Clarity: a +1 competence bonus on one attack roll, saving throw or skill check within the next minute, declared before the roll it applies to."
+    },
+    {
+     "type": "narrative",
+     "target": "Hallucination: pleasant hallucinations for 1 hour — wandering lights, music, playful surreal animals. You know they are unreal but they distract you, giving a -2 penalty on Perception checks."
+    },
+    {
+     "type": "narrative",
+     "target": "Intoxication: you feel comfortably drunk for 1 hour, as after a few drinks."
+    },
+    {
+     "type": "narrative",
+     "target": "Lucid Dream: taken within an hour of going to sleep, you get an hour-long dream under your own control."
+    },
+    {
+     "type": "narrative",
+     "target": "Resistance: a +1 resistance bonus on saves for 1 minute."
+    },
+    {
+     "type": "narrative",
+     "target": "Sleep: restful sleep for at least an hour unless woken; if you were going to sleep anyway you carry on sleeping normally afterwards."
+    },
+    {
+     "type": "narrative",
+     "target": "Sobriety: completely sober for 1 hour, negating drunkenness penalties, though detect poison and other magical or alchemical tests still read you as inebriated. The hour does not count toward sobering up — it only postpones the intoxication."
+    },
+    {
+     "type": "narrative",
+     "target": "Tenacity: 1 temporary hit point for 1 minute."
+    },
+    {
+     "type": "narrative",
+     "target": "Wakefulness: awake for 2 hours with no sleepiness and no jitteriness, plus a +5 resistance bonus against sleep-related spells such as lullaby and sleep. It only defers the need for sleep and does not count as rest; using it repeatedly leaves you as tired as if you never had."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Ten mutually exclusive options, each with its own duration; the vocabulary cannot express 'choose one', so emitting them as live specs would grant all ten at once. Corpus duration is 'see text' and no single duration is emitted for the same reason."
+  },
+  "positive-pulse-greater": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "damage",
+       "dice": "3d6",
+       "damage_type": "positive",
+       "lethality": "lethal",
+       "scales": "full",
+       "note": "3d6 plus 1 point per caster level; only creatures damaged by positive energy, such as undead, and haunts manifesting in the area take it"
+      }
+     ]
+    },
+    {
+     "type": "situational_mod",
+     "amount": 8,
+     "bonus_type": "untyped",
+     "target": "saving throws against death effects, energy drain, negative energy and effects directly caused by haunts",
+     "duration": {
+      "kind": "fixed",
+      "amount": 1,
+      "unit": "round"
+     },
+     "note": "granted to creatures healed by positive energy in the burst, which this spell does not heal"
+    }
+   ],
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 3,
+    "bonus_per_level": 1,
+    "damage_type": "positive"
+   },
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "Read against positive pulse, which this spell only modifies: the damage falls on undead and haunts in the burst, never on living creatures, who instead get the save bonus for 1 round. The prose states no cap on the per-level addition. The already-converted positive-pulse records this damage as 'untyped'; it is positive energy and the vocabulary has a positive type, so this entry uses it — the orchestrator may want the pair made consistent."
+  },
+  "possess-object": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As magic jar, except you send your mind into a single object and animate it as animate objects, controlling it as though it were your own body. You cannot speak or cast spells while in it. Your own body counts as dead meanwhile, which temporarily suspends any disease, poison or other affliction on you."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours/level (1) or until you return to your body'."
+  },
+  "possession": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "You project your soul into a creature you know the location of within range — line of sight and line of effect are not needed — and your own body appears dead. Failing to take the host ends the spell. The host's soul is imprisoned alongside you and keeps its own senses but can exert no influence and use no mental abilities; you may speak to it telepathically as though sharing a language, but only if you choose to."
+    },
+    {
+     "type": "narrative",
+     "target": "You keep your Intelligence, Wisdom, Charisma, level, class, base attack bonus, base save bonuses, alignment and mental abilities. The body keeps its Strength, Dexterity, Constitution, hit points, natural abilities and automatic abilities. Extra limbs grant no extra or better attacks, and you cannot use the body's extraordinary or supernatural abilities, spells or spell-like abilities."
+    },
+    {
+     "type": "narrative",
+     "target": "A standard action returns you to your own body at any range on the same plane, ending the spell. If the host dies you return to your body and the host's soul is gone for good. If your own body is slain, you die when the spell ends or the host body is killed. You may cast this again from inside a host, resetting the duration, but you always return to your original body, never an intermediate one. Creatures whose souls are their bodies — incorporeal undead, non-native outsiders — use greater possession instead."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "possession-greater": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As possession, except that on taking a host you enter its body physically and your own body vanishes. You are ejected into the nearest empty square when the spell expires or the host dies."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "possession-trap": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A ward over your spirit that snares would-be possessors. A creature attempting to possess you — by magic jar or the like — must first succeed at a Will save or have the attempt ruined and its spirit shunted into the spell's focus gem, held there for 1 round per caster level as though trapped in a magic jar. The trap fails outright if you are not carrying the focus gem at the moment of the attempt."
+    },
+    {
+     "type": "narrative",
+     "target": "If the possessor makes its save, its possession affects you normally and you may attempt any save that attempt normally allows. Either way you know at once that someone tried and whether anything is now caught in the gem. Destroying the gem while it holds a creature frees that creature immediately. Once triggered the spell protects you no further, and a freed creature may try to possess you again."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 24,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours (24) or until activated (see text); rounds/level (1)' — the 24 hours is the ward, the rounds per level is how long a snared spirit stays in the gem."
+  },
+  "pouncing-fury": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "When you charge, make a full attack at the end of the charge using only claw attacks you already have, one attack per claw. Any bonus on damage or other special effect that applies to charge attacks benefits only the first claw attack."
+    },
+    {
+     "type": "permission",
+     "target": "When you make a claw attack as an attack of opportunity, you may spend one additional use of your attacks of opportunity to make one more claw attack against the creature that provoked it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The claws are the caster's own natural attacks; the spell grants extra uses of them, not damage of its own."
+  },
+  "power-word-blind": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "blinded",
+     "note": "no saving throw; the word works whether or not the creature can hear it"
+    },
+    {
+     "type": "narrative",
+     "target": "How long the blindness lasts depends on the target's current hit points: 50 or fewer, permanent; 51 to 100, 1d4+1 minutes; 101 to 200, 1d4+1 rounds. A creature with 201 or more current hit points is unaffected."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Corpus duration is 'see text' and the real duration is read off the target's current hit points at the moment of casting, so no duration is emitted — putting one on the apply_condition would fix a span the spell explicitly varies."
+  },
+  "power-word-kill": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "dead",
+     "note": "no saving throw; the word works whether or not the creature can hear it"
+    },
+    {
+     "type": "narrative",
+     "target": "A creature with 101 or more current hit points is unaffected."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "power-word-stun": {
+   "effects": [
+    {
+     "type": "apply_condition",
+     "target": "stunned",
+     "note": "no saving throw; the word works whether or not the creature can hear it"
+    },
+    {
+     "type": "narrative",
+     "target": "How long the stun lasts depends on the target's current hit points: 50 or fewer, 4d4 rounds; 51 to 100, 2d4 rounds; 101 to 150, 1d4 rounds. A creature with 151 or more current hit points is unaffected."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Corpus duration is 'see text' and the real duration is read off the target's current hit points, so no duration is emitted."
+  },
+  "pox-of-rumors": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A curse making the target attract a kind of unflattering rumour you name at casting. If it fails the initial Will save, then every day it spends in a settlement it must save again; on a failure it says or does something that makes bystanders assume the rumour is true in some incriminating way. A target unaware of what the rumours are takes -4 on those daily saves. After the first failure every resident's attitude toward it worsens by one step; each further failure brings focused harassment — residents taunting or attacking it, and the authorities investigating if the rumour implies a crime."
+    },
+    {
+     "type": "narrative",
+     "target": "Castable at any distance. The target's Will save takes the same bonuses and penalties as against scrying, including +5 if it is on another plane, except that you must have at least a possession or garment as the material component: a possession or garment gives the target no penalty, and a piece of its body gives it only -5. Being a curse, it can be lifted before its duration ends only by remove curse or similar magic."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The scrying-derived save modifiers depend on the caster's connection to the target and are resolved at the table, not by a fixed DC."
+  },
+  "pox-pustules": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "sickened"
+      },
+      {
+       "type": "ability_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "dex",
+       "note": "this penalty cannot reduce Dexterity below 0"
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "The target may spend a move action scratching at the rash to shed the sickened condition — but not the Dexterity penalty — until the start of its next turn."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A -4 penalty to the score, not Dexterity damage, so ability_mod is used rather than ability_damage. The prose names no bonus type, hence untyped."
+  },
+  "prayer": {
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "attack"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "damage",
+     "note": "weapon damage rolls"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "fort"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "ref"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "will"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 1,
+     "bonus_type": "luck",
+     "target": "skill checks"
+    },
+    {
+     "type": "narrative",
+     "target": "Every foe in the same 40-foot burst instead takes a -1 penalty on attack rolls, weapon damage rolls, saves and skill checks."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The specs carry the ally side, which is what the caster's party will have applied. The foe penalty lands on different creatures in the same burst and no spec type can say which side of the burst it applies to, so it is stated in prose."
+  },
+  "prediction-of-failure": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "apply_condition",
+       "target": "shaken",
+       "duration": {
+        "kind": "permanent"
+       }
+      },
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "kind": "permanent"
+       }
+      },
+      {
+       "type": "narrative",
+       "target": "A spellcaster that fails this save also gains one random minor spellblight."
+      }
+     ],
+     "on_success": [
+      {
+       "type": "apply_condition",
+       "target": "shaken",
+       "duration": {
+        "kind": "per_level",
+        "amount": 1,
+        "unit": "round"
+       }
+      },
+      {
+       "type": "apply_condition",
+       "target": "sickened",
+       "duration": {
+        "kind": "per_level",
+        "amount": 1,
+        "unit": "round"
+       }
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Will partial, not Will negates: a success shortens the shaken and sickened to 1 round per level rather than preventing them, which is why both branches carry conditions. Corpus duration is 'permanent or rounds/level (1)'; the permanent form is emitted at the top level and each branch carries its own accurate span."
+  },
+  "prehensile-pilfer": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "While taking a full-attack action, use your tail to attempt a dirty trick or steal combat maneuver as a swift action. For this the tail counts as a natural weapon with 5 feet of reach."
+    },
+    {
+     "type": "narrative",
+     "target": "No effect on a creature without a prehensile tail. If the target already has an extra attack from haste or similar, this only lets the tail make dirty trick and steal maneuvers and grants no additional attack."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "preserve": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Food, water, plants and other perishables you touch, up to 1 pound per caster level, stay exactly as fresh as they were when cast, and are protected against spoilage-causing spells of this spell's level or lower such as putrefy food and drink. When it lapses they resume ageing normally. It also works on severed body parts and the bodies of small creatures as gentle repose, within the same weight limit. Permanency at caster level 9th and 500 gp makes it permanent."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 7,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'weeks (1)'; the unit vocabulary stops at day, so one week is written as 7 days — an exact conversion, not an estimate."
+  },
+  "preserve-grace": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The good-aligned target can foresee the moral consequences of a contemplated act, exactly as if wearing a phylactery of faithfulness. The guidance here leans toward protecting beauty and toward peaceful, merciful resolutions."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "pressure-adaptation": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "The target adjusts to 100 feet of new pressure — or to the whole shift, if it is an instantaneous one within its native range — after a single successful Fortitude save rather than the usual five."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "It changes how many saves an environmental rule demands, not the save's own modifier, so save_mod would misstate it."
+  },
+  "prestidigitation": {
+   "effects": [
+    {
+     "type": "permission",
+     "target": "Perform minor magical tricks for the duration: slowly lift 1 pound of material; colour, clean or soil items in a 1-foot cube each round; chill, warm or flavour 1 pound of nonliving material; create small objects that look crude and artificial."
+    },
+    {
+     "type": "narrative",
+     "target": "It cannot deal damage, cannot affect a spellcaster's concentration, and cannot duplicate any other spell effect. Materials it creates are extremely fragile and unusable as tools, weapons or spell components. Any real change to an object — beyond moving, cleaning or soiling it — lasts only 1 hour."
+    }
+   ],
+   "duration": {
+    "kind": "fixed",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "primal-regression": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "ability_mod",
+       "amount": 6,
+       "bonus_type": "enhancement",
+       "target": "str"
+      },
+      {
+       "type": "combat_mod",
+       "amount": 2,
+       "bonus_type": "natural armour",
+       "target": "ac"
+      },
+      {
+       "type": "save_mod",
+       "amount": -4,
+       "bonus_type": "untyped",
+       "target": "will"
+      },
+      {
+       "type": "temp_hp",
+       "dice": "2d8",
+       "source": "primal regression",
+       "note": "these vanish when the spell ends"
+      },
+      {
+       "type": "narrative",
+       "target": "Intelligence and Charisma drop to 3 if they were higher, and the target cannot use Intelligence- or Charisma-based skills, cast spells, understand language, or communicate coherently."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "When the spell ends each affected creature must succeed at a Will save or take 1d4 points of Intelligence drain and 1d4 points of Charisma damage."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Intelligence and Charisma are set to a flat 3 rather than reduced by an amount, which ability_mod cannot express — a -4 or any other figure would be invented. The closing drain and damage fire only when the spell expires and only on a second failed save, so they are not emitted as ability_drain and ability_damage that would land at casting."
+  },
+  "primal-scream": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "break enchantment",
+     "note": "affects only you and frees you only from enchantment and paralysis effects; if the caster level check to break the hostile effect fails, the spell fails with no other effect"
+    },
+    {
+     "type": "narrative",
+     "target": "You can cast this while paralyzed or while an enchantment stops you speaking, but not inside an area of silence, not if something other than enchantment or paralysis is stopping you speaking — a gag, say — and not where speech is impossible."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Element sonic is already derived from the descriptor."
+  },
+  "prismatic-sphere": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As prismatic wall, but an immobile opaque globe of shimmering light 10 feet in radius centred on you, protecting you from every form of attack, with the same seven colours and the same effects. Its blindness effect on creatures of less than 8 HD lasts 2d4 x 10 minutes. You may pass in and out and stand near it unharmed, but while you are inside it blocks anything projected through it, spells included. Any other creature attacking you or trying to pass suffers each colour's effect in turn. Usually only the upper hemisphere exists, the lower half being buried in the floor you stand on. Permanency can make it permanent."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Same reason as prismatic wall: the colours' effects fire on whoever tries to cross, not on a target the caster designates."
+  },
+  "prismatic-spray": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Seven multicoloured beams spray from your hand in a 60-foot cone. Creatures in the area with 8 HD or less are automatically blinded for 2d4 rounds. Every creature in the area is then struck by one or more randomly determined beams."
+    },
+    {
+     "type": "narrative",
+     "target": "Roll 1d8 per creature: 1 red, 20 points of fire damage (Reflex half); 2 orange, 40 points of acid damage (Reflex half); 3 yellow, 80 points of electricity damage (Reflex half); 4 green, poison (frequency 1 per round for 6 rounds, initial effect death, secondary effect 1 Con per round, cure 2 consecutive Fortitude saves); 5 blue, flesh to stone (Fortitude negates); 6 indigo, insane as the insanity spell (Will negates); 7 violet, sent to another plane (Will negates); 8, roll twice more, ignoring any further 8."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "Which of seven effects a creature takes is rolled per creature, so emitting damage specs would apply the fire, acid and electricity all at once — 140 points to everyone in the cone. The automatic blindness is real but gated on the target having 8 HD or less, and an apply_condition spec beside an un-executable beam table would half-execute the spell misleadingly, so the whole thing is narrative."
+  },
+  "prismatic-wall": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "An immobile vertical plane of shimmering light, at most 4 feet wide and 2 feet high per caster level, that protects you from every form of attack. You may pass through it and stand near it unharmed; any other creature of less than 8 HD within 20 feet that looks at it is blinded for 2d4 rounds. Cast into a space a creature occupies, it is disrupted and wasted."
+    },
+    {
+     "type": "narrative",
+     "target": "The seven colours, in order, with what each stops, what it does to a creature attacking you or crossing it, and what negates it. 1st red: stops nonmagical ranged weapons, deals 20 points of fire damage (Reflex half), negated by cone of cold. 2nd orange: stops magical ranged weapons, deals 40 points of acid damage (Reflex half), negated by gust of wind. 3rd yellow: stops poisons, gases and petrification, deals 80 points of electricity damage (Reflex half), negated by disintegrate. 4th green: stops breath weapons, poison (frequency 1 per round for 6 rounds, initial effect death, secondary effect 1 Con per round, cure 2 consecutive Fortitude saves), negated by passwall. 5th blue: stops divination and mental attacks, turns the creature to stone (Fortitude negates), negated by magic missile. 6th indigo: stops all spells, Will save or become insane as the insanity spell, negated by daylight. 7th violet: an energy field destroying all objects and effects, sends creatures to another plane (Will negates), negated by dispel magic or greater dispel magic."
+    },
+    {
+     "type": "narrative",
+     "target": "The colours can be destroyed only in order, the first before the second and so on. A rod of cancellation or mage's disjunction destroys the whole wall; an antimagic field cannot penetrate it; dispel magic and greater dispel magic work on it only once the other six colours are gone. Spell resistance applies, but the caster level check is repeated for each colour present. Permanency can make it permanent."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Every number in the table is damage taken by whoever attacks the caster or tries to cross the wall — the same retributive shape as thorn body — and which colour applies depends on how many are still standing. None of it is damage the caster aims at a target, so none of it is emitted as a damage spec."
+  },
+  "probe-history": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "situational_mod",
+       "amount": 5,
+       "bonus_type": "competence",
+       "target": "the single Knowledge check this spell lets you attempt"
+      },
+      {
+       "type": "narrative",
+       "target": "Ask about one topic and make the matching Knowledge check. What you learn comes from a reality in which you were an acquaintance of the target, so the answer may differ subtly from the truth here. Track Knowledge checks made this way separately when deciding whether a retry is allowed."
+      }
+     ]
+    },
+    {
+     "type": "narrative",
+     "target": "Once you have probed a target's history, successful or not, you can never probe that creature again nor look for the same information in another creature's history."
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": "The bonus is the caster's, not the target's, and only arrives if the target fails its save — hence the save_gate."
+  },
+  "produce-flame": {
+   "effects": [
+    {
+     "type": "damage",
+     "dice": "1d6",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "scales": "full",
+     "note": "1d6 + 1 point per caster level, maximum +5; delivered by melee touch attack, or hurled up to 120 feet as a ranged touch attack with no range penalty"
+    },
+    {
+     "type": "narrative",
+     "target": "Torch-bright flames in your open hand that harm neither you nor your gear. A new set appears the instant you hurl the old one. Each attack you make cuts 1 minute from the remaining duration, and if that brings it to 0 the spell ends once the attack resolves. It does not work underwater."
+    }
+   ],
+   "scaling": {
+    "kind": "damage",
+    "die": 6,
+    "base_dice": 1,
+    "bonus_per_level": 1,
+    "bonus_cap": 5,
+    "damage_type": "fire"
+   },
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The damage is aimed by the caster at an enemy and resolves on a hit, so it is the spell's own. Element fire is already derived from the descriptor."
+  },
+  "profane-nimbus": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A nimbus of shadow shaped like your god's unholy symbol. Any good creature that strikes you with an unarmed strike, a natural weapon or a handheld weapon deals its damage normally, but takes 1d6 points of damage + 1 point per caster level, maximum +15, in return. Creatures using melee weapons with reach are not caught by this. Spell resistance applies against that damage."
+    },
+    {
+     "type": "narrative",
+     "target": "You also take half damage from magical attacks with the good descriptor, and none at all if such an attack allows a Reflex save for half and you succeed at it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The 1d6 + 1 per level is retributive — it lands on whoever strikes the caster, never on a target the caster picks — so it is deliberately not a damage spec. This is the thorn body shape exactly."
+  },
+  "prognostication": {
+   "effects": [
+    {
+     "type": "spell_effect",
+     "target": "divination",
+     "note": "except that it can see up to a year and a day ahead, and is significantly more cryptic than divination because the distant future is less predictable"
+    }
+   ],
+   "duration": {
+    "kind": "instantaneous"
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "programmed-image": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "As silent image, except the figment waits for a trigger you set at casting — possibly a word — and then plays, carrying visual, auditory, olfactory and thermal elements including intelligible speech. The trigger may be as broad or as precise as you like but must be audible, tactile, olfactory or visual; it cannot rest on something not normally obvious to the senses, such as alignment. See magic mouth for how such triggers work."
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'permanent until triggered, then rounds/level (1)'; the permanent form is emitted because that is the state the spell sits in from casting, and the rounds-per-level playback follows the trigger."
+  },
+  "project-image": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Creates a quasi-real illusory double of you that looks, sounds and smells like you but is intangible. It mimics everything you do, speech included, unless you direct it otherwise as a move action. You may see and hear through it as though standing where it stands, switching between its senses and your own as a free action on your turn; while using its senses your own body counts as blinded and deafened."
+    },
+    {
+     "type": "narrative",
+     "target": "Any spell you cast with a range of touch or greater may originate from the image instead of from you, and affects other targets normally. The image cannot be the target of your spells except illusion spells. Objects are affected by the image as though they had made their Will saves. You must keep line of effect to it at all times: if that is broken the spell ends, including momentarily by dimension door, teleport, plane shift or the like."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "round",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": ""
+  },
+  "project-weakness": {
+   "effects": [
+    {
+     "type": "save_gate",
+     "target": "will",
+     "dc": "10 + spell level + casting ability modifier",
+     "on_failure": [
+      {
+       "type": "narrative",
+       "target": "The target reacts to garlic, mirrors, ringing bells, sunlight and the rest exactly as a vampire of your own kind would. It gains none of vampirism's benefits — no fast healing, no special requirements to kill it permanently — only the weaknesses. The curse cannot kill: anything that would kill it, such as long sunlight exposure for a moroi's weaknesses, instead leaves it helpless until the curse or the harmful effect is lifted."
+      }
+     ]
+    }
+   ],
+   "duration": {
+    "kind": "permanent",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Which weaknesses apply depends on the caster's own kind of vampirism, so nothing can be named as a fixed vulnerability spec."
+  },
+  "prophetic-lore": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "Recalls prophecies about a person, place, item or event — old predictions, lost ones, or entirely new. If the person or item is present, or you are at the place, casting takes 1d4 x 10 minutes; with general but specific information about the subject it takes 1d4 x 2 hours; with only rumours the spell has no effect at all. Several prophecies of varying detail and accuracy may surface; roll d% and add your caster level, maximum 10, to determine what you get."
+    }
+   ],
+   "converted_by": "read",
+   "notes": "Corpus duration is 'see text' and the corpus description ends before the d% results table, so the outcomes it maps to are not present to convert."
+  },
+  "prosperous-room": {
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "A room you own produces 1 more Goods, Labor, Influence or Magic than it already does — an extra unit of each type if it produces several — and 25% more gp if it generates gp. It only increases capital the room already generates; a room producing no Magic gains none. While it lasts, neither you nor your allies may interact further with the room or the spell ends immediately, and you cannot spend downtime actions running a business there, though its employees and workers carry on as usual."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "day",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "A downtime and capital subsystem effect; nothing in the vocabulary addresses buildings or capital."
+  },
+  "protection-from-arrows": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "magic",
+     "note": "against ranged weapons only; it does not let the warded creature damage creatures with similar damage reduction"
+    },
+    {
+     "type": "narrative",
+     "target": "The ward discharges once it has prevented 10 points of damage per caster level, to a maximum of 100 points."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "Corpus duration is 'hours/level (1) or until discharged'. The damage_reduction type has no way to restrict itself to ranged weapons, so that restriction rides in the note."
+  },
+  "protection-from-arrows-communal": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "magic",
+     "note": "against ranged weapons only; it does not let a warded creature damage creatures with similar damage reduction"
+    },
+    {
+     "type": "narrative",
+     "target": "You divide the total duration among the creatures touched in 1-hour intervals. Each subject's ward ends for that subject once it has absorbed 10 points of damage per caster level, to a maximum of 100 points."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "hour",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The per_level duration is the pool divided among subjects; the vocabulary cannot say 'divided among targets'."
+  },
+  "protection-from-chaos": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by chaotic creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by chaotic creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by chaotic creatures",
+     "note": "at the original effect's own DC; success suppresses the control for this spell's duration"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by chaotic creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "Chaotic summoned creatures cannot make bodily contact with the target: their natural weapon attacks fail and they recoil if the attack requires touching. The protection ends if the warded creature attacks the blocked creature or forces the barrier against it, and spell resistance can overcome it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "This spell's own text names no amount; the +2 deflection and +2 resistance are read from protection from evil, which it says it functions like. Situational rather than flat for the same reason as that spell."
+  },
+  "protection-from-chaos-communal": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by chaotic creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by chaotic creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by chaotic creatures"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by chaotic creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "As protection from chaos, including the barrier against contact by chaotic summoned creatures, except that you divide the total duration among the creatures touched in 1-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Numbers read from protection from evil by way of protection from chaos."
+  },
+  "protection-from-energy": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "one energy type chosen when you cast — acid, cold, electricity, fire or sonic",
+     "note": "temporary; it discharges once it has absorbed 12 points of that energy per caster level, to a maximum of 120 points at caster level 10th"
+    },
+    {
+     "type": "narrative",
+     "target": "Protection from energy overlaps and does not stack with resist energy: a creature warded by both spends the protection first, and resist energy takes over once the protection is exhausted."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The energy type is chosen at casting, so it cannot be named in a vocabulary field. Corpus duration is 'minutes/level (10) or until discharged'."
+  },
+  "protection-from-energy-communal": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "one energy type chosen when you cast — acid, cold, electricity, fire or sonic",
+     "note": "temporary; a subject's ward ends once it has absorbed 12 points of that energy per caster level, to a maximum of 120 points"
+    },
+    {
+     "type": "narrative",
+     "target": "As protection from energy, except that you divide the total duration among the creatures touched in 10-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The per_level duration is the pool divided among subjects."
+  },
+  "protection-from-evil": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by evil creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by evil creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against a spell or effect that possesses or controls the mind",
+     "note": "made at once, at the original effect's own DC, and only against effects created by evil creatures or objects; on a success the control is suppressed for this spell's duration and resumes when it ends"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by evil creatures or objects to possess or exercise mental control over you",
+     "note": "it does not expel a controlling life force already in place, such as a ghost or a caster using magic jar, but it does stop it controlling you"
+    },
+    {
+     "type": "narrative",
+     "target": "A barrier 1 foot out that moves with you also blocks bodily contact by evil summoned creatures: their natural weapon attacks fail and they recoil if the attack requires touching you. Non-evil summoned creatures are unaffected by this, and the protection ends if you attack the blocked creature or try to force the barrier against it. Spell resistance can let a creature overcome it and touch you."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Both bonuses apply only against evil creatures, so they are situational_mod rather than combat_mod and save_mod — a flat +2 AC and +2 to all saves would overstate the ward against every other opponent. The GM adjudicates the 'created by evil creatures or objects' clause on the second effect, as the prose says."
+  },
+  "protection-from-evil-communal": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by evil creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by evil creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against a spell or effect that possesses or controls the mind",
+     "note": "at the original effect's own DC, against evil-created effects only; success suppresses the control for the spell's duration"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by evil creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "As protection from evil, including the barrier against contact by evil summoned creatures, except that you divide the total duration among the creatures touched in 1-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Numbers read from protection from evil, which this spell only modifies. The per_level duration is the pool divided among subjects."
+  },
+  "protection-from-good": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by good creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by good creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by good creatures",
+     "note": "at the original effect's own DC; success suppresses the control for this spell's duration"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by good creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "Good summoned creatures cannot make bodily contact with the target: their natural weapon attacks fail and they recoil if the attack requires touching. The protection ends if the warded creature attacks the blocked creature or forces the barrier against it, and spell resistance can overcome it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The +2 deflection and +2 resistance are read from protection from evil, which this spell says it functions like; its own text names no amount."
+  },
+  "protection-from-good-communal": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by good creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by good creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by good creatures"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by good creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "As protection from good, including the barrier against contact by good summoned creatures, except that you divide the total duration among the creatures touched in 1-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Numbers read from protection from evil by way of protection from good."
+  },
+  "protection-from-law": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by lawful creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by lawful creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by lawful creatures",
+     "note": "at the original effect's own DC; success suppresses the control for this spell's duration"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by lawful creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "Lawful summoned creatures cannot make bodily contact with the target: their natural weapon attacks fail and they recoil if the attack requires touching. The protection ends if the warded creature attacks the blocked creature or forces the barrier against it, and spell resistance can overcome it."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "The +2 deflection and +2 resistance are read from protection from evil, which this spell says it functions like."
+  },
+  "protection-from-law-communal": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "AC against attacks made or effects created by lawful creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "saving throws against attacks made or effects created by lawful creatures"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against control by lawful creatures"
+    },
+    {
+     "type": "immunity",
+     "target": "new attempts by lawful creatures or objects to possess or exercise mental control over you"
+    },
+    {
+     "type": "narrative",
+     "target": "As protection from law, including the barrier against contact by lawful summoned creatures, except that you divide the total duration among the creatures touched in 1-minute intervals."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Numbers read from protection from evil by way of protection from law. The corpus lists this spell's descriptor as 'evil' where protection from law itself carries 'chaotic'; that looks like a corpus data error, but descriptors are not this pass's to change."
+  },
+  "protection-from-natural-attacks": {
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 5,
+     "note": "DR 5/- (nothing bypasses it), and only against natural weapons of the one type chosen at casting: bite, claw, gore, hoof, pincers, slam, sting, swarm, tail slap, talon, tentacle or wing"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "bypass is left empty because DR 5/- is bypassed by nothing; the restriction to one chosen natural attack type has no field of its own."
+  },
+  "protection-from-outsiders": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "deflection",
+     "target": "AC when targeted by outsiders of the racial subtype chosen at casting"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "resistance",
+     "target": "saving throws when targeted by outsiders of the racial subtype chosen at casting"
+    },
+    {
+     "type": "situational_mod",
+     "amount": 4,
+     "bonus_type": "morale",
+     "target": "the fresh saving throw this spell grants against mental control by outsiders of the chosen subtype",
+     "note": "works as protection from evil's second effect, at the original effect's own DC"
+    },
+    {
+     "type": "narrative",
+     "target": "Choose one specific outsider racial subtype — angel, azata, demon, oni, psychopomp, protean and the like. Alignment and general subtypes such as elemental, extraplanar or native cannot be chosen, and outsiders with no racial subtype (genies, night hags, yeth hounds, xills) are unaffected. Summoned creatures of the chosen subtype are barred from bodily contact exactly as in protection from evil. The spell takes the alignment descriptors opposite the chosen race's alignment — lawful and good against a chaotic evil race, chaotic against a lawful one, none against a neutral one."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": true
+   },
+   "converted_by": "read",
+   "notes": "Both +4 bonuses apply only against the chosen subtype, so they are situational rather than flat."
+  },
+  "protection-from-spells": {
+   "effects": [
+    {
+     "type": "situational_mod",
+     "amount": 8,
+     "bonus_type": "resistance",
+     "target": "saving throws against spells and spell-like abilities, but not against supernatural or extraordinary abilities"
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 10,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "A flat save_mod on all three saves would also cover supernatural and extraordinary abilities, which the prose explicitly excludes. Affects one creature touched per four caster levels."
+  },
+  "protection-from-spores": {
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "brown mold, green slime, russet mold, yellow mold and similar hazards of CR 6 or lower"
+    },
+    {
+     "type": "immunity",
+     "target": "poison, disease and infestation attacks from fungal creatures of CR 6 or lower, such as basidirond spores and violet fungus rot"
+    },
+    {
+     "type": "immunity",
+     "target": "fungus-based toxins such as striped toadstool"
+    },
+    {
+     "type": "narrative",
+     "target": "Against similar hazards or monsters of CR 7 or higher, the target instead gains a bonus on all saving throws against the effect equal to half your caster level. The spell offers no protection at all against fungal infestations created by the seeded, by the spell what grows within, or by Xhamen-Dor."
+    }
+   ],
+   "duration": {
+    "kind": "per_level",
+    "amount": 1,
+    "unit": "minute",
+    "dismissible": false
+   },
+   "converted_by": "read",
+   "notes": "The CR 7+ bonus is half the caster level with no base number, so no situational_mod is emitted for it — an integer there would be invented."
+  }
+ }
+}
