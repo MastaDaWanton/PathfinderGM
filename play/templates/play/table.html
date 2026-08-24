@@ -618,6 +618,11 @@
                 color: #e8c9a0; font: 400 12.5px/1 Palatino, serif; }
   .abilitybtn:hover { border-color: rgba(214,72,72,.8); color: #ffe7b4;
                       box-shadow: 0 0 14px rgba(150,26,26,.35); }
+  /* A toggle that is on glows steadily — the state has to be readable at a glance,
+     not discovered by clicking it again. */
+  .abilitybtn.on { border-color: rgba(214,72,72,.95); color: #ffe7b4;
+                   background: linear-gradient(rgba(140,30,24,.55), rgba(70,16,12,.6));
+                   box-shadow: 0 0 12px rgba(190,50,40,.45); }
   /* The map tray. Off-screen rather than hidden, so opening it slides rather than
      appears — the same ink-bleed logic the rest of the page uses. */
   #maptab {
@@ -1658,9 +1663,12 @@ function renderAbilities(s) {
   const list = s.abilities || [];
   if (!list.length) { $("#abilities").innerHTML = ""; return; }
   $("#abilities").innerHTML = `<div class="abrow-label">Your abilities</div>` +
-    list.map(a => `<button class="abilitybtn" data-ability="${esc(a.name)}"
+    list.map(a => `<button class="abilitybtn${a.active ? " on" : ""}"
+      data-ability="${esc(a.name)}"
       title="${esc(a.path)} · Control Blood ${a.tier}${
-        a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}</button>`).join("");
+        a.toggle ? (a.active ? " · ACTIVE — click to dismiss" : " · off — click to form") : ""}${
+        a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}${
+        a.toggle ? (a.active ? " ●" : " ○") : ""}</button>`).join("");
 }
 
 document.addEventListener("click", e => {
@@ -2059,8 +2067,23 @@ document.addEventListener("click", async e => {
 
   if (t.closest("#cb-strike")) {
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    // More than one weapon only while a toggle grants one (the armed punch, while
+    // the armament is formed) — then the strike has to ask which.
+    const arms = (STATE.attacks || {}).weapons || [];
+    if (arms.length > 1) {
+      combatMenu(arms.map(w => `<button data-strikeweapon="${esc(w)}">${esc(w)}
+        </button>`).join("") + `<span class="cb-note">Which weapon?</span>`);
+      return;
+    }
     COMBAT.standard = { label: `Strike ${targetName()}`,
       actions: [{ op: "attack", target: COMBAT.target, params: {} }] };
+    combatMenu(""); renderPlan(); return;
+  }
+  const sw = t.closest("[data-strikeweapon]");
+  if (sw) {
+    const w = sw.dataset.strikeweapon;
+    COMBAT.standard = { label: `Strike ${targetName()} (${w})`,
+      actions: [{ op: "attack", target: COMBAT.target, params: { weapon: w } }] };
     combatMenu(""); renderPlan(); return;
   }
 
@@ -2069,8 +2092,11 @@ document.addEventListener("click", async e => {
     const seq = (STATE.attacks || {}).sequence || [0];
     const abil = (STATE.abilities || []).filter(a =>
       !["swift", "free", "immediate"].includes(actionKind(a.text)));
+    const arms = (STATE.attacks || {}).weapons || [];
     const options = (i) => `<option value="">weapon (${seq[i] >= 0 ? "+" : ""}${
-      seq[i]})</option>` + ((STATE.attacks || {}).replaceable ? abil.map(a =>
+      seq[i]})</option>` + (arms.length > 1 ? arms.slice(1).map(w =>
+      `<option value="w:${esc(w)}">${esc(w)} (${seq[i] >= 0 ? "+" : ""}${
+      seq[i]})</option>`).join("") : "") + ((STATE.attacks || {}).replaceable ? abil.map(a =>
       `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "");
     combatMenu(seq.map((p, i) =>
       `<div class="cb-slot"><label>attack ${i + 1}</label>
@@ -2082,11 +2108,15 @@ document.addEventListener("click", async e => {
   }
   if (t.closest("#cb-fullok")) {
     const slots = [...$("#cb-menu").querySelectorAll("select")].map(s => s.value);
-    const actions = slots.map((v, i) => v
-      ? { op: "use_ability", params: { ability: v }, target: COMBAT.target }
-      : { op: "attack", target: COMBAT.target, params: { iteration: i } });
-    const label = "Full attack: " + slots.map(v => v || "weapon").join(", ") +
-                  ` on ${targetName()}`;
+    const actions = slots.map((v, i) => {
+      if (!v) return { op: "attack", target: COMBAT.target, params: { iteration: i } };
+      if (v.startsWith("w:")) return { op: "attack", target: COMBAT.target,
+        params: { iteration: i, weapon: v.slice(2) } };
+      return { op: "use_ability", params: { ability: v }, target: COMBAT.target };
+    });
+    const label = "Full attack: " + slots.map(v =>
+      v ? (v.startsWith("w:") ? v.slice(2) : v) : "weapon").join(", ") +
+      ` on ${targetName()}`;
     COMBAT.standard = { label, actions };
     combatMenu(""); renderPlan(); return;
   }

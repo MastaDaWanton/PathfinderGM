@@ -99,6 +99,25 @@ def control_blood_for(actor, path: str) -> int:
     return control_blood(actor)["a" if taken.index(key) == 0 else "b"]
 
 
+def toggle_key(actor, name: str) -> str:
+    """The condition key this ability toggles, or "" for an ordinary ability.
+
+    Declared in the class data (`paths.<path>.toggles`): Extracorporeal Blood Armament
+    was a fire-and-forget use with nothing on screen to say whether it still held, and
+    "the user isn't confused about whether or not its active" is the whole feature. A
+    toggle is a standing condition with no clock — visible wherever conditions are.
+    """
+    want = " ".join(str(name or "").split()).strip().lower()
+    if not want:
+        return ""
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        for listed, key in (det.get("toggles") or {}).items():
+            if str(listed).lower() == want:
+                return str(key)
+    return ""
+
+
 def is_passive(actor, name: str) -> bool:
     """Whether this ability is an always-active passive in a path the actor follows.
 

@@ -701,7 +701,22 @@ class Actor:
         """
         from . import weapons as weapons_mod
 
-        return weapons_mod.get(key or self.equipped or "unarmed")
+        wanted = (key or self.equipped or "unarmed").strip().lower()
+        # The armament's own weapon. Built here rather than in the weapons table
+        # because its damage die is the class table's blood column at this character's
+        # level — a table entry cannot know who is asking. It arms the fist and only
+        # the fist: a held weapon never carries the armament, which is why this is a
+        # separate weapon rather than a bonus on whatever is equipped. The fist die
+        # rides at damage time as an itemised modifier (see `_op_attack`).
+        if wanted in ("armed punch", "armed punches", "blood gauntlets"):
+            from . import leveling
+
+            base = dict(weapons_mod.get("unarmed"))
+            base["name"] = "armed punch"
+            base["damage"] = leveling.table_die(self, "blood") or "1d8"
+            base["type"] = "bludgeoning and piercing"
+            return base
+        return weapons_mod.get(wanted)
 
     def _uses_finesse(self, weapon: dict) -> bool:
         return (

@@ -149,6 +149,11 @@ def _known_weapon(name) -> bool:
     before settings are configured in some entry points."""
     from .weapons import has
 
+    # The armament's own weapon exists on the wearer, not in the table — the sheet
+    # builds it from the class's blood die. Validation lets it through; whether the
+    # armament is actually formed is the engine's legality check, with a better error.
+    if str(name).strip().lower() in ("armed punch", "armed punches", "blood gauntlets"):
+        return True
     return has(str(name))
 
 

@@ -926,7 +926,7 @@
     ]
    },
    "abilities": {
-    "Extracorporeal Blood Armament": "Free action gauntlets dealing (Blood DMG + Fist DMG + STR mod) piercing/bludgeoning or non-lethal damage. Apply special abilities (Corrosive, Keen, Vicious, Advancing) by paying Non-Lethal costs per turn. Applies 1 blood stack per hit.",
+    "Extracorporeal Blood Armament": "Toggle (free action): form or dismiss blood gauntlets over your hands. While formed, the armed punch is available as an attack, dealing Blood DMG + Fist DMG + STR mod as piercing/bludgeoning (or non-lethal). The armament never applies through a held weapon — it arms your fists, not your sword. Applies 1 blood stack per hit. Special abilities (Corrosive, Keen, Vicious, Advancing) can be paid for in Non-Lethal costs per turn.",
     "Coagulant Stacks": "Target loses -10 ft movement per stack.",
     "Vampiric Recovery": "Rip stacks back from enemies to deal 2d10 damage and heal 50% of damage dealt (1d3 turn cooldown).",
     "Vortex Pull": "Swift action. Pull enemies 10 ft per stack towards you (1d3 turn cooldown).",
@@ -1068,7 +1068,10 @@
    "passive": [
     "Swift Strikes",
     "Uncanny Dodge"
-   ]
+   ],
+   "toggles": {
+    "Extracorporeal Blood Armament": "blood armament"
+   }
   }
  },
  "_paths_note": "Imported from the author's own document by tools/import_blood_paths.py. Abilities are tiered by Control Blood level (1-5), which is what 'control blood 1a' through '5b' on the progression table refers to — not by character level. Descriptions are the document's own sentences, unedited: the engine executes none of them yet, so what the app shows is what the author wrote rather than a paraphrase of it.",

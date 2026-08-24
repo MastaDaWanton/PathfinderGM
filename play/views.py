@@ -75,9 +75,15 @@ def _attack_slots(pc) -> dict:
         return {"sequence": [], "weapon": "", "replaceable": False}
     from rules.tables import iterative_attacks
 
+    # Every weapon a swing may declare. More than one only while a toggle grants an
+    # alternative — the armed punch exists exactly as long as the armament is formed.
+    weapons = [pc.equipped or "unarmed"]
+    if pc.has_condition("blood armament"):
+        weapons.append("armed punch")
     return {
         "sequence": iterative_attacks(pc.bab),
         "weapon": (pc.equipped or "unarmed"),
+        "weapons": weapons,
         "replaceable": bool(getattr(pc, "paths", None)),
     }
 
@@ -106,8 +112,15 @@ def _usable_abilities(pc) -> list[dict]:
                     continue
                 if int(tier) <= reached:
                     key = (det.get("resolves") or {}).get(name, "")
-                    out.append({"name": name, "path": path, "tier": int(tier),
-                                "text": (det.get("abilities") or {}).get(key, "")})
+                    entry = {"name": name, "path": path, "tier": int(tier),
+                             "text": (det.get("abilities") or {}).get(key, "")}
+                    # A toggle's button must say whether it holds — that confusion is
+                    # the reason toggles exist as a concept at all.
+                    cond = (det.get("toggles") or {}).get(name)
+                    if cond:
+                        entry["toggle"] = True
+                        entry["active"] = pc.has_condition(str(cond))
+                    out.append(entry)
     return out
 
 

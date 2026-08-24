@@ -248,9 +248,11 @@ def test_work_above_your_level_is_refused_with_the_level_that_allows_it(engine):
 
 
 def test_an_unknown_track_is_refused_with_the_ones_that_exist(engine):
+    # "blacksmith" was the unknown example here until the blacksmithing world class
+    # arrived and made it real — the refusal needs a track that stays fictional.
     with pytest.raises(IntentError, match="herbalist"):
         engine.validate([{"op": "craft", "actor": "pc",
-                          "params": {"track": "blacksmith", "recipe": "a nail"}}])
+                          "params": {"track": "basket weaver", "recipe": "a basket"}}])
 
 
 def test_progress_survives_a_save(pc):

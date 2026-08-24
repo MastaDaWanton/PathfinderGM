@@ -543,11 +543,19 @@ class Engine:
             )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.equipped or "unarmed"
-            if not weapons_mod.has(key):
+            # The armed punch is worn, not carried: it exists while the armament
+            # condition holds and nowhere else, so both the weapons-table check and
+            # the carried-list check would refuse it for the wrong reason.
+            if key in ("armed punch", "armed punches", "blood gauntlets"):
+                if not actor.has_condition("blood armament"):
+                    raise IntentError(
+                        "attack: the blood armament is not formed. Use Extracorporeal "
+                        "Blood Armament to form it first.", "legality", index)
+            elif not weapons_mod.has(key):
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
                 )
-            if actor.weapons and key not in actor.weapons and key != "unarmed":
+            elif actor.weapons and key not in actor.weapons and key != "unarmed":
                 raise IntentError(
                     f"attack: {actor.name} is not carrying a {key} "
                     f"(has {', '.join(actor.weapons) or 'nothing'})",
@@ -872,6 +880,13 @@ class Engine:
         self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
+        # The armed punch exists only while the armament is formed. Refused here with
+        # the toggle's own name, because a swing with a weapon you are not wearing is
+        # not a miss — it is a turn that should never have been declared.
+        if weapon["name"] == "armed punch" and not actor.has_condition("blood armament"):
+            raise IntentError(
+                "attack: the blood armament is not formed. Use Extracorporeal Blood "
+                "Armament to form it first.", "legality")
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
 
@@ -967,6 +982,20 @@ class Engine:
                 mult = weapon["crit_mult"] if state.get("crit") else 1
                 dice_notation = _multiply_dice(weapon["damage"], mult)
                 dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power)
+                if weapon["name"] == "armed punch":
+                    # Blood DMG + Fist DMG + STR: the blood die is the weapon's own
+                    # and the player rolls it; the fist die rides as an itemised
+                    # modifier the engine rolls, because the dice pipeline speaks one
+                    # notation per roll and a hidden rider keeps every number named
+                    # rather than folded into a fake die. Riders do not multiply on a
+                    # crit, same as 1e treats extra damage dice.
+                    from . import leveling as leveling_mod
+
+                    fist = leveling_mod.table_die(actor, "fist") or "1d6"
+                    fist_roll = self.dice.roll(fist, label="fist die",
+                                               visibility="hidden")
+                    dmg_mods = dmg_mods + [Modifier(fist_roll.total,
+                                                    f"fist die ({fist})")]
                 if mult > 1:
                     dmg_mods = [Modifier(m.value * mult, f"{m.source} x{mult}")
                                 for m in dmg_mods]
@@ -2410,6 +2439,29 @@ class Engine:
             raise IntentError(
                 f"use_ability: {found} is always active — it is never used, it simply "
                 f"happens. Attack, and it does its work on the attack.", "legality")
+
+        # A toggle is a standing state, not a spent action. Using it again turns it
+        # off, and the state lives as a clockless condition so every place that shows
+        # conditions shows whether it holds — which is the whole point: the armament
+        # used to be fire-and-forget with nothing on screen saying if it still held.
+        key = leveling.toggle_key(actor, found)
+        if key:
+            if actor.has_condition(key):
+                actor.remove_condition(key)
+                return Outcome(
+                    intent_id=intent.id, op="use_ability",
+                    effects=[{"ref": actor.ref, "kind": "toggle", "state": "off",
+                              "condition": key}],
+                    tell=f"{actor.name} lets the {key} fall away.",
+                    because=intent.because)
+            actor.add_condition(key, rounds=None, source=found)
+            return Outcome(
+                intent_id=intent.id, op="use_ability",
+                effects=[{"ref": actor.ref, "kind": "toggle", "state": "on",
+                          "condition": key}],
+                tell=(f"{actor.name} forms the {key}. "
+                      f"The armed punch is ready as an attack."),
+                because=intent.because)
         if not effects:
             tier = leveling.tier_needed(actor, wanted)
             return Outcome(
