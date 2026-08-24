@@ -897,3 +897,26 @@ def test_the_full_blood_bond_text_is_data_and_the_glossary_serves_it():
     entry = glossary.lookup(glossary.build(pc), "blood bond")
     assert entry["text"].startswith("Your blood is bonded to you")
     assert "Constitution check (DC 10+LVL+CONmod)" in entry["text"]
+
+
+def test_blood_bending_bab_matches_the_supplied_chart():
+    """The user's chart is the standard full progression — +1 per level, iterative
+    attacks at 6/11/16 — and the class had been shipped as three_quarter, which the
+    document itself never stated. Every one of the twenty rows is checked, because a
+    progression is exactly the kind of table that is wrong at one level and looks right
+    at the other nineteen."""
+    from rules.sheet import from_dict, load_pc, to_dict
+    from rules.tables import iterative_attacks
+
+    chart = {1: [1], 2: [2], 3: [3], 4: [4], 5: [5],
+             6: [6, 1], 7: [7, 2], 8: [8, 3], 9: [9, 4], 10: [10, 5],
+             11: [11, 6, 1], 12: [12, 7, 2], 13: [13, 8, 3], 14: [14, 9, 4],
+             15: [15, 10, 5], 16: [16, 11, 6, 1], 17: [17, 12, 7, 2],
+             18: [18, 13, 8, 3], 19: [19, 14, 9, 4], 20: [20, 15, 10, 5]}
+    for level, want in chart.items():
+        d = to_dict(load_pc("fixtures/pc-kesst.json"))
+        d["class"] = "blood bending"
+        d["level"] = level
+        d["ranks"] = {}
+        pc = from_dict(d, ref="pc")
+        assert iterative_attacks(pc.bab) == want, (level, pc.bab)

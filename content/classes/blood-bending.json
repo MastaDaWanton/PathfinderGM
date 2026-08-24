@@ -7,7 +7,7 @@
   "hit_die": "2d8",
   "hit_dice_per_level": 2,
   "_hit_dice_note": "Two Hit Dice per level, per the author. Every other 1e class has one, so 'per Hit Die' and 'per level' are the same number everywhere else and are not here: at 20th this character has 40 HD, Mighty Blood Rage grants +160 temporary hit points rather than +80, and they outgrow the HD caps on sleep and colour spray well before their level suggests.",
-  "bab": "three_quarter",
+  "bab": "full",
   "saves": {
     "fort": "good_plus_1",
     "ref": "good",
@@ -1079,5 +1079,6 @@
       "amount": 2,
       "why": "Blood Bond: 'Permanently increase your Constitution by +2 for every 5 levels in Blood Bending.'"
     }
-  ]
+  ],
+  "_bab_note": "Full progression, per the class chart the user supplied 2026-08-24: +1 per level, iteratives at 6/11/16 — the standard full BAB table. Was three_quarter, which the document itself never stated."
 }

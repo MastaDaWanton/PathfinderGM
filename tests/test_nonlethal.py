@@ -35,7 +35,10 @@ from rules.sheet import IllegalSheet, from_dict, load_pc, to_dict, validate
 PDF_FORT = [3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13]
 PDF_REF = [2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12]
 PDF_WILL = [1, 2, 2, 3, 4, 5, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11]
-PDF_BAB = [0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 15]
+# Was the PDF's own three-quarter column ([0, 1, 2, 3, 3, …]); superseded 2026-08-24 by
+# the user's chart, which is the standard full progression. test_leveling holds the
+# twenty-row iterative check against that chart.
+PDF_BAB = list(range(1, 21))
 
 
 @pytest.fixture
