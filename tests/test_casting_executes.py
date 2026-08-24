@@ -366,7 +366,19 @@ def test_a_formula_the_spell_prints_but_does_not_deal_is_refused(spell_id, why):
     version of the veto was conditional-based and refused caustic eruption and fire storm,
     both of which deal exactly what they print, once, in an area.
     """
-    assert spells_mod.get(spell_id).effects == [], why
+    # The rule is "this spell deals no damage of its own", not "this spell has no
+    # mechanics". Asserting the second was a fine proxy while a regex was the only thing
+    # writing these — a regex that refused the damage refused everything. Reading them
+    # properly made that false: aspect of the stag really does grant +2 dodge AC, +20 ft
+    # of speed and a way through undergrowth, and its antler dice are still correctly
+    # left as prose. So the assertion is narrowed to what it always meant.
+    got = spells_mod.get(spell_id).effects or []
+    flat = list(got)
+    for spec in got:                      # a save_gate hides its damage one level down
+        flat.extend(spec.get("on_failure") or [])
+        flat.extend(spec.get("on_success") or [])
+    offending = [s for s in flat if s.get("type") in ("damage", "heal")]
+    assert offending == [], f"{why}: {offending}"
     assert not spells_mod.get(spell_id).scaling, why
 
 

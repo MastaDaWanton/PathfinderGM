@@ -179,7 +179,14 @@ class Spell:
     # True while a machine's reading of the prose stands unreviewed. The editor clears it
     # on save, exactly as the ingredient and creature corpora do.
     effects_converted: bool = False
+    # Read by a person (or an agent reading the prose), rather than pattern-matched out
+    # of it. A different state from `effects_converted`, and worth telling apart on the
+    # page: one of them is waiting for somebody to check it and the other is not.
+    effects_read: bool = False
     range_value: dict = field(default_factory=dict)
+    # The printed duration, structured. Derived like `range_value` and for the same
+    # reason: a buff the engine cannot time is a buff it cannot apply.
+    duration_value: dict = field(default_factory=dict)
     area_value: dict = field(default_factory=dict)
     save: str = ""              # "" | fort | ref | will
     save_effect: str = ""       # "" | none | negates | half | partial | disbelief | see text
@@ -374,6 +381,93 @@ def spellbooks_for(lists: dict) -> list[str]:
 _RANGE_BANDS = {"close": (25, 5, 2), "medium": (100, 10, 1), "long": (400, 40, 1)}
 _RANGE_FIXED = re.compile(r"^(?:feet|ft\.?)\s*\((\d+)\)")
 _RANGE_PER_LEVEL = re.compile(r"^(miles?|feet|ft\.?)\s*/\s*level\s*\((\d+)\)")
+
+
+_DUR_UNITS = {"round": "round", "rounds": "round", "minute": "minute",
+              "minutes": "minute", "hour": "hour", "hours": "hour",
+              "day": "day", "days": "day"}
+_DUR_PER_LEVEL = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*/\s*level\s*\((\d+)\)")
+_DUR_FIXED = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*\((\d+)\)")
+
+
+def parse_duration(text: str) -> dict:
+    """The printed duration line as something the engine can time a buff with.
+
+    Without this a converted buff is inert: `_op_buff` keeps a clock in rounds, and the
+    corpus states duration as prose — "minutes/level (1)". Nine tenths of the corpus says
+    it in four shapes, which is why this is a parser rather than a table somebody types:
+    740 spells say minutes/level, 564 rounds/level, 508 instantaneous, 243 hours/level.
+
+    Empty rather than guessed for "see text" and the sixty-odd lines with no number in
+    them, for the same reason `parse_range` refuses: a duration of zero is a value
+    somebody chose, and a spell that quietly lasts no time is worse than one the GM is
+    asked to adjudicate.
+    """
+    s = " ".join((text or "").strip().lower().split())
+    if not s:
+        return {}
+
+    out: dict = {}
+    # "or until discharged" rides on top of a real duration — the spell ends at whichever
+    # comes first — so it is a flag rather than a kind of its own.
+    if "until discharged" in s:
+        out["until_discharged"] = True
+    if "dismissible" in s or s.startswith("d "):
+        out["dismissible"] = True
+
+    if s.startswith("permanent"):
+        return {**out, "kind": "permanent"}
+    if s.startswith("instantaneous"):
+        return {**out, "kind": "instantaneous"}
+    # "concentration, up to minutes/level (1)" carries both: the cap is what the engine
+    # can time, and concentration is why it may end sooner.
+    concentrating = s.startswith("concentration")
+
+    m = _DUR_PER_LEVEL.search(s)
+    if m:
+        got = {"kind": "per_level", "amount": int(m.group(2)),
+               "unit": _DUR_UNITS[m.group(1)]}
+        if concentrating:
+            got["concentration"] = True
+        return {**out, **got}
+    m = _DUR_FIXED.search(s)
+    if m:
+        got = {"kind": "fixed", "amount": int(m.group(2)),
+               "unit": _DUR_UNITS[m.group(1)]}
+        if concentrating:
+            got["concentration"] = True
+        return {**out, **got}
+    if concentrating:
+        return {**out, "kind": "concentration"}
+    if out.get("until_discharged"):
+        return {**out, "kind": "until_discharged"}
+    return {}
+
+
+# The engine's clock. Everything timed in this app is counted in rounds.
+_ROUNDS_PER = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
+
+
+def duration_rounds(spell, caster_level: int = 1) -> int | None:
+    """How many rounds this spell lasts for this caster, or None.
+
+    None means "not a thing with a clock" — instantaneous, permanent, concentration, or
+    a duration the parser refused. The caller must treat None as "do not time it" rather
+    than as zero, which is the difference between a permanent effect and one that expires
+    the instant it lands.
+    """
+    d = getattr(spell, "duration_value", None) or {}
+    if not isinstance(d, dict):
+        return None
+    kind, unit = d.get("kind"), d.get("unit")
+    per = _ROUNDS_PER.get(str(unit), 0)
+    if not per:
+        return None
+    if kind == "per_level":
+        return max(1, int(d.get("amount", 1)) * max(1, int(caster_level)) * per)
+    if kind == "fixed":
+        return max(1, int(d.get("amount", 1)) * per)
+    return None
 
 
 def parse_range(text: str) -> dict:
@@ -1209,6 +1303,8 @@ def normalise(d: dict) -> dict:
             element = claimed if claimed in ELEMENTS else ""
         out["element"] = element
 
+    if not out.get("duration_value"):
+        out["duration_value"] = parse_duration(out.get("duration", ""))
     if not out.get("range_value"):
         out["range_value"] = parse_range(out.get("range", ""))
     if not out.get("area_value"):
@@ -1226,6 +1322,71 @@ def normalise(d: dict) -> dict:
 
 _ALL: dict[str, Spell] | None = None
 _META: dict = {}
+
+
+# What a hand-read entry is allowed to say. Anything else in the file is ignored rather
+# than merged: the reading pass owns the mechanical half, and a partition file that
+# restated a spell's school or class lists would be a second copy of a fact the corpus
+# already holds — the disagreement CLAUDE.md warns about, arriving by a new route.
+_READ_FIELDS = ("effects", "scaling", "duration_value", "element")
+
+
+def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]:
+    """Overlay the read-by-hand mechanics from a folder of partition files.
+
+    Silent about a folder that does not exist, because the layer is optional: the app
+    ran for months without it and must go on running if somebody deletes it. Loud —
+    through `read_mechanics_problems` — about an entry that does not validate, because
+    a bad spec that loads is exactly the failure this whole second pass exists to end.
+    """
+    if not folder.is_dir():
+        return raw
+    for path in sorted(folder.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for sid, got in (data.get("spells") or {}).items():
+            key = str(sid).strip().lower()
+            if key not in raw or not isinstance(got, dict):
+                continue
+            entry = dict(raw[key])
+            for fname in _READ_FIELDS:
+                value = got.get(fname if fname != "duration_value" else "duration")
+                if value in (None, "", [], {}):
+                    continue
+                entry[fname] = value
+            if got.get("effects"):
+                # Flagged as read rather than converted: `effects_converted` means "a
+                # machine guessed this and nobody has checked it", and that is no longer
+                # true of a spell somebody sat down and read.
+                entry["effects_converted"] = False
+                entry["effects_read"] = True
+            raw[key] = entry
+    return raw
+
+
+def read_mechanics_problems() -> dict[str, list[str]]:
+    """Every hand-read spec that does not validate, by spell id.
+
+    The merge gate. Twenty agents wrote these in parallel and none of them could see
+    each other's work, so the file that proves they agreed with the schema is this one.
+    """
+    from django.conf import settings
+
+    out: dict[str, list[str]] = {}
+    folder = Path(settings.BASE_DIR) / "content" / "spells" / "mechanics"
+    if not folder.is_dir():
+        return out
+    for path in sorted(folder.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for sid, got in (data.get("spells") or {}).items():
+            found: list[str] = []
+            for spec in got.get("effects") or []:
+                found.extend(effectspec.validate(spec, str(sid)))
+            if found:
+                out[str(sid)] = found
+    return out
 
 
 def all_spells() -> dict[str, Spell]:
@@ -1258,6 +1419,14 @@ def all_spells() -> dict[str, Spell]:
                     _META = {"descriptors": data["descriptors"],
                              "classes": data.get("classes", []),
                              "note": data.get("note", "")}
+        # The read-by-hand layer, last, because it wins. `spells-mechanics.json` is what
+        # a regex made of the prose; `mechanics/*.json` is what somebody got by reading
+        # it. Where they disagree the reading is right — that is the whole reason the
+        # second layer exists, and the machine pass has already been wrong 31 times in a
+        # way only reading caught.
+        for folder in (Path(settings.BASE_DIR) / "content" / "spells" / "mechanics",
+                       Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spell-mechanics"):
+            raw = _layer_read_mechanics(folder, raw)
         # Normalised after the merge rather than per file, because the mechanics file and
         # the Codex file each hold half of what a derivation needs — an element read from
         # a scaling formula in one and from descriptors in the other.

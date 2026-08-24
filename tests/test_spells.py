@@ -321,7 +321,17 @@ def test_repeating_damage_is_left_as_prose_rather_than_flattened():
     Measured when the tag gate was relaxed to catch magic missile: it also caught
     constricting coils, black tentacles and summon stampede — three per-round effects out of
     five extra spells. Magic missile is hand-written instead."""
-    assert not spells.get("acid-arrow").effects
+    # The *repeating* half stays prose — `effectspec` has no repeating-damage type, so
+    # flattening it into one hit would have the arrow deal its whole duration at once.
+    # The initial hit is a different question and the answer is plain in the text: "The
+    # arrow deals 2d4 points of acid damage." A machine reading refused the whole spell
+    # because it could not tell those apart; reading it can.
+    fx = spells.get("acid-arrow").effects or []
+    assert any(e.get("type") == "damage" and e.get("dice") == "2d4" for e in fx),         "the initial hit is stated plainly and should be executable"
+    assert any(e.get("type") == "narrative" and "each round" in str(e.get("target", ""))
+               for e in fx), "the repeating damage must stay prose"
+    assert not any(e.get("type") == "damage" and "round" in str(e.get("note", ""))
+                   for e in fx), "no spec may claim to repeat"
     assert not spells.get("acid-arrow").scaling
     assert spells.get("magic-missile").effects
     assert spells.get("magic-missile").effects_converted is False
@@ -629,3 +639,60 @@ def test_a_spell_authored_through_the_app_comes_back(client, tmp_path):
     assert back["source"] == "yours"
     assert back["level_available"].startswith("wizard 1")
     assert back["components"] == ["V", "S"]
+
+
+# --- duration, structured -------------------------------------------------------------
+
+def test_the_printed_duration_becomes_something_the_engine_can_time():
+    """Converting a buff is pointless while its duration is prose.
+
+    `_op_buff` keeps its clock in rounds and the corpus says "minutes/level (1)", so
+    every converted bonus would have landed with no way to expire — the note the spell
+    work left open as "riders still not applied". Nine tenths of the corpus states it in
+    four shapes, which is why this is a parser and not a table somebody types: 740 spells
+    say minutes/level, 564 rounds/level, 508 instantaneous, 243 hours/level.
+    """
+    from rules import spells
+
+    bless = spells.get("bless")
+    assert bless.duration_value == {"kind": "per_level", "amount": 1, "unit": "minute"}
+    assert spells.duration_rounds(bless, 5) == 50        # five minutes, ten rounds each
+    assert spells.duration_rounds(bless, 1) == 10
+
+
+def test_a_spell_with_no_clock_reports_none_and_not_zero():
+    """None means "do not time this"; zero would mean "expires the instant it lands".
+    An instantaneous fireball and a permanent effect are both None, and a caller that
+    treated that as a number would end a permanent spell on the round it was cast."""
+    from rules import spells
+
+    assert spells.duration_rounds(spells.get("fireball")) is None
+    assert spells.get("fireball").duration_value == {"kind": "instantaneous"}
+
+
+def test_a_duration_the_parser_cannot_read_is_left_empty():
+    """"see text" is seventy-four spells. An empty dict says the GM adjudicates; a
+    guessed number would say the rules had decided, which they have not."""
+    from rules import spells
+
+    assert spells.parse_duration("see text") == {}
+    assert spells.parse_duration("") == {}
+
+
+def test_until_discharged_rides_on_top_of_a_real_duration():
+    """"minutes/level (1) or until discharged" ends at whichever comes first, so the
+    flag joins the duration rather than replacing it — read as its own kind, the spell
+    would have lost the clock it also has."""
+    from rules import spells
+
+    got = spells.parse_duration("minutes/level (1) or until discharged")
+    assert got["kind"] == "per_level" and got["unit"] == "minute"
+    assert got["until_discharged"] is True
+
+
+def test_most_of_the_corpus_now_carries_a_clock():
+    """The measurement that says this was worth doing: 2,921 of 3,040."""
+    from rules import spells
+
+    timed = [s for s in spells.all_spells().values() if s.duration_value]
+    assert len(timed) >= 2900, len(timed)
