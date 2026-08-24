@@ -1,4 +1,6 @@
-from django.urls import path
+from django.conf import settings
+from django.contrib.staticfiles.views import serve as static_serve
+from django.urls import path, re_path
 
 from play import class_views, craft_views, home_views, views
 
@@ -64,4 +66,20 @@ urlpatterns = [
     path("api/classes/open/<str:class_id>", class_views.class_open, name="class_open"),
     path("api/classes/validate", class_views.class_validate, name="class_validate"),
     path("api/classes/save", class_views.class_save, name="class_save"),
+
+    # Static files, routed explicitly rather than left to the runserver handler.
+    #
+    # `runserver` inserts this route itself and the frozen exe does not run `runserver`,
+    # so without this line every page in the packaged build loads with no CSS backgrounds,
+    # no fonts and no dice — and does so *silently*, because a missing background image is
+    # not an error anywhere. "Anything available in a browser must also work in the
+    # packaged desktop app" is the standing constraint this satisfies.
+    #
+    # `insecure=True` because the view refuses to serve when DEBUG is off, and this app is
+    # a single-user process bound to 127.0.0.1 with no deployment and no untrusted client.
+    # The alternative — a `collectstatic` step into a directory the installer has to
+    # create — puts derived files outside the install root, which is the exact shape
+    # CLAUDE.md's stale-cache rule was written about.
+    re_path(r"^%s(?P<path>.*)$" % settings.STATIC_URL.lstrip("/"), static_serve,
+            {"insecure": True}, name="static"),
 ]

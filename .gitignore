@@ -14,6 +14,9 @@ desktop.ini
 # Build output
 build/
 dist/
+# Generated specs are noise; the hand-written one is the build definition and is the only
+# record of which content directories ship, so it is tracked by name.
 *.spec
+!pathfindergm.spec
 node_modules/
 z-image-turbo_*.png

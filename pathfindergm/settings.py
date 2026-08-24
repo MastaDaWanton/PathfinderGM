@@ -7,15 +7,24 @@ files are the data, and a save you can read in a text editor survives the app.
 
 from pathlib import Path
 
-from .paths import resource_root, user_data_root
+from .paths import is_frozen, resource_root, secret_key, user_data_root
 
 BASE_DIR = resource_root()
 
-# Local single-user desktop app: there is no deployment and no untrusted network. The key
-# is regenerated per install in the packaged build; this literal is the dev value.
-SECRET_KEY = "django-insecure-local-desktop-only-+c@#h^o_q^!j=!x1zs0ngd&x9ruj38"
+# Local single-user desktop app: there is no deployment and no untrusted network. The
+# packaged build makes a key on first run and keeps it in the user's data directory —
+# the previous comment said that was already happening and it was not, so every copy of
+# the exe would have shipped one literal key. Development keeps the literal, because a
+# key file appearing in a developer's AppData for a `runserver` session is surprise for
+# no benefit.
+SECRET_KEY = secret_key() if is_frozen()     else "django-insecure-local-desktop-only-+c@#h^o_q^!j=!x1zs0ngd&x9ruj38"
 
-DEBUG = True
+# Off in the packaged build. A traceback page carries source, settings and local
+# variables, and while this only ever listens on localhost, "only localhost" is a
+# property of today's launcher rather than a guarantee — and the person reading a
+# 500 page in a shipped game cannot act on a stack trace anyway. Development keeps it,
+# because a developer reading a stack trace is the entire point of it.
+DEBUG = not is_frozen()
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
 INSTALLED_APPS = [
