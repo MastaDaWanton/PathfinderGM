@@ -838,7 +838,11 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     for _ in range(limit):
         # A side with nobody standing means the fight is over.
         if scene.sides and scene.sides_standing() <= 1:
-            c.transcript.append({"who": "gm", "text": "The fight is over.",
+            # Settled while the sides are still declared — the same payout the
+            # end_encounter op makes, because two pieces of code end fights and both
+            # must pay the same way.
+            xp_line = c.engine()._settle_xp()
+            c.transcript.append({"who": "gm", "text": ("The fight is over." + xp_line),
                                  "kind": "consequence"})
             scene.end_encounter()
             return

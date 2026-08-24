@@ -37,6 +37,7 @@ WIRING = {
         "/api/level-up",
         "dice3d.js", "Dice3D.ask",                      # the dice
         "[data-gloss]",                                 # the glossary popover
+        "The body", "Experience",                       # the ledger and the needs
     ],
     "/craft/": [
         "/api/craft/preview", "/api/craft/do", "/api/forage",

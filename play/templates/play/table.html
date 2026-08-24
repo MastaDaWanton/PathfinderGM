@@ -1567,6 +1567,13 @@ function render(s) {
         temp ? ` <small>+${temp} temp</small>` : ""}</span></div>
       ${nl ? `<div class="row${nl >= nlLimit ? " danger" : ""}"><span>Non-lethal</span>
         <span>${nl} <small>of ${nlLimit}</small></span></div>` : ""}
+      ${pc.xp ? `<div class="row"><span>Experience</span><span>${
+        pc.xp.have.toLocaleString()} <small>of ${pc.xp.next.toLocaleString()}</small>${
+        pc.xp.ready ? ` <small class="cd" title="Sleep to take the level">ready</small>`
+                    : ""}</span></div>` : ""}
+      ${(pc.needs || []).length ? `<h2>The body</h2>${pc.needs.map(n => `
+        <div class="row${n.danger ? " danger" : ""}" title="${esc(n.detail)}">
+          <span>${esc(n.label)}</span><span>${esc(n.state)}</span></div>`).join("")}` : ""}
       ${(pc.dr && pc.dr.length)
         ? `<div class="row"><span>Damage reduction</span><span>${
              pc.dr.map(esc).join(", ")}</span></div>` : ""}

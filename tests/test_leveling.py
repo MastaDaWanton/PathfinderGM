@@ -79,6 +79,7 @@ def test_a_level_rolls_its_hit_points_rather_than_maximising_them():
     the user's own sentence draws the contrast against — "2d8 is a roll that should be
     made to get my actual health... however lvl 1 should get Max HP"."""
     pc = load_pc("fixtures/pc-kesst.json")
+    _earned(pc)
     before, was = pc.hp_max, pc.level
     got = leveling.level_up(pc, dice=Dice(seed=5))
     assert got["ok"] and pc.level == was + 1
@@ -90,6 +91,7 @@ def test_a_level_rolls_its_hit_points_rather_than_maximising_them():
 def test_a_level_never_costs_hit_points():
     """A wretched Constitution and a low roll must not take hit points away."""
     pc = load_pc("fixtures/pc-kesst.json")
+    _earned(pc)
     pc.abilities["con"] = 3
     before = pc.hp_max
     got = leveling.level_up(pc, dice=Dice(seed=1))
@@ -243,7 +245,17 @@ def test_the_level_up_endpoint_actually_works(tmp_path, settings):
                     content_type="application/json")
     assert r.status_code == 200
 
-    was = cm.current().scene.pc().level
+    # The gate refuses an unearned level with the ledger's own numbers...
+    r = client.post("/api/level-up")
+    assert r.status_code == 409
+    assert b"needs 2,000" in r.content
+
+    # ...and opens once the XP is real.
+    pc = cm.current().scene.pc()
+    was = pc.level
+    from rules import xp
+
+    pc.xp = xp.total_for(was + 1)
     r = client.post("/api/level-up")
     assert r.status_code == 200, r.content[:200]
     got = r.json()["levelled"]
@@ -830,6 +842,15 @@ def test_the_forge_says_which_slot_is_which():
 # that are mechanics, not flavour. The text is stored in the class file now and these pin
 # the two mechanics that were missing.
 
+def _earned(pc):
+    """XP enough for the next level: these tests are about what a level *does*, and the
+    gate — the feature that levels are earned, not chosen — has its own tests below."""
+    from rules import xp
+
+    pc.xp = xp.total_for(int(pc.level) + 1)
+    return pc
+
+
 def _bender(level=4):
     from rules.sheet import from_dict, load_pc, to_dict
 
@@ -837,7 +858,7 @@ def _bender(level=4):
     d["class"] = "blood bending"
     d["level"] = level
     d["ranks"] = {}
-    return from_dict(d, ref="pc")
+    return _earned(from_dict(d, ref="pc"))
 
 
 def test_blood_bond_grants_con_every_five_levels():

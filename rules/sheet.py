@@ -285,6 +285,11 @@ class Actor:
     # one per check made rather than per hour elapsed.
     thirst_checks: int = 0
     hunger_checks: int = 0
+    # The experience ledger. `xp` is what this character has earned; `xp_value` is what
+    # defeating them awards — the bestiary's own column, carried onto the actor so a
+    # finished fight can settle up without a lookup into a book the scene may not have.
+    xp: int = 0
+    xp_value: int = 0
     # Of the raw material carried, how much of each came back perfect. A subset of
     # `inventory`, never larger than it, and spent first when the pot asks for that herb.
     pristine: dict[str, int] = field(default_factory=dict)
@@ -1628,8 +1633,65 @@ class Actor:
 
     # --- serialisation ------------------------------------------------------------------
 
+    def _needs_summary(self) -> list[dict]:
+        """Hunger, thirst and rest as the side panel shows them.
+
+        Each need reports where it stands and what going without costs, in the rules'
+        own numbers — the consequence text is the same arithmetic `survival.pass_hours`
+        runs, said before it happens instead of discovered when it does.
+        """
+        from . import survival
+
+        out = []
+        fed_h = int(self.fed_minutes) // 60
+        wat_h = int(self.watered_minutes) // 60
+        awake_h = int(self.awake_minutes) // 60
+
+        def entry(key, label, exempt_rule, hours, grace, state_hungry, detail):
+            if survival.exempt(self, exempt_rule):
+                return {"id": key, "label": label, "state": "no need", "danger": False,
+                        "detail": "This character is exempt; no checks are ever made."}
+            left = grace - hours
+            if left > 0:
+                state = f"{left}h of grace left"
+                danger = left <= 4
+            else:
+                state = state_hungry
+                danger = True
+            return {"id": key, "label": label, "state": state, "danger": danger,
+                    "detail": detail}
+
+        out.append(entry(
+            "water", "Thirst", survival.NO_WATER, wat_h,
+            survival.hours_until_thirsty(self),
+            f"parched — a check every hour, DC {survival.thirst_dc(self.thirst_checks)}",
+            "After a day plus Con-score hours without water: a Constitution check "
+            "every hour, harder each time. Failure deals non-lethal damage and "
+            "fatigues; enough of it and you drop."))
+        out.append(entry(
+            "food", "Hunger", survival.NO_FOOD, fed_h,
+            survival.hours_until_hungry(self),
+            f"starving — a check every day, DC {survival.hunger_dc(self.hunger_checks)}",
+            "After three days without food: a Constitution check each day, harder "
+            "each time. Failure deals non-lethal damage and fatigues."))
+        out.append(entry(
+            "sleep", "Rest", survival.NO_SLEEP, awake_h,
+            survival.AWAKE_GRACE_HOURS,
+            f"past a day awake — Will save every active hour, "
+            f"DC {survival.awake_dc(awake_h)}",
+            "Past twenty-four hours awake: a Will save every hour spent working. "
+            "Failure deals non-lethal damage and fatigues, then exhausts — and the "
+            "hour you fail badly is the hour you fall where you stand."))
+        return out
+
     def summary(self) -> dict:
+        from . import xp as xp_mod
+
         out = {
+            "xp": {"have": int(self.xp),
+                   "next": xp_mod.total_for(min(20, self.level + 1)),
+                   "ready": xp_mod.ready_to_level(self)},
+            "needs": self._needs_summary(),
             "ref": self.ref,
             "name": self.name,
             "kind": self.kind,
@@ -2071,6 +2133,7 @@ def to_dict(actor: Actor) -> dict:
         "awake_minutes": actor.awake_minutes, "fed_minutes": actor.fed_minutes,
         "watered_minutes": actor.watered_minutes,
         "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
+        "xp": actor.xp, "xp_value": actor.xp_value,
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
         "picked_at": dict(actor.picked_at),
         "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
@@ -2355,6 +2418,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         watered_minutes=int(data.get("watered_minutes", 0) or 0),
         thirst_checks=int(data.get("thirst_checks", 0) or 0),
         hunger_checks=int(data.get("hunger_checks", 0) or 0),
+        xp=int(data.get("xp", 0) or 0),
+        xp_value=int(data.get("xp_value", 0) or 0),
         pristine={k: int(v) for k, v in (data.get("pristine") or {}).items()
                   if int(v) > 0},
         spellbook=list(data.get("spellbook") or []),

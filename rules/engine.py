@@ -2146,6 +2146,29 @@ class Engine:
             tell=tell, because=intent.because,
         )
 
+    def _settle_xp(self) -> str:
+        """Award the fight's XP to the PC while the sides are still declared.
+
+        Returns the sentence for the tell, or "". Kept beside the encounter ops rather
+        than in the view, because two different pieces of code end fights and both must
+        pay out the same way.
+        """
+        from . import xp as xp_mod
+
+        pc = self.scene.pc()
+        if pc is None or pc.hp <= 0:
+            return ""
+        total, names = xp_mod.award_for_fallen(self.scene, pc)
+        if not total:
+            return ""
+        pc.xp = int(getattr(pc, "xp", 0) or 0) + total
+        nxt = xp_mod.total_for(min(20, pc.level + 1))
+        line = (f" {pc.name} gains {total:,} XP for {', '.join(names)} "
+                f"({pc.xp:,} of {nxt:,} for level {min(20, pc.level + 1)}).")
+        if xp_mod.ready_to_level(pc):
+            line += " Enough to advance — it will settle with a night's sleep."
+        return line
+
     def _op_begin_encounter(self, intent: Intent, partial: dict) -> Outcome:
         rolls, order = [], []
         for side, refs in intent.params["sides"].items():
@@ -2208,12 +2231,13 @@ class Engine:
                            tell="", because=intent.because)
         standing = [self.scene.actors[r].name for r, _ in self.scene.initiative
                     if self.scene.conscious(r)]
+        xp_line = self._settle_xp()
         self.scene.end_encounter()
         return Outcome(
             intent_id=intent.id, op="end_encounter",
             effects=[{"kind": "encounter", "ended": True}],
             tell="The fighting stops." + (f" Still standing: {', '.join(standing)}."
-                                          if standing else ""),
+                                          if standing else "") + xp_line,
             because=intent.because,
         )
 
@@ -2580,6 +2604,16 @@ class Engine:
         if actor is None:
             raise IntentError("rest: nobody here to rest", "refs")
 
+        # Sleeping on enough experience is how a level arrives: "once i have enough
+        # Exp sleeping should initiate the leveling process." Before the rest itself,
+        # so the new hit die is part of the night's recovery rather than after it.
+        levelled = None
+        from . import leveling as leveling_mod
+        from . import xp as xp_mod
+
+        if kind == "night" and actor.is_pc and xp_mod.ready_to_level(actor):
+            levelled = leveling_mod.level_up(actor, dice=self.dice)
+
         result = actor.rest(kind)
         refilled = actor.refresh_pools("rest.night", self.dice)
         hours = result["hours"]
@@ -2603,7 +2637,12 @@ class Engine:
             intent_id=intent.id, op="rest",
             effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
                       "hours": hours, "hp_after": actor.hp}],
-            tell=" ".join(bits), because=intent.because,
+            tell=" ".join(bits)
+                 + (f" In the night, level {levelled['level']} settles: "
+                    f"+{levelled['hp']} hp"
+                    f"{', ' + ', '.join(levelled['grants']) if levelled['grants'] else ''}."
+                    if levelled and levelled.get("ok") else ""),
+            because=intent.because,
         )
 
     def _op_eat(self, intent: Intent, partial: dict) -> Outcome:

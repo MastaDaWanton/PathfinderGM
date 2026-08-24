@@ -32,6 +32,7 @@ from .sheet import Actor, from_dict
 
 TEMPLATES: dict[str, dict] = {
     "guildhand": {
+        "xp": 65,
         "name": "guildhand",
         "kind": "npc",
         "abilities": {"str": 11, "dex": 10, "con": 11, "int": 10, "wis": 10, "cha": 9},
@@ -47,6 +48,7 @@ TEMPLATES: dict[str, dict] = {
         "notes": "Commoner 1. Tired, half-attentive, not paid enough to fight.",
     },
     "watchman": {
+        "xp": 135,
         "name": "watchman",
         "kind": "npc",
         "abilities": {"str": 13, "dex": 12, "con": 12, "int": 9, "wis": 11, "cha": 10},
@@ -62,6 +64,7 @@ TEMPLATES: dict[str, dict] = {
         "notes": "Warrior 1 in a chain shirt. Will shout before drawing.",
     },
     "thug": {
+        "xp": 135,
         "name": "thug",
         "kind": "npc",
         "abilities": {"str": 14, "dex": 13, "con": 13, "int": 9, "wis": 10, "cha": 8},
@@ -77,6 +80,7 @@ TEMPLATES: dict[str, dict] = {
         "notes": "Warrior 1. Prefers a sap: a body that wakes up cannot testify to a killing.",
     },
     "guard dog": {
+        "xp": 100,
         "name": "dog",
         "kind": "npc",
         "size": "small",
@@ -112,6 +116,10 @@ def instantiate(
     if found is None:
         raise UnknownTemplate(f"no creature {template!r}." + suggestion(key))
     data = dict(found)
+    # What defeating this creature is worth — `lookup` computed it into `xp`; here it
+    # becomes the actor's `xp_value`, and its own ledger starts at zero.
+    data["xp_value"] = int(data.pop("xp", 0) or 0)
+    data["xp"] = 0
     if name:
         data["name"] = name
     data["world_entity_id"] = world_entity_id
@@ -224,6 +232,19 @@ def lookup(key: str) -> dict | None:
         data["effects"] = creature_effects.from_creature(raw)
     if not data.get("notes"):
         data["notes"] = f"CR {raw.get('cr', '?')} {raw.get('creature_type', '')}".strip()
+    # What defeating it is worth. Stated `xp` first, then CR against the Core award
+    # table. Carried as `xp` here and turned into `xp_value` by `instantiate` —
+    # `_NOT_ON_THE_SHEET` strips both source fields, so without this hop every
+    # imported creature was worth nothing and no fight ever paid out.
+    stated = raw.get("xp")
+    if stated:
+        data["xp"] = int(stated)
+    else:
+        from .xp import CR_AWARD
+
+        cr = raw.get("cr_value")
+        if cr is not None:
+            data["xp"] = CR_AWARD.get(round(float(cr), 3), 0)
     return data
 
 

@@ -338,6 +338,18 @@ def level_up(actor, dice=None) -> dict:
     if int(actor.level or 1) >= MAX_LEVEL:
         return {"ok": False, "why": f"{actor.name} is already {MAX_LEVEL}th level."}
 
+    # The gate: a level is earned, not chosen. PCs only — the GM's creatures level by
+    # authorship, not ledger.
+    if getattr(actor, "is_pc", False):
+        from . import xp as xp_mod
+
+        need = xp_mod.total_for(int(actor.level or 1) + 1)
+        have = int(getattr(actor, "xp", 0) or 0)
+        if have < need:
+            return {"ok": False,
+                    "why": f"{actor.name} has {have:,} XP; "
+                           f"level {int(actor.level or 1) + 1} needs {need:,}."}
+
     cls = classes_mod.get(actor.char_class or "")
     if not cls:
         return {"ok": False, "why": f"no class data for {actor.char_class!r}."}
