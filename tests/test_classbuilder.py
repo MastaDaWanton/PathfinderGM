@@ -444,29 +444,35 @@ def test_blood_bending_reports_exactly_its_nine_known_gaps():
     `effectspec.VOCAB` at all (it lists "natural armour" and "shield", and no plain armour
     bonus). Both are recorded in docs/class-creation.md; neither is invented by this test.
 
+    The ninth was Coagulated Plate's `bonus_type: "armor"`, which failed because the
+    effect vocabulary had no plain armour bonus at all — only `natural armour`, which
+    is a different bonus that stacks with it. Adding `armour` fixed the class and
+    mage armor's +4 in the same stroke; both had been written as something else.
+
     The other fifteen problems a naive run of `effectspec.validate` reports on this file
     are *not* errors — nine `dice_from`, two tiered or formula amounts and four
     `engine_op`s — which is the reason `validate_effect` exists.
     """
     problems = cb.validate_class(blood_bending())
-    assert len(problems) == 9, problems
+    assert len(problems) == 8, problems
+    # All eight are the same defect: a save whose DC is written in a note rather than
+    # in the field the engine reads, so nothing rolls against it.
     assert sum("Saving throw needs dc" in p for p in problems) == 8
-    assert sum("'armor' is not a bonus type" in p for p in problems) == 1
 
 
 def test_the_class_layer_extensions_are_not_reported_as_missing_fields():
     """The nine `dice_from` damage effects, the tiered DR and the formula-driven AC bonus
     all leave a field empty that `effectspec` requires — because `resolve_effect` fills it
     in from the class table, the tier or the sheet. Reported as errors, they would bury the
-    two real problems in fifteen false ones."""
+    real problems in fifteen false ones."""
     from rules import effectspec
 
     naive = [p for path in blood_bending()["paths"].values()
              for ability, specs in (path.get("effects") or {}).items()
              for spec in specs
              for p in effectspec.validate(spec, ability)]
-    assert len(naive) == 24
-    assert len(cb.validate_class(blood_bending())) == 9
+    assert len(naive) == 23
+    assert len(cb.validate_class(blood_bending())) == 8
 
 
 # --- the page ------------------------------------------------------------------------------
@@ -496,7 +502,7 @@ def test_a_shipped_class_opens_for_editing(client):
     data = client.get("/api/classes/open/blood bending").json()
     assert data["class"]["name"] == "Blood Bending"
     assert len(data["class"]["paths"]) == 4
-    assert len(data["problems"]) == 9
+    assert len(data["problems"]) == 8
 
 
 def test_saving_an_invalid_class_writes_nothing_and_says_why(client, mine):

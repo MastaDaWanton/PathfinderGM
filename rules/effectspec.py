@@ -46,9 +46,16 @@ VOCAB: dict[str, list[dict]] = {
                     tuple(PHYSICAL_DAMAGE) + tuple(ENERGY_DAMAGE)
                     + ("poison", "negative", "positive", "force", "untyped")],
     "bonus_type": [{"id": b, "name": b.title()} for b in (
-        "alchemical", "circumstance", "competence", "deflection", "dodge", "enhancement",
-        "inherent", "insight", "luck", "morale", "natural armour", "profane", "racial",
-        "resistance", "sacred", "shield", "size", "untyped")],
+        # "armour" is the plain armour bonus — what worn armour and mage armor grant,
+        # and the one that does NOT stack with either. Its absence was found twice
+        # independently: mage armor's +4 had to be written `untyped` (which stacks with
+        # a breastplate, and must not), and Blood Bending's Coagulated Plate carries a
+        # `bonus_type: "armor"` that failed validation outright. "natural armour" was
+        # here from the start, which is what made the gap easy to miss — they are
+        # different bonuses that stack with each other and not with themselves.
+        "alchemical", "armour", "circumstance", "competence", "deflection", "dodge",
+        "enhancement", "inherent", "insight", "luck", "morale", "natural armour",
+        "profane", "racial", "resistance", "sacred", "shield", "size", "untyped")],
     "combat_target": [{"id": k, "name": n} for k, n in (
         ("attack", "Attack rolls"), ("damage", "Damage rolls"), ("ac", "Armour class"),
         ("touch_ac", "Touch AC"), ("cmb", "CMB"), ("cmd", "CMD"),

@@ -873,8 +873,8 @@ CURATED: dict[str, list[dict]] = {
          "note": "against fear effects"},
     ],
     "mage-armor": [
-        {"type": "combat_mod", "amount": 4, "bonus_type": "untyped", "target": "ac",
-         "note": "armour bonus — does not stack with worn armour"},
+        {"type": "combat_mod", "amount": 4, "bonus_type": "armour", "target": "ac",
+         "note": "does not stack with worn armour"},
     ],
     "shield-of-faith": [
         {"type": "combat_mod", "amount": 2, "bonus_type": "deflection", "target": "ac",

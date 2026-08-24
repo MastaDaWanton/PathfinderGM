@@ -681,7 +681,7 @@
      {
       "type": "combat_mod",
       "target": "ac",
-      "bonus_type": "armor",
+      "bonus_type": "armour",
       "formula": "3 + control_blood"
      }
     ],
