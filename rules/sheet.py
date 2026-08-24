@@ -1050,14 +1050,17 @@ class Actor:
         self.hp = min(self.hp_max, self.hp + amount)
         # 1e: curing hit point damage removes an equal amount of non-lethal damage. Miss
         # this and a character healed to full still lies there unconscious from a beating.
-        nl_back = self.heal_nonlethal(amount)
+        self.heal_nonlethal(amount)
         healed = self.hp - before
-        # Blood Bond: healing with nowhere to land banks as temporary hit points. Only
-        # what is genuinely spare — the cure's points do their 1e work first, real hit
-        # points and non-lethal both, and the bank takes the remainder. The first cut
-        # banked the whole amount alongside the non-lethal clearing, so a 14-point cure
-        # did 22 points of work; the user's ruling is that it functions as 1e does.
-        spare = amount - healed - nl_back
+        # Blood Bond: healing with nowhere to land banks as temporary hit points. The
+        # non-lethal clearing above does NOT count against the bank: in 1e it is a
+        # rider — "healing that raises your hit points also removes an equal amount of
+        # nonlethal damage" — not a spender, so the cure's points are consumed only by
+        # real hit points. This went wrong twice in opposite directions before landing
+        # here: first the bank ignored the rider question entirely, then a "fix" made
+        # the rider eat the pool, and a full-health bender carrying non-lethal drank a
+        # 16-point cure and banked nothing.
+        spare = amount - healed
         if spare > 0 and self.allows("heal.overflow_temp_hp"):
             self.gain_temp_hp(spare, source="overflowing vitality")
         return healed

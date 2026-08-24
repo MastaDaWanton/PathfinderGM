@@ -179,14 +179,29 @@ def test_the_cure_tell_names_the_nonlethal_and_the_bank(table):
     assert pc.nonlethal < 8
 
 
-def test_the_bank_takes_only_what_the_cure_did_not_spend(table):
-    """The user's ruling: it functions as 1e does. A 14-point cure on a full-health
-    bender carrying 8 non-lethal clears the 8 and banks 6 — not 8 and 14, which was the
-    first cut double-spending the same points."""
+def test_the_nonlethal_rider_does_not_eat_the_bank(table):
+    """1e's non-lethal clearing is a rider, not a spender: "healing that raises your
+    hit points also removes an equal amount of nonlethal damage." A 14-point cure on a
+    full-health bender carrying 8 non-lethal clears the 8 for free and banks all 14 —
+    "it healed the non-lethal but gave me no temp hp?" was a fix that had made the
+    rider consume the pool."""
     scene, engine, pc = table
     pc.overrides["heal.overflow_temp_hp"] = True
     pc.hp = pc.hp_max
     pc.nonlethal = 8
     pc.heal(14)
     assert pc.nonlethal == 0
-    assert sum(p.amount for p in pc.temp_pools) == 6
+    assert sum(p.amount for p in pc.temp_pools) == 14
+
+
+def test_healing_real_damage_still_consumes_the_cure(table):
+    """The control on the rider: 4 down and 8 non-lethal, cured 14 — heals 4, clears 8
+    free, banks the 10 that had no hit points to raise."""
+    scene, engine, pc = table
+    pc.overrides["heal.overflow_temp_hp"] = True
+    pc.hp = pc.hp_max - 4
+    pc.nonlethal = 8
+    pc.heal(14)
+    assert pc.hp == pc.hp_max
+    assert pc.nonlethal == 0
+    assert sum(p.amount for p in pc.temp_pools) == 10
