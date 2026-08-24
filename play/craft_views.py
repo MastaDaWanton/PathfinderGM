@@ -413,9 +413,15 @@ def batch_max(result, pc) -> int:
     limit = MAX_BATCH
     for sid, n in (result.consumes or {}).items():
         if n > 0:
-            held = getattr(pc.stock.get(sid), "count", 0)
+            # A material may be a crafted jar on the shelf or a raw thing in the
+            # satchel: the four newer crafts make no distinction and put both in
+            # `consumes`, so both places are asked before deciding the count.
+            held = getattr(pc.stock.get(sid), "count", 0) or pc.inventory.get(sid, 0)
             limit = min(limit, int(held) // n)
-    for iid, n in (result.consumes_raw or {}).items():
+    # Herbalism alone separates raw ingredients from crafted stock. Read with a default
+    # rather than demanded of every craft — a forge has no such split, and asking for
+    # the field crashed every preview at four of the five benches.
+    for iid, n in (benches.result_field(result, "consumes_raw", {}) or {}).items():
         if n > 0:
             limit = min(limit, int(pc.inventory.get(iid, 0)) // n)
     return max(0, limit)

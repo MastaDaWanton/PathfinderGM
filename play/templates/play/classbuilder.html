@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Class builder — Pathfinder GM</title>
+<style>
+  :root {
+    --ink: #e8e2d4; --dim: #a89f8c; --line: #3b332a; --bg: #17130f; --card: #1f1a14;
+    --accent: #c9a227; --bad: #d4705e; --ok: #7fa66b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 Georgia, "Times New Roman", serif; }
+  a { color: var(--accent); }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); background: #120f0c; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .04em; }
+  header .why { color: var(--dim); font-size: 13px; margin: 0; flex: 1 1 320px; }
+  .layout { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 58px); }
+  nav { border-right: 1px solid var(--line); padding: 14px 0; background: #14100c; }
+  nav button { display: block; width: 100%; text-align: left; background: none;
+               border: 0; border-left: 3px solid transparent; color: var(--ink);
+               padding: 8px 16px; font: inherit; cursor: pointer; }
+  nav button:hover { background: #1d1813; }
+  nav button.on { border-left-color: var(--accent); background: #221c15; }
+  nav button .badge { float: right; background: var(--bad); color: #1a1209;
+                      border-radius: 9px; padding: 0 7px; font-size: 12px; }
+  nav .adv { color: var(--dim); font-size: 12px; padding: 12px 16px 4px;
+             text-transform: uppercase; letter-spacing: .1em; }
+  main { padding: 18px 24px 80px; max-width: 1100px; }
+  h2 { font-size: 19px; margin: 0 0 4px; }
+  .blurb { color: var(--dim); font-size: 14px; margin: 0 0 18px; }
+  .field { margin: 0 0 16px; }
+  .field > label { display: block; font-size: 14px; letter-spacing: .02em; }
+  .field .help { color: var(--dim); font-size: 12.5px; margin: 2px 0 5px; }
+  .field .consumer { color: #6f6857; font-size: 11.5px; font-family: monospace;
+                     margin: 3px 0 0; }
+  input, textarea, select { background: #120f0b; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px;
+    font: 14px/1.4 Georgia, serif; width: 100%; }
+  input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
+  textarea { min-height: 66px; }
+  .req { color: var(--accent); }
+  button.act { background: #2a2219; color: var(--ink); border: 1px solid var(--line);
+               border-radius: 3px; padding: 6px 12px; font: 14px Georgia, serif;
+               cursor: pointer; }
+  button.act:hover { border-color: var(--accent); }
+  button.act.go { background: var(--accent); color: #17130f; border-color: var(--accent); }
+  button.small { padding: 2px 8px; font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .card { border: 1px solid var(--line); background: var(--card); border-radius: 4px;
+          padding: 12px 14px; margin: 0 0 12px; }
+  .card h4 { margin: 0 0 8px; font-size: 15px; }
+  table.levels { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.levels th, table.levels td { border: 1px solid var(--line); padding: 3px 5px; }
+  table.levels th { color: var(--dim); font-weight: normal; font-size: 12.5px; }
+  table.levels td.lv { text-align: center; width: 44px; color: var(--dim); }
+  #problems { position: sticky; top: 0; z-index: 5; background: #1b120f;
+              border: 1px solid #4a2a22; border-radius: 4px; padding: 10px 12px;
+              margin: 0 0 16px; font-size: 13.5px; }
+  #problems.clean { background: #131a11; border-color: #2f4425; }
+  #problems ul { margin: 6px 0 0; padding-left: 18px; }
+  #problems li { margin: 3px 0; cursor: pointer; }
+  #problems code { color: var(--dim); font-family: monospace; }
+  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 10px;
+          padding: 0 8px; font-size: 12px; color: var(--dim); }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  .ability { display: grid; grid-template-columns: 1.4fr 1.2fr 90px 1fr 34px; gap: 6px;
+             align-items: center; margin-bottom: 5px; }
+  .ability .lbl { color: var(--dim); font-size: 11.5px; }
+  .tier { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 8px; }
+  .kv { display: grid; grid-template-columns: 1fr 2fr 34px; gap: 6px; margin-bottom: 5px; }
+  .note { color: var(--dim); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Class builder</h1>
+  <p class="why">Everything a Pathfinder class is, as fields. A simple class fills in the
+    first two sections and stops; Blood Bending fills in all nine.</p>
+  <span id="where" class="pill"></span>
+  <a href="/">← home</a>
+</header>
+
+<div class="layout">
+  <nav id="nav"></nav>
+  <main>
+    <div id="topbar" class="card">
+      <div class="row">
+        <label style="flex:0 0 auto">Start from</label>
+        <select id="scaffold" style="flex:1 1 260px"></select>
+        <button class="act" id="load-scaffold">Load template</button>
+        <label style="flex:0 0 auto">or open</label>
+        <select id="existing" style="flex:1 1 200px"></select>
+        <button class="act" id="load-existing">Open</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="note" id="saved"></span>
+        <span style="flex:1"></span>
+        <button class="act go" id="save">Save to my homebrew</button>
+      </div>
+    </div>
+    <div id="problems" class="clean">Checking…</div>
+    <div id="body"></div>
+  </main>
+</div>
+
+<script>
+const CAT = {{ state_json|safe }};
+const SECTIONS = CAT.schema;
+// Which section a validation message belongs to, worked out from the dotted path the
+// message opens with. The messages are written for a person, so the mapping is the one
+// piece of coupling between them and the form — kept to the root key alone.
+const SECTION_OF = {};
+SECTIONS.forEach(s => s.fields.forEach(f => { SECTION_OF[f.name] = s.id; }));
+
+let CLS = {};
+let PROBLEMS = [];
+let current = SECTIONS[0].id;
+
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const csrf = () => document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";
+
+// --- the model -----------------------------------------------------------------------
+// One plain object holding the class exactly as it will be saved. Every input writes into
+// it and nothing else holds state, so the JSON tab and the form cannot disagree.
+
+function setField(name, value) {
+  if (value === "" || value === null || value === undefined) delete CLS[name];
+  else CLS[name] = value;
+  check();
+}
+
+function listFrom(text) {
+  return String(text || "").split(",").map(s => s.trim()).filter(Boolean);
+}
+
+// --- drawing -------------------------------------------------------------------------
+
+function drawNav() {
+  const counts = {};
+  PROBLEMS.forEach(p => {
+    const id = SECTION_OF[rootOf(p)];
+    if (id) counts[id] = (counts[id] || 0) + 1;
+  });
+  let plain = "", adv = "";
+  SECTIONS.forEach(s => {
+    const badge = counts[s.id] ? `<span class="badge">${counts[s.id]}</span>` : "";
+    const html = `<button data-sec="${s.id}" class="${s.id === current ? "on" : ""}">
+      ${esc(s.title)}${badge}</button>`;
+    if (s.advanced) adv += html; else plain += html;
+  });
+  $("#nav").innerHTML = plain
+    + `<div class="adv">Advanced — a simple class needs none of these</div>` + adv
+    + `<div class="adv">Raw</div>`
+    + `<button data-sec="__json" class="${current === "__json" ? "on" : ""}">JSON</button>`;
+  $("#nav").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { current = b.dataset.sec; draw(); });
+}
+
+function rootOf(problem) {
+  return String(problem).split(":")[0].split(/[.[]/)[0].trim();
+}
+
+function drawProblems() {
+  const box = $("#problems");
+  if (!PROBLEMS.length) {
+    box.className = "clean";
+    box.innerHTML = `<b>This class is valid.</b> <span class="note">It will load, a
+      character can be made in it, and it levels to 20.</span>`;
+    return;
+  }
+  box.className = "";
+  box.innerHTML = `<b>${PROBLEMS.length} thing${PROBLEMS.length > 1 ? "s" : ""} to
+    fix.</b> <span class="note">Nothing is saved until they are gone.</span>
+    <ul>${PROBLEMS.map((p, i) => {
+      const head = String(p).split(":")[0];
+      const rest = String(p).slice(head.length + 1);
+      return `<li data-i="${i}"><code>${esc(head)}</code> ${esc(rest)}</li>`;
+    }).join("")}</ul>`;
+  box.querySelectorAll("li").forEach(li => li.onclick = () => {
+    const id = SECTION_OF[rootOf(PROBLEMS[li.dataset.i])];
+    if (id) { current = id; draw(); }
+  });
+}
+
+function draw() {
+  drawNav();
+  drawProblems();
+  $("#where").textContent = (CLS.name || "unnamed") + " · " + (CLS.id || "no id");
+  if (current === "__json") return drawJson();
+  const sec = SECTIONS.find(s => s.id === current);
+  const host = $("#body");
+  host.innerHTML = `<h2>${esc(sec.title)}</h2><p class="blurb">${esc(sec.blurb)}</p>
+    <div id="fields"></div>`;
+  const fields = $("#fields");
+  sec.fields.forEach(f => fields.appendChild(drawField(f)));
+}
+
+function labelFor(f) {
+  return `<label>${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ""}</label>
+    ${f.help ? `<div class="help">${esc(f.help)}${
+      f.example ? ` <i>e.g. ${esc(f.example)}</i>` : ""}</div>` : ""}`;
+}
+
+function drawField(f) {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  wrap.innerHTML = labelFor(f);
+  const value = CLS[f.name];
+
+  if (f.type === "table") wrap.appendChild(drawLevels());
+  else if (f.type === "paths") wrap.appendChild(drawPaths());
+  else if (f.type === "group") wrap.appendChild(drawGroup(f));
+  else if (f.type === "object") wrap.appendChild(drawObject(f));
+  else if (f.type === "map") wrap.appendChild(drawMap(f));
+  else wrap.appendChild(drawInput(f, value, v => setField(f.name, v)));
+
+  if (f.consumer) {
+    const c = document.createElement("div");
+    c.className = "consumer";
+    c.textContent = "read by " + f.consumer;
+    wrap.appendChild(c);
+  } else if (f.type !== "table" && f.type !== "paths") {
+    const c = document.createElement("div");
+    c.className = "consumer";
+    c.textContent = "recorded only — no engine mechanism reads this";
+    wrap.appendChild(c);
+  }
+  return wrap;
+}
+
+/** One scalar input, by type. `onchange` receives the value in the shape the file holds. */
+function drawInput(f, value, onchange, small) {
+  let el;
+  if (f.type === "choice") {
+    el = document.createElement("select");
+    el.innerHTML = `<option value=""></option>` + (f.choices || []).map(c =>
+      `<option value="${esc(c)}" ${String(value) === String(c) ? "selected" : ""}>
+        ${esc(c)}</option>`).join("");
+    el.onchange = () => onchange(el.value);
+  } else if (f.type === "bool") {
+    el = document.createElement("select");
+    el.innerHTML = ["", "true", "false"].map(c =>
+      `<option value="${c}" ${String(value) === c ? "selected" : ""}>
+        ${c || "—"}</option>`).join("");
+    el.onchange = () => onchange(el.value === "" ? "" : el.value === "true");
+  } else if (f.type === "textarea") {
+    el = document.createElement("textarea");
+    el.value = value == null ? "" : value;
+    el.oninput = () => onchange(el.value);
+  } else if (f.type === "list") {
+    el = document.createElement("input");
+    el.value = Array.isArray(value) ? value.join(", ") : (value || "");
+    el.placeholder = (f.choices || []).slice(0, 3).join(", ");
+    el.oninput = () => onchange(listFrom(el.value));
+  } else {
+    el = document.createElement("input");
+    el.value = value == null ? "" : value;
+    if (f.type === "number") el.type = "number";
+    el.oninput = () => onchange(
+      f.type === "number" ? (el.value === "" ? "" : Number(el.value)) : el.value);
+  }
+  if (small) el.style.margin = "0";
+  return el;
+}
+
+// --- repeating structures --------------------------------------------------------------
+
+function drawGroup(f) {
+  const host = document.createElement("div");
+  const rows = Array.isArray(CLS[f.name]) ? CLS[f.name] : [];
+  rows.forEach((row, i) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h4>${esc(f.label)} ${i + 1}
+      <button class="act small" data-del="${i}" style="float:right">remove</button></h4>`;
+    (f.of || []).forEach(sub => {
+      const line = document.createElement("div");
+      line.className = "field";
+      line.innerHTML = labelFor(sub);
+      if (sub.type === "object") line.appendChild(drawSubObject(sub, row));
+      else line.appendChild(drawInput(sub, row[sub.name], v => {
+        if (v === "" || v === null) delete row[sub.name]; else row[sub.name] = v;
+        check();
+      }));
+      card.appendChild(line);
+    });
+    card.querySelector("[data-del]").onclick = () => {
+      rows.splice(i, 1); check(); draw();
+    };
+    host.appendChild(card);
+  });
+  const add = document.createElement("button");
+  add.className = "act";
+  add.textContent = "Add " + f.label.toLowerCase().replace(/s$/, "");
+  add.onclick = () => {
+    CLS[f.name] = rows.concat([{}]);
+    check(); draw();
+  };
+  host.appendChild(add);
+  return host;
+}
+
+function drawSubObject(f, parent) {
+  const host = document.createElement("div");
+  host.className = "card";
+  const obj = parent[f.name] && typeof parent[f.name] === "object" ? parent[f.name] : {};
+  (f.of || []).forEach(sub => {
+    const line = document.createElement("div");
+    line.className = "field";
+    line.innerHTML = labelFor(sub);
+    line.appendChild(drawInput(sub, obj[sub.name], v => {
+      if (v === "" || v === null) delete obj[sub.name]; else obj[sub.name] = v;
+      if (Object.keys(obj).length) parent[f.name] = obj; else delete parent[f.name];
+      check();
+    }));
+    host.appendChild(line);
+  });
+  return host;
+}
+
+function drawObject(f) {
+  const host = document.createElement("div");
+  const on = CLS[f.name] && typeof CLS[f.name] === "object";
+  const toggle = document.createElement("button");
+  toggle.className = "act";
+  toggle.textContent = on ? "Remove this block" : "Add this block";
+  toggle.onclick = () => {
+    if (on) delete CLS[f.name]; else CLS[f.name] = {};
+    check(); draw();
+  };
+  if (on) {
+    const card = document.createElement("div");
+    card.className = "card";
+    (f.of || []).forEach(sub => {
+      const line = document.createElement("div");
+      line.className = "field";
+      line.innerHTML = labelFor(sub);
+      line.appendChild(drawInput(sub, CLS[f.name][sub.name], v => {
+        if (v === "" || v === null) delete CLS[f.name][sub.name];
+        else CLS[f.name][sub.name] = v;
+        check();
+      }));
+      card.appendChild(line);
+    });
+    host.appendChild(card);
+  }
+  host.appendChild(toggle);
+  return host;
+}
+
+/** A name → text map: features, ability text, resolves, toggles, upgrades. */
+function drawMap(f, obj, onchange) {
+  const host = document.createElement("div");
+  const target = obj || (CLS[f.name] && typeof CLS[f.name] === "object" ? CLS[f.name] : {});
+  Object.entries(target).forEach(([k, v]) => {
+    const line = document.createElement("div");
+    line.className = "kv";
+    const key = document.createElement("input");
+    key.value = k;
+    key.placeholder = f.key_label || "Name";
+    key.onchange = () => {
+      const entries = Object.entries(target);
+      for (const kk of Object.keys(target)) delete target[kk];
+      entries.forEach(([ek, ev]) => { target[ek === k ? key.value : ek] = ev; });
+      commitMap(f, target, onchange); draw();
+    };
+    const val = document.createElement(String(v || "").length > 60 ? "textarea" : "input");
+    val.value = v == null ? "" : v;
+    val.placeholder = f.value_label || "Text";
+    val.oninput = () => { target[key.value] = val.value; commitMap(f, target, onchange); };
+    const del = document.createElement("button");
+    del.className = "act small";
+    del.textContent = "×";
+    del.onclick = () => { delete target[k]; commitMap(f, target, onchange); draw(); };
+    line.append(key, val, del);
+    host.appendChild(line);
+  });
+  const add = document.createElement("button");
+  add.className = "act";
+  add.textContent = "Add entry";
+  add.onclick = () => {
+    target[""] = "";
+    commitMap(f, target, onchange);
+    draw();
+  };
+  host.appendChild(add);
+  return host;
+}
+
+function commitMap(f, target, onchange) {
+  if (onchange) onchange(target);
+  else if (Object.keys(target).length) CLS[f.name] = target;
+  else delete CLS[f.name];
+  check();
+}
+
+// --- the level table --------------------------------------------------------------------
+// Twenty rows and any number of die columns, because a class table is exactly that: what a
+// level grants, and whatever dice the class prints in a column of its own.
+
+function levelRows() {
+  if (!Array.isArray(CLS.levels)) CLS.levels = [];
+  return CLS.levels;
+}
+
+function columnsOf() {
+  const out = [];
+  levelRows().forEach(r => Object.keys(r || {}).forEach(k => {
+    if (k !== "level" && k !== "grants" && !k.startsWith("_") && !out.includes(k))
+      out.push(k);
+  }));
+  return out;
+}
+
+function drawLevels() {
+  const host = document.createElement("div");
+  const cols = columnsOf();
+  const rows = levelRows();
+  const byLevel = {};
+  rows.forEach(r => { if (r && r.level != null) byLevel[Number(r.level)] = r; });
+
+  let head = `<tr><th>Lv</th><th>Grants (comma separated)</th>`
+    + cols.map(c => `<th>${esc(c)} <button class="act small" data-dropcol="${esc(c)}"
+        >×</button></th>`).join("") + `</tr>`;
+  let body = "";
+  for (let n = 1; n <= CAT.max_level; n++) {
+    const r = byLevel[n];
+    body += `<tr><td class="lv">${n}</td>
+      <td><input data-lv="${n}" data-key="grants" value="${
+        esc((r && r.grants || []).join(", "))}"></td>`
+      + cols.map(c => `<td><input data-lv="${n}" data-key="${esc(c)}" value="${
+          esc(r && r[c] || "")}" style="width:80px"></td>`).join("")
+      + `</tr>`;
+  }
+  host.innerHTML = `<div class="row">
+      <button class="act" id="addcol">Add a die column</button>
+      <span class="note">A column is any name you like — Fist, Blood, Squall. Effects can
+        read one and multiply it.</span></div>
+    <table class="levels"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+
+  host.querySelectorAll("input[data-lv]").forEach(inp => {
+    inp.oninput = () => {
+      const n = Number(inp.dataset.lv);
+      let row = byLevel[n];
+      if (!row) {
+        row = { level: n, grants: [] };
+        byLevel[n] = row;
+        rows.push(row);
+        rows.sort((a, b) => Number(a.level) - Number(b.level));
+      }
+      if (inp.dataset.key === "grants") row.grants = listFrom(inp.value);
+      else if (inp.value.trim()) row[inp.dataset.key] = inp.value.trim();
+      else delete row[inp.dataset.key];
+      check();
+    };
+  });
+  host.querySelector("#addcol").onclick = () => {
+    const name = prompt("Column name (fist, blood, squall):", "");
+    if (!name) return;
+    for (let n = 1; n <= CAT.max_level; n++) {
+      if (!byLevel[n]) { const r = { level: n, grants: [] }; byLevel[n] = r; rows.push(r); }
+      byLevel[n][name.trim()] = byLevel[n][name.trim()] || "1d6";
+    }
+    rows.sort((a, b) => Number(a.level) - Number(b.level));
+    check(); draw();
+  };
+  host.querySelectorAll("[data-dropcol]").forEach(b => b.onclick = () => {
+    rows.forEach(r => delete r[b.dataset.dropcol]);
+    check(); draw();
+  });
+  return host;
+}
+
+// --- paths ------------------------------------------------------------------------------
+// The hard part, and the reason this is a page rather than a bench form. A path is a
+// repeating structure four levels deep: paths → tiers → abilities → effects. Adding an
+// ability wires up its `resolves` entry and its text at the same moment, because those
+// three are one act to an author and three maps in the file.
+
+function pathsObj() {
+  if (!CLS.paths || typeof CLS.paths !== "object") CLS.paths = {};
+  return CLS.paths;
+}
+
+function drawPaths() {
+  const host = document.createElement("div");
+  const paths = pathsObj();
+  const spec = {};
+  (SECTIONS.find(s => s.id === "paths").fields.find(f => f.name === "paths").of || [])
+    .forEach(f => { spec[f.name] = f; });
+
+  Object.entries(paths).forEach(([pid, path]) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h4>Path <span class="mono">${esc(pid)}</span>
+      <button class="act small" data-delpath="1" style="float:right">remove path</button>
+      </h4>`;
+
+    ["name", "role", "summary", "global_rule"].forEach(key => {
+      const line = document.createElement("div");
+      line.className = "field";
+      line.innerHTML = labelFor(spec[key]);
+      line.appendChild(drawInput(spec[key], path[key], v => {
+        if (v === "") delete path[key]; else path[key] = v;
+        check();
+      }));
+      card.appendChild(line);
+    });
+
+    // Tiers. Each ability line carries the four facts that are separate maps in the file:
+    // what it is called on the tier, which ability it resolves to, whether it is a passive
+    // (never usable), and which condition it toggles.
+    path.tiers = path.tiers && typeof path.tiers === "object" ? path.tiers : {};
+    path.abilities = path.abilities || {};
+    path.resolves = path.resolves || {};
+    for (let t = 1; t <= CAT.max_tier; t++) {
+      const names = Array.isArray(path.tiers[String(t)]) ? path.tiers[String(t)] : [];
+      const tier = document.createElement("div");
+      tier.className = "tier";
+      tier.innerHTML = `<b>Tier ${t}</b> <span class="note">usable once the character has
+        reached ${esc(CAT.track_phrase)} ${t} on this path</span>
+        <div class="ability"><span class="lbl">Name on the tier</span>
+          <span class="lbl">Resolves to</span><span class="lbl">Passive</span>
+          <span class="lbl">Toggles condition</span><span></span></div>`;
+      names.forEach((name, i) => {
+        const line = document.createElement("div");
+        line.className = "ability";
+
+        const nm = document.createElement("input");
+        nm.value = name;
+        nm.onchange = () => { renameAbility(path, name, nm.value); check(); draw(); };
+
+        const res = document.createElement("input");
+        res.value = path.resolves[name] || "";
+        res.setAttribute("list", "abilitylist");
+        res.onchange = () => { path.resolves[name] = res.value; check(); };
+
+        const pas = document.createElement("input");
+        pas.type = "checkbox";
+        pas.style.width = "auto";
+        pas.checked = (path.passive || []).includes(name);
+        pas.onchange = () => {
+          const set = new Set(path.passive || []);
+          pas.checked ? set.add(name) : set.delete(name);
+          if (set.size) path.passive = [...set]; else delete path.passive;
+          check();
+        };
+
+        const tog = document.createElement("input");
+        tog.value = (path.toggles || {})[name] || "";
+        tog.placeholder = "a condition name";
+        tog.onchange = () => {
+          path.toggles = path.toggles || {};
+          if (tog.value.trim()) path.toggles[name] = tog.value.trim();
+          else delete path.toggles[name];
+          if (!Object.keys(path.toggles).length) delete path.toggles;
+          check();
+        };
+
+        const del = document.createElement("button");
+        del.className = "act small";
+        del.textContent = "×";
+        del.onclick = () => {
+          names.splice(i, 1);
+          if (!names.length) delete path.tiers[String(t)];
+          check(); draw();
+        };
+        line.append(nm, res, pas, tog, del);
+        tier.appendChild(line);
+      });
+      const add = document.createElement("button");
+      add.className = "act small";
+      add.textContent = "Add an ability at tier " + t;
+      add.onclick = () => {
+        const name = prompt("What is it called?", "");
+        if (!name) return;
+        path.tiers[String(t)] = names.concat([name]);
+        // The three maps an author thinks of as one act: it is on the tier, it resolves to
+        // itself, and it has a paragraph waiting to be written.
+        path.resolves[name] = name;
+        if (!(name in path.abilities)) path.abilities[name] = "";
+        check(); draw();
+      };
+      tier.appendChild(add);
+      card.appendChild(tier);
+    }
+
+    ["abilities", "resolves", "upgrades", "toggles", "core", "needs"].forEach(key => {
+      if (key === "resolves" || key === "toggles") return;   // edited on the lines above
+      const line = document.createElement("div");
+      line.className = "field";
+      line.innerHTML = labelFor(spec[key]);
+      if (spec[key].type === "list") {
+        line.appendChild(drawInput(spec[key], path[key], v => {
+          if (!v || !v.length) delete path[key]; else path[key] = v;
+          check();
+        }));
+      } else {
+        line.appendChild(drawMap(spec[key], path[key] || {}, target => {
+          if (Object.keys(target).length) path[key] = target; else delete path[key];
+        }));
+      }
+      card.appendChild(line);
+    });
+
+    // Effects, as JSON. The effect vocabulary has its own builder on the homebrew page;
+    // duplicating it here would be a second form to keep level with the first, so this is
+    // the honest shape: the text the file holds, checked live by the same validator.
+    const fx = document.createElement("div");
+    fx.className = "field";
+    fx.innerHTML = labelFor(spec.effects);
+    const area = document.createElement("textarea");
+    area.className = "mono";
+    area.style.minHeight = "140px";
+    area.value = JSON.stringify(path.effects || {}, null, 1);
+    area.onchange = () => {
+      try {
+        const parsed = JSON.parse(area.value || "{}");
+        path.effects = parsed;
+        area.style.borderColor = "";
+        check();
+      } catch (e) {
+        area.style.borderColor = "var(--bad)";
+      }
+    };
+    fx.appendChild(area);
+    card.appendChild(fx);
+
+    card.querySelector("[data-delpath]").onclick = () => {
+      delete paths[pid];
+      if (!Object.keys(paths).length) delete CLS.paths;
+      check(); draw();
+    };
+    host.appendChild(card);
+  });
+
+  const add = document.createElement("button");
+  add.className = "act";
+  add.textContent = "Add a path";
+  add.onclick = () => {
+    const id = prompt("Path id — lower case, it is what the sheet stores:", "");
+    if (!id) return;
+    paths[id.trim().toLowerCase()] = {
+      name: id.trim(), tiers: {}, abilities: {}, resolves: {},
+    };
+    check(); draw();
+  };
+  host.appendChild(add);
+
+  const names = new Set();
+  Object.values(paths).forEach(p =>
+    Object.keys(p.abilities || {}).forEach(n => names.add(n)));
+  const list = document.createElement("datalist");
+  list.id = "abilitylist";
+  list.innerHTML = [...names].map(n => `<option value="${esc(n)}">`).join("");
+  host.appendChild(list);
+  return host;
+}
+
+/** Rename an ability everywhere it is named, which is four maps and two lists. */
+function renameAbility(path, was, now) {
+  now = String(now || "").trim();
+  if (!now || now === was) return;
+  Object.keys(path.tiers).forEach(t => {
+    path.tiers[t] = path.tiers[t].map(n => (n === was ? now : n));
+  });
+  ["resolves", "toggles", "upgrades", "needs"].forEach(key => {
+    if (path[key] && was in path[key]) {
+      path[key][now] = path[key][was];
+      delete path[key][was];
+    }
+  });
+  ["passive", "core", "undescribed"].forEach(key => {
+    if (Array.isArray(path[key])) path[key] = path[key].map(n => (n === was ? now : n));
+  });
+}
+
+// --- the JSON tab -------------------------------------------------------------------------
+
+function drawJson() {
+  const host = $("#body");
+  host.innerHTML = `<h2>JSON</h2><p class="blurb">The file exactly as it will be saved.
+    Paste one in and press Apply to bring an existing class into the form.</p>
+    <textarea id="raw" class="mono" style="min-height:60vh"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="act" id="apply">Apply</button>
+      <span class="note" id="rawnote"></span></div>`;
+  $("#raw").value = JSON.stringify(CLS, null, 1);
+  $("#apply").onclick = () => {
+    try {
+      const parsed = JSON.parse($("#raw").value);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+        throw new Error("a class is a JSON object");
+      CLS = parsed;
+      $("#rawnote").textContent = "";
+      check(); draw();
+    } catch (e) {
+      $("#rawnote").textContent = "That does not parse: " + e.message;
+    }
+  };
+}
+
+// --- validation and saving ------------------------------------------------------------
+
+let timer = null;
+function check() {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const res = await fetch("/api/classes/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify({ class: CLS }),
+    });
+    const data = await res.json();
+    PROBLEMS = data.problems || [];
+    drawNav();
+    drawProblems();
+    $("#where").textContent = (CLS.name || "unnamed") + " · " + (CLS.id || "no id");
+  }, 350);
+}
+
+async function save() {
+  const res = await fetch("/api/classes/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+    body: JSON.stringify({ class: CLS }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    $("#saved").textContent = "Saved to " + data.path
+      + " — it is playable now; the creation forge will offer it.";
+    if (data.existing) fillExisting(data.existing);
+  } else {
+    PROBLEMS = data.problems || ["The save failed and said nothing, which is a bug."];
+    $("#saved").textContent = "Not saved.";
+    drawNav(); drawProblems();
+  }
+}
+
+function fillExisting(rows) {
+  $("#existing").innerHTML = rows.map(r =>
+    `<option value="${esc(r.id)}">${esc(r.name)}${r.mine ? " (yours)" : ""}</option>`
+  ).join("");
+}
+
+// --- start ---------------------------------------------------------------------------
+
+$("#scaffold").innerHTML = CAT.scaffolds.map(s =>
+  `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join("");
+fillExisting(CAT.existing);
+$("#saved").textContent = "Yours are written to " + CAT.homebrew_dir;
+
+$("#load-scaffold").onclick = async () => {
+  const res = await fetch("/api/classes/scaffold/" + $("#scaffold").value);
+  const data = await res.json();
+  if (data.class) { CLS = data.class; current = SECTIONS[0].id; check(); draw(); }
+};
+$("#load-existing").onclick = async () => {
+  const res = await fetch("/api/classes/open/" + encodeURIComponent($("#existing").value));
+  const data = await res.json();
+  if (data.class) { CLS = data.class; current = SECTIONS[0].id; check(); draw(); }
+};
+$("#save").onclick = save;
+
+(async () => {
+  const res = await fetch("/api/classes/scaffold/" + CAT.scaffolds[0].id);
+  CLS = (await res.json()).class || {};
+  check();
+  draw();
+})();
+</script>
+</body>
+</html>

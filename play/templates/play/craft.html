@@ -474,6 +474,9 @@
 <header>
   <h1>Crafting</h1>
   <nav id="tabs"></nav>
+  <!-- A craft practised by more than one rulebook. Enchanting is the first: its own
+       essence-and-focus system, and Pathfinder's +1 ladder beside it. -->
+  <nav id="modes" hidden></nav>
   <a class="back" href="/play/">← back to the table</a>
   <a class="back" href="/" style="margin-left:0">worlds &amp; characters</a>
 </header>
@@ -808,9 +811,7 @@ function stationTip(t, method, level, known) {
     lines.push((t.descriptions || {})[method]);
   }
   if (!known) lines.push(`Learned at ${t.name} ${level}.`);
-  return lines.join("
-
-") || method;
+  return lines.join("\n\n") || method;
 }
 
 function renderStations() {
@@ -829,9 +830,7 @@ function renderChain() {
   $("#chainrow").innerHTML = CHAIN.length
     ? CHAIN.map((m, i) => `${i ? '<span class="arrow">→</span>' : ""}
         <button class="step" data-step="${i}" title="${
-          esc(stationTip(STATE.tracks[CRAFT] || {}, m, 1, true))}
-
-Click to remove."
+          esc(stationTip(STATE.tracks[CRAFT] || {}, m, 1, true))}\n\nClick to remove."
           >${esc(m)}</button>`).join("")
     : `<span class="empty">No method chosen — pick stations above, in the order you work them.</span>`;
   const raw = CHOSEN.map(id => {

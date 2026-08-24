@@ -1648,8 +1648,7 @@ function render(s) {
           const note = [j.masterwork ? "masterwork" : "",
                         j.enhancement ? `+${j.enhancement}` : "",
                         worn ? "worn" : ""].filter(Boolean).join(" · ");
-          return `<div class="row" title="${esc((j.effects || []).join("
-"))}">
+          return `<div class="row" title="${esc((j.effects || []).join("\n"))}">
             <span>${esc(j.name)}${j.count > 1 ? ` ×${j.count}` : ""}${
               note ? ` <small>${esc(note)}</small>` : ""}</span>
             <span>${acts}</span></div>`;
@@ -1911,9 +1910,7 @@ async function loadCraftActions() {
         (a.targets && a.targets.length
           ? ` data-creature="${esc(a.targets[0].name)}"` : "");
       const tip = [a.blurb || "", a.requires_note || "",
-                   a.available ? "" : a.why].filter(Boolean).join("
-
-");
+                   a.available ? "" : a.why].filter(Boolean).join("\n\n");
       return `<button type="button" ${attr} ${a.available ? "" : "disabled"}
         title="${esc(tip)}">${esc(a.label)}<small>${esc(a.track)}${
         a.level ? ` ${a.level}` : ""}</small></button>`;
