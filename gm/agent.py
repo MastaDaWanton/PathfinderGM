@@ -94,7 +94,8 @@ class GMAgent:
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         base = prompts.call_one_messages(brief, history, player_input,
-                                         in_combat=fighting)
+                                         in_combat=fighting,
+                                         enemy=self._current_enemy())
         messages = base
 
         attempts: list[Attempt] = []
@@ -301,13 +302,39 @@ class GMAgent:
             + "\n".join(rejections)
         )
 
+    def _current_enemy(self) -> str | None:
+        """Who the worked examples' {Current Enemy} placeholder should become.
+
+        The first conscious combatant on a side the PC is not on, while a fight is
+        declared; otherwise nobody, and the fill falls back to "stranger". Named from
+        the sides rather than from `kind`, because the sides are what the fight itself
+        declared hostile.
+        """
+        scene = self.engine.scene
+        pc = scene.pc()
+        if not scene.in_encounter or pc is None:
+            return None
+        for side, refs in scene.sides.items():
+            if pc.ref in refs:
+                continue
+            for ref in refs:
+                foe = scene.actors.get(ref)
+                if foe is not None and foe.hp > 0:
+                    return foe.name
+        return None
+
     # --- The prose itself ------------------------------------------------------------
 
     def _echo_index(self):
         if getattr(self, "_echoes", None) is None:
+            # Filled with the fallback word, not the raw token: the index wants the
+            # phrasing around the placeholder, and "{Current Enemy}" never appears in
+            # a reply — only whatever it was filled with does.
             self._echoes = narration_mod.build_echo_index(
-                *[e["reply"]["narration"] for e in prompts.EXAMPLES],
-                *[e["reply"]["narration"] for e in prompts.NPC_EXAMPLES],
+                *[prompts.fill_enemy(e["reply"]["narration"], None)
+                  for e in prompts.EXAMPLES],
+                *[prompts.fill_enemy(e["reply"]["narration"], None)
+                  for e in prompts.NPC_EXAMPLES],
                 prompts.CONSEQUENCE_EXAMPLE["assistant"],
             )
         return self._echoes

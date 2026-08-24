@@ -36,6 +36,40 @@ from rules.tables import DC_BANDS, MANEUVERS
 # their senses, lets the world push back, and hands the turn over with a real question —
 # and the four are *shown* rather than listed, because a prompt that lists them produces
 # four dutiful paragraphs in that order every single time.
+# The worked examples used to cast real templates — a guildhand under the lamp, thugs in
+# the alley, "c1 (a thug)" taking its NPC turn — and mid-bear-fight the model played the
+# examples instead of the scene: the bear's turn narrated a grinning thug and his sap.
+# So no example names an enemy type any more. They say {Current Enemy}, and the token is
+# filled at build time with the creature actually there — a copied sentence now lands on
+# the right actor instead of inventing a wrong one. Two tokens because grammar and data
+# want different shapes: {Current Enemy} is a definite noun phrase mid-sentence ("the
+# bear", "Ragnar"), {Current Enemy Kind} is the bare name for asks and spawn params.
+ENEMY_TOKEN = "{Current Enemy}"
+ENEMY_KIND_TOKEN = "{Current Enemy Kind}"
+
+
+def _definite(name: str) -> str:
+    """"bear" reads as "the bear" in prose; a proper name is already itself."""
+    name = (name or "").strip()
+    if not name:
+        return "the stranger"
+    if name[0].isupper() or name.lower().startswith("the "):
+        return name
+    return f"the {name}"
+
+
+def fill_enemy(text: str, enemy: str | None) -> str:
+    """Put the scene's actual opposition into an example's placeholder slots.
+
+    With nobody declared — no fight on, an empty scene — the fill is "stranger", which
+    is deliberately not a template and not a person: if the model copies it anyway, the
+    prose says a stranger did something, which invents nobody in particular, and a
+    copied spawn of it fails validation instead of conjuring a phantom thug.
+    """
+    kind = (enemy or "").strip() or "stranger"
+    return text.replace(ENEMY_TOKEN, _definite(kind)).replace(ENEMY_KIND_TOKEN, kind)
+
+
 EXAMPLES = [
     {
         "player": "I wait for the lamp to swing away, then go over the wall.",
@@ -45,8 +79,8 @@ EXAMPLES = [
                 "the seam of your collar and started working its way down. Above the yard "
                 "the watch-lamp swings out on its chain, drags a wedge of wet light across "
                 "the flagstones, and begins the slow pull back. In the doorway beneath it "
-                "a guildhand shifts his weight from one foot to the other and blows into "
-                "his cupped hands; the sap on his belt is loose on its cord, and he has "
+                "{Current Enemy} shifts weight from one foot to the other and blows into "
+                "cupped hands; the sap on his belt is loose on its cord, and he has "
                 "not looked up in some while. The wall is eight feet of slick masonry with "
                 "a hand's width of ledge along the top, and the light will be back across "
                 "it in about as long as it takes to breathe twice. The lamp is at the far "
@@ -54,7 +88,7 @@ EXAMPLES = [
             ),
             "suggestions": [
                 "Go now, while the lamp is away",
-                "Wait for the guildhand to turn his back as well",
+                "Wait for {Current Enemy} to turn away as well",
                 "Follow the wall along and look for a darker stretch",
             ],
             "intents": [{
@@ -175,8 +209,8 @@ EXAMPLES = [
                 "Speak first — ask who sent them",
             ],
             "intents": [
-                {"op": "spawn", "because": "the guild does not send one man",
-                 "params": {"template": "thug", "count": 2}},
+                {"op": "spawn", "because": "trouble like this does not come alone",
+                 "params": {"template": "{Current Enemy Kind}", "count": 2}},
             ],
         },
     },
@@ -643,7 +677,7 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
 
 
 def call_one_messages(briefing_scene: str, history: list[dict], player_input: str,
-                      in_combat: bool = False) -> list[dict]:
+                      in_combat: bool = False, enemy: str | None = None) -> list[dict]:
     """The turn prompt, in one of two modes.
 
     Out of a fight the model is shown long examples and asked to build a scene. In one it
@@ -659,8 +693,9 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
 
     messages = [{"role": "system", "content": briefing + "\n\n" + briefing_scene}]
     for ex in examples:
-        messages.append({"role": "user", "content": ex["player"]})
-        messages.append({"role": "assistant", "content": json.dumps(ex["reply"])})
+        messages.append({"role": "user", "content": fill_enemy(ex["player"], enemy)})
+        messages.append({"role": "assistant",
+                         "content": fill_enemy(json.dumps(ex["reply"]), enemy)})
     messages.extend(history)
     messages.append({"role": "user", "content": player_input})
     return messages
@@ -689,14 +724,14 @@ Write it as fiction, not as a report."""
 CONSEQUENCE_EXAMPLE = {
     "user": (
         "The player said: I grab for the mooring rope before the ferry drifts out.\n\n"
-        "You had already narrated: The current has the ferry now, and the old man is "
+        "You had already narrated: The current has the ferry now, and the ferryman is "
         "shouting at you from the deck.\n\n"
         "What the engine decided:\n"
         "- Ashka Verel makes the Reflex save by 3.\n"
     ),
     "assistant": (
         "The rope burns through your palms and then holds, and the ferry swings back "
-        "against the pilings hard enough to stagger the old man. He looks at the water, "
+        "against the pilings hard enough to stagger the ferryman. He looks at the water, "
         "then at you, and does not say thank you."
     ),
 }
@@ -738,24 +773,49 @@ say so with a single {"op": "narrate_only"} intent."""
 # turn — "intent 0 is not an object", three attempts in a row, so the creature stood
 # there hesitating while the player was attacked by nobody. Same lesson, second place it
 # had to be learned: demonstration, not instruction.
+# These examples used to cast "a thug" and "a guildhand", and the bleed was watched
+# live: a bear's turn came back as "The thug, grinning in a way that doesn't reach his
+# eyes, swinging the sap". Now they cast {Current Enemy}, filled with the creature whose
+# turn it actually is — a model that copies its example now narrates the right animal.
 NPC_EXAMPLES = [
     {
-        "ask": "Round 2. It is c1 (a thug) turn.\nThey are unhurt and their conditions "
-               "are: none.\nWhat does c1 do?",
+        "ask": "Round 2. It is c1 ({Current Enemy Kind}) turn.\nThey are unhurt and "
+               "their conditions are: none.\nWhat does c1 do?",
         "reply": {
-            "narration": "The nearer one shifts his grip on the sap and comes in low.",
+            "narration": "{Current Enemy} closes the distance fast, low and quiet, "
+                         "picking the moment.",
             "intents": [{"op": "attack", "actor": "c1", "target": "pc",
-                         "because": "he is paid to put her down, not to kill her"}],
+                         "because": "it means to put the intruder down"}],
         },
     },
     {
-        "ask": "Round 4. It is c2 (a guildhand) turn.\nThey are badly hurt and their "
-               "conditions are: shaken.\nWhat does c2 do?",
+        "ask": "Round 4. It is c2 ({Current Enemy Kind}) turn.\nThey are badly hurt and "
+               "their conditions are: shaken.\nWhat does c2 do?",
         "reply": {
-            "narration": "He looks at the blood on his sleeve, and at the gate, and "
-                         "decides the gate is closer.",
+            "narration": "{Current Enemy} takes in the blood it is losing, and the open "
+                         "ground behind it, and chooses the ground.",
             "intents": [{"op": "narrate_only",
-                         "because": "he is not paid enough to die on a gate"}],
+                         "because": "living matters more to it now than winning"}],
+        },
+    },
+    {
+        "ask": "Round 3. It is c1 ({Current Enemy Kind}) turn.\nThey are bloodied and "
+               "their conditions are: none.\nWhat does c1 do?",
+        "reply": {
+            "narration": "{Current Enemy} is past caution now — it comes straight on, "
+                         "hard, everything it has left in the one rush.",
+            "intents": [{"op": "attack", "actor": "c1", "target": "pc",
+                         "because": "wounded and cornered, it fights"}],
+        },
+    },
+    {
+        "ask": "Round 2. It is c3 ({Current Enemy Kind}) turn.\nThey are lightly hurt "
+               "and their conditions are: none.\nWhat does c3 do?",
+        "reply": {
+            "narration": "{Current Enemy} gives a step of ground and raises a cry that "
+                         "carries — a summons, not a retreat.",
+            "intents": [{"op": "narrate_only",
+                         "because": "it is buying time for whatever answers the call"}],
         },
     },
 ]
@@ -770,9 +830,12 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
                    "bloodied" if share <= .67 else "lightly hurt")
     conditions = ", ".join(c.name.lower() for c in actor.conditions) or "none"
     messages = [{"role": "system", "content": NPC_TURN_BRIEFING + "\n\n" + briefing_scene}]
+    # The acting creature is its own {Current Enemy}: an example the model copies now
+    # describes the animal whose turn it is, not a thug it was once shown.
     for ex in NPC_EXAMPLES:
-        messages.append({"role": "user", "content": ex["ask"]})
-        messages.append({"role": "assistant", "content": json.dumps(ex["reply"])})
+        messages.append({"role": "user", "content": fill_enemy(ex["ask"], actor.name)})
+        messages.append({"role": "assistant",
+                         "content": fill_enemy(json.dumps(ex["reply"]), actor.name)})
     messages.append({"role": "user", "content":
         f"Round {round_no}. It is {ref} ({actor.name}) turn.\n"
         f"They are {hp_note} and their conditions are: {conditions}.\n"

@@ -37,7 +37,7 @@ def test_a_fight_is_not_shown_the_long_ones():
 def test_out_of_a_fight_is_shown_the_long_ones():
     msgs = prompts.call_one_messages("BRIEF", [], "I open the box")
     shown = " ".join(m["content"] for m in msgs)
-    assert prompts.EXAMPLES[0]["reply"]["narration"] in shown
+    assert prompts.fill_enemy(prompts.EXAMPLES[0]["reply"]["narration"], None) in shown
     assert prompts.COMBAT_EXAMPLES[0]["reply"]["narration"] not in shown
 
 

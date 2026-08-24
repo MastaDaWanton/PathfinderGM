@@ -395,7 +395,7 @@ MAX_CONSEQUENCE_CHARS = 700
 # check can touch, but the nouns give it away. A sentence naming one of these is the
 # example bleeding through, unless the turn itself is genuinely about a ferry — which is
 # what the `context` parameter decides.
-_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel", "old man")
+_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel", "old man", "ferryman")
 
 # The NPC-turn examples have a cast of their own, and it bleeds the same way: in a real
 # bear fight the bear's turn was narrated as "The thug, grinning..., swinging the sap" and

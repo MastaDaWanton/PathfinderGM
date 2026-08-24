@@ -364,3 +364,52 @@ def test_the_old_man_mark_reaches_the_consequence_cut():
     bled = ("Your blade bites deep. "
             "The old man's eyes widen in alarm as he takes in your transformed arms.")
     assert narration.clean_consequence(bled) == "Your blade bites deep."
+
+
+def test_no_worked_example_names_an_enemy_type():
+    """The examples used to cast a guildhand under the lamp, thugs in the alley and
+    "c1 (a thug)" on its NPC turn — and mid-bear-fight the model played them instead of
+    the scene. Every enemy in an example is now the {Current Enemy} placeholder, so a
+    copied sentence lands on the right actor instead of inventing a wrong one."""
+    import json as _json
+
+    from gm import prompts
+
+    everything = _json.dumps(prompts.EXAMPLES) + _json.dumps(prompts.NPC_EXAMPLES) \
+        + _json.dumps(prompts.COMBAT_EXAMPLES) + _json.dumps(prompts.CONSEQUENCE_EXAMPLE)
+    for enemy_type in ("thug", "guildhand", "watchman", "guard dog", "old man"):
+        assert enemy_type not in everything.lower(), enemy_type
+    assert prompts.ENEMY_TOKEN in everything
+
+
+def test_the_placeholder_becomes_the_creature_actually_there():
+    """An NPC turn's examples cast the acting creature itself: a bear's turn shows the
+    model sentences about the bear, so even faithful plagiarism narrates the right
+    animal."""
+    from gm import prompts
+    from rules.bestiary import instantiate
+
+    bear = instantiate("thug", name="bear")
+    msgs = prompts.npc_turn_messages("BRIEF", [], "c1", bear, 2)
+    shown = " ".join(m["content"] for m in msgs)
+    assert "the bear" in shown
+    assert prompts.ENEMY_TOKEN not in shown
+    assert prompts.ENEMY_KIND_TOKEN not in shown
+
+
+def test_without_a_fight_the_placeholder_is_a_stranger():
+    """The fill's fallback invents nobody in particular, and a copied spawn of it fails
+    validation instead of conjuring a phantom: "stranger" is deliberately no template."""
+    from gm import prompts
+
+    msgs = prompts.call_one_messages("BRIEF", [], "I open the box")
+    shown = " ".join(m["content"] for m in msgs)
+    assert prompts.ENEMY_TOKEN not in shown
+    assert "stranger" in shown
+
+
+def test_a_proper_name_is_not_given_an_article():
+    from gm import prompts
+
+    assert prompts.fill_enemy("{Current Enemy} snarls.", "bear") == "the bear snarls."
+    assert prompts.fill_enemy("{Current Enemy} snarls.", "Ragnar") == "Ragnar snarls."
