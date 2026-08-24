@@ -13,7 +13,7 @@ consequences, and a **tag** is ours, for finding things.
 The second half of this file defends a different line, drawn in `rules/spells.py`: what is
 a *re-reading of a fact the corpus already states* is derived at load and never stored, and
 what is a *machine's guess at English prose* is stored in `content/spells/spells-mechanics.json`
-and flagged. 385 of 3,040 carry effects; the other 2,655 remain prose, which is the honest
+and flagged. 354 of 3,040 carry effects; the other 2,686 remain prose, which is the honest
 number and the one these tests pin.
 """
 from __future__ import annotations
@@ -264,7 +264,7 @@ def test_every_converted_effect_passes_the_schema():
 
     A conversion that produces specs the engine will not hold is worse than no conversion:
     it looks authored, saves without complaint and does nothing. Measured at zero invalid
-    out of 385 spells carrying effects.
+    out of 354 spells carrying effects.
     """
     bad: list[str] = []
     for s in spells.all_spells().values():
@@ -275,22 +275,29 @@ def test_every_converted_effect_passes_the_schema():
 
 
 def test_the_conversion_covers_what_it_claims_and_no_more():
-    """385 of 3,040. The number is in the test because a coverage claim in a document ages
+    """354 of 3,040. The number is in the test because a coverage claim in a document ages
     into a lie, and because a change that silently converts three hundred more spells is a
     change somebody should have to look at.
 
-    2,655 are left as prose on purpose. Anything whose formula the patterns could not read
+    2,686 are left as prose on purpose. Anything whose formula the patterns could not read
     with certainty stays English rather than becoming a confident wrong number — the single
     failure mode CLAUDE.md names most.
+
+    It was 385 until `_op_cast` started rolling these numbers instead of printing them.
+    Executing the corpus found 31 formulas that a spell prints but does not deal by being
+    cast — teleport's mishap, thorn body's retribution, nine granted natural attacks, four
+    that repeat every round — and every one of them was invisible while nothing rolled
+    them. That is the "verify end to end, on real regenerated content" lesson arriving on
+    schedule.
     """
     entries, report = spells.build_mechanics()
     assert report["total"] == 3040
-    assert report["effects"] == 385
-    assert report["scaling"] == 373
+    assert report["effects"] == 354
+    assert report["scaling"] == 342
     assert report["curated"] == 12
-    assert report["prose"] == 2655
+    assert report["prose"] == 2686
     assert report["invalid"] == []
-    assert report["by_kind"] == {"damage": 359, "healing": 14}
+    assert report["by_kind"] == {"damage": 327, "healing": 15}
 
 
 def test_the_converted_file_is_what_the_converter_produces():
@@ -554,7 +561,7 @@ def test_the_bench_says_where_the_engine_stops(client):
     hazard a page like this carries: a label that describes a limit outlives the limit and
     starts lying. It has now aged a second time and this test is the record of it — the
     blurb says the engine "will not read 1d6 per caster level out of English", and it now
-    does exactly that for 385 spells. `play/homebrew.py` is where the sentence lives;
+    does exactly that for 354 spells. `play/homebrew.py` is where the sentence lives;
     docs/spells.md lists it under INTEGRATION NOTES as one line to rewrite.
 
     Left asserting the text that is actually shipping, because a test asserting what the
@@ -590,7 +597,7 @@ def test_an_unknown_spell_is_a_404(client):
 
 def test_the_builder_opens_a_shipped_spell_through_the_app(client):
     """Every bench opens, shipped or authored. A conversion nobody can open is a conversion
-    nobody can undo, and 385 spells were converted mechanically with nobody having read
+    nobody can undo, and 354 spells were converted mechanically with nobody having read
     them."""
     d = client.get("/api/bench/spells/open/fireball").json()
     assert d["source"] == "shipped"

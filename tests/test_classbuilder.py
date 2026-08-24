@@ -544,3 +544,73 @@ def test_live_validation_answers_two_hundred_even_when_the_class_is_wrong(client
                       content_type="application/json")
     assert res.status_code == 200
     assert res.json()["problems"]
+
+
+# --- the page wears the app's own clothes ---------------------------------------------
+
+TEMPLATE = Path("play/templates/play/classbuilder.html")
+CRAFT = Path("play/templates/play/craft.html")
+
+
+def _root_block(path: Path) -> dict[str, str]:
+    """The `:root` custom properties a template declares, as a dict."""
+    import re
+
+    text = path.read_text(encoding="utf-8")
+    block = re.search(r":root\s*\{(.*?)\}", text, re.S).group(1)
+    return {m.group(1): m.group(2).strip()
+            for m in re.finditer(r"(--[a-z-]+)\s*:\s*([^;]+);", block)}
+
+
+def test_the_builder_declares_the_same_palette_as_the_craft_bench():
+    """The user's words: "its UI need to be the same style as everything else". Pinned as a
+    value comparison rather than a screenshot, because the failure this prevents is drift —
+    a palette corrected on one page and left stale on another, which is the shape CLAUDE.md
+    names as the reason a fix ships from the copy nobody looked at.
+    """
+    mine, craft = _root_block(TEMPLATE), _root_block(CRAFT)
+    shared = set(mine) & set(craft)
+    assert len(shared) >= 12, f"only {len(shared)} tokens in common with the craft bench"
+    for token in sorted(shared):
+        assert mine[token] == craft[token], \
+            f"{token} is {mine[token]} here and {craft[token]} on the craft bench"
+
+
+def test_the_builder_uses_the_shipped_leather_and_the_shipped_face():
+    """Reuse of the app's vocabulary, not a parallel one: the same two background images,
+    the same display face, loaded through `{% static %}` so the packaged build finds them.
+    """
+    text = TEMPLATE.read_text(encoding="utf-8")
+    assert "{% load static %}" in text
+    for asset in ("img/grimoire-leather.jpg", "img/card-leather.jpg",
+                  "fonts/Cinzel-Regular.woff2"):
+        assert asset in text, f"{asset} is what the rest of the app is made of"
+    assert 'font-variant: small-caps' in text
+
+
+def test_the_validation_banner_uses_the_benchs_alarm_and_confirm_colours():
+    """A refusal has to read the same wherever it comes from. The banner is the alarm
+    colour the forge's `.problems` box uses, and the confirm state is the brew green the
+    shelf uses for a thing that worked."""
+    text = TEMPLATE.read_text(encoding="utf-8")
+    import re
+
+    banner = re.search(r"#problems \{(.*?)\}", text, re.S).group(1)
+    clean = re.search(r"#problems\.clean \{(.*?)\}", text, re.S).group(1)
+    assert "var(--alarm)" in banner and "110,31,31" in banner
+    assert "var(--brew)" in clean
+
+
+def test_the_restyle_did_not_drop_the_two_things_that_are_the_feature(client):
+    """Both halves of "everything labeled" are rendered by the page itself, so a restyle is
+    exactly where they would be lost without a test noticing: the line naming which engine
+    mechanism reads a field, and the admission where none does.
+
+    The live validation is pinned by its two halves as well — the per-section badge count
+    and the click-to-jump handler that reads the section off the message's dotted path.
+    """
+    body = client.get("/homebrew/classes/").content.decode("utf-8")
+    assert '"read by " + f.consumer' in body
+    assert "recorded only — no engine mechanism reads this" in body
+    assert 'class="badge"' in body
+    assert "SECTION_OF[rootOf(" in body

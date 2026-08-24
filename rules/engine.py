@@ -21,6 +21,7 @@ from . import compulsion
 from . import consumables
 from . import crafting
 from . import dc as dc_mod
+from . import effectspec
 from . import foraging
 from . import ingredients as ing_mod
 from . import resources
@@ -1948,18 +1949,38 @@ class Engine:
         )
 
     def _op_cast(self, intent: Intent, partial: dict) -> Outcome:
-        """Cast a spell: spend the slot, state the numbers, and stop there.
+        """Cast a spell: spend the slot, state the numbers, and roll what the spell says.
 
         The engine owns the slot, the caster level and the save DC, and it owns them
         completely — the GM cannot cast a spell the caster does not have, at a level they
         cannot reach, out of a slot they already spent.
 
-        It does **not** own what the spell does. That lives in the spell's prose, and a
-        parser guessing mechanics out of three thousand English paragraphs would produce
-        confident wrong numbers, which is the failure mode this project has been bitten by
-        most. So the outcome carries the facts a narrator and a player both need — DC, save
-        type, caster level, duration, whether spell resistance applies — and any damage or
-        condition that follows arrives as its own validated intent.
+        **What changed, and where the boundary is now.** This used to state the facts and
+        stop, because "a parser guessing mechanics out of three thousand English
+        paragraphs would produce confident wrong numbers". That reasoning was right and it
+        is now narrower rather than gone: 385 of the 3,040 spells carry effects that were
+        read mechanically and validated against `effectspec`, and 2,655 still do not. So
+        the boundary moved from per-corpus to **per-spell** — a spell carrying effects is
+        executed, and a spell carrying none takes exactly the path it always took. An
+        empty `spell.effects` is the honest signal that this one's mechanics are prose.
+
+        Three stages, in 1e's own order:
+
+        1. **The dice, once.** A fireball is rolled once and everyone in the area saves
+           against that number; rolling per target would give two creatures in one blast
+           different damage. The caster rolls it, which means a PC rolls their own — the
+           same suspend/resume the player's attacks and their damage already use.
+        2. **A saving throw per target**, rolled with that creature's own modifiers
+           against the caster's real DC.
+        3. **The damage**, full on a failure and halved on a success, through
+           `_apply_damage` like every other point of damage in the game — so resistance,
+           damage reduction, temporary hit points and interception all apply without a
+           line of their own here.
+
+        What it still does not do is spell resistance: `spell.sr` is a real tri-state now
+        and no creature carries an SR *number* the engine can check against, so nothing is
+        rolled and the printed line is reported as it always was. Half a check would be
+        worse than none — see docs/spells.md §5.1.
         """
         actor = self.scene.actors[intent.actor]
         spell = spells_mod.get(str(intent.params["spell"]))
@@ -1967,17 +1988,27 @@ class Engine:
         dc = casting.save_dc(actor, level)
         cl = casting.caster_level(actor)
 
+        # The slot is spent once, on the way in, and never again on a resume. `state`
+        # living in `partial` is what distinguishes the two: a cast that suspends for the
+        # player's damage roll comes back through here with its state, and re-spending
+        # would cost a second slot for one fireball.
+        state = partial.get("cast_state")
+        if state is None:
+            pool = casting.slot_pool(level)
+            spent = actor.spend_pool(pool, 1)
+            if not spent["ok"]:
+                raise IntentError(f"cast: {actor.name} has no {pool} left", "legality")
+            if casting.caster_data(actor).get("prepare_from") == "spellbook":
+                casting.unprepare(actor, spell.id, 1)
+            state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
         pool = casting.slot_pool(level)
-        spent = actor.spend_pool(pool, 1)
-        if not spent["ok"]:
-            raise IntentError(f"cast: {actor.name} has no {pool} left", "legality")
-        if casting.caster_data(actor).get("prepare_from") == "spellbook":
-            casting.unprepare(actor, spell.id, 1)
 
         targets = intent.targets() or ([intent.params["at"]] if intent.params.get("at")
                                        else [])
         save = (spell.saving_throw or "").strip()
         sr = (spell.spell_resistance or "").strip()
+        plan = spells_mod.casting_plan(spell, cl)
+        dice = plan["dice"]
 
         bits = [f"caster level {cl}"]
         if save and save.lower() not in ("none", "no", "—", "-"):
@@ -1987,17 +2018,119 @@ class Engine:
         if spell.duration:
             bits.append(spell.duration)
 
+        # Everything a narrator, a player and a GM correcting a conversion all need. The
+        # keys that were here before are untouched; `effects_converted` is new and is the
+        # one a GM most needs, because 385 of these numbers were read by a machine and
+        # nobody has checked them.
+        cast_effect = {
+            "ref": actor.ref, "kind": "cast", "spell": spell.id,
+            "name": spell.name, "spell_level": level, "dc": dc,
+            "caster_level": cl, "save": save, "spell_resistance": sr,
+            "duration": spell.duration, "range": spell.range,
+            "area": spell.area or spell.effect or spell.targets,
+            "targets": targets, "slot": pool,
+            "slots_left": casting.slots_left(actor, level),
+            "element": spell.element, "dice": dice,
+            "range_feet": spells_mod.range_feet(spell, cl),
+            "effects": spell.effects, "effects_converted": spell.effects_converted,
+        }
+
+        if not spell.effects:
+            # One of the 2,655. Unchanged, deliberately: the outcome states the facts and
+            # whatever the GM then declares arrives as its own validated intent.
+            return Outcome(
+                intent_id=intent.id, op="cast", effects=[cast_effect],
+                tell=f"{actor.name} casts {spell.name} ({'; '.join(bits)}).",
+                because=intent.because,
+            )
+
+        live = [ref for ref in targets if ref in self.scene.actors]
+
+        if dice and state["stage"] == "dice":
+            roll = self._roll_or_suspend_stage(
+                intent, actor, [],
+                f"{spell.name} — {'healing' if plan['kind'] == 'heal' else 'damage'}",
+                None, partial, state, dice, state_key="cast_state",
+            )
+            state["rolls"].append(roll.as_dict())
+            state["rolled"] = max(0, roll.total)
+            state["stage"] = "targets"
+
+        rolled = int(state.get("rolled", 0))
+        while dice and state["i"] < len(live):
+            target = self.scene.actors[live[state["i"]]]
+            amount, saved = rolled, False
+
+            if plan["save"]:
+                # Rolled by whoever is saving, not by the caster — which is what lets a
+                # PC roll their own save against a spell and keeps every NPC's save with
+                # the engine, through the one rule `_force_visibility` states.
+                save_roll = self._roll_or_suspend_stage(
+                    intent, target, target.save_modifiers(plan["save"]),
+                    f"{SAVES[plan['save']]} save against {spell.name}", dc,
+                    partial, state, "1d20", state_key="cast_state",
+                )
+                state["rolls"].append(save_roll.as_dict())
+                saved = save_roll.total >= dc
+                effect = plan["save_effect"]
+                if saved and effect == "negates":
+                    amount = 0
+                elif saved and effect == "half":
+                    # Half of the total that was actually rolled, not a second roll of
+                    # half the dice. `effectspec` cannot say "roll and halve" — the stored
+                    # success branch carries half the *dice* — so the engine does it here,
+                    # where the rolled number exists. Same rule `_op_save` applies to a
+                    # poison gate; not the same code, because that one rolls per save and
+                    # an area spell must not.
+                    amount = max(0, rolled // 2)
+                elif saved:
+                    # "partial" — a successful save reduces the spell rather than halving
+                    # it, and by how much is in the spell's own text. Nothing is applied
+                    # rather than a number being invented, and the tell says why.
+                    amount = 0
+                state["tells"].append(
+                    f"{target.name} {'makes' if saved else 'fails'} the "
+                    f"{SAVES[plan['save']]} save ({save_roll.total} against DC {dc})"
+                    + (f"; what a partial save leaves is in {spell.name}'s text."
+                       if saved and plan["save_effect"] == "partial" else "."))
+
+            if plan["kind"] == "heal":
+                healed = target.heal(amount)
+                state["effects"].append({
+                    "ref": target.ref, "kind": "heal", "amount": healed,
+                    "rolled": amount, "hp_after": target.hp, "hp_max": target.hp_max})
+                state["tells"].append(
+                    f"{target.name} recovers {healed} hit points.")
+            elif amount > 0:
+                hit = self._apply_damage(target, amount, plan["damage_type"],
+                                         lethality=plan["lethality"])
+                state["effects"].append(hit)
+                # What the target actually lost, not what the die said: a 30-point
+                # fireball against fire resistance 10 is 20, and a GM told the first
+                # number narrates a wound nobody took.
+                state["tells"].append(
+                    f"{target.name} takes {hit['amount']} {hit['type']}"
+                    + (f" ({hit['note']})." if hit["note"] else "."))
+            state["i"] += 1
+
+        effects = [cast_effect] + list(state["effects"])
+        for ref in {e["ref"] for e in state["effects"] if e.get("kind") == "damage"}:
+            effects.extend(self._hp_state_effects(self.scene.actors[ref]))
+
+        tells = [f"{actor.name} casts {spell.name} ({'; '.join(bits)})."]
+        if dice:
+            tells.append(f"{dice} — {state.get('rolled', 0)}.")
+        tells.extend(state["tells"])
+        # The specs that are not the rolled dice — a bless's +1, a barkskin's natural
+        # armour. Rendered rather than applied: see `spells.casting_plan`, which explains
+        # that applying one needs the spell's duration as rounds and that is still prose.
+        for spec in plan["riders"]:
+            tells.append(effectspec.render(spec) + ".")
+
         return Outcome(
             intent_id=intent.id, op="cast",
-            effects=[{"ref": actor.ref, "kind": "cast", "spell": spell.id,
-                      "name": spell.name, "spell_level": level, "dc": dc,
-                      "caster_level": cl, "save": save, "spell_resistance": sr,
-                      "duration": spell.duration, "range": spell.range,
-                      "area": spell.area or spell.effect or spell.targets,
-                      "targets": targets, "slot": pool,
-                      "slots_left": casting.slots_left(actor, level)}],
-            tell=f"{actor.name} casts {spell.name} ({'; '.join(bits)}).",
-            because=intent.because,
+            rolls=[_roll_from_dict(r) for r in state["rolls"]],
+            effects=effects, tell=" ".join(tells), because=intent.because,
         )
 
     def _check_cast(self, intent: Intent, index: int) -> None:
@@ -2805,12 +2938,22 @@ class Engine:
     def _roll_or_suspend_stage(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int | None, partial: dict, state: dict, notation: str,
+        state_key: str = "attack_state",
     ) -> Roll:
         """One stage of a multi-stage intent: roll it, or hand it to the player and stop.
 
         Unlike `_roll_or_suspend` this carries the accumulated `state` into the
         suspension, so an attack that has already rolled to-hit does not roll it again
         when the player comes back to roll damage.
+
+        `state_key` names the slot the state is parked in across the round trip. It
+        defaults to the attack's so every existing caller is unchanged; `cast` passes its
+        own, because a cast has already spent a spell slot by the time it first suspends
+        and reading a half-finished attack back into it would spend a second one.
+
+        `actor` is whoever *makes* this roll, which is not always the intent's actor: a
+        cast rolls the caster's damage and then each target's saving throw, and the popup
+        must only ever open for a roll the player is entitled to make.
         """
         if intent.visibility == "player" and actor.is_pc:
             if "player_face" in partial:
@@ -2830,7 +2973,7 @@ class Engine:
                     "because": intent.because,
                     "intent_id": intent.id,
                 },
-                {"attack_state": state},
+                {state_key: state},
             )
         return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
 

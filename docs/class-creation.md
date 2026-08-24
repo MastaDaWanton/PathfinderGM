@@ -9,7 +9,11 @@ document is the list of those fields. If a mechanism is not here, no class has i
 
 - The machine-readable version is `CLASS_SCHEMA` in `rules/classbuilder.py`. The builder
   page generates its whole form from it, so this table and the form cannot drift.
-- The tool is at **`/homebrew/classes/`**.
+- The tool is at **`/homebrew/classes/`**, reached from the **Character classes** bench on
+  the homebrew tab. It wears the same leather as the rest of the app: the shelf's palette,
+  Cinzel small-caps headings over Palatino body text, the craft bench's tabs stood on end
+  as the section rail, and the writing surface the effect builder and the forge use — a
+  page in the book rather than a bound cover, so no clasps or bevel.
 - `rules/classbuilder.py:validate_class` refuses a class that would misbehave, and every
   message says the fix rather than the fault.
 
@@ -281,10 +285,26 @@ link to `/homebrew/classes/` rather than try. `play/homebrew.py:Bench.builder` d
 `"effects"` for every kind in `registry.KINDS`, so the classes bench currently offers the
 flat effects form for something that is not a flat form.
 
-**`play/homebrew.py`.** The classes bench's `waiting` text still reads "What a class still
-cannot declare here is a path — its Coagulator and Blood Commander branches are not in the
-file." Both statements are now false: the paths are in the file, and a class can declare
-them. A link to `/homebrew/classes/` belongs on that card.
+**`play/homebrew.py`.** Done: `PAGE_BUILDERS` maps the classes bench to
+`/homebrew/classes/`, the bench reports `builder: "page"` rather than offering the flat
+effects form it cannot draw, and the stale `waiting` sentence is gone.
+
+**`play/templates/play/home.html` — the link to this page renders in browser-default
+blue.** Measured in the running app 2026-08-24: the anchor at the classes bench reads
+`rgb(0, 0, 238)` for both its text and its border, on the leather gradient. Two causes, one
+line apart:
+
+- `border: 1px solid var(--rule)` — **`--rule` is not declared anywhere in the
+  templates.** An undefined custom property with no fallback is invalid at computed-value
+  time, so `border-color` falls back to `currentColor`.
+- The anchor carries `class="pick"`, which is the card-picker cursor rule and not a link
+  style, so nothing overrides the user agent's blue — and `currentColor` is therefore blue
+  too.
+
+The fix is one of `color: var(--gold); text-decoration: none` with
+`border-color: var(--gold-dim)`, or rendering it as `<a class="quiet">` and reusing the
+button styling that is already there. Left to whoever owns that file; every other page's
+gold-on-leather link treatment is the model.
 
 **`rules/leveling.py:control_blood`.** The literal `control blood` phrase is the only
 class-specific string in the engine. The generalisation is small and backward compatible:

@@ -668,6 +668,76 @@ def effects_at(spell, caster_level: int) -> list[dict]:
     return out
 
 
+def casting_plan(spell, caster_level: int) -> dict:
+    """What the engine has to roll and apply to cast this spell once, at this level.
+
+    The engine should not walk effect specs. It knows how to roll dice, halve a total and
+    put damage through `_apply_damage`; *which* dice and *whether* there is a save is a
+    fact about the spell, and this is the one place that reads it out of the specs.
+
+    Returns, always with every key present so a caller never has to guess:
+
+        dice          "10d6" — rolled ONCE for the whole spell, or "" for nothing to roll
+        kind          "damage" | "heal" | ""
+        damage_type   "fire"
+        lethality     "lethal" | "nonlethal"
+        save          "" | fort | ref | will — a gate the engine must roll per target
+        save_effect   "" | half | negates | partial
+        riders        specs that are not the rolled dice, for the GM to see
+        note          why a rider is not executed, where there is a reason
+
+    One roll for the whole spell is not an optimisation, it is 1e: a fireball is rolled
+    once and every creature in the area saves against that number. `_op_save` rolls the
+    failure branch per save because a poison gate really is one creature at a time; an
+    area spell is not, and rolling per target would give two creatures in one blast
+    different damage.
+    """
+    plan = {"dice": "", "kind": "", "damage_type": "untyped", "lethality": "lethal",
+            "save": "", "save_effect": "", "riders": [], "note": ""}
+    specs = effects_at(spell, caster_level)
+
+    def take(core: dict) -> None:
+        plan["kind"] = "heal" if core.get("type") == "heal" else "damage"
+        plan["dice"] = str(core.get("dice") or "")
+        plan["damage_type"] = str(core.get("damage_type") or "untyped")
+        plan["lethality"] = str(core.get("lethality") or "lethal")
+
+    for spec in specs:
+        kind = str(spec.get("type", ""))
+        if kind == "save_gate" and not plan["dice"]:
+            core = next((e for e in (spec.get("on_failure") or [])
+                         if e.get("type") in ("damage", "heal")), None)
+            if core is None:
+                plan["riders"].append(spec)
+                continue
+            take(core)
+            plan["save"] = str(spec.get("target") or "")
+            # The printed line is the authority on what a success does; the branches only
+            # say what the converter could express. A gate whose success branch is empty
+            # is "negates" if the line says negates and "partial" if it says partial, and
+            # those are not the same thing to the creature saving.
+            printed = getattr(spell, "save_effect", "") or ""
+            if printed in ("half", "negates", "partial"):
+                plan["save_effect"] = printed
+            else:
+                plan["save_effect"] = "half" if any(
+                    e.get("type") in ("damage", "heal")
+                    for e in (spec.get("on_success") or [])) else "negates"
+        elif kind in ("damage", "heal") and not plan["dice"]:
+            take(spec)
+        else:
+            plan["riders"].append(spec)
+
+    if plan["riders"]:
+        # Said out loud rather than left as an empty list somewhere. A +4 enhancement to
+        # Strength needs a duration in rounds to be applied, and a spell's duration is
+        # still prose — "minutes/level (1)" — so applying one would mean inventing how
+        # long it lasts. Shown to the GM instead of guessed at.
+        plan["note"] = ("recorded for the GM: applying these needs the spell's duration "
+                        "as a number of rounds, which is still prose")
+    return plan
+
+
 # --- reading the prose ---------------------------------------------------------------------
 #
 # Every one of these is a *detection*, in the shape CLAUDE.md names as the only kind of fix
@@ -717,6 +787,74 @@ _VETO_BEFORE = re.compile(
     r"(additional|extra|more|another|each additional|instead|rather than|as if|"
     r"such as|for example)\s*$", re.I)
 
+# "healed for 1d6 points of damage/2 caster levels" — a *heal* written in the vocabulary
+# of damage, which is how blaze of glory came out of the converter as a spell that damages
+# every good creature in range. Matched before the damage patterns for that reason.
+_RE_HEAL_PER_LEVEL = re.compile(
+    r"(?:heals?|healed for|restores?)\s+" + _DICE + r"\s*(?:points?\s*)?(?:of\s*)?"
+    r"(?:damage|hit points)" + _PER_LEVEL, re.I)
+
+# A formula the spell prints but does not itself deal on being cast. Four kinds, and the
+# distinction is *who takes it and when* rather than whether the sentence is conditional —
+# which is what the first version of this got wrong, refusing caustic eruption and fire
+# storm (both of which deal exactly what they say, in an area, once) while still letting
+# teleport's mishap through.
+#
+# Every one of these was found by executing the whole converted corpus rather than by
+# reading it: they were inert while `_op_cast` only narrated, and the moment it started
+# rolling, teleport dealt 1d10 to its target and thorn body burned whoever it was aimed at.
+_VETO_CLAUSE = re.compile(
+    # Retributive: the damage goes to somebody who attacks *you*. The last of these needs
+    # the "you" — "creatures that fail their save take 2d6" is the spell doing its job,
+    # and "creatures that successfully grapple you take 2d6" is thorn body punishing them.
+    r"striking you|strikes? (?:the|a) wall|each time a weapon strikes"
+    r"|in addition to their normal damage|the attacker takes"
+    r"|(?:creatures?|anyone|any creature|those) (?:that|who)\s[^.]{0,50}?\byou\b"
+    # The same shape aimed at a summon rather than at you — "any creature that grapples
+    # with it … takes 1d4". Keyed on grappling and on being struck, which is what makes it
+    # retribution rather than the spell's own damage.
+    r"|grapple[sd]? with it|grappled by it|hits? it with|unarmed strike|natural weapon"
+    # A hazard the spell leaves standing, paid on walking into it rather than on casting.
+    r"|attempt to move through"
+    # Damage aimed at a third party — seer's bane burns the diviner, not the target.
+    r"|the caster of|strikes at him"
+    # A worked example in the spell's own text. Blood crow strike's "For example, if you
+    # are a 14th-level monk…" is not a thing the spell does.
+    r"|for example"
+    # A natural attack the spell grants. The dice belong to that attack, not to the cast.
+    r"|gains? (?:a|an|\d+|two|three)\s[^.]{0,30}?attack|grants? you\s[^.]{0,34}?attack"
+    r"|this attack uses"
+    # Named natural attacks, spelled out rather than caught by a general "…attack…".
+    # A pattern loose enough to match "make a ranged touch attack" would veto scorching
+    # ray, searing light and every other ray in the book, all of which deal exactly what
+    # they print. No ray spell says "slam attack".
+    r"|(?:slam|claw|bite|gore|tail|talon|hoof|sting|tentacle|wing|pincer)s?\s+attacks?"
+    # Damage that repeats, which `effectspec` cannot hold and one hit understates.
+    r"|at the (?:start|beginning) of (?:its|your|their|each|the) turn"
+    r"|each round|every round|rounds? thereafter",
+    re.I)
+
+# A teleport mishap sits a sentence away from its dice — "Mishap: You and anyone else …
+# have gotten scrambled. You each take 1d10 points of damage" — so this is searched in the
+# run-up to the formula rather than in its own clause.
+_RE_MISHAP = re.compile(r"\bmishap\b", re.I)
+
+
+def _clause(text: str, at: int) -> str:
+    """The sentence a formula sits in, for the veto to read."""
+    start = max(text.rfind(".", 0, at), text.rfind(":", 0, at)) + 1
+    end = text.find(".", at)
+    return text[start:end if end > 0 else len(text)]
+
+
+def _refuses(text: str, m: re.Match) -> bool:
+    """Whether this match is a formula the spell does not deal by being cast."""
+    if _VETO_BEFORE.search(text[max(0, m.start() - 24):m.start()]):
+        return True
+    if _RE_MISHAP.search(text[max(0, m.start() - 300):m.start()]):
+        return True
+    return bool(_VETO_CLAUSE.search(_clause(text, m.start())))
+
 
 def _energy(word: str | None) -> str | None:
     return _ENERGY_WORDS.get((word or "").strip().lower())
@@ -746,22 +884,37 @@ def read_scaling(entry: dict) -> dict | None:
     text = entry.get("description") or ""
 
     for pattern, kind in ((_RE_HEAL_PLUS, "healing"), (_RE_DAMAGE_PLUS, "damage")):
-        m = pattern.search(text)
-        if not m:
+        for m in pattern.finditer(text):
+            if _refuses(text, m):
+                continue
+            out = {"kind": kind, "die": int(m.group("die")),
+                   "base_dice": int(m.group("count") or 1),
+                   "bonus_per_level": int(m.group("per"))}
+            cap = _cap_near(text, m.end(), _RE_CAP_BONUS)
+            if cap:
+                out["bonus_cap"] = int(cap.group(1))
+            # cure/inflict are the positive and negative energy pair, and the prose says
+            # which.
+            out["damage_type"] = "positive" if kind == "healing" else (
+                "negative" if re.search(r"negative energy", text, re.I) else "untyped")
+            return out
+
+    # Healing stated per caster level, checked before the damage patterns because it is
+    # written in their words: "healed for 1d6 points of damage/2 caster levels".
+    for m in _RE_HEAL_PER_LEVEL.finditer(text):
+        if _refuses(text, m):
             continue
-        out = {"kind": kind, "die": int(m.group("die")),
-               "base_dice": int(m.group("count") or 1),
-               "bonus_per_level": int(m.group("per"))}
-        cap = _cap_near(text, m.end(), _RE_CAP_BONUS)
+        out = {"kind": "healing", "die": int(m.group("die")),
+               "dice_per": int(m.group("count") or 1),
+               "per_levels": _DIVISORS.get((m.group("div") or "").lower(), 1),
+               "damage_type": "positive"}
+        cap = _cap_near(text, m.end(), _RE_CAP_DICE)
         if cap:
-            out["bonus_cap"] = int(cap.group(1))
-        # cure/inflict are the positive and negative energy pair, and the prose says which.
-        out["damage_type"] = "positive" if kind == "healing" else (
-            "negative" if re.search(r"negative energy", text, re.I) else "untyped")
+            out["cap_dice"] = int(cap.group(1))
         return out
 
     for m in _RE_PER_LEVEL.finditer(text):
-        if _VETO_BEFORE.search(text[max(0, m.start() - 24):m.start()]):
+        if _refuses(text, m):
             continue
         energy = _energy(m.group("type"))
         if energy is None:
@@ -778,7 +931,7 @@ def read_scaling(entry: dict) -> dict | None:
         return out
 
     for m in _RE_FLAT.finditer(text):
-        if _VETO_BEFORE.search(text[max(0, m.start() - 24):m.start()]):
+        if _refuses(text, m):
             continue
         energy = _energy(m.group("type"))
         if energy is None:

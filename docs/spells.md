@@ -10,7 +10,7 @@ Three files hold it:
 | File | What it holds |
 | --- | --- |
 | `content/spells/spells.json` | The Spell Codex as imported. 3,040 entries, descriptive. Never rewritten. |
-| `content/spells/spells-mechanics.json` | The mechanical half read out of the prose: 385 entries carrying `scaling` and `effects`. Layers over the above by id. |
+| `content/spells/spells-mechanics.json` | The mechanical half read out of the prose: 354 entries carrying `scaling` and `effects`. Layers over the above by id. |
 | `rules/spells.py` | The schema, the derivations, the conversion, and `validate_spell` for a UI to call. |
 
 ---
@@ -169,15 +169,39 @@ Measured over the whole corpus, and pinned in
 | | Count |
 | --- | ---: |
 | Spells in the corpus | **3,040** |
-| Carrying executable `effects` | **385** |
-| — with a damage formula | 359 |
-| — with a healing formula | 14 |
+| Carrying executable `effects` | **354** |
+| — with a damage formula | 327 |
+| — with a healing formula | 15 |
 | — hand-written (buffs, magic missile) | 12 |
-| Left as prose | **2,655** |
+| Left as prose | **2,686** |
 | Converted specs that fail `effectspec.validate` | **0** |
 
-385 of 3,040 is 12.7%, and it is the honest ceiling of what regular prose gives up.
-Everything left is left on purpose:
+354 of 3,040 is 11.6%, and it is the honest ceiling of what regular prose gives up.
+
+**It was 385 until the engine started rolling these numbers.** Executing the whole
+converted corpus found 31 formulas that a spell *prints* but does not *deal by being cast*,
+every one of them invisible for as long as `_op_cast` only narrated. Teleport dealt 1d10 to
+whatever you aimed at, because its Mishap row says "You each take 1d10 points of damage".
+Thorn body burned its target instead of whoever struck the caster. Blaze of glory, which
+heals, was converted as damage because the book writes healing in the vocabulary of damage
+— "healed for 1d6 points of damage/2 caster levels". That is CLAUDE.md's "verify end to
+end, on real regenerated content" arriving exactly on schedule: the regex metrics said 385
+with great confidence and 31 of them were wrong.
+
+The refusals are keyed on **who takes the damage and when**, not on whether the sentence is
+conditional. The first version of the veto *was* conditional-based and it refused caustic
+eruption and fire storm — both of which deal precisely what they print, once, in an area.
+The four categories, all in `spells._VETO_CLAUSE`:
+
+| Category | Example | Spells |
+| --- | --- | ---: |
+| Mishap | teleport, dream travel — "Mishap: … you each take 1d10" | 2 |
+| Retributive | thorn body, sacred nimbus — damage to whoever strikes *you* | 5 |
+| A granted natural attack | savage maw's bite, shadow claws' claws — the dice belong to the attack | 13 |
+| Repeats every round | call the void, fire of judgment — one hit understates it | 8 |
+| Aimed at a third party, or inside a worked example | seer's bane, blood crow strike | 3 |
+
+Everything else is left as prose on purpose:
 
 - **Gated on our own tags.** A spell is only converted if it carries the `damage` or
   `healing` tag. Relaxing that gate to catch magic missile (whose corpus tags say `utility`)
@@ -304,46 +328,58 @@ unusual class but a spell nobody can ever cast.
 Everything below is in a file this work was not allowed to touch. Each is a specific change
 with the reason it is needed.
 
-### 5.1 `rules/engine.py` — `_op_cast` must execute the effects
+### 5.1 `rules/engine.py` — `_op_cast` executes the effects  ✅ DONE
 
-`_op_cast` today spends the slot, computes caster level and save DC, and stops, "because a
-parser guessing mechanics out of three thousand English paragraphs would produce confident
-wrong numbers". That reasoning was right and is now narrower: 385 spells carry validated,
-executable specs and 2,655 still do not. **The boundary should move to per-spell rather than
-per-corpus** — execute what carries effects, narrate what does not.
+**Delivered.** `_op_cast` no longer states the numbers and stops. The boundary moved from
+per-corpus to **per-spell**: a spell carrying effects is executed, a spell carrying none
+takes exactly the path it always took, and an empty `spell.effects` is the honest signal
+that this one's mechanics are English.
 
-Concretely, after the slot is spent:
+Three stages, in 1e's own order:
 
-```python
-cl = casting.caster_level(actor)
-specs = spells_mod.effects_at(spell, cl)      # dice already scaled for this caster
-```
+1. **The dice, once.** `spells.casting_plan(spell, caster_level)` reads *what* to roll out
+   of the specs — the engine never walks spec shapes — and the caster rolls it a single
+   time. A fireball is rolled once and everyone in the area saves against that number;
+   rolling per target hands two creatures in one blast different damage. This is also why
+   the halving could not simply reuse `_op_save`, which rolls its failure branch per save:
+   that is right for a poison gate and wrong for an area spell.
+2. **A saving throw per target**, rolled with that creature's own `save_modifiers` against
+   the caster's real DC. `_roll_or_suspend_stage` now takes the actor who *makes* the roll,
+   so the caster rolls the damage and each target rolls its own save, and the popup only
+   ever opens for a roll the player is entitled to make.
+3. **The damage**, through `_apply_damage` like every other point of damage in the game —
+   so resistance, damage reduction, temporary hit points and interception all apply without
+   a line of their own in `_op_cast`.
 
-Three things `effects_at` hands back need the engine's own numbers substituted:
+The three substitutions, as resolved:
 
-1. **The save DC.** A `save_gate` carries `dc: "10 + spell level + casting ability modifier"`
-   — the string constant `spells.SAVE_DC_FORMULA` — because a spell cannot know the caster's
-   ability modifier. Replace it with `casting.save_dc(actor, level)`, which `_op_cast`
-   already computes.
-2. **The halved branch.** `on_success` on a "Reflex half" spell carries *half the dice*
-   (`5d6` where the failure branch has `10d6`). `effectspec` has no way to say "roll the
-   full dice and halve the total", and the two have the same mean, floor and ceiling — but
-   the engine *does* have the rolled total, so it should roll `on_failure` once and halve it
-   rather than rolling the success branch separately. Same expected damage, correct variance,
-   and one roll shown to the player instead of two.
-3. **Spell resistance.** `spell.sr` is now a real tri-state (`true` / `false` / `null` where
-   the source will not say). Nothing in the engine checks SR yet; `rules/creature_effects.py`
-   already records each creature's SR as a `narrative` spec, named exactly so this is
-   greppable when the check is built.
+1. **The save DC** is `casting.save_dc(actor, level)`. `spells.SAVE_DC_FORMULA` never
+   reaches a comparison; `test_the_dc_is_the_casters_own_and_not_the_formula_string` pins
+   both halves of that.
+2. **The halving** is `rolled // 2` applied to the total that was actually rolled, in
+   `_op_cast`, because that is the only place the number exists. `negates` gives 0 on a
+   success. `partial` applies **nothing** on a success and says so on the tell — a partial
+   save reduces the spell by an amount the spell's own text owns, and inventing one would
+   be the failure this whole schema exists to avoid.
+3. **Spell resistance did not land, deliberately.** It needs an SR *number* on the creature
+   to check `1d20 + caster level` against, and `Actor` has no such field — `bestiary`
+   drops it and `rules/creature_effects.py` records it as a `narrative` spec. Adding the
+   field means `rules/sheet.py` and `rules/bestiary.py`, which is not a contained change,
+   and a half-check that sometimes ignored SR would be worse than a gap everybody can see.
+   The printed line is still reported on the outcome exactly as before.
 
-The `cast` outcome should also carry what it now can: `effects` (the scaled specs),
-`element`, `scaling_dice(spell, cl)` as a string for the log, and
-`spells.range_feet(spell, cl)`.
+The `cast` effect carries `element`, `dice` (the scaled notation), `range_feet`, the scaled
+`effects` themselves, and `effects_converted` — which is the one a GM most needs, because
+354 of these numbers were read by a machine and nobody has checked them.
 
-**Do not execute a spell with no effects.** `spell.effects` being empty is the honest signal
-that this spell is one of the 2,655 whose mechanics are prose; the current narrate-only path
-is still exactly right for it. And **show `effects_converted`** — 385 of these were read by a
-machine and nobody has checked them, so a GM should be able to see which.
+**Still not applied: the non-damage riders.** Bless's +1 morale bonus, barkskin's natural
+armour, the six ability boosts. `casting_plan` returns them under `riders` and `_op_cast`
+renders them onto the tell for the GM rather than applying them, because `_op_buff` needs a
+duration in **rounds** and a spell's duration is still prose — `"minutes/level (1)"`. The
+next contained step is a `duration_value` on the spell, derived from that line the way
+`range_value` is derived from the range line; then the riders can go through
+`consumables._spec_to_intents` as sub-intents, exactly as `_op_use_item` already does, with
+no second copy of the spec→intent mapping.
 
 ### 5.2 The play page
 
@@ -356,7 +392,7 @@ machine and nobody has checked them, so a GM should be able to see which.
 - **`search(klass=…)` now matches a domain, bloodline or patron as well as a class list.** A
   cleric with the Fire domain can be shown what their domain grants, which was impossible
   before `level_available` unified the four.
-- **`search(executable=True)`** filters to the 385 spells the engine can resolve.
+- **`search(executable=True)`** filters to the 354 spells the engine can resolve.
 
 ### 5.3 `rules/effectspec.py` — two vocabulary gaps found
 
@@ -383,10 +419,10 @@ Neither is urgent. Both are recorded because the alternative was a silently wron
  and turn it into a number."
 ```
 
-It now does exactly that, for 385 spells. This is the second time this blurb has aged past
+It now does exactly that, for 354 spells. This is the second time this blurb has aged past
 its subject — it previously read "no spell system" — which is the hazard the test
 `test_the_bench_says_where_the_engine_stops` exists to record. The honest replacement is
-something like: *385 spells carry effects the engine can roll; the other 2,655 are prose, and
+something like: *354 spells carry effects the engine can roll; the other 2,686 are prose, and
 what a converted one does can be corrected on this bench.*
 
 ### 5.5 `play/homebrew.py` — most spells cannot be opened by clicking
@@ -395,15 +431,58 @@ what a converted one does can be corrected on this bench.*
 bench's clickable rows stop at "Ablative…". Fireball cannot be opened from the page at all,
 even though `/api/bench/spells/open/fireball` serves it correctly. The bench's own search
 pane finds any spell but its rows are not wired to the editor. Wiring the search results to
-`data-open` would make all 3,040 editable, which matters most for the 385 whose effects a
+`data-open` would make all 3,040 editable, which matters most for the 354 whose effects a
 machine wrote.
 
 ### 5.6 `rules/effectspec.py` — the `spell_effect` type's `blocked` text
 
 It says "the engine has no spell system: this is recorded and narrated, and nothing will cast
-it". The engine does have a spell system now (slots, caster level, DCs, and effects for 385
+it". The engine does have a spell system now (slots, caster level, DCs, and effects for 354
 spells); what is still true is that `spell_effect` itself has no op. The sentence should be
 narrowed rather than deleted.
+
+### 5.8 `rules/intents.py` — `cast` should default to `visibility: "player"`
+
+The op table declares `"cast": (("spell",), (…), "hidden")`. That was right while a cast
+rolled nothing. It is now the exact trap the `"attack"` entry two lines above documents:
+
+> `player`, because the PC rolls their own to-hit and their own damage. Defaulting this to
+> `hidden` meant the engine silently rolled the player's attacks for them, which
+> contradicts the architecture decision outright.
+
+A PC's fireball is in the same position. The mechanism is already in place — a cast
+declared `visibility: "player"` suspends for the player's dice and resumes correctly, and
+`_force_visibility` still demotes every non-PC caster to hidden — so this is one word.
+
+**It was left alone deliberately**, because `rules/intents.py` was not in scope and the
+change is not free: five tests in `tests/test_casting.py` call `cast(e, "fireball")` and
+read `.outcomes[0]`, which becomes an empty list the moment the cast suspends. They would
+need to resume through the popup the way the attack tests do. Worth doing together, in one
+change, by whoever owns both files.
+
+### 5.9 `tests/test_casting.py` — one docstring is now false
+
+`test_the_outcome_states_the_facts_and_not_the_damage` still passes: it reads
+`effects[0]`, the cast effect stays first, and it carries no `damage` or `amount` key. But
+its docstring says
+
+> The engine will not read "1d6 per caster level" out of English prose and turn it into a
+> number — anything mechanical arrives as its own validated intent.
+
+which is no longer true for 354 spells. A test that passes while its stated reason is false
+is the same hazard as the bench blurb in §5.4, and it is the third time this particular
+sentence has aged. What is still true, and worth keeping a test for, is narrower: the *cast
+effect itself* states facts and never damage, because the damage arrives as its own effects
+beside it.
+
+### 5.10 `rules/engine.py` — `_op_save` could take a pre-rolled total
+
+The halving rule now exists in two places: `_op_save` rolls its failure branch and halves
+it for a poison gate, and `_op_cast` halves the total it already rolled for an area spell.
+They are not the same code because they are not the same situation — one roll per save
+versus one roll shared across everything in the blast — but they are the same *rule*, and
+CLAUDE.md is specific about what happens to a rule with two copies. Giving `_op_save` an
+optional pre-rolled total would let the cast path call it and leave one copy.
 
 ### 5.7 Rebuilding the mechanics file
 
