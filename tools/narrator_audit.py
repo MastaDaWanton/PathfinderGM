@@ -146,7 +146,12 @@ def audit(turns: int, script: str, world: str, character: str,
             # And the things review cannot see, because they are about the *engine*.
             turn_log = getattr(c, "turn_log", None) or []
             outcomes = (turn_log[-1].get("outcomes") if turn_log else None) or []
-            if fighting and not outcomes:
+            # A turn that suspended for the player's d20 has done plenty — the attack
+            # exists, the engine is waiting on a die. Scored as "did nothing" at first,
+            # which reported three faults in fifty on llama3.1 that were all a punch
+            # waiting to be rolled. The measurement was wrong, not the app.
+            pending = bool(cm.current().scene.awaiting)
+            if fighting and not outcomes and not pending:
                 faults.append("combat-turn-did-nothing")
             if body.get("rejections"):
                 faults.append("intent-rejected")
