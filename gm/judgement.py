@@ -501,7 +501,18 @@ def inject_fight(raw_intents, player_text: str, scene):
             "because": "the player said they attack"}]
     if getattr(scene, "in_encounter", False):
         # In a fight with nobody left to hit. Spawning a fresh opponent mid-encounter
-        # would be inventing reinforcements the GM never called for.
+        # would be inventing reinforcements the GM never called for — but the fight is
+        # plainly over, and saying so is the one thing that pays out: XP and treasure
+        # settle on the way *out* of an encounter.
+        #
+        # Found by `tools/narrator_audit.py` on its sixth turn: "I keep hitting him"
+        # scored `combat-turn-did-nothing`, because the thug was already down and the
+        # encounter had not closed, so the turn had nothing in it at all.
+        if not any(str(r.get("op", "")).lower() == "end_encounter"
+                   for r in raw_intents if isinstance(r, dict)):
+            return list(raw_intents) + [{
+                "op": "end_encounter",
+                "because": "there is nobody left standing to fight"}]
         return raw_intents
 
     template = "thug"

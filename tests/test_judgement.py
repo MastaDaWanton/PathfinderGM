@@ -772,3 +772,48 @@ def test_a_named_weapon_opens_at_its_own_range():
     assert _opens_at("I shoot him with my crossbow.")[0] == 80
     assert _opens_at("I throw my dagger at him.")[0] == 10
     assert _opens_at("I punch the bruiser in the face.")[0] == 5
+
+
+def test_swinging_when_everyone_is_down_ends_the_fight():
+    """Found by `tools/narrator_audit.py` on its sixth turn: "I keep hitting him" scored
+    `combat-turn-did-nothing`, because the thug was already down and the encounter had
+    not closed, so the turn contained nothing at all.
+
+    Saying the fight is over is the one thing that pays: XP and treasure settle on the
+    way *out* of an encounter. Spawning fresh reinforcements instead would be inventing
+    an enemy the GM never called for."""
+    from rules.bestiary import instantiate
+
+    room = _empty_room()
+    thug = instantiate("thug", scene=room, name="a thug")
+    thug.hp = -3
+    room.add(thug)
+    # `in_encounter` is derived from the initiative order, so the fight is begun rather
+    # than asserted.
+    room.initiative = [("pc", 15), ("c1", 9)]
+    room.turn = 0
+    out = judgement.inject_fight([{"op": "narrate_only"}], "I keep hitting him.", room)
+    ops = [i["op"] for i in out]
+    assert "end_encounter" in ops, ops
+    assert "spawn" not in ops, "reinforcements nobody called for"
+
+
+def test_a_turn_that_fails_every_attempt_says_so_instead_of_crashing():
+    """The error path unpacked `schedule` — which holds (model, host, provider, key) —
+    as a pair, and raised `ValueError: too many values to unpack` *while reporting that
+    the turn had failed*. The honest "five attempts, here is what each one got wrong"
+    message the player is owed came out as a 500 and a traceback.
+
+    It only runs when every attempt has failed, which is why nobody had reached it until
+    `tools/narrator_audit.py` drove enough turns to find one."""
+    import re as _re
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
+        encoding="utf-8")
+    raiser = src[src.index("could not produce a valid turn"):][:400]
+    assert "for m, *_ in schedule" in raiser
+    assert "for m, _ in schedule" not in raiser
+    # And the schedule really is wider than two, which is what made it a bug.
+    built = _re.search(r"schedule = \[\((.*?)\)\]", src)
+    assert built and built.group(1).count(",") >= 2, built and built.group(1)

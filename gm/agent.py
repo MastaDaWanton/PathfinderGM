@@ -260,10 +260,16 @@ class GMAgent:
                             repairs=repairs + claim_repairs + prose_repairs,
                             rejections=rejections)
 
+        # `schedule` holds (model, host, provider, key). Unpacked as a pair, this line
+        # raised `ValueError: too many values to unpack` *while reporting that the turn
+        # had failed* — so the honest "five attempts, here is what each one got wrong"
+        # message the player was owed came out as a 500 and a traceback instead. It only
+        # runs when every attempt has failed, which is why nobody had ever reached it.
+        # Found by `tools/narrator_audit.py`.
         raise IntentError(
             "the GM could not produce a valid turn in "
             f"{len(schedule)} attempts across "
-            f"{len({m for m, _ in schedule})} model(s):\n" + "\n".join(rejections)
+            f"{len({m for m, *_ in schedule})} model(s):\n" + "\n".join(rejections)
         )
 
     # --- An NPC's turn -------------------------------------------------------------------
