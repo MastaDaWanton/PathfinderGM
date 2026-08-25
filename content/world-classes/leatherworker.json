@@ -1,135 +1,170 @@
 {
-  "id": "leatherworker",
-  "name": "Leatherworker",
-  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — skinning, curing and crafting — turning what a fight leaves on the ground into satchels, cloaks, barding and armour, from deer hide to dragonhide.",
-  "grantable_at_creation": true,
-
-  "_thresholds_note": "Herbalist's curve, kept deliberately: the mastery awards in rules/worldclass.py are shared across tracks, so the same MP arithmetic that set 25/65/50/100 there sets it here. The dip at level 4 is the herbalist file's documented intent — each high-tier piece is a larger undertaking, so fewer of them make a level — and it holds for a breastplate exactly as it held for an elixir. Do not 'fix' it in one file and not the other; that is the stale-copy bug CLAUDE.md warns about, so if it ever changes, change both.",
-  "thresholds": [25, 65, 50, 100],
-
-  "milestones": {
-    "5": "legendary-hide"
+ "id": "leatherworker",
+ "name": "Leatherworker",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — skinning, curing and crafting — turning what a fight leaves on the ground into satchels, cloaks, barding and armour, from deer hide to dragonhide.",
+ "grantable_at_creation": true,
+ "_thresholds_note": "Herbalist's curve, kept deliberately: the mastery awards in rules/worldclass.py are shared across tracks, so the same MP arithmetic that set 25/65/50/100 there sets it here. The dip at level 4 is the herbalist file's documented intent — each high-tier piece is a larger undertaking, so fewer of them make a level — and it holds for a breastplate exactly as it held for an elixir. Do not 'fix' it in one file and not the other; that is the stale-copy bug CLAUDE.md warns about, so if it ever changes, change both.",
+ "thresholds": [
+  25,
+  65,
+  50,
+  100
+ ],
+ "milestones": {
+  "5": "legendary-hide"
+ },
+ "_deeds_note": "Same shape as the herbalist's deed, for the same measured reason: a deed that requires a level-5 method can never open the gate to level 5. The deed is the material, not the method — successfully working legendary hide into anything is the proof, and masterwork tooling is the mastery that follows it. A Leatherworker 4 reaches legendary hide the way the refusals allow: with a legendary-capable tannin and a chain of methods learned by 4, since nothing below `tool` is gated at 5.",
+ "deeds": {
+  "legendary-hide": {
+   "min_tier": "legendary",
+   "note": "Any successful piece worked from legendary hide, however it was reached."
+  }
+ },
+ "levels": [
+  {
+   "level": 1,
+   "tools": [
+    "skinning knife",
+    "fleshing beam"
+   ],
+   "methods": [
+    "skin",
+    "flense",
+    "cure",
+    "cut",
+    "stitch"
+   ],
+   "max_tier": "common / mundane",
+   "note": "Rawhide work: skin the beast in the field, flense and salt-cure the hide, cut and stitch cured rawhide into cords, wraps, sheaths and simple satchels. The clock starts at the skinning — a green hide is refuse in two days."
   },
-
-  "_deeds_note": "Same shape as the herbalist's deed, for the same measured reason: a deed that requires a level-5 method can never open the gate to level 5. The deed is the material, not the method — successfully working legendary hide into anything is the proof, and masterwork tooling is the mastery that follows it. A Leatherworker 4 reaches legendary hide the way the refusals allow: with a legendary-capable tannin and a chain of methods learned by 4, since nothing below `tool` is gated at 5.",
-  "deeds": {
-    "legendary-hide": {
-      "min_tier": "legendary",
-      "note": "Any successful piece worked from legendary hide, however it was reached."
-    }
+  {
+   "level": 2,
+   "tools": [
+    "tanning rack",
+    "bark vats"
+   ],
+   "methods": [
+    "tan",
+    "oil"
+   ],
+   "max_tier": "uncommon / volatile",
+   "note": "True leather. Tanning binds the hide for good — it will never spoil again — and oiling keeps it leather instead of board. Monster hides open up: winter wolf, dire boar, the shells and scaled things."
   },
-
-  "levels": [
-    {
-      "level": 1,
-      "tools": ["skinning knife", "fleshing beam"],
-      "methods": ["skin", "flense", "cure", "cut", "stitch"],
-      "max_tier": "common / mundane",
-      "note": "Rawhide work: skin the beast in the field, flense and salt-cure the hide, cut and stitch cured rawhide into cords, wraps, sheaths and simple satchels. The clock starts at the skinning — a green hide is refuse in two days."
-    },
-    {
-      "level": 2,
-      "tools": ["tanning rack", "bark vats"],
-      "methods": ["tan", "oil"],
-      "max_tier": "uncommon / volatile",
-      "note": "True leather. Tanning binds the hide for good — it will never spoil again — and oiling keeps it leather instead of board. Monster hides open up: winter wolf, dire boar, the shells and scaled things."
-    },
-    {
-      "level": 3,
-      "tools": ["dye vats", "half-moon knife", "stitching pony"],
-      "methods": ["dye", "line"],
-      "max_tier": "rare / magical",
-      "note": "Coloured and lined work: dyed leathers that hold their colour, fur-lined cloaks and boots built as two hides working together."
-    },
-    {
-      "level": 4,
-      "tools": ["wax kettle", "hardening trough"],
-      "methods": ["harden"],
-      "max_tier": "exotic / planar",
-      "note": "Cuir bouilli — leather boiled in wax until it sets like thin steel. The hardening station is where leather stops being clothing and starts being armour."
-    },
-    {
-      "level": 5,
-      "tools": ["master tannery"],
-      "methods": ["tool"],
-      "max_tier": "legendary / mythic",
-      "note": "Masterwork tooling: the ornament, fit and finish that makes a piece masterwork — and dragonhide work, which accepts nothing less."
-    }
-  ],
-
-  "method_descriptions": {
-    "skin": "Takes the hide off a fallen creature in the field. This happens over a carcass, not at the bench — every hide on the bench already went through it, and the spoilage clock started when it did.",
-    "flense": "Scrapes fat and flesh from the inside of a green hide over the beam. Flesh left on the hide putrefies under the salt, so this comes before curing or tanning.",
-    "cure": "Salts a green hide to stop the spoilage clock. Cured rawhide keeps indefinitely but is not yet leather: it goes stiff, and soaking softens it back toward spoiling.",
-    "cut": "Cuts panels, straps and pieces to pattern. Straps are cut work and nothing more; everything assembled is cut before it is stitched.",
-    "stitch": "Sews cut pieces into a finished thing with thread, sinew or gut. Only cured or tanned hide takes a seam — stitching a green hide sews a bag of rot.",
-    "tan": "Steeps a flensed hide in tannin liquor until it is leather through and through. A tanned hide never spoils, takes every later method, and is the foundation of all higher work. The tannin must be equal to the hide: bark for beasts, harsher liquors for monsters.",
-    "oil": "Dresses leather with oils and fats so it stays supple, sheds water and survives service. Some oils bring their own character — salamander oil keeps fire off, troll fat closes scratches overnight.",
-    "dye": "Colours leather in the vat. Common dyes are colour and nothing else; the rare ones carry their own qualities into the piece.",
-    "line": "Builds a piece as two layers — a working outer hide and an inner lining of fur or soft leather — so both hides' qualities ride in one garment.",
-    "harden": "Cuir bouilli: boils tanned leather in wax until it sets rigid. Hardened leather turns blades like thin steel and is the heart of leather armour. Only tanned hide survives the kettle — raw hide boils down to glue.",
-    "tool": "Masterwork finishing: carved, stamped and burnished ornament, exact fit, perfect edges. A tooled piece is masterwork, takes enchantment, and is the only standard dragonhide accepts."
+  {
+   "level": 3,
+   "tools": [
+    "dye vats",
+    "half-moon knife",
+    "stitching pony"
+   ],
+   "methods": [
+    "dye",
+    "line"
+   ],
+   "max_tier": "rare / magical",
+   "note": "Coloured and lined work: dyed leathers that hold their colour, fur-lined cloaks and boots built as two hides working together."
   },
-
-  "_method_help_note": "The structured half of method_descriptions: what the tooltip renders. `does` is the mechanical effect in numbers, `needs` is what must be on the bench for the method to be legal, `for` is what a player reaches for it to accomplish. Kept beside the prose rather than replacing it — the prose is the voice, this is the answer to 'what will this button do to my DC'.",
-  "method_help": {
-    "skin": {
-      "does": "Field action, not a bench stage: puts a hide into stock with its 48-hour spoilage clock started. Contributes no potency and no DC.",
-      "needs": "A fallen creature in the scene, and a skinning knife. Refused at the bench — the hide there is already off the beast.",
-      "for": "Turning a fight into material. What the beast was decides the hide's tier."
-    },
-    "flense": {
-      "does": "No potency change. Required before cure or tan on a green hide; without it those steps are refused.",
-      "needs": "A green hide and the fleshing beam.",
-      "for": "Stopping the hide putrefying under the salt. Skipping it spoils the vat, not just the piece."
-    },
-    "cure": {
-      "does": "Stops the spoilage clock permanently. No potency change. +2 DC as a stage, like any other.",
-      "needs": "A flensed green hide and curing salt.",
-      "for": "Buying time. Cured rawhide keeps forever, takes a seam, and is the cheapest way to make a hide safe on the day you skinned it."
-    },
-    "cut": {
-      "does": "No potency change. Assembles the `straps` pattern on its own; every other pattern is cut before it is stitched.",
-      "needs": "A hide that is cured or tanned, and a half-moon knife for fine work.",
-      "for": "Panels to pattern. The step where a hide becomes pieces of a thing."
-    },
-    "stitch": {
-      "does": "No potency change. Assembles every pattern except straps — without it the chain produces a stack of panels.",
-      "needs": "Thread on the bench (linen, sinew, gut), and hide that is cured or tanned. Stitching green hide is refused: it rots.",
-      "for": "Making the piece exist. This is the method that finishes an ordinary garment."
-    },
-    "tan": {
-      "does": "No potency change, but it is the gate on everything above: hardening, and the armour rows on the output, require tanned leather. Also ends spoilage for good.",
-      "needs": "A tannin within one tier of the hide — oak bark for a deer, dragonblood tannin for dragonhide — and the bark vats.",
-      "for": "Turning hide into leather. Nothing that matters is reachable without it."
-    },
-    "oil": {
-      "does": "Potency x1.10. Some oils carry their own effect into the piece (salamander oil, resist fire 1; troll fat, self-mending).",
-      "needs": "An oil on the bench — neatsfoot, currier's tallow, something rendered.",
-      "for": "Service life, and a cheap way to buy an extra property from the oil itself."
-    },
-    "dye": {
-      "does": "No potency change. Rare dyes contribute their own effects (shadow black, +1 Stealth in darkness; void dye, +2).",
-      "needs": "A dye on the bench and the dye vats. Mordant salts fix the rare colours permanently.",
-      "for": "Colour, and at the top of the ladder a genuine mechanical property."
-    },
-    "line": {
-      "does": "No potency change. Both hides' effects ride in the finished piece rather than only the outer one's.",
-      "needs": "Two hides on the bench — an outer and an inner. Refused with one.",
-      "for": "Stacking two hides' qualities in one garment: a working outer shell over a warm or silent lining."
-    },
-    "harden": {
-      "does": "Potency x1.25. Cuir bouilli — the piece sets rigid and becomes armour-grade.",
-      "needs": "Tanned leather (raw hide boils to glue and is refused) and a wax on the bench, in the hardening trough.",
-      "for": "Armour. This is where leather stops being clothing."
-    },
-    "tool": {
-      "does": "Potency x1.25 and sets `masterwork` on the output — the flag the enchanter's vessel requirement reads. Must be the last method in the chain.",
-      "needs": "The master tannery, and a piece worth finishing. Legendary hide accepts no lesser standard.",
-      "for": "Masterwork. A tooled armour piece is what an enchantment gets bound to; an untooled one cannot take it."
-    }
+  {
+   "level": 4,
+   "tools": [
+    "wax kettle",
+    "hardening trough"
+   ],
+   "methods": [
+    "harden"
+   ],
+   "max_tier": "exotic / planar",
+   "note": "Cuir bouilli — leather boiled in wax until it sets like thin steel. The hardening station is where leather stops being clothing and starts being armour."
   },
-
-  "_portable_note": "The tannery is furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split the herbalist's workbench established.",
-  "fixed_tools": ["master tannery", "hardening trough", "bark vats", "tanning rack"]
+  {
+   "level": 5,
+   "tools": [
+    "master tannery"
+   ],
+   "methods": [
+    "tool"
+   ],
+   "max_tier": "legendary / mythic",
+   "note": "Masterwork tooling: the ornament, fit and finish that makes a piece masterwork — and dragonhide work, which accepts nothing less."
+  }
+ ],
+ "method_descriptions": {
+  "skin": "Takes the hide off a fallen creature in the field. This happens over a carcass, not at the bench — every hide on the bench already went through it, and the spoilage clock started when it did.",
+  "flense": "Scrapes fat and flesh from the inside of a green hide over the beam. Flesh left on the hide putrefies under the salt, so this comes before curing or tanning.",
+  "cure": "Salts a green hide to stop the spoilage clock. Cured rawhide keeps indefinitely but is not yet leather: it goes stiff, and soaking softens it back toward spoiling.",
+  "cut": "Cuts panels, straps and pieces to pattern. Straps are cut work and nothing more; everything assembled is cut before it is stitched.",
+  "stitch": "Sews cut pieces into a finished thing with thread, sinew or gut. Only cured or tanned hide takes a seam — stitching a green hide sews a bag of rot.",
+  "tan": "Steeps a flensed hide in tannin liquor until it is leather through and through. A tanned hide never spoils, takes every later method, and is the foundation of all higher work. The tannin must be equal to the hide: bark for beasts, harsher liquors for monsters.",
+  "oil": "Dresses leather with oils and fats so it stays supple, sheds water and survives service. Some oils bring their own character — salamander oil keeps fire off, troll fat closes scratches overnight.",
+  "dye": "Colours leather in the vat. Common dyes are colour and nothing else; the rare ones carry their own qualities into the piece.",
+  "line": "Builds a piece as two layers — a working outer hide and an inner lining of fur or soft leather — so both hides' qualities ride in one garment.",
+  "harden": "Cuir bouilli: boils tanned leather in wax until it sets rigid. Hardened leather turns blades like thin steel and is the heart of leather armour. Only tanned hide survives the kettle — raw hide boils down to glue.",
+  "tool": "Masterwork finishing: carved, stamped and burnished ornament, exact fit, perfect edges. A tooled piece is masterwork, takes enchantment, and is the only standard dragonhide accepts."
+ },
+ "_method_help_note": "The structured half of method_descriptions: what the tooltip renders. `does` is the mechanical effect in numbers, `needs` is what must be on the bench for the method to be legal, `for` is what a player reaches for it to accomplish. Kept beside the prose rather than replacing it — the prose is the voice, this is the answer to 'what will this button do to my DC'.",
+ "method_help": {
+  "skin": {
+   "does": "Field action, not a bench stage: puts a hide into stock with its 48-hour spoilage clock started. Contributes no potency and no DC.",
+   "needs": "A fallen creature in the scene, and a skinning knife. Refused at the bench — the hide there is already off the beast.",
+   "for": "Turning a fight into material. What the beast was decides the hide's tier."
+  },
+  "flense": {
+   "does": "No potency change. Required before cure or tan on a green hide; without it those steps are refused.",
+   "needs": "A green hide and the fleshing beam.",
+   "for": "Stopping the hide putrefying under the salt. Skipping it spoils the vat, not just the piece."
+  },
+  "cure": {
+   "does": "Stops the spoilage clock permanently. No potency change. +2 DC as a stage, like any other.",
+   "needs": "A flensed green hide and curing salt.",
+   "for": "Buying time. Cured rawhide keeps forever, takes a seam, and is the cheapest way to make a hide safe on the day you skinned it."
+  },
+  "cut": {
+   "does": "No potency change. Assembles the `straps` pattern on its own; every other pattern is cut before it is stitched.",
+   "needs": "A hide that is cured or tanned, and a half-moon knife for fine work.",
+   "for": "Panels to pattern. The step where a hide becomes pieces of a thing."
+  },
+  "stitch": {
+   "does": "No potency change. Assembles every pattern except straps — without it the chain produces a stack of panels.",
+   "needs": "Thread on the bench (linen, sinew, gut), and hide that is cured or tanned. Stitching green hide is refused: it rots.",
+   "for": "Making the piece exist. This is the method that finishes an ordinary garment."
+  },
+  "tan": {
+   "does": "No potency change, but it is the gate on everything above: hardening, and the armour rows on the output, require tanned leather. Also ends spoilage for good.",
+   "needs": "A tannin within one tier of the hide — oak bark for a deer, dragonblood tannin for dragonhide — and the bark vats.",
+   "for": "Turning hide into leather. Nothing that matters is reachable without it."
+  },
+  "oil": {
+   "does": "Potency x1.10. Some oils carry their own effect into the piece (salamander oil, resist fire 1; troll fat, self-mending).",
+   "needs": "An oil on the bench — neatsfoot, currier's tallow, something rendered.",
+   "for": "Service life, and a cheap way to buy an extra property from the oil itself."
+  },
+  "dye": {
+   "does": "No potency change. Rare dyes contribute their own effects (shadow black, +1 Stealth in darkness; void dye, +2).",
+   "needs": "A dye on the bench and the dye vats. Mordant salts fix the rare colours permanently.",
+   "for": "Colour, and at the top of the ladder a genuine mechanical property."
+  },
+  "line": {
+   "does": "No potency change. Both hides' effects ride in the finished piece rather than only the outer one's.",
+   "needs": "Two hides on the bench — an outer and an inner. Refused with one.",
+   "for": "Stacking two hides' qualities in one garment: a working outer shell over a warm or silent lining."
+  },
+  "harden": {
+   "does": "Potency x1.25. Cuir bouilli — the piece sets rigid and becomes armour-grade.",
+   "needs": "Tanned leather (raw hide boils to glue and is refused) and a wax on the bench, in the hardening trough.",
+   "for": "Armour. This is where leather stops being clothing."
+  },
+  "tool": {
+   "does": "Potency x1.25 and sets `masterwork` on the output — the flag the enchanter's vessel requirement reads. Must be the last method in the chain.",
+   "needs": "The master tannery, and a piece worth finishing. Legendary hide accepts no lesser standard.",
+   "for": "Masterwork. A tooled armour piece is what an enchantment gets bound to; an untooled one cannot take it."
+  }
+ },
+ "_portable_note": "The tannery is furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split the herbalist's workbench established.",
+ "fixed_tools": [
+  "master tannery",
+  "hardening trough",
+  "bark vats",
+  "tanning rack"
+ ],
+ "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
 }

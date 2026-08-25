@@ -380,3 +380,82 @@ def test_two_declarations_both_have_to_be_there():
            for c in schema["properties"]["intents"]["allOf"]]
     assert ops == ["travel", "give"]
     assert schema["properties"]["intents"]["minItems"] >= 2
+
+
+
+# --- the chain, not the links ------------------------------------------------------------
+
+def _chain(said, scene, world=None):
+    """Every injector `agent.plan_turn` runs, in the order it runs them.
+
+    Read out of the agent's own source rather than rewritten here, because a copy of an
+    ordering is an ordering that can drift — and this whole test file exists because one
+    did. If `plan_turn` reorders them, this reorders with it.
+    """
+    import inspect
+    import re
+
+    from gm import agent as agent_mod, judgement
+
+    src = inspect.getsource(agent_mod.GMAgent.plan_turn)
+    names = re.findall(r"judgement\.(\w+)\(raw", src)
+    raw = [{"op": "narrate_only", "params": {}}]
+    for name in names:
+        fn = getattr(judgement, name)
+        raw = fn(raw, said, scene, world) if name == "inject_travel" else (
+            fn(raw, scene) if name == "fill_obvious_targets" else fn(raw, said, scene))
+    return raw, names
+
+
+def test_the_injectors_run_in_an_order_that_does_not_give_the_goods_away():
+    """The bug this file exists for, and the reason it survived a green suite.
+
+    "I sell the Yarow Elixir" matches `_HANDS_OVER`. `inject_goods` ran first and wrote a
+    `give` — the elixir left the satchel for nothing — and `inject_sale` then bowed out,
+    because a `give` was already present. A declared sale paid zero gold.
+
+    Every test of the sale passed, because every one of them called `inject_sale`
+    directly. The order only exists in `plan_turn`, and nothing ran the chain."""
+    scene = _scene_with_a_satchel()
+    raw, names = _chain("I sell the Yarow Elixir to her", scene)
+
+    assert "inject_sale" in names and "inject_goods" in names
+    assert names.index("inject_sale") < names.index("inject_goods"), \
+        f"goods runs before sale: {names}"
+
+    ops = [r["op"] for r in raw]
+    assert "sell" in ops, f"the declared sale never reached the engine: {ops}"
+    assert "give" not in ops, f"the elixir was also given away: {ops}"
+
+
+def test_one_sentence_produces_one_op_for_the_thing_it_names():
+    """The general form. Whatever the chain does, an item may leave the satchel once."""
+    scene = _scene_with_a_satchel()
+    for said in ("I sell the Yarow Elixir to her",
+                 "I hand over the Yarow Elixir",
+                 "I buy a lantern"):
+        raw, _ = _chain(said, scene)
+        moving = [r["op"] for r in raw if r["op"] in {"sell", "buy", "give"}]
+        assert len(moving) <= 1, f"{said!r} moved goods {len(moving)} times: {moving}"
+
+
+def test_the_chain_leaves_a_quiet_turn_quiet():
+    scene = _scene_with_a_satchel()
+    raw, _ = _chain("I look around the square", scene)
+    assert [r["op"] for r in raw] == ["narrate_only"]
+
+
+def test_what_the_chain_produces_is_what_the_schema_asked_for():
+    """`declared_ops` and the chain have to agree, or the schema requires an op the
+    injectors would never have supplied as a backstop — and a turn the model cannot
+    satisfy is a turn that burns seven attempts and dies."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    for said in ("I sell the Yarow Elixir to her", "I hand over the brass key",
+                 "I sneak past the guard", "I look around the square"):
+        wanted = judgement.declared_ops(said, scene)
+        raw, _ = _chain(said, scene)
+        got = {r["op"] for r in raw}
+        for op in wanted:
+            assert op in got, f"{said!r}: schema wants {op}, chain gives {sorted(got)}"

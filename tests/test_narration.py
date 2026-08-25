@@ -231,11 +231,21 @@ def test_a_full_scene_passes():
 def test_a_turn_that_never_hands_back_is_caught():
     """Every example ends by asking the player something. A turn that closes on a full
     stop tends to close the fiction with it."""
+    # Over the scene floor on purpose, so the finding under test is the only one. It was
+    # 356 characters and cleared the old floor of 320 by a hair; raising that floor to 600
+    # made this report `too-short` as well, and a test that asserts one finding is a test
+    # that has to keep its fixture honest about every other rule in the file.
     text = ("You get the door open on a room full of ledgers and dust, and the clerk at "
             "the far end does not look up from his work. Rain drums on the roof above "
             "the stacks. The lamp beside him has burned down to a stub and nobody has "
             "trimmed it, and the ink on his fingers is a week old at least. Somewhere "
-            "below, a door closes and a bolt goes across it.")
+            "below, a door closes and a bolt goes across it. The shelves run back further "
+            "than the light reaches, and the aisles between them are narrow enough that "
+            "you would have to turn sideways to pass another person. A ledger lies open "
+            "on the nearest table with a line ruled under one entry and nothing written "
+            "beside it. The clerk turns a page. Outside, the rain gets heavier, and the "
+            "gutter above the window begins to spill over onto the sill.")
+    assert len(text) > narration.MIN_SCENE_CHARS
     r = narration.review(text, min_chars=narration.MIN_SCENE_CHARS)
     assert [f.kind for f in r.findings] == ["no-hand-back"]
 
@@ -821,3 +831,89 @@ def test_a_stated_gender_says_it_rather_than_refusing_to():
             if pc.name in ln][0]
     assert "she has breasts" in line
     assert "Do not describe their body" not in line
+
+
+
+# --- texture: what can be measured about prose without lying about it --------------------
+
+def test_the_harness_was_reviewing_an_empty_string():
+    """The worst measurement bug in this project's history, and it hid in the instrument.
+
+    `tools/narrator_audit.py` read the narration off `/api/say`'s response body — and
+    `_state(c)` has never had a `narration` key. So `review` scored "" on every turn of
+    every run, and the 196/200 baseline's proudest line — "no invented names, no invented
+    companions, no third-person slips, no echoed examples" — was measuring nothing at all.
+    Only the engine-side faults could ever fire.
+
+    Reading the prose off the transcript instead, the same 20-turn town script scored
+    14/20 rather than 19/20: three invented names and two invented companions that had
+    been there the whole time."""
+    import inspect
+
+    from play import views
+
+    assert '"narration"' not in inspect.getsource(views._state), (
+        "if _state ever returns a narration key, the harness's old read was right and "
+        "this test is the thing that is wrong")
+
+    from pathlib import Path as _P
+
+    src = (_P(__file__).resolve().parents[1] / "tools" / "narrator_audit.py").read_text(
+        encoding="utf-8")
+    assert "c.transcript[was:]" in src, "the harness is not reading the transcript"
+
+
+def test_texture_counts_what_a_person_could_check_by_reading():
+    said = ("You step into the yard. The air is cold and smells of tar. "
+            "A man looks up from the bench and says nothing at all.")
+    t = narration.texture(said)
+    assert t["sentences"] == 3
+    assert t["chars"] == len(said)
+    assert t["opens"] == "you step"
+    assert t["second_person"] == 1
+    assert not t["has_speech"]
+    assert t["words_spread"] > 0
+
+
+def test_an_opening_reused_from_the_turn_before_is_counted():
+    """The soft form of `repeats-an-earlier-beat`, which only catches a whole sentence
+    repeated exactly. A narrator that opens every turn "You step" is formulaic long before
+    it repeats a sentence."""
+    t = narration.texture("You step into the yard.", ["You step past the gate."])
+    assert t["echoed_openings"] == 1
+
+
+def test_formula_is_a_property_of_a_session_not_a_turn():
+    """One turn opening "You step" says nothing. Three in four is the defect that was
+    fixed here before — "ten of ten paragraphs ended the same way"."""
+    share, opener = narration.formulaic(
+        ["You step into the yard.", "You step past the gate.",
+         "You step over the sill.", "Rain has got into the lamp oil."])
+    assert opener == "you step" and share == 0.75
+    assert share > narration.FORMULA_SHARE
+
+    # And a healthy run is nowhere near the threshold. Measured on 20 real town turns:
+    # the commonest opener appeared twice in nineteen.
+    healthy, _ = narration.formulaic(
+        ["You step into the yard.", "The rain starts.", "A man looks up.",
+         "Somewhere a dog barks.", "The gate hangs open."])
+    assert healthy < narration.FORMULA_SHARE
+
+
+def test_the_scene_floor_is_what_the_examples_demonstrate():
+    """"dialogue and general world descriptions can increase in length".
+
+    320 was set as a floor well under what the examples show, so a brief beat survived —
+    and it turned out to bite nothing: a 20-turn town run measured mean 839 characters and
+    a minimum of 559. Every turn cleared it by a wide margin."""
+    assert narration.MIN_SCENE_CHARS == 600
+    # The fight keeps its own pace. This is the half that was asked to grow.
+    assert narration.MIN_COMBAT_CHARS == 140
+    assert narration.MAX_COMBAT_CHARS == 600
+
+
+def test_the_floor_reaches_the_sampler_rather_than_the_prompt():
+    """A `minLength` in the schema is neither instruction nor demonstration — it is the
+    grammar, which is why it works where asking for length never has."""
+    schema = prompts.turn_schema(min_chars=narration.MIN_SCENE_CHARS)
+    assert schema["properties"]["narration"]["minLength"] == 600

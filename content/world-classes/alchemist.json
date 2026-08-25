@@ -1,125 +1,153 @@
 {
-  "id": "alchemist",
-  "name": "Alchemist",
-  "summary": "A Universal World Class any character may take regardless of their class. It levels through the bench — dissolving, reacting and sealing — unlocking the laboratory's verbs and higher tiers of material, from brimstone and saltpetre to dragon bile and philosophic mercury.",
-  "grantable_at_creation": true,
-
-  "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist — by doing the work. The two namespaces never meet in code.",
-
-  "_thresholds_note": "The Herbalist's curve, unchanged, because the two tracks pay mastery the same way (rules/worldclass.py MP_AWARDS is shared) and a chain here is worth what a chain there is worth. The dip at level 4 is the Herbalist's deliberate dip; see herbalist.json for the measured pacing that produced it — do not 'fix' it in one file and not the other.",
-  "thresholds": [25, 65, 50, 100],
-
-  "milestones": {
-    "5": "legendary-work"
+ "id": "alchemist",
+ "name": "Alchemist",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through the bench — dissolving, reacting and sealing — unlocking the laboratory's verbs and higher tiers of material, from brimstone and saltpetre to dragon bile and philosophic mercury.",
+ "grantable_at_creation": true,
+ "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist — by doing the work. The two namespaces never meet in code.",
+ "_thresholds_note": "The Herbalist's curve, unchanged, because the two tracks pay mastery the same way (rules/worldclass.py MP_AWARDS is shared) and a chain here is worth what a chain there is worth. The dip at level 4 is the Herbalist's deliberate dip; see herbalist.json for the measured pacing that produced it — do not 'fix' it in one file and not the other.",
+ "thresholds": [
+  25,
+  65,
+  50,
+  100
+ ],
+ "milestones": {
+  "5": "legendary-work"
+ },
+ "_deeds_note": "The same trap the Herbalist's deed walked into is avoided the same way: the deed is the MATERIAL, not the method. If the deed required catalyze — a Level 5 method — the gate could never open. Any successful craft at legendary tier is the great work, however it was reached, and catalyze is the mastery that follows it.",
+ "deeds": {
+  "legendary-work": {
+   "min_tier": "legendary",
+   "note": "Any successful craft at legendary tier, however it was reached."
+  }
+ },
+ "levels": [
+  {
+   "level": 1,
+   "tools": [
+    "travelling alchemy kit",
+    "iron crucible"
+   ],
+   "methods": [
+    "calcine",
+    "dissolve",
+    "seal"
+   ],
+   "max_tier": "common / mundane",
+   "note": "Roadside work: burning to ash, dissolving in a jar, corking the result."
   },
-
-  "_deeds_note": "The same trap the Herbalist's deed walked into is avoided the same way: the deed is the MATERIAL, not the method. If the deed required catalyze — a Level 5 method — the gate could never open. Any successful craft at legendary tier is the great work, however it was reached, and catalyze is the mastery that follows it.",
-  "deeds": {
-    "legendary-work": {
-      "min_tier": "legendary",
-      "note": "Any successful craft at legendary tier, however it was reached."
-    }
+  {
+   "level": 2,
+   "tools": [
+    "glass alembic",
+    "filter frames and papers"
+   ],
+   "methods": [
+    "filter",
+    "precipitate"
+   ],
+   "max_tier": "uncommon / volatile",
+   "note": "Real glassware: separating a mixture into what it was hiding."
   },
-
-  "levels": [
-    {
-      "level": 1,
-      "tools": ["travelling alchemy kit", "iron crucible"],
-      "methods": ["calcine", "dissolve", "seal"],
-      "max_tier": "common / mundane",
-      "note": "Roadside work: burning to ash, dissolving in a jar, corking the result."
-    },
-    {
-      "level": 2,
-      "tools": ["glass alembic", "filter frames and papers"],
-      "methods": ["filter", "precipitate"],
-      "max_tier": "uncommon / volatile",
-      "note": "Real glassware: separating a mixture into what it was hiding."
-    },
-    {
-      "level": 3,
-      "tools": ["alchemical laboratory"],
-      "methods": ["react", "stabilize"],
-      "max_tier": "rare / magical",
-      "note": "The dangerous heart of the craft: making substances fight, and living through it."
-    },
-    {
-      "level": 4,
-      "tools": ["athanor"],
-      "methods": ["sublime"],
-      "max_tier": "exotic / planar",
-      "note": "The slow furnace: vapour to crystal, matter refined past what a flame can do."
-    },
-    {
-      "level": 5,
-      "tools": ["philosopher's bench"],
-      "methods": ["catalyze"],
-      "max_tier": "legendary / mythic",
-      "note": "The great work: catalysts that transform without being consumed."
-    }
-  ],
-
-  "method_descriptions": {
-    "calcine": "Roasts a material in the crucible until only its essential salt remains. Strips water and rot; the ash keeps indefinitely.",
-    "dissolve": "Takes a material up into a solvent so it can be worked as a liquid. Most chains start here — the bench works solutions, not lumps.",
-    "seal": "Closes the work into its vessel: flask, bladder or clay pot. The finishing method — nothing follows a seal, and an unsealed preparation is bench-work, not an item you can carry and throw.",
-    "filter": "Passes a solution through frame and paper, holding back what does not belong. Removes impurities, penalties and secondary toxicities while keeping the beneficial traits.",
-    "precipitate": "Drives a dissolved substance back out of its solvent as a concentrated solid. The reverse of dissolve, and the way a solution becomes a powder worth keeping.",
-    "react": "Sets two prepared substances against each other and keeps what the violence produces. The heart of the craft: +25% to the primary effect, and every classic of the trade — fire that clings, acid that eats, smoke that blinds — is a reaction. A reaction needs a solvent as its medium.",
-    "stabilize": "Buffers a reaction so it spends itself in the product instead of in your face. Required before two volatile materials may share a vessel, and the only answer to a material that attacks its own flask.",
-    "sublime": "Vaporises a substance in the athanor and recovers it as crystal, leaving everything gross behind. +25% to the primary effect; the exotic tiers are worked almost entirely as sublimates.",
-    "catalyze": "Uses legendary material to drive a transformation it does not take part in. Permanent works, philosophic salts, and preparations at 150% of base strength."
+  {
+   "level": 3,
+   "tools": [
+    "alchemical laboratory"
+   ],
+   "methods": [
+    "react",
+    "stabilize"
+   ],
+   "max_tier": "rare / magical",
+   "note": "The dangerous heart of the craft: making substances fight, and living through it."
   },
-
-  "_method_help_note": "`method_descriptions` is the prose a rulebook prints; `method_help` is what the bench shows beside the button — what the method DOES in numbers, what it NEEDS in the vessel to be legal, and what a player reaches FOR it to accomplish. Kept as three fields rather than one paragraph because those are three different questions and a player mid-chain is only ever asking one of them.",
-  "method_help": {
-    "calcine": {
-      "does": "Burns a material down to its essential salt. No potency change; the calx keeps indefinitely and cannot spoil.",
-      "needs": "A material that survives fire — a solid. Nothing already in solution.",
-      "for": "Turning a perishable reagent into one that keeps, and the first step of any powder you mean to precipitate later."
-    },
-    "dissolve": {
-      "does": "Takes a material up into a solvent. No potency change; it is the step that makes everything after it possible.",
-      "needs": "A solvent on the bench — the bench works solutions, not lumps.",
-      "for": "Starting almost every chain. React, filter and precipitate all assume a solution is already there."
-    },
-    "seal": {
-      "does": "Closes the work into its vessel. No potency change. Finishing method: nothing may follow it, and sealing before reacting is refused outright.",
-      "needs": "Nothing beyond the work itself, though a vessel material is what makes the result throwable rather than merely carried.",
-      "for": "Turning bench-work into an item you can put in a pack. An unsealed preparation is not a thing you own."
-    },
-    "filter": {
-      "does": "Strips every poison and penalty out of the work — removed from the specs themselves, not merely hidden on the card. Refused when there is nothing harmful to remove.",
-      "needs": "Something harmful in the vessel, and a solution to pass through the frame.",
-      "for": "Antitoxin, antiplague, and any chain where a venom went in on purpose and must not come out."
-    },
-    "precipitate": {
-      "does": "Drives a dissolved substance back out as a solid. No potency change.",
-      "needs": "A solution — something must be dissolved before it can be driven out of solution.",
-      "for": "Powders and dusts: itching powder, flash powder, smelling salts. The way a liquid chain ends in something dry."
-    },
-    "react": {
-      "does": "×1.25 potency. The dangerous heart of the craft, and the step that adds the volatile surcharge: +3 DC for each volatile material past the first.",
-      "needs": "A solvent or a herbalism intermediate that pours, as the medium. Two volatile materials also need Stabilize in the same chain.",
-      "for": "Every classic the trade sells — alchemist's fire, acid flasks, thunderstones — and every potion that holds a spell."
-    },
-    "stabilize": {
-      "does": "No potency change and no shape of its own. It legalises what would otherwise be refused: two volatiles in one vessel, or any material that attacks its own flask.",
-      "needs": "Nothing. It is always legal to add, and adding it costs a stage (+2 DC) whether it was required or not.",
-      "for": "Surviving the reaction. Alkahest, phlogiston and starfall cores cannot be worked at all without it."
-    },
-    "sublime": {
-      "does": "×1.25 potency. Vapour to crystal in the athanor, leaving everything gross behind.",
-      "needs": "The athanor, which is furniture — this is bench work, not roadside work.",
-      "for": "The exotic tiers, which are worked almost entirely as sublimates, and for stacking a second ×1.25 on top of a reaction."
-    },
-    "catalyze": {
-      "does": "×1.50 potency, the largest multiplier in the craft.",
-      "needs": "The philosopher's bench, and legendary material to be worth the stage at all.",
-      "for": "The great work: permanent preparations and anything that must be stronger than the trade can otherwise make."
-    }
+  {
+   "level": 4,
+   "tools": [
+    "athanor"
+   ],
+   "methods": [
+    "sublime"
+   ],
+   "max_tier": "exotic / planar",
+   "note": "The slow furnace: vapour to crystal, matter refined past what a flame can do."
   },
-
-  "_portable_note": "The laboratory and athanor are furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split herbalist.json declares for its still and workbench.",
-  "fixed_tools": ["alchemical laboratory", "athanor", "philosopher's bench"]
+  {
+   "level": 5,
+   "tools": [
+    "philosopher's bench"
+   ],
+   "methods": [
+    "catalyze"
+   ],
+   "max_tier": "legendary / mythic",
+   "note": "The great work: catalysts that transform without being consumed."
+  }
+ ],
+ "method_descriptions": {
+  "calcine": "Roasts a material in the crucible until only its essential salt remains. Strips water and rot; the ash keeps indefinitely.",
+  "dissolve": "Takes a material up into a solvent so it can be worked as a liquid. Most chains start here — the bench works solutions, not lumps.",
+  "seal": "Closes the work into its vessel: flask, bladder or clay pot. The finishing method — nothing follows a seal, and an unsealed preparation is bench-work, not an item you can carry and throw.",
+  "filter": "Passes a solution through frame and paper, holding back what does not belong. Removes impurities, penalties and secondary toxicities while keeping the beneficial traits.",
+  "precipitate": "Drives a dissolved substance back out of its solvent as a concentrated solid. The reverse of dissolve, and the way a solution becomes a powder worth keeping.",
+  "react": "Sets two prepared substances against each other and keeps what the violence produces. The heart of the craft: +25% to the primary effect, and every classic of the trade — fire that clings, acid that eats, smoke that blinds — is a reaction. A reaction needs a solvent as its medium.",
+  "stabilize": "Buffers a reaction so it spends itself in the product instead of in your face. Required before two volatile materials may share a vessel, and the only answer to a material that attacks its own flask.",
+  "sublime": "Vaporises a substance in the athanor and recovers it as crystal, leaving everything gross behind. +25% to the primary effect; the exotic tiers are worked almost entirely as sublimates.",
+  "catalyze": "Uses legendary material to drive a transformation it does not take part in. Permanent works, philosophic salts, and preparations at 150% of base strength."
+ },
+ "_method_help_note": "`method_descriptions` is the prose a rulebook prints; `method_help` is what the bench shows beside the button — what the method DOES in numbers, what it NEEDS in the vessel to be legal, and what a player reaches FOR it to accomplish. Kept as three fields rather than one paragraph because those are three different questions and a player mid-chain is only ever asking one of them.",
+ "method_help": {
+  "calcine": {
+   "does": "Burns a material down to its essential salt. No potency change; the calx keeps indefinitely and cannot spoil.",
+   "needs": "A material that survives fire — a solid. Nothing already in solution.",
+   "for": "Turning a perishable reagent into one that keeps, and the first step of any powder you mean to precipitate later."
+  },
+  "dissolve": {
+   "does": "Takes a material up into a solvent. No potency change; it is the step that makes everything after it possible.",
+   "needs": "A solvent on the bench — the bench works solutions, not lumps.",
+   "for": "Starting almost every chain. React, filter and precipitate all assume a solution is already there."
+  },
+  "seal": {
+   "does": "Closes the work into its vessel. No potency change. Finishing method: nothing may follow it, and sealing before reacting is refused outright.",
+   "needs": "Nothing beyond the work itself, though a vessel material is what makes the result throwable rather than merely carried.",
+   "for": "Turning bench-work into an item you can put in a pack. An unsealed preparation is not a thing you own."
+  },
+  "filter": {
+   "does": "Strips every poison and penalty out of the work — removed from the specs themselves, not merely hidden on the card. Refused when there is nothing harmful to remove.",
+   "needs": "Something harmful in the vessel, and a solution to pass through the frame.",
+   "for": "Antitoxin, antiplague, and any chain where a venom went in on purpose and must not come out."
+  },
+  "precipitate": {
+   "does": "Drives a dissolved substance back out as a solid. No potency change.",
+   "needs": "A solution — something must be dissolved before it can be driven out of solution.",
+   "for": "Powders and dusts: itching powder, flash powder, smelling salts. The way a liquid chain ends in something dry."
+  },
+  "react": {
+   "does": "×1.25 potency. The dangerous heart of the craft, and the step that adds the volatile surcharge: +3 DC for each volatile material past the first.",
+   "needs": "A solvent or a herbalism intermediate that pours, as the medium. Two volatile materials also need Stabilize in the same chain.",
+   "for": "Every classic the trade sells — alchemist's fire, acid flasks, thunderstones — and every potion that holds a spell."
+  },
+  "stabilize": {
+   "does": "No potency change and no shape of its own. It legalises what would otherwise be refused: two volatiles in one vessel, or any material that attacks its own flask.",
+   "needs": "Nothing. It is always legal to add, and adding it costs a stage (+2 DC) whether it was required or not.",
+   "for": "Surviving the reaction. Alkahest, phlogiston and starfall cores cannot be worked at all without it."
+  },
+  "sublime": {
+   "does": "×1.25 potency. Vapour to crystal in the athanor, leaving everything gross behind.",
+   "needs": "The athanor, which is furniture — this is bench work, not roadside work.",
+   "for": "The exotic tiers, which are worked almost entirely as sublimates, and for stacking a second ×1.25 on top of a reaction."
+  },
+  "catalyze": {
+   "does": "×1.50 potency, the largest multiplier in the craft.",
+   "needs": "The philosopher's bench, and legendary material to be worth the stage at all.",
+   "for": "The great work: permanent preparations and anything that must be stronger than the trade can otherwise make."
+  }
+ },
+ "_portable_note": "The laboratory and athanor are furniture. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — the same split herbalist.json declares for its still and workbench.",
+ "fixed_tools": [
+  "alchemical laboratory",
+  "athanor",
+  "philosopher's bench"
+ ],
+ "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
 }

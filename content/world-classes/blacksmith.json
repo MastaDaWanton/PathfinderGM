@@ -1,135 +1,169 @@
 {
-  "id": "blacksmith",
-  "name": "Blacksmith",
-  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — smelting, forging and finishing — unlocking forge stations, methods and higher tiers of metal, from bog iron to the skymetals and the legendary orange-gold horacalcum.",
-  "grantable_at_creation": true,
-
-  "_thresholds_note": "Copied from Herbalist deliberately, dip and all: the two tracks are meant to pace the same, a level-1 forge chain is worth about the same MP as a level-1 herb chain (3 first-time + 2 for a second stage), and a second curve would mean two clocks to balance instead of one. The dip at level 4 is the Herbalist author's and is deliberate — do not 'fix' it here either.",
-  "thresholds": [25, 65, 50, 100],
-
-  "milestones": {
-    "5": "legendary-metal"
+ "id": "blacksmith",
+ "name": "Blacksmith",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — smelting, forging and finishing — unlocking forge stations, methods and higher tiers of metal, from bog iron to the skymetals and the legendary orange-gold horacalcum.",
+ "grantable_at_creation": true,
+ "_thresholds_note": "Copied from Herbalist deliberately, dip and all: the two tracks are meant to pace the same, a level-1 forge chain is worth about the same MP as a level-1 herb chain (3 first-time + 2 for a second stage), and a second curve would mean two clocks to balance instead of one. The dip at level 4 is the Herbalist author's and is deliberate — do not 'fix' it here either.",
+ "thresholds": [
+  25,
+  65,
+  50,
+  100
+ ],
+ "milestones": {
+  "5": "legendary-metal"
+ },
+ "_deeds_note": "Mirrors the Herbalist's legendary-catalyst lesson: the deed is the material, not the method, because polish is a level-5 method and gating level 5 on a level-5 method is a gate that never opens. A Blacksmith 4 reaches legendary metal the one way the rules allow below level 5: the novel-alloy rule, where alloying two different metals of the same tier yields a metal one band rarer — two exotic skymetals in one crucible is a legendary melt. rules/blacksmith.py implements that step.",
+ "deeds": {
+  "legendary-metal": {
+   "min_tier": "legendary",
+   "note": "Any successful forging at legendary tier, however the metal was reached."
+  }
+ },
+ "levels": [
+  {
+   "level": 1,
+   "tools": [
+    "field forge",
+    "hammer and tongs"
+   ],
+   "methods": [
+    "smelt",
+    "forge",
+    "quench"
+   ],
+   "max_tier": "common / mundane",
+   "note": "Bar iron, horseshoes, plain blades and simple repairs."
   },
-
-  "_deeds_note": "Mirrors the Herbalist's legendary-catalyst lesson: the deed is the material, not the method, because polish is a level-5 method and gating level 5 on a level-5 method is a gate that never opens. A Blacksmith 4 reaches legendary metal the one way the rules allow below level 5: the novel-alloy rule, where alloying two different metals of the same tier yields a metal one band rarer — two exotic skymetals in one crucible is a legendary melt. rules/blacksmith.py implements that step.",
-  "deeds": {
-    "legendary-metal": {
-      "min_tier": "legendary",
-      "note": "Any successful forging at legendary tier, however the metal was reached."
-    }
+  {
+   "level": 2,
+   "tools": [
+    "bellows and anvil",
+    "riveting set"
+   ],
+   "methods": [
+    "flux",
+    "rivet"
+   ],
+   "max_tier": "uncommon / volatile",
+   "note": "Clean melts, fitted hafts and grips, silver and cold iron work."
   },
-
-  "levels": [
-    {
-      "level": 1,
-      "tools": ["field forge", "hammer and tongs"],
-      "methods": ["smelt", "forge", "quench"],
-      "max_tier": "common / mundane",
-      "note": "Bar iron, horseshoes, plain blades and simple repairs."
-    },
-    {
-      "level": 2,
-      "tools": ["bellows and anvil", "riveting set"],
-      "methods": ["flux", "rivet"],
-      "max_tier": "uncommon / volatile",
-      "note": "Clean melts, fitted hafts and grips, silver and cold iron work."
-    },
-    {
-      "level": 3,
-      "tools": ["smelting furnace", "crucible", "grindstone and whetstone"],
-      "methods": ["alloy", "temper", "hone"],
-      "max_tier": "rare / magical",
-      "note": "True steel-making: crucible alloys, the heat-treatment that holds an edge, and the first masterwork pieces. This is the professional smith, and masterwork is professional work."
-    },
-    {
-      "level": 4,
-      "tools": ["masterwork forge", "drawplate and swage"],
-      "methods": ["draw", "fold"],
-      "max_tier": "exotic / planar",
-      "note": "Pattern-welding and wire-drawing: named steels, mail, and the skymetals."
-    },
-    {
-      "level": 5,
-      "tools": ["starmetal forge"],
-      "methods": ["polish"],
-      "max_tier": "legendary / mythic",
-      "note": "Mirror finishes, legendary metal, and work that outlives its maker."
-    }
-  ],
-
-  "method_descriptions": {
-    "smelt": "Reduces ore to workable metal in the fire. Needs fuel in the charge, and metal above rare tier needs a fuel of rare tier or better — adamantine does not melt over charcoal.",
-    "forge": "Heats and hammers metal to shape on the anvil. The heart of every chain, and the step everything after the fire depends on. Needs fuel.",
-    "quench": "Plunges forged work into a bath to fix its hardness. What the bath is made of soaks into the steel — brine bites harder than water, and stranger liquids leave stranger marks.",
-    "flux": "Adds a cleansing agent to the melt that carries off slag and impurity. Strips the drawbacks of dirty ore the way Purify strips a poison — but it cleans the metal, not the smith: hazardous metal is hazardous still.",
-    "rivet": "Cold-joins fittings to finished metal: hafts, grips, guards and bindings. The way everything that is not the blade gets onto the blade.",
-    "alloy": "Melts two or more metals into one. Alloying two different metals of the same tier yields a metal one band rarer — a novel alloy is a discovery. Some metals refuse it: what makes cold iron cold iron does not survive the mixing.",
-    "temper": "Reheats quenched steel to a chosen colour and lets it down slowly, trading brittleness for spring. The step that separates a tool from a bar of hard iron, and the first requirement of fine and masterwork quality.",
-    "draw": "Pulls metal through a plate into wire and thin section — mail rings, springs, filigree. With fold, the shaping half of masterwork quality.",
-    "fold": "Doubles and welds the billet over itself, evening the carbon and layering the steel. The watered pattern on a fine blade is this method made visible.",
-    "hone": "Grinds and whets the working edge to its final geometry. With temper, what raises a piece from plain to fine.",
-    "polish": "Brings the surface to a mirror over days of ever-finer abrasive. The last touch on masterwork and the method of legendary metal."
+  {
+   "level": 3,
+   "tools": [
+    "smelting furnace",
+    "crucible",
+    "grindstone and whetstone"
+   ],
+   "methods": [
+    "alloy",
+    "temper",
+    "hone"
+   ],
+   "max_tier": "rare / magical",
+   "note": "True steel-making: crucible alloys, the heat-treatment that holds an edge, and the first masterwork pieces. This is the professional smith, and masterwork is professional work."
   },
-
-  "_method_help_note": "The structured half of a method's tooltip: `does` is the mechanical effect in numbers, `needs` is what must be in the charge for it to be legal, `for` is what a player reaches for it to accomplish. `method_descriptions` above stays as the prose half. Every method in the level table has an entry — a test asserts the two sets match, because a method with no tooltip is a button whose effect the player can only learn by spending materials on it.",
-  "method_help": {
-    "smelt": {
-      "does": "Turns ore into metal. No DC change of its own; the melt's rarity is the rarest thing in it. Exotic or legendary metal needs a fuel of rare tier or better.",
-      "needs": "Ore, metal or alloy in the charge, and a fuel. Charcoal will not melt a skymetal — dragonfire coal or better.",
-      "for": "Getting workable metal out of what you dug up, and the first step of any alloy."
-    },
-    "forge": {
-      "does": "Shapes the metal into the named base item. +2 DC as a stage, like every step. Everything after the fire depends on it having happened.",
-      "needs": "A fuel in the charge and a base item named — a weapon from the weapons list or an armour by name.",
-      "for": "Making the thing. No chain produces an object without it."
-    },
-    "quench": {
-      "does": "Fixes hardness. +2 DC as a stage, and the bath's own effects join the piece — brine, blessed water and wyvern blood each leave their own mark.",
-      "needs": "Forge earlier in the same chain. You cannot quench what was never forged.",
-      "for": "Hardening the work, and the cheapest way to put an exotic property into an ordinary blade."
-    },
-    "flux": {
-      "does": "Strips the harmful effects carried by ore in the charge — bog iron's slag-brittle -1 damage comes off, and the removal is named on the result. It does not touch metal-borne harm.",
-      "needs": "A flux in the charge and dirty ore to clean. Fluxing a clean melt removes nothing.",
-      "for": "Smelting cheap or filthy ore without the finished piece carrying the penalty."
-    },
-    "rivet": {
-      "does": "Cold-joins fittings to the piece, adding each fitting's effects — a wire-wrapped grip's +2 CMD against disarm, a darkwood haft's halved weight.",
-      "needs": "A base item named. Fittings in the charge to attach; it burns no fuel.",
-      "for": "Everything that is not the blade: hafts, grips, guards and bindings."
-    },
-    "alloy": {
-      "does": "Melts two or more metals into one. Two DIFFERENT metals of the same tier come out one band rarer — the novel-alloy rule, and the level-4 route to legendary metal.",
-      "needs": "Smelt earlier in the same chain and at least two metals. Cold iron, mithral, adamantine, noqual, inubrix and horacalcum refuse the crucible entirely.",
-      "for": "Making steel and bronze, and for reaching a tier of metal above anything you own."
-    },
-    "temper": {
-      "does": "Trades brittleness for spring. No effect of its own, and it is half of the quality ladder: with a finishing method it makes masterwork, alone it makes fine.",
-      "needs": "Quench earlier in the same chain. Tempering is letting quenched steel back down, so there must be quenched steel.",
-      "for": "Quality. Nothing above plain is reachable without it."
-    },
-    "draw": {
-      "does": "Pulls stock through the plate into wire and thin section. +2 DC as a stage; it does not change quality on its own.",
-      "needs": "Forge earlier in the same chain.",
-      "for": "Mail rings, springs and filigree — the shaping half of pattern and mail work."
-    },
-    "fold": {
-      "does": "Doubles and welds the billet over itself, evening the steel. +2 DC as a stage; it does not change quality on its own.",
-      "needs": "Forge earlier in the same chain.",
-      "for": "Pattern-welded blades — the watered steel a named smith signs."
-    },
-    "hone": {
-      "does": "Grinds the working edge to its final geometry. The finishing half of the quality ladder: with temper it makes masterwork, which sets the DC floor to 20 and gives a weapon +1 enhancement on attack rolls (armour: check penalty lessened by 1).",
-      "needs": "Forge earlier in the same chain.",
-      "for": "Masterwork. This is the method the enchanter's vessel requirement is waiting on."
-    },
-    "polish": {
-      "does": "Brings the surface to a mirror. Counts as a finishing method, so it can stand in for hone in the quality ladder. Nothing may follow it in the chain.",
-      "needs": "Hone earlier in the same chain — polish is the last grade of an honed surface.",
-      "for": "The final grade on legendary metal, and the last thing a master does to a piece."
-    }
+  {
+   "level": 4,
+   "tools": [
+    "masterwork forge",
+    "drawplate and swage"
+   ],
+   "methods": [
+    "draw",
+    "fold"
+   ],
+   "max_tier": "exotic / planar",
+   "note": "Pattern-welding and wire-drawing: named steels, mail, and the skymetals."
   },
-
-  "_portable_note": "The furnace and the masterwork forge are architecture, not baggage. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — same call as the Herbalist's still and workbench.",
-  "fixed_tools": ["smelting furnace", "masterwork forge", "starmetal forge"]
+  {
+   "level": 5,
+   "tools": [
+    "starmetal forge"
+   ],
+   "methods": [
+    "polish"
+   ],
+   "max_tier": "legendary / mythic",
+   "note": "Mirror finishes, legendary metal, and work that outlives its maker."
+  }
+ ],
+ "method_descriptions": {
+  "smelt": "Reduces ore to workable metal in the fire. Needs fuel in the charge, and metal above rare tier needs a fuel of rare tier or better — adamantine does not melt over charcoal.",
+  "forge": "Heats and hammers metal to shape on the anvil. The heart of every chain, and the step everything after the fire depends on. Needs fuel.",
+  "quench": "Plunges forged work into a bath to fix its hardness. What the bath is made of soaks into the steel — brine bites harder than water, and stranger liquids leave stranger marks.",
+  "flux": "Adds a cleansing agent to the melt that carries off slag and impurity. Strips the drawbacks of dirty ore the way Purify strips a poison — but it cleans the metal, not the smith: hazardous metal is hazardous still.",
+  "rivet": "Cold-joins fittings to finished metal: hafts, grips, guards and bindings. The way everything that is not the blade gets onto the blade.",
+  "alloy": "Melts two or more metals into one. Alloying two different metals of the same tier yields a metal one band rarer — a novel alloy is a discovery. Some metals refuse it: what makes cold iron cold iron does not survive the mixing.",
+  "temper": "Reheats quenched steel to a chosen colour and lets it down slowly, trading brittleness for spring. The step that separates a tool from a bar of hard iron, and the first requirement of fine and masterwork quality.",
+  "draw": "Pulls metal through a plate into wire and thin section — mail rings, springs, filigree. With fold, the shaping half of masterwork quality.",
+  "fold": "Doubles and welds the billet over itself, evening the carbon and layering the steel. The watered pattern on a fine blade is this method made visible.",
+  "hone": "Grinds and whets the working edge to its final geometry. With temper, what raises a piece from plain to fine.",
+  "polish": "Brings the surface to a mirror over days of ever-finer abrasive. The last touch on masterwork and the method of legendary metal."
+ },
+ "_method_help_note": "The structured half of a method's tooltip: `does` is the mechanical effect in numbers, `needs` is what must be in the charge for it to be legal, `for` is what a player reaches for it to accomplish. `method_descriptions` above stays as the prose half. Every method in the level table has an entry — a test asserts the two sets match, because a method with no tooltip is a button whose effect the player can only learn by spending materials on it.",
+ "method_help": {
+  "smelt": {
+   "does": "Turns ore into metal. No DC change of its own; the melt's rarity is the rarest thing in it. Exotic or legendary metal needs a fuel of rare tier or better.",
+   "needs": "Ore, metal or alloy in the charge, and a fuel. Charcoal will not melt a skymetal — dragonfire coal or better.",
+   "for": "Getting workable metal out of what you dug up, and the first step of any alloy."
+  },
+  "forge": {
+   "does": "Shapes the metal into the named base item. +2 DC as a stage, like every step. Everything after the fire depends on it having happened.",
+   "needs": "A fuel in the charge and a base item named — a weapon from the weapons list or an armour by name.",
+   "for": "Making the thing. No chain produces an object without it."
+  },
+  "quench": {
+   "does": "Fixes hardness. +2 DC as a stage, and the bath's own effects join the piece — brine, blessed water and wyvern blood each leave their own mark.",
+   "needs": "Forge earlier in the same chain. You cannot quench what was never forged.",
+   "for": "Hardening the work, and the cheapest way to put an exotic property into an ordinary blade."
+  },
+  "flux": {
+   "does": "Strips the harmful effects carried by ore in the charge — bog iron's slag-brittle -1 damage comes off, and the removal is named on the result. It does not touch metal-borne harm.",
+   "needs": "A flux in the charge and dirty ore to clean. Fluxing a clean melt removes nothing.",
+   "for": "Smelting cheap or filthy ore without the finished piece carrying the penalty."
+  },
+  "rivet": {
+   "does": "Cold-joins fittings to the piece, adding each fitting's effects — a wire-wrapped grip's +2 CMD against disarm, a darkwood haft's halved weight.",
+   "needs": "A base item named. Fittings in the charge to attach; it burns no fuel.",
+   "for": "Everything that is not the blade: hafts, grips, guards and bindings."
+  },
+  "alloy": {
+   "does": "Melts two or more metals into one. Two DIFFERENT metals of the same tier come out one band rarer — the novel-alloy rule, and the level-4 route to legendary metal.",
+   "needs": "Smelt earlier in the same chain and at least two metals. Cold iron, mithral, adamantine, noqual, inubrix and horacalcum refuse the crucible entirely.",
+   "for": "Making steel and bronze, and for reaching a tier of metal above anything you own."
+  },
+  "temper": {
+   "does": "Trades brittleness for spring. No effect of its own, and it is half of the quality ladder: with a finishing method it makes masterwork, alone it makes fine.",
+   "needs": "Quench earlier in the same chain. Tempering is letting quenched steel back down, so there must be quenched steel.",
+   "for": "Quality. Nothing above plain is reachable without it."
+  },
+  "draw": {
+   "does": "Pulls stock through the plate into wire and thin section. +2 DC as a stage; it does not change quality on its own.",
+   "needs": "Forge earlier in the same chain.",
+   "for": "Mail rings, springs and filigree — the shaping half of pattern and mail work."
+  },
+  "fold": {
+   "does": "Doubles and welds the billet over itself, evening the steel. +2 DC as a stage; it does not change quality on its own.",
+   "needs": "Forge earlier in the same chain.",
+   "for": "Pattern-welded blades — the watered steel a named smith signs."
+  },
+  "hone": {
+   "does": "Grinds the working edge to its final geometry. The finishing half of the quality ladder: with temper it makes masterwork, which sets the DC floor to 20 and gives a weapon +1 enhancement on attack rolls (armour: check penalty lessened by 1).",
+   "needs": "Forge earlier in the same chain.",
+   "for": "Masterwork. This is the method the enchanter's vessel requirement is waiting on."
+  },
+  "polish": {
+   "does": "Brings the surface to a mirror. Counts as a finishing method, so it can stand in for hone in the quality ladder. Nothing may follow it in the chain.",
+   "needs": "Hone earlier in the same chain — polish is the last grade of an honed surface.",
+   "for": "The final grade on legendary metal, and the last thing a master does to a piece."
+  }
+ },
+ "_portable_note": "The furnace and the masterwork forge are architecture, not baggage. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — same call as the Herbalist's still and workbench.",
+ "fixed_tools": [
+  "smelting furnace",
+  "masterwork forge",
+  "starmetal forge"
+ ],
+ "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
 }

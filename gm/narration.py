@@ -21,6 +21,8 @@ except the person slips, where the substitution is unambiguous.
 from __future__ import annotations
 
 import re
+import statistics
+from collections import Counter
 from dataclasses import dataclass, field
 
 # Six words is long enough that sharing one is copying rather than coincidence, and short
@@ -108,15 +110,21 @@ def unquoted(text: str) -> str:
 
 # A turn shorter than this is not a scene. Measured: with the old prompt the model
 # returned a mean of 81 characters — "The air inside is stale, thick with the smell of
-# parchment and ink." — because the examples it was shown averaged 102. The floor is set
-# well under the length the examples now demonstrate (~600) so that a genuinely brief beat
-# is allowed and only a one-liner is caught.
+# parchment and ink." — because the examples it was shown averaged 102.
 #
-# Length is used here and nowhere else, deliberately. It is the one thing about prose that
-# can be measured without lying about it: counting sensory words or scoring "vividness"
-# with a regex is exactly the kind of metric CLAUDE.md records as having given confident,
-# wrong answers about quality.
-MIN_SCENE_CHARS = 320
+# Raised from 320 on the table's instruction: "dialogue and general world descriptions can
+# increase in length". 320 was set as a floor well *under* what the examples demonstrate,
+# so that a genuinely brief beat survived — and it turned out to be doing nothing, because
+# a 20-turn town run measured a mean of 839 characters and a minimum of 559. Every turn
+# already cleared the old floor by a wide margin. 600 is what the examples actually
+# demonstrate, which makes it a floor that can bite.
+#
+# Enforced at the sampler through `turn_schema`, not asked for in words — which is why it
+# works. CLAUDE.md's rule is that instruction volume loses to demonstration volume; a
+# `minLength` is neither, it is the grammar.
+#
+# The fight keeps its own numbers below. This is the half the table asked to grow.
+MIN_SCENE_CHARS = 600
 
 # In a fight the pace of the prose is the pace of the fight. Three or four sentences is
 # the right answer and 900 characters of weather is not, so the floor drops and there is a
@@ -768,6 +776,88 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             if low not in found:
                 found.append(tok)
     return found
+
+
+# --- texture: what can be measured about prose without lying about it ---------------------
+#
+# The instruction was to score whether the prose is any *good*. The honest answer is that
+# most of what "good" means cannot be measured here, and CLAUDE.md says why: counting
+# sensory words or scoring vividness with a regex is named there as the kind of metric that
+# has given confident, wrong answers about quality.
+#
+# So this measures symptoms of *formula*, which is a different thing and is real. The
+# precedent is "ten of ten paragraphs ended the same way" — countable, undeniable, and
+# fixed once seen. Everything here is a number a person can check by reading the prose.
+#
+# Measured on 20 real town turns, llama3.1:8b, 2026-08-25, the first run in which the
+# harness actually read the prose at all:
+#
+#     length          mean 839 chars, median 760, range 559-1165
+#     sentences       170, mean 17.0 words, stdev 8.7
+#     openings        varied — the most repeated turn-opener appeared twice in nineteen
+#     second person   31 of 170 sentences begin "you" (18%)
+#     dialogue        9 of 19 turns contain speech, and 7 of 7 spoken questions were
+#                     answered in somebody's own words
+#
+# That corpus shows no formula defect these measures can see, which is the finding rather
+# than a failure of the measures. They are reported by `tools/narrator_audit.py` so drift
+# has a baseline to drift *from* — a number nobody is watching is not a measurement.
+_OPENER_WORDS = 2
+
+# How much opener reuse is too much. The measured rate is 2 repeats in 19 turns; a run
+# where more than a third of turns open the same way is formulaic in the sense that has
+# been fixed here before, and is nowhere near what a healthy run does.
+FORMULA_SHARE = 0.34
+
+
+def _sentences(text: str) -> list[str]:
+    return [s.strip() for s in _SENTENCE.findall(text or "") if s.strip()]
+
+
+def opening_of(sentence: str, words: int = _OPENER_WORDS) -> str:
+    """The first couple of words, lowercased — the handle a formula is held by."""
+    found = re.findall(r"[A-Za-z']+", sentence or "")
+    return " ".join(w.lower() for w in found[:words])
+
+
+def texture(text: str, earlier: list[str] | None = None) -> dict:
+    """Countable facts about one turn's prose.
+
+    No verdict attached. A caller that wants one applies its own threshold — `review`
+    uses exactly one of these, and only at a share no healthy run approaches.
+    """
+    sentences = _sentences(text)
+    lengths = [len(re.findall(r"[A-Za-z']+", s)) for s in sentences]
+    openers = [opening_of(s) for s in sentences]
+    before = [opening_of(s) for e in (earlier or []) for s in _sentences(e)]
+    return {
+        "chars": len(text or ""),
+        "sentences": len(sentences),
+        "words_mean": round(sum(lengths) / len(lengths), 1) if lengths else 0.0,
+        # Spread, not average. A page of fourteen-word sentences and a page that runs
+        # from four words to forty read nothing alike and average the same.
+        "words_spread": (round(statistics.pstdev(lengths), 1)
+                         if len(lengths) > 1 else 0.0),
+        "opens": openers[0] if openers else "",
+        # Openings this turn shares with the turns just before it. The soft form of
+        # `repeats-an-earlier-beat`, which only catches a whole sentence repeated exactly.
+        "echoed_openings": sum(1 for o in openers if o and o in before),
+        "second_person": sum(1 for o in openers if o.split()[:1] == ["you"]),
+        "has_speech": bool(re.search(r'["“][^"”]{4,}["”]|\'[^\']{8,}\'', text or "")),
+    }
+
+
+def formulaic(turns: list[str]) -> tuple[float, str]:
+    """How much of a run opens the same way, and the opener that does it.
+
+    For the harness rather than for a turn: formula is a property of a session, and a
+    single turn opening "You step" says nothing at all.
+    """
+    firsts = [opening_of(_sentences(t)[0]) for t in turns if _sentences(t)]
+    if not firsts:
+        return 0.0, ""
+    counted = Counter(firsts).most_common(1)[0]
+    return counted[1] / len(firsts), counted[0]
 
 
 # --- the consequence call ------------------------------------------------------------------

@@ -30,6 +30,7 @@ import argparse
 import collections
 import json
 import os
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -74,6 +75,78 @@ SCRIPTS = {
         "I walk out before anyone else decides to try me.",
         "I find somewhere quiet and sit down.",
     ],
+    # --- the long horizon ---------------------------------------------------------------
+    #
+    # Both scripts above are ten lines and loop, which measures a narrator's first ten
+    # turns over and over. It cannot show drift, and drift is the failure a long session
+    # actually has: the prose narrowing, the same opening returning, a name invented in
+    # turn 12 becoming settled fact by turn 40.
+    #
+    # Sixty distinct lines, no repeats, and deliberately wandering — town, road, wild,
+    # ruin, back to town — because a session that stays in one square is the looping
+    # problem with extra steps. Run it with `--turns 60` and read the per-third report.
+    "long": [
+        "I look around and take stock of the street.",
+        "I ask the nearest stallholder what work there is.",
+        "I ask what they are selling today.",
+        "I count what coin I have.",
+        "I ask who I should speak to about work outside the walls.",
+        "I walk down towards the water.",
+        "I watch the boats for a while.",
+        "I ask a boatman where the river goes.",
+        "I ask him what he carries downstream.",
+        "I buy something to eat from a stall.",
+        "I eat it while I walk.",
+        "I head for the smith to see what he has on the rack.",
+        "I ask the smith about the ore he uses.",
+        "I ask him what he would charge to mend a blade.",
+        "I look at what else is on the rack.",
+        "I leave the shop and walk out towards the gate.",
+        "I ask the gate guard what lies north.",
+        "I ask him whether the road is safe.",
+        "I ask when the gate closes.",
+        "I walk out into the grassland beyond the wall.",
+        "I look for tracks in the grass.",
+        "I follow the tracks a while.",
+        "I stop and listen.",
+        "I climb the nearest rise to see further.",
+        "I look back the way I came.",
+        "I keep walking north until the light starts to go.",
+        "I make camp and sleep until dawn.",
+        "I check my things before I set off.",
+        "I look for water.",
+        "I drink and fill what I can carry.",
+        "I forage for anything worth taking.",
+        "I look at what I have gathered.",
+        "I walk on towards the treeline.",
+        "I step in under the trees.",
+        "I listen for anything moving.",
+        "I look for a way through.",
+        "I follow the ground where it falls away.",
+        "I come out the other side and look around.",
+        "I find the ruin the guard mentioned.",
+        "I walk the outside of it first.",
+        "I look for a way in.",
+        "I step inside.",
+        "I let my eyes adjust.",
+        "I look at the walls.",
+        "I search the floor.",
+        "I take whatever is worth carrying.",
+        "I go back out into the light.",
+        "I sit down and rest a while.",
+        "I look at how far the sun has moved.",
+        "I start back the way I came.",
+        "I walk until I can see the walls again.",
+        "I come in through the gate.",
+        "I tell the guard what I found.",
+        "I ask him who would want to hear about it.",
+        "I go and find that person.",
+        "I tell them what is out there.",
+        "I ask what it is worth to them.",
+        "I take what they offer.",
+        "I go and find somewhere to sleep.",
+        "I lie down and let the day go.",
+    ],
 }
 
 
@@ -107,6 +180,9 @@ def audit(turns: int, script: str, world: str, character: str,
             said = lines[n % len(lines)]
             before = cm.current()
             fighting = before.scene.in_encounter
+            # Where the transcript stood before this turn, so what the turn actually
+            # wrote can be recovered afterwards.
+            was = len(before.transcript)
             started = time.monotonic()
             # Answer anything the engine is waiting on first. A fight suspends for the
             # player's d20, and `/api/say` correctly refuses while a roll is pending —
@@ -131,7 +207,17 @@ def audit(turns: int, script: str, world: str, character: str,
 
             c = cm.current()
             body = r.json()
-            text = str(body.get("narration") or "")
+            # Off the transcript, not off the response. `/api/say` returns `_state(c)`,
+            # which has never had a `narration` key — so this read "" on every turn of
+            # every run this harness has ever done, and `narration.review` was scoring an
+            # empty string. The 196/200 baseline's proudest line, "no invented names, no
+            # third-person slips, no echoed examples", was measuring nothing at all.
+            #
+            # Both beats this turn: the setup narration and the consequence. The player
+            # reads both, so both are reviewed.
+            said_this_turn = [b["text"] for b in c.transcript[was:]
+                              if b.get("who") == "gm" and b.get("text")]
+            text = " ".join(said_this_turn)
             faults: list[str] = []
 
             # What the app's own reviewer would say, run against the same world names the
@@ -162,14 +248,78 @@ def audit(turns: int, script: str, world: str, character: str,
                 tally[f] += 1
             rows.append({"n": n, "said": said, "faults": faults,
                          "seconds": round(seconds, 1),
-                         "narration": text[:120]})
+                         # Whole, not truncated to 120 — the length of the prose is the
+                         # thing being asked about now, and a clipped sample cannot
+                         # answer it.
+                         "narration": text})
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
         cm._LIVE.clear()
     modelcfg.for_role = real_for_role
 
     clean = sum(1 for r in rows if not r["faults"])
-    return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows}
+    return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows,
+            "texture": _texture_report(rows), "drift": _drift_report(rows)}
+
+
+def _texture_report(rows: list[dict]) -> dict:
+    """What the prose was like, over the whole run.
+
+    Reported rather than judged. See `gm.narration.texture` on why most of what "good"
+    means is not measurable here and why these particular numbers are.
+    """
+    said = [r["narration"] for r in rows if r.get("narration")]
+    if not said:
+        return {}
+    lengths = sorted(len(t) for t in said)
+    per_turn = [narration_mod.texture(t) for t in said]
+    share, opener = narration_mod.formulaic(said)
+    spoke = sum(1 for t in per_turn if t["has_speech"])
+    return {
+        "turns_with_prose": len(said),
+        "chars_mean": round(statistics.mean(lengths)),
+        "chars_median": lengths[len(lengths) // 2],
+        "chars_min": lengths[0], "chars_max": lengths[-1],
+        "sentences_mean": round(statistics.mean(t["sentences"] for t in per_turn), 1),
+        "words_per_sentence": round(statistics.mean(t["words_mean"] for t in per_turn), 1),
+        "words_spread": round(statistics.mean(t["words_spread"] for t in per_turn), 1),
+        "turns_with_speech": spoke,
+        # The one number with a threshold on it, and it is generous — see FORMULA_SHARE.
+        "same_opening_share": round(share, 2),
+        "same_opening": opener,
+        "formulaic": share > narration_mod.FORMULA_SHARE,
+    }
+
+
+def _drift_report(rows: list[dict], parts: int = 3) -> list[dict]:
+    """The same numbers, by third of the run.
+
+    The whole reason the `long` script exists. A ten-line looping script measures a
+    narrator's first ten turns repeatedly and cannot show the thing a long session
+    actually does — narrow. Comparing the first third against the last is the cheapest
+    honest way to see it: if the prose is shortening, the openings converging or the
+    faults piling up, the columns say so.
+    """
+    said = [r for r in rows if r.get("narration")]
+    if len(said) < parts * 3:
+        return []
+    size = len(said) // parts
+    out = []
+    for i in range(parts):
+        chunk = said[i * size:(i + 1) * size] if i < parts - 1 else said[i * size:]
+        texts = [r["narration"] for r in chunk]
+        share, opener = narration_mod.formulaic(texts)
+        per = [narration_mod.texture(t) for t in texts]
+        out.append({
+            "part": f"{i + 1}/{parts}",
+            "turns": len(chunk),
+            "chars_mean": round(statistics.mean(len(t) for t in texts)),
+            "words_spread": round(statistics.mean(p["words_spread"] for p in per), 1),
+            "same_opening_share": round(share, 2),
+            "same_opening": opener,
+            "faults": sum(len(r["faults"]) for r in chunk),
+        })
+    return out
 
 
 def _known_names(c) -> set[str]:
@@ -208,6 +358,30 @@ def main() -> None:
             if kind == "rolls-answered":
                 continue
             print(f"  {kind:28s} {n:4d}   {100 * n / turns:6.1f}")
+    tex = result.get("texture") or {}
+    if tex:
+        print("\nthe prose itself:")
+        print(f"  length          mean {tex['chars_mean']} chars, "
+              f"median {tex['chars_median']}, "
+              f"range {tex['chars_min']}-{tex['chars_max']}")
+        print(f"  sentences       {tex['sentences_mean']} per turn, "
+              f"{tex['words_per_sentence']} words each, spread {tex['words_spread']}")
+        print(f"  speech          {tex['turns_with_speech']}/{tex['turns_with_prose']} "
+              f"turns contain somebody speaking")
+        print(f"  openings        {int(100 * tex['same_opening_share'])}% share the "
+              f"commonest ({tex['same_opening']!r})"
+              + ("  ** FORMULAIC **" if tex["formulaic"] else ""))
+
+    drift = result.get("drift") or []
+    if drift:
+        print("\ndrift, by third of the run:")
+        print(f"  {'part':6} {'turns':>5} {'chars':>6} {'spread':>7} {'faults':>7}   "
+              f"commonest opening")
+        for d in drift:
+            print(f"  {d['part']:6} {d['turns']:5d} {d['chars_mean']:6d} "
+                  f"{d['words_spread']:7.1f} {d['faults']:7d}   "
+                  f"{int(100 * d['same_opening_share'])}% {d['same_opening']!r}")
+
     if args.json:
         Path(args.json).write_text(json.dumps(result, indent=1), encoding="utf-8")
         print(f"\nwritten to {args.json}")
