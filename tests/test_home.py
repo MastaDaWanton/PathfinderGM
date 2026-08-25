@@ -11,6 +11,7 @@ saves, and there is a test here for each.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -423,6 +424,24 @@ def test_the_picker_can_reach_a_spell_past_the_first_four_hundred(client):
 
     found = client.get("/api/spells/list?q=fireball").json()
     assert "fireball" in {s["id"] for s in found["spells"]}
+
+
+def test_the_spells_bench_draws_one_list_and_not_two(client):
+    """The bench drew the same 3,040 spells twice: `paneSpells()` renders the list the
+    search box drives, and the generic `BENCH.rows` table drew a second one underneath —
+    the first 200 by name, wired to nothing. Typing "fireball" filtered the top list and
+    left the lower one showing Abadar's Truthtelling onward, which reads as a broken
+    search. `OWN_LISTING` is what suppresses it; the pane is JS, so the guard is what
+    there is to pin."""
+    tpl = (Path(__file__).resolve().parents[1]
+           / "play" / "templates" / "play" / "home.html").read_text(encoding="utf-8")
+    assert 'const OWN_LISTING = ["spells"];' in tpl
+    assert "BENCH.rows.length && !OWN_LISTING.includes(b.id)" in tpl
+    # And the surviving list scrolls inside itself. It was `max-height:none`, so opening
+    # the bench grew the page by 3,040 rows and using the search box scrolled the box
+    # itself off the top of the screen.
+    assert "max-height:none" not in tpl
+    assert ".rows.spellrows" in tpl
 
 
 def test_the_literal_spell_routes_are_not_read_as_spell_names(client):
