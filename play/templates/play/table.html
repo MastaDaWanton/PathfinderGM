@@ -1279,6 +1279,7 @@
         <button type="button" id="cb-strike">Strike</button>
         <button type="button" id="cb-fullatk">Full attack…</button>
         <button type="button" id="cb-ability">Ability…</button>
+        <button type="button" id="cb-cast">Cast…</button>
         <button type="button" id="cb-swift">Swift…</button>
         <button type="button" id="cb-free">Free…</button>
         <button type="button" id="cb-clear" class="quiet">Clear</button>
@@ -2261,6 +2262,20 @@ document.addEventListener("click", async e => {
     combatMenu(list.map(a => `<button data-pick="${slot}:${esc(a.name)}"
       title="${esc((a.text || "").slice(0, 200))}">${esc(a.name)}</button>`).join(""));
   };
+  // Casting is a standard action like any other, and it was the one a spellcaster
+  // could not reach: `cast` was missing from the panel's op list, so a wizard's whole
+  // turn had to be typed and routed through the narrator. The spells offered are the
+  // ones actually prepared, because a spell in the book and a spell in the head are
+  // different things and the engine refuses the second question anyway.
+  if (t.closest("#cb-cast")) {
+    const spells = (STATE.pc && STATE.pc.castable) || [];
+    if (!spells.length) { combatMenu(`<span class="cb-note">Nothing prepared.</span>`);
+      return; }
+    combatMenu(spells.map(sp => `<button data-pick="cast:${esc(sp.id || sp.name)}"
+      title="${esc(sp.summary || sp.name || "")}">${esc(sp.name || sp.id)}${
+        sp.left != null ? ` (${sp.left})` : ""}</button>`).join(""));
+    return;
+  }
   if (t.closest("#cb-ability")) { menuFor(["standard", "full-round", "move"], "standard"); return; }
   if (t.closest("#cb-swift")) { menuFor(["swift", "immediate"], "swift"); return; }
   if (t.closest("#cb-free")) { menuFor(["free"], "free"); return; }
@@ -2269,7 +2284,9 @@ document.addEventListener("click", async e => {
   if (pick) {
     const [slot, ...rest] = pick.dataset.pick.split(":");
     const name = rest.join(":");
-    if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
+    if (slot === "cast") COMBAT.standard = { label: `Cast ${name}`,
+      actions: [{ op: "cast", params: { spell: name }, target: COMBAT.target }] };
+    else if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
       actions: [{ op: "use_ability", params: { ability: name },
                   target: COMBAT.target }] };
     else if (slot === "swift") COMBAT.swift = name;

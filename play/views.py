@@ -659,7 +659,13 @@ def say(request):
 # The combat panel's whitelist: what a button may emit, and nothing else. The free-text
 # box still exists for everything unconventional, and it goes through the GM like any
 # spoken turn — this path is for the actions whose arithmetic is already the engine's.
-_COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre"}
+# `cast` was missing, so a spellcaster had no deterministic way to take their own main
+# action: the panel offered Strike, Full attack, Ability, Swift and Free, and a wizard's
+# entire turn had to be typed and routed through the narrator. Measured in the engine,
+# casting itself has worked all along — Magic Missile 1d4+1 x3, Burning Hands 5d4 at
+# Reflex DC 12, Fireball 5d6 at DC 14, damage applied, spell resistance and saves read
+# off the spell. Only the button was absent.
+_COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast"}
 
 
 @require_POST

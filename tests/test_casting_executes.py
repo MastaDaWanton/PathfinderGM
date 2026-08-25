@@ -398,3 +398,41 @@ def test_the_vetoes_did_not_take_the_real_ones_with_them(spell_id):
     is easily broad enough to catch a fireball, and "no false positives" is worth nothing
     on its own."""
     assert spells_mod.get(spell_id).effects, spell_id
+
+
+def test_a_caster_can_cast_from_the_combat_panel():
+    """`cast` was missing from `_COMBAT_OPS`, so the panel offered Strike, Full attack,
+    Ability, Swift and Free — and a spellcaster's own main action was the one thing it
+    could not do. A wizard's whole turn had to be typed and routed through the narrator,
+    which is both slower and the least reliable path in the app.
+
+    Casting itself has worked in the engine all along: Magic Missile 1d4+1 x3, Burning
+    Hands 5d4 at Reflex DC 12, Fireball 5d6 at DC 14, damage applied. Only the button
+    was absent."""
+    from play.views import _COMBAT_OPS
+
+    assert "cast" in _COMBAT_OPS
+
+
+def test_the_panel_is_told_what_is_castable():
+    """The side panel carried no spell information at all, so there was nothing for a
+    Cast button to list. Prepared casters answer with what is in their head and how many
+    copies are left; a spell in the book that was never prepared is not offered."""
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["class"], d["level"] = "wizard", 5
+    d["spellbook"] = ["magic-missile", "burning-hands", "fireball"]
+    d["prepared"] = {"magic-missile": 2, "fireball": 1}
+    castable = from_dict(d).summary()["castable"]
+
+    by_id = {c["id"]: c for c in castable}
+    assert by_id["magic-missile"]["left"] == 2
+    assert by_id["fireball"]["left"] == 1
+    assert "burning-hands" not in by_id, "offered a spell that was never prepared"
+
+
+def test_somebody_who_cannot_cast_is_offered_nothing():
+    from rules.sheet import load_pc
+
+    assert load_pc("fixtures/pc-kesst.json").summary()["castable"] == []

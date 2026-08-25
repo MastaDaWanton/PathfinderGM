@@ -1851,6 +1851,11 @@ class Actor:
                                if self.ability_damage.get(a) or self.ability_drain.get(a)},
             "gear_damaged": [i.name for i in self.gear.values() if i.hp < i.hp_max],
             "world_classes": _world_class_summary(self),
+            # What this character could cast right now. The side panel carried no spell
+            # information at all, which is why the combat panel had no Cast button and a
+            # spellcaster's whole turn had to be typed at the narrator — casting itself
+            # has worked in the engine the whole time.
+            "castable": _castable_summary(self),
             "satchel": _satchel_summary(self),
             # Everything crafted, on the side panel rather than only the full sheet:
             # four more crafts now make things, and a forged blade the player cannot
@@ -2412,6 +2417,44 @@ def _class_features(actor: Actor) -> list[str]:
         for granted in classes_mod.features_at(actor.char_class or "", level):
             if granted not in out:
                 out.append(granted)
+    return out
+
+
+def _castable_summary(actor: Actor) -> list[dict]:
+    """The spells this character could cast right now, for the combat panel.
+
+    Prepared casters answer with what is actually in their head and how many copies are
+    left; spontaneous casters answer with what they know, since any of it can be cast
+    while a slot of the level remains. Either way the engine has the final word — this
+    only decides what the Cast button offers.
+
+    Empty for anybody who does not cast, which is the common case and must cost nothing.
+    """
+    from . import casting
+
+    try:
+        data = casting.profile(actor) if hasattr(casting, "profile") else None
+    except Exception:                                   # pragma: no cover - guard
+        data = None
+    book = list(getattr(actor, "spellbook", None) or [])
+    prepared = dict(getattr(actor, "prepared", None) or {})
+    if not book and not prepared:
+        return []
+
+    out: list[dict] = []
+    for sid in sorted(set(book) | set(prepared)):
+        left = prepared.get(sid)
+        if prepared and not left:
+            continue          # a prepared caster cannot cast what is not in their head
+        try:
+            from . import spells as spells_mod
+
+            spell = spells_mod.get(sid)
+            name, summary = spell.name, spell.line
+        except Exception:
+            name, summary = sid, ""
+        out.append({"id": sid, "name": name, "summary": summary,
+                    "left": left})
     return out
 
 
