@@ -140,6 +140,13 @@ _CONDITION_STEMS = {
     "disabled": r"disabled",
     # "deadly" is not death. Bounded on purpose.
     "dead": r"dead\b|\bdies\b|\bslain\b",
+    # Bleed arrived in `CONDITIONS` once the round tick existed to make it mean
+    # something, and the default stem — `bleed\w*` — immediately read the *word* rather
+    # than the condition: leechwort's "+2 on Heal checks to staunch bleeding" came out
+    # carrying "Causes bleed", which is the opposite of what the herb does. 1e writes the
+    # condition with a number on it ("bleed 1d6", "1 point of bleed damage"), and that is
+    # what this matches; the plain participle is prose and stays prose.
+    "bleed": r"bleed\s+\d|\d+\s+(?:points?\s+of\s+)?bleed\b|bleed\s+damage",
 }
 
 # Verbs that genuinely undo a condition. "end" is deliberately absent: Allnight says

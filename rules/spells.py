@@ -385,16 +385,32 @@ _RANGE_PER_LEVEL = re.compile(r"^(miles?|feet|ft\.?)\s*/\s*level\s*\((\d+)\)")
 
 _DUR_UNITS = {"round": "round", "rounds": "round", "minute": "minute",
               "minutes": "minute", "hour": "hour", "hours": "hour",
-              "day": "day", "days": "day"}
-_DUR_PER_LEVEL = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*/\s*level\s*\((\d+)\)")
+              "day": "day", "days": "day",
+              # Three lines in the corpus and they were being refused for want of two
+              # dictionary entries: "weeks/level (1)", "weeks (1)", "months (1)".
+              "week": "week", "weeks": "week", "month": "month", "months": "month"}
+_UNIT = r"(rounds?|minutes?|hours?|days?|weeks?|months?)"
+_DUR_PER_LEVEL = re.compile(_UNIT + r"\s*/\s*level\s*\((\d+)\)")
+# "rounds (1) + rounds/3 levels (1)" — a fixed base with a per-level tail on top of it.
+# Eleven lines, and the base was being dropped: the per-level search found the tail and
+# returned, so blade barrier's guaranteed first round simply was not there.
+_DUR_BASE_PLUS = re.compile(r"^\s*" + _UNIT + r"\s*\((\d+)\)\s*\+")
+# "rounds (2d4)", "hours (4d12)", "days (1d3)" — sixteen lines whose length is rolled
+# rather than stated. Refused outright before this, because the shape had nowhere to go:
+# `amount` is an integer everywhere else in this dict.
+_DUR_ROLLED = re.compile(_UNIT + r"\s*\((\d*d\d+(?:\s*\+\s*\d+)?)\)")
+# "concentration + rounds/level (1)" and "concentration, up to rounds/level (1)" are not
+# the same spell. The first runs for as long as you concentrate *and then* the tail; the
+# second ends at the tail whether you are still concentrating or not. Both were being
+# flattened to the same dict.
+_DUR_CONC_PLUS = re.compile(r"^concentration\s*\+")
 # "minutes/2 levels (1)", "hours/2 levels (1)" — one unit per N caster levels. Matched
 # before the plain per-level form, which would otherwise read the same line and drop the
 # divisor: surelife came out twice as long as it is, and nothing on screen would have
 # looked wrong. A reader flagged the shape at the merge, which is the only reason it was
 # caught before it shipped.
-_DUR_PER_N_LEVELS = re.compile(
-    r"\b(rounds?|minutes?|hours?|days?)\s*/\s*(\d+)\s*levels\s*\((\d+)\)")
-_DUR_FIXED = re.compile(r"\b(rounds?|minutes?|hours?|days?)\s*\((\d+)\)")
+_DUR_PER_N_LEVELS = re.compile(_UNIT + r"\s*/\s*(\d+)\s*levels\s*\((\d+)\)")
+_DUR_FIXED = re.compile(_UNIT + r"\s*\((\d+)\)")
 
 
 def parse_duration(text: str) -> dict:
@@ -430,29 +446,51 @@ def parse_duration(text: str) -> dict:
     # can time, and concentration is why it may end sooner.
     concentrating = s.startswith("concentration")
 
+    def carrying(got: dict, at: int = 0) -> dict:
+        """The flags that ride on top of whatever shape was matched.
+
+        `base` is the fixed part of "rounds (1) + rounds/level (1)", and it is only taken
+        when it sits *in front of* the match — otherwise "rounds/level (1)" would read
+        its own bracket as a base and every per-level spell would gain a round.
+        """
+        if concentrating:
+            got["concentration"] = True
+            if _DUR_CONC_PLUS.match(s):
+                # The tail comes *after* the concentration rather than capping it. The
+                # engine times the tail either way — it is the part it can count — but a
+                # card that says "up to 5 rounds" about a spell that lasts as long as you
+                # concentrate and then five more is telling the player the wrong thing.
+                got["concentration_plus"] = True
+        head = _DUR_BASE_PLUS.match(s)
+        if head and at > head.end() - 1 and not concentrating:
+            got["base"] = int(head.group(2))
+            got["base_unit"] = _DUR_UNITS[head.group(1)]
+        return got
+
     # The divisor form first: "minutes/2 levels" also matches the plain per-level
     # pattern, and reading it there would silently drop the 2.
     m = _DUR_PER_N_LEVELS.search(s)
     if m:
-        got = {"kind": "per_level", "amount": int(m.group(3)),
-               "unit": _DUR_UNITS[m.group(1)], "per_levels": int(m.group(2))}
-        if concentrating:
-            got["concentration"] = True
-        return {**out, **got}
+        return {**out, **carrying(
+            {"kind": "per_level", "amount": int(m.group(3)),
+             "unit": _DUR_UNITS[m.group(1)], "per_levels": int(m.group(2))}, m.start())}
     m = _DUR_PER_LEVEL.search(s)
     if m:
-        got = {"kind": "per_level", "amount": int(m.group(2)),
-               "unit": _DUR_UNITS[m.group(1)]}
-        if concentrating:
-            got["concentration"] = True
-        return {**out, **got}
+        return {**out, **carrying(
+            {"kind": "per_level", "amount": int(m.group(2)),
+             "unit": _DUR_UNITS[m.group(1)]}, m.start())}
+    # Rolled before fixed, because "rounds (2d4)" has no plain integer in its bracket and
+    # would otherwise fall through both to "see text".
+    m = _DUR_ROLLED.search(s)
+    if m:
+        return {**out, **carrying(
+            {"kind": "rolled", "dice": m.group(2).replace(" ", ""),
+             "unit": _DUR_UNITS[m.group(1)]}, m.start())}
     m = _DUR_FIXED.search(s)
     if m:
-        got = {"kind": "fixed", "amount": int(m.group(2)),
-               "unit": _DUR_UNITS[m.group(1)]}
-        if concentrating:
-            got["concentration"] = True
-        return {**out, **got}
+        return {**out, **carrying(
+            {"kind": "fixed", "amount": int(m.group(2)),
+             "unit": _DUR_UNITS[m.group(1)]}, m.start())}
     if concentrating:
         return {**out, "kind": "concentration"}
     if out.get("until_discharged"):
@@ -461,7 +499,8 @@ def parse_duration(text: str) -> dict:
 
 
 # The engine's clock. Everything timed in this app is counted in rounds.
-_ROUNDS_PER = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
+_ROUNDS_PER = {"round": 1, "minute": 10, "hour": 600, "day": 14400,
+               "week": 100800, "month": 432000}
 
 
 def duration_rounds(spell, caster_level: int = 1) -> int | None:
@@ -479,16 +518,45 @@ def duration_rounds(spell, caster_level: int = 1) -> int | None:
     per = _ROUNDS_PER.get(str(unit), 0)
     if not per:
         return None
+    # "rounds (1) + rounds/3 levels (1)" — a guaranteed first round with a per-level tail
+    # on top. Added here rather than folded into `amount`, because the base and the tail
+    # can be in different units: "instantaneous + minutes/level (1)".
+    base = int(d.get("base", 0) or 0) * _ROUNDS_PER.get(str(d.get("base_unit")), 0)
     if kind == "per_level":
         # `per_levels` is "one unit per N caster levels". Ignoring it doubled surelife
         # and terrain bond, and nothing on screen would have looked wrong — a reader
         # flagged the key at the merge rather than letting it through.
         every = max(1, int(d.get("per_levels", 1) or 1))
         levels = max(1, int(caster_level) // every)
-        return max(1, int(d.get("amount", 1)) * levels * per)
+        return max(1, base + int(d.get("amount", 1)) * levels * per)
     if kind == "fixed":
-        return max(1, int(d.get("amount", 1)) * per)
+        return max(1, base + int(d.get("amount", 1)) * per)
+    # A rolled length — "rounds (2d4)" — is deliberately not answered here. Rolling it
+    # would make this function non-deterministic and put randomness inside something
+    # every card, tooltip and preview calls; `roll_duration` does it once, with the
+    # engine's own seeded dice, at the moment the spell is actually cast.
     return None
+
+
+def roll_duration(spell, caster_level: int, dice) -> int | None:
+    """How many rounds a spell lasts *this time*, rolling the length if it is rolled.
+
+    Sixteen spells state a length as dice — "rounds (2d4)", "hours (4d12)" — and the
+    parser refused all sixteen until `kind: rolled` existed. Split from `duration_rounds`
+    rather than added to it so that the deterministic question stays deterministic: a
+    card that re-rendered a shorter number every time it was drawn would be worse than
+    one that says "2d4 rounds".
+    """
+    d = getattr(spell, "duration_value", None) or {}
+    if isinstance(d, dict) and d.get("kind") == "rolled" and dice is not None:
+        per = _ROUNDS_PER.get(str(d.get("unit")), 0)
+        if per:
+            rolled = dice.roll(str(d.get("dice") or "1"), label="duration",
+                               visibility="hidden").total
+            base = int(d.get("base", 0) or 0) * _ROUNDS_PER.get(
+                str(d.get("base_unit")), 0)
+            return max(1, base + rolled * per)
+    return duration_rounds(spell, caster_level)
 
 
 def parse_range(text: str) -> dict:
@@ -783,6 +851,17 @@ def effects_at(spell, caster_level: int) -> list[dict]:
     return out
 
 
+def _is_the_spells_own(spec: dict) -> bool:
+    """Whether this spec is what the spell does, to its target, on being cast.
+
+    The two fields it asks about did not exist when `casting_plan` was written, and both
+    absent means exactly what every existing spec means, so all 6,476 of them answer True
+    here and take the path they always took.
+    """
+    return (str(spec.get("trigger") or "on_cast") == "on_cast"
+            and str(spec.get("recipient") or "target") in ("target", "area"))
+
+
 def casting_plan(spell, caster_level: int) -> dict:
     """What the engine has to roll and apply to cast this spell once, at this level.
 
@@ -819,6 +898,14 @@ def casting_plan(spell, caster_level: int) -> dict:
 
     for spec in specs:
         kind = str(spec.get("type", ""))
+        if not _is_the_spells_own(spec):
+            # Not what the spell does on being cast: it waits for something, or it lands
+            # on somebody who is not the target. Either way it is not the dice the caster
+            # rolls now, and claiming it as such is how thorn body — 1d6 to *whoever
+            # strikes you* — came out of the engine burning the druid it was protecting.
+            # Measured, on the first run of the executor: "Kesst Vayr takes 5 piercing."
+            plan["riders"].append(spec)
+            continue
         if kind == "save_gate" and not plan["dice"]:
             core = next((e for e in (spec.get("on_failure") or [])
                          if e.get("type") in ("damage", "heal")), None)

@@ -890,6 +890,19 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         scene.bleeding = []
 
+        # And whatever is standing in the scene did at the top of the round: the fire in
+        # an incendiary cloud, the squeeze of black tentacles, a fog lifting. The same
+        # reasoning as the bleeding immediately above — something taking hit points off a
+        # character every round with nothing said about it is the sort of thing a player
+        # finds out about only when they are dead.
+        from rules.engine import _ward_tell
+
+        for h in scene.hazards:
+            said = _ward_tell(scene, h)
+            if said:
+                c.transcript.append({"who": "gm", "text": said, "kind": "consequence"})
+        scene.hazards = []
+
         if ref is None:
             scene.end_encounter()
             return

@@ -334,6 +334,27 @@ CONDITIONS: dict[str, dict] = {
         "name": "Confused",
         "note": "acts randomly each round; roll on the confusion table",
     },
+    # Two that were on the unimplemented ledger in tests/test_reference.py until the
+    # machinery each of them was waiting for arrived. Both are Appendix 2 conditions; the
+    # four the spell readers also asked for — slowed, cursed, diseased, poisoned — are
+    # not, and are refused rather than invented. `slow` is a spell whose effect is a
+    # bundle of modifiers, and a curse, a disease and a poison are afflictions with their
+    # own rules, not entries on this table.
+    "bleed": {
+        "name": "Bleed",
+        "note": "takes the stated damage at the start of its turn until it is stopped, "
+                "by a DC 15 Heal check or any cure spell",
+    },
+    # +2 to hit, and — the half that could not be said before — total concealment. The
+    # `concealment` key is read by `Actor.concealment`, not by `_condition_mods`, which
+    # only picks up integers it is asked for by name; the miss chance is not a modifier
+    # to anything, it is a percentile rolled before damage.
+    "invisible": {
+        "name": "Invisible",
+        "attack": 2, "concealment": 50,
+        "note": "+2 on attack rolls, ignores the opponent's Dex bonus to AC, and 50% "
+                "total concealment",
+    },
 }
 
 # --- Difficulty bands ------------------------------------------------------------

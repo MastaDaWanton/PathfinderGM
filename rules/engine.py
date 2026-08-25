@@ -72,6 +72,13 @@ class Scene:
     # rather than a phrase in the narration. A pool knows where it is, whose it is and
     # how much blood is in it; everything else about it is the ability's business.
     pools: list["BloodPool"] = field(default_factory=list)
+    # Things put into the scene that are neither creatures nor modifiers: fog, walls,
+    # lights, lingering hazards. See `Manifestation`, which explains why the grid does
+    # almost all of the work.
+    manifests: list["Manifestation"] = field(default_factory=list)
+    # Effects waiting for something to happen — a round to pass, a blow to land, a
+    # creature to walk in. See `Ward`.
+    wards: list["Ward"] = field(default_factory=list)
     initiative: list[tuple[str, int]] = field(default_factory=list)
     # Who has taken a turn this encounter. A combatant who has not acted is flat-footed,
     # which is usually several points of AC and is the thing an ambush is *for*.
@@ -103,6 +110,11 @@ class Scene:
 
     # What the dying did at the top of this round, for the GM to narrate.
     bleeding: list[dict] = field(default_factory=list)
+    # What the standing hazards did at the top of this round — the fire in the cloud, the
+    # tentacles' squeeze. The same shape as `bleeding` and read the same way: something
+    # happening to a character every round with nothing said about it is the thing a
+    # player only finds out about when they are dead.
+    hazards: list[dict] = field(default_factory=list)
     # The scene owns no randomness of its own; the engine lends it one for the
     # round tick, so stabilisation rolls come from the same seeded stream as
     # everything else and a scene stays reproducible.
@@ -216,6 +228,9 @@ class Scene:
         """
         if not self.initiative:
             return None
+        # Cleared once per call rather than per rollover, so the two lines below can
+        # accumulate across however many rounds this one call has to skip through.
+        self.hazards = []
         for step in range(1, len(self.initiative) + 1):
             nxt = (self.turn + step) % len(self.initiative)
             if nxt <= self.turn:
@@ -230,11 +245,217 @@ class Scene:
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
                 ) if r]
+                # After the dying, because a hazard that finishes somebody should find
+                # them where the round left them rather than where it started.
+                #
+                # Appended rather than assigned, and that is not tidiness. One call to
+                # `advance_turn` rolls the round over as many times as it takes to find
+                # somebody still standing, so a cloud that drops the last conscious NPC
+                # ticks again on the way out — and an assignment here loses the tick that
+                # did the dropping. Measured: an incendiary cloud took a thug from 13 hit
+                # points to -6 and `scene.hazards` came back empty, so nothing was
+                # narrated and the fight simply ended with no reason given.
+                self.hazards.extend(self.tick_standing(1))
             if self.conscious(self.initiative[nxt][0]):
                 self.turn = nxt
                 self.acted.add(self.initiative[nxt][0])
                 return self.initiative[nxt][0]
         return None                      # nobody left standing
+
+    # --- things standing in the scene ------------------------------------------------
+
+    def place(self, made: "Manifestation") -> "Manifestation":
+        """Put a manifestation into the scene and write its squares onto the map.
+
+        Only the squares it actually *changes* are recorded, so lifting a fog cloud off a
+        stone pillar does not take the pillar's opacity with it. On a scene with no grid
+        the thing still exists and still expires — it simply has nowhere to put squares,
+        which is honest rather than a refusal: most scenes have no map.
+        """
+        made.id = made.id or f"m{len(self.manifests) + 1}"
+        if self.grid is not None and made.terrain in ("obscuring", "blocked", "difficult"):
+            already = getattr(self.grid, made.terrain)
+            made.added = [s for s in made.squares
+                          if self.grid.inside(s) and s not in already]
+            already.update(made.added)
+        self.manifests.append(made)
+        return made
+
+    def lift(self, made: "Manifestation") -> None:
+        """Take one back off the map. Squares another live manifestation also claims stay."""
+        self.manifests = [m for m in self.manifests if m is not made]
+        if self.grid is None or not made.added:
+            return
+        still = set()
+        for other in self.manifests:
+            if other.terrain == made.terrain:
+                still.update(other.added)
+        getattr(self.grid, made.terrain).difference_update(set(made.added) - still)
+
+    def standing_on(self, ref: str) -> list["Manifestation"]:
+        """Every manifestation whose squares this creature is in."""
+        from .grid import footprint
+
+        anchor = self.positions.get(ref)
+        actor = self.actors.get(ref)
+        if anchor is None or actor is None:
+            return []
+        here = footprint(anchor, actor.size)
+        return [m for m in self.manifests if m.covers(here)]
+
+    def tick_standing(self, rounds: int = 1) -> list[dict]:
+        """One round of everything the scene is holding: hazards fire, then clocks run.
+
+        On the Scene rather than on the Engine, and that is the same call `bleed_out`
+        made: the round tick belongs to whatever owns the round, and `advance_turn` is
+        reached from the NPC loop and from tests without an Engine anywhere in sight.
+        The cost is that damage here goes through `Actor.take_damage` rather than
+        `Engine._apply_damage`, so resistance, DR and temporary hit points all apply and
+        interception does not — which is right anyway: a guard steps in front of a blow
+        aimed at somebody, not in front of the ground they are both standing on.
+        """
+        out: list[dict] = []
+        for ward in list(self.wards):
+            if ward.trigger == "each_round":
+                out.extend(self._fire(ward))
+        for ward in list(self.wards):
+            if ward.stops_with and ward.owner:
+                holder = self.actors.get(ward.owner)
+                if holder is None or not holder.has_condition(ward.stops_with):
+                    self.wards.remove(ward)
+                    continue
+            if ward.rounds_left is None:
+                continue
+            ward.rounds_left -= rounds
+            if ward.rounds_left <= 0:
+                self.wards.remove(ward)
+        for made in list(self.manifests):
+            if made.rounds_left is None:
+                continue
+            made.rounds_left -= rounds
+            if made.rounds_left <= 0:
+                self.lift(made)
+                out.append({"kind": "manifest_ended", "what": made.what, "id": made.id})
+        return out
+
+    def _fire(self, ward: "Ward", struck_by: str = "") -> list[dict]:
+        """Resolve one ward against whoever it aims at, and say what it did."""
+        out: list[dict] = []
+        for victim in self._aimed_at(ward, struck_by):
+            out.extend(self._resolve_on(victim, ward, ward.spec or {},
+                                        ward.save, ward.save_effect))
+        return out
+
+    def _resolve_on(self, victim: Actor, ward: "Ward", spec: dict,
+                    save: str, save_effect: str) -> list[dict]:
+        """One effect, on one creature, with its save rolled if it has one.
+
+        Four types are resolved — damage, healing, a condition, ability damage — plus a
+        save gate, which is unwrapped rather than treated as a fifth thing: incendiary
+        cloud is "6d6 fire, Reflex half, **every round**", and without this the gate came
+        back as "something is due, GM" once a round for as long as the cloud stood.
+
+        Anything else is reported as due rather than silently skipped. A ward that
+        quietly does nothing is precisely the failure a `trigger` field was added to end.
+        """
+        kind = str(spec.get("type", ""))
+        if self._dice is None:
+            return [{"kind": "ward_due", "ref": victim.ref, "source": ward.source,
+                     "line": effectspec.render(spec)}]
+
+        if kind == "save_gate":
+            gate_save = str(spec.get("target") or save or "")
+            branch = spec.get("on_failure") or []
+            saved = False
+            out: list[dict] = []
+            if gate_save:
+                roll = self._dice.d20(
+                    victim.save_modifiers(gate_save),
+                    label=f"{gate_save} save against {ward.source}", visibility="hidden")
+                saved = roll.total >= ward.dc
+                if saved:
+                    branch = spec.get("on_success") or []
+                    if not branch:
+                        return [{"kind": "ward_saved", "ref": victim.ref,
+                                 "source": ward.source, "roll": roll.total,
+                                 "dc": ward.dc}]
+            for inner in branch:
+                out.extend(self._resolve_on(victim, ward, inner, "", ""))
+            return out
+
+        saved = False
+        if save:
+            roll = self._dice.d20(victim.save_modifiers(save),
+                                  label=f"{save} save against {ward.source}",
+                                  visibility="hidden")
+            saved = roll.total >= ward.dc
+            if saved and save_effect in ("negates", ""):
+                return [{"kind": "ward_saved", "ref": victim.ref, "source": ward.source,
+                         "roll": roll.total, "dc": ward.dc}]
+
+        out = []
+        if kind in ("damage", "heal"):
+            rolled = max(0, self._dice.roll(str(spec.get("dice") or "0"),
+                                            label=ward.source,
+                                            visibility="hidden").total)
+            if saved and save_effect == "half":
+                rolled //= 2
+            if kind == "heal":
+                return [{"kind": "heal", "ref": victim.ref,
+                         "amount": victim.heal(rolled), "source": ward.source}]
+            d = victim.take_damage(rolled, str(spec.get("damage_type") or "untyped"),
+                                   (), str(spec.get("lethality") or "lethal"))
+            out.append({"kind": "damage", "ref": victim.ref, "amount": d["taken"],
+                        "type": d["type"], "rolled": rolled, "saved": saved,
+                        "hp_after": victim.hp, "hp_max": victim.hp_max,
+                        "source": ward.source})
+            for c in victim.apply_hp_state():
+                out.append({"kind": "condition", "ref": victim.ref, "condition": c,
+                            "from": ward.source})
+        elif kind == "apply_condition":
+            victim.add_condition(str(spec.get("target") or ""), source=ward.source)
+            out.append({"kind": "condition", "ref": victim.ref,
+                        "condition": str(spec.get("target") or ""),
+                        "from": ward.source})
+        elif kind == "ability_damage":
+            amount = max(0, self._dice.roll(str(spec.get("dice") or "0"),
+                                            label=ward.source,
+                                            visibility="hidden").total)
+            res = victim.damage_ability(str(spec.get("target") or "str")[:3], amount)
+            # `**res` first, deliberately: `damage_ability` returns its own `kind`
+            # ("damage" or "drain") and spreading it last overwrites the one that says
+            # what sort of effect this is — a hit-point reader would then take an ability
+            # loss for a wound.
+            out.append({**res, "kind": "ability_damage", "ref": victim.ref,
+                        "source": ward.source})
+        else:
+            out.append({"kind": "ward_due", "ref": victim.ref, "source": ward.source,
+                        "line": effectspec.render(spec)})
+        return out
+
+    def _aimed_at(self, ward: "Ward", struck_by: str = "") -> list[Actor]:
+        """Which creatures this ward lands on. The recipient field, resolved.
+
+        This is the whole point of the field. Every spec used to land on "the target", so
+        the ten-odd spells that punish an *attacker* could not be written without the
+        engine burning the wrong creature — measured: thorn body, converted mechanically,
+        set fire to the caster it was protecting.
+        """
+        who = ward.recipient or "target"
+        if who == "attacker":
+            found = self.actors.get(struck_by)
+            return [found] if found and found.hp > 0 else []
+        if who == "caster":
+            found = self.actors.get(ward.caster)
+            return [found] if found else []
+        if who == "area":
+            made = next((m for m in self.manifests if m.id == ward.manifest_id), None)
+            if made is None:
+                return []
+            return [a for ref, a in self.actors.items()
+                    if a.hp > 0 and made in self.standing_on(ref)]
+        found = self.actors.get(ward.owner)
+        return [found] if found else []
 
     def sides_standing(self) -> int:
         """How many of the recorded sides still have someone up."""
@@ -256,6 +477,13 @@ class Scene:
         # a side emptying inside the NPC-turn loop, which calls this directly.
         self.grid = None
         self.positions.clear()
+        # The fog goes with the map it was drawn on. A manifestation kept past the grid
+        # that held its squares is a bank of fog with no location, and the next fight
+        # would lay a fresh grid without it — the squares would be gone and the thing
+        # claiming them would not.
+        self.manifests = []
+        self.wards = []
+        self.hazards = []
 
     def depart(self, ref: str) -> Actor | None:
         """Take one creature out of the scene, and out of every structure that names it.
@@ -291,6 +519,10 @@ class Scene:
         self.reacted = {k: v for k, v in self.reacted.items()
                         if not k.startswith(f"{ref}:")}
         self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]
+        # And the wards, for the reason this method's docstring gives about every other
+        # structure: a ward naming a creature who has left the scene is one more place
+        # for a ghost to keep acting from, and this one would fire every round.
+        self.wards = [w for w in self.wards if ref not in (w.owner, w.caster)]
         self.sides = {side: [r for r in refs if r != ref]
                       for side, refs in self.sides.items()}
         return actor
@@ -374,6 +606,100 @@ class _NeedsPlayerRoll(Exception):
         super().__init__("awaiting player roll")
         self.prompt = prompt
         self.partial = partial or {}
+
+
+@dataclass
+class Manifestation:
+    """Something a spell put into the scene and left standing there.
+
+    The user called it "temp-spawning" and it is the largest gap the spell readers found
+    that was not about numbers: fog clouds, walls, dancing lights, illusions, created
+    objects and lingering hazards all *exist somewhere* for a while, and there was no
+    shape in the app for a thing that is neither a creature nor a modifier.
+
+    Almost none of this is new machinery. `rules/grid.py` already keeps `obscuring`,
+    `blocked` and `difficult` square sets that the map draws and that `Grid.reachable`
+    and `Grid.line_of_sight` already route around, so a fog cloud is twenty feet of
+    obscuring squares and a wall of stone is blocked squares. `Scene.pools` is the
+    precedent for the rest: a positioned thing with a lifetime, ticked with the round and
+    cleared with the encounter.
+
+    `added` is the half that is easy to get wrong. The squares this thing *changed* are
+    not the squares it covers: a fog cloud rolled across a room with a stone pillar in it
+    covers the pillar's square and did not make it opaque. Clearing on expiry removes
+    `added` and nothing else, so a dungeon does not lose its own walls when the fog lifts.
+    """
+    what: str = ""
+    terrain: str = "none"                       # obscuring | blocked | difficult | none
+    squares: list[tuple[int, int]] = field(default_factory=list)
+    added: list[tuple[int, int]] = field(default_factory=list)
+    rounds_left: int | None = None              # None = until dispelled
+    source: str = ""
+    owner: str = ""                             # who put it there
+    id: str = ""
+
+    def covers(self, squares) -> bool:
+        mine = {tuple(s) for s in self.squares}
+        return any(tuple(s) in mine for s in squares)
+
+    def as_dict(self) -> dict:
+        return {"what": self.what, "terrain": self.terrain,
+                "squares": [list(s) for s in self.squares],
+                "added": [list(s) for s in self.added],
+                "rounds_left": self.rounds_left, "source": self.source,
+                "owner": self.owner, "id": self.id}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Manifestation":
+        return cls(
+            what=d.get("what", ""), terrain=d.get("terrain", "none"),
+            squares=[tuple(s) for s in d.get("squares") or []],
+            added=[tuple(s) for s in d.get("added") or []],
+            rounds_left=d.get("rounds_left"), source=d.get("source", ""),
+            owner=d.get("owner", ""), id=d.get("id", ""))
+
+
+@dataclass
+class Ward:
+    """A standing arrangement that fires an effect when something happens.
+
+    `Scene.guards` is the precedent and the shape is deliberately the same: a thing the
+    *scene* holds rather than either creature, because it is a relationship and a copy on
+    each end is two things to keep level. A guard answers "who steps in front of a blow";
+    a ward answers "what happens, and to whom, when this occurs".
+
+    It exists because two of the vocabulary's gaps turned out to be the same gap. Damage
+    that repeats every round — incendiary cloud, acid fog, wall of fire's heat, black
+    tentacles — and damage aimed at whoever strikes you — thorn body, eruptive pustules,
+    holy aura, cape of wasps — differ only in which event wakes them up. One structure
+    with a `trigger` on it covers both, and covered a third (a hazard paid on walking
+    into it) without being asked to.
+    """
+    owner: str                                  # the creature it sits on, "" for an area
+    trigger: str                                # each_round | when_struck | ...
+    spec: dict = field(default_factory=dict)    # the effect, with its dice resolved
+    recipient: str = "target"
+    caster: str = ""
+    rounds_left: int | None = None
+    source: str = ""
+    save: str = ""                              # "" | fort | ref | will
+    dc: int = 0
+    save_effect: str = ""                       # half | negates
+    # A ward that is really a condition's teeth ends when the condition is removed.
+    # Without this, curing a bleed would leave the thing that was doing the bleeding.
+    stops_with: str = ""
+    manifest_id: str = ""                       # the area this ward belongs to
+
+    def as_dict(self) -> dict:
+        return {"owner": self.owner, "trigger": self.trigger, "spec": self.spec,
+                "recipient": self.recipient, "caster": self.caster,
+                "rounds_left": self.rounds_left, "source": self.source,
+                "save": self.save, "dc": self.dc, "save_effect": self.save_effect,
+                "stops_with": self.stops_with, "manifest_id": self.manifest_id}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Ward":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
 @dataclass
@@ -963,6 +1289,28 @@ class Engine:
                         f"({atk.total} against {ac_note}).")
                     state["i"] += 1
                     continue
+                # Concealment: displacement, blur, entropic shield and invisibility all
+                # come down to a percentile the attack has to beat, and there was nowhere
+                # on the sheet to hold one — so four spells whose entire content is this
+                # were inert, and `invisible` sat on the unimplemented-condition ledger.
+                #
+                # Rolled by the engine rather than handed to the player through the dice
+                # popup, and that is a considered exception to "the player rolls their
+                # own": 1e does not call this an attack roll, it is a chance the blow
+                # finds a creature that is not quite where it looks. Adding a fourth
+                # suspension stage to every swing to ask for it would cost more than it
+                # is worth. The number is stated in the tell either way.
+                chance, why = defender.concealment()
+                if chance:
+                    miss = self.dice.roll("1d100", label=f"miss chance ({why})",
+                                          visibility="hidden")
+                    state["rolls"].append(miss.as_dict())
+                    if miss.total <= chance:
+                        state["tells"].append(
+                            f"{actor.name} finds nothing there — {why}, {chance}% miss "
+                            f"chance ({miss.total}).")
+                        state["i"] += 1
+                        continue
                 state["hit_total"] = atk.total
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
@@ -1029,6 +1377,14 @@ class Engine:
                 for extra in self._deliver_coating(actor, defender, weapon_key):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # Thorns, wasps, holy fire: whatever the defender is wearing that
+                # punishes the creature who just hit them. Fired here rather than in
+                # `_apply_damage`, because retribution is owed to a *melee attack* and
+                # not to every point of damage — a fireball does not get spiked.
+                if weapon["category"] == "melee":
+                    for got in self._retaliate(defender, actor):
+                        state["effects"].append(got)
+                        state["tells"].append(_ward_tell(self.scene, got))
                 state["i"] += 1
                 state["stage"] = "attack"
 
@@ -2128,17 +2484,405 @@ class Engine:
         if dice:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
         tells.extend(state["tells"])
-        # The specs that are not the rolled dice — a bless's +1, a barkskin's natural
-        # armour. Rendered rather than applied: see `spells.casting_plan`, which explains
-        # that applying one needs the spell's duration as rounds and that is still prose.
+
+        # The riders, in two piles. The ones the engine can run — a manifestation, a
+        # summon, an operation on another spell, anything waiting on a trigger — are run;
+        # everything else keeps the path it had, rendered for the GM. A bless's +1 is
+        # still not applied, and that is a separate argument with its own test: applying
+        # it needs a decision about stacking that this change is not making.
+        ran, said = self._run_specs(plan["riders"], self._cast_context(
+            actor, spell, cl, level, dc, live, plan, intent))
+        effects.extend(ran)
+        tells.extend(said)
         for spec in plan["riders"]:
-            tells.append(effectspec.render(spec) + ".")
+            if not self._executes(spec):
+                tells.append(effectspec.render(spec) + ".")
 
         return Outcome(
             intent_id=intent.id, op="cast",
             rolls=[_roll_from_dict(r) for r in state["rolls"]],
             effects=effects, tell=" ".join(tells), because=intent.because,
         )
+
+    def _retaliate(self, struck: Actor, by: Actor) -> list[dict]:
+        """Whatever the creature that was just hit does back, on its own.
+
+        Reads the wards the scene holds rather than anything on either sheet, for the
+        reason `Scene.guards` gives: this is a relationship, and it belongs to the scene.
+        """
+        out: list[dict] = []
+        for ward in list(self.scene.wards):
+            if ward.trigger == "when_struck" and ward.owner == struck.ref:
+                out.extend(self.scene._fire(ward, struck_by=by.ref))
+        return out
+
+    def _cast_context(self, actor: Actor, spell, cl: int, level: int, dc: int,
+                      live: list[str], plan: dict, intent: Intent) -> dict:
+        """Everything a spec needs about the cast it arrived in.
+
+        The duration is the piece that was missing and is now real: `spells.parse_duration`
+        reads the printed line and `spells.duration_rounds` turns it into rounds for this
+        caster, so "rounds/level (1)" at caster level 5 is five rounds rather than a
+        sentence nothing can time. Without it a ward would have to be given an invented
+        lifetime, which is how a fog cloud ends up standing for the rest of the campaign.
+        """
+        square = intent.params.get("square")
+        if square is None and self.scene.has_grid:
+            square = (self.scene.positions.get(live[0]) if live else None) \
+                or self.scene.positions.get(actor.ref)
+        return {
+            "caster": actor.ref, "targets": live, "caster_level": cl,
+            # Rolled once, here, with the engine's own seeded dice — see
+            # `spells.roll_duration` on why the deterministic reader stayed deterministic.
+            "rounds": spells_mod.roll_duration(spell, cl, self.dice),
+            "source": spell.name, "dc": dc,
+            "save": plan.get("save", ""), "save_effect": plan.get("save_effect", ""),
+            "square": tuple(square) if square else None,
+            "chosen": intent.params.get("choose"),
+            "vars": {
+                "caster_level": cl, "level": actor.level, "spell_level": level,
+                "hit_dice": actor.hit_dice, "casting_mod": dc - 10 - level,
+                **{f"{ab}_mod": actor.ability_mod(ab)
+                   for ab in ("str", "dex", "con", "int", "wis", "cha")},
+            },
+        }
+
+    # --- executing the effect vocabulary --------------------------------------------
+    #
+    # Deliberately narrow, and the narrowness is the design. `casting_plan` already owns
+    # the rolled dice and the save, and the 6,476 specs the corpus carried before these
+    # types existed keep the exact path they had: a bless's +1 is still rendered for the
+    # GM rather than applied, because applying it is a separate argument with its own
+    # test pinning the current answer.
+    #
+    # What runs here is what could not be *said* at all before — a manifestation, a
+    # summon, an operation on another spell, a miss chance, damage to gear — plus any
+    # effect whose trigger is not "immediately", which is the repeating and retributive
+    # family. Nothing that used to be narrated silently starts happening.
+
+    _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
+                 "choose_one", "bundle")
+
+    def _executes(self, spec: dict) -> bool:
+        return (str(spec.get("type", "")) in self._EXECUTES
+                or str(spec.get("trigger") or "on_cast") != "on_cast")
+
+    def _run_specs(self, specs: list[dict], ctx: dict) -> tuple[list[dict], list[str]]:
+        """Every spec in this list the engine can run, run. Returns effects and tells.
+
+        `ctx` carries what a spec needs and cannot know: the caster, the targets, the
+        caster level to resolve a formula against, the save DC, the duration in rounds,
+        and the square a manifestation lands on.
+        """
+        effects: list[dict] = []
+        tells: list[str] = []
+        for spec in specs:
+            if not self._executes(spec):
+                continue
+            got, said = self._run_one(spec, ctx)
+            effects.extend(got)
+            tells.extend(said)
+        return effects, tells
+
+    def _run_one(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        kind = str(spec.get("type", ""))
+        if kind == "bundle":
+            return self._run_specs(spec.get("effects") or [], ctx)
+        if kind == "choose_one":
+            return self._choose(spec, ctx)
+        if kind == "manifest":
+            return self._manifest(spec, ctx)
+        if kind == "summon":
+            return self._summon(spec, ctx)
+        if kind == "spell_operation":
+            return self._spell_operation(spec, ctx)
+        if kind == "concealment":
+            return self._conceal(spec, ctx)
+        if kind == "object_damage":
+            return self._object_damage(spec, ctx)
+        return self._stand_by(spec, ctx)
+
+    def _choose(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """One option, or none and a sentence saying so.
+
+        Never all of them. A polymorph spell written as five separate effects applies
+        five shapes at once, which is the failure the type exists to end — so an unchosen
+        choice is reported rather than resolved, and the report names the options so the
+        GM can recast naming one.
+        """
+        options = spec.get("options") or []
+        picked = spec.get("chosen") if spec.get("chosen") not in (None, "") \
+            else ctx.get("chosen")
+        try:
+            index = int(picked)
+        except (TypeError, ValueError):
+            index = 0
+        if not 1 <= index <= len(options):
+            names = " / ".join(effectspec.render(o) for o in options)
+            return ([{"kind": "choice_pending", "options": len(options)}],
+                    [f"Nothing is applied until one is chosen — {names}. "
+                     f'Recast with {{"choose": 1}} to take the first.'])
+        # The chosen option is always named, and *then* whatever of it the engine can run
+        # is run. Reporting only what executed meant a choice resolved to a form made of
+        # modifiers said nothing at all — the GM could not tell which shape was taken.
+        taken = options[index - 1]
+        effects = [{"kind": "choice_made", "chosen": index,
+                    "line": effectspec.render(taken)}]
+        tells = [effectspec.render(taken) + "."]
+        ran, said = self._run_one(taken, ctx) if self._executes(taken) else ([], [])
+        return effects + ran, tells + said
+
+    def _manifest(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Write a thing into the scene, and onto the map where there is one."""
+        squares = self._squares_for(spec, ctx)
+        made = self.scene.place(Manifestation(
+            what=str(spec.get("what") or "something"),
+            terrain=str(spec.get("terrain") or "none"),
+            squares=squares, rounds_left=ctx.get("rounds"),
+            source=ctx.get("source", ""), owner=ctx.get("caster", ""),
+        ))
+        # The hazard half. A cloud that burns whoever is in it is a ward aimed at the
+        # area, and it is the same structure a per-round damage spell registers — which
+        # is why `on_enter` did not need machinery of its own.
+        for inner in spec.get("on_enter") or []:
+            self.scene.wards.append(Ward(
+                owner="", trigger="each_round", recipient="area",
+                spec=self._resolved(inner, ctx), caster=ctx.get("caster", ""),
+                rounds_left=ctx.get("rounds"), source=ctx.get("source", ""),
+                save=ctx.get("save", ""), dc=int(ctx.get("dc", 0) or 0),
+                save_effect=ctx.get("save_effect", ""), manifest_id=made.id,
+            ))
+        where = (f" over {len(made.squares)} squares" if made.squares else "")
+        # Said when the thing wanted squares and there was nowhere to put them. The first
+        # version tested `not made.squares`, which is true in exactly the case the note is
+        # for — so the note never appeared on a mapless scene and always would have on a
+        # dancing light.
+        note = "" if self.scene.has_grid or made.terrain == "none" else \
+            " — there is no map in this scene, so it is placed in the fiction only"
+        return ([{"kind": "manifest", **made.as_dict()}],
+                [f"{made.what[:1].upper()}{made.what[1:]}{where}{note}."])
+
+    def _squares_for(self, spec: dict, ctx: dict) -> list[tuple[int, int]]:
+        """The squares a manifestation covers, from the grid's own area functions.
+
+        `rules/grid.py` already draws a burst, a line and a cone for spell areas, so a
+        fog cloud is `burst(centre, 20)` and nothing here has to know what a radius is.
+        A scene with no map gets an empty list and the thing still exists — a
+        manifestation without squares is fiction, not a bug.
+        """
+        if not self.scene.has_grid:
+            return []
+        centre = ctx.get("square")
+        if centre is None:
+            return []
+        size = int(spec.get("size") or 0)
+        shape = str(spec.get("shape") or "radius")
+        if not size or shape == "point":
+            return [tuple(centre)]
+        if shape == "line":
+            towards = ctx.get("towards") or (centre[0] + 1, centre[1])
+            return sorted(gridmod.line(tuple(centre), tuple(towards), size))
+        if shape == "cone":
+            return sorted(gridmod.cone(tuple(centre), str(ctx.get("facing") or "e"), size))
+        if shape in ("wall", "square"):
+            span = max(1, size // gridmod.SQUARE_FT)
+            return [(centre[0] + dx, centre[1]) for dx in range(span)] if shape == "wall" \
+                else [(centre[0] + dx, centre[1] + dy)
+                      for dy in range(span) for dx in range(span)]
+        return sorted(gridmod.burst(tuple(centre), size))
+
+    def _summon(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Bring a creature in through the same door everything else arrives by."""
+        from .bestiary import UnknownTemplate
+
+        name = str(spec.get("creature") or "").strip()
+        side = "pc" if str(spec.get("side") or "caster") == "caster" else "them"
+        caster = self.scene.actors.get(ctx.get("caster", ""))
+        if caster is not None and not caster.is_pc:
+            side = "them" if side == "pc" else "pc"
+        try:
+            made = self._bring_in(name, count=int(spec.get("count") or 1), side=side)
+        except UnknownTemplate as exc:
+            # Named rather than invented. A summon that quietly produces nothing is a
+            # spell the player paid a slot for and cannot tell did not work.
+            return ([{"kind": "summon_refused", "creature": name, "why": str(exc)}],
+                    [f"Nothing arrives: {exc}"])
+        return ([{"kind": "summon", "actors": made, "side": side}],
+                ["Answering the call: "
+                 + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + "."])
+
+    def _spell_operation(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Permanency, dispel magic, suppression — spells whose target is another spell.
+
+        The caster level check is rolled where the book calls for one; the three
+        operations that act on a lifetime act on the real lifetimes the engine keeps —
+        a buff's `rounds_left`, a condition's, a manifestation's. Countering and
+        absorbing are reported: both happen in the middle of somebody else's casting and
+        there is no readied-action step to hang them on, which is said out loud rather
+        than answered with a shrug.
+        """
+        op = str(spec.get("operation") or "dispel")
+        who = self._recipient(spec, ctx)
+        named = str(spec.get("target") or "").strip()
+        effects: list[dict] = []
+
+        if spec.get("check_dc"):
+            dc = effectspec.evaluate(spec["check_dc"], ctx.get("vars") or {})
+            roll = self.dice.d20([Modifier(int(ctx.get("caster_level", 1)),
+                                           "caster level")],
+                                 label=f"caster level check ({op})", visibility="hidden")
+            effects.append({"kind": "caster_level_check", "op": op, "dc": dc,
+                            "total": roll.total, "beat": roll.total >= dc})
+            if roll.total < dc:
+                return (effects,
+                        [f"The caster level check fails ({roll.total} against DC {dc}); "
+                         f"{named or 'the magic'} holds."])
+
+        if op in ("counter", "absorb"):
+            return (effects + [{"kind": "spell_operation_noted", "operation": op,
+                                "target": named}],
+                    [f"{effectspec.render(spec)} — the GM adjudicates this one: it "
+                     f"resolves during another creature's casting, and the engine has no "
+                     f"readied action to hang it on."])
+
+        touched = self._lifetimes(who, named)
+        if not touched:
+            return (effects + [{"kind": "spell_operation_noted", "operation": op,
+                                "target": named}],
+                    [f"Nothing on {who.name if who else 'them'} matches "
+                     f"{named or 'that'}."])
+
+        changed = []
+        for holder in touched if str(spec.get("everything")) == "yes" else touched[:1]:
+            changed.append(self._retime(holder, op, ctx))
+        effects.append({"kind": "spell_operation", "operation": op,
+                        "ref": who.ref if who else "", "changed": changed})
+        word = {"make_permanent": "will not expire now", "dispel": "ends",
+                "suppress": "is held off", "extend": "lasts twice as long"}[op]
+        return (effects,
+                [", ".join(c["what"] for c in changed) + f" {word}."])
+
+    def _lifetimes(self, who: Actor | None, named: str) -> list:
+        """Everything on a creature — or in the scene — with a clock that can be changed.
+
+        Matched by name where one is given, and everything otherwise. Buffs, conditions
+        and manifestations all carry a `source`, which is the string a caster would use
+        to say which spell they mean.
+        """
+        needle = named.strip().lower()
+
+        def matches(source: str) -> bool:
+            return not needle or needle in str(source or "").lower()
+
+        found: list = []
+        if who is not None:
+            found += [b for b in who.buffs if matches(b.source)]
+            found += [c for c in who.conditions if matches(c.source)]
+        found += [m for m in self.scene.manifests if matches(m.source)]
+        return found
+
+    def _retime(self, holder, op: str, ctx: dict) -> dict:
+        """Change one thing's clock. The four operations that are really about a clock."""
+        what = getattr(holder, "source", "") or getattr(holder, "what", "") or "it"
+        left = getattr(holder, "rounds_left", None)
+        if op == "make_permanent":
+            holder.rounds_left = None
+        elif op == "extend":
+            holder.rounds_left = None if left is None else left * 2
+        else:                                    # dispel, suppress
+            holder.rounds_left = 0 if op == "suppress" else -1
+            if isinstance(holder, Manifestation):
+                self.scene.lift(holder)
+            else:
+                for owner in self.scene.actors.values():
+                    if holder in owner.buffs:
+                        owner.buffs.remove(holder)
+                    elif holder in owner.conditions:
+                        owner.conditions.remove(holder)
+        return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
+
+    def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A miss chance, held as a buff so it expires on the clock everything else uses."""
+        who = self._recipient(spec, ctx)
+        if who is None:
+            return [], []
+        amount = int(spec.get("miss_chance", 20) or 20)
+        who.add_buff("concealment", "miss_chance", amount,
+                     source=ctx.get("source", "concealment"), rounds=ctx.get("rounds"))
+        return ([{"kind": "concealment", "ref": who.ref, "miss_chance": amount,
+                  "rounds": ctx.get("rounds")}],
+                [f"{who.name} is hard to place: attacks against them miss {amount}% of "
+                 f"the time."])
+
+    def _object_damage(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        who = self._recipient(spec, ctx)
+        if who is None:
+            return [], []
+        rolled = max(0, self.dice.roll(
+            effectspec.resolve_dice(spec.get("dice"), ctx.get("caster_level", 1)),
+            label="object damage", visibility="hidden").total)
+        dtype = str(spec.get("damage_type") or "untyped")
+        named = str(spec.get("item") or "").strip()
+        results = ([who.damage_item(named, rolled, dtype)] if named
+                   else who.damage_all_gear(rolled, dtype))
+        notable = [r for r in results if r["taken"]]
+        tell = "; ".join(
+            f"{who.name}'s {r['item']} takes {r['taken']} through hardness "
+            f"{r['hardness']}" + (" — destroyed" if r["destroyed"] else
+                                  " — broken" if r["broken"] else "")
+            for r in notable) or f"Nothing {who.name} carries is marked by it"
+        return ([{"kind": "item_damage", "ref": who.ref, **r} for r in results],
+                [tell + "."])
+
+    def _stand_by(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """An effect that is not due yet: register it and wait for its trigger.
+
+        This is where repeating damage and retribution both land, and they land in the
+        same place because they *are* the same thing with a different event on the front.
+        """
+        # Two different creatures, and keeping them apart is the whole fix. The ward
+        # *sits on* whoever the spell was cast on — thorn body is on you — and its
+        # `recipient` decides who takes the damage when it fires, which for thorn body is
+        # whoever hit you. Collapsing the two is precisely the bug measured before this
+        # existed: a converted thorn body burned the caster it was protecting.
+        bearer = self._recipient({"recipient": "target"}, ctx)
+        ward = Ward(
+            owner=(bearer.ref if bearer else ctx.get("caster", "")),
+            trigger=str(spec.get("trigger") or "on_cast"),
+            spec=self._resolved(spec, ctx),
+            recipient=str(spec.get("recipient") or "target"),
+            caster=ctx.get("caster", ""), rounds_left=ctx.get("rounds"),
+            source=ctx.get("source", ""), save=ctx.get("save", ""),
+            dc=int(ctx.get("dc", 0) or 0), save_effect=ctx.get("save_effect", ""),
+            stops_with=str(spec.get("stops_with") or ""),
+        )
+        self.scene.wards.append(ward)
+        return ([{"kind": "ward", "ref": ward.owner, **ward.as_dict()}],
+                [f"{effectspec.render(spec)} — standing, and it will fire when it is due."])
+
+    def _resolved(self, spec: dict, ctx: dict) -> dict:
+        """A spec with the things that depend on the caster already worked out.
+
+        Done once, when the ward is registered, rather than every round it fires. A ward
+        that re-read `caster_level` each round would keep changing as the caster levelled
+        mid-fight, and — worse — would go on scaling after the caster had left the scene.
+        """
+        out = dict(spec)
+        if out.get("dice"):
+            out["dice"] = effectspec.resolve_dice(out["dice"], ctx.get("caster_level", 1))
+        if "amount" in out and effectspec.is_formula(out["amount"]):
+            out["amount"] = effectspec.evaluate(out["amount"], ctx.get("vars") or {})
+        return out
+
+    def _recipient(self, spec: dict, ctx: dict) -> Actor | None:
+        """Which creature a spec lands on, at cast time."""
+        who = str(spec.get("recipient") or "target")
+        if who in ("caster", "self"):
+            return self.scene.actors.get(ctx.get("caster", ""))
+        live = [r for r in (ctx.get("targets") or []) if r in self.scene.actors]
+        if live:
+            return self.scene.actors[live[0]]
+        return self.scene.actors.get(ctx.get("caster", ""))
 
     def _check_cast(self, intent: Intent, index: int) -> None:
         """Everything about a cast that is checkable before anything is spent.
@@ -2917,18 +3661,34 @@ class Engine:
         return actor
 
     def _op_spawn(self, intent: Intent, partial: dict) -> Outcome:
+        made = self._bring_in(
+            intent.params["template"], count=int(intent.params.get("count", 1)),
+            name=intent.params.get("name"),
+            from_entity_id=intent.params.get("from_entity_id"),
+        )
+        return Outcome(
+            intent_id=intent.id, op="spawn",
+            effects=[{"kind": "spawn", "actors": made}],
+            tell="On the board: " + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + ".",
+            because=intent.because,
+        )
+
+    def _bring_in(self, template: str, count: int = 1, name: str | None = None,
+                  from_entity_id: str | None = None, side: str = "") -> list[dict]:
+        """Put creatures on the board. The one path a creature arrives by.
+
+        Pulled out of `_op_spawn` so the `summon` effect type routes through it rather
+        than growing a creature system of its own. A summoning spell and a GM saying "two
+        bravos step out of the dark" are the same event with different fiction attached,
+        and the initiative bookkeeping below is the part that is easy to forget and
+        expensive to get wrong twice.
+        """
         from .bestiary import instantiate  # local import: bestiary is data, not core
 
-        count = int(intent.params.get("count", 1))
         made = []
-        for n in range(count):
-            actor = instantiate(
-                intent.params["template"],
-                scene=self.scene,
-                name=intent.params.get("name"),
-                world_entity_id=intent.params.get("from_entity_id"),
-                index=n,
-            )
+        for n in range(max(1, int(count))):
+            actor = instantiate(template, scene=self.scene, name=name,
+                                world_entity_id=from_entity_id, index=n)
             self.scene.add(actor)
             made.append({"ref": actor.ref, "name": actor.name})
             # Someone who arrives mid-fight rolls in. Without this they were on the
@@ -2943,15 +3703,13 @@ class Engine:
                     (i for i, (r, _) in enumerate(self.scene.initiative)
                      if r == self.scene.current_ref()), self.scene.turn
                 )
+                # A summoned creature fights for whoever called it. Without the `side`
+                # argument every arrival joined "them", so a caster's own celestial dog
+                # counted against them and a fight could not end while it was standing.
                 self.scene.sides.setdefault(
-                    "pc" if actor.is_pc else "them", []
+                    side or ("pc" if actor.is_pc else "them"), []
                 ).append(actor.ref)
-        return Outcome(
-            intent_id=intent.id, op="spawn",
-            effects=[{"kind": "spawn", "actors": made}],
-            tell="On the board: " + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + ".",
-            because=intent.because,
-        )
+        return made
 
     # --- helpers ------------------------------------------------------------------------
 
@@ -3141,6 +3899,38 @@ def survival_note(toll) -> str:
     if failed and not bits:
         bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")
     return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
+
+
+def _ward_tell(scene: Scene, e: dict) -> str:
+    """One thing a standing effect did, in the voice the rest of the log is written in.
+
+    A free function because both the attack path and the round tick produce these and
+    `play/views.py` narrates the round tick's — three callers, one sentence, and three
+    copies of it is how two of them end up disagreeing about what a saved hazard reads as.
+    """
+    who = scene.actors.get(e.get("ref", ""))
+    name = who.name if who else e.get("ref", "something")
+    source = e.get("source", "it")
+    kind = e.get("kind")
+    if kind == "damage":
+        half = " (halved by the save)" if e.get("saved") else ""
+        return (f"{name} takes {e['amount']} {e['type']} damage from {source}{half} "
+                f"({e.get('hp_after')}/{e.get('hp_max')}).")
+    if kind == "heal":
+        return f"{source} restores {e['amount']} hit points to {name}."
+    if kind == "ward_saved":
+        return f"{name} rides out {source} ({e.get('roll')} against DC {e.get('dc')})."
+    if kind == "condition":
+        return f"{name} is {e.get('condition')} ({e.get('from', source)})."
+    if kind == "ability_damage":
+        return (f"{name} takes {e.get('amount')} "
+                f"{ABILITY_FULL.get(str(e.get('ability', '')), 'ability')} damage "
+                f"from {source}.")
+    if kind == "manifest_ended":
+        return f"{e.get('what', 'It')} thins out and is gone."
+    if kind == "ward_due":
+        return f"{source}: {e.get('line', '')} — for the GM to apply."
+    return ""
 
 
 def _damage_note(d: dict) -> str:

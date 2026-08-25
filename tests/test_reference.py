@@ -120,14 +120,16 @@ def test_the_conditions_the_engine_does_not_implement_yet_are_named(conditions):
     book = {c["key"] for c in conditions["conditions"]}
     missing = sorted(book - set(CONDITIONS))
     assert missing == [
-        # Needs a per-round damage tick the engine does not have yet.
-        "bleed",
         # An item condition, not a creature one; arrives with sunder and item hit points.
         "broken",
-        # Negative levels, which means recomputing a whole sheet downwards.
+        # Negative levels, which means recomputing a whole sheet downwards. There is now
+        # a `negative_level` effect type that states and counts them honestly, and it is
+        # declared `engine=False` for exactly this reason.
         "energy drained",
-        # Both need targeting and miss-chance rules that zones do not yet model.
-        "incorporeal", "invisible",
+        # Half damage from everything non-magical, which `Actor.take_damage` has no
+        # notion of. Invisible left this list once the miss chance existed; incorporeal
+        # is waiting on a different thing.
+        "incorporeal",
     ], "the unimplemented-condition ledger changed; update it deliberately"
 
 

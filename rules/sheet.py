@@ -681,6 +681,27 @@ class Actor:
 
     # --- condition contributions --------------------------------------------------
 
+    def concealment(self) -> tuple[int, str]:
+        """The miss chance an attack against this creature must beat, and where it is from.
+
+        Displacement, blur, entropic shield and blurred movement are *entirely* this and
+        were entirely inert: with nothing on the sheet to hold a miss chance they had to
+        be written as prose, and the tempting alternative — writing 50% as an AC bonus —
+        changes *which* attacks land rather than how many, which is a different spell.
+
+        The best source wins rather than adding up. Two 20% miss chances are not 40% in
+        1e and they are not 36% either; concealment does not stack with concealment.
+        """
+        best, why = 0, ""
+        for c in self.conditions:
+            got = c.data.get("concealment")
+            if isinstance(got, int) and got > best:
+                best, why = got, c.name.lower()
+        for b in self.buffs:
+            if b.kind == "concealment" and b.amount > best:
+                best, why = b.amount, b.source or "concealment"
+        return best, why
+
     def _condition_mods(self, field_name: str) -> list[Modifier]:
         out = []
         for c in self.conditions:

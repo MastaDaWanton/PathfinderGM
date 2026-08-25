@@ -19,6 +19,7 @@ prevent.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .biomes import BIOMES
@@ -65,6 +66,10 @@ VOCAB: dict[str, list[dict]] = {
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
         ("see_invisible", "See invisible"), ("blindsense", "Blindsense"),
+        # Blindsense was here and blindsight was not, which is a real difference in 1e:
+        # blindsense locates a creature and still leaves it total concealment, blindsight
+        # does not. A spell granting the better one had to be written as the weaker.
+        ("blindsight", "Blindsight"),
         ("true_seeing", "True seeing"))],
     "movement": [{"id": k, "name": n} for k, n in (
         ("land", "Land speed"), ("climb", "Climb speed"), ("swim", "Swim speed"),
@@ -84,6 +89,70 @@ VOCAB: dict[str, list[dict]] = {
     # Empty on purpose, and the editor says why rather than offering a free-text box that
     # looks like it will do something.
     "spell": [],
+
+    # --- who an effect lands on, and when ---------------------------------------------
+    #
+    # These two are the reason most of the additions below exist at all. Twenty readers
+    # went through the corpus a spell at a time and both gaps were reported by nearly
+    # every one of them, from opposite ends of the list.
+    #
+    # Every spec used to land on "the target", full stop — so eruptive pustules, thorn
+    # body, holy aura, cape of wasps, water shield and kinetic reverberation, all of
+    # which deal their dice to *whoever strikes you*, could only be written as prose.
+    # Written without a recipient they are worse than prose: thorn body converted
+    # mechanically once and burned the creature it was cast on, which is the caster.
+    "recipient": [{"id": k, "name": n} for k, n in (
+        ("target", "The target"), ("self", "The one who has it"),
+        ("caster", "The caster"), ("attacker", "Whoever struck them"),
+        ("ally", "An ally"), ("area", "Everything in the area"))],
+    # `on_cast` is what every one of the 6,476 existing specs means, so it is the default
+    # and an absent trigger keeps behaving exactly as it does today.
+    #
+    # `each_round` is the single largest cause of a fully-stated spell falling to prose.
+    # Incendiary cloud is 6d6 fire, Reflex half, *every round*; as a plain save gate it
+    # fires once at casting and never again, which understates the spell by however many
+    # rounds it lasts. Acid fog, wall of fire, hungry pit, black tentacles, pain strike
+    # and poison are the same shape.
+    "trigger": [{"id": k, "name": n} for k, n in (
+        ("on_cast", "Immediately"), ("each_round", "Every round while it lasts"),
+        ("when_struck", "When struck in melee"),
+        ("when_grappled", "When grappled"),
+        ("on_enter", "When something enters the area"),
+        ("on_expiry", "When it ends"))],
+
+    # What a manifested thing does to the squares it covers. Every one of these is a set
+    # the `Grid` already keeps and the map already draws and routes around — which is the
+    # whole reason `manifest` can be executed rather than narrated.
+    "terrain": [{"id": k, "name": n} for k, n in (
+        ("obscuring", "Blocks sight, not movement — fog, smoke"),
+        ("blocked", "Solid: blocks sight and movement — a wall"),
+        ("difficult", "Costs double to enter — grease, undergrowth"),
+        ("none", "Occupies no squares — a light, a sound, an image"))],
+    "manifest_shape": [{"id": k, "name": n} for k, n in (
+        ("radius", "A spread from a point"), ("line", "A line"),
+        ("wall", "A wall"), ("square", "A block of squares"), ("cone", "A cone"),
+        ("point", "One square"))],
+
+    # Permanency, dispel magic, counterspell, break enchantment, antimagic field: spells
+    # whose target is *another spell*. There was no way to say any of it.
+    "spell_operation": [{"id": k, "name": n} for k, n in (
+        ("make_permanent", "Make it permanent"), ("dispel", "End it"),
+        ("suppress", "Hold it off while this lasts"), ("extend", "Make it last longer"),
+        ("counter", "Counter it as it is cast"),
+        ("absorb", "Absorb it and hold the energy"))],
+
+    # 1e's attitude track, in the book's own order. Diplomacy moves a creature along it
+    # and charm, calm emotions and the whole enchantment family set it outright.
+    "attitude": [{"id": k, "name": k.title()} for k in (
+        "hostile", "unfriendly", "indifferent", "friendly", "helpful")],
+
+    "side": [{"id": k, "name": n} for k, n in (
+        ("caster", "The caster"), ("target", "The target"),
+        ("nobody", "Nobody — it acts on its own"))],
+    # A yes/no that is a dropdown rather than a checkbox, because the generated form
+    # renders `choice` and has no widget for a boolean. Two entries beat a text box that
+    # accepts "true", "y", "Yes" and "1" and means something different for each.
+    "yes_no": [{"id": "no", "name": "No"}, {"id": "yes", "name": "Yes"}],
 }
 
 
@@ -92,8 +161,8 @@ class Field:
     """One input on the generated form."""
     id: str
     label: str
-    kind: str                       # int | signed | dice | choice | text | duration
-                                    #  | effects | bool | formula
+    kind: str                       # int | signed | signed_formula | dice | choice
+                                    #  | text | duration | effects | bool | formula
     vocab: str = ""                 # which VOCAB list fills the dropdown
     required: bool = True
     default: object = None
@@ -111,7 +180,23 @@ class Field:
 
 # Every type may carry these. Pulled out because 55 of the corpus's effects state a
 # duration and repeating it on twenty type definitions is how two of them end up differing.
+#
+# `recipient` and `trigger` joined this list rather than becoming fields on a handful of
+# types, and that is the same decision the module header argues for everything else:
+# *who* an effect lands on and *when* it fires are questions every type has an answer to,
+# and putting them on five types would mean the sixth silently cannot ask.
+#
+# Both default to what an absent value has always meant — the target, immediately — so
+# every one of the 6,476 specs already in the corpus keeps its exact behaviour.
 COMMON = [
+    Field("recipient", "Lands on", "choice", vocab="recipient", required=False,
+          default="target",
+          hint="Whose sheet it touches. 'Whoever struck them' is how thorn body, holy "
+               "aura and cape of wasps punish an attacker rather than their own bearer."),
+    Field("trigger", "Fires", "choice", vocab="trigger", required=False,
+          default="on_cast",
+          hint="'Every round while it lasts' is incendiary cloud's 6d6 — one hit "
+               "understates it by however many rounds the cloud stands."),
     Field("duration", "Lasts", "duration", required=False,
           hint="Leave empty for instantaneous."),
     Field("uses", "Use limit", "choice", vocab="uses", required=False,
@@ -161,7 +246,18 @@ def _modifier(target_field: Field) -> list[Field]:
     is grouped this way.
     """
     return [
-        Field("amount", "Amount", "signed", hint="+2, -4."),
+        # A formula as well as a number, and that one change recovers a family the
+        # readers hit constantly: divine favor's "+1 luck per three caster levels,
+        # maximum +3", divine power, lay of the land, ward the faithful, wrath, wave
+        # shield, protection from spores. `amount` was an int, so none of them could be
+        # *written* — divine favor is stored as a flat +1 with the real rule in a note
+        # nothing reads, which is a spell that stops scaling at caster level 3.
+        #
+        # `save_gate.dc` has accepted a formula since it was written; this is the same
+        # shape, made general, and an integer still validates exactly as before.
+        Field("amount", "Amount", "signed_formula",
+              hint="+2, -4 — or a formula: caster_level, caster_level/2, "
+                   "min(1 + caster_level/3, 3)."),
         Field("bonus_type", "Bonus type", "choice", vocab="bonus_type",
               default="alchemical",
               hint="1e stacks untyped bonuses and does not stack two of a kind."),
@@ -223,6 +319,21 @@ CATEGORIES: list[Category] = [
                 Field("stopped_by", "Stopped by", "text", required=False,
                       default="DC 15 Heal check"),
             ]),
+            # Enervation, energy drain, the resurrection of a dead character. Thirty-one
+            # spells state it and none could say it: written as an `ability_damage` it
+            # damages the wrong thing, and written as a `narrative` the GM gets a
+            # paragraph where they wanted a number.
+            EffectType("negative_level", "Negative levels", "One negative level", [
+                Field("amount", "How many", "signed_formula", default=1),
+                Field("becomes_permanent", "Becomes permanent", "text", required=False,
+                      hint="What the book says about it sticking: '24 hours later, "
+                           "Fortitude DC 18 negates'. Empty for one that never does."),
+            ], engine=False,
+                blocked="Recorded, counted and shown to the GM with what it costs — −1 "
+                        "on every attack, save, skill and ability check, −5 hit points, "
+                        "−1 caster level, each. Not applied: a negative level moves "
+                        "eight different numbers on the sheet at once and applying seven "
+                        "of them would be worse than applying none."),
         ]),
 
     Category(
@@ -258,6 +369,19 @@ CATEGORIES: list[Category] = [
                        "Eliminates fatigue for 8 hours", [
                 Field("target", "Condition", "choice", vocab="condition"),
             ]),
+            # Charm person, calm emotions, the whole Diplomacy-adjacent enchantment
+            # family — thirty-three spells set where a creature sits on 1e's attitude
+            # track, and there was no track. Written as prose, "the target becomes
+            # friendly" is a sentence; written here it is a value a later check can be
+            # made against.
+            EffectType("attitude", "Attitude", "The target becomes friendly", [
+                Field("target", "Becomes", "choice", vocab="attitude"),
+                Field("towards", "Towards", "choice", vocab="recipient",
+                      required=False, default="caster"),
+            ], engine=False,
+                blocked="Recorded on the creature and shown to the GM. No check in the "
+                        "app consults an attitude yet — Diplomacy is rolled against a DC "
+                        "the GM sets, not against a track."),
         ]),
 
     Category(
@@ -300,6 +424,54 @@ CATEGORIES: list[Category] = [
             ], blocked="Applied when a creature has it — half again as much damage of "
                        "that type. A consumable that inflicts it is recorded and "
                        "narrated."),
+            # Displacement, blur, entropic shield and blurred movement are *entirely*
+            # this, and every one of them was inert: with no way to say "miss chance"
+            # they had to be written as narrative, and the alternative — writing 50% as
+            # an AC bonus — changes which attacks land rather than how many.
+            #
+            # Executable. The attack path rolls it as a percentile before damage, and
+            # `invisible` carries one in the condition table, which is what finally lets
+            # that condition mean something.
+            EffectType("concealment", "Concealment", "50% miss chance for 5 rounds", [
+                Field("miss_chance", "Miss chance %", "int", default=20,
+                      hint="20 for concealment, 50 for total concealment. 1e has no "
+                           "other values."),
+                Field("blocks_targeting", "Cannot be targeted", "choice", vocab="yes_no",
+                      required=False, default="no",
+                      hint="Total concealment does; displacement explicitly does not — "
+                           "enemies still target it normally and still miss half the "
+                           "time."),
+            ]),
+            EffectType("spell_resistance", "Spell resistance", "SR 12 + caster level", [
+                Field("amount", "Rating", "signed_formula",
+                      hint="A number, or a formula: 12 + caster_level."),
+            ], engine=False,
+                blocked="Recorded on the sheet and shown to the GM. `_op_cast` rolls no "
+                        "check to overcome spell resistance — no creature in the app "
+                        "carries a rating for it to check against, and half a check "
+                        "would be worse than none. docs/spells.md §5.1."),
+        ]),
+
+    Category(
+        "object", "Objects",
+        "Gear rather than the creature carrying it. An object has hardness and hit "
+        "points of its own and neither is on anybody's character sheet.",
+        [
+            # Shatter, warp wood, rusting grasp, heat metal, a disintegrate aimed at a
+            # door. `rules/sheet.py` gives every `Item` a hardness and hit points and
+            # `damage_all_gear` already puts damage through both, so this is the one
+            # missing piece: a way for an authored effect to reach it. Naming an item is
+            # optional because the spells that do this usually do not — shatter takes
+            # everything crystalline in the area.
+            EffectType("object_damage", "Damage to gear", "2d6 to everything carried", [
+                Field("dice", "How much", "dice"),
+                Field("damage_type", "Type", "choice", vocab="damage_type",
+                      default="untyped",
+                      hint="Energy is halved against objects before hardness — except "
+                           "acid, which bites."),
+                Field("item", "Which item", "text", required=False,
+                      hint="By name. Empty means everything the target carries."),
+            ]),
         ]),
 
     Category(
@@ -365,6 +537,119 @@ CATEGORIES: list[Category] = [
         ]),
 
     Category(
+        "presence", "Put into the scene",
+        "A thing that is now *there* — fog, a wall, a light, a summoned creature. It "
+        "occupies squares, it has a lifetime, and it goes away when that runs out.",
+        [
+            # The user's "temp-spawning", and it is executable because the state it needs
+            # already exists. `rules/grid.py` keeps `obscuring`, `blocked` and `difficult`
+            # square sets; the tactical map draws them and `Grid.reachable` and
+            # `line_of_sight` already route around them. A fog cloud is 20 feet of
+            # obscuring squares, a wall of stone is blocked squares, grease is difficult
+            # squares — nothing new had to be invented, only written to.
+            #
+            # `Scene.pools` is the precedent for the other half: a positioned thing with
+            # a lifetime, ticked and cleared with the encounter. `Scene.manifests` is the
+            # same idea with squares instead of a point.
+            EffectType(
+                "manifest", "Something appears",
+                "A bank of fog fills a 20-foot radius for 10 minutes", [
+                    Field("what", "What appears", "text",
+                          hint="a bank of fog, a wall of stone, four dancing lights."),
+                    Field("terrain", "Does to its squares", "choice", vocab="terrain",
+                          default="obscuring"),
+                    Field("shape", "Shape", "choice", vocab="manifest_shape",
+                          default="radius", required=False),
+                    Field("size", "Size in feet", "int", required=False,
+                          hint="The radius of a spread, or the length of a line or wall."),
+                    Field("on_enter", "Happens to whoever enters it", "effects",
+                          required=False,
+                          hint="A hazard rather than a shape: acid fog's damage, an "
+                               "etheric shard's cut. Left empty for plain terrain."),
+                ],
+                blocked="Its squares are written onto the map and cleared when it "
+                        "expires. On a scene with no grid it is recorded and narrated — "
+                        "there is nowhere to put squares."),
+            # Routed to the same `bestiary.instantiate` the `spawn` op uses rather than
+            # given a creature system of its own. That is the whole design: a summoning
+            # spell and a GM saying "two thugs step out of the dark" are the same event.
+            EffectType(
+                "summon", "A creature arrives", "Summons one celestial dog for 5 rounds",
+                [
+                    Field("creature", "Which creature", "text",
+                          hint="By its name on the Bestiary bench — 782 stat blocks plus "
+                               "guildhand, watchman, thug and guard dog."),
+                    Field("count", "How many", "int", required=False, default=1),
+                    Field("side", "Fights for", "choice", vocab="side",
+                          required=False, default="caster",
+                          hint="Whose side it arrives on."),
+                ],
+                blocked="A creature the Bestiary does not carry is refused by name "
+                        "rather than invented — a summon that quietly produces nothing "
+                        "is worse than one that says which name it did not recognise."),
+        ]),
+
+    Category(
+        "spellcraft", "Acting on magic itself",
+        "Permanency, dispel magic, counterspelling, suppression: spells whose target is "
+        "another spell rather than a creature.",
+        [
+            EffectType(
+                "spell_operation", "Do something to a spell",
+                "Makes the duration of the spell it follows permanent", [
+                    Field("operation", "What it does", "choice", vocab="spell_operation",
+                          default="dispel"),
+                    Field("target", "Which magic", "text", required=False,
+                          hint="A spell by name, or in words: 'the spell you just cast', "
+                               "'one magical effect on the target'. Empty means the GM "
+                               "picks at the table."),
+                    Field("check_dc", "Caster level check DC", "formula", required=False,
+                          hint="Where the book calls for one: 11 + caster_level for "
+                               "dispel magic. Empty means no check is rolled."),
+                    Field("everything", "Everything on them", "choice", vocab="yes_no",
+                          required=False, default="no",
+                          hint="Greater dispel magic ends every effect it beats, not "
+                               "the one the caster names."),
+                ],
+                blocked="Making permanent, ending and holding off are applied to the "
+                        "real lifetimes the engine keeps — a buff's rounds, a "
+                        "condition's, a manifested thing's — and the caster level check "
+                        "is rolled where a DC is given. Countering and absorbing are "
+                        "recorded for the GM: both happen during somebody else's "
+                        "casting, and the engine has no readied-action step to hang "
+                        "them on."),
+        ]),
+
+    Category(
+        "choice", "One of several",
+        "The spell offers forms and the caster picks one. Written as separate effects "
+        "they all apply at once, which is every polymorph spell turning you into all "
+        "five shapes simultaneously.",
+        [
+            EffectType(
+                "choose_one", "Choose one of these",
+                "Blindness or deafness, whichever you choose", [
+                    Field("options", "The options", "effects",
+                          hint="One entry per form. Group a form that is several effects "
+                               "at once with 'All of these together'."),
+                    Field("chosen", "Chosen", "int", required=False,
+                          hint="Which option applies, counting from 1. Left empty until "
+                               "the caster says."),
+                ],
+                blocked="Exactly one option applies, and only when one has been chosen. "
+                        "A cast that names none applies none and says so — applying all "
+                        "of them is the failure this type exists to stop."),
+            EffectType(
+                "bundle", "All of these together",
+                "Beast shape I, bear: +2 Strength, +2 natural armour, scent", [
+                    Field("label", "Called", "text",
+                          hint="The name of this form or option — 'bear', 'Small "
+                               "elemental', 'restore a lost memory'."),
+                    Field("effects", "What it does", "effects"),
+                ]),
+        ]),
+
+    Category(
         "narrative", "Narrative only",
         "Says what happens without claiming a number. Explicit, so that prose is never "
         "mistaken for a mechanic the engine will apply.",
@@ -393,14 +678,200 @@ def find(type_id: str) -> tuple[Category, EffectType] | None:
     return None
 
 
+# --- formulas -------------------------------------------------------------------------------
+#
+# `amount` was an int, and that single fact put a whole family of spells out of reach:
+# "an insight bonus equal to your caster level, maximum +5", "+1 per four caster levels",
+# "half your caster level". Divine favor, divine power, authenticating gaze, lay of the
+# land, liberating command, ward the faithful, wrath, wave shield and protection from
+# spores all state their bonus as a formula and all had to be stored as a flat number with
+# the real rule in a `note` that nothing reads — a spell that silently stops scaling.
+#
+# The variables are named rather than positional, and the list is closed: a formula naming
+# something that is not in here is rejected at authoring time with the list in the message.
+# That is the same rule the descriptor vocabulary follows — a guessed name is worse than a
+# refusal, because it produces a number instead of an error.
+FORMULA_VARS: dict[str, str] = {
+    "caster_level": "The caster's caster level.",
+    "level": "The character's class level. The same as caster level for a full caster.",
+    "spell_level": "The level of the slot this was cast from.",
+    "hit_dice": "The creature's Hit Dice.",
+    "casting_mod": "The caster's casting ability modifier — Int, Wis or Cha.",
+    "str_mod": "The Strength modifier.", "dex_mod": "The Dexterity modifier.",
+    "con_mod": "The Constitution modifier.", "int_mod": "The Intelligence modifier.",
+    "wis_mod": "The Wisdom modifier.", "cha_mod": "The Charisma modifier.",
+}
+
+
+class BadFormula(ValueError):
+    """A formula that cannot be evaluated, with the reason in the message."""
+
+
+def _formula_names(expr: str) -> set[str]:
+    """Every variable a formula names, or a raise. The parse *is* the validation.
+
+    Built on `ast` rather than on a regex because a regex that recognises `min(1 +
+    caster_level/3, 3)` also recognises `min(1 + caster_level/3, 3` and half a dozen other
+    things that are not expressions. The whitelist below is what makes evaluating an
+    authored string safe: no attribute access, no subscripts, no calls except min and max,
+    and no names except the ones `FORMULA_VARS` declares.
+    """
+    import ast
+
+    try:
+        tree = ast.parse(str(expr), mode="eval")
+    except SyntaxError as exc:
+        raise BadFormula(f"{expr!r} is not an expression") from exc
+
+    # Operators are nodes of their own in the tree — `ast.walk` yields `Add` beside the
+    # `BinOp` that holds it — so they are whitelisted here rather than only inside the
+    # BinOp branch. The first version checked only the BinOp and rejected `1 +
+    # caster_level` on the operator it had just approved.
+    allowed = (ast.Expression, ast.Load, ast.Constant, ast.Name, ast.Call, ast.BinOp,
+               ast.UnaryOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv,
+               ast.UAdd, ast.USub)
+    names: set[str] = set()
+    called: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, allowed):
+            raise BadFormula(f"{type(node).__name__.lower()} is not allowed in a formula")
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in ("min", "max"):
+                raise BadFormula("only min() and max() may be called")
+            called.add(node.func.id)
+            if not node.args or node.keywords:
+                raise BadFormula(f"{node.func.id}() takes numbers, in brackets")
+    return names - called
+
+
+def is_formula(value) -> bool:
+    """Whether this is a formula this module can evaluate. Plain integers are not.
+
+    `None` is not, and saying so takes an explicit line: `str(None)` is `"None"`, which
+    parses as a perfectly valid constant expression naming no unknown variables — so the
+    obvious version of this answered True for a field that was simply absent, and the
+    engine then rewrote every missing `amount` as the number 0.
+    """
+    if value is None or isinstance(value, (int, float)) or not str(value).strip():
+        return False
+    try:
+        names = _formula_names(value)
+    except BadFormula:
+        return False
+    # A bare constant is a number written oddly, not a formula, and nothing is gained by
+    # sending "7" through the evaluator.
+    return bool(names) and names <= set(FORMULA_VARS)
+
+
+def evaluate(expr, context: dict | None = None) -> int:
+    """A formula as a number, for this caster.
+
+    Division floors, because 1e floors: "+1 per three caster levels" at caster level 5 is
+    +1, not +1.67 and not +2. Python's `/` on two ints would give the fraction, so both
+    kinds of divide are rounded down here rather than left to whichever the author typed.
+
+    An unknown variable evaluates to 0 rather than raising, and that is deliberate: the
+    refusal belongs at authoring time, where `validate` names the whole list of variables
+    in a message the author can act on, not at resolution time in the middle of a fight.
+    """
+    if isinstance(expr, (int, float)):
+        return int(expr)
+    text = str(expr).strip()
+    if not text:
+        return 0
+    try:
+        return int(text)
+    except ValueError:
+        pass
+
+    import ast
+
+    ctx = {k: int(v) for k, v in (context or {}).items() if isinstance(v, (int, float))}
+    _formula_names(text)                      # raises BadFormula on anything unsafe
+
+    def walk(node):
+        if isinstance(node, ast.Expression):
+            return walk(node.body)
+        if isinstance(node, ast.Constant):
+            return int(node.value)
+        if isinstance(node, ast.Name):
+            return int(ctx.get(node.id, 0))
+        if isinstance(node, ast.UnaryOp):
+            return -walk(node.operand) if isinstance(node.op, ast.USub) \
+                else walk(node.operand)
+        if isinstance(node, ast.Call):
+            args = [walk(a) for a in node.args]
+            return (min if node.func.id == "min" else max)(*args)
+        if isinstance(node, ast.BinOp):
+            a, b = walk(node.left), walk(node.right)
+            if isinstance(node.op, ast.Add):
+                return a + b
+            if isinstance(node.op, ast.Sub):
+                return a - b
+            if isinstance(node.op, ast.Mult):
+                return a * b
+            if b == 0:
+                raise BadFormula("division by zero")
+            return a // b
+        raise BadFormula("unreadable formula")
+
+    return int(walk(ast.parse(text, mode="eval")))
+
+
+# --- dice that scale --------------------------------------------------------------------------
+#
+# Harm, implosion and wail of the banshee deal a flat 10 points per caster level and none
+# of them could be written: `dice` had to *be* dice, so `10` was the only legal thing to
+# put there and it is wrong at every caster level above 1st by a factor of the level.
+#
+# `rules/spells.py` already solves the scaling problem for a *spell* — one formula on the
+# spell, applied by `effects_at` — and that stays the right place for a spell. This is for
+# the other authors: a homebrew feat, a magic item, a creature ability, all of which carry
+# effects with no spell around them to hold a `scaling` dict.
+_PER_LEVEL_DICE = re.compile(
+    r"^\s*(?P<count>\d*)(?:d(?P<die>\d+))?\s*(?:/|\s+per\s+)\s*(?P<every>\d*)\s*"
+    r"(?:caster\s+)?levels?\s*(?:,?\s*max(?:imum)?\s*(?P<cap>\d+)\s*(?:d\d+)?)?\s*$",
+    re.I)
+
+
+def resolve_dice(value, caster_level: int = 1) -> str:
+    """`"10/level"` at caster level 15 is `"150"`; `"1d6/2 levels"` at 7 is `"3d6"`.
+
+    Anything that is already plain dice comes back untouched, so every existing spec goes
+    through here unchanged. The floor is one die or one point — "1d8 per two caster
+    levels" at 1st is the smallest the effect can be, not nothing at all, which is the
+    same rule `spells.scaling_dice` applies and for the same reason.
+    """
+    text = str(value or "").strip()
+    m = _PER_LEVEL_DICE.match(text)
+    if not m:
+        return text
+    cl = max(1, int(caster_level))
+    every = max(1, int(m.group("every") or 1))
+    count = max(1, int(m.group("count") or 1))
+    total = max(count, count * (cl // every))
+    cap = int(m.group("cap") or 0)
+    if cap:
+        total = min(total, cap)
+    return f"{total}d{m.group('die')}" if m.group("die") else str(total)
+
+
 # --- validation ---------------------------------------------------------------------------
 
-def validate(spec: dict, path: str = "effect") -> list[str]:
+def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False) -> list[str]:
     """Everything wrong with one authored effect, named.
 
     Returned as a list rather than raised, because the editor shows all of a form's
     problems at once and a builder that reports them one at a time is a builder nobody
     finishes a complex effect in.
+
+    `inherits_window` says the parent already supplies the lifetime — a hazard inside a
+    manifestation's `on_enter` burns for as long as the cloud stands, and asking it to
+    restate the cloud's duration would put the same fact in two places for the two to
+    then disagree about. Keyword-only and defaulted, so every existing caller is
+    untouched.
     """
     problems: list[str] = []
     type_id = str(spec.get("type", "")).strip()
@@ -428,30 +899,103 @@ def validate(spec: dict, path: str = "effect") -> list[str]:
                 int(value)
             except (TypeError, ValueError):
                 problems.append(f"{path}: {f.label.lower()} must be a number.")
+        elif f.kind == "signed_formula":
+            # A number *or* a formula, and the difference is checked rather than assumed:
+            # an amount of "caster_lvl" is a typo for `caster_level` and would otherwise
+            # sail through and evaluate to zero — a bonus of +0, which is a bug nobody
+            # sees because it looks exactly like a spell that did nothing.
+            try:
+                int(value)
+            except (TypeError, ValueError):
+                head = f"{path}: {f.label.lower()} must be a number or a formula"
+                try:
+                    unknown = sorted(_formula_names(value) - set(FORMULA_VARS))
+                except BadFormula as exc:
+                    problems.append(f"{head} — {exc}.")
+                else:
+                    if unknown:
+                        problems.append(
+                            f"{head}, and {', '.join(unknown)} is not something a "
+                            f"formula can use. One of: "
+                            f"{', '.join(sorted(FORMULA_VARS))}.")
         elif f.kind == "dice":
             if not _is_dice(str(value)):
                 problems.append(
                     f"{path}: {value!r} is not dice. Write 1d4, 2d6+2 or a number.")
         elif f.kind == "effects":
             for i, nested in enumerate(value or []):
-                problems.extend(validate(nested, f"{path} > {f.label.lower()} {i + 1}"))
+                problems.extend(validate(
+                    nested, f"{path} > {f.label.lower()} {i + 1}",
+                    inherits_window=(f.id == "on_enter")))
 
     if spec.get("uses") not in (None, "", "unlimited") and not spec.get("uses_count"):
         problems.append(f"{path}: a use limit needs a count.")
+
+    # A trigger that is not "immediately" needs something to keep it alive. Without a
+    # duration `each_round` has no rounds and `when_struck` has no window to be struck
+    # in, so the effect would be authored, accepted, and never fire once — the silent
+    # failure docs/homebrew-rules.md §1 exists to prevent, arriving by a new route.
+    trigger = str(spec.get("trigger") or "on_cast")
+    if trigger not in ("on_cast", "") and not inherits_window \
+            and not _lasts(spec.get("duration")):
+        problems.append(
+            f"{path}: '{_vocab_name('trigger', trigger)}' needs a duration — without one "
+            f"there is no window for it to fire in and it would never happen.")
+
+    if type_id == "choose_one":
+        options = spec.get("options") or []
+        if len(options) < 2:
+            problems.append(
+                f"{path}: a choice needs at least two options. One option is not a "
+                f"choice, it is just that effect.")
+        chosen = spec.get("chosen")
+        if chosen not in (None, "") and not 1 <= int(chosen) <= len(options):
+            problems.append(
+                f"{path}: option {chosen} was chosen and there are {len(options)}.")
+
+    if type_id == "manifest":
+        if str(spec.get("terrain") or "none") != "none" and not spec.get("size"):
+            problems.append(
+                f"{path}: a shape that changes its squares needs a size in feet — "
+                f"without one there is nothing to write onto the map.")
+
     return problems
 
 
+def _lasts(duration) -> bool:
+    """Whether this duration is a window rather than an instant."""
+    if not isinstance(duration, dict):
+        return False
+    unit = str(duration.get("unit", ""))
+    if unit == "permanent":
+        return True
+    if unit in ("", "instant"):
+        return False
+    return str(duration.get("amount", "")).strip() not in ("", "0")
+
+
+def _vocab_name(vocab: str, value) -> str:
+    for option in VOCAB.get(vocab, []):
+        if option["id"] == str(value):
+            return option["name"]
+    return str(value)
+
+
 def _is_dice(s: str) -> bool:
-    """`1d4`, `2d6+2`, a flat number, or the corpus's own `1-4`.
+    """`1d4`, `2d6+2`, a flat number, the corpus's own `1-4`, or `10/level`.
 
     The herb document writes healing as "roll 1-4 to see how many hit points", which is a
     d4 by another name. Refusing the notation would have rejected four real entries for a
     difference in spelling.
-    """
-    import re
 
+    `10/level` and `1d6/2 levels` were added last, for harm, implosion and wail of the
+    banshee — a flat 10 points per caster level, which `dice: "10"` gets wrong at every
+    level above 1st. Strictly more is accepted than before, so nothing that validated
+    stops validating.
+    """
     return bool(re.fullmatch(
-        r"\s*\d*\s*d\s*\d+\s*(?:[+-]\s*\d+)?\s*|\s*\d+\s*|\s*\d+\s*-\s*\d+\s*", s, re.I))
+        r"\s*\d*\s*d\s*\d+\s*(?:[+-]\s*\d+)?\s*|\s*\d+\s*|\s*\d+\s*-\s*\d+\s*", s, re.I)
+        or _PER_LEVEL_DICE.match(s))
 
 
 def executable(spec: dict) -> bool:
@@ -480,7 +1024,7 @@ def render(spec: dict) -> str:
     dur = _duration(spec.get("duration"))
 
     if t in ("ability_mod", "skill_mod", "save_mod", "combat_mod", "situational_mod"):
-        sign = f"{int(amount):+d}" if amount is not None else "?"
+        sign = _signed(amount)
         # The note carries the qualifier a dropdown cannot hold — "to staunch bleeding" —
         # without which two bonuses on the same skill read as the same effect twice.
         qualifier = str(spec.get("note") or "").strip()
@@ -525,7 +1069,7 @@ def render(spec: dict) -> str:
         rng = f" {spec['range']} ft" if spec.get("range") else ""
         body = f"{_label(etype, target)}{rng}"
     elif t == "speed":
-        body = f"{int(amount):+d} ft {_label(etype, target).lower()}"
+        body = f"{_signed(amount)} ft {_label(etype, target).lower()}"
     elif t == "spell_effect":
         cl = f", caster level {spec['caster_level']}" if spec.get("caster_level") else ""
         body = f"Acts as {target}{cl}"
@@ -539,20 +1083,124 @@ def render(spec: dict) -> str:
         if ok:
             parts.append("save: " + ", ".join(ok))
         body = " · ".join(parts)
+    elif t == "manifest":
+        what = str(spec.get("what") or "something")
+        # The dropdown's own label explains the shape to somebody choosing one — "A
+        # spread from a point" — and reads as nonsense in a sentence. The card gets the
+        # noun instead.
+        shape = {"radius": "radius spread", "line": "line", "wall": "wall",
+                 "square": "block", "cone": "cone",
+                 "point": "square"}.get(str(spec.get("shape") or "radius"), "spread")
+        terrain = str(spec.get("terrain") or "none")
+        does = {"obscuring": "blocking sight", "blocked": "solid",
+                "difficult": "difficult ground"}.get(terrain, "")
+        body = what[:1].upper() + what[1:]
+        if spec.get("size"):
+            body += f" — a {spec['size']}-foot {shape}"
+        if does:
+            body += f", {does}"
+        hazard = [render(e) for e in spec.get("on_enter") or []]
+        if hazard:
+            body += " · on entering: " + ", ".join(hazard)
+    elif t == "summon":
+        n = int(spec.get("count") or 1)
+        body = f"Summons {n} {spec.get('creature') or 'creature'}" + ("s" if n > 1 else "")
+    elif t == "spell_operation":
+        what = str(spec.get("target") or "a magical effect")
+        body = f"{_vocab_name('spell_operation', spec.get('operation'))}: {what}"
+        if str(spec.get("everything")) == "yes":
+            body += " — and everything else on them"
+        if spec.get("check_dc"):
+            body += f" (caster level check, DC {spec['check_dc']})"
+    elif t == "choose_one":
+        options = spec.get("options") or []
+        chosen = spec.get("chosen")
+        if chosen not in (None, "") and 1 <= int(chosen) <= len(options):
+            body = f"Chosen: {render(options[int(chosen) - 1])}"
+        else:
+            body = "One of: " + " / ".join(render(o) for o in options) if options \
+                else "One of — nothing to choose from"
+    elif t == "bundle":
+        inner = ", ".join(render(e) for e in spec.get("effects") or [])
+        label = str(spec.get("label") or "").strip()
+        body = f"{label}: {inner}" if label else inner
+    elif t == "concealment":
+        body = f"{spec.get('miss_chance', 20)}% miss chance"
+        if str(spec.get("blocks_targeting")) == "yes":
+            body += ", and cannot be targeted"
+    elif t == "spell_resistance":
+        body = f"Spell resistance {amount}"
+    elif t == "negative_level":
+        n = str(amount or 1)
+        body = f"{n} negative level" + ("" if n == "1" else "s")
+        if spec.get("becomes_permanent"):
+            body += f" ({spec['becomes_permanent']})"
+    elif t == "attitude":
+        towards = _vocab_name("recipient", spec.get("towards") or "caster").lower()
+        body = f"Attitude towards {towards}: {_label(etype, target).lower()}"
+    elif t == "object_damage":
+        what = str(spec.get("item") or "").strip() or "everything carried"
+        body = f"{dice} {spec.get('damage_type', 'untyped')} damage to {what}"
     else:
         body = str(target or spec.get("note") or etype.name)
         body = body[:1].upper() + body[1:]
+
+    # Who and when, appended rather than woven in, so the sentence a type already produced
+    # is unchanged whenever the two are left at their defaults — which is all 6,476 of the
+    # specs that existed before these fields did.
+    aim = _aim(spec)
+    if aim:
+        body += f", {aim}"
 
     if dur == "permanent":
         # "for permanent" is not English. Found in an authored entry: a +10 Strength with
         # no expiry read "+10 Strength for permanent".
         body += " (permanent)"
     elif dur:
-        body += f" for {dur}"
+        # The comma only when something was already appended, so "+2 Climb checks for 1
+        # hour" is untouched and "…, on whoever struck them, for 5 rounds" does not run
+        # its two clauses together.
+        body += (", " if aim else " ") + f"for {dur}"
     limit = _uses(spec)
     if limit:
         body += f" ({limit})"
     return body
+
+
+# How each of the two lands in a sentence. Kept as phrases rather than reusing the
+# dropdown's own labels, because "Whoever struck them" reads as a heading and "on whoever
+# struck them" reads as English — and the card is read by a player, not by a form.
+_RECIPIENT_PHRASE = {
+    "target": "", "self": "on whoever has it", "caster": "on the caster",
+    "attacker": "on whoever struck them", "ally": "on an ally",
+    "area": "on everything in the area",
+}
+_TRIGGER_PHRASE = {
+    "on_cast": "", "each_round": "every round", "when_struck": "when struck in melee",
+    "when_grappled": "when grappled", "on_enter": "on entering it",
+    "on_expiry": "when it ends",
+}
+
+
+def _aim(spec: dict) -> str:
+    """"every round, on everything in the area" — or "" when both are at their default."""
+    bits = [_TRIGGER_PHRASE.get(str(spec.get("trigger") or "on_cast"), ""),
+            _RECIPIENT_PHRASE.get(str(spec.get("recipient") or "target"), "")]
+    return ", ".join(b for b in bits if b)
+
+
+def _signed(amount) -> str:
+    """`+2`, `-4`, or a formula left as the author wrote it.
+
+    A formula is not signed and must not be forced into a sign: "+caster_level/2" is not
+    something anybody writes, and `int()` on it used to be a crash on the card.
+    """
+    if amount is None or str(amount).strip() == "":
+        return "?"
+    try:
+        return f"{int(amount):+d}"
+    except (TypeError, ValueError):
+        return str(amount)
 
 
 def _label(etype: EffectType, value) -> str:

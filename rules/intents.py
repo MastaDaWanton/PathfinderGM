@@ -222,7 +222,15 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # guessing at it would produce confident wrong numbers. Anything mechanical the GM
     # narrates comes back as its own `damage`, `condition` or `save` intent and is
     # validated like everything else. See docs/intent-protocol.md §11.
-    "cast": (("spell",), ("at", "level", "defensively"), "hidden"),
+    # `square` is where a spell that puts something into the scene puts it — a fog
+    # cloud's centre. Without it a manifest lands on the target's square, or the caster's
+    # when there is no target, which is right often enough to be a default and wrong
+    # often enough to need saying.
+    #
+    # `choose` names which branch of a `choose_one` effect the caster picked. A spell
+    # that offers five forms and is cast without naming one applies none of them, which
+    # is the whole point of the type: applying all five is what it exists to stop.
+    "cast": (("spell",), ("at", "level", "defensively", "square", "choose"), "hidden"),
     # Crafted potions and tinctures doing something. `how` is drink, throw or coat, and
     # the difference is real: a splash weapon is a ranged touch attack and a coated blade
     # waits for the next hit. Before these an item was a paragraph in a satchel.

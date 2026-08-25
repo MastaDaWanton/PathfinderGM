@@ -94,6 +94,16 @@ class Dice:
             lo, hi = int(r.group(1)), int(r.group(2))
             if hi > lo:
                 return 1, hi - lo + 1, lo - 1
+        # A flat number is a legal amount of damage and always has been —
+        # `effectspec._is_dice` has accepted one since it was written, and harm's "10
+        # points per caster level" resolves to a bare "150" at caster level 15. Refusing
+        # it here meant an authored effect that validated cleanly and then raised BadDice
+        # in the middle of resolution, which is the worst of both answers.
+        #
+        # Zero dice of one face, plus the number as the flat term: `roll` rolls nothing
+        # and the total is exactly what was asked for.
+        if re.fullmatch(r"\s*\d+\s*", str(notation or "")):
+            return 0, 1, int(str(notation).strip())
         m = DICE_RE.match(notation)
         if not m:
             raise BadDice(f"cannot read dice notation {notation!r}")
