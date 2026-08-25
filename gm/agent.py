@@ -163,6 +163,10 @@ class GMAgent:
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
+                # After `inject_goods`, which bows out when a `give` is already present:
+                # selling is the more specific reading of handing something over, and it
+                # is the one that pays.
+                raw = judgement.inject_sale(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,

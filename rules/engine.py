@@ -2387,6 +2387,94 @@ class Engine:
             effects=effects, tell=tell.strip(), because=intent.because,
         )
 
+    def _op_sell(self, intent: Intent, partial: dict) -> Outcome:
+        """Hand something over and be paid for it.
+
+        Measured, and the reason this exists: a player asked a stallholder to price a
+        satchel holding a potency-1,335 draught, haggled her from ten gold up to
+        twenty-two and shook her hand on it. Every turn of that resolved to
+        `narrate_only`. No item moved, no coin moved, and the purse was empty afterwards
+        — "it's also obvious the vender in this interaction did not actually see what i
+        was trying to give her it was completely narrative", which was exactly true.
+
+        The stall's till is the interesting half. `market.can_pay` caps the payment at
+        what this shop has on hand today, and the cap is an offer rather than a refusal:
+        a stallholder short of the asking price puts down what they have, and whether
+        that is worth taking is the player's decision, not the engine's.
+        """
+        from . import market as market_mod
+        from . import pricing
+
+        actor = self.scene.actors[intent.actor]
+        item_id = str(intent.params["item"]).strip().lower()
+        count = max(1, int(intent.params.get("count") or 1))
+
+        held = actor.stock.get(item_id)
+        if held is None or held.count < 1:
+            raise IntentError(
+                f"sell: {actor.name} is not carrying {item_id!r}. They have: "
+                f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}", "legality")
+        count = min(count, held.count)
+
+        buyer = intent.params.get("to")
+        if buyer and buyer not in self.scene.actors:
+            raise IntentError(f"sell: unknown buyer {buyer!r}", "refs")
+        who = self.scene.actors[buyer].name if buyer else "the stallholder"
+
+        # The same three coordinates the shelf is drawn on, read the same way
+        # `craft_views` reads them, so a stall's money and its stock agree about which
+        # shop on which day this is.
+        place = str(self.scene.location_id or "nowhere")
+        stall = str(intent.params.get("stall") or buyer or "market")
+        day = market_mod.day_of(self.scene.clock_minutes)
+
+        asking = round(pricing.what_a_shop_pays(held) * count, 2)
+        # A price the player has already agreed to caps the ask — that is the haggle,
+        # and the trade screen is where it gets named. It can only ever lower the price
+        # asked: a player cannot talk a stall into paying more than the goods are worth
+        # by writing a bigger number into the intent.
+        agreed = intent.params.get("accept")
+        if agreed is not None:
+            try:
+                asking = min(asking, max(0.0, float(agreed)))
+            except (TypeError, ValueError):
+                pass
+
+        paid = market_mod.can_pay(self.scene.market_taken, asking, place, stall, day)
+        if paid <= 0:
+            return Outcome(
+                intent_id=intent.id, op="sell", effects=[],
+                tell=f"{who} turns out the till and finds nothing left in it today. "
+                     f"Nothing changes hands.",
+                because=intent.because,
+            )
+
+        # `take_stock` answers how many were *taken*, not how many are left — reading it
+        # as "left" reported a sold-out jar as having one still on the shelf.
+        sold = actor.take_stock(item_id, count)
+        left = actor.stock[item_id].count if item_id in actor.stock else 0
+        cp = int(round(paid * 100))
+        actor.purse = goods.credit(actor.purse, cp)
+        market_mod.mark_spent(self.scene.market_taken, paid, place, stall, day)
+
+        coins = goods.coinage()
+        short = paid < asking
+        tell = (f"{actor.name} hands over {sold}x {held.name} and takes "
+                f"{goods.purse_line(goods.coins_for(cp), coins)}")
+        if short:
+            # Said out loud, because a silent shortfall reads as a bad price rather than
+            # an empty till, and the difference is the whole point of the cap.
+            tell += (f" — all {who} can raise today, against "
+                     f"{pricing.as_text(asking)} asked")
+        tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
+
+        return Outcome(
+            intent_id=intent.id, op="sell",
+            effects=[{"ref": actor.ref, "kind": "sold", "item": held.name,
+                      "count": sold, "paid_cp": cp, "left": left}],
+            tell=tell, because=intent.because,
+        )
+
     def _op_cast(self, intent: Intent, partial: dict) -> Outcome:
         """Cast a spell: spend the slot, state the numbers, and roll what the spell says.
 

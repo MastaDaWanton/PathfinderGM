@@ -96,6 +96,67 @@ def mark_sold(taken: dict, material_id: str, place: str, stall: str, day: int) -
     taken[k] = int(taken.get(k, 0)) + 1
 
 
+# --- what the stall can actually pay ---------------------------------------------------
+#
+# A market herbalist cannot hand over 1,325 gold for one bottle, and until this existed
+# nothing said so: the shop's side of a trade was as unmodelled as the trade itself.
+#
+# Drawn the same way the shelf is — seeded on (place, stall, day) — so walking out and
+# back in does not reroll the till, and tomorrow is a fresh day's takings. Nothing has to
+# be written to the save for that.
+#
+# Generous, by instruction: "give everyone a good bit of coin". These are the float a
+# stall has on hand, not its net worth, and the band is wide enough that two stalls in
+# one town feel different to sell to.
+PURSE_BY_TIER: dict[str, tuple[int, int]] = {
+    "common": (40, 120),
+    "uncommon": (150, 400),
+    "rare": (500, 1200),
+    "exotic": (1500, 3500),
+    "legendary": (5000, 12000),
+}
+
+# What a stall is, when nothing says. A town market stall, which is what the player has
+# actually been standing in front of every time this has come up.
+DEFAULT_STALL_TIER = "uncommon"
+
+
+def purse(place: str, stall: str, day: int, tier: str = DEFAULT_STALL_TIER) -> int:
+    """What this stall has in the till today, in gold.
+
+    Deterministic in (place, stall, day) exactly as `stock` is, and keyed apart from it —
+    `stock` seeds a `Random` on the same string, and drawing both from one stream would
+    make the shelf change whenever the purse formula was retuned.
+    """
+    lo, hi = PURSE_BY_TIER.get(str(tier or "").strip().lower(),
+                               PURSE_BY_TIER[DEFAULT_STALL_TIER])
+    return random.Random("purse|" + key(place, stall, day)).randint(lo, hi)
+
+
+def spent_today(taken: dict, place: str, stall: str, day: int) -> float:
+    """What this stall has already paid out today. Same shape as `mark_sold`."""
+    return float((taken or {}).get(f"spent|{key(place, stall, day)}", 0) or 0)
+
+
+def mark_spent(taken: dict, amount: float, place: str, stall: str, day: int) -> None:
+    """Record coin leaving the till. Mutates `taken` in place, like `mark_sold`."""
+    k = f"spent|{key(place, stall, day)}"
+    taken[k] = round(float(taken.get(k, 0) or 0) + max(0.0, float(amount)), 2)
+
+
+def can_pay(taken: dict, asked: float, place: str, stall: str, day: int,
+            tier: str = DEFAULT_STALL_TIER) -> float:
+    """What the stall can put on the counter against a price of `asked`.
+
+    Capped, never refused. "i can still sell to them if i am willing to any get what they
+    can give" — so a stallholder short of the asking price makes a smaller offer rather
+    than turning the player away, and whether that is worth taking is the player's call.
+    A caller that wants the refusal can compare this against `asked` itself.
+    """
+    left = purse(place, stall, day, tier) - spent_today(taken, place, stall, day)
+    return round(max(0.0, min(float(asked or 0), left)), 2)
+
+
 def summary(shelf) -> dict[str, int]:
     """How many of each rarity are on the shelf — for the page, and for a test to count
     without re-deriving the quota."""

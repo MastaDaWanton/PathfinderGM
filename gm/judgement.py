@@ -945,6 +945,67 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
+# --- selling something -----------------------------------------------------------------
+#
+# The ninth of these, and the reason is the usual one: the op exists, the prompt carries
+# it, and the model does not emit it. Measured before the op existed at all — a whole
+# haggle over a satchel of tinctures, four turns, every one of them `narrate_only`.
+#
+# Deliberately narrower than `inject_goods`. That one reads a noun phrase out of the
+# sentence; this one does not have to, because what is being sold has to be something the
+# character is actually carrying — so the *satchel* is the vocabulary, and a name that
+# does not match a jar on the shelf is not a sale.
+_SELLS = re.compile(
+    r"\b(?:i\s+)?(?:sell|sells|selling|offer\s+to\s+sell|hand\s+over|trade\s+away|"
+    r"part\s+with|flog|pawn|barter\s+away)\b", re.I)
+
+# "how much for", "what will you give me for", "name a price for" — asking is not selling
+# and must not move anything. This is the guard `inject_goods` gets from its "?" check,
+# and it is written out here because a haggle is full of statements that are still
+# questions: "twenty gold coins" ends in no question mark at all.
+_JUST_HAGGLING = re.compile(
+    r"\b(?:how\s+much|what\s+(?:will|would|can)\s+you|name\s+a\s+price|"
+    r"what'?s?\s+it\s+worth|price\s+(?:for|these|this|them)|appraise)\b", re.I)
+
+
+def inject_sale(raw_intents, player_text: str, scene) -> list:
+    """Make a declared sale reach the engine.
+
+    Grounded in the satchel rather than in the sentence, which is the difference between
+    this and `inject_goods`: the thing being sold has to be a jar the character is holding
+    right now, so "I sell the draught" finds the draught and "I sell my soul" finds
+    nothing and stays out of the way.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text or _JUST_HAGGLING.search(player_text):
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "sell" in present or "give" in present:
+        return raw_intents
+    if not _SELLS.search(player_text):
+        return raw_intents
+
+    pc = scene.pc()
+    if pc is None or not getattr(pc, "stock", None):
+        return raw_intents
+
+    said = player_text.lower()
+    # Longest name first, so "Yarow Elixir" wins over a jar merely called "Elixir".
+    for item in sorted(pc.stock.values(),
+                       key=lambda s: len(getattr(s, "name", "")), reverse=True):
+        name = str(getattr(item, "name", "")).lower()
+        base = str(getattr(item, "base", "")).lower()
+        for candidate in (name, base):
+            if candidate and len(candidate) > 3 and candidate in said:
+                return list(raw_intents) + [{
+                    "op": "sell", "actor": pc.ref,
+                    "params": {"item": item.id},
+                    "because": "the player said they were selling it",
+                }]
+    return raw_intents
+
+
 # A declared risky action, by the verb that declares it. The same shape as the goods
 # and survival injections and for the same reason: "I was able to sneak out of the
 # tavern without a roll" — the narrator narrated the slipping-out and emitted

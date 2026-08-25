@@ -604,6 +604,11 @@ not need to have chosen the class; doing the work is how they take it up.
 Acid, and anything that eats what a person is carrying:
 {"op": "item_damage", "params": {"amount": "2d6", "type": "acid"}} — name an "item" for
 one thing, or leave it out and everything they carry takes it.
+Selling something out of the satchel:
+{"op": "sell", "actor": "pc", "params": {"item": "<the jar's id>", "count": 1,
+"to": "<the buyer's ref, if they are in the scene>"}} — the engine prices it, checks what
+that stall can actually raise today and moves the coin. Never state a price or a sum of
+money in the narration: what the buyer can pay is not something you know.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 

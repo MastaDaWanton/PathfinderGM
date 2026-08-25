@@ -204,3 +204,74 @@ def test_there_is_no_stall_in_an_empty_field(client):
                     content_type="application/json")
     assert r.status_code == 409
     assert "nobody here selling" in r.json()["error"]
+
+
+
+# --- what the stall can pay ---------------------------------------------------------
+
+def test_a_market_stall_cannot_hand_over_a_thousand_gold():
+    """The shop's side of a trade was as unmodelled as the trade itself. Measured on the
+    real satchel: one Blackthorn purified draught is worth 1,325 gp, and an ordinary town
+    stall was under no constraint at all about being able to buy it."""
+    from rules import market
+
+    till = market.purse("Pangrella", "apothecary", 2)
+    assert 150 <= till <= 400, f"an uncommon stall had {till} gp on hand"
+    assert till < 1325
+
+
+def test_the_till_is_the_same_till_when_you_walk_back_in():
+    """Drawn, not stored — seeded on (place, stall, day) exactly as the shelf is. Walk out
+    and back and the money has not changed; tomorrow is a fresh day's takings."""
+    from rules import market
+
+    assert (market.purse("Pangrella", "apothecary", 2)
+            == market.purse("Pangrella", "apothecary", 2))
+    assert (market.purse("Pangrella", "apothecary", 2)
+            != market.purse("Pangrella", "apothecary", 3))
+
+
+def test_the_purse_and_the_shelf_are_drawn_from_different_streams():
+    """`stock` seeds a Random on `key(place, stall, day)`. Drawing the purse from the same
+    string would make the shelf change every time the purse formula was retuned, which is
+    a shop's entire inventory moving because somebody adjusted how much money it had."""
+    from rules import market
+
+    before = [getattr(m, "id", "") for m in market.stock(
+        [], place="Pangrella", stall="apothecary", day=2)]
+    market.purse("Pangrella", "apothecary", 2)
+    after = [getattr(m, "id", "") for m in market.stock(
+        [], place="Pangrella", stall="apothecary", day=2)]
+    assert before == after
+
+
+def test_a_short_stall_makes_a_smaller_offer_rather_than_refusing():
+    """"i can still sell to them if i am willing to any get what they can give" — so the
+    cap is an offer, not a refusal, and whether it is worth taking is the player's call."""
+    from rules import market
+
+    taken = {}
+    offered = market.can_pay(taken, 1325.6, "Pangrella", "apothecary", 2)
+    assert 0 < offered < 1325.6
+    assert offered == market.purse("Pangrella", "apothecary", 2)
+
+
+def test_coin_that_has_left_the_till_is_gone_until_tomorrow():
+    """Otherwise a stall with 247 gp buys the whole satchel one bottle at a time."""
+    from rules import market
+
+    taken = {}
+    first = market.can_pay(taken, 1000, "Pangrella", "apothecary", 2)
+    market.mark_spent(taken, first, "Pangrella", "apothecary", 2)
+    assert market.can_pay(taken, 200, "Pangrella", "apothecary", 2) == 0
+    # A new day is a new float.
+    assert market.can_pay(taken, 200, "Pangrella", "apothecary", 3) > 0
+
+
+def test_a_richer_house_can_buy_what_a_stall_cannot():
+    """The reason the cap is worth having: selling a masterwork draught becomes a matter
+    of finding somebody who can pay for it, and the refusal is mechanical rather than
+    narrated."""
+    from rules import market
+
+    assert market.purse("Pangrella", "the guild vault", 2, "legendary") > 1325

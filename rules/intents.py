@@ -235,6 +235,17 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # the difference is real: a splash weapon is a ranged touch attack and a coated blade
     # waits for the next hit. Before these an item was a paragraph in a satchel.
     "use_item": (("item",), ("how", "to", "weapon"), "player"),
+    # Selling something. There was no op for this at all, and the absence was not
+    # theoretical: a player asked a stallholder to price a satchel holding a
+    # potency-1,335 draught, haggled her up from ten gold to twenty-two, shook her hand
+    # — and every turn of it resolved to `narrate_only`. No item moved, no coin moved,
+    # and the purse was still empty afterwards. She could not see the goods because
+    # nothing had ever been handed to her.
+    #
+    # `accept` is the price the player agrees to, which is what makes a partial sale
+    # possible: a stall short of the asking price offers what it has, and taking it is
+    # the player's call rather than the engine's refusal.
+    "sell": (("item",), ("count", "to", "stall", "accept"), "player"),
     # Being pulled towards a target you did not choose. `to` is who is compelled; the
     # actor is who they are pulled towards. It penalises and never prohibits — see the
     # header of rules/compulsion.py, which is where that decision is argued.
