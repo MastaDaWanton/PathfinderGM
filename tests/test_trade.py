@@ -600,3 +600,82 @@ def test_a_jar_in_the_satchel_is_not_a_person():
     src = inspect.getsource(GMAgent._known_names)
     assert 'getattr(actor, "stock"' in src, \
         "the satchel is not part of the vocabulary"
+
+
+
+# --- casting, which a typed sentence could not do ----------------------------------------
+
+def _wizard_scene():
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.char_class = "wizard"
+    pc.spellbook = ["prestidigitation", "magic-missile"]
+    pc.prepared = {"prestidigitation": 1}
+    scene.add(pc)
+    return scene
+
+
+def test_a_declared_spell_reaches_the_engine():
+    """The tenth injector, found by playing. "I cast prestidigitation on the Sweetspire
+    Tea to make it gleam like something far finer" produced a paragraph about blue light
+    and a single `narrate_only`. No slot spent, no spell cast, nothing the engine saw.
+
+    The `cast` op has worked for months — Magic Missile 1d4+1 x3, Burning Hands 5d4 at
+    Reflex DC 12, saves and spell resistance read off the spell. Only the door from a
+    typed sentence was missing, which is what the combat panel's Cast button was added for
+    and what a player who types instead of clicking never had."""
+    from gm import judgement
+
+    raw = judgement.inject_cast([{"op": "narrate_only", "params": {}}],
+                                "I cast prestidigitation on the Sweetspire Tea",
+                                _wizard_scene())
+    assert [r["op"] for r in raw] == ["narrate_only", "cast"]
+    assert raw[-1]["params"]["spell"] == "prestidigitation"
+
+
+def test_a_spell_she_does_not_have_injects_nothing():
+    """Grounded in the book, the same way `inject_sale` is grounded in the satchel. A
+    wizard who says "I cast fireball" at level 1 gets no intent, and the narrator is free
+    to tell her so — a better turn than a legality error that burns five attempts."""
+    from gm import judgement
+
+    raw = judgement.inject_cast([{"op": "narrate_only", "params": {}}],
+                                "I cast fireball at the crowd", _wizard_scene())
+    assert [r["op"] for r in raw] == ["narrate_only"]
+
+
+def test_asking_about_a_spell_is_not_casting_it():
+    from gm import judgement
+
+    for said in ("what spells do I have prepared?",
+                 "I prepare prestidigitation for tomorrow",
+                 "I scribe prestidigitation into my book"):
+        raw = judgement.inject_cast([{"op": "narrate_only", "params": {}}], said,
+                                    _wizard_scene())
+        assert [r["op"] for r in raw] == ["narrate_only"], said
+
+
+def test_a_spell_in_her_own_book_is_not_an_invented_person():
+    """"Prestidigitation" was reported as an invented name the first time one was cast.
+    Only what *this character* knows is added, not all 3,040 spells: a name is grounded
+    because she has it, not because a rulebook somewhere prints it."""
+    import inspect
+
+    from gm.agent import GMAgent
+
+    src = inspect.getsource(GMAgent._known_names)
+    assert 'getattr(actor, "spellbook"' in src
+
+
+def test_no_literal_backspace_survived_in_judgement():
+    """Written into this module through a shell heredoc twice while adding `inject_cast`,
+    and both times the regex word boundaries arrived as literal backspace bytes (0x08) —
+    a pattern that then silently matches nothing at all. `_CASTS` failed to see "I cast
+    prestidigitation" and the injector returned quietly, looking like a logic bug.
+
+    CLAUDE.md records this exact trap and says to use the Write tool or build the
+    backslash with chr(92). Eight bytes had to be repaired."""
+    from pathlib import Path as _P
+
+    src = (_P(__file__).resolve().parents[1] / "gm" / "judgement.py").read_bytes()
+    assert chr(8).encode() not in src

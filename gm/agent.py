@@ -191,6 +191,10 @@ class GMAgent:
                 raw = judgement.inject_sale(raw, player_input, self.engine.scene)
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
+                # Before `inject_checks`: "I cast charm person on the guard" is a spell,
+                # not a Diplomacy check, and the check injector's verbs are broad enough
+                # to claim it.
+                raw = judgement.inject_cast(raw, player_input, self.engine.scene)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
@@ -447,6 +451,14 @@ class GMAgent:
             for item in (getattr(actor, "stock", {}) or {}).values():
                 names.add(str(getattr(item, "name", "")))
                 names.add(str(getattr(item, "base", "")))
+            # And the spells they can cast. "Prestidigitation" was reported as an
+            # invented person the first time one was cast — it is in the app's own spell
+            # list, and a wizard naming a spell she has in her book is not inventing
+            # anybody. Only what this character knows, not all 3,040: a name is grounded
+            # because *she* has it, not because a rulebook somewhere prints it.
+            for sid in (list(getattr(actor, "spellbook", []) or [])
+                        + list(getattr(actor, "prepared", {}) or {})):
+                names.add(str(sid).replace("-", " "))
         return {n for n in names if n}
 
     _VOCAB: dict[int, set[str]] = {}

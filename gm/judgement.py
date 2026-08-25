@@ -1020,12 +1020,12 @@ def inject_sale(raw_intents, player_text: str, scene) -> list:
 # guard; "the sneak thief" has no leading I-verb) does not fire.
 _CHECK_VERBS = (
     ("stealth", r"sneak|slip\s+(?:out|past|away|by|through)|creep|skulk|tip.?toe"
-                r"|hide|steal\s+(?:past|away|through)"),
-    ("sleight of hand", r"pick\s+(?:\w+\s)?pockets?|pickpocket|palm|filch"),
+                r"|hide\b|steal\s+(?:past|away|through)"),
+    ("sleight of hand", r"pick\s+(?:\w+\s)?pockets?|pickpocket|palm\b|filch"),
     ("disable device", r"pick\s+the\s+lock|pick\s+(?:\w+\s)?locks?|disarm\s+the\s+trap"
-                       r"|jimmy"),
+                       r"|jimmy\b"),
     ("climb", r"climb|scale\s+the|clamber"),
-    ("swim", r"swim"),
+    ("swim", r"swim\b"),
     ("acrobatics", r"leap|jump\s+(?:across|over|down|the)|vault|tumble|somersault"),
     ("escape artist", r"slip\s+(?:my|the|these)\s+(?:ropes?|bonds?|manacles?|chains?)"
                       r"|wriggle\s+(?:free|out)"),
@@ -1296,6 +1296,7 @@ _DECLARERS = (
     ("sale", lambda raw, text, scene, world: inject_sale(raw, text, scene)),
     ("goods", lambda raw, text, scene, world: inject_goods(raw, text, scene)),
     ("ability", lambda raw, text, scene, world: inject_ability(raw, text, scene)),
+    ("cast", lambda raw, text, scene, world: inject_cast(raw, text, scene)),
     ("checks", lambda raw, text, scene, world: inject_checks(raw, text, scene)),
     ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
@@ -1325,3 +1326,82 @@ def declared_ops(player_text: str, scene, world=None) -> list[str]:
         if op and op not in ops:
             ops.append(op)
     return ops
+
+
+# --- casting a spell ---------------------------------------------------------------------
+#
+# The tenth, and found the same way as the ninth: by playing. "I cast prestidigitation on
+# the Sweetspire Tea to make it gleam like something far finer" produced a paragraph about
+# blue light and a single `narrate_only`. No slot spent, no spell cast, nothing the engine
+# saw.
+#
+# The `cast` op has worked for months — Magic Missile 1d4+1 x3, Burning Hands 5d4 at
+# Reflex DC 12, saves and spell resistance all read off the spell. Only the door from a
+# typed sentence was missing, which is exactly what the combat panel's Cast button was
+# added for and exactly what a player who types instead of clicking never got.
+#
+# Grounded in what the character can actually cast, the same way `inject_sale` is grounded
+# in the satchel. A wizard who says "I cast fireball" at level 1 gets no intent from this,
+# and the narrator is free to tell them so — which is a better turn than a legality error
+# that burns five attempts.
+_CASTS = re.compile(
+    r"\b(?:i\s+)?(?:cast|casts|casting|invoke|invokes|channel|channels)\b", re.I)
+
+# Asking about a spell is not casting it.
+_ABOUT_A_SPELL = re.compile(
+    r"\b(?:what|which|how|can\s+i|could\s+i|do\s+i\s+know|prepare|memoris|memoriz|"
+    r"learn|scribe|read)\b", re.I)
+
+
+def inject_cast(raw_intents, player_text: str, scene) -> list:
+    """Make a declared spell reach the engine."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text or _ABOUT_A_SPELL.search(player_text):
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "cast" in present or "use_ability" in present:
+        return raw_intents
+    if not _CASTS.search(player_text):
+        return raw_intents
+
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    from rules import casting, spells as spells_mod
+
+    if not casting.is_caster(pc):
+        return raw_intents
+
+    # What they could actually cast right now. Prepared for a wizard, known for a
+    # sorcerer; `knows` answers both, and the book is the vocabulary.
+    said = player_text.lower()
+    reachable = list(getattr(pc, "spellbook", []) or []) + list(
+        (getattr(pc, "prepared", {}) or {}))
+    best = ""
+    for sid in reachable:
+        try:
+            spell = spells_mod.get(sid)
+        except KeyError:
+            continue
+        name = str(getattr(spell, "name", "")).lower()
+        # Longest name first, so "cure light wounds" is not beaten by "cure".
+        if name and name in said and len(name) > len(best):
+            best = name
+            chosen = sid
+    if not best:
+        return raw_intents
+
+    params = {"spell": chosen}
+    # Somebody to aim it at, when the sentence names one of the people present.
+    for ref, actor in scene.actors.items():
+        if ref == pc.ref or not actor.name:
+            continue
+        if actor.name.lower() in said:
+            params["at"] = ref
+            break
+    return list(raw_intents) + [{
+        "op": "cast", "actor": pc.ref, "params": params,
+        "because": "the player said they cast it",
+    }]
