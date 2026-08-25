@@ -886,7 +886,14 @@ _DEPARTS = re.compile(
     r"|walks|walking|travel|travels|travelling|traveling|leave|leaves|leaving|go|goes"
     r"|going|ride|rides|riding|march|marches|marching|flee|fleeing|run|running"
     r"|climb|climbs|climbing|descend|descends|push on|press on|make my way|slip out"
-    r"|slip away)\b[^.!?]{0,60}?\b(?:for|to|towards?|into|out to|up to|down to)\b",
+    # Going home is as common as setting out, and none of these were here: "Return to
+    # Zhilvarnia" was one of the app's own suggestion chips, and "I turn back towards
+    # the city walls" is how the same move gets typed. The ground-noun requirement
+    # below keeps them honest — "I return the sword to him" has no ground in it.
+    r"|return|returns|returning|turn back|turns back|turning back|double back"
+    r"|retrace|retraces|retracing"
+    r"|slip away)\b[^.!?]{0,60}?\b(?:for|to|towards?|into|out to|up to|down to|back to"
+    r"|back towards?)\b",
     re.I)
 
 

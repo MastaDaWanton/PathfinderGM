@@ -518,3 +518,27 @@ def test_a_word_that_is_only_sometimes_ground_does_not_move_anybody(scene):
                  "The sword is mine, and I take it to the table."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
         assert all(r.get("op") != "travel" for r in out), text
+
+
+def test_going_home_is_a_journey_too(scene):
+    """"Return to Zhilvarnia" is one of the app's own suggestion chips, and none of the
+    ways of saying it were in `_DEPARTS`: return, turn back, double back, retrace. Going
+    home is as common a move as setting out, and the safety net had no word for it."""
+    scene.biome = "grassland"
+    for text, biome in (("I return to the city.", "urban"),
+                        ("I turn back towards the city walls.", "urban"),
+                        ("I double back to the forest.", "forest"),
+                        ("I retrace my steps to the coast.", "coast")):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
+        assert out[-1].get("op") == "travel", text
+        assert out[-1]["params"]["biome"] == biome, text
+
+
+def test_returning_something_to_somebody_is_not_a_journey(scene):
+    """The ground noun is what keeps the new verbs honest: handing a sword back names
+    no terrain, so nobody travels."""
+    scene.biome = "grassland"
+    for text in ("I return the sword to him.", "I turn back to face him.",
+                 "I give the coin to the boy."):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
+        assert all(r.get("op") != "travel" for r in out), text
