@@ -22,6 +22,7 @@ from rules import biomes, grid, ingredients as ing_mod
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
+from .apiutil import read_body, read_int
 from . import downed, player_input, roster
 
 
@@ -270,7 +271,7 @@ def switch_character(request):
     Their campaign resumes where it stopped rather than starting over — one campaign per
     character is what makes that possible.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     character_id = str(body.get("id", "")).strip()
     try:
         c = campaign_mod.switch_to(character_id)
@@ -289,7 +290,7 @@ def new_character(request):
     the roster — a character who died in the second session is the reason the third one
     went the way it did.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     source = str(body.get("source", "")).strip()
     try:
         character = roster.from_pregen(source)
@@ -352,7 +353,7 @@ def slots(request):
     if pc is None:
         return JsonResponse({"error": "no character"}, status=404)
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     action = str(body.get("action", "")).strip().lower()
     key = str(body.get("slot", "")).strip().lower()
 
@@ -360,9 +361,9 @@ def slots(request):
         if action == "add":
             pc.add_slot(key)
         elif action == "remove":
-            pc.remove_slot(key, int(body.get("index", -1)))
+            pc.remove_slot(key, read_int(body, "index", -1))
         elif action == "set":
-            pc.set_slot(key, int(body.get("index", -1)), body.get("item"))
+            pc.set_slot(key, read_int(body, "index", -1), body.get("item"))
         else:
             return JsonResponse(
                 {"error": "action must be add, remove or set"}, status=400
@@ -509,10 +510,10 @@ def prepare_spells(request):
     if not casting.is_caster(pc):
         return JsonResponse({"error": f"{pc.name} does not cast spells"}, status=400)
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     action = str(body.get("action", "prepare")).strip().lower()
     spell_id = str(body.get("spell", "")).strip().lower()
-    count = max(1, int(body.get("count", 1) or 1))
+    count = read_int(body, "count", 1, lo=1)
 
     try:
         spell = spells_mod.get(spell_id)
@@ -584,7 +585,7 @@ def say(request):
             {"error": "There is a roll waiting on you."}, status=409
         )
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     text = (body.get("text") or "").strip()
 
     # Continue: the player is not acting, and is asking the scene to go on without them.
@@ -671,7 +672,7 @@ def combat_act(request):
     `_finish` every spoken turn uses), so the fiction keeps its voice; and the NPC
     turns that follow run exactly as they always have.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     scene = c.scene
     pc = scene.pc()
@@ -738,7 +739,7 @@ def roll(request):
 
     from rules.dice import Dice
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     prompt = c.scene.awaiting
     notation = prompt.get("die", "1d20")
     low = prompt.get("min", 1)
@@ -991,7 +992,7 @@ def wear_item(request):
     A player action on their own property, so it goes straight to the sheet rather than
     through the GM, exactly as drinking does.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     pc = c.scene.pc()
     if pc is None:
@@ -1014,7 +1015,7 @@ def wear_item(request):
             if not record.get("wearable") or not record.get("slot"):
                 return JsonResponse(
                     {"error": f"{record['name']} is not something you wear"}, status=400)
-            slot = pc.wear(record, int(body.get("index", 0) or 0))
+            slot = pc.wear(record, read_int(body, "index", 0))
             tell = f"{pc.name} puts on {record['name']} ({slot})."
     except Exception as exc:
         # Slot rules refuse with a sentence — already occupied, no such slot. A 400 with
@@ -1037,7 +1038,7 @@ def use_item(request):
     The op is `use_item`, which already existed and already emits ordinary intents for the
     effects — this only gives it a door from the sheet.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     pc = c.scene.pc()
     if pc is None:

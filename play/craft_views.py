@@ -21,6 +21,7 @@ from rules import (benches, biomes, consumables, crafting, foraging, goods,
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
+from .apiutil import read_body, read_int
 
 # The disciplines the app knows about. Only Herbalism has rules behind it; the rest are
 # declared so the page is honest about what is coming instead of hiding it. `track` is
@@ -375,7 +376,7 @@ def craft_ingredients(request):
 def craft_preview(request):
     """What the chain would make. Never an error for a chain that is merely bad — the
     problems come back in the body so the page can grey the button and say why."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     try:
         disc = _discipline(str(body.get("craft", "herbalism")))
@@ -487,7 +488,7 @@ def craft_do(request):
     to the game — one roll for a hundred doses would mean a single 1 spoiling the lot,
     which is a different rule rather than the same rule automated.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     try:
         disc = _discipline(str(body.get("craft", "herbalism")))
@@ -504,7 +505,7 @@ def craft_do(request):
             {"error": f"The {disc['name'].lower()} bench cannot take a chain yet."},
             status=409)
 
-    wanted = max(1, min(MAX_BATCH, int(body.get("batch", 1) or 1)))
+    wanted = read_int(body, "batch", 1, lo=1, hi=MAX_BATCH)
     try:
         chain = benches.chain_from_body(state["track"], body, mode)
     except benches.UnknownBench as exc:
@@ -680,7 +681,7 @@ def _one_craft(c, disc, state, result) -> dict:
 @require_POST
 def craft_recipes(request):
     """Keep a chain under a name, so a working recipe is worked out once."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     name = str(body.get("name", "")).strip()
     if not name:
@@ -880,7 +881,7 @@ def craft_excursion(request):
     is obtainable *here*, and the hours it cost. The materials land in the satchel the
     benches already read, so a prospected ore is at the forge the moment it is dug.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     pc = c.scene.pc()
     if pc is None:
@@ -970,7 +971,7 @@ def craft_excursion(request):
     # asking for a 48-hour market run quietly became a 12-hour one. Still capped — a
     # two-day dig is a foraging trip, not a visit to a stall — but the trim is said out
     # loud rather than left for the player to notice in the clock.
-    asked = max(1, int(body.get("hours", 1) or 1))
+    asked = read_int(body, "hours", 1, lo=1)
     hours = min(12, asked)
     trimmed = asked > hours
     spent_cp = 0
@@ -1072,7 +1073,7 @@ def craft_action(request):
     same `forage` op the bench uses, and either call failing falls back to plain prose
     built from the facts — a model being down costs colour, never the herbs.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     pc = c.scene.pc()
     if pc is None:
@@ -1083,7 +1084,7 @@ def craft_action(request):
             {"error": f"{action!r} is not a craft action yet — foraging only."},
             status=400)
 
-    hours = max(1, min(48, int(body.get("hours", 1) or 1)))
+    hours = read_int(body, "hours", 1, lo=1, hi=48)
     place, when = _forage_scene(c)
     from play import modelcfg
 
@@ -1202,14 +1203,14 @@ def craft_action(request):
 def forage_do(request):
     """Walk the ground and see what turns up. Routed through the engine's `forage` op so
     the bench and the table roll on exactly the same machinery."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     # No biome is sent. You forage where you are standing; the ground is `travel`'s to
     # change, and the bench has no business claiming to be somewhere else.
     params = {}
     # Clamped rather than trusted. The slider stops at 48, and a hand-written request for
     # a thousand hours would spend a thousand rolls before the body ever got a word in.
-    hours = max(1, min(48, int(body.get("hours", 1) or 1)))
+    hours = read_int(body, "hours", 1, lo=1, hi=48)
     params["hours"] = hours
     try:
         resolution = c.engine().run(c.engine().validate([{
@@ -1236,7 +1237,7 @@ def forage_do(request):
 @require_POST
 def travel_to(request):
     """Change the ground underfoot from the bench, without going through the GM."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     c = campaign_mod.current()
     try:
         resolution = c.engine().run(c.engine().validate([{

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 
 from django.http import JsonResponse
+from .apiutil import read_body, read_int
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -97,7 +98,7 @@ def spell_save(request):
     `rules.spells.all_spells` skips a file it cannot read, so writing a half-valid spell
     is the same as writing one that quietly does not exist.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     problems = spells_mod.validate_spell(body)
     if problems:
         return JsonResponse({"error": "; ".join(problems), "problems": problems},

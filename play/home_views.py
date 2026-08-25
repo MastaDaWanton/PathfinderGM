@@ -21,6 +21,7 @@ from rules import biomes, effectspec, registry, spells
 from world.loader import UnsupportedSchema
 
 from . import campaign as campaign_mod
+from .apiutil import read_body, read_int
 from . import homebrew, library, roster
 from .craft_views import DISCIPLINES
 
@@ -115,7 +116,7 @@ def start_in_world(request):
     from django.conf import settings
     from pathlib import Path
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     world_id = str(body.get("world", "")).strip()
     try:
         card = library.get(world_id)
@@ -138,7 +139,7 @@ def start_in_world(request):
 @require_POST
 def resume(request):
     """Put a character back in the chair and go to the table."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     try:
         campaign_mod.switch_to(str(body.get("id", "")).strip())
     except LookupError as exc:
@@ -194,7 +195,7 @@ def effect_preview(request):
     All the problems at once: a builder that reports them one at a time is one nobody
     finishes a complex effect in.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     out = []
     for i, spec in enumerate(body.get("effects") or []):
         out.append({
@@ -211,7 +212,7 @@ def effect_preview(request):
 def save_consumable(request):
     """Keep an authored thing. Refused if any effect is malformed — a file that cannot be
     read back is worse than a form the user has to finish."""
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     name = str(body.get("name", "")).strip()
     if not name:
         return JsonResponse({"error": "It needs a name."}, status=400)
@@ -284,7 +285,7 @@ def save_thing(request, bench_id: str):
     not be shadowed by a stale copy in the user's data directory, so yours layers over what
     ships and both remain readable.
     """
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     name = str(body.get("name", "")).strip()
     if not name:
         return JsonResponse({"error": "It needs a name."}, status=400)
@@ -396,7 +397,7 @@ def house_rules(request):
     from rules import houserules
 
     if request.method == "POST":
-        body = json.loads(request.body or "{}")
+        body = read_body(request)
         rules, problems = houserules.set_active(body)
         if problems:
             return JsonResponse({"rules": rules, "problems": problems}, status=400)
@@ -415,7 +416,7 @@ def model_settings(request):
     from . import modelcfg
 
     if request.method == "POST":
-        body = json.loads(request.body or "{}")
+        body = read_body(request)
         problems = modelcfg.save(body.get("roles"), body.get("keys"))
         if problems:
             return JsonResponse({"problems": problems}, status=400)
@@ -440,7 +441,7 @@ def delete_character(request):
     """Remove a character from the roster, on the player's explicit say-so."""
     from . import roster as roster_mod
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     ok, why = roster_mod.retire_file(str(body.get("id", "")).strip())
     if not ok:
         return JsonResponse({"error": why}, status=409)
@@ -460,7 +461,7 @@ def create_character(request):
 
     from .roster import enrol
 
-    body = json.loads(request.body or "{}")
+    body = read_body(request)
     built, problems = creation.build(body)
     if problems:
         return JsonResponse({"problems": problems}, status=400)
