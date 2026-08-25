@@ -157,6 +157,68 @@ def can_pay(taken: dict, asked: float, place: str, stall: str, day: int,
     return round(max(0.0, min(float(asked or 0), left)), 2)
 
 
+# --- the shelf a stall in play is standing behind --------------------------------------
+#
+# `craft_views` builds its pool per craft, because an excursion is a trip to *one* trade's
+# supplier. A stall the player has walked up to in a scene is not that: it is whatever
+# this stallholder sells, and the honest default is everything anybody prices.
+#
+# Cached per process rather than per call. Reading four benches' catalogues is the
+# expensive part and the answer only changes when the content files do, which does not
+# happen while the app is running.
+_POOL: list | None = None
+
+
+def everything_priced() -> list:
+    """Every material any bench sells, once each.
+
+    Deduplicated by id: `content/materials` is one shelf shared by four crafts, so the
+    same quicklime is reachable from the alchemist and the blacksmith both, and a stall
+    that stocked it twice would sell it twice.
+    """
+    global _POOL
+    if _POOL is not None:
+        return _POOL
+    from . import benches
+
+    seen: dict[str, object] = {}
+    for track in benches.BENCHES:
+        try:
+            found = benches.obtainable(track, "bought")
+        except Exception:
+            continue
+        for m in found:
+            mid = str(getattr(m, "id", ""))
+            price = getattr(m, "price_gp", None)
+            if mid and mid not in seen and price:
+                seen[mid] = m
+    _POOL = list(seen.values())
+    return _POOL
+
+
+def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
+            tier: str = DEFAULT_STALL_TIER) -> list:
+    """What this stall has on the counter right now — today's shelf minus what has gone.
+
+    **A stall does not stock what it could not buy.** The rarity quota alone put a
+    2,500 gp Ring of Climbing on a market stall's *common* shelf, because 18 of the 79
+    common-tier materials are magic gear over 100 gp — the tiers track price well on
+    average (common median 2 gp against legendary 16,000) and the tail is what gets you.
+    A corner stall with 247 gp in the till holding a ring it could never have bought is
+    the "shop is a catalogue" bug wearing a different hat.
+
+    The till is the bound, and it is a bound this module already knows. One rule, no
+    content re-tiering, and it makes the two halves of a shop agree: what a stallholder
+    can pay out and what they have on the shelf are the same fact seen from both sides.
+    """
+    till = purse(place, stall, day, tier)
+    from . import pricing
+
+    affordable = [m for m in everything_priced() if pricing.worth(m) <= till]
+    shelf = stock(affordable, place=place, stall=stall, day=day)
+    return remaining(shelf, taken or {}, place, stall, day)
+
+
 def summary(shelf) -> dict[str, int]:
     """How many of each rarity are on the shelf — for the page, and for a test to count
     without re-deriving the quota."""

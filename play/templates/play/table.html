@@ -555,6 +555,56 @@
       url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
   #sheetpanel.on { display: grid; transform: none; opacity: 1; }
+
+  /* --- The counter -----------------------------------------------------------
+     Yours on the left, theirs on the right, the deal in the middle. Asked for in
+     those words, and the middle column is the part that matters: it is where a
+     stall short of the asking price says so, which is the one thing four turns of
+     narrated haggling never managed. */
+  #tradepanel {
+    position: fixed; inset: 0; z-index: 31;
+    display: none; grid-template-rows: auto 1fr;
+    background:
+      linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
+      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
+  }
+  #tradepanel.on { display: grid; }
+  .tradebody {
+    display: grid; grid-template-columns: 1fr minmax(240px, 22%) 1fr;
+    gap: 18px; padding: 18px 34px 28px; overflow: hidden; min-height: 0;
+  }
+  .tradecol { display: flex; flex-direction: column; min-height: 0; }
+  .tradecol > h2 {
+    font: 600 15px/1 var(--display); letter-spacing: .16em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--gold-dim);
+  }
+  .tradecol > h2 span { float: right; color: var(--ink-dim); letter-spacing: .04em;
+    text-transform: none; font-family: var(--body); font-weight: 400; }
+  .tradelist { overflow-y: auto; min-height: 0; flex: 1; padding-right: 6px; }
+  .traderow {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline;
+    width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 4px;
+    background: rgba(0,0,0,.18); border: 1px solid transparent; border-radius: 3px;
+    color: var(--ink); font: 14px/1.35 var(--body); cursor: pointer;
+  }
+  .traderow:hover { border-color: var(--gold-dim); background: rgba(0,0,0,.30); }
+  .traderow.on { border-color: var(--accent); background: rgba(0,0,0,.36); }
+  .traderow b { font-weight: 500; }
+  .traderow .why { display: block; font-size: 12px; color: var(--ink-dim); }
+  /* A jar the engine cannot run anything from is worth a quarter as much, and the
+     reason has to be visible next to the number or the price looks arbitrary. */
+  .traderow .inert { color: var(--alarm); opacity: .75; }
+  .traderow .gp { font-variant-numeric: tabular-nums; color: var(--gold); }
+  .tradedeal {
+    border-left: 1px solid var(--gold-dim); border-right: 1px solid var(--gold-dim);
+    padding: 0 16px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .tradedeal .what { font: 15px/1.4 var(--body); color: var(--ink); min-height: 3em; }
+  .tradedeal .sum { font: 22px/1 var(--display); color: var(--gold); }
+  .tradedeal .short { font: 13px/1.5 var(--body); color: var(--alarm); }
+  .tradedeal button { width: 100%; }
+  #trademsg { font: 13px/1.5 var(--body); color: var(--ink-dim); }
   #sheetpanel::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     box-shadow: inset 0 0 220px 60px rgba(0,0,0,.72);
@@ -1303,6 +1353,11 @@
       <button type="button" id="craftaction" class="quiet"
               title="Forage, prospect, skin, gather, buy — every way of getting material"
               >Craft action</button>
+      <!-- Selling used to be a sentence you typed and hoped about. It is a counter
+           now: what you carry, what they have, and what their till can actually
+           raise. -->
+      <button type="button" id="tradeaction" class="quiet"
+              title="Buy and sell at the counter">Trade</button>
     </form>
     <!-- The excursion panel. Foraging lived only on the bench page, where it was a
          button and a table: no narration, no time, no way back into the fiction. -->
@@ -1362,6 +1417,32 @@
     <div class="deathscroll">
       <div id="deathchoices"></div>
       <div id="deathroster"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tradepanel" aria-hidden="true">
+  <div class="sheethead">
+    <h1 id="tradename">At the counter</h1>
+    <div class="meta" id="trademeta"></div>
+    <span id="trademsg"></span>
+    <button class="close" id="closetrade">Close  ·  Esc</button>
+  </div>
+  <div class="tradebody">
+    <div class="tradecol">
+      <h2>What you carry <span id="tradepurse"></span></h2>
+      <div class="tradelist" id="tradmine"></div>
+    </div>
+    <div class="tradecol tradedeal">
+      <h2>The deal</h2>
+      <div class="what" id="tradewhat">Pick something from either side.</div>
+      <div class="sum" id="tradesum"></div>
+      <div class="short" id="tradeshort"></div>
+      <button class="quiet" id="tradego" disabled>—</button>
+    </div>
+    <div class="tradecol">
+      <h2>Their wares <span id="tradetill"></span></h2>
+      <div class="tradelist" id="tradtheirs"></div>
     </div>
   </div>
 </div>
@@ -3152,6 +3233,147 @@ function tabBackground(s) {
 $("#closesheet").onclick = closeSheet;
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("#sheetpanel").classList.contains("on")) closeSheet();
+});
+
+
+/* --- the counter --------------------------------------------------------------
+   "i single store should not have every possible item ... also nothing has a price
+   on it ... its also obvious the vender in this interaction did not actually see
+   what i was trying to give her it was completely narrative."
+
+   All three, and the third is why this screen exists rather than a better prompt:
+   picking a jar off a list and being paid for it has nothing in it for a model to
+   decide, so it goes straight to the engine the way the combat panel does. */
+let TRADE = null, PICK = null;
+
+async function openTrade() {
+  $("#tradepanel").classList.add("on");
+  $("#tradepanel").setAttribute("aria-hidden", "false");
+  $("#trademsg").textContent = "";
+  PICK = null;
+  try {
+    // `post` already reads the body, throws on a bad status and hands back the parsed
+    // object. Calling `.json()` on its return is how this screen first shipped, and the
+    // panel opened completely empty with "r.json is not a function" in the corner.
+    TRADE = await post("/api/trade", {});
+  } catch (e) {
+    $("#trademsg").textContent = e.message;
+    return;
+  }
+  drawTrade();
+}
+
+async function closeTrade() {
+  $("#tradepanel").classList.remove("on");
+  $("#tradepanel").setAttribute("aria-hidden", "true");
+  // The purse and the satchel have both moved; the page behind this is now stale, and
+  // the transcript has gained a line for every trade that happened.
+  render(await (await fetch("/api/state")).json());
+}
+
+$("#tradeaction").onclick = openTrade;
+
+function tradeRow(x, side) {
+  const on = PICK && PICK.side === side && PICK.id === x.id ? " on" : "";
+  return `<button class="traderow${on}" data-side="${side}" data-id="${esc(x.id)}">
+    <span><b>${esc(x.name)}</b>${x.count > 1 ? ` ×${x.count}` : ""}
+      <span class="why${x.does_something ? "" : " inert"}">${
+        x.tier}${x.does_something ? "" : " · nothing the engine can run"}</span></span>
+    <span class="gp">${esc(x.price)}</span></button>`;
+}
+
+function drawTrade() {
+  $("#trademeta").textContent = `${TRADE.stall} · day ${TRADE.day}`;
+  $("#tradepurse").textContent = TRADE.purse;
+  $("#tradetill").textContent = `${TRADE.till.text} in the till`;
+  $("#tradmine").innerHTML = TRADE.mine.length
+    ? TRADE.mine.map(x => tradeRow(x, "sell")).join("")
+    : `<div class="empty">You are carrying nothing anyone would buy.</div>`;
+  $("#tradtheirs").innerHTML = TRADE.theirs.length
+    ? TRADE.theirs.map(x => tradeRow(x, "buy")).join("")
+    : `<div class="empty">The stall is bare today.</div>`;
+  drawDeal();
+}
+
+function drawDeal() {
+  const go = $("#tradego");
+  if (!PICK) {
+    $("#tradewhat").textContent = "Pick something from either side.";
+    $("#tradesum").textContent = "";
+    $("#tradeshort").textContent = "";
+    go.disabled = true; go.textContent = "—";
+    return;
+  }
+  const rows = PICK.side === "sell" ? TRADE.mine : TRADE.theirs;
+  const x = rows.find(r => r.id === PICK.id);
+  if (!x) { PICK = null; return drawDeal(); }
+
+  if (PICK.side === "sell") {
+    // The whole reason the middle column exists. A stall short of the asking price
+    // puts down what it has and says so — "i can still sell to them if i am willing
+    // to any get what they can give" — and taking it is the player's call.
+    const offered = Math.min(x.gp, TRADE.till.gp);
+    $("#tradewhat").textContent = `You hand over ${x.name}.`;
+    $("#tradesum").textContent = coinText(offered);
+    $("#tradeshort").textContent = offered < x.gp
+      ? `They cannot raise the ${x.price} it is worth — that is everything in the till.`
+      : "";
+    go.disabled = offered <= 0;
+    go.textContent = offered <= 0 ? "They have nothing left today"
+                                  : `Take ${coinText(offered)}`;
+  } else {
+    const short = x.gp > TRADE.purse_gp;
+    $("#tradewhat").textContent = `You buy ${x.name}.`;
+    $("#tradesum").textContent = x.price;
+    $("#tradeshort").textContent = short
+      ? `You have ${TRADE.purse}.` : "";
+    go.disabled = short;
+    go.textContent = short ? "You cannot afford it" : `Pay ${x.price}`;
+  }
+}
+
+// Whole gold down to copper, in the same shape `pricing.as_text` writes server-side.
+// Duplicated deliberately and kept trivial: the alternative is a round trip to price a
+// number the browser already has.
+function coinText(gp) {
+  const cp = Math.round((gp || 0) * 100);
+  const parts = [];
+  if (Math.floor(cp / 100)) parts.push(`${Math.floor(cp / 100).toLocaleString()} gp`);
+  if (Math.floor((cp % 100) / 10)) parts.push(`${Math.floor((cp % 100) / 10)} sp`);
+  if (cp % 10) parts.push(`${cp % 10} cp`);
+  return parts.join(" ") || "0 cp";
+}
+
+$("#tradepanel").addEventListener("click", e => {
+  const row = e.target.closest("[data-side]");
+  if (!row) return;
+  PICK = { side: row.dataset.side, id: row.dataset.id };
+  drawTrade();
+});
+
+$("#tradego").addEventListener("click", async () => {
+  if (!PICK) return;
+  const rows = PICK.side === "sell" ? TRADE.mine : TRADE.theirs;
+  const x = rows.find(r => r.id === PICK.id);
+  const body = { op: PICK.side, item: PICK.id, count: 1 };
+  // The agreed price travels with a sale, so what the screen offered is what the
+  // engine pays. It can only ever lower the ask — see `_op_sell`.
+  if (PICK.side === "sell") body.accept = Math.min(x.gp, TRADE.till.gp);
+
+  $("#tradego").disabled = true;
+  try {
+    $("#trademsg").textContent = (await post("/api/trade/do", body)).tell;
+  } catch (err) {
+    $("#trademsg").textContent = err.message;
+  }
+  PICK = null;
+  TRADE = await post("/api/trade", {});
+  drawTrade();
+});
+
+$("#closetrade").onclick = closeTrade;
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("#tradepanel").classList.contains("on")) closeTrade();
 });
 
 function busy(on) {

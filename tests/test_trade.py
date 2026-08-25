@@ -215,3 +215,92 @@ def test_the_longest_matching_name_wins():
     raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}],
                                 "I sell the Yarow Elixir", scene)
     assert raw[-1]["params"]["item"] == "yarow-elixir#1"
+
+
+
+# --- buying, which did not exist in play at all ------------------------------------------
+
+def _counter(place="pangrella", stall="market", day=0, taken=None):
+    from rules import market as m
+
+    return m.on_sale(place, stall, day, taken or {})
+
+
+def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
+    """Buying existed only on the crafting bench, as an excursion that spends hours and
+    rolls a check to go and find a supplier. That is the right shape for stocking a
+    workshop and the wrong one for standing at a counter, so there was no way at all to
+    buy a thing while looking at it."""
+    pc = engine.scene.pc()
+    pc.purse = {"gp": 50}
+    cheapest = min(_counter(), key=pricing.worth)
+
+    out = run(engine, {"op": "buy", "actor": "pc",
+                       "params": {"item": cheapest.id, "count": 2}})
+
+    assert out[0].effects[0]["kind"] == "bought"
+    # Named exactly, not "something in the satchel has a count of 2" — the loose version
+    # of this passes even when the wrong thing was bought.
+    assert len(pc.stock) == 1
+    bought = next(iter(pc.stock.values()))
+    assert bought.base == cheapest.name and bought.count == 2
+    assert pc.purse != {"gp": 50}, "nothing was paid"
+
+
+def test_what_has_been_carried_out_of_the_shop_is_gone(engine):
+    """`mark_sold` is what makes the one legendary one legendary."""
+    from rules import market as m
+
+    pc = engine.scene.pc()
+    pc.purse = {"gp": 500}
+    cheapest = min(_counter(), key=pricing.worth)
+    run(engine, {"op": "buy", "actor": "pc", "params": {"item": cheapest.id}})
+
+    left = m.on_sale("pangrella", "market", 0, engine.scene.market_taken)
+    assert cheapest.id not in {x.id for x in left}
+
+
+def test_an_empty_purse_buys_nothing_and_says_the_price(engine):
+    pc = engine.scene.pc()
+    pc.purse = {"sp": 2}
+    dearest = max(_counter(), key=pricing.worth)
+
+    out = run(engine, {"op": "buy", "actor": "pc", "params": {"item": dearest.id}})
+    assert "Nothing changes hands" in out[0].tell
+    assert pc.purse == {"sp": 2} and not pc.stock
+
+
+def test_buying_what_is_not_on_the_counter_names_what_is(engine):
+    """A blind rejection costs the GM a whole regeneration to learn one word."""
+    from rules.intents import IntentError
+
+    with pytest.raises(IntentError) as caught:
+        run(engine, {"op": "buy", "actor": "pc", "params": {"item": "moon-cheese"}})
+    assert "on the counter" in str(caught.value)
+
+
+def test_a_stall_does_not_stock_what_it_could_not_have_bought():
+    """The rarity quota alone put a 2,500 gp Ring of Climbing on a market stall's *common*
+    shelf. 18 of the 79 common-tier materials are magic gear over 100 gp — the tiers track
+    price well on average (common median 2 gp against legendary 16,000) and it is the tail
+    that gets you. A corner stall holding a ring it could never have bought is the "shop is
+    a catalogue" bug wearing a different hat.
+
+    The till is the bound, which makes the two halves of a shop agree: what a stallholder
+    can pay out and what they have on the shelf are one fact seen from both sides."""
+    from rules import market as m
+
+    till = m.purse("pangrella", "market", 0, "common")
+    shelf = m.on_sale("pangrella", "market", 0, {}, "common")
+    assert shelf, "the filter emptied the shelf entirely"
+    dearest = max(pricing.worth(x) for x in shelf)
+    assert dearest <= till, f"a {dearest} gp thing on a stall holding {till} gp"
+
+
+def test_a_richer_house_stocks_what_a_stall_cannot():
+    from rules import market as m
+
+    poor = max(pricing.worth(x) for x in m.on_sale("pangrella", "market", 0, {}, "common"))
+    rich = max(pricing.worth(x)
+               for x in m.on_sale("pangrella", "vault", 0, {}, "legendary"))
+    assert rich > poor * 10

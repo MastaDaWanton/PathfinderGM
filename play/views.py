@@ -1074,3 +1074,117 @@ def use_item(request):
     from rules.sheet import full_sheet
 
     return JsonResponse({"ok": True, "tell": tell, "sheet": full_sheet(pc)})
+
+
+# --- trading ---------------------------------------------------------------------------
+#
+# "i single store should not have every possible item" was the first half of this, and it
+# got the shelf. This is the second half, and it came from watching a haggle happen
+# entirely in prose: "it's also obvious the vender in this interaction did not actually
+# see what i was trying to give her it was completely narrative."
+#
+# She could not see it. There was no sell op, no buy op, and no price on anything the
+# player had made. Four turns of bargaining resolved to `narrate_only` and the purse was
+# empty afterwards.
+#
+# Straight to the engine, like `use_item` and the combat panel, and for the same reason:
+# picking a jar off a list and being paid for it has nothing in it for a model to decide.
+
+
+def _stall_of(c) -> tuple[str, str, int]:
+    """Which shop, on which day. Read the same way `craft_views` reads it, so a stall's
+    money and its stock agree about where and when this is."""
+    from rules import market
+
+    return (str(c.scene.location_id or "nowhere"), "market",
+            market.day_of(c.scene.clock_minutes))
+
+
+def _row(item, price: float, count: int = 1) -> dict:
+    from rules import pricing
+
+    return {"id": str(getattr(item, "id", "")), "name": str(getattr(item, "name", "")),
+            "tier": str(getattr(item, "tier", "") or "common"), "count": count,
+            "gp": round(price, 2), "price": pricing.as_text(price),
+            # What the engine can actually run with it, which is a quarter of the price
+            # when the answer is nothing — worth showing beside the number.
+            "does_something": bool(getattr(item, "specs", None))}
+
+
+@require_POST
+def trade(request):
+    """Both sides of a counter: what you are carrying, and what they have."""
+    from rules import goods, market, pricing
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    body = read_body(request)
+    place, stall, day = _stall_of(c)
+    stall = str(body.get("stall") or stall)
+    tier = str(body.get("tier") or market.DEFAULT_STALL_TIER)
+
+    till = market.purse(place, stall, day, tier)
+    left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
+    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier)
+
+    return JsonResponse({
+        "stall": stall, "place": place, "day": day,
+        "till": {"gp": left, "text": pricing.as_text(max(0.0, left))},
+        "purse": goods.purse_line(pc.purse, goods.coinage()),
+        "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
+        # Yours, at what a shop would pay — which is the number that matters when the
+        # question is what you can get for it, not what it is worth.
+        "mine": sorted(
+            (_row(s, pricing.what_a_shop_pays(s), s.count) for s in pc.stock.values()),
+            key=lambda r: -r["gp"]),
+        "theirs": sorted((_row(m, pricing.worth(m)) for m in counter),
+                         key=lambda r: -r["gp"]),
+    })
+
+
+@require_POST
+def trade_do(request):
+    """Actually hand something over, or actually pay for it."""
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    # The same guard `say` and the combat panel apply. Resolution is genuinely stopped
+    # mid-list waiting on a d20, and running a second intent list through the engine
+    # underneath it is how a suspension gets lost.
+    if c.scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+
+    body = read_body(request)
+    op = str(body.get("op", "")).strip().lower()
+    if op not in ("sell", "buy"):
+        return JsonResponse({"error": "sell or buy"}, status=400)
+
+    place, stall, day = _stall_of(c)
+    params = {"item": str(body.get("item", "")).strip().lower(),
+              "count": read_int(body, "count", 1, lo=1, hi=999),
+              "stall": str(body.get("stall") or stall)}
+    # The haggle, when the screen has offered a partial and the player took it. Only ever
+    # lowers what is asked — see `_op_sell`.
+    if op == "sell" and body.get("accept") is not None:
+        params["accept"] = body["accept"]
+
+    try:
+        engine = c.engine()
+        resolution = engine.run(engine.validate(
+            [{"op": op, "actor": "pc", "because": "at the counter", "params": params}]))
+    except IntentError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        # The same rule the drink button learned: a trade that cannot happen is a
+        # sentence on the screen, never a 500 with an invisible error.
+        return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
+
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    return JsonResponse({"ok": True, "tell": tell})

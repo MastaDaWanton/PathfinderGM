@@ -246,6 +246,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # possible: a stall short of the asking price offers what it has, and taking it is
     # the player's call rather than the engine's refusal.
     "sell": (("item",), ("count", "to", "stall", "accept"), "player"),
+    # And the other direction. Buying existed only on the crafting bench, as an
+    # excursion that spends hours and rolls a check for raw materials — so there was no
+    # way at all to buy a thing off a stall while standing in front of it. The right-hand
+    # side of a trade needs this or it is a display case.
+    "buy": (("item",), ("count", "from_", "stall"), "player"),
     # Being pulled towards a target you did not choose. `to` is who is compelled; the
     # actor is who they are pulled towards. It penalises and never prohibits — see the
     # header of rules/compulsion.py, which is where that decision is argued.

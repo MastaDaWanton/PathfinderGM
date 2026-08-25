@@ -2475,6 +2475,76 @@ class Engine:
             tell=tell, because=intent.because,
         )
 
+    def _op_buy(self, intent: Intent, partial: dict) -> Outcome:
+        """Buy something off the stall in front of you.
+
+        Buying existed only on the crafting bench before this, as an excursion that
+        spends hours and rolls a check to go and find a supplier. That is the right shape
+        for stocking a workshop and the wrong one for standing at a counter, so there was
+        no way at all to buy a thing while looking at it.
+
+        The shelf is the same shelf `market` has always drawn — deterministic in
+        (place, stall, day), so the amethyst is still there when you walk back in, and
+        `mark_sold` means the one legendary is one legendary.
+        """
+        from . import market as market_mod
+        from . import pricing
+        from .crafting import Stock
+
+        actor = self.scene.actors[intent.actor]
+        item_id = str(intent.params["item"]).strip().lower()
+        count = max(1, int(intent.params.get("count") or 1))
+
+        seller = intent.params.get("from_")
+        if seller and seller not in self.scene.actors:
+            raise IntentError(f"buy: unknown seller {seller!r}", "refs")
+        who = self.scene.actors[seller].name if seller else "the stallholder"
+
+        place = str(self.scene.location_id or "nowhere")
+        stall = str(intent.params.get("stall") or seller or "market")
+        day = market_mod.day_of(self.scene.clock_minutes)
+
+        counter = market_mod.on_sale(place, stall, day, self.scene.market_taken)
+        found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
+                     None)
+        if found is None:
+            # Named, not blank. The same reasoning `use_item` and `sell` follow: a blind
+            # rejection costs the GM a whole regeneration to learn one word.
+            near = ", ".join(sorted(str(getattr(m, "id", "")) for m in counter)[:12])
+            raise IntentError(
+                f"buy: {who} has no {item_id!r} on the counter today. They have: "
+                f"{near or 'nothing'}", "legality")
+
+        price = round(pricing.worth(found) * count, 2)
+        cp = int(round(price * 100))
+        purse, paid = goods.spend(actor.purse, cp)
+        coins = goods.coinage()
+        if not paid:
+            return Outcome(
+                intent_id=intent.id, op="buy", effects=[],
+                tell=f"{found.name} is {pricing.as_text(price)} and {actor.name} has "
+                     f"{goods.purse_line(actor.purse, coins)}. Nothing changes hands.",
+                because=intent.because,
+            )
+
+        actor.purse = purse
+        # Onto the shelf as a crafted-shape entry, which is the one container the
+        # inventory panels and the benches both already read.
+        actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
+                              potency=1.0, craft=str(getattr(found, "track", "") or "")),
+                        count)
+        for _ in range(count):
+            market_mod.mark_sold(self.scene.market_taken, item_id, place, stall, day)
+
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": found.name,
+                      "count": count, "paid_cp": cp}],
+            tell=f"{actor.name} pays {who} {pricing.as_text(price)} for {count}x "
+                 f"{found.name}. ({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because,
+        )
+
     def _op_cast(self, intent: Intent, partial: dict) -> Outcome:
         """Cast a spell: spend the slot, state the numbers, and roll what the spell says.
 
