@@ -78,11 +78,49 @@ path itself — `schedule` holds four-tuples and the raise unpacked it as a pair
 `ValueError` replaced the honest "five attempts, here is what each got wrong" message with
 a 500.
 
+## The baseline
+
+Measured 2026-08-25, 200 turns, this build, two scripts, two models. Local Ollama,
+one RTX-class GPU, nothing else contending.
+
+| model | script | clean | faults | mean turn | worst |
+|---|---|---|---|---|---|
+| llama3.1:8b | town | **50/50 (100%)** | — | 14.2s | 42s |
+| llama3.1:8b | fight | 49/50 (98%) | 1 × `turn-failed` | 15.8s | 72s |
+| qwen3-8b-heretic | town | 48/50 (96%) | 2 × `turn-failed` | 25.6s | 54s |
+| qwen3-8b-heretic | fight | 49/50 (98%) | 1 × `turn-failed` | 20.5s | 44s |
+
+**196 of 200 turns clean — 98%.**
+
+The four faults are all the same kind, and it is the honest one: the model could not
+produce a valid turn in seven attempts (five on the narrator, two on the fallback), and
+the player is told so. Nothing crashed and nothing false reached the transcript.
+
+What did *not* happen in 200 turns is the part worth stating plainly: **no invented
+names, no invented companions, no third-person slips, no echoed examples, no outcome
+claims, and no combat turn that proposed nothing.** Every failure mode this project has
+fixed stayed fixed, including the one that cost a whole evening's combat loop the day
+this was written.
+
+### Read this before trusting the table
+
+The first fight run reported 47/50 and three `combat-turn-did-nothing`. All three were an
+attack that had suspended for the player's d20 — the intent existed and the engine was
+waiting on a die, which is the system working. The harness recorded outcomes before
+answering the roll and read the gap as the GM proposing nothing, *which is exactly the
+failure it was written to detect*. Corrected, that run is 49/50.
+
+A harness that can produce a false positive for the thing it measures is worth more
+scepticism than the number it prints. Re-derive a fault before believing it.
+
 ## Still open
 
-The numbers below are the baseline to beat, not a pass mark. The honest gap is that no
-run yet is long enough to put a confidence interval on: 50 turns per script per model is
-a starting point, not a release gate.
+- 50 turns per script per model is a baseline, not a release gate, and not enough to put
+  a confidence interval on a 2% failure rate.
+- Both scripts are short and loop. A long session drifts in ways ten repeated lines
+  cannot show — which is the gap [Can LLM Agents Stick to the Script?][script] exists to
+  measure.
+- Nothing here scores whether the prose is any *good*. It scores whether it is true.
 
 [script]: https://arxiv.org/html/2608.08160
 [orch]: https://arxiv.org/html/2606.16014
