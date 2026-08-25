@@ -212,7 +212,7 @@ def fix_hand_back(text: str) -> tuple[str, str]:
 
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
-           min_chars: int = 0, max_chars: int = 0) -> Review:
+           min_chars: int = 0, max_chars: int = 0, alone: bool = False) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -354,7 +354,37 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             ))
             break
 
+    # 4b. An ally the player has not got. The same failure as the invented name and
+    #     invisible to that check, because "companion" carries no capital letter.
+    if alone:
+        for phrase in invented_companions(text):
+            out.findings.append(Finding(
+                "invented-companion", f"gives the player {phrase!r}, who is not there",
+                f"Nobody is fighting beside them. Remove {phrase!r}: every blow in this "
+                f"scene is the player's own, and crediting a second pair of hands "
+                f"rewrites who did what.",
+                weight=3,
+            ))
+            break
+
     return out
+
+
+# An ally the player has not got. Measured in the tavern: the killing blow came back as
+# "your fist connects with a meaty impact, and **your companion's** next swing brings you
+# another crushing blow" — Grist was alone in that fight, and had been for the whole
+# scene. The invented-name check cannot see this: "companion" is a common noun with no
+# capital letter, so there is nothing for a name check to catch.
+_COMPANION = re.compile(
+    r"\byour (?:companion|companions|ally|allies|friend|friends|comrade|comrades"
+    r"|partner|band|party|group|men|people|crew)\b"
+    r"|\bthe others\b|\byour side\b|\bone of your (?:companions|allies|friends)\b",
+    re.I)
+
+
+def invented_companions(text: str) -> list[str]:
+    """Phrases that hand the player somebody who is not there."""
+    return sorted({m.group(0) for m in _COMPANION.finditer(text or "")})
 
 
 def invented_names(text: str, known: set[str]) -> list[str]:

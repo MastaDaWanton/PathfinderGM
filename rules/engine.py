@@ -1328,6 +1328,18 @@ class Engine:
                     f"{'twice more' if extra == 2 else 'again'} at {defender.name}.")
 
         while state["i"] < len(sequence):
+            # Stop swinging at somebody who has already gone down. Measured in the
+            # tavern: the thug dropped to -5 on the first swing of a Swift Strikes pair,
+            # and the second was still queued — so the player was asked to roll a d20 at
+            # a body on the floor, and because `scene.awaiting` was set the NPC driver
+            # returned early every time and never reached the "one side left standing"
+            # check. The fight could not end, so the XP and the treasure never settled.
+            # The reported "0 XP from the bear" has this shape underneath it too.
+            if defender.hp <= 0 or not defender.can_act():
+                if state["i"]:
+                    state["tells"].append(
+                        f"{defender.name} is already down; {actor.name} holds the blow.")
+                break
             iteration = sequence[state["i"]]
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
             # Compulsions are charged here rather than in `attack_modifiers` because the

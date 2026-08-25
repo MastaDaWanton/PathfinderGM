@@ -376,6 +376,18 @@ class GMAgent:
             pass
         return {n for n in names if n}
 
+    def _alone(self) -> bool:
+        """Whether the player has nobody standing beside them.
+
+        Deliberately generous about what counts as company: anybody else still on their
+        feet, friend or foe, and the check stays quiet. Only when the player is the last
+        one upright is "your companion's next swing" certainly an invention — which is
+        exactly the scene it was measured in, a tavern with one thug at -5 hp.
+        """
+        others = [a for r, a in self.engine.scene.actors.items()
+                  if not a.is_pc and a.hp > 0]
+        return not others
+
     def polish(self, text: str, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                scene_brief: str = "") -> tuple[str, list[str], list[Attempt]]:
@@ -388,7 +400,7 @@ class GMAgent:
         review = narration_mod.review(
             text, pc_name=self._pc_name(), echo_index=self._echo_index(),
             known_names=self._known_names(), earlier=earlier,
-            min_chars=min_chars, max_chars=max_chars,
+            min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
         )
         if review.ok:
             return text, [], []
@@ -410,7 +422,7 @@ class GMAgent:
         after = narration_mod.review(
             fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
             known_names=self._known_names(), earlier=earlier,
-            min_chars=min_chars, max_chars=max_chars,
+            min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
         )
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
         # that had removed twenty of twenty-one borrowed phrases, and the plagiarised

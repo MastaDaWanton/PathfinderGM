@@ -454,3 +454,35 @@ def test_a_proper_name_is_not_given_an_article():
 
     assert prompts.fill_enemy("{Current Enemy} snarls.", "bear") == "the bear snarls."
     assert prompts.fill_enemy("{Current Enemy} snarls.", "Ragnar") == "Ragnar snarls."
+
+
+def test_a_companion_the_player_has_not_got_is_caught():
+    """Measured in the tavern, on the killing blow: "your fist connects with a meaty
+    impact, and your companion's next swing brings you another crushing blow to the
+    thug's jaw". Grist was alone, and had been all scene.
+
+    The invented-name check cannot see this — "companion" carries no capital letter, so
+    there is nothing for a name check to catch — and it is the same failure: a second
+    pair of hands that does not exist, credited with half the fight."""
+    said = ("Your fist connects with a meaty impact, and your companion's next swing "
+            "brings you another crushing blow to the thug's jaw.")
+    assert narration.invented_companions(said) == ["your companion"]
+
+    r = narration.review(said, pc_name="Kesst Vayr", alone=True)
+    assert [f.kind for f in r.findings] == ["invented-companion"]
+    assert r.score > 1
+
+
+def test_a_companion_is_allowed_when_somebody_is_actually_there():
+    """Deliberately generous about what counts as company: anybody else still on their
+    feet, friend or foe. Only when the player is the last one upright is it certainly
+    an invention."""
+    said = "Your companion drives a shoulder into the door beside you."
+    assert narration.review(said, pc_name="Kesst Vayr", alone=False).ok
+
+
+def test_the_ways_a_second_pair_of_hands_gets_invented():
+    for said in ("Your allies close in around the fire.",
+                 "The others fall back towards the arch.",
+                 "One of your companions shouts a warning."):
+        assert narration.invented_companions(said), said

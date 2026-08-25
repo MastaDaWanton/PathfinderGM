@@ -215,3 +215,52 @@ def test_a_toggle_never_names_a_bystander_as_its_target():
             ' ? ` on ${foe.name}` : "";') in tpl
     # And the unconditional version is gone.
     assert '`I use ${name}${foe ? " on " + foe.name : ""}.`' not in tpl
+
+
+def test_swift_strikes_does_not_swing_at_a_body_on_the_floor():
+    """Measured in the tavern. The thug dropped to -5 on the first swing of a Swift
+    Strikes pair and the second was still queued, so the player was asked to roll a d20
+    at a corpse — and because `scene.awaiting` was set, the NPC driver returned early
+    every time and never reached its "one side left standing" check.
+
+    The fight could not end. XP and treasure settle on the way out of an encounter, so
+    neither ever paid: the reported "0 XP" has this shape underneath it."""
+    import json as _json
+
+    from django.test import Client, override_settings
+
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=_tmpdir()):
+        cm._LIVE.clear()
+        c = cm.begin_with(_bender(level=6))          # enough BAB for a second swing
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
+        thug = instantiate("thug", scene=c.scene, name="a thug")
+        thug.hp = 1                                   # one hit puts it down
+        c.scene.add(thug)
+        e = c.engine()
+        e.run(e.validate([{"op": "begin_encounter",
+                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+        while c.scene.current_ref() != "pc":
+            c.scene.advance_turn()
+        c.save()
+
+        r = Client().post("/api/combat/act", data=_json.dumps({
+            "actions": [{"op": "attack", "target": "c1",
+                         "params": {"full_attack": True}}],
+            "label": "strike", "end_turn": True}), content_type="application/json")
+        assert r.status_code == 200, r.content[:200]
+
+        after = cm.current()
+        # Whatever else happened, nobody is being asked to roll at a body.
+        if after.scene.awaiting:
+            assert after.scene.actors["c1"].hp > 0, (
+                "a roll is pending against a defender who is already down")
+        cm._LIVE.clear()
+
+
+def _tmpdir():
+    import tempfile
+    from pathlib import Path
+    return Path(tempfile.mkdtemp()) / "campaigns"
