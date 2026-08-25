@@ -930,7 +930,14 @@ def craft_excursion(request):
                 f"{goods.purse_line(pc.purse, coins) or 'nothing'}.")}, status=409)
         within = stall
 
-    hours = max(1, min(12, int(body.get("hours", 1) or 1)))
+    # An excursion is a day's work at most; foraging is the one that can run for days,
+    # and it clamps to 48. The hours slider is shared between them and goes to 48, so
+    # asking for a 48-hour market run quietly became a 12-hour one. Still capped — a
+    # two-day dig is a foraging trip, not a visit to a stall — but the trim is said out
+    # loud rather than left for the player to notice in the clock.
+    asked = max(1, int(body.get("hours", 1) or 1))
+    hours = min(12, asked)
+    trimmed = asked > hours
     spent_cp = 0
     unaffordable = 0
     engine = c.engine()
@@ -991,9 +998,11 @@ def craft_excursion(request):
         if unaffordable:
             paid += (f" {unaffordable} more "
                      f"{'was' if unaffordable == 1 else 'were'} left on the counter.")
+    capped = (f" (You meant to spend {asked}; this is a day's errand at most, "
+              f"so it took {hours}.)" if trimmed else "")
     line = (f"{pc.name} spends {hours} hour{'s' if hours != 1 else ''} "
             f"{verb}{' the ' + creature if creature else ''}. "
-            f"{'Found: ' + tally if haul else 'Nothing worth carrying.'}{paid}")
+            f"{'Found: ' + tally if haul else 'Nothing worth carrying.'}{paid}{capped}")
     c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
     c.save()
     return JsonResponse({

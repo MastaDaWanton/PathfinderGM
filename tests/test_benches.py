@@ -162,6 +162,22 @@ def test_buying_from_a_market_costs_money(client):
     assert "Paid" in d["tell"]
 
 
+def test_asking_for_more_hours_than_an_errand_takes_says_so(client):
+    """One hours slider serves both panels and runs to 48, because foraging can be a
+    multi-day trip. An excursion caps at 12. Dragging it to 48 and pressing a market card
+    silently bought a 12-hour errand, and the only way to notice was the clock."""
+    c = cm.current()
+    c.scene.pc().purse = {"gp": 50}
+    c.save()
+    r = client.post("/api/craft/excursion",
+                    data=json.dumps({"action": "blacksmith:buy", "hours": 48}),
+                    content_type="application/json")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["hours"] == 12
+    assert "meant to spend 48" in d["tell"]
+
+
 def test_an_empty_purse_cannot_shop(client):
     """The refusal names the cheapest thing on the stall and what is actually in the
     purse, so "no" is a fact about the money rather than a dead button."""
