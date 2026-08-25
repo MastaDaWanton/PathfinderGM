@@ -17,7 +17,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from rules import (benches, biomes, consumables, crafting, foraging, goods,
-                   ingredients, worldclass)
+                   ingredients, market, worldclass)
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -902,33 +902,54 @@ def craft_excursion(request):
     found = benches.obtainable(track, str(spec.get("obtain") or ""),
                                biome=c.biome or None, creature=creature or None)
     ceiling = worldclass.tier_rank(worldclass.get(track).at(level).max_tier)
-    within = [m for m in found if getattr(m, "rank", 1) <= ceiling]
-    if not within:
-        return JsonResponse(
-            {"error": f"Nothing here is within a {track} of level {level}."
-                      if found else "There is nothing of that kind to be had here."},
-            status=409)
-
-    # A market is not a field. Every material carries `price_gp` and the alchemist's own
-    # blurb says "Price is in gp on each material", but nothing here ever read it: "Buy
-    # from the market" handed Steel, a Steel Crossguard and Tin to a character whose
-    # purse was `{}`, which made every gated excursion pointless beside it — prospecting
-    # needs the right ground and hours of daylight, and buying needed a d20.
     buying = str(spec.get("obtain") or "") == "bought"
+    day = market.day_of(c.scene.clock_minutes)
+    place = str(c.scene.location_id or c.biome or "nowhere")
+
     if buying:
-        stall = [m for m in within if _price_cp(m) > 0]
-        if not stall:
-            return JsonResponse(
-                {"error": "Nothing on this stall is priced for sale."}, status=409)
+        # A market is not a field, and a shop is not a catalogue.
+        #
+        # Every material carries `price_gp` and the alchemist's own blurb says "Price is
+        # in gp on each material", and nothing here read either: buying ran the identical
+        # path as prospecting, so a stallholder in Zhilvarnia carried all 397 priced
+        # materials at once and handed over Steel, a Crossguard and Tin to an empty purse.
+        #
+        # The shelf is drawn from everything the stall could conceivably carry — **before**
+        # the level gate, deliberately. What a shop stocks is a fact about the shop, not
+        # about who walked in; a first-day smith should be able to see the good steel on
+        # the rack and be told it is beyond them, rather than have the world quietly
+        # contain nothing but nails.
+        priced = [m for m in found if _price_cp(m) > 0]
+        shelf = market.stock(priced, place=place, stall=key, day=day)
+        on_shelf = market.remaining(shelf, c.scene.market_taken, place, key, day)
+        if not on_shelf:
+            return JsonResponse({"error": (
+                "The stall is bare. What they had today has been bought — come back "
+                "tomorrow." if shelf else
+                "Nothing on this stall is priced for sale.")}, status=409)
+
+        within = [m for m in on_shelf if getattr(m, "rank", 1) <= ceiling]
+        if not within:
+            best = min(on_shelf, key=lambda m: getattr(m, "rank", 1))
+            return JsonResponse({"error": (
+                f"Nothing on the shelf today is within a {track} of level {level}. "
+                f"The plainest thing they have is {best.name}.")}, status=409)
+
         purse_cp = goods.in_copper(pc.purse)
-        cheapest = min(stall, key=_price_cp)
+        cheapest = min(within, key=_price_cp)
         if purse_cp < _price_cp(cheapest):
             coins = goods.coinage()
             return JsonResponse({"error": (
-                f"You cannot afford anything here. The cheapest is {cheapest.name} at "
-                f"{_price_line(cheapest)}, and you have "
-                f"{goods.purse_line(pc.purse, coins) or 'nothing'}.")}, status=409)
-        within = stall
+                f"You cannot afford anything on the shelf today. The cheapest you could "
+                f"use is {cheapest.name} at {_price_line(cheapest)}, and you have "
+                f"{goods.purse_line(pc.purse, coins)}.")}, status=409)
+    else:
+        within = [m for m in found if getattr(m, "rank", 1) <= ceiling]
+        if not within:
+            return JsonResponse(
+                {"error": f"Nothing here is within a {track} of level {level}."
+                          if found else "There is nothing of that kind to be had here."},
+                status=409)
 
     # An excursion is a day's work at most; foraging is the one that can run for days,
     # and it clamps to 48. The hours slider is shared between them and goes to 48, so
@@ -965,14 +986,23 @@ def craft_excursion(request):
         # refusing outright: a good roll that finds more than you can carry money for
         # should still sell you what you *can* afford, and say what was left behind.
         if buying:
-            afforded, left = [], 0
+            # Off a shelf, not out of a bin. The modular index above can reach for the
+            # same entry twice, and a stall that holds one amethyst cannot sell two.
+            seen, once = set(), []
             for m in picks:
+                if m.id in seen:
+                    continue
+                seen.add(m.id)
+                once.append(m)
+            afforded, left = [], 0
+            for m in once:
                 purse, enough = goods.spend(pc.purse, _price_cp(m))
                 if not enough:
                     left += 1
                     continue
                 pc.purse = purse
                 spent_cp += _price_cp(m)
+                market.mark_sold(c.scene.market_taken, m.id, place, key, day)
                 afforded.append(m)
             unaffordable = left
             picks = afforded

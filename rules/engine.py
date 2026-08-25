@@ -89,6 +89,12 @@ class Scene:
     attacked: set[str] = field(default_factory=set)
     round: int = 0
     clock_minutes: int = 0
+    # What each shop has sold, as "place|stall|day|material" -> count. A stall's shelf is
+    # drawn rather than stored (see `rules.market`), so this is the only part that has to
+    # survive a save: the one legendary on the shelf has to stay sold once it is bought.
+    # The day is in the key, so yesterday's sales stop counting without anything sweeping
+    # them up.
+    market_taken: dict[str, int] = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
     # The ground underfoot, which decides what can be foraged here. Defaults from the
     # world's own Biomes/Terrain facts when a campaign starts, and the GM moves it as the
