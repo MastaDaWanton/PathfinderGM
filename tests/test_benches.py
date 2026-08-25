@@ -333,3 +333,41 @@ def test_every_station_has_an_icon_of_its_own(client):
         methods = {m["method"] for m in d["track"]["all_methods"]}
         assert methods <= set(glyphs), f"{track} has stations with no icon"
         assert len(set(glyphs.values())) == len(glyphs), f"{track} reuses an icon"
+
+
+def test_one_word_for_what_is_being_made():
+    """Four benches, four spellings: the forge reads `base` or `item`, the tannery
+    `product` or `pattern`, the enchanter `item`, herbalism `base`. The craft page copes
+    by sending the value under all four names at once, which works and is one bench away
+    from not working — and it means anything else driving these endpoints has to know
+    the whole list.
+
+    Same drift as `requires` versus `needs` on the excursion gates."""
+    assert benches.shape_of({"base": "dagger"}) == "dagger"
+    assert benches.shape_of({"pattern": "satchel"}) == "satchel"
+    assert benches.shape_of({"shaping": "cloak"}) == "cloak"
+    assert benches.shape_of({}) == ""
+    filled = benches.with_shape({"shaping": "dagger"})
+    for alias in benches.SHAPE_ALIASES:
+        assert filled[alias] == "dagger"
+    # Nothing said stays nothing said: a bench that needs no shape must not be handed one.
+    assert benches.with_shape({"craft": "herbalism"}) == {"craft": "herbalism"}
+
+
+def test_a_shape_the_bench_does_not_make_is_refused_by_name(client):
+    """Before the aliases were normalised, a tannery simply never saw the word the player
+    typed: `shaping` matched none of its keys, so asking for a dagger silently produced a
+    satchel. It now answers with the patterns it does know."""
+    from play.craft_views import _craft_materials
+
+    c = cm.current()
+    mats = [m["id"] for m in _craft_materials("leatherworker")[:3]]
+    for m in mats:
+        c.scene.pc().carry(m, 4)
+    c.save()
+    body = {"craft": "leatherworking", "ingredients": mats, "materials": mats,
+            "methods": ["skin", "cure"], "shaping": "dagger"}
+    r = client.post("/api/craft/preview", data=json.dumps(body),
+                    content_type="application/json")
+    assert r.status_code == 400
+    assert "satchel" in r.json()["error"], r.json()["error"]

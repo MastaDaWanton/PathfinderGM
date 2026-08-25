@@ -105,10 +105,39 @@ def supports(track_id: str, mode: str = "") -> bool:
     return hasattr(mod, "preview") and hasattr(mod, "chain_from_body")
 
 
+# What is being made, as each bench happens to spell it. The forge reads `base` or
+# `item`, the tannery `product` or `pattern`, the enchanter `item`, herbalism `base` —
+# four benches, four vocabularies for one question, which is the same drift that left
+# `requires` and `needs` disagreeing about excursion gates.
+#
+# The page copes by sending the value under all four names at once. That works and is
+# one bench away from not working, and it means anything else driving these endpoints —
+# a test, a tool, a future mobile client — has to know the whole list. Normalised here
+# instead, so a bench may keep its own word and callers only need one.
+SHAPE_ALIASES = ("base", "item", "product", "pattern", "shape", "shaping", "base_item")
+
+
+def shape_of(body: dict) -> str:
+    """The thing being made, whichever of its names the caller used."""
+    for key in SHAPE_ALIASES:
+        said = str((body or {}).get(key) or "").strip()
+        if said:
+            return said
+    return ""
+
+
+def with_shape(body: dict) -> dict:
+    """The body with every alias filled in, so each bench finds its own spelling."""
+    said = shape_of(body)
+    if not said:
+        return dict(body or {})
+    return dict(body or {}, **{k: said for k in SHAPE_ALIASES})
+
+
 def chain_from_body(track_id: str, body: dict, mode: str = ""):
     mod = module_for(track_id, mode)
     if hasattr(mod, "chain_from_body"):
-        return mod.chain_from_body(body)
+        return mod.chain_from_body(with_shape(body))
     raise UnknownBench(f"{track_id} cannot read a chain from the bench yet")
 
 
