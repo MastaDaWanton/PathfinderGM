@@ -323,15 +323,23 @@ def _drift_report(rows: list[dict], parts: int = 3) -> list[dict]:
 
 
 def _known_names(c) -> set[str]:
-    names = {a.name for a in c.scene.actors.values()}
+    """The agent's own list, asked for rather than reimplemented.
+
+    This was a second copy, and it drifted exactly the way CLAUDE.md says a duplicated
+    rule drifts. When the agent's vocabulary was widened to the world's prose — taking
+    `invented-name` from 16% of turns to 4% when the saved runs were re-scored — the live
+    harness went on reporting 15%, because it was still scoring against its own narrower
+    set. The app was fixed and the instrument said it was not.
+
+    An audit that grades the app against a different rulebook than the app uses is not
+    measuring the app.
+    """
+    from gm.agent import GMAgent
+
     try:
-        w = c.world
-        names |= {e.name for e in w.entities.values()}
-        names |= {f["name"] for ch in w.chronology for f in ch.figures}
-        names.add(w.name)
+        return GMAgent(c.world, c.engine())._known_names()
     except Exception:
-        pass
-    return {n for n in names if n}
+        return {a.name for a in c.scene.actors.values() if a.name}
 
 
 def main() -> None:
