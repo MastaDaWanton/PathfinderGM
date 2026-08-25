@@ -3103,6 +3103,12 @@ class Engine:
         pc = self.scene.pc()
         if pc is None or pc.hp <= 0:
             return ""
+        # Settled first and appended to every path out of here. Written as
+        # `return line + self._settle_treasure()` on the paying branch only, a creature
+        # with a treasure column and no XP price — which is most of the bestiary, since
+        # 6,355 of 7,136 entries never had either filled in — dropped its purse on the
+        # floor and nobody picked it up.
+        coin = self._settle_treasure()
         total, names = xp_mod.award_for_fallen(self.scene, pc)
         if not total:
             # A fight that killed something and paid nothing has to say so. Silence
@@ -3117,15 +3123,38 @@ class Engine:
             if fallen:
                 return (f" No experience: {', '.join(sorted(set(fallen)))} "
                         f"{'carries' if len(set(fallen)) == 1 else 'carry'} no price in "
-                        f"the bestiary, so the award is the GM's to make.")
-            return ""
+                        f"the bestiary, so the award is the GM's to make.") + coin
+            return coin
         pc.xp = int(getattr(pc, "xp", 0) or 0) + total
         nxt = xp_mod.total_for(min(20, pc.level + 1))
         line = (f" {pc.name} gains {total:,} XP for {', '.join(names)} "
                 f"({pc.xp:,} of {nxt:,} for level {min(20, pc.level + 1)}).")
         if xp_mod.ready_to_level(pc):
             line += " Enough to advance — it will settle with a night's sleep."
-        return line
+        return line + coin
+
+    def _settle_treasure(self) -> str:
+        """What the fallen were carrying, into the PC's purse.
+
+        Beside the XP for the same reason the XP is here: two pieces of code end fights
+        and both have to pay out the same way. It became necessary the moment a market
+        started charging — a character spent their starting wealth and there was no way
+        in the game to earn a copper, because the `treasure` column every creature
+        carries had never been read by anything.
+        """
+        from . import goods as goods_mod, treasure as treasure_mod
+
+        pc = self.scene.pc()
+        if pc is None or pc.hp <= 0:
+            return ""
+        gold, names = treasure_mod.take_from_fallen(self.scene, pc, self.dice)
+        if not gold:
+            return ""
+        pc.purse = goods_mod.credit(pc.purse, gold * 100)
+        coins = goods_mod.coinage()
+        return (f" Taken from {', '.join(sorted(set(names)))}: "
+                f"{goods_mod.purse_line(goods_mod.coins_for(gold * 100), coins)} "
+                f"({goods_mod.purse_line(pc.purse, coins)} in hand).")
 
     def _op_begin_encounter(self, intent: Intent, partial: dict) -> Outcome:
         rolls, order = [], []

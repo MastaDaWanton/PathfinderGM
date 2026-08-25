@@ -171,6 +171,16 @@ def spend(purse: dict, cost_cp: int) -> tuple[dict, bool]:
     return {c: n for c, n in left.items() if n > 0}, True
 
 
+def credit(purse: dict, amount_cp: int) -> dict:
+    """Money into a purse, counted up into the largest coins it makes.
+
+    The counterpart to `spend`. There was no public one until treasure started coming
+    off the fallen, because until then nothing in the game ever paid the player.
+    """
+    return _add_change({c: int(n) for c, n in (purse or {}).items() if int(n) > 0},
+                       max(0, int(amount_cp)))
+
+
 def coins_for(amount_cp: int) -> dict:
     """A bare amount as the coins it would be counted out in, largest first.
 
