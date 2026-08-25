@@ -708,7 +708,32 @@ class GMAgent:
         # Call 2 says what the dice did; it has even less business asking the player
         # what they perceive than call 1 does.
         text, _ = narration_mod.fix_hand_back(text)
-        return text, Attempt("consequence", reply.seconds, reply.model, reply.text)
+
+        # And every other prose rule, which this call had never been subject to.
+        #
+        # Found by reading a real transcript: two consequence beats in Thessaly's campaign
+        # introduced the player's own character as a stranger — "you notice Thessaly Corr
+        # stepping out of the shadows at the edge of the fountain, her eyes fixed on you"
+        # — and then narrated the whole fight about her in the third person: "The thug's
+        # blow crashes into Thessaly... She gasps in pain as she struggles to sit up."
+        #
+        # `plan_turn` reviews and polishes call 1's narration. Call 2 got
+        # `clean_consequence`, `name_refs` and the hand-back fix, and nothing else — no
+        # third-person check, no invented names, no misgendering, no wrong body. Roughly
+        # half of what the player reads was never checked at all, which is also why the
+        # audit's fault rates rose the moment it started reading both beats instead of
+        # one.
+        #
+        # `min_chars` stays 0: this is meant to be two or three sentences, and a length
+        # floor here would pad the one call in the app that should be short.
+        text, repairs, more = self.polish(text, player_input=player_input,
+                                          scene_brief="")
+        text, swapped = narration_mod.right_body(text, self._pc_gender(),
+                                                 self._other_names())
+        attempt = Attempt("consequence", reply.seconds, reply.model, reply.text,
+                          note="; ".join(repairs + ([f"wrong body: {', '.join(swapped)}"]
+                                                    if swapped else [])))
+        return text, attempt
 
 
 def _suggestions(data: dict, limit: int = 3) -> list[str]:
