@@ -459,3 +459,68 @@ def test_what_the_chain_produces_is_what_the_schema_asked_for():
         got = {r["op"] for r in raw}
         for op in wanted:
             assert op in got, f"{said!r}: schema wants {op}, chain gives {sorted(got)}"
+
+
+
+# --- one rule, four doors ----------------------------------------------------------------
+
+def test_an_unconscious_character_cannot_trade_use_items_or_swing():
+    """Found in the first minute of a play session, in code committed the same day.
+
+    Thessaly Corr was at 0 hit points, Unconscious and Disabled after a fight — and she
+    sold a Woad Tincture and bought a jar of beeswax across the counter. Nothing anywhere
+    asked whether she was awake.
+
+    `say` has refused the downed since somebody typed "now what" at -3 hit points and got
+    cheerful narration about dodging a thug. `use_item`, `combat_act` and the counter all
+    shipped without that guard: one rule, four doors, one of them locked.
+
+    `say` still answers 200 here and that is correct — a turn taken while down runs the
+    stabilisation clock rather than refusing, which is what `downed.resolve` is for."""
+    import json as _json
+
+    from django.test import Client
+
+    from play import campaign as cm
+
+    c = cm.current()
+    pc = c.scene.pc()
+    if pc is None:
+        import pytest as _pytest
+        _pytest.skip("no live campaign to check the doors against")
+
+    was_hp, was_conditions = pc.hp, [x.key for x in pc.conditions]
+    pc.hp = 0
+    pc.add_condition("unconscious")
+    c.save()
+    try:
+        client = Client()
+        for path, body in (
+                ("/api/trade/do", {"op": "sell", "item": "nothing#1"}),
+                ("/api/use", {"item": "nothing#1", "how": "drink"}),
+                ("/api/combat/act", {"actions": [], "label": "x"})):
+            r = client.post(path, data=_json.dumps(body),
+                            content_type="application/json")
+            assert r.status_code == 409, f"{path} let a downed character act"
+            assert "no condition to" in r.json().get("error", ""), path
+    finally:
+        pc.hp = was_hp
+        pc.conditions = [x for x in pc.conditions if x.key in was_conditions]
+        c.save()
+
+
+def test_the_guard_is_one_helper_and_not_four_copies():
+    """CLAUDE.md's rule about a rule with more than one home: a consequence rule was
+    corrected in one prompt and left stale in the other, and the bug went on shipping from
+    the copy nobody looked at. This is that shape exactly — the check existed, in one
+    place, and three other doors never got it."""
+    import inspect
+
+    from play import views
+
+    src = inspect.getsource(views)
+    assert src.count("def _cannot_act(") == 1
+    # Every door calls the helper rather than re-deriving the rule.
+    for door in ("def trade_do", "def use_item", "def combat_act"):
+        body = src.split(door, 1)[1][:1600]
+        assert "_cannot_act(" in body, f"{door} does not ask whether the player can act"

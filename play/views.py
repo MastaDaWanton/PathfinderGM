@@ -682,8 +682,9 @@ def combat_act(request):
     c = campaign_mod.current()
     scene = c.scene
     pc = scene.pc()
-    if pc is None:
-        return JsonResponse({"error": "nobody is being played"}, status=409)
+    refusal = _cannot_act(pc, "act")
+    if refusal:
+        return refusal
     if scene.awaiting:
         return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
     if not scene.in_encounter:
@@ -1070,6 +1071,12 @@ def use_item(request):
 
     item = str(body.get("item", "")).strip().lower()
     how = str(body.get("how", "drink")).strip().lower()
+    # An unconscious character does not reach for a jar. The one exception a table might
+    # want — somebody else pouring a potion down their throat — is a different action
+    # taken by a different person, and this endpoint is the player acting on their own.
+    refusal = _cannot_act(pc, "use that")
+    if refusal:
+        return refusal
     target = str(body.get("to", "") or "pc").strip()
     try:
         engine = c.engine()
@@ -1092,6 +1099,29 @@ def use_item(request):
     from rules.sheet import full_sheet
 
     return JsonResponse({"ok": True, "tell": tell, "sheet": full_sheet(pc)})
+
+
+def _cannot_act(pc, doing: str):
+    """A refusal when the character is in no state to do this, else None.
+
+    One rule, four doors, and only one of them was locked. `say` has refused the downed
+    since somebody typed "now what" at -3 hit points and got cheerful narration about
+    dodging — and `use_item`, `combat_act` and the counter all shipped without it.
+
+    Found in the first minute of a play session: Thessaly was at 0 hit points,
+    Unconscious and Disabled after a fight, and she sold a tincture and bought a jar of
+    beeswax across the counter. Nothing anywhere asked whether she was awake.
+
+    A helper rather than a fourth copy, which is CLAUDE.md's rule about a rule that has
+    more than one home: the consequence rule was corrected in one prompt and left stale in
+    the other, and the bug went on shipping from the copy nobody looked at.
+    """
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+    if downed.state_of(pc) not in ("fine", "disabled"):
+        return JsonResponse(
+            {"error": f"{pc.name} is in no condition to {doing}."}, status=409)
+    return None
 
 
 @require_POST
@@ -1218,6 +1248,10 @@ def trade_do(request):
     # underneath it is how a suspension gets lost.
     if c.scene.awaiting:
         return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+
+    refusal = _cannot_act(pc, "trade")
+    if refusal:
+        return refusal
 
     body = read_body(request)
     op = str(body.get("op", "")).strip().lower()
