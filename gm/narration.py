@@ -329,13 +329,28 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
 
     # 4. A name from nowhere. The World Bible lesson: given freedom a model invents a
     #    person or a place and then treats it as settled fact.
+    #
+    #    Read against `text` and not `body`. `body` is the narration with spoken dialogue
+    #    stripped, which is right for the player's-name rule above — an NPC may say
+    #    "Grist" out loud — but it exempted every name introduced inside quotation marks,
+    #    and dialogue is precisely where one NPC names another. Measured in play: the
+    #    stranger said "There's Glimble at the corner of Wind and Elm", a smith with no
+    #    entry anywhere in Pangrella, and the review returned ok with zero findings while
+    #    `invented_names` on the same sentence found him immediately. The suggestion chips
+    #    then offered "Head to Glimble's immediately", which is the invention becoming
+    #    settled fact one turn later.
     if known_names is not None:
-        for name in invented_names(body, known_names):
+        for name in invented_names(text, known_names):
             out.findings.append(Finding(
                 "invented-name", f"names {name!r}, which is not in this world",
                 f"{name!r} is not a person or place in this world. Use only the people "
                 f"in the scene and the places the world contains, or describe someone "
-                f"without naming them.",
+                f"without naming them. This applies inside dialogue too — what a "
+                f"character says out loud invents a person just as firmly as narration.",
+                # Heavier than a prose nit. `polish` keeps the original whenever the
+                # rewrite does not score better, and a bland sentence is a far cheaper
+                # outcome than a person who does not exist entering the campaign.
+                weight=3,
             ))
             break
 
@@ -358,7 +373,20 @@ def invented_names(text: str, known: set[str]) -> list[str]:
         first = sentence.strip().split(" ")[0].strip(".,!?;:'\"")
         for tok in tokens:
             low = tok.lower()
+            # The whole token first, so a name that owns its apostrophe survives: this
+            # world's people are Khy'vyr and Khra'gix, and splitting before checking
+            # would reduce them to "khy" and report both as invented.
             if low in _NOT_A_NAME or low in allowed:
+                continue
+            # "Thrain's place" is Thrain, who exists. Reading the possessive as its own
+            # token reported a real clan elder as an invention.
+            stem = re.sub(r"['’]s$", "", low)
+            if stem != low and (stem in allowed or stem in _NOT_A_NAME):
+                continue
+            # "I've", "I'll", "We're" — a capitalised contraction is not a name. Tested
+            # on the head rather than a list of forms, so every contraction of a word
+            # already known not to be a name is covered without enumerating them.
+            if re.split(r"['’]", low)[0] in _NOT_A_NAME:
                 continue
             if tok == first:                     # start of a sentence proves nothing
                 continue

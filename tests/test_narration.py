@@ -130,6 +130,47 @@ def test_describing_someone_without_naming_them_is_fine():
         "A woman in a wet cloak watches from the arch and says nothing.", KNOWN)
 
 
+def test_a_name_invented_inside_dialogue_is_caught():
+    """Measured in live play, turn one, Pangrella: the stranger said "There's Glimble at
+    the corner of Wind and Elm" — a smith with zero occurrences anywhere in the world
+    file — and `review` came back ok with no findings at all, while `invented_names` on
+    the same sentence found him at once.
+
+    The check read `unquoted(text)`, which strips spoken dialogue. That is right for the
+    player's-name rule it was written beside (an NPC may say "Grist" out loud) and wrong
+    here, because dialogue is exactly where one character names another. One turn later
+    the suggestion chips read "Head to Glimble's immediately"."""
+    said = "The stranger leans in. 'There's Glimble at the corner of Wind and Elm.'"
+    assert "Glimble" in narration.invented_names(said, KNOWN)
+
+    r = narration.review(said, pc_name="Kesst Vayr", known_names=KNOWN)
+    assert not r.ok, "a name invented inside quotation marks reached the player"
+    assert [f.kind for f in r.findings] == ["invented-name"]
+    # Heavier than a prose nit: `polish` keeps the original whenever its rewrite does not
+    # score better, and bland prose is a cheaper outcome than a person who does not exist.
+    assert r.score > 1
+
+
+def test_a_possessive_of_a_real_name_is_not_an_invention():
+    """Reading the whole text meant reading possessives too, and "Thrain's place" —
+    Thrain being a Zhilakai clan elder with 16 mentions in Pangrella — was reported as
+    invented. A false positive costs a repair call and makes the prose blander."""
+    known = KNOWN | {"Thrain"}
+    assert not narration.invented_names("We went to Thrain's place by the river.", known)
+
+
+def test_a_capitalised_contraction_is_not_a_name():
+    """"I think I've said enough" — the same full-text read turned I've into a person."""
+    assert not narration.invented_names("He said I've had enough of this.", KNOWN)
+
+
+def test_a_name_that_owns_an_apostrophe_survives():
+    """This world's peoples are Khy'vyr and Khra'gix. Stripping at the apostrophe before
+    checking would cut them to "khy" and report both as inventions."""
+    assert not narration.invented_names(
+        "The trader is Khy'vyr, and he waits.", {"Khy'vyr"})
+
+
 # --- Saying it twice --------------------------------------------------------------------
 
 def test_repeating_an_earlier_beat_is_caught():

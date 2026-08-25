@@ -8,6 +8,7 @@ to keep level with the first.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from django.test import Client, override_settings
@@ -70,6 +71,63 @@ def test_skill_ranks_are_counted_and_named():
     assert any("ranks" in p for p in problems)
     _, problems = creation.build(spec(skills=["basketweaving"]))
     assert any("not a skill" in p for p in problems)
+
+
+def test_the_racial_int_pays_for_skill_ranks():
+    """Found in live play. A human blood bender bought Int 18 and put the racial +2 there,
+    making Int 20 on the finished sheet — and the creation screen showed "ranks (4 class
+    +1 human + Int) 10 / 9" in red for the tenth skill. The server accepted all ten.
+
+    `creation.build` applies the racial adjustment and only then reads the modifier, so
+    the budget is 4 + 5 + 1 = 10. The page was reading the bought score, 18, for a
+    modifier of +4. Pinned on the server, which is the side that was right."""
+    built, problems = creation.build(spec(
+        race="human", bonus_ability="int", **{"class": "blood bending"},
+        # Int 18 is 17 of the 20-point budget on its own; the rest stay at 10.
+        abilities={"str": 10, "dex": 10, "con": 10, "int": 18, "wis": 10, "cha": 10},
+        paths=["battle blood"],
+        feats=["toughness", "dodge"],
+        skills=["acrobatics", "climb", "craft", "heal", "intimidate",
+                "knowledge (nature)", "perception", "profession", "stealth", "survival"],
+    ))
+    assert problems == [], problems
+    assert built["sheet"]["abilities"]["int"] == 20
+    assert len(built["sheet"]["ranks"]) == 10
+
+
+def test_an_elfs_fixed_int_pays_for_skill_ranks_too():
+    """The elf is the worse half of the same bug: their +2 Int is fixed in `mods` rather
+    than chosen, so no bonus_ability is involved and the page's raw read was short a rank
+    in every elf build ever made, with nothing on screen to explain it."""
+    built, problems = creation.build(spec(
+        race="elf", **{"class": "wizard"},
+        abilities={"str": 10, "dex": 10, "con": 10, "int": 18, "wis": 10, "cha": 10},
+        skills=["appraise", "craft", "fly", "knowledge (arcana)",
+                "linguistics", "perception", "spellcraft"],
+        feats=["toughness"],
+        spellbook=["mage-armor", "magic-missile", "shield", "sleep",
+                   "burning-hands", "charm-person", "grease", "enlarge-person"],
+    ))
+    assert problems == [], problems
+    assert built["sheet"]["abilities"]["int"] == 20
+    # 2 class + 5 Int, no human rank: seven, where the raw read allowed six.
+    assert len(built["sheet"]["ranks"]) == 7
+    # And 3 + 5 spells, where the raw read allowed 3 + 4.
+    assert len(built["sheet"].get("spellbook") or []) == 8
+
+
+def test_the_creation_page_reads_abilities_after_the_race():
+    """The disagreement was only ever in the page: `ranksBudget` and `spellCap` did their
+    own `Math.floor((f.abilities.int - 10) / 2)` on the bought score. Both go through
+    `abilityMod` now, which applies `mods` and the chosen +2 first. Pinned as source
+    because the budget is drawn in JS and cannot be reached from here."""
+    tpl = (Path(__file__).resolve().parents[1]
+           / "play" / "templates" / "play" / "home.html").read_text(encoding="utf-8")
+    assert "function finalAbility(f, opts, ab)" in tpl
+    assert 'const intMod = abilityMod(f, opts, "int");' in tpl
+    assert 'return 3 + abilityMod(f, opts, "int");' in tpl
+    # The raw read is gone from both budgets.
+    assert "Math.floor((f.abilities.int - 10) / 2)" not in tpl
 
 
 def test_a_human_fighter_gets_three_feats_and_a_dwarf_one_fewer():

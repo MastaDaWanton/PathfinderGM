@@ -1366,10 +1366,32 @@ function pointsSpent(f, opts) {
     (n, v) => n + (opts.point_costs[v] ?? 0), 0);
 }
 
+// A score as the character will actually have it: what was bought, plus what the race
+// does to it. `rules/creation.py` applies the racial adjustment and only then reads the
+// modifier, so anything here that reads a raw score disagrees with the server about the
+// character being built.
+function finalAbility(f, opts, ab) {
+  const race = opts.races.find(r => r.id === f.race);
+  let v = f.abilities[ab];
+  if (race) {
+    v += (race.mods && race.mods[ab]) || 0;
+    if (race.any && f.bonus_ability === ab) v += race.any;
+  }
+  return v;
+}
+
+function abilityMod(f, opts, ab) {
+  return Math.floor((finalAbility(f, opts, ab) - 10) / 2);
+}
+
 function ranksBudget(f, opts) {
   const cls = opts.classes.find(c => c.id === f.class);
   if (!cls) return 0;
-  const intMod = Math.floor((f.abilities.int - 10) / 2);
+  // Post-racial, matching `creation.py`. Read raw, a human blood bender with 18 Int and
+  // the racial +2 in Int was shown "10 / 9" in red for a tenth skill the server accepts
+  // without complaint — and an elf, whose +2 Int is fixed in `mods` rather than chosen,
+  // was short a rank in every build with no way to see why.
+  const intMod = abilityMod(f, opts, "int");
   return Math.max(1, cls.skill_ranks + intMod) + (f.race === "human" ? 1 : 0);
 }
 
@@ -1380,7 +1402,10 @@ function featBudget(f) {
 function spellCap(f, opts) {
   const spec = opts.spells_known[f.class];
   if (spec === undefined) return 0;
-  if (spec === "3 + int_mod") return 3 + Math.floor((f.abilities.int - 10) / 2);
+  // Same post-racial reading as `ranksBudget`, and the same disagreement before it: a
+  // human wizard who puts the racial +2 in Int is owed a fourth first-level spell by
+  // `creation.py` and was shown a cap of three.
+  if (spec === "3 + int_mod") return 3 + abilityMod(f, opts, "int");
   return spec;
 }
 
@@ -1390,14 +1415,7 @@ function paneForge() {
   const cls = opts.classes.find(c => c.id === f.class);
   const spent = pointsSpent(f, opts);
   const rb = ranksBudget(f, opts), fb = featBudget(f), sc = spellCap(f, opts);
-  const abfinal = ab => {
-    let v = f.abilities[ab];
-    if (race) {
-      v += race.mods?.[ab] || 0;
-      if (race.any && f.bonus_ability === ab) v += race.any;
-    }
-    return v;
-  };
+  const abfinal = ab => finalAbility(f, opts, ab);
   return `<div class="forge">
     <button class="quiet" data-unforge>← back</button>
     <h2 class="sect">Who are they?</h2>
