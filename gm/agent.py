@@ -156,6 +156,10 @@ class GMAgent:
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
+                # Last, and after the target fills: a fight the player declared and the
+                # GM only described. Runs once there is certainly nobody to fight, so it
+                # cannot steal a turn from `fill_obvious_targets`.
+                raw = judgement.inject_fight(raw, player_input, self.engine.scene)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)
             except IntentError as exc:

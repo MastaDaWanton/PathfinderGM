@@ -326,6 +326,134 @@ def fill_obvious_targets(raw_intents, scene) -> list:
     return out
 
 
+# Starting a fight, said by the player about themselves. Deliberately narrower than the
+# outcome-claim list: this creates a creature and an initiative order, so it must fire on
+# a declaration and nothing else.
+_VIOLENCE = re.compile(
+    r"\b(?:attack|attacks|attacking|hit|hits|hitting|strike|strikes|striking"
+    r"|punch|punches|punching|stab|stabs|stabbing|slash|slashes|slashing"
+    r"|swing at|swings at|swinging at|swinging|draw on|draws on|drawing on"
+    r"|charge|charges|charging|rush|rushes|rushing|jump|jumps|jumping"
+    r"|tackle|tackles|tackling|grapple|grapples|grappling|shove|shoves|shoving"
+    r"|throttle|throttles|throttling|pick a fight|picks a fight|picking a fight"
+    r"|start a fight|starts a fight|starting a fight|take a swing|takes a swing"
+    r"|taking a swing|square up|squares up|squaring up|kill|kills|killing"
+    r"|fight|fights|fighting)\b", re.I)
+
+# The commonest ways those verbs are used about nothing you can bleed. "I hit the road",
+# "I strike a match", "I jump the queue" — each is a sentence a player will type, and
+# each would otherwise conjure a thug and roll initiative.
+#
+# Kept per verb rather than as one shared noun list. Written shared first, "We charge the
+# camp" stopped being a fight, because "camp" was in the list for the sake of "strike
+# camp" — which is a different verb entirely.
+_NOT_VIOLENCE = re.compile(
+    r"\b(?:"
+    r"hits?\s+(?:the\s+|a\s+|my\s+)?(?:road|hay|sack|deck|books|trail|bottle|mark)"
+    r"|strikes?\s+(?:the\s+|a\s+|my\s+)?(?:match|light|camp|tent|bargain|deal|chord"
+    r"|note|balance|flint|lucky)"
+    r"|jumps?\s+(?:the\s+|a\s+|my\s+)?(?:queue|gap|ship|rope|claim|gun|conclusion)"
+    r"|charges?\s+(?:the\s+|a\s+|my\s+)?(?:price|fee|coin|rate|toll)"
+    r"|attacks?\s+(?:the\s+|a\s+|my\s+)?(?:problem|question|subject|topic|task|issue)"
+    r"|shoves?\s+(?:the\s+|a\s+|my\s+)?(?:door|table|chair|box|cart|crate|shutter)"
+    r")\b", re.I)
+
+
+def wants_a_fight(player_text: str) -> bool:
+    """Whether the player has just declared violence on somebody."""
+    text = str(player_text or "")
+    if not text or "?" in text:
+        return False
+    if _MUSING.search(text) or _NOT_VIOLENCE.search(text):
+        return False
+    return _player_is_the_one_swinging(text)
+
+
+# Another subject sitting immediately in front of the verb.
+_OTHER_SUBJECT = re.compile(r"\b(?:the|a|an|his|her|their|its|they|he|she|it)\s+\w+\s*$",
+                            re.I)
+_MINE = re.compile(r"\b(?:i|we|i'm|we're|i've|we've|i'll|we'll)\b", re.I)
+# Anybody who is not the player, anywhere in front of the verb. An imperative has none of
+# these; "He punches me in the ribs" has one and is a report rather than a declaration.
+_THIRD_PARTY = re.compile(
+    r"\b(?:he|she|it|they|them|the|a|an|his|her|their|its|someone|somebody|everyone"
+    r"|anyone|nobody)\b", re.I)
+
+
+def _player_is_the_one_swinging(text: str) -> bool:
+    """Whether the violence in this sentence is the player's own doing.
+
+    Co-occurrence with a first-person pronoun is not enough: "The thug attacks me"
+    contains both and is a report of being attacked, which must not conjure a second
+    thug — nor may "I watch as the thug attacks me". Whoever is named immediately in
+    front of the verb is the one doing it.
+
+    And the pronoun is not required at all, because the app writes its own suggestion
+    chips as imperatives. Measured live: the chip under a tavern scene read "Just start
+    swinging at him", it arrives in the box verbatim when clicked, and a rule demanding
+    "I" ignored the app's own offer to start the fight.
+    """
+    m = _VIOLENCE.search(text)
+    if not m:
+        return False
+    before = text[:m.start()]
+    if _OTHER_SUBJECT.search(before):
+        return False
+    if _MINE.search(before[-80:]):
+        return True
+    # No subject at all in front of it: an imperative, which is the player speaking.
+    return not _THIRD_PARTY.search(before)
+
+
+def inject_fight(raw_intents, player_text: str, scene):
+    """The player started a fight and there was nobody there to have it with.
+
+    Measured in live play, four turns in a row: "I shoulder my way into the worst tavern
+    on the street and pick a fight with the biggest bruiser in the room" came back as a
+    paragraph about a hulking mass of muscle and tattoos, `outcomes: []`, no actor in the
+    scene and no encounter. The GM has a `spawn` op, a `begin_encounter` op, a worked
+    example of both and a briefing line, and narrated the fight instead of proposing it —
+    which is this project's oldest lesson wearing new clothes.
+
+    Same shape and the same defence as `repair_unknown_refs`: the player is not deciding
+    who exists, they are declaring what *they* do, and the world owes them an opponent.
+    The template comes from the same cue table, defaulting to the same thug.
+
+    Fires only when there is genuinely nobody to fight — an existing enemy means
+    `fill_obvious_targets` is the right tool and this one must stay out of its way.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if not wants_a_fight(player_text):
+        return raw_intents
+    # Anything the GM already proposed that makes a fight is left alone.
+    for raw in raw_intents:
+        if isinstance(raw, dict) and str(raw.get("op", "")).lower() in (
+                "spawn", "begin_encounter", "attack"):
+            return raw_intents
+    if getattr(scene, "in_encounter", False):
+        return raw_intents
+    if any(_can_be_fought(a) for r, a in (getattr(scene, "actors", {}) or {}).items()
+           if not getattr(a, "is_pc", False)):
+        return raw_intents
+
+    template = "thug"
+    for cue, name in _TEMPLATE_CUES:
+        if cue.search(player_text or ""):
+            template = name
+            break
+    known = set(getattr(scene, "actors", {}) or {})
+    ref = next(f"c{i}" for i in range(1, len(known) + 3) if f"c{i}" not in known)
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_ref = getattr(pc, "ref", "pc")
+    return list(raw_intents) + [
+        {"op": "spawn", "because": "the player started a fight with somebody",
+         "params": {"template": template, "count": 1}},
+        {"op": "begin_encounter", "because": "the player started it",
+         "params": {"sides": {"you": [pc_ref], "them": [ref]}}},
+    ]
+
+
 def repair_unknown_refs(raw_intents, player_text: str, scene):
     """Create the people the GM was already talking about, instead of losing the turn.
 

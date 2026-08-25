@@ -586,3 +586,66 @@ def test_talking_about_a_journey_is_not_taking_one(scene):
                  "I talk about heading into the hills."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene, world)
         assert all(r.get("op") != "travel" for r in out), text
+
+
+def _empty_room():
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+    scene = Scene()
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    return scene
+
+
+def test_a_fight_the_player_starts_actually_starts(scene):
+    """Measured in live play, four turns in a row with `outcomes: []`. "I shoulder my way
+    into the worst tavern on the street and pick a fight with the biggest bruiser in the
+    room" came back as a paragraph about a hulking mass of muscle and tattoos, no actor
+    in the scene and no encounter. The GM has a spawn op, a begin_encounter op, a worked
+    example of both and a briefing line, and narrated the fight instead of proposing it.
+
+    Same defence as `repair_unknown_refs`: the player is not deciding who exists, they
+    are declaring what they do, and the world owes them an opponent."""
+    for text in ("I shoulder my way into the tavern and pick a fight with the bruiser.",
+                 "I attack the man at the bar.", "I punch him.",
+                 "I take a swing at the nearest drunk.", "We charge the camp.",
+                 # The app writes its own suggestion chips as imperatives, and they
+                 # arrive in the box verbatim when clicked. The chip under the tavern
+                 # scene read exactly this, and a rule demanding "I" ignored the app's
+                 # own offer to start the fight.
+                 "Just start swinging at him", "Attack the watchman.",
+                 "Start swinging."):
+        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
+        ops = [i.get("op") for i in out]
+        assert "spawn" in ops and "begin_encounter" in ops, text
+
+
+def test_an_idiom_does_not_conjure_a_thug(scene):
+    """Each of these is a sentence a player will type, and each would otherwise create a
+    creature and roll initiative. Kept per verb: written as one shared noun list, "We
+    charge the camp" stopped being a fight because "camp" was there for "strike camp"."""
+    for text in ("I hit the road at first light.", "I strike a match.", "I strike camp.",
+                 "I jump the queue.", "I attack the problem from another angle.",
+                 "I shove the door open.", "I charge the toll and let him pass.",
+                 "Should I attack him?", "I think about attacking him."):
+        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
+        assert all(i.get("op") != "spawn" for i in out), text
+
+
+def test_being_attacked_is_not_attacking(scene):
+    """"The thug attacks me" has a violence verb and a first-person pronoun in it and is
+    a report of being hit. Co-occurrence is not enough — the pronoun has to come before
+    the verb with no other subject between them."""
+    for text in ("The thug attacks me.", "I watch as the thug attacks me.",
+                 "He punches me in the ribs.", "They start fighting each other."):
+        out = judgement.inject_fight([{"op": "narrate_only"}], text, _empty_room())
+        assert all(i.get("op") != "spawn" for i in out), text
+
+
+def test_an_enemy_already_present_is_left_to_the_target_fill():
+    """`fill_obvious_targets` is the right tool when somebody is already standing there,
+    and this must stay out of its way rather than spawn a second opponent."""
+    from rules.bestiary import instantiate
+    room = _empty_room()
+    room.add(instantiate("thug", scene=room, name="a thug"))
+    out = judgement.inject_fight([{"op": "narrate_only"}], "I attack the thug.", room)
+    assert len(out) == 1 and out[0]["op"] == "narrate_only"
