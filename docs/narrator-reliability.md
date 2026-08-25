@@ -183,6 +183,70 @@ on a 20-turn town script. What it would buy is structural — `_repair_outcome_c
 becomes unreachable rather than merely unnecessary — and that is worth revisiting once
 the intents call stops paying for examples it does not need.
 
+## The baseline was measuring an empty string
+
+Everything above this line, including the 196/200, was scored on `""`.
+
+`tools/narrator_audit.py` read the narration off `/api/say`'s response body, and
+`_state(c)` has never had a `narration` key. So `narration.review` ran against an empty
+string on every turn of every run — and the five checks the table was proudest of
+(invented names, invented companions, third-person slips, echoed examples, outcome
+claims) could not fire, because there was nothing for them to read. Only the engine-side
+faults ever could.
+
+Reading the prose off the transcript instead, same script, same model, same machine:
+
+| | clean |
+|---|---|
+| 20-turn town, blind | 19/20 (95%) |
+| 20-turn town, reading | **14/20 (70%)** — 3 invented-name, 2 invented-companion |
+
+**Treat every number above this section as void.** The instrument was broken, and a
+harness that can produce a false positive for the thing it measures deserves more
+scepticism than the number it prints — which this document already said, about a smaller
+version of the same mistake.
+
+## The long horizon
+
+Both scripts were ten lines and looped: they measured a narrator's first ten turns over
+and over, which cannot show drift because there is nowhere to drift to. `--script long`
+is sixty distinct lines that wander — town, river, road, wild, ruin, back — and the
+harness reports the run in thirds.
+
+Its first run found the narrator narrowing:
+
+| third | chars | spread | faults | commonest opening |
+|---|---|---|---|---|
+| 1/3 | 768 | 7.1 | 4 | 16% `the watchman's` |
+| 2/3 | 755 | 6.7 | 3 | 26% `as you` |
+| 3/3 | 842 | 6.9 | 7 | **48% `as you`** |
+
+Length and sentence spread held steady. The prose does not get shorter or flatter over a
+session — it gets *same*. `formulaic-opening` (weight 2, fires when a turn opens like two
+of the last six) is the repair, and the confirming run flattens it:
+
+| third | before | after |
+|---|---|---|
+| 1/3 | 16% | 16% |
+| 2/3 | 26% | 26% |
+| 3/3 | **48%** | **21%** |
+
+Overall clean is unchanged at 45/60 against 46/60 — within noise on sixty turns, and
+worth saying plainly rather than dressing up as an improvement. What moved is the shape.
+Prose also lengthened with the new floor: mean 790 → 841, shortest turn 472 → 623.
+
+## What the prose is like
+
+Reported by the harness every run, so drift has a baseline to drift from. These count and
+do not judge — see `gm.narration.texture` on why most of what "good" means is not
+measurable here, and why CLAUDE.md names the alternative as a metric class that has given
+confident, wrong answers.
+
+    length        mean 841 chars, median 794, range 623-1244
+    sentences     9.1 per turn, 17.4 words each, spread 7.2
+    speech        44 of 57 turns contain somebody speaking
+    openings      21% share the commonest
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put
