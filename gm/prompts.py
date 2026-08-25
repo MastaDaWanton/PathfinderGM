@@ -773,18 +773,37 @@ know what actually happened, which you do not. Emit only the intents.
 
 def call_one_intents_only(briefing_scene: str, history: list[dict], player_input: str,
                           in_combat: bool = False, enemy: str | None = None) -> list[dict]:
-    """The same turn prompt, with the prose half switched off.
+    """The same turn prompt, with the prose taken out of the examples as well.
 
-    The examples still carry their narration. Stripping it was tried first and made the
-    replies worse: the examples are what teach the *shape* of an intent list, and an
-    example with an empty narration field reads as a demonstration that turns can be
-    empty. The instruction says what this turn wants; the examples still show the protocol.
+    The first cut left the examples' narration in place and measured 26.8s a turn against
+    a 16.9s baseline — same correctness, 60% slower — because both calls were carrying the
+    same several thousand characters of scene-writing. On a local 8B that is most of the
+    cost of a turn, paid twice.
+
+    So the examples keep their intents and lose their prose. What they are here to teach
+    is the shape of an intent list; the narration in them is teaching the other call's job.
+    A one-character narration rather than an empty string, deliberately: an example whose
+    narration field is "" reads as a demonstration that a turn may be empty, which is the
+    failure grammar-constrained decoding exists to prevent.
     """
     messages = call_one_messages(briefing_scene, history, player_input,
                                  in_combat=in_combat, enemy=enemy)
     messages[0] = {"role": "system",
                    "content": messages[0]["content"] + "\n" + INTENTS_ONLY_EXTRA}
-    return messages
+    out = [messages[0]]
+    for m in messages[1:]:
+        if m["role"] == "assistant":
+            try:
+                reply = json.loads(m["content"])
+            except (ValueError, TypeError):
+                out.append(m)
+                continue
+            reply["narration"] = "-"
+            reply.pop("suggestions", None)
+            out.append({"role": "assistant", "content": json.dumps(reply)})
+        else:
+            out.append(m)
+    return out
 
 
 PROSE_AFTER_EXTRA = """

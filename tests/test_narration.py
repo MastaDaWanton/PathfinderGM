@@ -917,3 +917,107 @@ def test_the_floor_reaches_the_sampler_rather_than_the_prompt():
     grammar, which is why it works where asking for length never has."""
     schema = prompts.turn_schema(min_chars=narration.MIN_SCENE_CHARS)
     assert schema["properties"]["narration"]["minLength"] == 600
+
+
+
+# --- the long horizon --------------------------------------------------------------------
+
+def test_a_narrator_that_has_started_opening_every_turn_the_same_way():
+    """The first thing the first 60-turn run ever found, and it could not have been found
+    before: both existing scripts are ten lines and loop, so they measure a narrator's
+    first ten turns over and over.
+
+    Measured, llama3.1:8b, 60 distinct turns, by third of the session — the share of turns
+    opening with the commonest opener:
+
+        first third   16%   ("the watchman's")
+        middle third  26%   ("as you")
+        last third    48%   ("as you")
+
+    Nearly half of every turn in the last third began "As you", and the faults climbed
+    with it: 4, 3, 7.
+
+    Invisible to every check that existed. `repeats-an-earlier-beat` wants a whole
+    sentence repeated exactly; this is the sentence *shape* returning, which is what a
+    narrator narrowing actually looks like."""
+    earlier = ["As you step into the yard, the rain starts.",
+               "As you turn the corner, a dog barks and is hushed.",
+               "The gate hangs open on one hinge."]
+    r = narration.review("As you reach the well, a woman looks up. What do you do?",
+                         earlier=earlier)
+    assert [f.kind for f in r.findings] == ["formulaic-opening"]
+    assert "as you" in r.findings[0].detail
+
+
+def test_opening_like_one_earlier_turn_is_a_coincidence():
+    """Two, not one. English has a limited number of ways to start a sentence about
+    somebody walking somewhere, and a check that fired on the first repeat would cost a
+    repair call on most turns of a healthy session."""
+    once = ["As you step into the yard, the rain starts.",
+            "The gate hangs open on one hinge."]
+    r = narration.review("As you reach the well, a woman looks up. What do you do?",
+                         earlier=once)
+    assert not any(f.kind == "formulaic-opening" for f in r.findings)
+
+
+def test_a_turn_that_starts_somewhere_new_is_left_alone():
+    earlier = ["As you step into the yard, the rain starts.",
+               "As you turn the corner, a dog barks and is hushed."]
+    r = narration.review(
+        "A woman at the well looks up as your shadow crosses her. What do you do?",
+        earlier=earlier)
+    assert not any(f.kind == "formulaic-opening" for f in r.findings)
+
+
+def test_the_long_script_does_not_repeat_itself():
+    """A looping script cannot show drift — it shows the same ten turns again. Sixty
+    distinct lines is the whole point of it, and a duplicate would quietly put the loop
+    back."""
+    import importlib.util
+    from pathlib import Path as _P
+
+    path = _P(__file__).resolve().parents[1] / "tools" / "narrator_audit.py"
+    spec = importlib.util.spec_from_file_location("_audit", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    lines = mod.SCRIPTS["long"]
+    assert len(lines) >= 60, f"only {len(lines)} lines"
+    assert len(set(lines)) == len(lines), "the long script repeats itself"
+
+
+def test_drift_is_reported_by_third_of_the_run():
+    """The cheapest honest way to see a session narrow: compare the start against the end.
+    A single whole-run average hides exactly the shape that matters."""
+    import importlib.util
+    from pathlib import Path as _P
+
+    path = _P(__file__).resolve().parents[1] / "tools" / "narrator_audit.py"
+    spec = importlib.util.spec_from_file_location("_audit2", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # A session that starts varied and narrows, which is the shape the real 60-turn run
+    # had: 16% of the first third shared an opening, 48% of the last. Ten identical beats
+    # followed by ten identical ones is not that — both ends come out at 100%, which is
+    # what the first version of this fixture measured and why it proved nothing.
+    varied = ["A dog barks somewhere behind the wall.",
+              "Rain has got into the lamp oil.",
+              "The gate hangs open on one hinge.",
+              "Somewhere below, a bolt goes across.",
+              "Smoke comes off the forge in a thin line.",
+              "The clerk turns a page and says nothing."]
+    narrowed = ["As you walk on, the light goes.",
+                "As you turn, the street empties.",
+                "As you pass the well, a shutter closes.",
+                "As you reach the arch, the wind drops.",
+                "As you stop, the noise stops with you.",
+                "The lamp gutters and browns."]
+    rows = ([{"narration": t, "faults": []} for t in varied]
+            + [{"narration": t, "faults": []} for t in varied]
+            + [{"narration": t, "faults": ["invented-name"]} for t in narrowed])
+    drift = mod._drift_report(rows)
+    assert len(drift) == 3
+    assert drift[0]["same_opening_share"] < drift[-1]["same_opening_share"]
+    assert drift[-1]["same_opening"] == "as you"
+    assert drift[-1]["faults"] > drift[0]["faults"]

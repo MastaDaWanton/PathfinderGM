@@ -323,6 +323,32 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
                 ))
                 break
 
+    # 3b. Opening the same way as the turns just before it. Measured on the first
+    #     60-turn run — the first long script this project has ever had, and the first
+    #     thing it found: the commonest opening took 16% of the first third of the
+    #     session, 26% of the second and **48% of the last**. Nearly half of every turn
+    #     began "As you", and faults nearly doubled alongside it (4, 3, 7).
+    #
+    #     Invisible to every check that existed. `repeats-an-earlier-beat` wants a whole
+    #     sentence repeated exactly; this is the same sentence *shape* returning, which is
+    #     what a narrator narrowing actually looks like. And invisible to the ten-line
+    #     looping scripts, which measure a narrator's first ten turns over and over.
+    #
+    #     Two, not one. A turn opening like the one before it is a coincidence; opening
+    #     like two of the last six is the pattern that ends at 48%.
+    if earlier and text:
+        mine = opening_of(_sentences(text)[0] if _sentences(text) else "")
+        recent = [opening_of(_sentences(e)[0]) for e in earlier[-6:] if _sentences(e)]
+        same = sum(1 for o in recent if o and o == mine)
+        if mine and same >= 2:
+            out.findings.append(Finding(
+                "formulaic-opening", f"{same} recent turns also open {mine!r}",
+                f"You have opened {same + 1} turns in a row with {mine!r}. Start this one "
+                f"somewhere else — on a person, on a sound, on the thing that has "
+                f"changed — and do not begin it with the player.",
+                weight=2,
+            ))
+
     # 3. Repeating a beat the player has already read.
     if earlier:
         recent = {s.strip().lower() for e in earlier[-6:]
