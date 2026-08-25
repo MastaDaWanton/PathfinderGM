@@ -1265,6 +1265,255 @@ CURATED: dict[str, list[dict]] = {
 }
 
 
+# --- the flat bonuses -------------------------------------------------------------------
+#
+# `read_scaling` reads damage and healing, which is the loud half of a spell. The quiet
+# half is a number added to something the sheet already computes, and 2,686 spells had no
+# mechanical half at all until this. Surveyed across those 2,686 before a line of it was
+# written, because a reader built from a handful of examples converts a handful of spells:
+#
+#     functions_as   459     "This spell functions like absorb rune I"
+#     condition      240     "is staggered"
+#     damage_dice    195     "2d4 points of acid damage"
+#     immunity       139     "immune to diseases and poisons"
+#     skill_mod       62     "+10 enhancement bonus on Perception checks"
+#     ac_mod          46     "+2 armor bonus to AC"
+#     dr              39     "DR 5/-"
+#     ability_mod     39     "+8 size bonus to Strength"
+#     attack_mod      26     "+1 morale bonus on attack rolls"
+#     fast_healing    18     "fast healing 5"
+#     temp_hp         16     "10 temporary hit points"
+#     save_mod        14     "+1 competence bonus on Fortitude"
+#
+# 1,057 of 2,686 carry at least one of these. What is read here is the unambiguous
+# subset: a signed bonus of a named type applied to a named thing, plus the handful of
+# defences written as bare numbers. A "+2 armor bonus to AC" cannot mean anything else.
+#
+# What is deliberately *not* read: conditions and immunities. "is staggered" is nearly
+# always the failure half of a save whose DC sits in a different sentence, and a condition
+# applied with no gate in front of it is a spell that always works — which is a wrong
+# number, and this project's rule is that prose beats a wrong number every time.
+
+_BONUS = (r"alchemical|circumstance|competence|deflection|dodge|enhancement|inherent|"
+          r"insight|luck|morale|natural armou?r|profane|racial|resistance|sacred|shield|"
+          r"size|trait|armou?r")
+
+# The vocabulary `effectspec` will accept, which is not the vocabulary the Codex writes.
+# The Codex is American and `VOCAB["bonus_type"]` is not, and the ids keep their spaces —
+# "natural armour", not "natural_armour". Slugging them cost three spells (primal
+# regression, transformation, tree shape) their armour bonus, and the schema said so.
+_BONUS_ID = {"natural armor": "natural armour", "natural armour": "natural armour",
+             "armor": "armour", "armour": "armour"}
+
+_ABIL_ID = {"strength": "str", "dexterity": "dex", "constitution": "con",
+            "intelligence": "int", "wisdom": "wis", "charisma": "cha"}
+_SAVE_ID = {"fortitude": "fort", "reflex": "ref", "will": "will"}
+
+_RE_ABILITY = re.compile(
+    rf"\+(\d+)\s+({_BONUS})\s+bonus\s+to\s+"
+    rf"(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\b", re.I)
+_RE_AC = re.compile(rf"\+(\d+)\s+({_BONUS})\s+bonus\s+to\s+"
+                    rf"(?:its\s+|your\s+|their\s+|the\s+target's\s+)?AC\b", re.I)
+_RE_SAVE = re.compile(rf"\+(\d+)\s+({_BONUS})\s+bonus\s+on\s+"
+                      rf"(Fortitude|Reflex|Will)\s+sav", re.I)
+_RE_SKILL = re.compile(rf"\+(\d+)\s+({_BONUS})\s+bonus\s+on\s+"
+                       rf"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+checks", re.I)
+_RE_ATTACK = re.compile(rf"\+(\d+)\s+({_BONUS})\s+bonus\s+on\s+attack\s+rolls", re.I)
+_RE_DR = re.compile(r"\bDR\s+(\d+)\s*/\s*([\w\-—–]+)")
+_RE_FAST_HEAL = re.compile(r"\bfast\s+healing\s+(\d+)\b", re.I)
+_RE_TEMP_HP = re.compile(r"\b(\d+)\s+temporary\s+hit\s+points\b", re.I)
+_RE_RESIST = re.compile(r"\bresistance\s+(\d+)\s+(?:to|against)\s+"
+                        r"(acid|cold|electricity|fire|sonic)\b", re.I)
+
+# Immunity takes free text rather than a vocabulary, so what the prose says is what the
+# card shows. Bounded on both ends anyway: the phrase has to be short, and it has to be a
+# thing rather than a clause — "immune to disease" is an immunity and "immune to the
+# effects described above" is a sentence the parser has no business reading.
+_RE_IMMUNE = re.compile(
+    r"\bimmun(?:e|ity)\s+to\s+([a-z][a-z\- ]{2,30}?)"
+    r"(?=[,.;]|\s+(?:and\s+(?:immun|gains?)|but|while|for|from|that|which|as|until)\b|$)",
+    re.I)
+# Words that mean the sentence was pointing at something in the text rather than naming a
+# thing. Read off the head noun, the same way `judgement._is_a_thing` decides.
+_NOT_AN_IMMUNITY = {"it", "them", "this", "that", "these", "those", "effects", "effect",
+                    "above", "below", "spell", "spells", "damage", "the", "such", "all",
+                    "any", "its", "their", "same", "one", "attack", "attacks",
+                    # The parser having run past the end of the noun phrase and into the
+                    # rest of the sentence: "immune to poison are unaffected", "immune to
+                    # fear instead", "immune to diseases and poisons with".
+                    "with", "instead", "unaffected", "also", "are", "is", "was", "were",
+                    "ignore", "gains", "gain", "and", "or"}
+
+# Three words is a thing — "mind-affecting effects", "energy drain", "critical hits". Four
+# is a clause: "fear also ignore absurdity" was the parser reading on past the noun.
+_IMMUNITY_WORDS = 3
+
+
+def _bonus_id(word: str) -> str:
+    """The Codex's spelling as `effectspec` spells it. Ids keep their spaces."""
+    low = " ".join(str(word or "").split()).lower()
+    return _BONUS_ID.get(low, low)
+
+
+def read_bonuses(entry: dict) -> list[dict]:
+    """Flat bonuses and bare-number defences, from the Codex's own prose.
+
+    Only what one reading can mean. Every pattern here names its amount, its bonus type
+    and what it applies to in one clause, so there is nothing left to infer — which is the
+    line between this and the conditions, where the number that matters (the save DC) is
+    usually in a different sentence entirely.
+    """
+    text = str(entry.get("description") or "")
+    if not text:
+        return []
+    found: list[dict] = []
+    seen: set[tuple] = set()
+
+    def add(spec: dict, key: tuple) -> None:
+        if key not in seen:
+            seen.add(key)
+            found.append(spec)
+
+    for m in _RE_ABILITY.finditer(text):
+        target = _ABIL_ID[m.group(3).lower()]
+        add({"type": "ability_mod", "amount": int(m.group(1)),
+             "bonus_type": _bonus_id(m.group(2)), "target": target},
+            ("ability_mod", target))
+    for m in _RE_AC.finditer(text):
+        add({"type": "combat_mod", "amount": int(m.group(1)),
+             "bonus_type": _bonus_id(m.group(2)), "target": "ac"}, ("combat_mod", "ac"))
+    for m in _RE_ATTACK.finditer(text):
+        add({"type": "combat_mod", "amount": int(m.group(1)),
+             "bonus_type": _bonus_id(m.group(2)), "target": "attack"},
+            ("combat_mod", "attack"))
+    for m in _RE_SAVE.finditer(text):
+        target = _SAVE_ID[m.group(3).lower()]
+        add({"type": "save_mod", "amount": int(m.group(1)),
+             "bonus_type": _bonus_id(m.group(2)), "target": target},
+            ("save_mod", target))
+    for m in _RE_SKILL.finditer(text):
+        skill = " ".join(m.group(3).split()).lower()
+        if skill not in {s["id"] for s in effectspec.VOCAB.get("skill", [])}:
+            continue                      # "Perception checks" yes, "these checks" no
+        add({"type": "skill_mod", "amount": int(m.group(1)),
+             "bonus_type": _bonus_id(m.group(2)), "target": skill},
+            ("skill_mod", skill))
+    for m in _RE_DR.finditer(text):
+        add({"type": "damage_reduction", "amount": int(m.group(1)),
+             "bypass": ("" if m.group(2) in "-—–" else m.group(2).lower())},
+            ("damage_reduction",))
+    for m in _RE_FAST_HEAL.finditer(text):
+        add({"type": "fast_healing", "amount": int(m.group(1))}, ("fast_healing",))
+    for m in _RE_TEMP_HP.finditer(text):
+        add({"type": "temp_hp", "dice": m.group(1)}, ("temp_hp",))
+    for m in _RE_RESIST.finditer(text):
+        add({"type": "resistance", "target": m.group(2).lower(),
+             "amount": int(m.group(1))}, ("resistance", m.group(2).lower()))
+    for m in _RE_IMMUNE.finditer(text):
+        what = " ".join(m.group(1).split()).lower().strip(" -")
+        words = what.split()
+        if not words or len(words) > _IMMUNITY_WORDS:
+            continue
+        if any(w in _NOT_AN_IMMUNITY for w in (words[0], words[-1])):
+            continue
+        add({"type": "immunity", "target": what}, ("immunity", what))
+    return found
+
+
+# --- "this spell functions like ..." -----------------------------------------------------
+#
+# The largest single group by a distance: 459 of the 2,686. Not prose to be parsed at all
+# — a pointer to another spell, whose mechanics have already been read. Following it costs
+# nothing and cannot invent anything, because the numbers come from an entry that already
+# exists.
+#
+# Resolved repeatedly, because the chain has depth: absorb rune II functions like absorb
+# rune I. A spell that points at something with no mechanics of its own stays prose, which
+# is most of them.
+_RE_FUNCTIONS_AS = re.compile(
+    r"functions?\s+(?:identically\s+)?(?:like|as)\s+(?:the\s+spell\s+)?"
+    r"\*{0,2}([a-z][a-z' \-]{2,40}?)\*{0,2}\s*(?:,|\.|\s+except|\s+but|\s+save)", re.I)
+
+_RESOLVE_ROUNDS = 4
+
+
+# The prose writes "mass cure light wounds"; the id is `cure-light-wounds-mass`. Same for
+# lesser and greater, which the Codex puts in front and the ids put behind. Worth 43 more
+# resolutions on its own, and it is a convention rather than a guess: the corpus is
+# consistent about it in both directions.
+_RANKS = ("lesser", "greater", "mass")
+
+
+def _name_variants(name: str):
+    yield name
+    for word in _RANKS:
+        if name.startswith(word + "-"):
+            yield f"{name[len(word) + 1:]}-{word}"
+        if name.endswith("-" + word):
+            yield f"{word}-{name[:-(len(word) + 1)]}"
+    # "functions like a mark of justice" — the article comes along with the name.
+    for article in ("a-", "the-"):
+        if name.startswith(article):
+            yield name[len(article):]
+
+
+def functions_as(entry: dict, known: set[str] | None = None) -> str:
+    """The id of the spell this one says it copies, or "".
+
+    `known` is every real spell id. Given it, a name is only returned when it names
+    something that exists — which is what keeps "functions like normal" and "functions
+    like intended" out, both of which are the parser reading a sentence that was never
+    about another spell at all.
+    """
+    m = _RE_FUNCTIONS_AS.search(str(entry.get("description") or ""))
+    if not m:
+        return ""
+    name = " ".join(m.group(1).split()).lower().strip(" ,.")
+    if not name or name in {"a spell", "this spell", "the spell", "normal", "intended"}:
+        return ""
+    slug = re.sub(r"[^a-z0-9]+", "-", name).strip("-")
+    if known is None:
+        return slug
+    for candidate in _name_variants(slug):
+        if candidate in known:
+            return candidate
+    return ""
+
+
+def inherit(out: dict, entries: list[dict]) -> int:
+    """Give every "functions like X" spell the mechanics of X. Returns how many gained one.
+
+    Run to a fixed point rather than once, because the references chain — and capped, so a
+    pair of spells that name each other cannot spin.
+    """
+    by_id = {e["id"]: e for e in entries}
+    known = set(by_id)
+    gained = 0
+    for _ in range(_RESOLVE_ROUNDS):
+        moved = 0
+        for sid, entry in by_id.items():
+            if sid in out:
+                continue
+            other = functions_as(entry, known)
+            if not other or other not in out or not out[other].get("effects"):
+                continue
+            out[sid] = {
+                "id": sid,
+                "effects": [dict(e) for e in out[other]["effects"]],
+                "effects_converted": True,
+                # Where the numbers came from. A card that shows an effect the spell's own
+                # prose never states has to be able to say why.
+                "inherited_from": other,
+            }
+            if out[other].get("scaling"):
+                out[sid]["scaling"] = dict(out[other]["scaling"])
+            moved += 1
+        gained += moved
+        if not moved:
+            break
+    return gained
+
+
 def convert(entry: dict) -> tuple[dict, list[str]]:
     """One spell's mechanical half, and any spec the schema refused.
 
@@ -1278,6 +1527,14 @@ def convert(entry: dict) -> tuple[dict, list[str]]:
     if sc:
         out["scaling"] = sc
     specs = list(curated) if curated else effects_from_scaling(entry, sc)
+    # The flat bonuses, added to whatever the damage reader found rather than instead of
+    # it: `aid` is 1d8 temporary hit points *and* a +1 morale bonus on attack rolls, and
+    # reading only one of those is half a spell. Never over a curated entry — those were
+    # written by a person precisely because the prose defeats a pattern.
+    if not curated:
+        have = {(s.get("type"), s.get("target")) for s in specs}
+        specs = specs + [s for s in read_bonuses(entry)
+                         if (s.get("type"), s.get("target")) not in have]
     for spec in specs:
         found = effectspec.validate(spec, entry.get("id", "?"))
         problems.extend(found)
@@ -1301,7 +1558,7 @@ def build_mechanics(entries: list[dict] | None = None) -> tuple[dict, dict]:
         entries = _shipped_entries()
     out: dict[str, dict] = {}
     report = {"total": len(entries), "scaling": 0, "effects": 0, "curated": 0,
-              "prose": 0, "invalid": [], "by_kind": {}}
+              "prose": 0, "invalid": [], "by_kind": {}, "inherited": 0}
     for entry in entries:
         got, problems = convert(entry)
         report["invalid"].extend(problems)
@@ -1317,6 +1574,11 @@ def build_mechanics(entries: list[dict] | None = None) -> tuple[dict, dict]:
             report["effects"] += 1
         if not got.get("effects_converted", True):
             report["curated"] += 1
+    # Last, and over the finished set: a spell can only inherit from one that has already
+    # been read, and 459 of them are waiting on exactly that.
+    report["inherited"] = inherit(out, entries)
+    report["effects"] += report["inherited"]
+    report["prose"] = max(0, report["prose"] - report["inherited"])
     return out, report
 
 
@@ -1329,11 +1591,36 @@ def _shipped_entries() -> list[dict]:
 
 
 def write_mechanics() -> dict:
-    """Rebuild `content/spells/spells-mechanics.json`. Run when the conversion changes."""
+    """Rebuild `content/spells/spells-mechanics.json`, keeping what people corrected.
+
+    A merge, not an overwrite, and that distinction cost two spells their correction the
+    first time this ran after the reader was widened. `fly` and `binding earth` had both
+    been rewritten by hand as narrative — fly's "1d6" is a *descent timer*, not damage —
+    and a plain regeneration put the wrong damage specs straight back. Fourteen entries in
+    the shipped file are in that state.
+
+    `effects_converted` is the marker and it already meant exactly this: true is a
+    machine's reading that nobody has checked, and its absence is a person's answer. The
+    module docstring above warns about precisely this failure — "an effect derived at read
+    time is silently overwritten the moment somebody corrects it" — and the file being
+    written rather than derived is not on its own enough to prevent it.
+    """
     from django.conf import settings
 
     entries, report = build_mechanics()
     path = Path(settings.BASE_DIR) / "content" / "spells" / "spells-mechanics.json"
+    kept = 0
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8")).get("spells") or []
+        except (ValueError, OSError):
+            existing = []
+        for entry in existing:
+            sid = entry.get("id")
+            if sid and not entry.get("effects_converted"):
+                entries[sid] = entry
+                kept += 1
+    report["kept_by_hand"] = kept
     payload = {
         "note": "Damage, healing and the classic buffs, read out of the Codex's prose by "
                 "rules.spells.build_mechanics. `effects_converted` marks a machine's "

@@ -292,10 +292,13 @@ def test_the_conversion_covers_what_it_claims_and_no_more():
     """
     entries, report = spells.build_mechanics()
     assert report["total"] == 3040
-    assert report["effects"] == 354
+    # 354 before the flat-bonus reader and the "functions like" pass. The scaling and
+    # curated counts are untouched by either — damage and healing are read exactly as
+    # they were, and the widening is entirely in the quiet half of a spell.
+    assert report["effects"] == 640
     assert report["scaling"] == 342
     assert report["curated"] == 12
-    assert report["prose"] == 2686
+    assert report["prose"] == 2400
     assert report["invalid"] == []
     assert report["by_kind"] == {"damage": 327, "healing": 15}
 
@@ -733,3 +736,169 @@ def test_two_machine_misreadings_that_only_reading_caught():
             flat.extend(spec.get("on_success") or [])
         assert not [x for x in flat if x.get("type") == "damage"], sid
         assert not spells.scaling_dice(s, 10), f"{sid} still claims a damage progression"
+
+
+
+# --- the quiet half of a spell -------------------------------------------------------
+
+def test_a_flat_bonus_is_read_out_of_the_prose():
+    """`read_scaling` reads damage and healing, which is the loud half. The quiet half is
+    a number added to something the sheet already computes, and 2,686 of 3,040 spells had
+    no mechanical half at all because nothing read it.
+
+    Surveyed across those 2,686 before a line of the reader was written — ac_mod 46,
+    ability_mod 39, skill_mod 62, attack_mod 26, save_mod 14 — because a reader built from
+    a handful of examples converts a handful of spells."""
+    got = spells.read_bonuses({"description":
+        "Invisible layers of solid force surround the target, granting a +2 armor bonus "
+        "to AC and DR 5/- against ranged attacks."})
+    kinds = {(g["type"], g.get("target")): g for g in got}
+    assert kinds[("combat_mod", "ac")]["amount"] == 2
+    assert kinds[("damage_reduction", None)]["amount"] == 5
+    assert kinds[("damage_reduction", None)]["bypass"] == ""
+
+
+def test_the_codex_spells_armour_the_other_way():
+    """The corpus is American and `effectspec.VOCAB["bonus_type"]` is not, and the ids keep
+    their spaces. Slugging "natural armor" to `natural_armour` cost primal regression,
+    transformation and tree shape their armour bonus, and the schema said so by name."""
+    got = spells.read_bonuses(
+        {"description": "You gain a +4 natural armor bonus to AC."})
+    assert got[0]["bonus_type"] == "natural armour"
+    _, problems = spells.convert(
+        {"id": "x", "description": "You gain a +4 natural armor bonus to AC."})
+    assert problems == []
+
+
+def test_a_bonus_is_added_to_the_damage_rather_than_replacing_it():
+    """`aid` is 1d8 temporary hit points *and* a +1 morale bonus on attack rolls. Reading
+    only one of those is half a spell."""
+    got, problems = spells.convert({
+        "id": "aid",
+        "description": "The target gains a +1 morale bonus on attack rolls and saving "
+                       "throws against fear effects, plus 10 temporary hit points.",
+    })
+    kinds = {e["type"] for e in got["effects"]}
+    assert {"combat_mod", "temp_hp"} <= kinds
+    assert problems == []
+
+
+def test_a_condition_with_no_save_in_front_of_it_stays_prose():
+    """240 unconverted spells say something like "is staggered", and in nearly all of them
+    the DC that decides it sits in a different sentence. A condition applied with no gate
+    is a spell that always works, which is a wrong number — and prose beats a wrong number
+    every time in this project."""
+    got = spells.read_bonuses(
+        {"description": "The target is staggered for 1 round."})
+    assert not any(g["type"] == "apply_condition" for g in got)
+
+
+def test_an_immunity_is_a_thing_and_not_the_rest_of_the_sentence():
+    """Free text, so what the prose says is what the card shows — which means the parser
+    running past the end of the noun phrase is visible to the player. "immune to poison
+    are unaffected", "immune to fear instead" and "immune to diseases and poisons with"
+    were all real output before the head and tail words were checked."""
+    good = spells.read_bonuses({"description": "The target is immune to poison."})
+    assert good == [{"type": "immunity", "target": "poison"}]
+
+    for said in ("Creatures immune to poison are unaffected by this spell.",
+                 "Those immune to fear instead take a -2 penalty.",
+                 "You are immune to the effects described above."):
+        assert not [g for g in spells.read_bonuses({"description": said})
+                    if g["type"] == "immunity"], said
+
+
+# --- "this spell functions like ..." ---------------------------------------------------
+
+def test_a_spell_that_copies_another_one_inherits_its_mechanics():
+    """The largest single group in the unconverted corpus: 459 spells say they function
+    like another one. That is not prose to be parsed at all — it is a pointer, and
+    following it cannot invent anything, because the numbers come from an entry that
+    already exists."""
+    entries = [
+        # A flat bonus rather than damage, because `read_scaling` wants a whole entry —
+        # tags, level, the lot — and the point here is the pointer, not the parser.
+        {"id": "absorb-rune-i",
+         "description": "The target gains a +2 deflection bonus to AC."},
+        {"id": "absorb-rune-ii", "description": "This spell functions like absorb rune I, "
+                                                "except as noted above."},
+    ]
+    out, _ = spells.build_mechanics(entries)
+    assert "absorb-rune-i" in out, "the spell being copied did not convert"
+    assert "absorb-rune-ii" in out
+    assert out["absorb-rune-ii"]["inherited_from"] == "absorb-rune-i"
+    assert out["absorb-rune-ii"]["effects"] == out["absorb-rune-i"]["effects"]
+
+
+def test_the_prose_and_the_ids_name_ranks_the_other_way_round():
+    """The Codex writes "mass cure light wounds"; the id is `cure-light-wounds-mass`. Worth
+    43 more resolutions on its own, and it is a convention rather than a guess — the corpus
+    is consistent about it in both directions."""
+    known = {"cure-light-wounds-mass", "age-resistance-lesser"}
+    assert spells.functions_as(
+        {"description": "This spell functions like mass cure light wounds, except..."},
+        known) == "cure-light-wounds-mass"
+    assert spells.functions_as(
+        {"description": "This functions as lesser age resistance, but..."},
+        known) == "age-resistance-lesser"
+
+
+def test_functioning_like_something_that_is_not_a_spell_inherits_nothing():
+    """"functions like normal", "functions as intended", "functions like a tanglefoot bag"
+    — 69 of them, and each one is the parser reading a sentence that was never about
+    another spell."""
+    known = {"fireball"}
+    for said in ("This spell functions like normal, except louder.",
+                 "The armour functions as intended, but heavier.",
+                 "This functions like a tanglefoot bag, save that..."):
+        assert spells.functions_as({"description": said}, known) == "", said
+
+
+def test_a_reference_chain_cannot_spin():
+    """Two spells naming each other resolve to nothing rather than looping."""
+    entries = [
+        {"id": "a", "description": "This spell functions like b, except as noted."},
+        {"id": "b", "description": "This spell functions like a, except as noted."},
+    ]
+    out, _ = spells.build_mechanics(entries)
+    assert out == {}
+
+
+def test_the_whole_corpus_converts_without_a_single_invalid_spec():
+    """3,040 spells through the schema. The count is the point: 354 carried mechanics
+    before this and 640 do now, and every one of them validates."""
+    out, report = spells.build_mechanics()
+    assert report["invalid"] == []
+    assert len(out) >= 640, f"only {len(out)} spells carry mechanics"
+
+
+
+def test_a_rebuild_does_not_destroy_what_a_person_corrected():
+    """Measured the first time the widened reader was written to disk: `fly` and `binding
+    earth` had both been corrected by hand to narrative — fly's "1d6" is a *descent
+    timer*, "floats downward 60 feet per round for 1d6 rounds", not damage — and a plain
+    regeneration put the wrong damage specs straight back.
+
+    Fourteen entries in the shipped file are in that state, and the marker for it already
+    existed: `effects_converted` true is a machine's reading nobody has checked, and its
+    absence is a person's answer.
+
+    This module's own docstring warns about exactly this — "an effect derived at read time
+    is silently overwritten the moment somebody corrects it" — and writing to a file
+    instead of deriving at load is not on its own enough to prevent it."""
+    import json
+    from pathlib import Path as _P
+
+    from django.conf import settings
+
+    path = _P(settings.BASE_DIR) / "content" / "spells" / "spells-mechanics.json"
+    shipped = {s["id"]: s for s in
+               json.loads(path.read_text(encoding="utf-8"))["spells"]}
+
+    by_hand = [s for s in shipped.values() if not s.get("effects_converted")]
+    assert len(by_hand) == 14, f"{len(by_hand)} hand-written entries, expected 14"
+
+    # And the two the rebuild actually broke are among them, still narrative.
+    for sid in ("fly", "binding-earth"):
+        kinds = [e.get("type") for e in shipped[sid]["effects"]]
+        assert kinds == ["narrative"], f"{sid} was regenerated over: {kinds}"
