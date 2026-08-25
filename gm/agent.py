@@ -261,7 +261,7 @@ class GMAgent:
             # Telling somebody their character has a body she does not have is not a
             # prose nit to lose a coin-toss over.
             narration, swapped = narration_mod.right_body(
-                narration, self._pc_gender())
+                narration, self._pc_gender(), self._other_names())
             if swapped:
                 prose_repairs = prose_repairs + [
                     f"wrong body: replaced {', '.join(repr(s) for s in swapped)}"]

@@ -377,7 +377,7 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     # 2c. The player's character given the wrong body. Separate from 2b and not reachable
     #     from it: the paragraph that prompted this was in the second person from end to
     #     end and contained no pronoun at all.
-    for part in wrong_body(text, gender):
+    for part in wrong_body(text, gender, tuple(others or ())):
         out.findings.append(Finding(
             "wrong-body", f"gives the player's character {part!r}",
             f"The player's character is a {gender}. {part!r} is not part of her body — "
@@ -516,26 +516,105 @@ _WRONG_BODY = {"woman": _MALE_BODY, "man": _FEMALE_BODY}
 # Punctuation is excluded so the window cannot cross into the next sentence.
 _BODY_GAP = 40
 
+# "your" and "my", because the player's body gets described in both. Measured, the turn
+# after the second-person case was fixed: asked to describe her chest aloud, the model
+# put the whole description in her own mouth — "'My chest is. muscular, with well-defined
+# pectoralis muscles that curve outward from the center of my body.'" — and a check
+# reading only `your` saw nothing at all in it.
+#
+# `my` needs a speaker, though. An NPC saying "my beard" is describing their own face and
+# is nobody's business but theirs, so a first-person possessive only counts when the
+# player is the one talking.
+_OWNS = r"your|my"
 
-def wrong_body(text: str, gender: str) -> list[str]:
-    """Sex-specific anatomy handed to the player's character.
+# How far back to look for who is speaking. Wide enough to reach past "You take a deep
+# breath and begin to describe your chest, speaking in a low, matter-of-fact tone." and
+# find the "You" that starts it.
+_SPEAKER_LOOKBACK = 160
 
-    Second person only, because that is how the player's body is always described, and
-    because it is the case no pronoun rule can see. An unstated gender gets no opinion:
-    most of the bestiary has none and inventing one to check against would be the guess
-    this whole field exists to stop.
+
+# Whose part it is, when something owns it. Read backwards from the part itself rather
+# than forwards from a possessive, because the forward rule cannot cross a full stop and
+# the model's punctuation is not reliable: the line that prompted this reads "'My chest
+# is. muscular, with well-defined pectoralis muscles" — a stray period between the
+# possessive and the part, and a gap rule that excludes "." saw nothing in it at all.
+_POSSESSIVE = re.compile(r"\b(my|your|his|her|their|its|our)\b|['’]s\b", re.I)
+
+# How far back a possessive still governs the part. Long enough for the broken sentence
+# above (38 characters from "My" to "pectoralis"), short enough that it does not reach
+# back into the previous speaker's turn.
+_OWNER_LOOKBACK = 60
+
+
+def _owner_of(text: str, at: int) -> str:
+    """Who the part at this position belongs to: "my", "your", "his", "" for nobody."""
+    window = text[max(0, at - _OWNER_LOOKBACK):at]
+    found = list(_POSSESSIVE.finditer(window))
+    if not found:
+        return ""
+    last = found[-1]
+    return (last.group(1) or "someone").lower()
+
+
+def _player_is_speaking(text: str, at: int, others: tuple[str, ...] = ()) -> bool:
+    """Whether the "my" at this position belongs to the player's character.
+
+    Read off the attribution in front of it, nearest wins. "Vorgath says, 'My beard…'"
+    has his name closer than any "you", and is his to describe.
+    """
+    window = text[max(0, at - _SPEAKER_LOOKBACK):at]
+    mine = [m.start() for m in re.finditer(r"\byou\b|\byour\b", window, re.I)]
+    theirs = [m.start() for n in others if n
+              for m in re.finditer(r"\b" + re.escape(n) + r"\b", window, re.I)]
+    if not mine:
+        return False
+    return not theirs or max(mine) > max(theirs)
+
+
+def _parts_of_the_player(text: str, marks: str, others: tuple[str, ...]):
+    """Every match of `marks` that is a part of the player's character's body.
+
+    The question is *whose body is being described*, not which pronoun happens to sit in
+    front of the word — that is what the two versions before this got wrong, each in its
+    own way. The first read only "your" and missed the turn where the character described
+    herself out loud. The second added "my" as a prefix and still missed it, because the
+    model wrote "'My chest is. muscular, with well-defined pectoralis muscles" and a
+    forward rule that will not cross a full stop cannot get from the possessive to the
+    part.
+
+    So ownership is read backwards from the part, and there are exactly two ways for it
+    to be the player's: the narration says "your", or the player is the one speaking and
+    says "my". Anything owned by a third person is theirs.
+
+    Who is speaking is read off the attribution rather than off a matched pair of quote
+    marks, and that is not a shortcut. `_QUOTED` caps a span at 300 characters, and the
+    real turn this was written against ran to a 500-character speech — so the quote never
+    matched, the "inside a player quote" test answered no, and the check missed the very
+    line it had just been extended to catch.
+    """
+    for m in re.finditer(rf"\b({marks})\b", text, re.I):
+        owner = _owner_of(text, m.start())
+        if owner == "your":
+            yield m
+        elif owner == "my" and _player_is_speaking(text, m.start(), others):
+            yield m
+
+
+def wrong_body(text: str, gender: str, others: tuple[str, ...] = ()) -> list[str]:
+    """Sex-specific anatomy on the player's character's body.
+
+    Whether the narration is describing her or she is describing herself, and neither
+    case is reachable by a pronoun rule: "you" and "my" both carry no gender in English,
+    which is the whole reason this check has to know what she *is* rather than what she
+    is called. An unstated gender gets no opinion — most of the bestiary has none, and
+    inventing one to check against would be the guess this field exists to stop.
     """
     marks = _WRONG_BODY.get(str(gender or "").strip().lower())
     if not marks or not text:
         return []
     found: list[str] = []
-    for m in re.finditer(rf"\byour\b([^.!?]{{0,{_BODY_GAP}}}?)\b({marks})\b", text, re.I):
-        # "your opponent's beard" is somebody else's face. A possessive inside the gap
-        # hands the part to whoever owns it, so the sentence stops being about the
-        # player at all.
-        if re.search(r"['’]s\b", m.group(1)):
-            continue
-        part = m.group(2).lower()
+    for m in _parts_of_the_player(text, marks, tuple(others or ())):
+        part = m.group(1).lower()
         if part not in found:
             found.append(part)
     return found
@@ -576,7 +655,8 @@ _RIGHT_PART = {
 _ANATOMY_TAIL = re.compile(r"\s+(?:major|minor)?\s*(?:muscles?)\b", re.I)
 
 
-def right_body(text: str, gender: str) -> tuple[str, list[str]]:
+def right_body(text: str, gender: str,
+               others: tuple[str, ...] = ()) -> tuple[str, list[str]]:
     """Swap anatomy that is not theirs for the part that is.
 
     The backstop, not the repair. `review` raises `wrong-body` first and the model gets a
@@ -597,24 +677,26 @@ def right_body(text: str, gender: str) -> tuple[str, list[str]]:
         return text, []
     swapped: list[str] = []
 
-    def _swap(m):
-        gap, part = m.group(1), m.group(2)
-        neutral = table.get(part.lower())
-        # The same guard `wrong_body` applies, and it has to be applied here too: without
-        # it the backstop shaved the beard off "your opponent's beard" — a face the
-        # detector had deliberately left alone, edited by the fix for a finding that was
-        # never raised.
-        if not neutral or re.search(r"['’]s\b", gap):
-            return m.group(0)
-        swapped.append(part.lower())
-        return f"your{gap}{neutral}"
-
-    # By span, via `sub`, never `str.replace` — the trap `fix_hand_back` documents, where
-    # a whitespace shift between what was found and what is replaced makes the fix a
-    # silent no-op.
-    out = re.sub(rf"\byour\b([^.!?]{{0,{_BODY_GAP}}}?)\b({marks})\b", _swap, text, flags=re.I)
-    if swapped:
-        out = _ANATOMY_TAIL.sub("", out)
+    # The *same* matches the detector found, not a second regex that agrees with it by
+    # eye. Two expressions drifted apart once already — the fix shaved the beard off a
+    # face the detector had deliberately exempted — and this is the only way they cannot.
+    #
+    # Right to left, so an earlier replacement cannot shift the offsets of a later one.
+    hits = list(_parts_of_the_player(text, marks, tuple(others or ())))
+    out = text
+    for m in reversed(hits):
+        right = table.get(m.group(1).lower())
+        if not right:
+            continue
+        swapped.append(m.group(1).lower())
+        # By span, never `str.replace` — the trap `fix_hand_back` documents, where a
+        # whitespace shift between what was found and what is replaced makes the fix a
+        # silent no-op. Whatever qualifies the noun goes with it, or "your pectoralis
+        # major muscles" becomes "your breasts major muscles".
+        end = m.end()
+        tail = _ANATOMY_TAIL.match(out, end)
+        out = out[:m.start()] + right + out[(tail.end() if tail else end):]
+    swapped.reverse()
     return out, swapped
 
 

@@ -707,3 +707,62 @@ def test_the_backstop_is_wired_in_after_polish():
         encoding="utf-8")
     assert "narration_mod.right_body(" in src
     assert src.index("fix_hand_back(narration)") < src.index("right_body(")
+
+
+
+# --- whose body is being described -------------------------------------------------------
+
+# The third report, verbatim from the screenshot. The player asked to describe her chest
+# aloud and the model put the whole description in her own mouth.
+SPOKEN = ("You take a deep breath and begin to describe your chest, speaking in a low, "
+          "matter-of-fact tone. 'My chest is. muscular, with well-defined pectoralis "
+          "muscles that curve outward from the center of my body. The contours of my "
+          "chest are smooth.' As you continue to speak, your words become more precise, "
+          "as if you're trying to recall every nuance of your own body. Vorgath's eyes "
+          "narrow slightly, his expression unreadable.")
+
+
+def test_the_player_describing_herself_aloud_is_still_the_player():
+    """"it needs to be able to determine that the PC is the object being described and
+    know she is a woman."
+
+    Two earlier versions missed this line and each missed it differently. The first read
+    only "your" and never looked inside speech at all. The second added "my" as a prefix
+    and *still* missed it, because the model wrote "'My chest is. muscular, with
+    well-defined pectoralis muscles" — a stray full stop between the possessive and the
+    part, and a forward rule that will not cross "." cannot get from one to the other.
+
+    So ownership is read backwards from the part instead, and the question is whose body
+    is being described rather than which pronoun happens to sit in front of the word."""
+    assert narration.wrong_body(SPOKEN, "woman", ("Vorgath", "Lyra")) == ["pectoralis"]
+
+    fixed, swapped = narration.right_body(SPOKEN, "woman", ("Vorgath", "Lyra"))
+    assert swapped == ["pectoralis"] and "pectoralis" not in fixed
+    assert "breasts" in fixed
+
+
+def test_an_npc_describing_their_own_face_is_left_alone():
+    """"my beard" in somebody else's mouth is their business. The attribution decides it,
+    nearest wins: Vorgath's name is closer to this "My" than any "you"."""
+    said = "Vorgath strokes his chin. 'My beard has seen worse winters,' he says."
+    assert narration.wrong_body(said, "woman", ("Vorgath",)) == []
+    assert narration.right_body(said, "woman", ("Vorgath",)) == (said, [])
+
+
+def test_a_third_persons_body_is_never_the_players():
+    """"He scratches his beard" is a man in the scene, not a finding about the player."""
+    said = "He scratches his beard as he considers your offer."
+    assert narration.wrong_body(said, "woman", ("Vorgath",)) == []
+
+
+def test_the_fix_uses_the_matches_the_check_found():
+    """Not a second regex that agrees with the first by eye. Two expressions drifted apart
+    once already — the backstop shaved the beard off "your opponent's beard", a face the
+    detector had deliberately exempted — and sharing the finder is the only way they
+    cannot drift again."""
+    for said in (SPOKEN, "the surface of your pectoralis major muscles",
+                 "You duck under your opponent's beard.",
+                 "Vorgath strokes his chin. 'My beard is grey,' he says."):
+        found = narration.wrong_body(said, "woman", ("Vorgath",))
+        _, swapped = narration.right_body(said, "woman", ("Vorgath",))
+        assert found == swapped, said
