@@ -254,6 +254,18 @@ class GMAgent:
                 prose_repairs = prose_repairs + [
                     f"asked the player to narrate: replaced {outsourced!r}"]
 
+            # Same reason, same place. Measured on the turn that prompted it: the review
+            # found `wrong-body`, the rewrite was asked for, and it lost — the turn
+            # carried three findings at once and the repair could not beat all of them —
+            # so "your pectoralis major muscles" reached the player for a second time.
+            # Telling somebody their character has a body she does not have is not a
+            # prose nit to lose a coin-toss over.
+            narration, swapped = narration_mod.neutralise_body(
+                narration, self._pc_gender())
+            if swapped:
+                prose_repairs = prose_repairs + [
+                    f"wrong body: replaced {', '.join(repr(s) for s in swapped)}"]
+
             return TurnPlan(narration=narration, intents=intents,
                             suggestions=_suggestions(data),
                             attempts=attempts,

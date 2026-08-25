@@ -640,3 +640,53 @@ def test_everybody_is_allowed_to_say_i():
     """Dialogue is exempt, or every NPC who opens their mouth becomes a finding."""
     said = 'The guard shrugs. "I never saw him come through here," she says.'
     assert narration.narrator_in_first_person(said) == []
+
+
+
+# --- the backstop, for when the rewrite loses --------------------------------------------
+
+def test_the_wrong_body_is_replaced_when_the_rewrite_does_not_hold():
+    """Measured on the live save, the turn after the check was added. The review found
+    `wrong-body`, `polish` asked for a rewrite, and the rewrite lost — the turn carried
+    three findings at once (no-hand-back, repeats-an-earlier-beat, wrong-body) and a
+    repair has to beat all of them without adding a new kind. So the original was kept and
+    "your pectoralis major muscles" reached the player a second time.
+
+    Recorded from the turn log verbatim:
+        "unrepaired: ... wrong-body: gives the player's character 'pectoralis'"
+
+    Same bargain `fix_hand_back` makes: the model gets first go at a proper rewrite, and
+    what must never ship anyway is fixed mechanically."""
+    said = ("You notice that the intricate pattern etched into the surface of your "
+            "pectoralis major muscles is more pronounced now.")
+    fixed, swapped = narration.neutralise_body(said, "woman")
+    assert swapped == ["pectoralis"]
+    assert "pectoralis" not in fixed
+    # The qualifier goes with the noun, or the swap leaves "your chest major muscles".
+    assert "major muscles" not in fixed
+    assert "the surface of your chest" in fixed
+    assert narration.wrong_body(fixed, "woman") == []
+
+
+def test_the_backstop_leaves_somebody_elses_face_alone():
+    """The guard `wrong_body` applies has to be applied here too. Without it the backstop
+    shaved the beard off "your opponent's beard" — a face the detector had deliberately
+    exempted, edited by the fix for a finding that was never raised."""
+    said = "You duck under your opponent's beard and drive a fist into his ribs."
+    assert narration.neutralise_body(said, "woman") == (said, [])
+
+
+def test_the_backstop_has_no_opinion_without_a_gender():
+    said = "You scratch your beard."
+    assert narration.neutralise_body(said, "") == (said, [])
+
+
+def test_the_backstop_is_wired_in_after_polish():
+    """Unconditional and last, beside `fix_hand_back`, for the same reason: `polish` keeps
+    the original whenever its rewrite is no better, so a finding can survive the repair."""
+    from pathlib import Path as _P
+
+    src = (_P(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
+        encoding="utf-8")
+    assert "narration_mod.neutralise_body(" in src
+    assert src.index("fix_hand_back(narration)") < src.index("neutralise_body(")

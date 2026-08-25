@@ -541,6 +541,66 @@ def wrong_body(text: str, gender: str) -> list[str]:
     return found
 
 
+# What each wrong part becomes when the rewrite does not hold. Neutral, and true of
+# everybody: a chest is a chest, a jaw is a jaw. The substitution never invents anything
+# and never has to know what the right body looks like — it only has to stop asserting
+# the wrong one, which is the same bargain `fix_hand_back` makes.
+_NEUTRAL_PART = {
+    "beard": "jaw", "beards": "jaw", "bearded": "unshaven",
+    "stubble": "jaw", "whiskers": "jaw", "sideburns": "temples",
+    "moustache": "mouth", "moustaches": "mouth",
+    "mustache": "mouth", "mustaches": "mouth",
+    "adam's apple": "throat", "adams apple": "throat",
+    "pectoral": "chest", "pectorals": "chest", "pectoralis": "chest",
+    "chest hair": "chest", "manhood": "body", "penis": "body",
+    "phallus": "body", "testicles": "body", "scrotum": "body",
+    "breast": "chest", "breasts": "chest", "bosom": "chest",
+    "cleavage": "collarbone", "womb": "belly", "uterus": "belly",
+    "vulva": "body", "vagina": "body", "ovaries": "belly",
+}
+
+# "pectoralis major muscles" is one part with three words. Whatever qualifies the noun
+# has to go with it, or the swap leaves "the surface of your chest major muscles".
+_ANATOMY_TAIL = re.compile(r"\s+(?:major|minor)?\s*(?:muscles?)\b", re.I)
+
+
+def neutralise_body(text: str, gender: str) -> tuple[str, list[str]]:
+    """Swap anatomy that is not theirs for a part everybody has.
+
+    The backstop, not the repair. `review` raises `wrong-body` first and the model gets a
+    chance to rewrite the paragraph properly, which is much the better outcome — measured
+    live, though, that rewrite does not always land: on the turn this was written for it
+    had three findings to beat at once and kept the original, so "your pectoralis major
+    muscles" reached the player a second time.
+
+    Cutting too little is what shipped the bug. Cutting too much costs a duller sentence.
+    """
+    marks = _WRONG_BODY.get(str(gender or "").strip().lower())
+    if not marks or not text:
+        return text, []
+    swapped: list[str] = []
+
+    def _swap(m):
+        gap, part = m.group(1), m.group(2)
+        neutral = _NEUTRAL_PART.get(part.lower())
+        # The same guard `wrong_body` applies, and it has to be applied here too: without
+        # it the backstop shaved the beard off "your opponent's beard" — a face the
+        # detector had deliberately left alone, edited by the fix for a finding that was
+        # never raised.
+        if not neutral or re.search(r"['’]s\b", gap):
+            return m.group(0)
+        swapped.append(part.lower())
+        return f"your{gap}{neutral}"
+
+    # By span, via `sub`, never `str.replace` — the trap `fix_hand_back` documents, where
+    # a whitespace shift between what was found and what is replaced makes the fix a
+    # silent no-op.
+    out = re.sub(rf"\byour\b([^.!?]{{0,{_BODY_GAP}}}?)\b({marks})\b", _swap, text, flags=re.I)
+    if swapped:
+        out = _ANATOMY_TAIL.sub("", out)
+    return out, swapped
+
+
 # --- the narrator becoming a character ------------------------------------------------
 #
 # Measured in the same mirror scene: "Lyra stands beside me, her gaze locked onto the
