@@ -844,20 +844,39 @@ def inject_ability(raw_intents, player_text: str, scene) -> list:
 # Ground words a player actually types, mapped onto the canonical biomes. Deliberately
 # nouns about *destination*: "the treeline", "the woods". "gate" and "road" name no ground.
 _GROUND_WORDS = (
-    (re.compile(r"\b(?:forest|woods|woodland|treeline|trees)\b", re.I), "forest"),
+    (re.compile(r"\b(?:forest|woods|woodland|treeline|trees|thicket|copse)\b",
+                re.I), "forest"),
     (re.compile(r"\b(?:jungle|rainforest)\b", re.I), "jungle"),
-    (re.compile(r"\b(?:swamp|marsh|bog|fen)\b", re.I), "swamp"),
-    (re.compile(r"\b(?:hills?|moor|downs|upland)\b", re.I), "hills"),
+    (re.compile(r"\b(?:swamp|marsh|marshes|bog|fen|mire|quagmire|wetland)\b",
+                re.I), "swamp"),
+    (re.compile(r"\b(?:hills?|foothills|moor|moorland|downs|upland)\b", re.I), "hills"),
     (re.compile(r"\b(?:mountains?|peaks?|crags?)\b", re.I), "mountain"),
-    (re.compile(r"\b(?:desert|dunes)\b", re.I), "desert"),
+    (re.compile(r"\b(?:desert|dunes|badlands|wasteland|wastes|sands)\b",
+                re.I), "desert"),
     (re.compile(r"\b(?:tundra|snowfield|icefield)\b", re.I), "tundra"),
-    (re.compile(r"\b(?:coast|shore|beach|seafront)\b", re.I), "coast"),
-    (re.compile(r"\b(?:plains?|grassland|steppe|meadows?)\b", re.I), "grassland"),
+    (re.compile(r"\b(?:coast|coastline|shore|shoreline|beach|seafront)\b",
+                re.I), "coast"),
+    (re.compile(r"\b(?:plains?|grassland|grasslands|steppe|meadows?|scrub|scrubland"
+                r"|brushland|heath|heathland|savanna|savannah|veldt|prairie"
+                r"|pastures?)\b", re.I), "grassland"),
     (re.compile(r"\b(?:farmland|fields|orchards?)\b", re.I), "farmland"),
-    (re.compile(r"\b(?:underground|caves?|caverns?|tunnels)\b", re.I), "underground"),
+    (re.compile(r"\b(?:underground|caves?|caverns?|tunnels|catacombs|mineshaft)\b",
+                re.I), "underground"),
     (re.compile(r"\b(?:ruins?)\b", re.I), "ruins"),
-    (re.compile(r"\b(?:city|town|streets)\b", re.I), "urban"),
+    (re.compile(r"\b(?:city|town|streets|village|hamlet)\b", re.I), "urban"),
 )
+# The list above is longer than the ground the engine has fourteen names for, and that is
+# the point. Measured in play: "I leave the step and walk out past the edge of Zhilvarnia
+# into the open scrub" matched `_DEPARTS` cleanly and then found no ground word at all,
+# because "scrub" was not among them — so the party stayed in `urban` while the narrator
+# wrote dry underbrush and a sun overhead, the market stranger walked into the wilderness
+# with them, and every biome-gated excursion stayed locked on ground that was no longer
+# the ground they were standing on. Nothing here is a new mechanism; `travel` already
+# sheds the stranger and moves the biome the moment it fires.
+#
+# Bare "brush", "wood" and "mine" are deliberately absent: "brush past the guard", "a
+# wooden door" and "the sword is mine" are all commoner than the terrain reading, and a
+# false travel is far worse than a missed one — it teleports the party mid-sentence.
 
 # Going somewhere, not being somewhere: "I head for the treeline" travels, "I like these
 # woods" does not, and "the forest looming ahead" is the GM's sentence rather than the

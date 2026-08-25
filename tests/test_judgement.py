@@ -478,3 +478,43 @@ def test_travelling_to_the_ground_underfoot_is_not_a_transition(scene):
     out = judgement.inject_travel(
         [{"op": "narrate_only"}], "I head deeper into the forest.", scene)
     assert all(r.get("op") != "travel" for r in out)
+
+
+def test_ground_the_narrator_names_but_the_list_did_not(scene):
+    """Measured in live play, one turn after leaving the market: "I leave the step and
+    walk out past the edge of Zhilvarnia into the open scrub" matched `_DEPARTS` cleanly
+    and then found no ground word at all, because "scrub" was not among them.
+
+    So the party stayed in `urban` while the narrator wrote dry underbrush and a sun
+    overhead, the market stranger walked out into the wilderness alongside them, and
+    every biome-gated excursion stayed locked on ground nobody was standing on any more.
+    The same law as the outcome-claim verbs: each session reaches for a noun the list
+    does not have, and the list is what has to grow."""
+    scene.biome = "urban"
+    said = ("I leave the step and walk out past the edge of Zhilvarnia into the open "
+            "scrub, looking for something dangerous to fight.")
+    out = judgement.inject_travel([{"op": "narrate_only"}], said, scene)
+    assert out[-1]["op"] == "travel"
+    assert out[-1]["params"]["biome"] == "grassland"
+
+    for text, biome in (("I head out to the heath before dark.", "grassland"),
+                        ("We ride for the badlands.", "desert"),
+                        ("I make my way down to the shoreline.", "coast"),
+                        ("I set out for the foothills.", "hills"),
+                        ("I go down to the catacombs.", "underground")):
+        got = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
+        assert got[-1].get("op") == "travel", text
+        assert got[-1]["params"]["biome"] == biome, text
+
+
+def test_a_word_that_is_only_sometimes_ground_does_not_move_anybody(scene):
+    """A false travel is far worse than a missed one — it teleports the party
+    mid-sentence and sheds whoever was talking to them. So bare "brush", "wood" and
+    "mine" stay out of the list: brushing past a guard, a wooden door and a sword that
+    is mine are all commoner than the terrain reading."""
+    scene.biome = "urban"
+    for text in ("I brush past the guard and keep going.",
+                 "I pull the wooden door to and bar it.",
+                 "The sword is mine, and I take it to the table."):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
+        assert all(r.get("op") != "travel" for r in out), text
