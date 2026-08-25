@@ -101,3 +101,48 @@ def test_read_int_never_raises_and_clamps():
     assert read_int({"n": True}, "n", 4) == 4
     assert read_int({"n": 99}, "n", 1, lo=1, hi=12) == 12
     assert read_int({"n": -99}, "n", 1, lo=1, hi=12) == 1
+
+
+# --- the second sweep, across every endpoint that resolves without the model ----------
+#
+# The first probe covered one endpoint and found seven 500s. Sweeping the other ten found
+# three more, all the same shape a third time: a field that should be a list or an object
+# arrives as something else, and the code calls `.get` on it.
+
+def test_effects_that_are_not_a_list_are_refused_not_raised(client):
+    """`"effects": "notalist"` walked into `effectspec.validate` a character at a time
+    and died on `.get`; `[null]` did the same. The spell builder is built to show a list
+    of problems, and both came back as HTTP 500 with a traceback instead."""
+    from rules.spells import validate_spell
+
+    for junk in ("notalist", 5, {"a": 1}):
+        problems = validate_spell({"name": "t", "effects": junk})
+        assert any("list of effects" in p for p in problems), junk
+    problems = validate_spell({"name": "t", "effects": [None, "x"]})
+    assert sum("must be an object" in p for p in problems) == 2
+
+
+def test_abilities_that_are_not_an_object_are_refused_not_raised():
+    """`"abilities": "x"` reached `raw.get(ab)` and raised AttributeError, so a
+    malformed create answered 500 rather than the list of problems `build` exists to
+    return."""
+    from rules import creation
+
+    _, problems = creation.build({"name": "T", "race": "dwarf", "class": "fighter",
+                                  "abilities": "x"})
+    assert any("object of six scores" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("url", [
+    "/api/roll", "/api/combat/act", "/api/craft/preview", "/api/craft/do",
+    "/api/craft/forage", "/api/spells/save", "/api/level-up", "/api/slots",
+    "/api/character/create", "/api/travel",
+])
+def test_no_endpoint_answers_a_bad_body_with_a_traceback(client, url):
+    """One case per endpoint, the shape that broke three of them: a field that should be
+    a container arriving as a bare string."""
+    for body in ({"effects": "x", "actions": "x", "abilities": "x", "choices": "x",
+                  "ingredients": "x", "name": "t", "craft": "herbalism"},
+                 {}, [1, 2, 3]):
+        r = client.post(url, data=json.dumps(body), content_type="application/json")
+        assert r.status_code < 500, f"{url} -> {r.status_code} on {body}"

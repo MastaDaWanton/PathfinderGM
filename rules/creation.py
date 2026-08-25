@@ -300,7 +300,13 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"Pick a class: {', '.join(sorted(classes_mod.all_classes()))}.")
 
     # --- abilities: point buy, then the race ---------------------------------------
+    # An object, or nothing. A string here — "abilities": "x" — reached `raw.get(ab)`
+    # and raised AttributeError, so a malformed create came back as HTTP 500 with a
+    # traceback instead of the list of problems this function exists to return.
     raw = payload.get("abilities") or {}
+    if not isinstance(raw, dict):
+        problems.append("Abilities must be an object of six scores.")
+        raw = {}
     abilities: dict[str, int] = {}
     spent = 0
     for ab in ("str", "dex", "con", "int", "wis", "cha"):

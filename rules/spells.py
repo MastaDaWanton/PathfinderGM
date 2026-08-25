@@ -1615,7 +1615,22 @@ def validate_spell(d: dict) -> list[str]:
     if scaling and int(scaling.get("die", 0)) not in (2, 3, 4, 6, 8, 10, 12, 20, 100):
         problems.append(f"scaling: d{scaling.get('die')} is not a die.")
 
-    for i, spec in enumerate(d.get("effects") or ()):
+    # `effects` has to be a list of objects before anything reads one. A string here —
+    # which is what the builder sends if its textarea is edited to something that is not
+    # JSON — walked into `effectspec.validate` a character at a time and died on
+    # `.get`; `[null]` did the same. Both came back as HTTP 500 with a traceback rather
+    # than as the sentence the builder is built to show.
+    effects = d.get("effects")
+    if effects in (None, ""):
+        effects = []
+    if not isinstance(effects, (list, tuple)):
+        problems.append("Effects must be a list of effects, each one an object.")
+        return problems
+    for i, spec in enumerate(effects):
+        if not isinstance(spec, dict):
+            problems.append(f"effect {i + 1}: an effect must be an object, "
+                            f"not {type(spec).__name__}.")
+            continue
         problems.extend(effectspec.validate(spec, f"effect {i + 1}"))
     return problems
 
