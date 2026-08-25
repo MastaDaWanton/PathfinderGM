@@ -252,7 +252,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # where somebody ends up — the zone is then re-derived from the real distance rather
     # than believed.
     "move": (("zone",), ("who", "square"), "hidden"),
-    "spawn": (("template",), ("from_entity_id", "count", "name"), "hidden"),
+    "spawn": (("template",),
+              ("from_entity_id", "count", "name", "zone", "distance_ft"),
+              "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends

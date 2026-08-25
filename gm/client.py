@@ -81,6 +81,7 @@ def chat(
     num_predict: int = 700,
     provider: str = "ollama",
     api_key: str = "",
+    schema: dict | None = None,
 ) -> Reply:
     """
     The timeout is generous because a cold load is genuinely slow: measured on this
@@ -100,7 +101,14 @@ def chat(
         "stream": False,
         "options": {"temperature": temperature, "num_predict": num_predict},
     }
-    if as_json:
+    # A schema, when the caller has one, rather than "some JSON please". Ollama passes
+    # `format` to the sampler as a grammar, so a reply that breaks the schema is not
+    # rejected after the fact — it is never generated. That is the difference between
+    # asking the model for an attack and making a turn without one unrepresentable, and
+    # it is the only lever on this project that does not depend on the model cooperating.
+    if schema:
+        payload["format"] = schema
+    elif as_json:
         payload["format"] = "json"
 
     req = urllib.request.Request(

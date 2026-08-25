@@ -114,9 +114,20 @@ class GMAgent:
         for n, (model, host, provider, key) in enumerate(schedule):
             if n == max_attempts:
                 rejections.append(f"— handing the turn to {model}")
+            # The shape the reply is *allowed* to have, built from this turn's situation
+            # rather than fixed. In a fight the intent list may not be empty and
+            # `narrate_only` is not among the choices, so the failure that cost this
+            # project its whole combat loop — narrating a punch and proposing nothing —
+            # is not a reply the sampler can produce. See `prompts.turn_schema`.
             reply = client.chat(messages, model, host, as_json=True,
                                 temperature=0.8 if n == 0 else 0.5,
-                                provider=provider, api_key=key)
+                                provider=provider, api_key=key,
+                                schema=prompts.turn_schema(
+                                    fighting=self.engine.scene.in_encounter,
+                                    refs=tuple(self.engine.scene.actors),
+                                    min_chars=(narration_mod.MIN_COMBAT_CHARS
+                                               if self.engine.scene.in_encounter
+                                               else narration_mod.MIN_SCENE_CHARS)))
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
             try:

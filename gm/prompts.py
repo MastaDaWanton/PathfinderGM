@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 
+from rules.intents import OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
 
 # One example per shape the GM actually needs. Demonstration, not description — and the
@@ -912,3 +913,67 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
         {"role": "assistant", "content": NARRATION_REPAIR_EXAMPLE["assistant"]},
         {"role": "user", "content": body},
     ]
+
+
+# --- the shape a turn is allowed to have -----------------------------------------------
+#
+# Everything else in this file asks the model to behave. This describes a reply the model
+# *cannot* break, because Ollama passes `format` to the sampler as a grammar: a token that
+# would leave the schema is never sampled, so there is no validate-and-retry loop and no
+# turn lost to a reply that came back the wrong shape.
+#
+# Researched rather than guessed. Grammar-constrained decoding is the standard answer to
+# exactly this failure — XGrammar is the default structured-generation backend for vLLM,
+# SGLang and TensorRT-LLM, and llama.cpp/Ollama expose the same thing through `format`.
+#
+# The important part is that the schema is built **per turn, from the situation**. A
+# static schema can only say "intents is a list of ops"; one built here can say "it is
+# this character's turn in a fight, so the list may not be empty and `narrate_only` is
+# not one of the choices". The failure that cost this session its whole combat loop —
+# the GM narrating a punch and proposing nothing — stops being something to detect and
+# repair, and becomes something the sampler cannot emit.
+
+# Ops that resolve a turn in a fight. `narrate_only` is deliberately absent.
+_FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools",
+              "guard", "end_encounter", "check", "save", "damage", "heal")
+
+
+def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
+                min_chars: int = 0) -> dict:
+    """The JSON schema this turn's reply must satisfy.
+
+    `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
+    the scene, which is the single most common rejection in the logs and the reason
+    `repair_unknown_refs` had to be written.
+    """
+    intent = {
+        "type": "object",
+        "properties": {
+            "op": {"type": "string",
+                   "enum": list(_FIGHT_OPS) if fighting else sorted(_OPS)},
+            "actor": ({"type": "string", "enum": list(refs)} if refs
+                      else {"type": "string"}),
+            "target": ({"type": "string", "enum": list(refs)} if refs
+                       else {"type": "string"}),
+            "because": {"type": "string"},
+            "params": {"type": "object"},
+        },
+        "required": ["op"],
+    }
+    intents = {"type": "array", "items": intent}
+    if fighting:
+        # The whole point. In a fight the list may not be empty, so "narrated the punch
+        # and proposed nothing" is not a reply this model can produce.
+        intents["minItems"] = 1
+    narration = {"type": "string"}
+    if min_chars:
+        narration["minLength"] = int(min_chars)
+    return {
+        "type": "object",
+        "properties": {
+            "narration": narration,
+            "suggestions": {"type": "array", "items": {"type": "string"}},
+            "intents": intents,
+        },
+        "required": ["narration", "intents"],
+    }

@@ -338,7 +338,57 @@ _VIOLENCE = re.compile(
     r"|throttle|throttles|throttling|pick a fight|picks a fight|picking a fight"
     r"|start a fight|starts a fight|starting a fight|take a swing|takes a swing"
     r"|taking a swing|square up|squares up|squaring up|kill|kills|killing"
-    r"|fight|fights|fighting)\b", re.I)
+    r"|fight|fights|fighting"
+    # Violence at a distance. Missing entirely at first, so "I throw my dagger at him"
+    # started no fight at all — and once it did, it opened toe to toe, which is the one
+    # range a thrown dagger is not for.
+    r"|throw|throws|throwing|hurl|hurls|hurling|lob|lobs|lobbing|sling|slings|slinging"
+    r"|shoot|shoots|shooting|loose|looses|loosing|fire at|fires at|firing at"
+    r"|pelt|pelts|pelting|snipe|snipes|sniping)\b", re.I)
+
+# The ones that only make sense with ground between you. A fight opened by a thrown
+# knife starts at that range; one opened by a punch starts in reach.
+_AT_RANGE = re.compile(
+    r"\b(?:throw|throws|throwing|hurl|hurls|hurling|lob|lobs|lobbing|sling|slings"
+    r"|slinging|shoot|shoots|shooting|loose|looses|loosing|fire at|fires at|firing at"
+    r"|pelt|pelts|pelting|snipe|snipes|sniping)\b", re.I)
+
+# A distance the player actually stated. "I shoot him with my bow at 120 feet" is a fact
+# about the fight and beats every default in this file; rounding it to `near` — three
+# squares, fifteen feet — makes a nonsense of the weapon.
+_STATED_FEET = re.compile(
+    r"\b(?:at|from)?\s*(\d{1,4})\s*(?:ft\b|foot\b|feet\b|')", re.I)
+_STATED_YARDS = re.compile(r"\b(?:at|from)?\s*(\d{1,4})\s*(?:yd\b|yds\b|yards?\b)", re.I)
+
+# What a weapon opens at when the player names one but no distance. Not read from the
+# weapons table because the table carries `crit_range` and no range increment at all —
+# these are the Core Rulebook's own increments, and the ones that matter here.
+_OPENS_AT = (
+    (re.compile(r"\b(?:longbow|composite longbow)\b", re.I), 100),
+    (re.compile(r"\b(?:shortbow|short bow|bow)\b", re.I), 60),
+    (re.compile(r"\b(?:heavy crossbow)\b", re.I), 120),
+    (re.compile(r"\b(?:crossbow)\b", re.I), 80),
+    (re.compile(r"\b(?:sling)\b", re.I), 50),
+    (re.compile(r"\b(?:javelin|spear)\b", re.I), 30),
+    (re.compile(r"\b(?:dagger|knife|axe|hatchet|bottle|stone|rock)\b", re.I), 10),
+)
+
+
+def opening_feet(player_text: str) -> int | None:
+    """How far apart this fight starts, in feet, or None to fall back to a zone."""
+    text = str(player_text or "")
+    m = _STATED_YARDS.search(text)
+    if m:
+        return max(5, int(m.group(1)) * 3)
+    m = _STATED_FEET.search(text)
+    if m:
+        return max(5, int(m.group(1)))
+    if not _AT_RANGE.search(text):
+        return None
+    for rx, feet in _OPENS_AT:
+        if rx.search(text):
+            return feet
+    return None
 
 # The commonest ways those verbs are used about nothing you can bleed. "I hit the road",
 # "I strike a match", "I jump the queue" — each is a sentence a player will type, and
@@ -431,10 +481,27 @@ def inject_fight(raw_intents, player_text: str, scene):
         if isinstance(raw, dict) and str(raw.get("op", "")).lower() in (
                 "spawn", "begin_encounter", "attack"):
             return raw_intents
+    # Somebody is already standing there: the player is not starting a fight, they are
+    # swinging in one. `fill_obvious_targets` cannot help — it puts a target on an attack
+    # that already exists, and the whole problem is that no attack was proposed at all.
+    #
+    # Measured in the tavern, round 2, three turns running: the encounter was live, the
+    # player typed "I punch the bruiser in the face", the narration described the punch
+    # landing, and the turn log read `outcomes: []`. No attack roll, nothing in the roll
+    # tracker, and the thug's hit points moved only when the thug swung back.
+    foes = [a for r, a in (getattr(scene, "actors", {}) or {}).items()
+            if not getattr(a, "is_pc", False) and _can_be_fought(a)]
+    if foes:
+        pc = scene.pc() if hasattr(scene, "pc") else None
+        if pc is None:
+            return raw_intents
+        target = min(foes, key=lambda a: (getattr(a, "hp", 0) <= 0, str(a.ref)))
+        return list(raw_intents) + [{
+            "op": "attack", "actor": getattr(pc, "ref", "pc"), "target": target.ref,
+            "because": "the player said they attack"}]
     if getattr(scene, "in_encounter", False):
-        return raw_intents
-    if any(_can_be_fought(a) for r, a in (getattr(scene, "actors", {}) or {}).items()
-           if not getattr(a, "is_pc", False)):
+        # In a fight with nobody left to hit. Spawning a fresh opponent mid-encounter
+        # would be inventing reinforcements the GM never called for.
         return raw_intents
 
     template = "thug"
@@ -447,10 +514,18 @@ def inject_fight(raw_intents, player_text: str, scene):
     pc = scene.pc() if hasattr(scene, "pc") else None
     pc_ref = getattr(pc, "ref", "pc")
     return list(raw_intents) + [
+        # Engaged, not near. You do not start a brawl with somebody fifteen feet away:
+        # measured in the tavern, the man the player swung at was laid out three squares
+        # off, out of reach of the punch that started the fight.
         {"op": "spawn", "because": "the player started a fight with somebody",
-         "params": {"template": template, "count": 1}},
+         "params": dict(
+             {"template": template, "count": 1,
+              "zone": "near" if _AT_RANGE.search(player_text or "") else "engaged"},
+             **({"distance_ft": feet} if (feet := opening_feet(player_text)) else {}))},
         {"op": "begin_encounter", "because": "the player started it",
          "params": {"sides": {"you": [pc_ref], "them": [ref]}}},
+        {"op": "attack", "actor": pc_ref, "target": ref,
+         "because": "the player swung first"},
     ]
 
 

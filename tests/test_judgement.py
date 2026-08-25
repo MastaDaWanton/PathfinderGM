@@ -641,11 +641,134 @@ def test_being_attacked_is_not_attacking(scene):
         assert all(i.get("op") != "spawn" for i in out), text
 
 
-def test_an_enemy_already_present_is_left_to_the_target_fill():
-    """`fill_obvious_targets` is the right tool when somebody is already standing there,
-    and this must stay out of its way rather than spawn a second opponent."""
+def test_swinging_at_somebody_already_there_rolls_an_attack():
+    """This test used to assert the opposite — that an enemy already in the scene was
+    "left to `fill_obvious_targets`" — and play disproved it within the hour.
+
+    `fill_obvious_targets` puts a target on an attack that already exists, and the whole
+    problem is that no attack was proposed at all. Measured in the tavern at round 2,
+    three turns running: the encounter was live, the player typed "I punch the bruiser
+    in the face", the narration described the punch landing, and the turn log read
+    `outcomes: []`. No attack roll, nothing in the roll tracker, and the only hit points
+    that moved were the player's when the thug swung back.
+
+    So a declared attack on somebody standing there becomes an attack intent, and a
+    second opponent is never spawned."""
     from rules.bestiary import instantiate
     room = _empty_room()
     room.add(instantiate("thug", scene=room, name="a thug"))
     out = judgement.inject_fight([{"op": "narrate_only"}], "I attack the thug.", room)
-    assert len(out) == 1 and out[0]["op"] == "narrate_only"
+    ops = [i["op"] for i in out]
+    assert "attack" in ops, ops
+    assert "spawn" not in ops, "a second opponent was conjured"
+    hit = next(i for i in out if i["op"] == "attack")
+    assert hit["target"] == "c1" and hit["actor"] == "pc"
+
+
+def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
+    """Reported from play: "thug is still 15ft away from you and no rolls have been
+    tracked in the roll tracker".
+
+    Two causes, both here. `begin_encounter` lays an unplaced combatant out by zone and
+    everything spawned defaulted to `near`, which is three squares — fifteen feet, out
+    of reach of the punch that started the fight. And starting the fight proposed no
+    attack, so nothing was ever rolled: the roll tracker was empty because there was no
+    roll, not because it failed to display one."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene()
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    raw = judgement.inject_fight([], "I punch the bruiser in the face.", scene)
+    assert [i["op"] for i in raw] == ["spawn", "begin_encounter", "attack"]
+
+    engine = Engine(scene, Dice(seed=5))
+    engine.run(engine.validate(raw))
+    assert scene.zones["c1"] == "engaged"
+    assert scene.distance_between("pc", "c1") == 5, "not within reach of a punch"
+    # And the attack is waiting on the player's d20 rather than silently not happening.
+    assert scene.awaiting and scene.awaiting["die"] == "1d20"
+    assert "Attack" in scene.awaiting["label"]
+
+
+def test_engaged_is_closer_than_near():
+    """`away = 3 if zone == "near" else 8` put the one zone that means "close enough to
+    hit" further away than "near" — eight squares, forty feet, across the room."""
+    from rules.engine import SQUARES_BY_ZONE
+
+    assert SQUARES_BY_ZONE["engaged"] < SQUARES_BY_ZONE["near"] < SQUARES_BY_ZONE["far"]
+    assert SQUARES_BY_ZONE["engaged"] == 1
+
+
+def test_a_thrown_weapon_opens_at_a_throwing_distance():
+    """Asked during play: "what if i throw something, am i going to start at the correct
+    range". Two bugs behind it. "throw" was not in the violence list at all, so throwing
+    a knife started no fight; and once it did, `inject_fight` hardcoded `engaged`, which
+    is the one range a thrown dagger is not for."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    def opens_at(said):
+        scene = Scene()
+        scene.add(load_pc("fixtures/pc-kesst.json"))
+        raw = judgement.inject_fight([], said, scene)
+        assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
+        engine = Engine(scene, Dice(seed=5))
+        engine.run(engine.validate(raw))
+        return scene.distance_between("pc", "c1")
+
+    # Each opens at its own range now rather than one generic fifteen feet: the weapon
+    # named in the sentence decides, and a stated distance beats the weapon.
+    for said, feet in (("I throw my dagger at him.", 10),
+                       ("I hurl a bottle at the bruiser.", 10),
+                       ("I shoot him with my crossbow.", 80),
+                       ("I sling a stone at it.", 50)):
+        assert opens_at(said) == feet, said
+    # A ranged verb with no weapon named still opens with ground between you.
+    assert opens_at("I loose an arrow at the watchman.") >= 15
+    for said in ("I punch the bruiser in the face.", "I charge him."):
+        assert opens_at(said) == 5, said
+
+
+def _opens_at(said):
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene()
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    raw = judgement.inject_fight([], said, scene)
+    assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
+    engine = Engine(scene, Dice(seed=5))
+    engine.run(engine.validate(raw))
+    return scene.distance_between("pc", "c1"), scene.grid.width
+
+
+def test_a_distance_the_player_stated_is_the_distance():
+    """Asked during play: "what if i shoot someone with a bow at 120ft". It opened at
+    forty — the `far` default — because a zone word has no way to say anything past
+    `far`, and `begin_encounter` builds the grid *after* `spawn` runs, so the spawn could
+    not place anybody and its distance was simply dropped."""
+    assert _opens_at("I shoot him with my bow at 120 feet.")[0] == 120
+    assert _opens_at("I loose an arrow at the watchman from 200 ft.")[0] == 200
+    assert _opens_at("I shoot at him from 40 yards.")[0] == 120       # yards are tripled
+
+
+def test_the_board_grows_to_hold_a_bowshot():
+    """The default map is 20x20 — a hundred feet square — and a bowshot is not. Clamping
+    put the target at the edge of the map and called it a hundred feet, which is a
+    different fight from the one the player described."""
+    feet, width = _opens_at("I loose an arrow at the watchman from 200 ft.")
+    assert feet == 200
+    assert width * 5 >= 200, f"the board is only {width * 5} feet across"
+
+
+def test_a_named_weapon_opens_at_its_own_range():
+    """No distance stated, so the weapon decides. The weapons table carries `crit_range`
+    and no range increment at all, so these are the Core Rulebook's."""
+    assert _opens_at("I shoot him with my longbow.")[0] == 100
+    assert _opens_at("I shoot him with my crossbow.")[0] == 80
+    assert _opens_at("I throw my dagger at him.")[0] == 10
+    assert _opens_at("I punch the bruiser in the face.")[0] == 5

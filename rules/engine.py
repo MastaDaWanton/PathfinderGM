@@ -44,6 +44,23 @@ from .tables import (
 
 # --- Scene state -------------------------------------------------------------------
 
+# How far each zone puts somebody, in five-foot squares. `engaged` is adjacent: within
+# reach, which is the whole meaning of the word and the difference between a brawl and
+# two people shouting across a room.
+SQUARES_BY_ZONE = {"engaged": 1, "near": 3, "far": 8}
+FEET_PER_SQUARE = 5
+
+
+def zone_for_feet(feet: int) -> str:
+    """The word for a distance. A bowshot is `far` however far past `far` it is."""
+    squares = max(1, int(feet) // FEET_PER_SQUARE)
+    if squares <= SQUARES_BY_ZONE["engaged"]:
+        return "engaged"
+    if squares <= SQUARES_BY_ZONE["near"]:
+        return "near"
+    return "far"
+
+
 @dataclass
 class Scene:
     """Everything the engine owns. The world agent may read this and writes none of it —
@@ -95,6 +112,11 @@ class Scene:
     # The day is in the key, so yesterday's sales stop counting without anything sweeping
     # them up.
     market_taken: dict[str, int] = field(default_factory=dict)
+    # How far a spawn asked to arrive, in feet, until the layout uses it.
+    # `begin_encounter` builds the grid *after* `spawn` runs, so a spawn cannot
+    # place anybody itself and its distance was simply lost — every archer
+    # opened at the `far` default of forty feet however far they said they were.
+    spawn_feet: dict[str, int] = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
     # The ground underfoot, which decides what can be foraged here. Defaults from the
     # world's own Biomes/Terrain facts when a campaign starts, and the GM moves it as the
@@ -170,6 +192,42 @@ class Scene:
         if not self.has_grid or pa is None or pb is None:
             return None
         return gap(pa, self.actors[a].size, pb, self.actors[b].size)
+
+    def place_by_zone(self, refs: list[str], feet: int | None = None) -> None:
+        """Put these actors on the map at the distance their zone claims.
+
+        Needed because a zone set *after* the board was laid — anything spawned
+        mid-fight — had nowhere to be put, and `resync_zones` runs the other way: it
+        reads distance off the map and names it, so on its own it simply renamed the
+        zone back to whatever the stale position implied.
+        """
+        pc = self.pc()
+        if self.grid is None or pc is None or pc.ref not in self.positions:
+            return
+        px, py = self.positions[pc.ref]
+        taken = set(self.positions.values())
+        for ref in refs:
+            if ref not in self.actors:
+                continue
+            away = (max(1, int(feet) // FEET_PER_SQUARE) if feet
+                    else SQUARES_BY_ZONE.get(self.zones.get(ref, "near"), 3))
+            # The default board is a hundred feet square and a bowshot is not. Grown
+            # rather than clamped: clamping put the archer's target at the edge of the
+            # map and called it 100 feet, which is a different fight from the one the
+            # player described.
+            if self.grid is not None and px + away >= self.grid.width:
+                self.grid.width = px + away + 2
+            for dy in range(0, self.grid.height):
+                for sign in (1, -1):
+                    spot = (min(self.grid.width - 1, max(0, px + away)),
+                            min(self.grid.height - 1, max(0, py + sign * dy)))
+                    if spot not in taken:
+                        self.positions[ref] = spot
+                        taken.add(spot)
+                        break
+                else:
+                    continue
+                break
 
     def resync_zones(self) -> dict[str, str]:
         """Re-derive every zone from the map.
@@ -3191,7 +3249,18 @@ class Engine:
                     if ref in self.scene.positions or ref not in self.scene.actors:
                         continue
                     zone = self.scene.zones.get(ref, "near")
-                    away = 3 if zone == "near" else 8
+                    # `engaged` means within reach. Written `3 if near else 8`, the one
+                    # zone that means "close enough to hit" was laid out further away
+                    # than "near" — eight squares, forty feet, across the room.
+                    #
+                    # A distance the spawn actually asked for beats the zone word: a
+                    # bowshot at 120 feet is 24 squares, and the zone vocabulary has no
+                    # way to say anything past `far`.
+                    stated = self.scene.spawn_feet.get(ref)
+                    away = (max(1, stated // FEET_PER_SQUARE) if stated
+                            else SQUARES_BY_ZONE.get(zone, 3))
+                    if pc_side + away >= self.scene.grid.width:
+                        self.scene.grid.width = pc_side + away + 2
                     if has_pc:
                         self.scene.positions[ref] = (pc_side, mid + i)
                     else:
@@ -3701,6 +3770,28 @@ class Engine:
             name=intent.params.get("name"),
             from_entity_id=intent.params.get("from_entity_id"),
         )
+        # How close they arrive. Without this everything spawned defaulted to `near`,
+        # which `begin_encounter` lays out three squares off — and a tavern brawl the
+        # player started by swinging opened with the man they punched standing fifteen
+        # feet away, out of reach of the attack that started it.
+        # An exact distance beats a zone word. "I shoot him with my bow at 120 feet" is a
+        # fact about the fight, and rounding it to `near` — three squares, fifteen feet —
+        # makes a nonsense of the weapon. The default map is 20x20, a hundred feet
+        # square, so a bowshot does not fit on it and the board grows to hold one.
+        feet = intent.params.get("distance_ft")
+        zone = str(intent.params.get("zone") or "").strip().lower()
+        if feet or zone in ("engaged", "near", "far"):
+            for m in made:
+                if feet:
+                    self.scene.zones[m["ref"]] = zone_for_feet(int(feet))
+                    self.scene.spawn_feet[m["ref"]] = int(feet)
+                else:
+                    self.scene.zones[m["ref"]] = zone
+                # A zone set after the layout has already run has to move them too.
+                self.scene.positions.pop(m["ref"], None)
+            if self.scene.grid is not None and self.scene.positions:
+                self.scene.place_by_zone([m["ref"] for m in made],
+                                         feet=int(feet) if feet else None)
         return Outcome(
             intent_id=intent.id, op="spawn",
             effects=[{"kind": "spawn", "actors": made}],
