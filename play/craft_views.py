@@ -871,6 +871,49 @@ def _price_line(material) -> str:
     return goods.purse_line(goods.coins_for(_price_cp(material)), goods.coinage())
 
 
+def _sells_its_own_trade(track_id: str, pool: list) -> list:
+    """This stall's own goods, out of everything its module can see.
+
+    The four material modules read `content/materials` as one shared folder, and only
+    the alchemist returns the whole of it — its `obtainable` says so on purpose, "a
+    market sells what the market sells". That was invisible while every stall carried
+    every priced material; with shelves it is the difference between an apothecary and
+    a car boot sale. Measured in play: "Buy reagents" sold a Brass Guard, a Steel
+    Crossguard, Quenching Oil and a Warding Essence, and four of the six things bought
+    could not be used at the alchemy bench at all.
+
+    So a stall draws its shelf from the catalogue that belongs to its own craft. Nothing
+    becomes unobtainable — a character carries all five tracks, and the smith's stall
+    sells the smith's stock — it just has to be bought from the right counter.
+
+    A homebrew material belongs to no shipped file and is offered at every stall, which
+    errs toward reachable rather than lost. That is the same call `_craft_materials`
+    makes for the bench shelves.
+    """
+    import json as json_mod
+    from pathlib import Path
+
+    from django.conf import settings
+
+    shipped: dict[str, set[str]] = {}
+    for p in (Path(settings.BASE_DIR) / "content" / "materials").glob("*.json"):
+        try:
+            data = json_mod.loads(p.read_text(encoding="utf-8"))
+        except Exception:                              # pragma: no cover - guard
+            continue
+        shipped[p.stem] = {str(m.get("id", "")).strip().lower()
+                           for m in data.get("materials", [])}
+    own = shipped.get(f"{track_id}-materials", set())
+    if not own:
+        return pool
+    elsewhere = set().union(*(v for k, v in shipped.items()
+                              if k != f"{track_id}-materials")) or set()
+    kept = [m for m in pool
+            if str(getattr(m, "id", "")).lower() in own
+            or str(getattr(m, "id", "")).lower() not in elsewhere]
+    return kept or pool
+
+
 @require_POST
 def craft_excursion(request):
     """Go out and come back with material — mining, skinning, gathering, buying.
@@ -935,6 +978,7 @@ def craft_excursion(request):
         # the rack and be told it is beyond them, rather than have the world quietly
         # contain nothing but nails.
         priced = [m for m in found if _price_cp(m) > 0]
+        priced = _sells_its_own_trade(track, priced)
         shelf = market.stock(priced, place=place, stall=key, day=day)
         on_shelf = market.remaining(shelf, c.scene.market_taken, place, key, day)
         if not on_shelf:

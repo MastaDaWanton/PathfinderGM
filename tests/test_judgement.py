@@ -542,3 +542,47 @@ def test_returning_something_to_somebody_is_not_a_journey(scene):
                  "I give the coin to the boy."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
         assert all(r.get("op") != "travel" for r in out), text
+
+
+def _pangrella():
+    from world import loader
+    return loader.load("fixtures/pangrella-campaign.json")
+
+
+def test_a_place_with_a_name_is_a_destination(scene):
+    """The ground-noun list can only hold terrain words, and the commonest way of saying
+    where you are going is to name the place — "Return to Zhilvarnia" is one of the app's
+    own suggestion chips. Matched against the world's real settlements rather than a
+    pattern, the same "ground every name" rule the invented-name check works by.
+
+    This began to matter when a market started requiring urban ground underfoot: leave
+    town, come back by naming the town, and without this the biome stays out in the
+    grass and every stall in the city is shut."""
+    world = _pangrella()
+    scene.biome = "grassland"
+    for text in ("Return to Zhilvarnia.", "I head back to Zhilvarnia.",
+                 "I walk to Mirabalos.", "I set out for Torvathys."):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene, world)
+        assert out[-1].get("op") == "travel", text
+        assert out[-1]["params"]["biome"] == "urban", text
+
+
+def test_already_in_the_town_you_named_is_not_a_journey(scene):
+    scene.biome = "urban"
+    out = judgement.inject_travel(
+        [{"op": "narrate_only"}], "Return to Zhilvarnia.", scene, _pangrella())
+    assert all(r.get("op") != "travel" for r in out)
+
+
+def test_talking_about_a_journey_is_not_taking_one(scene):
+    """"I think about going to Zhilvarnia one day" has a movement verb, a preposition and
+    a real city in it, and the party must not be somewhere else by the end of the
+    sentence. The hole was there for terrain too — this closes both."""
+    world = _pangrella()
+    scene.biome = "grassland"
+    for text in ("I think about going to Zhilvarnia one day.",
+                 "I wonder whether to head for the woods.",
+                 "I ask the guard about going to Torvathys.",
+                 "I talk about heading into the hills."):
+        out = judgement.inject_travel([{"op": "narrate_only"}], text, scene, world)
+        assert all(r.get("op") != "travel" for r in out), text

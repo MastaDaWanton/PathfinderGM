@@ -154,7 +154,8 @@ class GMAgent:
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
-                raw = judgement.inject_travel(raw, player_input, self.engine.scene)
+                raw = judgement.inject_travel(raw, player_input, self.engine.scene,
+                                              self.world)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)
             except IntentError as exc:

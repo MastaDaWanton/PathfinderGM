@@ -897,7 +897,50 @@ _DEPARTS = re.compile(
     re.I)
 
 
-def inject_travel(raw_intents, player_text: str, scene) -> list:
+# Settlement kinds, as World Bible writes them. A place of one of these kinds is
+# somewhere with streets, which is `urban` as far as the ground underfoot is concerned.
+_SETTLEMENT_KINDS = ("CITY", "TOWN", "VILLAGE", "SETTLEMENT")
+
+# Talking about a journey is not taking one. "I think about going to Zhilvarnia one day"
+# has a movement verb, a preposition and a real place in it, and the party must not be
+# standing somewhere else by the end of the sentence. Checked on what comes *before* the
+# departure, because that is where the deliberation sits — the same reason the existing
+# rule reads "Should we head into the woods?" as a question rather than a march.
+_MUSING = re.compile(
+    r"\b(?:think|thinks|thinking|thought|consider|considers|considering|wonder|wonders"
+    r"|wondering|dream|dreams|dreaming|imagine|imagines|imagining|plan|plans|planning"
+    r"|hope|hopes|hoping|wish|wishes|wishing|talk|talks|talking|speak|speaks|speaking"
+    r"|ask|asks|asking|remember|remembers|remembering|mean|means|meant"
+    r"|suppose|supposes|maybe|perhaps|someday|one day)\b", re.I)
+
+
+def _named_settlement(text: str, world) -> str:
+    """A settlement of this world named in this clause, or "".
+
+    The ground-noun list can only ever hold terrain words, and the commonest way of
+    saying where you are going is to name the place: "Return to Zhilvarnia" is one of
+    the app's own suggestion chips. Matched against the world's real entities rather
+    than a pattern, which is the same "ground every name" rule the invented-name check
+    works by — and it means a world with a town called Scrub still resolves correctly.
+
+    Longest name first, so "Zhilvarnia Gate" is preferred over "Zhilvarnia" where both
+    exist.
+    """
+    if world is None:
+        return ""
+    try:
+        places = [e for e in world.entities.values()
+                  if str(getattr(e, "kind", "") or "").upper() in _SETTLEMENT_KINDS]
+    except Exception:                                  # pragma: no cover - guard
+        return ""
+    for place in sorted(places, key=lambda e: -len(str(getattr(e, "name", "") or ""))):
+        name = str(getattr(place, "name", "") or "").strip()
+        if name and re.search(rf"\b{re.escape(name)}\b", text, re.I):
+            return name
+    return ""
+
+
+def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
     """Make a declared journey move the engine's ground.
 
     Playtest finding 8, and the confirmation session reproduced it exactly: "I head out
@@ -921,6 +964,8 @@ def inject_travel(raw_intents, player_text: str, scene) -> list:
     m = _DEPARTS.search(player_text)
     if not m:
         return raw_intents
+    if _MUSING.search(player_text[:m.start()]):
+        return raw_intents
     # The ground named after the movement verb, so "I leave the city for the treeline"
     # reads as forest rather than urban: the destination clause is what is scanned.
     after = player_text[m.start():]
@@ -931,4 +976,13 @@ def inject_travel(raw_intents, player_text: str, scene) -> list:
             return list(raw_intents) + [{
                 "op": "travel", "because": "the player said they go",
                 "params": {"biome": biome}}]
+
+    # No terrain word, but the destination may be a place with a name. This matters more
+    # since a market began requiring urban ground: leave town, come back by naming the
+    # town, and without this the biome stays wherever you were and every stall is shut.
+    named = _named_settlement(after, world)
+    if named and getattr(scene, "biome", "") != "urban":
+        return list(raw_intents) + [{
+            "op": "travel", "because": f"the player said they go to {named}",
+            "params": {"biome": "urban", "note": f"Back within {named}."}}]
     return raw_intents
