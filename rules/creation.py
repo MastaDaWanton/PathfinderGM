@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 
-from . import casting, classes as classes_mod, feats as feats_mod, houserules
+from . import casting, classes as classes_mod, dice, feats as feats_mod, houserules
 from . import leveling
 from .sheet import from_dict
 from .tables import ARMOUR, SKILLS, WEAPONS
@@ -192,6 +192,32 @@ def max_hit_die(spec) -> int:
 def die_label(spec) -> str:
     """How a hit die is written on a class card. `8` is a d8; `"2d8"` is already said."""
     return f"d{spec}" if isinstance(spec, (int, float)) or str(spec).isdigit() else str(spec)
+
+
+def starting_purse(cls: dict) -> dict[str, int]:
+    """What a new character has to spend, rolled from the class's own declaration.
+
+    Every class states this — "1d6 x 10 gp" for Blood Bending, "5d6 x 10 gp" for a
+    fighter — and nothing read it, so every character ever made began with an empty
+    purse. That was invisible until the craft hub grew a market: "Buy from the market"
+    handed over Steel, a Steel Crossguard and Tin to a character with nothing in their
+    pockets, because the buy path never asked what anything cost.
+
+    Rolled rather than averaged. Starting wealth is a roll in the Core Rulebook, and a
+    fixed 35 gp for every fighter is a different game from one where the dice decide
+    whether you can afford the breastplate.
+    """
+    spec = str(cls.get("starting_wealth") or "").strip().lower()
+    if not spec:
+        return {}
+    m = re.fullmatch(r"(\d+)d(\d+)\s*(?:[x×*]\s*(\d+))?\s*([a-z]{2})?", spec)
+    if not m:
+        return {}
+    count, faces = int(m.group(1)), int(m.group(2))
+    times = int(m.group(3) or 1)
+    coin = m.group(4) or "gp"
+    total = dice.Dice().roll(f"{count}d{faces}").total * times
+    return {coin: total} if total else {}
 
 
 def _feat_index() -> list[dict]:
@@ -395,6 +421,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "paths": paths,
         "goods": {outfit: 1},
         "slots": {"body": [outfit]},
+        "purse": starting_purse(cls),
         "hp": hp, "hp_max": hp,
         "notes": str(payload.get("notes", "")).strip(),
     }

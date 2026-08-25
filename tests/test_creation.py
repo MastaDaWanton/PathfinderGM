@@ -116,6 +116,30 @@ def test_an_elfs_fixed_int_pays_for_skill_ranks_too():
     assert len(built["sheet"].get("spellbook") or []) == 8
 
 
+def test_a_new_character_has_the_money_their_class_declares():
+    """Every class states starting wealth — "1d6 x 10 gp" for Blood Bending, "5d6 x 10
+    gp" for a fighter — and `build` never read it, so every character ever made began
+    with `purse: {}`. Invisible until the craft hub grew a market, where "Buy from the
+    market" handed over Steel, a Steel Crossguard and Tin to a character with nothing in
+    their pockets. Four classes had no figure at all; they live in `tables.CLASSES` and
+    now carry the Core Rulebook's."""
+    for cid, low, high in (("fighter", 50, 300), ("wizard", 30, 180),
+                           ("rogue", 40, 240), ("cleric", 40, 240)):
+        seen = set()
+        for _ in range(40):
+            built, problems = creation.build(spec(
+                **{"class": cid}, race="human", bonus_ability="str",
+                skills=["climb"], feats=["toughness", "dodge"],
+                spellbook=(["mage-armor", "magic-missile", "shield"]
+                           if cid == "wizard" else []),
+            ))
+            assert problems == [], (cid, problems)
+            gp = built["sheet"]["purse"].get("gp", 0)
+            assert low <= gp <= high, f"{cid} rolled {gp}, outside {low}..{high}"
+            seen.add(gp)
+        assert len(seen) > 1, f"{cid} starting wealth is not being rolled"
+
+
 def test_the_creation_page_reads_abilities_after_the_race():
     """The disagreement was only ever in the page: `ranksBudget` and `spellCap` did their
     own `Math.floor((f.abilities.int - 10) / 2)` on the bought score. Both go through

@@ -72,6 +72,7 @@ CLASSES = {
         "bab": "three_quarter",
         "good_saves": ("ref",),
         "skill_ranks": 8,
+        "starting_wealth": "4d6 x 10 gp",
         "proficiencies": ("simple", "rapier", "sap", "shortbow", "shortsword"),
         "class_skills": (
             "acrobatics", "appraise", "bluff", "climb", "craft", "diplomacy",
@@ -87,6 +88,7 @@ CLASSES = {
         "bab": "full",
         "good_saves": ("fort",),
         "skill_ranks": 2,
+        "starting_wealth": "5d6 x 10 gp",
         "proficiencies": ("simple", "martial"),
         "class_skills": (
             "climb", "craft", "handle animal", "intimidate",
@@ -100,6 +102,7 @@ CLASSES = {
         "bab": "half",
         "good_saves": ("will",),
         "skill_ranks": 2,
+        "starting_wealth": "3d6 x 10 gp",
         "proficiencies": ("club", "dagger", "light crossbow", "quarterstaff"),
         "class_skills": (
             "appraise", "craft", "fly", "knowledge (arcana)", "knowledge (dungeoneering)",
@@ -115,6 +118,7 @@ CLASSES = {
         "bab": "three_quarter",
         "good_saves": ("fort", "will"),
         "skill_ranks": 2,
+        "starting_wealth": "4d6 x 10 gp",
         "proficiencies": ("simple",),
         "class_skills": (
             "appraise", "craft", "diplomacy", "heal", "knowledge (arcana)",

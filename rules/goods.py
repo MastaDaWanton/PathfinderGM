@@ -171,6 +171,15 @@ def spend(purse: dict, cost_cp: int) -> tuple[dict, bool]:
     return {c: n for c, n in left.items() if n > 0}, True
 
 
+def coins_for(amount_cp: int) -> dict:
+    """A bare amount as the coins it would be counted out in, largest first.
+
+    A price is not a purse, but it is written the same way, and `purse_line` is the one
+    place that knows how this world spells its money.
+    """
+    return _add_change({}, max(0, int(amount_cp)))
+
+
 def _add_change(purse: dict, amount_cp: int) -> dict:
     out = {c: n for c, n in purse.items() if n > 0}
     for cid, value in reversed(DENOMINATIONS):

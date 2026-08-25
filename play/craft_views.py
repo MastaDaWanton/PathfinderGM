@@ -16,8 +16,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import (benches, biomes, consumables, crafting, foraging, ingredients,
-                   worldclass)
+from rules import (benches, biomes, consumables, crafting, foraging, goods,
+                   ingredients, worldclass)
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -839,6 +839,23 @@ def craft_actions(request):
     })
 
 
+def _price_cp(material) -> int:
+    """A material's shelf price in copper. Zero means it is not for sale.
+
+    Every bench's Material carries `price_gp`; the ones that leave it None are things
+    the world does not put on a counter, and those are excluded from a market rather
+    than handed over for free.
+    """
+    try:
+        return max(0, round(float(getattr(material, "price_gp", None)) * 100))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _price_line(material) -> str:
+    return goods.purse_line(goods.coins_for(_price_cp(material)), goods.coinage())
+
+
 @require_POST
 def craft_excursion(request):
     """Go out and come back with material — mining, skinning, gathering, buying.
@@ -892,7 +909,30 @@ def craft_excursion(request):
                       if found else "There is nothing of that kind to be had here."},
             status=409)
 
+    # A market is not a field. Every material carries `price_gp` and the alchemist's own
+    # blurb says "Price is in gp on each material", but nothing here ever read it: "Buy
+    # from the market" handed Steel, a Steel Crossguard and Tin to a character whose
+    # purse was `{}`, which made every gated excursion pointless beside it — prospecting
+    # needs the right ground and hours of daylight, and buying needed a d20.
+    buying = str(spec.get("obtain") or "") == "bought"
+    if buying:
+        stall = [m for m in within if _price_cp(m) > 0]
+        if not stall:
+            return JsonResponse(
+                {"error": "Nothing on this stall is priced for sale."}, status=409)
+        purse_cp = goods.in_copper(pc.purse)
+        cheapest = min(stall, key=_price_cp)
+        if purse_cp < _price_cp(cheapest):
+            coins = goods.coinage()
+            return JsonResponse({"error": (
+                f"You cannot afford anything here. The cheapest is {cheapest.name} at "
+                f"{_price_line(cheapest)}, and you have "
+                f"{goods.purse_line(pc.purse, coins) or 'nothing'}.")}, status=409)
+        within = stall
+
     hours = max(1, min(12, int(body.get("hours", 1) or 1)))
+    spent_cp = 0
+    unaffordable = 0
     engine = c.engine()
     roll = engine.dice.d20(label=spec.get("label", "Excursion"), visibility="player")
     face = roll.faces[0]
@@ -913,6 +953,22 @@ def craft_excursion(request):
         pool = [m for m in within if getattr(m, "rank", 1) <= reach] or within
         take = min(len(pool), 1 + hours // 2 + margin // 8)
         picks = [pool[(face * (i + 3)) % len(pool)] for i in range(max(1, take))]
+        # Paid for one at a time, in the order they were reached for, and the moment the
+        # purse cannot cover the next one the shopping stops. Trimming rather than
+        # refusing outright: a good roll that finds more than you can carry money for
+        # should still sell you what you *can* afford, and say what was left behind.
+        if buying:
+            afforded, left = [], 0
+            for m in picks:
+                purse, enough = goods.spend(pc.purse, _price_cp(m))
+                if not enough:
+                    left += 1
+                    continue
+                pc.purse = purse
+                spent_cp += _price_cp(m)
+                afforded.append(m)
+            unaffordable = left
+            picks = afforded
         counted: dict[str, int] = {}
         for m in picks:
             counted[m.id] = counted.get(m.id, 0) + 1
@@ -925,14 +981,25 @@ def craft_excursion(request):
     c.scene.clock_minutes += hours * 60
     tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing."
     verb = spec.get("verb") or spec.get("label", "working")
+    # What it cost and what was left on the counter, said in the same line as the haul.
+    # A purse that quietly empties is the version of this a player cannot check.
+    coins = goods.coinage()
+    paid = ""
+    if buying and spent_cp:
+        paid = (f" Paid {goods.purse_line(goods.coins_for(spent_cp), coins)}"
+                f", leaving {goods.purse_line(pc.purse, coins)}.")
+        if unaffordable:
+            paid += (f" {unaffordable} more "
+                     f"{'was' if unaffordable == 1 else 'were'} left on the counter.")
     line = (f"{pc.name} spends {hours} hour{'s' if hours != 1 else ''} "
             f"{verb}{' the ' + creature if creature else ''}. "
-            f"{'Found: ' + tally if haul else 'Nothing worth carrying.'}")
+            f"{'Found: ' + tally if haul else 'Nothing worth carrying.'}{paid}")
     c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
     c.save()
     return JsonResponse({
         "action": key, "label": spec.get("label", ""), "found": haul,
         "roll": face, "bonus": bonus, "dc": dc, "total": total, "succeeded": ok,
+        "spent_cp": spent_cp, "purse": dict(pc.purse),
         "hours": hours, "tell": line, "clock_minutes": c.scene.clock_minutes,
     })
 

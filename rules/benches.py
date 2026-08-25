@@ -227,16 +227,51 @@ def acquisitions() -> list[dict]:
         except ImportError:                    # pragma: no cover - guard
             continue
         table = getattr(mod, "ACQUISITION", None)
-        if not isinstance(table, dict):
+        # A dict keyed by id, or a plain list of specs that already carry one. The
+        # enchanter writes the list form, and requiring a dict here dropped all five of
+        # its methods on the floor without a word: skimming essence, cutting foci,
+        # harvesting the slain, buying inks and commissioning a vessel were absent from
+        # the craft hub entirely, which left an enchanter with no way to obtain a single
+        # material through the interface.
+        if isinstance(table, dict):
+            items = list(table.items())
+        elif isinstance(table, (list, tuple)):
+            items = [(str(s.get("id") or ""), s) for s in table if isinstance(s, dict)]
+        else:
             continue
-        for key, spec in table.items():
+        for key, spec in items:
             entry = {"track": track, "id": str(spec.get("id") or key)}
             entry.update({k: v for k, v in spec.items() if k != "id"})
+            entry["requires"] = gate_of(spec)
             # Namespaced, because two crafts may both offer "gather" and the hub has to
             # know whose gathering it is running.
             entry["key"] = f"{track}:{entry['id']}"
             out.append(entry)
     return sorted(out, key=lambda e: (e["track"], e["id"]))
+
+
+# What an excursion needs before it can be run at all. The hub asks one question and the
+# benches answered it in three vocabularies: blacksmith and leatherworker write
+# `"requires": "biome"`, the alchemist writes `"needs": "biome"`, and the enchanter writes
+# `"needs": {"biome": True}`. Only the first was ever read, so every alchemist and
+# enchanter method came back ungated — "Mine salts and ores" was offered on a city street
+# while the blacksmith's "Prospect for ore" was correctly greyed out beside it, and
+# alchemist gathering skipped the "leave the scene first" rule the other tracks obey.
+_GATES = ("carcass", "creature", "biome", "market")
+
+
+def gate_of(spec: dict) -> str:
+    """The one gate this excursion needs, whichever way its bench spelled it."""
+    raw = spec.get("requires", spec.get("needs", ""))
+    if isinstance(raw, dict):
+        # `{"market": True, "craft": (...)}` — the craft half is an extra condition the
+        # bench checks for itself; the gate is the one the hub knows how to test.
+        for g in _GATES:
+            if raw.get(g):
+                return g
+        return ""
+    text = str(raw or "").strip().lower()
+    return text if text in _GATES else ""
 
 
 def obtainable(track: str, obtain_kind: str, *, biome=None, creature=None) -> list:

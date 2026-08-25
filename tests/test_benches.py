@@ -109,6 +109,73 @@ def test_the_acquisition_hub_lists_every_craft(client):
     assert d["biomes"]
 
 
+def test_every_craft_reaches_the_hub_whatever_shape_it_declares(client):
+    """The enchanter writes `ACQUISITION` as a list; the other four write a dict. The hub
+    required a dict and skipped anything else without a word, so all five enchanter
+    methods — skimming essence, cutting foci, harvesting the slain, buying inks and
+    commissioning a vessel — were absent from the craft action entirely. Counted in the
+    running app: thirteen cards where there should have been eighteen, and an enchanter
+    with no way to obtain a single material through the interface."""
+    d = client.get("/api/craft/actions").json()
+    keys = {a["key"] for a in d["actions"]}
+    for track in ("herbalist", "blacksmith", "leatherworker", "alchemist", "enchanter"):
+        assert any(k.startswith(f"{track}:") for k in keys), f"{track} never reached the hub"
+    assert "enchanter:vessel-commission" in keys
+    assert len(d["actions"]) == 18
+
+
+def test_every_excursion_declares_a_gate_the_hub_understands():
+    """Three benches, three vocabularies for one question: blacksmith and leatherworker
+    write `"requires": "biome"`, the alchemist writes `"needs": "biome"`, the enchanter
+    writes `"needs": {"biome": True}`. Only the first was read, so every alchemist and
+    enchanter excursion came back ungated — "Mine salts and ores" was offered on a city
+    street while the blacksmith's "Prospect for ore" was correctly greyed out beside it,
+    and alchemist gathering skipped the "leave the scene first" rule."""
+    for spec in benches.acquisitions():
+        assert spec["requires"] in ("biome", "creature", "carcass", "market"), (
+            f"{spec['key']} has no gate the hub can test: {spec['requires']!r}")
+
+
+def test_buying_from_a_market_costs_money(client):
+    """Measured in play: "Buy from the market" handed Steel, a Steel Crossguard and Tin
+    to a character whose purse was `{}`. Every material carries `price_gp` and the
+    alchemist's own blurb says "Price is in gp on each material", and the excursion never
+    read it — which made every gated method pointless beside it, since prospecting needs
+    the right ground and hours of daylight and buying needed a d20."""
+    c = cm.current()
+    pc = c.scene.pc()
+    pc.purse = {"gp": 50}
+    c.save()
+    before = pc.purse["gp"]
+
+    for _ in range(12):                       # the check can fail; buy until one lands
+        r = client.post("/api/craft/excursion",
+                        data=json.dumps({"action": "blacksmith:buy"}),
+                        content_type="application/json")
+        assert r.status_code == 200, r.content
+        d = r.json()
+        if d["found"]:
+            break
+    assert d["found"], "twelve market runs and never a success"
+    assert d["spent_cp"] > 0, "the haul was free"
+    assert sum(d["purse"].values()) < before
+    assert "Paid" in d["tell"]
+
+
+def test_an_empty_purse_cannot_shop(client):
+    """The refusal names the cheapest thing on the stall and what is actually in the
+    purse, so "no" is a fact about the money rather than a dead button."""
+    c = cm.current()
+    c.scene.pc().purse = {}
+    c.save()
+    r = client.post("/api/craft/excursion",
+                    data=json.dumps({"action": "blacksmith:buy"}),
+                    content_type="application/json")
+    assert r.status_code == 409
+    why = r.json()["error"]
+    assert "cannot afford" in why and "cheapest" in why
+
+
 def test_an_excursion_that_needs_a_carcass_says_so(client):
     d = client.get("/api/craft/actions").json()
     skin = next(a for a in d["actions"] if a["key"] == "leatherworker:skin")
