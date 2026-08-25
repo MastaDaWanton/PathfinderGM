@@ -903,7 +903,12 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     (r"\b\d+\s*(?:gp|sp|cp|pp)\b", "states a sum of money"),
     (r"\bthat'?ll be\b|\bthat will be\b|\bcosts? you\b|\bfor the price of\b",
      "states a price"),
-    (r"\bhand(?:s|ing)? over (?:your|the) (?:payment|coins?|money|purse)\b",
+    # "you hand over", not "hands over" — the subject decides it. Without the pronoun this
+    # cut "She hands over the payment, and you can see the weight of the coins in her
+    # pouch", which is the *stallholder* paying for a jar the engine had just sold. A
+    # detector that removes the true half of a transaction is worse than none: the player
+    # is left with a sale nobody was seen to pay for.
+    (r"\byou hand(?:ed)? over (?:your|the) (?:payment|coins?|money|purse)\b",
      "states the player paying"),
 ]
 

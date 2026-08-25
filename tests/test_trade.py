@@ -723,3 +723,49 @@ def test_an_id_that_is_already_right_is_not_touched():
     scene = _scene_with_a_satchel()
     model = [{"op": "sell", "actor": "pc", "params": {"item": "yarow-elixir#1"}}]
     assert judgement.inject_sale(model, "I sell the Yarow Elixir", scene) == model
+
+
+
+def test_the_stallholder_is_allowed_to_hand_over_the_payment():
+    """A false positive in the money detector, found on the very sale it was written for.
+
+    The pattern read "hands over the payment" without asking whose hands, so it cut
+
+        "She hands over the payment, and you can see the weight of the coins in her
+         pouch before she tucks them away with a satisfied smile."
+
+    — the stallholder paying for a jar the engine had just sold. A detector that removes
+    the *true* half of a transaction is worse than none: the player is left with a sale
+    nobody was seen to pay for. The subject decides it."""
+    from rules.intents import find_outcome_claims
+
+    theirs = ("She hands over the payment, and you can see the weight of the coins in "
+              "her pouch before she tucks them away.")
+    assert not find_outcome_claims(theirs)
+
+    yours = "As you hand over your payment, she smiles."
+    assert any(c.why == "states the player paying" for c in find_outcome_claims(yours))
+
+
+def test_a_cosmetic_spell_does_not_move_the_price():
+    """Played end to end: prestidigitation cast on a jar of Sweetspire Tea "so it gleams
+    like a far finer thing", then sold at a premium.
+
+    The narration played along — "You name a price that's significantly higher than the
+    original cost... 'I'll take it,' she says" — and the ledger did not. The engine paid
+    7 sp 5 cp, which is `what_a_shop_pays` to the copper, and the purse moved 1,092 to
+    1,167 copper. Exactly 75.
+
+    `pricing.worth` reads tier and potency. Prestidigitation touches neither, so a
+    cosmetic glamour cannot inflate what anything is worth however well it is sold."""
+    from rules import pricing
+
+    plain = jar(base="Sweetspire Tea", tier="common", potency=1.0,
+                specs=[{"type": "heal", "dice": "1d4"}])
+    assert pricing.what_a_shop_pays(plain) == 0.75
+
+    # There is no field a cosmetic spell writes, which is the point — the price is a
+    # function of what the jar *is*.
+    gleaming = jar(base="Sweetspire Tea", tier="common", potency=1.0,
+                   specs=[{"type": "heal", "dice": "1d4"}])
+    assert pricing.worth(gleaming) == pricing.worth(plain)
