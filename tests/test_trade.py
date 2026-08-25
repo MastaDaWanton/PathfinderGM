@@ -679,3 +679,47 @@ def test_no_literal_backspace_survived_in_judgement():
 
     src = (_P(__file__).resolve().parents[1] / "gm" / "judgement.py").read_bytes()
     assert chr(8).encode() not in src
+
+
+
+# --- requiring the op is half a fix -------------------------------------------------------
+
+def test_the_model_names_the_jar_the_way_a_person_would():
+    """Measured in play, the turn after the schema started *requiring* a `sell` when the
+    player declares one. The model duly emitted the op — and named the jar in English:
+
+        The engine refused the GM's intents: sell: Thessaly Corr is not carrying
+        'sweetspire tea'. They have: beeswax#1, betony-tea#1, ... sweetspire-tea#1, ...
+
+    The thing she was selling is in that very list. The turn died on a 502.
+
+    `must_contain` gets the op proposed and leaves its params to chance, and the injector
+    had stood down because a `sell` was already present — so the one piece of code that
+    knows the ids was the one piece not looking. It corrects the params now instead of
+    bowing to them."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    scene.pc().add_stock(jar(base="Sweetspire Tea", tier="common", potency=1.25), 4)
+
+    model = [{"op": "sell", "actor": "pc", "params": {"item": "sweetspire tea"}}]
+    fixed = judgement.inject_sale(model, "I sell the Sweetspire Tea at a premium", scene)
+    assert fixed[0]["params"]["item"] == "sweetspire-tea#1"
+
+
+def test_an_item_the_satchel_never_heard_of_is_left_for_the_engine():
+    """The engine's own refusal names what she *does* have, which is a better error than
+    anything guessed here. Only an exact match on the id, the name or the base is taken."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    model = [{"op": "sell", "actor": "pc", "params": {"item": "moon cheese"}}]
+    assert judgement.inject_sale(model, "I sell the moon cheese", scene) == model
+
+
+def test_an_id_that_is_already_right_is_not_touched():
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    model = [{"op": "sell", "actor": "pc", "params": {"item": "yarow-elixir#1"}}]
+    assert judgement.inject_sale(model, "I sell the Yarow Elixir", scene) == model

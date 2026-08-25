@@ -973,6 +973,44 @@ _JUST_HAGGLING = re.compile(
     r"what'?s?\s+it\s+worth|price\s+(?:for|these|this|them)|appraise)\b", re.I)
 
 
+def _resolve_sold_item(raw_intents, pc) -> list:
+    """Point a `sell` at a jar the character is actually holding.
+
+    The model writes what a person would say — "sweetspire tea" — and the engine wants
+    `sweetspire-tea#1`. Only exact-ish matches are taken: the id itself, the jar's name,
+    or its base. A sell naming something the satchel has never heard of is left alone, so
+    the engine's own refusal still names what she does have.
+    """
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    stock = getattr(pc, "stock", {}) or {}
+    if not stock:
+        return raw_intents
+
+    def _find(said: str) -> str:
+        said = " ".join(str(said or "").split()).lower()
+        if not said or said in stock:
+            return ""
+        for item in sorted(stock.values(),
+                           key=lambda s: len(getattr(s, "name", "")), reverse=True):
+            for candidate in (str(getattr(item, "name", "")),
+                              str(getattr(item, "base", "")),
+                              str(item.id).split("#")[0].replace("-", " ")):
+                if candidate and candidate.lower() == said:
+                    return item.id
+        return ""
+
+    out = []
+    for entry in raw_intents:
+        if isinstance(entry, dict) and str(entry.get("op", "")).lower() == "sell":
+            params = dict(entry.get("params") or {})
+            found = _find(params.get("item"))
+            if found:
+                entry = dict(entry, params=dict(params, item=found))
+        out.append(entry)
+    return out
+
+
 def inject_sale(raw_intents, player_text: str, scene) -> list:
     """Make a declared sale reach the engine.
 
@@ -985,14 +1023,29 @@ def inject_sale(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     if "?" in player_text or _JUST_HAGGLING.search(player_text):
         return raw_intents
+
+    pc = scene.pc()
+    if pc is None or not getattr(pc, "stock", None):
+        return raw_intents
+
+    # Repair before deciding whether to inject. Measured in play, the turn after the
+    # schema started *requiring* a `sell` when the player declares one: the model duly
+    # emitted the op and named the jar the way a person would —
+    #
+    #     sell: Thessaly Corr is not carrying 'sweetspire tea'. They have:
+    #     beeswax#1, betony-tea#1, ... sweetspire-tea#1, ...
+    #
+    # — with the thing she was selling sitting in that very list. The engine refused, the
+    # turn died, and this injector had stood down because a `sell` was already present.
+    #
+    # Requiring the op and leaving its params to chance is half a fix. The injector is the
+    # only thing here that knows the ids, so it corrects one rather than bowing to it.
+    raw_intents = _resolve_sold_item(raw_intents, pc)
+
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if "sell" in present or "give" in present:
         return raw_intents
     if not _SELLS.search(player_text):
-        return raw_intents
-
-    pc = scene.pc()
-    if pc is None or not getattr(pc, "stock", None):
         return raw_intents
 
     said = player_text.lower()
