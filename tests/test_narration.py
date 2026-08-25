@@ -766,3 +766,58 @@ def test_the_fix_uses_the_matches_the_check_found():
         found = narration.wrong_body(said, "woman", ("Vorgath",))
         _, swapped = narration.right_body(said, "woman", ("Vorgath",))
         assert found == swapped, said
+
+
+
+# --- when nobody has said ----------------------------------------------------------------
+
+def test_a_character_nobody_has_described_is_not_described():
+    """Four characters on the live roster predate the gender field and read they/them,
+    which says nothing about a body — so nothing can be derived from them, and guessing
+    from a name is precisely what the field exists to stop.
+
+    Silence in the brief is what produced the wrong body in the first place: told nothing,
+    the model writes its default and then treats it as settled. An instruction not to
+    assert is weaker than a fact, but it is the only honest thing to say when nobody has
+    said."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.gender = ""
+    scene = Scene(location_id=None)
+    scene.add(pc)
+
+    class _W:
+        name, premise, secret = "Fantasia", {}, ""
+
+        def ancestors(self, _):
+            return []
+
+    line = [ln for ln in prompts.scene_brief(_W(), scene, None).splitlines()
+            if pc.name in ln][0]
+    assert "Do not describe their body" in line
+    # And it does not invent one to fill the gap.
+    assert ", a " not in line.split("the player's character")[1][:12]
+
+
+def test_a_stated_gender_says_it_rather_than_refusing_to():
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.gender = "woman"
+    scene = Scene(location_id=None)
+    scene.add(pc)
+
+    class _W:
+        name, premise, secret = "Fantasia", {}, ""
+
+        def ancestors(self, _):
+            return []
+
+    line = [ln for ln in prompts.scene_brief(_W(), scene, None).splitlines()
+            if pc.name in ln][0]
+    assert "she has breasts" in line
+    assert "Do not describe their body" not in line

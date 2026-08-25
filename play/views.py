@@ -1076,6 +1076,48 @@ def use_item(request):
     return JsonResponse({"ok": True, "tell": tell, "sheet": full_sheet(pc)})
 
 
+@require_POST
+def set_gender(request):
+    """Say what an existing character is, for the saves that predate the field.
+
+    The forge asks every new character, but four on the live roster were made when it
+    did not and read `they/them` — which says nothing about a body, so nothing can be
+    derived from it. Guessing from a name is precisely the thing this whole field exists
+    to stop, so it is asked rather than inferred.
+    """
+    from rules.sheet import gender_from_pronouns, pronouns_for_gender
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    said = " ".join(str(read_body(request).get("gender", "")).split()).lower()
+    if not said:
+        return JsonResponse({"error": "say woman or man"}, status=400)
+    if len(said) > 40:
+        return JsonResponse({"error": "that is too long to be a description"}, status=400)
+
+    pronouns = pronouns_for_gender(said)
+    if not pronouns:
+        return JsonResponse({"error": (
+            f"Nothing follows from {said!r} about which words to use. Choose woman or "
+            f"man, or turn a pronoun set on in the house rules and pick that.")},
+            status=400)
+
+    # Both, together. Keeping them coupled here is the same rule the forge follows, and
+    # the reason is on the live roster: a save holding a gender and a contradicting set
+    # of pronouns gives the narrator two answers to choose between.
+    pc.gender = said
+    pc.pronouns = pronouns
+    c.save()
+    # And onto the roster entry too, or the campaign and the character file disagree —
+    # which is exactly the state Thessaly's save was found in.
+    if getattr(c, "character_id", ""):
+        roster.record(c.character_id, pc)
+    return JsonResponse({"ok": True, "gender": pc.gender, "pronouns": pc.pronouns})
+
+
 # --- trading ---------------------------------------------------------------------------
 #
 # "i single store should not have every possible item" was the first half of this, and it

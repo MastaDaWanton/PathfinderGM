@@ -2604,6 +2604,10 @@ async function openSheet() {
     [SHEET.identity.heritage, SHEET.identity.race, SHEET.identity.class,
      SHEET.identity.size, SHEET.identity.gender,
      SHEET.identity.pronouns].filter(Boolean).join(" · ");
+  // Four characters on the roster predate the field and read they/them, which says
+  // nothing about a body. Silence is what produced the wrong one in the first place, so
+  // an unstated character says so here rather than quietly taking the model's default.
+  askGender(!SHEET.identity.gender);
   $("#sheettabs").innerHTML = TABS.map(([k, label]) =>
     `<button role="tab" data-tab="${k}" aria-selected="${k === SHEET_TAB}">${label}</button>`
   ).join("");
@@ -3229,6 +3233,43 @@ function tabBackground(s) {
     </div>
   </div>`;
 }
+
+/* An existing character with nothing said about what they are.
+   The forge asks everyone made since the field existed, but the roster still holds four
+   who predate it and read they/them — which says nothing about a body, so nothing can be
+   derived from it and guessing from a name is the thing the field exists to stop. */
+function askGender(missing) {
+  // Scoped to the sheet, not `$(".sheethead")`. The trade panel reuses that class and
+  // sits earlier in the document, so the bare selector returned *its* header — and
+  // `insertBefore` threw "the node before which the new node is to be inserted is not a
+  // child of this node", silently, with the prompt never appearing.
+  const head = $("#sheetpanel .sheethead");
+  let bar = $("#genderask");
+  if (!missing) { if (bar) bar.remove(); return; }
+  if (bar) return;
+  bar = document.createElement("div");
+  bar.id = "genderask";
+  bar.style.cssText = "flex:1;display:flex;gap:8px;align-items:center;"
+    + "font:13px/1.4 var(--body);color:var(--ink-dim)";
+  bar.innerHTML = `Nothing on this sheet says what they are, so the narration will
+    pick for them.
+    <button class="quiet" data-setgender="woman">woman</button>
+    <button class="quiet" data-setgender="man">man</button>`;
+  head.insertBefore(bar, $("#closesheet"));
+}
+
+$("#sheetpanel").addEventListener("click", async e => {
+  const pick = e.target.closest("[data-setgender]");
+  if (!pick) return;
+  try {
+    await post("/api/character/gender", { gender: pick.dataset.setgender });
+  } catch (err) {
+    $("#sheeterr").textContent = err.message;
+    return;
+  }
+  closeSheet();
+  openSheet();
+});
 
 $("#closesheet").onclick = closeSheet;
 document.addEventListener("keydown", e => {

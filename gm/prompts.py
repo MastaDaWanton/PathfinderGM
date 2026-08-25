@@ -665,6 +665,15 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
             if not body and actor.gender:
                 body = (f" When the narration touches their body, it is a "
                         f"{actor.gender}'s body.")
+            elif not actor.gender:
+                # Said out loud rather than left blank. Four characters on the live
+                # roster predate this field and cannot be derived — they/them says
+                # nothing about a body — and silence is what produced the wrong one in
+                # the first place: told nothing, the model writes its default and then
+                # treats it as settled. An instruction not to assert is weaker than a
+                # fact, but it is the only honest thing to say when nobody has said.
+                body = (" Nobody has said what they look like. Do not describe their "
+                        "body or assert anything about it; write what they do.")
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "

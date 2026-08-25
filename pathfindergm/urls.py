@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/roll", views.roll, name="roll"),
     path("api/combat/act", views.combat_act, name="combat_act"),
     path("api/use", views.use_item, name="use_item"),
+    path("api/character/gender", views.set_gender, name="set_gender"),
     path("api/trade", views.trade, name="trade"),
     path("api/trade/do", views.trade_do, name="trade_do"),
     path("craft/", craft_views.craft_page, name="craft"),
