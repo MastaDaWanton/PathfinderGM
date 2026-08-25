@@ -907,7 +907,12 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     if "?" in player_text:
         return raw_intents
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
-    if "give" in present:
+    # `sell` too, and that is not symmetry for its own sake. "I sell the Yarow Elixir"
+    # matches `_HANDS_OVER`, so this fired first and wrote a `give` — the elixir left the
+    # satchel for nothing, and `inject_sale` then bowed out because a `give` was already
+    # present. A declared sale paid the player zero gold for as long as the order was the
+    # other way round, and the whole trade feature was invisible behind it.
+    if present & {"give", "sell", "buy"}:
         return raw_intents
 
     pc = scene.pc()
@@ -1261,3 +1266,62 @@ def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
             "op": "travel", "because": f"the player said they go to {named}",
             "params": {"biome": "urban", "note": f"Back within {named}."}}]
     return raw_intents
+
+
+# --- what the player has already declared ------------------------------------------------
+#
+# Nine injectors now, and each one exists because the model failed to propose something
+# the player plainly said. That list grows once per feature, forever, which is the smell:
+# it is linear in features and every entry is a repair applied after the fact.
+#
+# The fight schema shows the better shape. In combat `narrate_only` is not in the op enum
+# at all, so "narrated the punch and proposed nothing" is not a reply the sampler can
+# produce — prevented rather than repaired. The same trick generalises: when a declaration
+# *is* detected, the turn schema can require that op to be present, and then the model
+# picks the item, the target and the reason itself. An injector guessing those is strictly
+# worse than the model choosing them with the scene in front of it.
+#
+# The injectors stay, demoted to backstop. Same doctrine as `right_body` under a brief
+# that already states the fact: say it first, catch it after.
+#
+# Read by running the injectors themselves rather than by a second copy of their patterns.
+# CLAUDE.md records what a duplicated rule costs — a consequence rule was fixed in one
+# prompt and left stale in the other, and the bug went on shipping from the copy nobody
+# looked at.
+_DECLARERS = (
+    ("survival", lambda raw, text, scene, world: inject_survival(raw, text, scene)),
+    # Sale before goods, the same order the live chain runs them in — and asking them in
+    # the wrong order here is what surfaced the bug: "I sell the Yarow Elixir" came back
+    # as both `give` and `sell`, which is one item leaving twice.
+    ("sale", lambda raw, text, scene, world: inject_sale(raw, text, scene)),
+    ("goods", lambda raw, text, scene, world: inject_goods(raw, text, scene)),
+    ("ability", lambda raw, text, scene, world: inject_ability(raw, text, scene)),
+    ("checks", lambda raw, text, scene, world: inject_checks(raw, text, scene)),
+    ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
+    ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
+)
+
+
+def declared_ops(player_text: str, scene, world=None) -> list[str]:
+    """The ops the player's own words already commit the turn to.
+
+    Each injector is asked what it would add to an empty turn. Whatever it names is
+    something the player has plainly declared, so the schema can insist on it up front
+    instead of the injector bolting it on afterwards.
+    """
+    found: list[dict] = []
+    for _, run in _DECLARERS:
+        try:
+            # Threaded, not run against a fresh empty list each time. Every injector bows
+            # out when a competing op is already present, and that is the only thing
+            # stopping one sentence from being read twice — "I sell the elixir" is a sale
+            # *or* a handing-over, never both.
+            found = list(run(found, player_text, scene, world) or found)
+        except Exception:
+            continue
+    ops: list[str] = []
+    for entry in found:
+        op = str((entry or {}).get("op", "")).strip()
+        if op and op not in ops:
+            ops.append(op)
+    return ops

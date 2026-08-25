@@ -8,6 +8,7 @@ Everything the model produces is checked in code before it touches the engine.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
 from django.conf import settings
@@ -68,6 +69,10 @@ class GMAgent:
         self.prose_provider = prose.get("provider", self.provider)
         self.prose_key = prose.get("api_key", "")
         self._echoes = None
+        # The experiment. Off by default and read per agent, so a run can be flipped
+        # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
+        # being tested and why it is measured rather than argued about.
+        self.intents_first = bool(os.environ.get("GM_INTENTS_FIRST"))
 
     # --- Call 1 ---------------------------------------------------------------------
 
@@ -93,13 +98,18 @@ class GMAgent:
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
-        base = prompts.call_one_messages(brief, history, player_input,
-                                         in_combat=fighting,
-                                         enemy=self._current_enemy())
+        build = (prompts.call_one_intents_only if self.intents_first
+                 else prompts.call_one_messages)
+        base = build(brief, history, player_input, in_combat=fighting,
+                     enemy=self._current_enemy())
         messages = base
 
         attempts: list[Attempt] = []
         rejections: list[str] = []
+        # What the player's own words already commit this turn to, read by asking the
+        # injectors what they would add. Computed once: it depends on the player's text
+        # and the scene, and neither moves between attempts.
+        declared = judgement.declared_ops(player_input, self.engine.scene, self.world)
 
         from play import modelcfg
 
@@ -125,9 +135,19 @@ class GMAgent:
                                 schema=prompts.turn_schema(
                                     fighting=self.engine.scene.in_encounter,
                                     refs=tuple(self.engine.scene.actors),
-                                    min_chars=(narration_mod.MIN_COMBAT_CHARS
-                                               if self.engine.scene.in_encounter
-                                               else narration_mod.MIN_SCENE_CHARS)))
+                                    # No floor when the prose is not being asked for.
+                                    # The schema enforces the minimum at the sampler, so
+                                    # leaving it in place would make the empty narration
+                                    # this mode requires unsamplable.
+                                    min_chars=0 if self.intents_first else
+                                    (narration_mod.MIN_COMBAT_CHARS
+                                     if self.engine.scene.in_encounter
+                                     else narration_mod.MIN_SCENE_CHARS),
+                                    # Required up front rather than injected afterwards.
+                                    # The injectors still run below as the backstop; this
+                                    # gives the model first refusal, with the scene in
+                                    # front of it, on choosing the item and the target.
+                                    must_contain=tuple(declared)))
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
             try:
@@ -162,11 +182,13 @@ class GMAgent:
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
-                raw = judgement.inject_goods(raw, player_input, self.engine.scene)
-                # After `inject_goods`, which bows out when a `give` is already present:
-                # selling is the more specific reading of handing something over, and it
-                # is the one that pays.
+                # Sale first, then goods. Selling is the more specific reading of handing
+                # something over and it is the one that pays — and the order was the other
+                # way round for exactly as long as it took `declared_ops` to notice: "I
+                # sell the Yarow Elixir" matched `_HANDS_OVER`, became a `give`, and the
+                # elixir left the satchel for nothing.
                 raw = judgement.inject_sale(raw, player_input, self.engine.scene)
+                raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
@@ -228,6 +250,15 @@ class GMAgent:
                         messages = _with_correction(base, reply.text, str(exc))
                         continue
                     raise
+
+            # Every prose repair below has nothing to work on when the prose has not been
+            # written yet — and that is the point of the experiment, not a special case
+            # bolted round it. `_repair_outcome_claims` in particular exists *only*
+            # because narration currently precedes the dice.
+            if self.intents_first:
+                return TurnPlan(narration="", intents=intents,
+                                suggestions=_suggestions(data), attempts=attempts,
+                                repairs=repairs, rejections=rejections)
 
             # Check 4 is the only one that gets a targeted repair, because the narration
             # around the claim is worth keeping.
@@ -530,6 +561,51 @@ class GMAgent:
         return " ".join(narration.split()), repairs, attempts
 
     # --- Call 2 -------------------------------------------------------------------------
+
+    def narrate_turn(self, outcomes: list, player_input: str, brief: str,
+                     earlier: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+        """The whole turn as prose, written after the engine has decided it.
+
+        The other half of `intents_first`. Here the prose call is the only one there is,
+        so every check that used to run over call 1's narration runs over this instead —
+        the prose is still reviewed, still polished, still has the body and hand-back
+        backstops under it. What is gone is `_repair_outcome_claims`, and it is gone
+        because it cannot happen: the model is being shown what the dice did.
+        """
+        fighting = self.engine.scene.in_encounter
+        tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
+        try:
+            reply = client.chat(
+                prompts.call_prose_messages(brief, [], player_input, tells,
+                                            in_combat=fighting,
+                                            enemy=self._current_enemy()),
+                self.prose_model, self.prose_host, as_json=True, temperature=0.8,
+                num_predict=900, provider=self.prose_provider, api_key=self.prose_key)
+            text = str(reply.json().get("narration", "")).strip()
+        except Exception as exc:
+            return "", [f"prose failed: {exc}"], [
+                Attempt("prose", 0.0, self.prose_model, note=str(exc)[:120])]
+
+        attempts = [Attempt("prose", reply.seconds, reply.model, reply.text)]
+        text = judgement.name_refs(text, self.engine.scene)
+        text = narration_mod.strip_example_cast(
+            text, player_input + " "
+            + " ".join(a.name for a in self.engine.scene.actors.values()))
+        text, repairs, polish_attempts = self.polish(
+            text, earlier=earlier or [],
+            min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
+                       else narration_mod.MIN_SCENE_CHARS),
+            max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
+            player_input=player_input, scene_brief=brief)
+        attempts.extend(polish_attempts)
+        text, outsourced = narration_mod.fix_hand_back(text)
+        if outsourced:
+            repairs = repairs + [f"asked the player to narrate: replaced {outsourced!r}"]
+        text, swapped = narration_mod.right_body(text, self._pc_gender(),
+                                                 self._other_names())
+        if swapped:
+            repairs = repairs + [f"wrong body: replaced {', '.join(swapped)}"]
+        return text, repairs, attempts
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
         """Say the facts the engine handed back.

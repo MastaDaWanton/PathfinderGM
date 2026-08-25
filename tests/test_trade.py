@@ -304,3 +304,79 @@ def test_a_richer_house_stocks_what_a_stall_cannot():
     rich = max(pricing.worth(x)
                for x in m.on_sale("pangrella", "vault", 0, {}, "legendary"))
     assert rich > poor * 10
+
+
+
+# --- required up front rather than injected afterwards -----------------------------------
+
+def test_a_declared_sale_is_required_by_the_schema_not_bolted_on():
+    """Nine injectors now, one per feature, growing forever — and each one is a repair
+    applied after the model failed to propose something the player plainly said.
+
+    The fight schema already shows the better shape: in combat `narrate_only` is not in
+    the op enum, so proposing nothing is not a reply the sampler can produce. The same
+    trick generalises. When a declaration is detected the schema requires that op, and the
+    model then picks the item and the target with the scene in front of it — which an
+    injector guessing afterwards cannot."""
+    from gm import judgement, prompts
+
+    scene = _scene_with_a_satchel()
+    assert judgement.declared_ops("I sell the Yarow Elixir to her", scene) == ["sell"]
+
+    schema = prompts.turn_schema(refs=("pc",), must_contain=("sell",))
+    required = schema["properties"]["intents"]["allOf"]
+    assert required[0]["contains"]["properties"]["op"]["const"] == "sell"
+    assert schema["properties"]["intents"]["minItems"] >= 1
+
+
+def test_selling_is_not_also_giving_it_away():
+    """Found by building `declared_ops`, in code committed hours earlier the same day.
+
+    "I sell the Yarow Elixir" matches `_HANDS_OVER`, so `inject_goods` ran first and wrote
+    a `give` — the elixir left the satchel for nothing — and `inject_sale` then bowed out
+    because a `give` was already present. A declared sale paid the player zero gold, and
+    the entire trade feature was invisible behind it.
+
+    Sale first, and `inject_goods` bows out to it. One sentence, one item, one op."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    said = "I sell the Yarow Elixir to her"
+
+    raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}], said, scene)
+    raw = judgement.inject_goods(raw, said, scene)
+    assert [r["op"] for r in raw] == ["narrate_only", "sell"]
+    assert judgement.declared_ops(said, scene) == ["sell"]
+
+
+def test_handing_something_over_is_still_a_give():
+    """The narrower reading must not swallow the wider one — "I hand over the brass key"
+    is not a sale and there is no key in the satchel to sell."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    assert judgement.declared_ops("I hand over the brass key", scene) == ["give"]
+
+
+def test_a_turn_that_declares_nothing_constrains_nothing():
+    """The schema only narrows when the player's own words commit the turn to something.
+    "I look around the square" is a quiet beat and must stay one."""
+    from gm import judgement, prompts
+
+    scene = _scene_with_a_satchel()
+    assert judgement.declared_ops("I look around the square", scene) == []
+    schema = prompts.turn_schema(refs=("pc",), must_contain=())
+    assert "allOf" not in schema["properties"]["intents"]
+
+
+def test_two_declarations_both_have_to_be_there():
+    """`allOf` of `contains`, one per op — a single `contains` with an enum is satisfied by
+    any one of them, so a turn that both travels and buys would be accepted with either
+    alone."""
+    from gm import prompts
+
+    schema = prompts.turn_schema(refs=("pc",), must_contain=("travel", "give"))
+    ops = [c["contains"]["properties"]["op"]["const"]
+           for c in schema["properties"]["intents"]["allOf"]]
+    assert ops == ["travel", "give"]
+    assert schema["properties"]["intents"]["minItems"] >= 2

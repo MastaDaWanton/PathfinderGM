@@ -745,6 +745,86 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
     return messages
 
 
+# --- intents first, prose afterwards -----------------------------------------------------
+#
+# The experiment behind `GM_INTENTS_FIRST`. Today one call returns narration and intents
+# together, which means the prose is written *before* the dice are rolled and before the
+# scene state changes — and every awkward thing in the turn descends from that:
+#
+#   * `_repair_outcome_claims` exists only because the model asserts results it cannot
+#     know yet. Remove the cause and the repair has nothing to do.
+#   * Every retry regenerates a 600-character paragraph. Five attempts means writing the
+#     scene five times to fix a malformed `target` field.
+#   * `polish` is a second full model call, spent fixing prose written blind. Measured on
+#     one live turn that resolved to `narrate_only` — nothing happened at all — plan 9.3s
+#     plus polish 10.6s, 19.9s and two model calls.
+#
+# The counter-argument is real and is why this is measured rather than assumed: the
+# narration may be doing work as a reasoning scratchpad. Writing "you swing at the thug"
+# before emitting `attack` is chain-of-thought, and on an 8B model that may well make the
+# *intents* better. Splitting them could make them worse. `tools/narrator_audit.py` is the
+# instrument; the 196/200 baseline is what it has to beat.
+INTENTS_ONLY_EXTRA = """
+THIS TURN: intents only. Do not write any narration at all — the "narration" field must be
+an empty string. Somebody else writes the prose after the engine has rolled, and they will
+know what actually happened, which you do not. Emit only the intents.
+"""
+
+
+def call_one_intents_only(briefing_scene: str, history: list[dict], player_input: str,
+                          in_combat: bool = False, enemy: str | None = None) -> list[dict]:
+    """The same turn prompt, with the prose half switched off.
+
+    The examples still carry their narration. Stripping it was tried first and made the
+    replies worse: the examples are what teach the *shape* of an intent list, and an
+    example with an empty narration field reads as a demonstration that turns can be
+    empty. The instruction says what this turn wants; the examples still show the protocol.
+    """
+    messages = call_one_messages(briefing_scene, history, player_input,
+                                 in_combat=in_combat, enemy=enemy)
+    messages[0] = {"role": "system",
+                   "content": messages[0]["content"] + "\n" + INTENTS_ONLY_EXTRA}
+    return messages
+
+
+PROSE_AFTER_EXTRA = """
+THIS TURN: the engine has already resolved it, and what it decided is below. Write the
+turn as prose — the scene, the people in it, what just happened — and put nothing in the
+"intents" list; it must be empty.
+
+What the engine decided is what happened. Do not contradict it, do not add a roll, do not
+state a number, and do not invent an outcome it did not give you. If it decided nothing
+mechanical, this is a quiet beat: describe the place and the people and hand the turn back.
+"""
+
+
+def call_prose_messages(briefing_scene: str, history: list[dict], player_input: str,
+                        tells: list[str], in_combat: bool = False,
+                        enemy: str | None = None) -> list[dict]:
+    """Write the whole turn, after the dice.
+
+    The *call-one* briefing and examples, not the consequence ones, because this is being
+    asked for a scene rather than for two sentences about a blow — the consequence prompt
+    demonstrates brevity, and demonstration volume is what wins.
+
+    The engine's tells go in as facts the prose has to honour. When there are none the
+    turn was a quiet beat, which still needs writing: a `narrate_only` turn producing no
+    prose at all is an empty page, and most town turns are `narrate_only`.
+    """
+    messages = call_one_messages(briefing_scene, history, player_input,
+                                 in_combat=in_combat, enemy=enemy)
+    messages[0] = {"role": "system",
+                   "content": messages[0]["content"] + "\n" + PROSE_AFTER_EXTRA}
+    said = "\n".join(f"- {t}" for t in tells if t)
+    messages[-1] = {
+        "role": "user",
+        "content": (f"The player said: {player_input}\n\n"
+                    + (f"What the engine decided:\n{said}" if said
+                       else "The engine decided nothing mechanical this turn.")),
+    }
+    return messages
+
+
 CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.
 
 The rules engine has resolved it. Below is what it decided. Narrate exactly that in two or
@@ -982,12 +1062,18 @@ _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools"
 
 
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
-                min_chars: int = 0) -> dict:
+                min_chars: int = 0, must_contain: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
 
     `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
     the scene, which is the single most common rejection in the logs and the reason
     `repair_unknown_refs` had to be written.
+
+    `must_contain` is the same idea aimed at the other failure — not proposing anything at
+    all. When the player has plainly declared something (`judgement.declared_ops` decides,
+    by asking the injectors themselves), the reply is required to contain that op, and the
+    model then picks the item, the target and the reason with the scene in front of it. An
+    injector bolting those on afterwards has to guess them.
     """
     intent = {
         "type": "object",
@@ -1008,6 +1094,17 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         # The whole point. In a fight the list may not be empty, so "narrated the punch
         # and proposed nothing" is not a reply this model can produce.
         intents["minItems"] = 1
+    wanted = [op for op in dict.fromkeys(must_contain) if op in _OPS]
+    if wanted:
+        # `allOf` of `contains`, one per op, because a single `contains` with an enum is
+        # satisfied by any one of them — a turn that both travels and buys needs both, and
+        # the enum form would accept either alone.
+        intents["allOf"] = [
+            {"contains": {"type": "object",
+                          "properties": {"op": {"const": op}},
+                          "required": ["op"]}}
+            for op in wanted]
+        intents["minItems"] = max(int(intents.get("minItems", 0)), len(wanted))
     narration = {"type": "string"}
     if min_chars:
         narration["minLength"] = int(min_chars)
