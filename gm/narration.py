@@ -212,7 +212,8 @@ def fix_hand_back(text: str) -> tuple[str, str]:
 
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
-           min_chars: int = 0, max_chars: int = 0, alone: bool = False) -> Review:
+           min_chars: int = 0, max_chars: int = 0, alone: bool = False,
+           pronouns: str = '', others: tuple = ()) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -356,6 +357,23 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
 
     # 4b. An ally the player has not got. The same failure as the invented name and
     #     invisible to that check, because "companion" carries no capital letter.
+    # 2b. The player's character given somebody else's pronouns. The scene brief has
+    #     always stated them — "when someone speaks about them, she/her" — and the model
+    #     still gets it wrong, which is the oldest lesson here arriving somewhere new.
+    #     Measured on a wizard whose sheet says she/her: a winged youth burst into the
+    #     gymnasium, pointed and shouted "It's him! Thessaly Corr!"
+    #
+    #     Check 2 above cannot see it: that reads `unquoted(text)`, because an NPC may
+    #     say the player's name aloud, and shouting it is exactly what happened.
+    for said in misgendered(text, pc_name, pronouns, tuple(others or ())):
+        out.findings.append(Finding(
+            "misgendered-pc", f"calls the player's character {said!r}",
+            f"The player's character uses {pronouns}. Never {said!r} — not in narration "
+            f"and not in anybody's mouth.",
+            weight=3,
+        ))
+        break
+
     if alone:
         for phrase in invented_companions(text):
             out.findings.append(Finding(
@@ -368,6 +386,76 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             break
 
     return out
+
+
+
+# --- the player's character, gendered by guesswork -------------------------------------
+#
+# The scene brief has always told the model the pronouns — "when someone speaks about
+# them, she/her" — and it still gets them wrong, which is this project's oldest lesson
+# arriving somewhere new. Measured in play on a wizard whose sheet said she/her: a winged
+# youth burst into the gymnasium, pointed, and shouted "It's him! Thessaly Corr!"
+#
+# The existing third-person check cannot see it. That one reads `unquoted(text)`, because
+# an NPC may perfectly well say the player's name out loud — and shouting it is exactly
+# what happened.
+# How far either side of the name to look. Wide enough for "It's him! Thessaly Corr!"
+# and the clause on either side of it; narrow enough that a paragraph about three
+# people does not pool all their pronouns together.
+MISGENDER_WINDOW = 90
+
+_PRONOUN_SETS = {
+    "she": ("she", "her", "hers", "herself"),
+    "he": ("he", "him", "his", "himself"),
+    "they": ("they", "them", "their", "theirs", "themself", "themselves"),
+}
+
+
+def _pronoun_family(pronouns: str) -> str:
+    """"she/her" -> "she". Anything unrecognised answers "", which checks nothing: a
+    table that invented ze/hir gets no opinion from this rule rather than a wrong one."""
+    first = str(pronouns or "").split("/")[0].strip().lower()
+    return first if first in _PRONOUN_SETS else ""
+
+
+def misgendered(text: str, pc_name: str, pronouns: str,
+                others: tuple[str, ...] = ()) -> list[str]:
+    """Pronouns used for the player's character that their sheet does not use.
+
+    Narrow on purpose, because the risk is the other way: "Thessaly nods and the trainer
+    steps back as he lowers his guard" has her name and a `he` in one sentence and is
+    perfectly correct prose about somebody else. So a sentence only counts when the
+    player's character is the *only* named person in it — which is what "It's him!
+    Thessaly Corr!" is, and what a sentence about the trainer is not.
+    """
+    family = _pronoun_family(pronouns)
+    if not family or not pc_name:
+        return []
+    # Only the opposite binary pronoun counts as evidence. "they" is deliberately never
+    # wrong here: it is the plural everybody uses for a crowd, and including it made
+    # "One of *them* spots you" and "*They* shout that it is her" both report the player
+    # as misgendered in the very line that gets her right.
+    wrong = {w for fam, words in _PRONOUN_SETS.items()
+             if fam != family and fam != "they" for w in words}
+    names = [n for n in others if n and n.lower() != pc_name.lower()]
+    first = pc_name.split()[0]
+    # A window of characters around the name, not a sentence. `_SENTENCE` splits on
+    # "!", so the line that prompted this - "It's him! Thessaly Corr!" - puts the
+    # pronoun and the name in two different sentences, and a per-sentence rule sees
+    # nothing at all.
+    text = text or ''
+    found: list[str] = []
+    pattern = r'\b(?:' + re.escape(pc_name) + '|' + re.escape(first) + r')\b'
+    for m in re.finditer(pattern, text, re.I):
+        lo = max(0, m.start() - MISGENDER_WINDOW)
+        window = text[lo:m.end() + MISGENDER_WINDOW]
+        if any(re.search(r'\b' + re.escape(n) + r'\b', window, re.I) for n in names):
+            continue      # somebody else is in earshot; the pronoun may be theirs
+        for token in re.findall(r"\b[A-Za-z']+\b", window):
+            low = token.lower()
+            if low in wrong and low not in found:
+                found.append(low)
+    return found
 
 
 # An ally the player has not got. Measured in the tavern: the killing blow came back as

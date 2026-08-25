@@ -486,3 +486,66 @@ def test_the_ways_a_second_pair_of_hands_gets_invented():
                  "The others fall back towards the arch.",
                  "One of your companions shouts a warning."):
         assert narration.invented_companions(said), said
+
+
+
+# --- somebody else's pronouns ---------------------------------------------------------
+
+def test_the_player_is_not_given_somebody_elses_pronouns():
+    """Reported from a screenshot. Thessaly Corr's sheet says she/her, and a winged youth
+    burst into the gymnasium, pointed, and shouted "It's him! Thessaly Corr!"
+
+    The scene brief has always told the model her pronouns — "when someone speaks about
+    them, she/her" — and it said him anyway, which is this project's oldest lesson
+    arriving somewhere new: an instruction does not hold, a detector does.
+
+    Check 2 cannot see this. It reads `unquoted(text)`, because an NPC may perfectly well
+    say the player's name aloud — and shouting it is precisely what happened."""
+    said = ("One of them spots you and points, exclaiming loudly, "
+            "'It's him! Thessaly Corr!'")
+    assert narration.misgendered(said, "Thessaly Corr", "she/her") == ["him"]
+
+    r = narration.review(said, pc_name="Thessaly Corr", pronouns="she/her")
+    assert any(f.kind == "misgendered-pc" for f in r.findings)
+    assert r.score > 1
+
+
+def test_a_pronoun_belonging_to_somebody_else_in_the_room_is_left_alone():
+    """The risk runs the other way too. "Thessaly nods and the trainer steps back as he
+    lowers his guard" has her name and a `he` a few words apart and is correct prose
+    about a different person, so a window containing another actor is not evidence."""
+    said = "Thessaly nods and the trainer steps back as he lowers his guard."
+    assert narration.misgendered(said, "Thessaly Corr", "she/her",
+                                 ("the trainer",)) == []
+
+
+def test_they_is_never_read_as_a_misgendering():
+    """"they" is what everybody calls a crowd. Counting it made "One of *them* spots you"
+    and "*They* shout that it is her" both report a misgendering in the very line that
+    gets her right, so only the opposite binary pronoun is evidence."""
+    for said in ("They shout that it is her, Thessaly Corr!",
+                 "The crowd part for Thessaly Corr and one of them cheers."):
+        assert narration.misgendered(said, "Thessaly Corr", "she/her") == [], said
+
+
+def test_it_works_the_other_way_round():
+    assert narration.misgendered("It's her! Borin Achereth!",
+                                 "Borin Achereth", "he/him") == ["her"]
+
+
+def test_a_set_the_rule_does_not_know_gets_no_opinion():
+    """A table that turned on ze/hir gets silence from this check rather than a wrong
+    answer: it has no way to know which words belong to it."""
+    said = "One of them points. 'It's him! Thessaly Corr!'"
+    assert narration.misgendered(said, "Thessaly Corr", "ze/hir") == []
+
+
+def test_no_literal_backspace_survived_in_the_source():
+    """Written into this module twice tonight through a shell heredoc, which is the trap
+    CLAUDE.md records: a regex needing a word boundary got a backspace byte instead and
+    silently matched nothing at all. The repair script that fixed it got mangled the same
+    way on its first run and replaced backspaces with backspaces."""
+    from pathlib import Path as _P
+
+    src = (_P(__file__).resolve().parents[1] / "gm" / "narration.py").read_bytes()
+    assert chr(8).encode() not in src
