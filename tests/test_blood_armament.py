@@ -190,3 +190,28 @@ def test_a_free_action_does_not_hand_the_round_to_the_enemy(tmp_path):
         assert after.scene.current_ref() == was_turn, "a free action passed the turn"
         assert after.scene.pc().has_condition("blood armament")
         cm._LIVE.clear()
+
+
+def test_a_toggle_never_names_a_bystander_as_its_target():
+    """Measured on a quiet step in Zhilvarnia, out of combat. Pressing the armament
+    toggle sent "I use Extracorporeal Blood Armament on the stranger sharing the step",
+    and the narrator wrote it exactly as it read: a claw held inches from the stranger's
+    face, the stranger flinching and nearly bolting. Forming a stance around your own
+    arm had become an act against a bystander.
+
+    The cause is that `foe` is "the first actor that is not the player and is still
+    standing" — the actor payload carries no hostility to test — so out of a fight it is
+    simply whoever else is in the scene. Pinned as source: the sentence is built in JS
+    and cannot be reached from here.
+    """
+    from pathlib import Path
+
+    tpl = (Path(__file__).resolve().parents[1]
+           / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    # A toggle is identifiable at the click, and the target is conditional on a fight.
+    assert 'data-toggle="${a.toggle ? "1" : "0"}"' in tpl
+    assert 'const fighting = !!(STATE.scene && STATE.scene.in_encounter);' in tpl
+    assert ('const aimed = (fighting && btn.dataset.toggle !== "1" && foe)'
+            ' ? ` on ${foe.name}` : "";') in tpl
+    # And the unconditional version is gone.
+    assert '`I use ${name}${foe ? " on " + foe.name : ""}.`' not in tpl

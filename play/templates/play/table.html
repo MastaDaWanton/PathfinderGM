@@ -1703,6 +1703,7 @@ function renderAbilities(s) {
   $("#abilities").innerHTML = `<div class="abrow-label">Your abilities</div>` +
     list.map(a => `<button class="abilitybtn${a.active ? " on" : ""}"
       data-ability="${esc(a.name)}"
+      data-toggle="${a.toggle ? "1" : "0"}"
       data-free="${(a.toggle || actionKind(a.text) === "free") ? "1" : "0"}"
       title="${esc(a.path)} · Control Blood ${a.tier}${
         a.toggle ? (a.active ? " · ACTIVE — click to dismiss" : " · off — click to form") : ""}${
@@ -1731,7 +1732,20 @@ document.addEventListener("click", async e => {
     finally { busy(false); }
     return;
   }
-  takeTurn({ text: `I use ${name}${foe ? " on " + foe.name : ""}.` }, false);
+  // Who, if anyone, this is aimed at. `foe` is "the first actor that is not the player
+  // and is still standing" — there is no hostility on the actor payload to test — so
+  // out of a fight it is whoever happens to be in the scene, and a toggle that arms
+  // your own body came out as an act against them. Measured on a quiet step in
+  // Zhilvarnia: forming the blood armament sent "I use Extracorporeal Blood Armament on
+  // the stranger sharing the step", and the narrator wrote it exactly as it read — the
+  // stranger flinched from a claw held inches from their face and nearly bolted.
+  //
+  // So: nobody is named outside a fight, because outside a fight there is no foe; and a
+  // toggle never names anybody, because entering a stance is not something you do to a
+  // person. Inside a fight an ordinary ability aims as it always did.
+  const fighting = !!(STATE.scene && STATE.scene.in_encounter);
+  const aimed = (fighting && btn.dataset.toggle !== "1" && foe) ? ` on ${foe.name}` : "";
+  takeTurn({ text: `I use ${name}${aimed}.` }, false);
 });
 
 // --- what the GM offered -----------------------------------------------------------
