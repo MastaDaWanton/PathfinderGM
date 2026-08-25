@@ -15,7 +15,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import judgement
+from gm import judgement, prompts
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -826,7 +826,25 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         return JsonResponse(_state(c))
 
     outcomes = [o for o in resolution.outcomes if o.tell]
-    if outcomes:
+    if getattr(agent, "intents_first", False):
+        # The experiment's other half: call 1 wrote no prose, so this call writes the
+        # whole turn — and it writes it knowing what the dice did. Runs whether or not
+        # there are tells, because a `narrate_only` turn with no prose is a blank page
+        # and most town turns are `narrate_only`.
+        brief = prompts.scene_brief(c.world, c.scene, c.location,
+                                    _recent_events(c.world, c.location))
+        earlier = [b["text"] for b in c.transcript[-8:] if b["who"] == "gm"]
+        try:
+            text, repairs, _ = agent.narrate_turn(
+                resolution.outcomes, player_input, brief, earlier)
+        except ModelUnavailable:
+            text, repairs = "", []
+        if not text:
+            text = " ".join(plain_tell(o.tell) for o in outcomes)
+        if text:
+            c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
+            c.history.append({"role": "assistant", "content": text})
+    elif outcomes:
         try:
             text, attempt = agent.narrate_outcome(narration, outcomes, player_input)
         except ModelUnavailable:

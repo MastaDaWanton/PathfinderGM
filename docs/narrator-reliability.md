@@ -136,6 +136,53 @@ like. It had never been told this was one.
 never asked the narrator to describe the player's body and no check would have scored it
 if they had. A clean number measures the checks, not the prose.
 
+## The experiment: intents first, prose after the dice
+
+Today one call returns narration and intents together, so **the prose is written before
+the dice are rolled**. Everything awkward in the turn descends from that: outcome claims
+have to be repaired because the model asserts results it cannot know; every retry
+regenerates a 600-character paragraph to fix a malformed `target` field; and `polish` is a
+second full call spent fixing prose written blind. One measured turn that resolved to
+`narrate_only` — nothing happened at all — cost 19.9s and two calls, plan 9.3 plus polish
+10.6.
+
+`GM_INTENTS_FIRST=1` swaps it: call 1 returns intents only, the engine resolves, and the
+prose call writes the whole turn knowing what happened. `_repair_outcome_claims` becomes
+unreachable rather than unnecessary.
+
+The counter-argument is why this is measured rather than argued: the narration may be
+doing real work as a reasoning scratchpad. Writing "you swing at the thug" before emitting
+`attack` is chain-of-thought, and on an 8B model splitting them could make the *intents*
+worse.
+
+Measured 2026-08-25, 20 turns per arm, `town`, llama3.1:8b, same machine.
+
+| arm | clean | mean | median | worst |
+|---|---|---|---|---|
+| baseline, prose first | 19/20 (95%) | 16.9s | 13.1s | 46.5s |
+| intents first | 19/20 (95%) | 26.8s | 19.2s | 77.4s |
+
+**Same correctness, and slower — the opposite of the prediction.** Nothing in the fault
+tally moved: one `turn-failed` each, no invented names, no third-person slips, no
+outcome claims in either arm. What did move is the clock, by about 60%.
+
+The reason is visible in the implementation rather than in the idea. The intents call
+still carries the whole call-one prompt — briefing, worked examples, the lot — and the
+prose call carries them again. Two long prompts where there was one, and on a local 8B
+that is most of the cost. An intents-only call has no use for the scene-writing examples
+at all, and stripping them is the obvious next thing to try.
+
+**A correction worth recording.** A first foreground sample read 42.2s and 64.2s and was
+reported as "much slower". It was contaminated: the 20-turn background arm was using the
+same GPU at the time. Two audits on one machine are not two independent measurements —
+the same class of mistake as the harness that scored a suspended roll as a turn that did
+nothing, and it took the full run to see it.
+
+So the split is **not adopted**. It costs 60% more wall-clock and buys nothing measurable
+on a 20-turn town script. What it would buy is structural — `_repair_outcome_claims`
+becomes unreachable rather than merely unnecessary — and that is worth revisiting once
+the intents call stops paying for examples it does not need.
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put
