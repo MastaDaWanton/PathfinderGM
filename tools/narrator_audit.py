@@ -77,10 +77,24 @@ SCRIPTS = {
 }
 
 
-def audit(turns: int, script: str, world: str, character: str) -> dict:
+def audit(turns: int, script: str, world: str, character: str,
+          model: str = "") -> dict:
     tally: collections.Counter = collections.Counter()
     rows: list[dict] = []
     lines = SCRIPTS[script]
+
+    # Swap the narrator for this run only, in memory. The user's own models.json is not
+    # touched: an audit that rewrites the player's settings is an audit nobody runs twice.
+    from play import modelcfg
+
+    real_for_role = modelcfg.for_role
+    if model:
+        def _override(role: str) -> dict:
+            cfg = dict(real_for_role(role))
+            if role in ("narrator", "prose"):
+                cfg["model"] = model
+            return cfg
+        modelcfg.for_role = _override
 
     with override_settings(CAMPAIGN_DIR=Path(os.environ.get("TEMP", "/tmp"))
                            / f"narrator-audit-{int(time.time())}"):
@@ -147,6 +161,7 @@ def audit(turns: int, script: str, world: str, character: str) -> dict:
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
         cm._LIVE.clear()
+    modelcfg.for_role = real_for_role
 
     clean = sum(1 for r in rows if not r["faults"])
     return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows}
@@ -170,11 +185,14 @@ def main() -> None:
     ap.add_argument("--script", choices=sorted(SCRIPTS), default="town")
     ap.add_argument("--world", default="")
     ap.add_argument("--character", default="fixtures/pc-kesst.json")
+    ap.add_argument("--model", default="",
+                    help="narrate with this model instead of the configured one")
     ap.add_argument("--json", default="", help="write the full run here")
     args = ap.parse_args()
 
     print(f"narrator audit: {args.turns} turns of '{args.script}'\n")
-    result = audit(args.turns, args.script, args.world, args.character)
+    result = audit(args.turns, args.script, args.world, args.character,
+                   args.model)
 
     turns = result["turns"] or 1
     print(f"\n{result['clean']}/{turns} turns clean "
