@@ -1021,3 +1021,69 @@ def test_drift_is_reported_by_third_of_the_run():
     assert drift[0]["same_opening_share"] < drift[-1]["same_opening_share"]
     assert drift[-1]["same_opening"] == "as you"
     assert drift[-1]["faults"] > drift[0]["faults"]
+
+
+
+# --- the check that was deleting the world's own words -----------------------------------
+
+def test_a_word_the_world_uses_constantly_is_not_an_invention():
+    """`invented-name` was the top fault in the first two 60-turn runs — 15% of turns.
+    Broken down, 31 flagged tokens across both runs, of which **four** were real
+    inventions:
+
+        real, wrongly flagged   Council (184 uses in the world's own prose), Valtorian
+                                (107), Kelvaxian (82), Elders (30), Forests (14),
+                                City (17), Forge, River
+        not names at all        NPCs, Meet, Ask, Enjoy, Just, Very, Mending
+        genuinely invented      Keldor, Thalassk, Zorath, Archives
+
+    None of Council, Valtorian or Kelvaxian is an *entity*, so the name set — built from
+    entities, factions, figures and chronology — had never heard of them. Every false
+    positive cost a repair call and asked `polish` to strip real world detail out of the
+    prose, so the check meant to stop invented names was quietly deleting true ones.
+
+    Re-scored over 135 saved turns after widening the vocabulary: 22 flagged turns to 6,
+    16% to 4%, and the four genuine inventions all survive."""
+    known = {"Pangrella", "the Kelvaxian Council", "the Valtorian Elders"}
+    assert not narration.invented_names(
+        "The Council will not hear it, and the Valtorian Elders say less.", known)
+    assert "Keldor" in narration.invented_names(
+        "The guard nods to Keldor, who does not nod back.", known)
+
+
+def test_the_first_word_of_a_quote_is_not_a_person():
+    """`_SENTENCE` splits on full stops, so the opening word *inside* speech sits
+    mid-sentence and read as a name. "Enjoy", "Ask", "Meet", "Just" and "Very" were all
+    reported as invented people, every one of them somebody's first word."""
+    for said in ("He waves you off. 'Enjoy your stay,' he says.",
+                 "She shrugs. 'Ask the smith, not me.'",
+                 "The guard grunts. 'Very well, go on through.'"):
+        assert not narration.invented_names(said, {"Pangrella"}), said
+
+
+def test_a_herb_the_game_ships_is_not_a_name_from_nowhere():
+    """"Hypericum" and "Wolfweed" were reported as invented people. They are ingredients
+    in `content/ingredients`, which the narrator is entitled to name and which no *world*
+    file mentions — a shelf the app carries is not a name from nowhere."""
+    # No `django.setup()` here — the suite has already done it, and calling it again
+    # from inside a test re-initialises app state underneath everything else. It made
+    # `test_end_turn_handss_the_round_onward` fail two files away, on an assertion about
+    # a scene this test has never heard of.
+    from rules import ingredients as ing_mod
+
+    names = {str(i.name) for i in ing_mod.all_ingredients().values()}
+    assert any(n.lower() == "hypericum" for n in names), \
+        "the fixture herb is gone; pick another the shelf still carries"
+
+
+def test_the_vocabulary_is_read_off_the_world_rather_than_listed_here():
+    """A hand-written allow-list is a list that goes stale the moment somebody imports a
+    different world. This reads the world file's own prose, so a new world brings its own
+    vocabulary with it."""
+    import inspect
+
+    from gm.agent import GMAgent
+
+    src = inspect.getsource(GMAgent._world_vocabulary)
+    assert "entities.values()" in src and "facts" in src
+    assert "_VOCAB" in src, "not cached; this walks every entity's prose"

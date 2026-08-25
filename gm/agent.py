@@ -9,6 +9,7 @@ Everything the model produces is checked in code before it touches the engine.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 
 from django.conf import settings
@@ -427,7 +428,67 @@ class GMAgent:
             names.add(world.name)
         except Exception:
             pass
+        # And every capitalised word the world's own prose uses. Titles alone are not the
+        # world's vocabulary: measured across two 60-turn runs, `invented-name` fired on
+        # 31 tokens and only four were real inventions. The rest were the world's own —
+        # Council (184 uses in its prose), Valtorian (107), Kelvaxian (82), Elders (30) —
+        # none of which is an *entity*, all of which the world says constantly.
+        #
+        # Every one of those cost a repair call and asked `polish` to strip real world
+        # detail out of the prose, so the check meant to stop invented names was quietly
+        # deleting true ones. 940 words for this world, and it contains none of Keldor,
+        # Thalassk or Zorath, which were the genuine inventions.
+        names |= self._world_vocabulary()
         return {n for n in names if n}
+
+    _VOCAB: dict[int, set[str]] = {}
+    _CAPITALISED = re.compile(r"\b[A-Z][a-zA-Z'’-]{2,}\b")
+
+    def _world_vocabulary(self) -> set[str]:
+        """Capitalised words the world file itself uses, cached per world.
+
+        Cached because it is a walk over every entity's prose and the answer only changes
+        when the world file does, which does not happen while the app is running.
+        """
+        world = self.world
+        key = id(world)
+        if key in GMAgent._VOCAB:
+            return GMAgent._VOCAB[key]
+
+        found: set[str] = set()
+        try:
+            chunks = [world.name or "", str(world.secret or "")]
+            chunks += [str(v) for v in (world.premise or {}).values()]
+            for e in world.entities.values():
+                chunks += [e.name or "", str(getattr(e, "summary", "") or ""),
+                           str(getattr(e, "prose", "") or "")]
+                chunks += [str(v) for v in (getattr(e, "facts", {}) or {}).values()]
+                for s in (getattr(e, "sections", []) or []):
+                    chunks.append(str(s if isinstance(s, str) else s.get("text", "")))
+            for chunk in chunks:
+                found |= set(GMAgent._CAPITALISED.findall(chunk))
+        except Exception:
+            pass
+        # And the things the game itself ships. "Hypericum" and "Wolfweed" were reported
+        # as invented people: they are herbs in `content/ingredients`, which the narrator
+        # is entitled to name and which no *world* file mentions. A shelf the app carries
+        # is not a name from nowhere.
+        try:
+            from rules import ingredients as ing_mod
+
+            for i in ing_mod.all_ingredients().values():
+                found |= set(GMAgent._CAPITALISED.findall(str(getattr(i, "name", ""))))
+        except Exception:
+            pass
+        try:
+            from rules import market as market_mod
+
+            for m in market_mod.everything_priced():
+                found |= set(GMAgent._CAPITALISED.findall(str(getattr(m, "name", ""))))
+        except Exception:
+            pass
+        GMAgent._VOCAB[key] = found
+        return found
 
     def _pc_pronouns(self) -> str:
         pc = self.engine.scene.pc()

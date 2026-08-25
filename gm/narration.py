@@ -780,6 +780,13 @@ def invented_names(text: str, known: set[str]) -> list[str]:
         if not tokens:
             continue
         first = sentence.strip().split(" ")[0].strip(".,!?;:'\"")
+        # A quote begins a sentence too. `_SENTENCE` splits on full stops, so the first
+        # word *inside* speech sits mid-sentence and was read as a name: measured across
+        # two 60-turn runs, "Enjoy", "Ask", "Meet", "Just" and "Very" were all reported as
+        # invented people, every one of them the opening word of somebody's line.
+        opens_speech = {
+            m.group(1) for m in re.finditer(r"[\"“”'‘’]\s*([A-Z][a-zA-Z'’-]{2,})",
+                                            sentence)}
         for tok in tokens:
             low = tok.lower()
             # The whole token first, so a name that owns its apostrophe survives: this
@@ -797,7 +804,7 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             # already known not to be a name is covered without enumerating them.
             if re.split(r"['’]", low)[0] in _NOT_A_NAME:
                 continue
-            if tok == first:                     # start of a sentence proves nothing
+            if tok == first or tok in opens_speech:   # a sentence start proves nothing
                 continue
             if low not in found:
                 found.append(tok)
