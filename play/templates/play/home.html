@@ -138,6 +138,10 @@
   #err { color: var(--alarm); min-height: 1.4em; margin-top: 12px; font-size: 14px; }
 
   .rows { max-height: 340px; overflow-y: auto; margin-top: 10px; }
+  /* The spell list is the bench's main content rather than a footnote, so it gets the
+     height for it — and it scrolls inside itself, because a list of 3,040 that grows the
+     page puts its own search box off the top of the screen the moment you use it. */
+  .rows.spellrows { max-height: calc(100vh - 430px); min-height: 260px; }
   .rows table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .rows td { padding: 4px 6px; border-bottom: 1px solid #241d15; }
   .rows td:nth-child(2) { color: var(--dim); width: 22%; }
@@ -987,10 +991,21 @@ function paneBuild(b) {
 async function repreview() {
   // The server validates and renders, so the card line here is the card line there.
   const flat = [];
+  // Which keys hold nested effects is asked of the catalogue rather than listed here.
+  // It used to read ["on_failure", "on_success"], which was every nesting there was —
+  // and the moment a type nested effects under any other name (a manifestation's
+  // on_enter, a choice's options, a bundle's effects) those children were drawn by
+  // `fieldHtml` and never previewed, so a nested effect with a problem showed a blank
+  // line and saved anyway. The form and the taxonomy read the same definition
+  // everywhere else; this was the one place they had drifted.
+  const nestedKeys = new Set();
+  for (const c of CAT.categories) for (const t of c.types) for (const f of t.fields) {
+    if (f.kind === "effects") nestedKeys.add(f.id);
+  }
   const walk = (list, prefix) => list.forEach((e, i) => {
     const path = prefix === "" ? String(i) : `${prefix}.${i}`;
     flat.push({ path, spec: e });
-    for (const key of ["on_failure", "on_success"]) {
+    for (const key of nestedKeys) {
       if (Array.isArray(e[key])) walk(e[key], `${path}.${key}`);
     }
   });
@@ -1047,7 +1062,7 @@ function paneSpells() {
     <p class="note" style="margin-bottom:0">${
       SPELLS ? `<b style="color:var(--ink)">${SPELLS.count}</b> shown` : "…"}</p>
   </div>
-  ${SPELLS ? `<div class="rows" style="max-height:none">
+  ${SPELLS ? `<div class="rows spellrows">
     <table>${SPELLS.spells.map(sp => `
       <tr class="open" data-spell="${esc(sp.id)}">
         <td>${esc(sp.name)}</td>
@@ -1076,6 +1091,11 @@ async function loadSpells() {
   render();
 }
 
+// Benches whose pane already lists their content. The generic `BENCH.rows` table is
+// suppressed for these: on the spells bench it was a second list of the same 3,040
+// spells, capped at the first 200 by name and wired to nothing.
+const OWN_LISTING = ["spells"];
+
 function paneHomebrew() {
   if (BENCH) {
     const b = BENCH.bench;
@@ -1098,7 +1118,7 @@ function paneHomebrew() {
       ${b.id === "spells" ? paneSpells() : ""}
       ${b.id === "rulesets" ? paneRules() : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
-      ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
+      ${(BENCH.rows.length && !OWN_LISTING.includes(b.id)) ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
              ${r.id ? `data-open="${esc(r.id)}"` : ""}>
            <td>${esc(r.name)}${r.unreviewed ? ` <span class="unread">unreviewed</span>` : ""}</td>
@@ -1108,7 +1128,7 @@ function paneHomebrew() {
           Editing something that ships writes your version alongside it — the shipped file
           is never changed, so a corrected table in a later build is not shadowed by a
           stale copy of yours.</p>` : ""}`
-        : `<p class="note">Nothing here yet.</p>`}`;
+        : (OWN_LISTING.includes(b.id) ? "" : `<p class="note">Nothing here yet.</p>`)}`;
   }
   return `<h2 class="sect">Workbenches</h2>
     <p class="note">Content you author sits over what ships, never replacing it. The rules
