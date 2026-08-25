@@ -213,7 +213,7 @@ def fix_hand_back(text: str) -> tuple[str, str]:
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
-           pronouns: str = '', others: tuple = ()) -> Review:
+           pronouns: str = '', others: tuple = (), gender: str = '') -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -374,6 +374,35 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         ))
         break
 
+    # 2c. The player's character given the wrong body. Separate from 2b and not reachable
+    #     from it: the paragraph that prompted this was in the second person from end to
+    #     end and contained no pronoun at all.
+    for part in wrong_body(text, gender):
+        out.findings.append(Finding(
+            "wrong-body", f"gives the player's character {part!r}",
+            f"The player's character is a {gender}. {part!r} is not part of her body — "
+            f"describe the one she has, or describe something else. This is not about "
+            f"which words you use for her; it is about what is there."
+            if str(gender).lower() == "woman" else
+            f"The player's character is a {gender}. {part!r} is not part of their body — "
+            f"describe the one they have, or describe something else.",
+            weight=3,
+        ))
+        break
+
+    # 7. The narrator writing itself into the scene. Measured in the same mirror beat:
+    #    "Lyra stands beside me... every detail of my image." Check 2 cannot see this —
+    #    it looks for the player's name, and there is no name here at all.
+    said = narrator_in_first_person(text)
+    if said:
+        out.findings.append(Finding(
+            "narrator-in-first-person", f"narrates as {', '.join(repr(s) for s in said)}",
+            f"You are not in this scene and you have no body in it. Nothing outside "
+            f"quoted speech may say {said[0]!r} — the player is 'you', everybody else "
+            f"has a name. Rewrite those clauses from the player's point of view.",
+            weight=2,
+        ))
+
     if alone:
         for phrase in invented_companions(text):
             out.findings.append(Finding(
@@ -456,6 +485,75 @@ def misgendered(text: str, pc_name: str, pronouns: str,
             if low in wrong and low not in found:
                 found.append(low)
     return found
+
+
+# --- the player's character, given the wrong body -------------------------------------
+#
+# Pronouns were never going to reach this and could not have. Measured in play: a
+# character whose sheet said they/them stood in front of a mirror and was narrated
+# "your eyes scan your face, noting the sharp lines of your jaw" and then "a faint,
+# intricate pattern etched into the surface of your pectoralis major muscles" — a man's
+# chest, in a paragraph containing no pronoun anywhere, because the narration is in the
+# second person and the second person has no gender in English.
+#
+# So the pronoun check above is structurally blind to it, the brief's one sentence about
+# pronouns had nothing to bite on, and the model wrote the body it defaults to. The
+# repair is in two halves: the brief now says what the character *is* in plain words
+# (`prompts.scene_brief`), and this catches it when that does not hold.
+#
+# Only anatomy that actually belongs to one body. "Jaw", "shoulders", "hands" and
+# "chest" are everybody's and are not evidence of anything — a check that flagged them
+# would fire on every correct description of a woman and make the prose worse for it.
+_MALE_BODY = (r"beards?|bearded|stubble|moustaches?|mustaches?|whiskers|sideburns"
+              r"|adam'?s apple|pectorals?|pectoralis|chest hair|manhood|penis|phallus"
+              r"|testicles?|scrotum")
+_FEMALE_BODY = (r"breasts?|bosom|cleavage|womb|uterus|vulva|vagina|ovaries"
+                r"|nipples? swell")
+_WRONG_BODY = {"woman": _MALE_BODY, "man": _FEMALE_BODY}
+
+# How far after "your" the part may sit. "the surface of your pectoralis major muscles"
+# is four words; a whole clause is too far and starts collecting other people's bodies.
+# Punctuation is excluded so the window cannot cross into the next sentence.
+_BODY_GAP = 40
+
+
+def wrong_body(text: str, gender: str) -> list[str]:
+    """Sex-specific anatomy handed to the player's character.
+
+    Second person only, because that is how the player's body is always described, and
+    because it is the case no pronoun rule can see. An unstated gender gets no opinion:
+    most of the bestiary has none and inventing one to check against would be the guess
+    this whole field exists to stop.
+    """
+    marks = _WRONG_BODY.get(str(gender or "").strip().lower())
+    if not marks or not text:
+        return []
+    found: list[str] = []
+    for m in re.finditer(rf"\byour\b([^.!?]{{0,{_BODY_GAP}}}?)\b({marks})\b", text, re.I):
+        # "your opponent's beard" is somebody else's face. A possessive inside the gap
+        # hands the part to whoever owns it, so the sentence stops being about the
+        # player at all.
+        if re.search(r"['’]s\b", m.group(1)):
+            continue
+        part = m.group(2).lower()
+        if part not in found:
+            found.append(part)
+    return found
+
+
+# --- the narrator becoming a character ------------------------------------------------
+#
+# Measured in the same mirror scene: "Lyra stands beside me, her gaze locked onto the
+# mirror, her eyes scanning every detail of my image." The narrator is not in the scene
+# and has no image. This is the third-person slip inverted — instead of pushing the
+# player out to arm's length it pulls the narrator in — and the existing check cannot see
+# it, because it looks for the player's *name* and there is none here.
+_FIRST_PERSON = re.compile(r"\b(?:i|me|my|mine|myself)\b")
+
+
+def narrator_in_first_person(text: str) -> list[str]:
+    """First-person words in narration. Dialogue is exempt — everybody says "I"."""
+    return sorted({m.group(0).lower() for m in _FIRST_PERSON.finditer(unquoted(text or ""))})
 
 
 # An ally the player has not got. Measured in the tavern: the killing blow came back as

@@ -513,50 +513,74 @@ def test_the_page_asks_before_it_deletes():
     assert 'c.active ? "" : `<button class="quiet danger"' in page
 
 
-def test_pronouns_are_asked_for_and_never_assumed():
+def test_gender_is_asked_for_and_never_assumed():
     """Reported from the roster: "she has also not been treated as a woman".
 
-    Thessaly Corr is a wizard with 66 turns played and `pronouns: they/them`, and so were
+    Thessaly Corr is a wizard with 66 turns played and `pronouns: they/them`, and so was
     every other character made through the forge — a roster of seven had two sets of real
     pronouns and both came off fixture files. The forge's form state carried a pronouns
     field and there was no input for it anywhere, so it defaulted, silently, every time.
 
-    The sheet carries pronouns precisely so the narrator does not guess; the bug that put
-    it there called one character "him" and "her" in consecutive sentences. A silent
-    default made it guess the same wrong thing instead. Same rule as a human placing
-    their +2: a choice that shapes the character is the player's to make."""
-    _, problems = creation.build(spec(pronouns=""))
-    assert any("Say which pronouns" in p for p in problems)
+    This screen asked for pronouns first and that was not enough, measured within the
+    hour: the same character stood in front of a mirror and was given a man's chest in a
+    paragraph written end to end in the second person, where no pronoun appears at all.
+    So the question is what they *are*, and the pronouns follow from it."""
+    _, problems = creation.build(spec(gender="", pronouns=""))
+    assert any("woman or a man" in p for p in problems)
 
-    built, problems = creation.build(spec(pronouns="she/her"))
+    built, problems = creation.build(spec(gender="woman", pronouns=""))
     assert problems == []
+    assert built["sheet"]["gender"] == "woman"
     assert built["sheet"]["pronouns"] == "she/her"
 
 
-def test_only_two_sets_are_offered_until_a_table_says_otherwise():
+def test_the_two_can_no_longer_disagree():
+    """"the fact that they are uncoupled is probably a part of the problem. a woman should
+    be referred to with the feminine pronouns and a man the masculine ones."
+
+    Two fields meant a save could hold both answers at once — Thessaly's did, a woman with
+    they/them beside her — and the narrator then had two sources to choose between."""
+    built, _ = creation.build(spec(gender="man", pronouns="she/her"))
+    assert built["sheet"]["pronouns"] == "he/him"
+
+
+def test_a_set_written_on_a_sheet_before_this_still_reads_back():
+    """Every character saved when the forge asked for pronouns says only that. she/her and
+    he/him each answer the new question on their own, so nothing on the roster needs a
+    migration to be understood — reading is not guessing."""
+    built, problems = creation.build(spec(gender="", pronouns="he/him"))
+    assert problems == []
+    assert built["sheet"]["gender"] == "man" and built["sheet"]["pronouns"] == "he/him"
+
+
+def test_only_two_are_offered_until_a_table_says_otherwise():
     """"male and female should be the only options default and we can add a way to
     create specific pronouns for fantasy/scify races, but should not be used unless
-    assigned by the user or set as active in a world"."""
+    assigned by the user or set as active in a world".
+
+    A turned-on set is offered as a gender rather than as a second question, because it
+    answers both at once — which is the whole reason the two were coupled."""
     from rules import houserules
 
-    assert creation.options()["pronouns"] == ["she/her", "he/him"]
+    assert creation.options()["genders"] == ["woman", "man"]
 
     houserules.set_active({"pronoun_sets": ["ze/hir"]})
     try:
-        assert creation.options()["pronouns"] == ["she/her", "he/him", "ze/hir"]
-        built, problems = creation.build(spec(pronouns="ze/hir"))
-        assert problems == [] and built["sheet"]["pronouns"] == "ze/hir"
+        assert creation.options()["genders"] == ["woman", "man", "ze/hir"]
+        built, problems = creation.build(spec(gender="ze/hir"))
+        assert problems == []
+        assert built["sheet"]["pronouns"] == "ze/hir"
+        assert built["sheet"]["gender"] == "ze/hir"
     finally:
         houserules.set_active({"pronoun_sets": []})
 
 
-def test_anything_the_player_writes_themselves_is_taken_as_given():
-    """The other half of "unless assigned by the user": a set nobody turned on is still
-    accepted when the player types it, because it is their character."""
-    built, problems = creation.build(spec(pronouns="they/them"))
-    assert problems == [] and built["sheet"]["pronouns"] == "they/them"
-    _, problems = creation.build(spec(pronouns="woman"))
-    assert any("is not a pronoun set" in p for p in problems)
+def test_a_gender_nothing_follows_from_is_refused():
+    """"elf" says nothing about which words to use, and the forge must not invent a set
+    for it — that is the guess the field exists to stop. The house rules are where a
+    world adds one, and a set there says both things at once."""
+    _, problems = creation.build(spec(gender="elf"))
+    assert any("Nothing follows from" in p for p in problems)
 
 
 def test_a_caster_may_not_walk_out_with_an_empty_spellbook():

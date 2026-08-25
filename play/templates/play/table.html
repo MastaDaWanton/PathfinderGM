@@ -2518,8 +2518,11 @@ async function openSheet() {
   }
   $("#sheetname").textContent = SHEET.identity.name;
   $("#sheetmeta").textContent =
+    // Gender and pronouns on the sheet, because the narrator reads both and a player
+    // who is being described wrongly needs somewhere to look and see what it was told.
     [SHEET.identity.heritage, SHEET.identity.race, SHEET.identity.class,
-     SHEET.identity.size].filter(Boolean).join(" · ");
+     SHEET.identity.size, SHEET.identity.gender,
+     SHEET.identity.pronouns].filter(Boolean).join(" · ");
   $("#sheettabs").innerHTML = TABS.map(([k, label]) =>
     `<button role="tab" data-tab="${k}" aria-selected="${k === SHEET_TAB}">${label}</button>`
   ).join("");

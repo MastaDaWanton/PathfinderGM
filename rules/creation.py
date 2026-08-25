@@ -22,7 +22,7 @@ import re
 
 from . import casting, classes as classes_mod, dice, feats as feats_mod, houserules
 from . import leveling
-from .sheet import from_dict
+from .sheet import from_dict, gender_from_pronouns, pronouns_for_gender
 from .tables import ARMOUR, SKILLS, WEAPONS
 
 # The Core Rulebook's seven. `mods` is what the race does to the scores; `any` means the
@@ -296,7 +296,11 @@ def options() -> dict:
         "ability_floor": ABILITY_FLOOR,
         "skills": sorted(SKILLS),
         "spells_known": SPELLS_KNOWN,
-        "pronouns": houserules.pronoun_sets(),
+        # What the forge asks. Woman and man, and then whatever sets this table has
+        # turned on — a set is offered here rather than in a second question because it
+        # answers both at once, which is the whole reason the two were coupled.
+        "genders": ["woman", "man"] + [p for p in houserules.pronoun_sets()
+                                       if p not in houserules.DEFAULT_PRONOUNS],
         # The full feat index, so the forge can offer a picker rather than a spelling
         # test. Names alone: the bench remains the place to read a feat in full.
         # 148 names collide with a Mythic Adventures twin — two rows both reading
@@ -358,22 +362,53 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     if spent > budget:
         problems.append(f"That spends {spent} of {budget} points.")
 
-    # Asked, never assumed. This defaulted to they/them and the forge had no field for
-    # it at all, so every character ever made through that screen was saved the same way
-    # regardless of who they were — a roster of seven had two sets of real pronouns and
-    # both came off fixture files. The sheet carries pronouns precisely so the narrator
-    # does not guess (the bug that added it called one character "him" and "her" in
-    # consecutive sentences), and a silent default made it guess the same wrong thing
-    # every time.
+    # One question, asked once, and the pronouns follow from it.
     #
-    # Same rule as a human placing their +2: a choice that shapes the character is the
-    # player's to make, and picking for them quietly is picking for them.
+    # It used to be the other way round: the forge asked for pronouns and nothing at all
+    # asked what the character *was*. That defaulted to they/them with no field anywhere,
+    # so every character made through that screen was saved identically regardless of who
+    # they were — a roster of seven had two sets of real pronouns and both came off
+    # fixture files.
+    #
+    # Asking for pronouns instead of gender did not fix it either, and the reason is
+    # measured: a character stood in front of a mirror and was given a man's chest in a
+    # paragraph written end to end in the second person — "your pectoralis major muscles"
+    # — where no pronoun appears at all, so the only fact the sheet held could not apply.
+    # Two uncoupled fields also let a save disagree with itself, which is exactly what
+    # happened: gender said one thing and the pronouns beside it said another, and the
+    # narrator had two answers to choose between.
+    #
+    # A woman is she/her and a man is he/him. A world of winged people or constructs
+    # turns its own set on in the house rules, and that set answers both questions at
+    # once — which is why picking one here is picking a gender, not a grammar.
+    said_gender = " ".join(str(payload.get("gender", "")).split()).lower()
     said_pronouns = " ".join(str(payload.get("pronouns", "")).split()).lower()
-    if not said_pronouns:
-        problems.append("Say which pronouns they use.")
-    elif "/" not in said_pronouns or len(said_pronouns) > 40:
+    # Whether the answer came from the player or was read off an older payload. It
+    # decides which of the two wins below, and getting it wrong made a stated gender of
+    # "elf" quietly keep whatever pronouns happened to be sitting beside it.
+    stated = bool(said_gender)
+    if not said_gender:
+        # A payload from before this field existed still says it, which is how the
+        # fixtures and the API keep working and how the roster reads back without a
+        # migration. Reading what the player already said is not guessing.
+        said_gender = gender_from_pronouns(said_pronouns) or said_pronouns
+    if not said_gender:
         problems.append(
-            f"{payload.get('pronouns')!r} is not a pronoun set; write them as 'she/her'.")
+            f"Say whether {name or 'this character'} is a woman or a man. The narration "
+            f"describes their body and chooses their pronouns from this, and left blank "
+            f"it will pick for them.")
+    elif len(said_gender) > 40:
+        problems.append(f"{payload.get('gender')!r} is too long to be a description.")
+
+    # The gender wins when the player stated one — that is the coupling. When it was only
+    # read off the pronouns, the pronouns are the thing that was actually said.
+    said_pronouns = (pronouns_for_gender(said_gender) or
+                     ("" if stated else said_pronouns))
+    if said_gender and not said_pronouns:
+        problems.append(
+            f"Nothing follows from {said_gender!r} about which words to use for them. "
+            f"Choose woman or man, or turn a pronoun set on in the house rules and pick "
+            f"that — a set says both things at once.")
 
     bonus_ab = str(payload.get("bonus_ability", "")).strip().lower()
     if race:
@@ -468,7 +503,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "name": name, "kind": "pc", "class": cid, "level": 1,
         "race": next(k for k, v in RACES.items() if v is race),
         "heritage": str(payload.get("heritage", "")).strip(),
-        "pronouns": said_pronouns,
+        "pronouns": said_pronouns, "gender": said_gender,
         "size": race["size"], "speed": race["speed"],
         "abilities": abilities,
         "ranks": {s: 1 for s in picked},

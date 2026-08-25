@@ -113,6 +113,29 @@ failure it was written to detect*. Corrected, that run is 49/50.
 A harness that can produce a false positive for the thing it measures is worth more
 scepticism than the number it prints. Re-derive a fault before believing it.
 
+### What 200 clean turns did not cover
+
+The day after that table was measured, a player asked her character to look in a mirror
+and got a man's chest back — "your pectoralis major muscles" — and, two sentences
+earlier, a narrator who had walked into the scene: "Lyra stands beside me... every detail
+of my image."
+
+Neither is in the table because nothing was looking for either. Both matter more than the
+percentage:
+
+**The second person hides gender completely.** Every check that had ever been written
+about who the player is worked on pronouns, and a paragraph addressed to "you" contains
+none. The sheet's one relevant fact could not apply to the sentence that got it wrong.
+The repair is in two halves — `prompts.scene_brief` now states in plain words what the
+character *is*, and `narration.wrong_body` catches anatomy that belongs to another body —
+and the first half is the one expected to do the work. The model knows what a woman looks
+like. It had never been told this was one.
+
+**A fault the harness cannot see is a fault that does not exist.** Two hundred turns of
+"no third-person slips" was true and meant less than it sounded, because the scripts
+never asked the narrator to describe the player's body and no check would have scored it
+if they had. A clean number measures the checks, not the prose.
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put

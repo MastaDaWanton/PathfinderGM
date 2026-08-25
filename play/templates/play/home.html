@@ -1353,9 +1353,14 @@ function featMatches() {
       x.prereq ? `<span>${esc(x.prereq)}</span>` : ""}</button>`).join("")}</div>`;
 }
 
+// The same two rows as `sheet.pronouns_for_gender`. A house-rule set is its own answer:
+// "ze/hir" is both what somebody is and what they are called, which is why it is offered
+// as a gender rather than as a second question.
+const PRONOUNS_FOR = { woman: "she/her", man: "he/him" };
+
 function forgeDefaults(opts) {
   return {
-    name: "", race: "", bonus_ability: "", heritage: "", pronouns: "",
+    name: "", race: "", bonus_ability: "", heritage: "", pronouns: "", gender: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     skills: [], feats: [], spellbook: [], paths: [],
   };
@@ -1425,22 +1430,27 @@ function paneForge() {
       <div><input type="text" data-cr="heritage" value="${esc(f.heritage)}"
         placeholder="Heritage — Zhilakai, Nahyrin… (optional)"></div>
     </div>
-    <!-- Asked, not guessed. the pronouns field was in the form's state and had no input
-         anywhere, so every character ever made through this screen was saved as
-         they/them: a roster of seven had two sets of real pronouns and both came from
-         fixture files. The sheet exists precisely so the narrator does not guess — the
-         bug it was added for was a character called "him" and "her" in consecutive
-         sentences — and an empty field made it guess the same wrong thing every time. -->
-    <p class="note" style="margin-top:12px">Their pronouns. The narration uses these
-      and nothing else reads them. Two are offered; a table that wants others turns them
-      on in the house rules, and anything written here is taken as given.</p>
+    <!-- One question, and the pronouns follow from it.
+         This screen used to ask for pronouns and never ask what the character was, and
+         two things went wrong with that. The field had no input at all for a long while,
+         so every character made here was saved as they/them regardless of who they were.
+         And when it did get one, it still could not reach the bug it was meant to: a
+         character stood in front of a mirror and was given a man's chest, in a paragraph
+         written end to end in the second person — "your pectoralis major muscles" —
+         where no pronoun appears anywhere for the field to have any effect on.
+         Uncoupled, the two could also disagree: a woman saved beside they/them gave the
+         narrator two answers to pick between. A woman is she/her; a man is he/him. -->
+    <p class="note" style="margin-top:12px">Whether they are a woman or a man. The
+      narration describes their body and takes their pronouns from this — a woman is
+      she/her, a man is he/him. A world with people this does not fit turns its own set
+      on in the house rules and it appears here.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${(opts.pronouns || ["she/her", "he/him"]).map(pr => `
-        <button class="quiet" data-crpronoun="${pr}" style="${
-          f.pronouns === pr ? "border-color:var(--accent);color:#f0dcae" : ""
-        }">${pr}</button>`).join("")}
-      <input type="text" data-cr="pronouns" value="${esc(f.pronouns)}"
-        placeholder="or write them" style="max-width:220px">
+      ${(opts.genders || ["woman", "man"]).map(g => `
+        <button class="quiet" data-crgender="${g}" style="${
+          f.gender === g ? "border-color:var(--accent);color:#f0dcae" : ""
+        }">${g}</button>`).join("")}
+      <span class="note">${f.gender
+        ? esc(PRONOUNS_FOR[f.gender] || f.gender) : "&nbsp;"}</span>
     </div>
 
     <h2 class="sect">Race</h2>
@@ -1754,8 +1764,14 @@ document.addEventListener("click", async e => {
     }
     const bonus = e.target.closest("[data-crbonus]");
     if (bonus) { f.bonus_ability = bonus.dataset.crbonus; render(); return; }
-    const pronoun = e.target.closest("[data-crpronoun]");
-    if (pronoun) { f.pronouns = pronoun.dataset.crpronoun; render(); return; }
+    const gender = e.target.closest("[data-crgender]");
+    if (gender) {
+      f.gender = gender.dataset.crgender;
+      // Kept in step here as well as on the server, so the sheet the player is shown
+      // never disagrees with the one that gets saved.
+      f.pronouns = PRONOUNS_FOR[f.gender] || f.gender;
+      render(); return;
+    }
     const addfeat = e.target.closest("[data-craddfeat]");
     if (addfeat) {
       f.feats = [...new Set([...f.feats, addfeat.dataset.craddfeat])];

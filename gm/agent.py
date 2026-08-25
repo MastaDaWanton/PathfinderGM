@@ -386,6 +386,11 @@ class GMAgent:
         pc = self.engine.scene.pc()
         return str(getattr(pc, "pronouns", "") or "") if pc else ""
 
+    def _pc_gender(self) -> str:
+        """What they are, which the second person never says. See `narration.wrong_body`."""
+        pc = self.engine.scene.pc()
+        return str(getattr(pc, "gender", "") or "") if pc else ""
+
     def _other_names(self) -> tuple:
         """Everybody in the scene who is not the player, so a pronoun near their name
         is not read as one of the player's."""
@@ -418,6 +423,7 @@ class GMAgent:
             known_names=self._known_names(), earlier=earlier,
             min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
             pronouns=self._pc_pronouns(), others=self._other_names(),
+            gender=self._pc_gender(),
         )
         if review.ok:
             return text, [], []
@@ -441,6 +447,7 @@ class GMAgent:
             known_names=self._known_names(), earlier=earlier,
             min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
             pronouns=self._pc_pronouns(), others=self._other_names(),
+            gender=self._pc_gender(),
         )
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
         # that had removed twenty of twenty-one borrowed phrases, and the plagiarised

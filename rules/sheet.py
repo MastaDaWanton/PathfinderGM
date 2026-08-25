@@ -193,6 +193,34 @@ class Reduction:
         return any(self.bypass.lower() == t.strip().lower() for t in traits)
 
 
+# The two sets that carry a body with them in ordinary English, and nothing else. A world
+# that turned on ze/hir gets an empty answer here rather than an invented one — the forge
+# asks in that case, which is the only honest way to find out.
+_IMPLIED_GENDER = {"she": "woman", "he": "man"}
+
+# The other direction, which is the one the forge uses. Keeping the two questions apart
+# was itself part of the bug: a character can be saved as a woman with they/them attached
+# and the narrator then has two sources disagreeing about her. A woman is "she", a man is
+# "he", and the table that wants anything else says so in the house rules — where the set
+# it turns on *is* the answer to both questions at once.
+_PRONOUNS_FOR = {"woman": "she/her", "man": "he/him",
+                 "female": "she/her", "male": "he/him"}
+
+
+def gender_from_pronouns(pronouns: str) -> str:
+    """"she/her" -> "woman". Anything else -> "", meaning nobody has said."""
+    first = str(pronouns or "").split("/")[0].strip().lower()
+    return _IMPLIED_GENDER.get(first, "")
+
+
+def pronouns_for_gender(gender: str) -> str:
+    """"woman" -> "she/her". A house-rule set like "ze/hir" is already its own answer."""
+    said = " ".join(str(gender or "").split()).lower()
+    if "/" in said:
+        return said
+    return _PRONOUNS_FOR.get(said, "")
+
+
 @dataclass
 class Actor:
     ref: str
@@ -358,6 +386,17 @@ class Actor:
     # Stated, never guessed. The model called Kesst "him" in one sentence and "her" in
     # the next because nothing on the sheet said, so it invented one each time.
     pronouns: str = "they/them"
+    # What the character *is*, as opposed to which words are used about them. These are
+    # two different facts and the sheet needed both, measured in play: a character whose
+    # narration was in the second person the whole time — "your jaw", "your pectoralis
+    # major muscles" — was described with a man's body, and no pronoun appeared anywhere
+    # in the paragraph for the pronouns field to have any effect on. The model was never
+    # told; it was only ever told which words to say when somebody spoke about her.
+    #
+    # A word, not a flag: "woman", "man", and whatever a world of winged people or
+    # constructs needs. Empty means unstated, which describes most of the bestiary and
+    # is not a thing to guess at.
+    gender: str = ""
 
     # NPC stat-block shortcuts. When present these replace *derivation*, not conditions.
     flat_skills: dict[str, int] = field(default_factory=dict)
@@ -2099,6 +2138,7 @@ def full_sheet(actor: Actor) -> dict:
             "race": actor.race,
             "heritage": actor.heritage,
             "pronouns": actor.pronouns,
+            "gender": actor.gender,
             "size": actor.size,
             "world_people_id": actor.world_people_id,
             "world_entity_id": actor.world_entity_id,
@@ -2339,6 +2379,7 @@ def to_dict(actor: Actor) -> dict:
                   for b in actor.buffs],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
+        "gender": actor.gender,
         "paths": list(actor.paths),
         "flat_skills": actor.flat_skills, "flat_saves": actor.flat_saves,
         "flat_ac": actor.flat_ac, "flat_attack": actor.flat_attack,
@@ -2663,6 +2704,11 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         race=data.get("race", "human"),
         paths=[str(p) for p in (data.get("paths") or [])],
         pronouns=data.get("pronouns", "they/them"),
+        # Every save written before the field existed still knows the answer, because
+        # she/her and he/him each imply one. Nothing else does, and an unrecognised set
+        # stays blank rather than being assigned a body by a lookup table.
+        gender=str(data.get("gender", "") or "").strip().lower()
+        or gender_from_pronouns(data.get("pronouns", "")),
         flat_skills={k.lower(): v for k, v in (data.get("flat_skills") or {}).items()},
         flat_saves=data.get("flat_saves") or {},
         flat_ac=data.get("flat_ac"),

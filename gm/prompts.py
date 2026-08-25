@@ -631,9 +631,19 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():
         if actor.is_pc:
+            # Both facts, in plain words. Pronouns alone were not enough and could not
+            # have been: measured in play on a character who stood in front of a mirror,
+            # the whole paragraph was in the second person — "your jaw", "your pectoralis
+            # major muscles" — so no pronoun appeared in it anywhere, and the only thing
+            # the brief had ever said about her was which pronouns to use *when somebody
+            # speaks about her*. Nothing said what she was, so the model wrote the body it
+            # defaults to. It knows what a woman looks like; it was never told this was one.
+            being = f", a {actor.gender}" if actor.gender else ""
+            body = (f" When the narration touches their body, it is a "
+                    f"{actor.gender}'s body." if actor.gender else "")
             lines.append(
-                f"  {ref} — {actor.name}, the player's character. Narrate to them as "
-                f"'you'; when someone speaks about them, {actor.pronouns}. "
+                f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
+                f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
                 f"{actor.hp}/{actor.hp_max} hp."
             )

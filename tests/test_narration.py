@@ -549,3 +549,94 @@ def test_no_literal_backspace_survived_in_the_source():
 
     src = (_P(__file__).resolve().parents[1] / "gm" / "narration.py").read_bytes()
     assert chr(8).encode() not in src
+
+
+
+# --- the wrong body --------------------------------------------------------------------
+
+# The mirror scene, recovered from the screenshot that reported it. Every line here is
+# what the model actually wrote.
+MIRROR = ("You approach a large, ornate mirror on the wall, and examine your reflection "
+          "from every angle. Your eyes scan your face, noting the sharp lines of your "
+          "jaw, the curve of your lips, and the piercing gaze that seems to bore into "
+          "those who meet your eye. Lyra stands beside me, her gaze locked onto the "
+          "mirror with a look of intense scrutiny, her eyes scanning every detail of my "
+          "image.")
+
+CHEST = ("Your gaze fixes on your chest, and you study it intently. The skin appears "
+         "smooth and unblemished, but as you examine it more closely, you notice a "
+         "faint, intricate pattern etched into the surface of your pectoralis major "
+         "muscles. Vorgath stands behind her, his arms crossed over his chest, a look "
+         "of interest etched on his face. What do you say?")
+
+
+def test_the_player_is_not_given_a_body_that_is_not_theirs():
+    """Reported from a screenshot. The character asked to inspect herself in a mirror and
+    the narration gave her "your pectoralis major muscles" — a man's bare chest.
+
+    No pronoun rule could have caught it and none ever will: the paragraph is written end
+    to end in the second person, and "you" has no gender in English. There is not one
+    pronoun in it for `misgendered` to look at."""
+    assert narration.wrong_body(CHEST, "woman") == ["pectoralis"]
+
+    r = narration.review(CHEST, pc_name="Thessaly Corr", pronouns="she/her",
+                         gender="woman", others=("Vorgath",))
+    assert [f.kind for f in r.findings] == ["wrong-body"]
+    assert r.score == 3
+
+
+def test_the_parts_everybody_has_are_not_evidence():
+    """The same paragraph says "the sharp lines of your jaw" and "your chest", and both
+    are perfectly good descriptions of a woman. A check that flagged them would fire on
+    every correct sentence in the file and make the prose worse for it."""
+    assert narration.wrong_body(MIRROR, "woman") == []
+    assert narration.wrong_body("Your chest aches and your shoulders burn.", "woman") == []
+
+
+def test_a_part_belonging_to_somebody_else_is_left_alone():
+    """"your opponent's beard" is a beard on another face. A possessive inside the gap
+    hands the part to whoever owns it and the sentence stops being about the player."""
+    said = "You duck under your opponent's beard and drive a fist into his ribs."
+    assert narration.wrong_body(said, "woman") == []
+
+
+def test_an_unstated_gender_gets_no_opinion():
+    """Most of the bestiary has none. Inventing one to check against would be the guess
+    the field exists to stop."""
+    assert narration.wrong_body(CHEST, "") == []
+    assert narration.wrong_body(CHEST, "ze/hir") == []
+
+
+def test_it_works_the_other_way_round_too():
+    said = "You catch sight of your breasts in the polished shield."
+    assert narration.wrong_body(said, "man") == ["breasts"]
+    assert narration.wrong_body(said, "woman") == []
+
+
+def test_a_breastplate_is_not_a_breast():
+    """Word boundaries, not substrings — the same trap `_example_bled` documents for
+    "sap" and "sapling". Half the armour in the game is a breastplate."""
+    assert narration.wrong_body("You buckle your breastplate tighter.", "man") == []
+
+
+# --- the narrator writing itself into the scene ------------------------------------------
+
+def test_the_narrator_does_not_stand_in_the_room():
+    """From the same mirror beat: "Lyra stands beside me, her gaze locked onto the mirror,
+    her eyes scanning every detail of my image." The narrator is not in the scene and has
+    no image in the mirror.
+
+    Check 2 cannot see this. It looks for the player's *name*, and there is no name in
+    the sentence at all — this is the third-person slip inverted, pulling the narrator in
+    rather than pushing the player out."""
+    assert narration.narrator_in_first_person(MIRROR) == ["me", "my"]
+
+    r = narration.review(MIRROR, pc_name="Thessaly Corr", pronouns="she/her",
+                         gender="woman", others=("Lyra",))
+    assert any(f.kind == "narrator-in-first-person" for f in r.findings)
+
+
+def test_everybody_is_allowed_to_say_i():
+    """Dialogue is exempt, or every NPC who opens their mouth becomes a finding."""
+    said = 'The guard shrugs. "I never saw him come through here," she says.'
+    assert narration.narrator_in_first_person(said) == []
