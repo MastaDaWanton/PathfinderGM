@@ -260,7 +260,7 @@ class GMAgent:
             # so "your pectoralis major muscles" reached the player for a second time.
             # Telling somebody their character has a body she does not have is not a
             # prose nit to lose a coin-toss over.
-            narration, swapped = narration_mod.neutralise_body(
+            narration, swapped = narration_mod.right_body(
                 narration, self._pc_gender())
             if swapped:
                 prose_repairs = prose_repairs + [

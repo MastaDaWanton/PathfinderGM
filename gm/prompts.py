@@ -608,6 +608,18 @@ If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} inte
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 
 
+# What the brief says about a body when the sheet names one of the two the app ships
+# with. Matter-of-fact and specific: this exists because "it is a woman's body" on its
+# own produced a narrator who described no body at all rather than the wrong one.
+_BODY_BRIEF = {
+    "woman": (" She is a woman and her body is a woman's — she has breasts, whatever "
+              "size, and no beard. Describe her as she is when the narration reaches "
+              "her; do not go vague to avoid it."),
+    "man": (" He is a man and his body is a man's. Describe him as he is when the "
+            "narration reaches him; do not go vague to avoid it."),
+}
+
+
 def scene_brief(world, scene, location, recent_events=None) -> str:
     """The world facts the GM may draw on this turn.
 
@@ -639,8 +651,15 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
             # speaks about her*. Nothing said what she was, so the model wrote the body it
             # defaults to. It knows what a woman looks like; it was never told this was one.
             being = f", a {actor.gender}" if actor.gender else ""
-            body = (f" When the narration touches their body, it is a "
-                    f"{actor.gender}'s body." if actor.gender else "")
+            # Said plainly, because vague is the failure mode. Told only "it is a woman's
+            # body", a model that has been stopped from writing the wrong chest writes no
+            # chest at all — "a woman should have breasts, whatever size they may be,
+            # otherwise its a man". So the brief names the thing rather than gesturing at
+            # it, and `narration.right_body` is the net under that, not the instruction.
+            body = _BODY_BRIEF.get(str(actor.gender).strip().lower(), "")
+            if not body and actor.gender:
+                body = (f" When the narration touches their body, it is a "
+                        f"{actor.gender}'s body.")
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "

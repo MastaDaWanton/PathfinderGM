@@ -659,13 +659,30 @@ def test_the_wrong_body_is_replaced_when_the_rewrite_does_not_hold():
     what must never ship anyway is fixed mechanically."""
     said = ("You notice that the intricate pattern etched into the surface of your "
             "pectoralis major muscles is more pronounced now.")
-    fixed, swapped = narration.neutralise_body(said, "woman")
+    fixed, swapped = narration.right_body(said, "woman")
     assert swapped == ["pectoralis"]
     assert "pectoralis" not in fixed
-    # The qualifier goes with the noun, or the swap leaves "your chest major muscles".
+    # The qualifier goes with the noun, or the swap leaves "your breasts major muscles".
     assert "major muscles" not in fixed
-    assert "the surface of your chest" in fixed
+    # And it asserts the right part rather than a neutral one. "a woman should have
+    # breasts, whatever size they may be, otherwise its a man" — the first version of
+    # this swapped every chest word for "chest", which stops the sentence being wrong
+    # without ever making it right and leaves the narrator permanently vague.
+    assert "the surface of your breasts" in fixed
     assert narration.wrong_body(fixed, "woman") == []
+
+
+def test_a_man_keeps_the_body_a_man_has():
+    said = "You catch sight of your breasts in the polished shield."
+    fixed, swapped = narration.right_body(said, "man")
+    assert swapped == ["breasts"] and "your chest" in fixed
+
+
+def test_a_woman_has_a_jaw_where_a_beard_would_be():
+    """Where there is nothing to assert, the true thing is still said. She has no beard;
+    she does have a jaw, and that is the place one would have been."""
+    fixed, swapped = narration.right_body("You scratch your beard.", "woman")
+    assert (fixed, swapped) == ("You scratch your jaw.", ["beard"])
 
 
 def test_the_backstop_leaves_somebody_elses_face_alone():
@@ -673,12 +690,12 @@ def test_the_backstop_leaves_somebody_elses_face_alone():
     shaved the beard off "your opponent's beard" — a face the detector had deliberately
     exempted, edited by the fix for a finding that was never raised."""
     said = "You duck under your opponent's beard and drive a fist into his ribs."
-    assert narration.neutralise_body(said, "woman") == (said, [])
+    assert narration.right_body(said, "woman") == (said, [])
 
 
 def test_the_backstop_has_no_opinion_without_a_gender():
     said = "You scratch your beard."
-    assert narration.neutralise_body(said, "") == (said, [])
+    assert narration.right_body(said, "") == (said, [])
 
 
 def test_the_backstop_is_wired_in_after_polish():
@@ -688,5 +705,5 @@ def test_the_backstop_is_wired_in_after_polish():
 
     src = (_P(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
         encoding="utf-8")
-    assert "narration_mod.neutralise_body(" in src
-    assert src.index("fix_hand_back(narration)") < src.index("neutralise_body(")
+    assert "narration_mod.right_body(" in src
+    assert src.index("fix_hand_back(narration)") < src.index("right_body(")
