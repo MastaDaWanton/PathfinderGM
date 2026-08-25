@@ -194,6 +194,36 @@ def die_label(spec) -> str:
     return f"d{spec}" if isinstance(spec, (int, float)) or str(spec).isdigit() else str(spec)
 
 
+def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list[str]:
+    """A legal opening spellbook for a class that needs one.
+
+    Only wizard, sorcerer and bard declare a `spells_known` cap; everybody else prepares
+    from the whole class list and is never asked. Chosen by name so the answer is stable
+    across builds rather than depending on however the corpus happens to be ordered.
+
+    Exists because a caster with an empty book is a character who cannot take their own
+    turn, and refusing to build one meant every generic "build every class" test needed
+    a legal book to hand.
+    """
+    from . import spells as spells_lib
+
+    cap_spec = SPELLS_KNOWN.get(cid)
+    if cap_spec is None:
+        return []
+    cap = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
+    if count is not None:
+        cap = min(cap, count)
+    out = []
+    for sid, sp in sorted(spells_lib.all_spells().items()):
+        level = sp.lists.get(cid)
+        if level is None or level > 1:
+            continue
+        out.append(sid)
+        if len(out) >= cap:
+            break
+    return out
+
+
 def starting_purse(cls: dict) -> dict[str, int]:
     """What a new character has to spend, rolled from the class's own declaration.
 
@@ -266,6 +296,7 @@ def options() -> dict:
         "ability_floor": ABILITY_FLOOR,
         "skills": sorted(SKILLS),
         "spells_known": SPELLS_KNOWN,
+        "pronouns": houserules.pronoun_sets(),
         # The full feat index, so the forge can offer a picker rather than a spelling
         # test. Names alone: the bench remains the place to read a feat in full.
         # 148 names collide with a Mythic Adventures twin — two rows both reading
@@ -326,6 +357,23 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     budget = houserules.point_budget()
     if spent > budget:
         problems.append(f"That spends {spent} of {budget} points.")
+
+    # Asked, never assumed. This defaulted to they/them and the forge had no field for
+    # it at all, so every character ever made through that screen was saved the same way
+    # regardless of who they were — a roster of seven had two sets of real pronouns and
+    # both came off fixture files. The sheet carries pronouns precisely so the narrator
+    # does not guess (the bug that added it called one character "him" and "her" in
+    # consecutive sentences), and a silent default made it guess the same wrong thing
+    # every time.
+    #
+    # Same rule as a human placing their +2: a choice that shapes the character is the
+    # player's to make, and picking for them quietly is picking for them.
+    said_pronouns = " ".join(str(payload.get("pronouns", "")).split()).lower()
+    if not said_pronouns:
+        problems.append("Say which pronouns they use.")
+    elif "/" not in said_pronouns or len(said_pronouns) > 40:
+        problems.append(
+            f"{payload.get('pronouns')!r} is not a pronoun set; write them as 'she/her'.")
 
     bonus_ab = str(payload.get("bonus_ability", "")).strip().lower()
     if race:
@@ -389,6 +437,14 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         cap = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
         if len(spellbook) > cap:
             problems.append(f"That is {len(spellbook)} spells against {cap} known.")
+        # And at least one. A wizard with an empty book is a character who cannot take
+        # their own turn: found on the roster as Thessaly Corr, a Wizard 1 with 66 turns
+        # played, three level-0 and two level-1 slots, save DCs of 13 and 14 — and no
+        # spells at all to put in them. Classes that prepare from the whole class list
+        # rather than a book declare no cap and are not asked.
+        if cap and not spellbook:
+            problems.append(
+                f"A {cid} begins knowing spells: choose up to {cap}.")
         from . import spells as spells_lib
 
         for sid in spellbook:
@@ -412,7 +468,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "name": name, "kind": "pc", "class": cid, "level": 1,
         "race": next(k for k, v in RACES.items() if v is race),
         "heritage": str(payload.get("heritage", "")).strip(),
-        "pronouns": str(payload.get("pronouns", "")).strip() or "they/them",
+        "pronouns": said_pronouns,
         "size": race["size"], "speed": race["speed"],
         "abilities": abilities,
         "ranks": {s: 1 for s in picked},

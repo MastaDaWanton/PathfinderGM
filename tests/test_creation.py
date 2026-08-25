@@ -19,7 +19,7 @@ from rules.sheet import from_dict
 
 def spec(**over):
     base = {
-        "name": "Durga Stonebrow", "race": "dwarf", "class": "fighter",
+        "name": "Durga Stonebrow", "race": "dwarf", "class": "fighter", "pronouns": "she/her",
         "abilities": {"str": 16, "dex": 14, "con": 14, "int": 10, "wis": 12, "cha": 8},
         "skills": ["climb", "intimidate"],
         "feats": ["power attack", "weapon focus"],
@@ -199,10 +199,11 @@ def test_every_kit_survives_the_sheet_validator():
     gear is a failing test rather than a corrupt character on disk."""
     for cid in creation.KITS:
         built, problems = creation.build({
-            "name": f"Kit test {cid}", "race": "elf", "class": cid,
+            "name": f"Kit test {cid}", "race": "elf", "class": cid, "pronouns": "she/her",
             "abilities": {"str": 14, "dex": 14, "con": 12, "int": 10,
                           "wis": 10, "cha": 10},
             "skills": [], "feats": [],
+            "spellbook": creation.starter_spells(cid, int_mod=1),
         })
         assert problems == [], (cid, problems)
         from_dict(built["sheet"])
@@ -383,9 +384,13 @@ def test_every_class_on_the_menu_can_actually_be_built():
         built, problems = creation.build({
             "name": f"Menu test {c['id']}", "race": "human", "bonus_ability": "con",
             "class": c["id"],
+            "pronouns": "she/her",
             "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
                           "wis": 12, "cha": 12},
             "skills": [], "feats": [],
+            # A caster with an empty book cannot take their own turn, so the menu walk
+            # gives each one a legal opening spellbook.
+            "spellbook": creation.starter_spells(c["id"], int_mod=1),
             # A class that declares branches must have one chosen; one that declares
             # none must carry none. Taking the first offered exercises both sides.
             "paths": creation.leveling.paths_for(c["id"])[:1],
@@ -506,3 +511,68 @@ def test_the_page_asks_before_it_deletes():
     assert "Keep them" in page
     # And the card you are playing offers no button at all.
     assert 'c.active ? "" : `<button class="quiet danger"' in page
+
+
+def test_pronouns_are_asked_for_and_never_assumed():
+    """Reported from the roster: "she has also not been treated as a woman".
+
+    Thessaly Corr is a wizard with 66 turns played and `pronouns: they/them`, and so were
+    every other character made through the forge — a roster of seven had two sets of real
+    pronouns and both came off fixture files. The forge's form state carried a pronouns
+    field and there was no input for it anywhere, so it defaulted, silently, every time.
+
+    The sheet carries pronouns precisely so the narrator does not guess; the bug that put
+    it there called one character "him" and "her" in consecutive sentences. A silent
+    default made it guess the same wrong thing instead. Same rule as a human placing
+    their +2: a choice that shapes the character is the player's to make."""
+    _, problems = creation.build(spec(pronouns=""))
+    assert any("Say which pronouns" in p for p in problems)
+
+    built, problems = creation.build(spec(pronouns="she/her"))
+    assert problems == []
+    assert built["sheet"]["pronouns"] == "she/her"
+
+
+def test_only_two_sets_are_offered_until_a_table_says_otherwise():
+    """"male and female should be the only options default and we can add a way to
+    create specific pronouns for fantasy/scify races, but should not be used unless
+    assigned by the user or set as active in a world"."""
+    from rules import houserules
+
+    assert creation.options()["pronouns"] == ["she/her", "he/him"]
+
+    houserules.set_active({"pronoun_sets": ["ze/hir"]})
+    try:
+        assert creation.options()["pronouns"] == ["she/her", "he/him", "ze/hir"]
+        built, problems = creation.build(spec(pronouns="ze/hir"))
+        assert problems == [] and built["sheet"]["pronouns"] == "ze/hir"
+    finally:
+        houserules.set_active({"pronoun_sets": []})
+
+
+def test_anything_the_player_writes_themselves_is_taken_as_given():
+    """The other half of "unless assigned by the user": a set nobody turned on is still
+    accepted when the player types it, because it is their character."""
+    built, problems = creation.build(spec(pronouns="they/them"))
+    assert problems == [] and built["sheet"]["pronouns"] == "they/them"
+    _, problems = creation.build(spec(pronouns="woman"))
+    assert any("is not a pronoun set" in p for p in problems)
+
+
+def test_a_caster_may_not_walk_out_with_an_empty_spellbook():
+    """Thessaly Corr again: a Wizard 1 with three level-0 and two level-1 slots, save DCs
+    of 13 and 14, and no spells at all to put in them — 66 turns of a character who could
+    not take her own turn. Only wizard, sorcerer and bard declare a cap; everybody else
+    prepares from the class list and is never asked."""
+    _, problems = creation.build(spec(
+        **{"class": "wizard"}, race="human", bonus_ability="int",
+        skills=["spellcraft"], feats=["toughness", "dodge"], spellbook=[]))
+    assert any("begins knowing spells" in p for p in problems)
+
+    _, problems = creation.build(spec(
+        **{"class": "wizard"}, race="human", bonus_ability="int",
+        skills=["spellcraft"], feats=["toughness", "dodge"],
+        spellbook=creation.starter_spells("wizard")))
+    assert problems == [], problems
+    # A fighter is not a caster and is not nagged about it.
+    assert creation.build(spec())[1] == []

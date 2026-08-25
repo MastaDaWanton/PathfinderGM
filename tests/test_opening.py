@@ -25,6 +25,7 @@ def test_first_level_takes_the_whole_die_and_never_rolls_it():
     built, problems = creation.build({
         "name": "Full Health", "race": "half-orc", "bonus_ability": "con",
         "class": "blood bending",
+        "pronouns": "she/her",
         "abilities": {"str": 10, "dex": 10, "con": 14, "int": 10, "wis": 10, "cha": 10},
         "skills": [], "feats": [], "paths": ["coagulator"],
     })
@@ -39,9 +40,10 @@ def test_first_level_takes_the_whole_die_and_never_rolls_it():
 ])
 def test_the_core_classes_take_their_own_die_whole(cid, die):
     built, problems = creation.build({
-        "name": f"Max {cid}", "race": "human", "bonus_ability": "str", "class": cid,
+        "name": f"Max {cid}", "race": "human", "bonus_ability": "str", "class": cid, "pronouns": "she/her",
         "abilities": {"str": 10, "dex": 10, "con": 10, "int": 10, "wis": 10, "cha": 10},
         "skills": [], "feats": [],
+        "spellbook": creation.starter_spells(cid),
     })
     assert problems == []
     assert built["sheet"]["hp"] == die       # Con 10 is no modifier either way

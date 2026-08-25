@@ -153,6 +153,7 @@ def test_every_scaffold_saves_loads_and_makes_a_character(kind, mine):
     built, problems = creation.build({
         "name": "Scaffold Test", "race": "human", "bonus_ability": "con",
         "class": entry["id"],
+        "pronouns": "she/her",
         "abilities": {"str": 12, "dex": 12, "con": 14, "int": 10, "wis": 12, "cha": 10},
         "skills": [], "feats": [],
         "paths": list(entry.get("paths") or {})[:1],
@@ -179,6 +180,7 @@ def test_a_scaffolded_class_levels_up_and_its_pool_formula_follows(mine):
     built, problems = creation.build({
         "name": "Storm Test", "race": "human", "bonus_ability": "wis",
         "class": "storm caller",
+        "pronouns": "she/her",
         "abilities": {"str": 10, "dex": 14, "con": 12, "int": 10, "wis": 14, "cha": 10},
         "skills": [], "feats": [], "paths": ["gale"],
     })
@@ -207,6 +209,7 @@ def test_the_path_scaffold_gates_its_abilities_by_tier(mine):
     built, _ = creation.build({
         "name": "Gale Test", "race": "human", "bonus_ability": "wis",
         "class": "storm caller",
+        "pronouns": "she/her",
         "abilities": {"str": 10, "dex": 14, "con": 12, "int": 10, "wis": 14, "cha": 10},
         "skills": [], "feats": [], "paths": ["gale"],
     })

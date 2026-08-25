@@ -1425,6 +1425,23 @@ function paneForge() {
       <div><input type="text" data-cr="heritage" value="${esc(f.heritage)}"
         placeholder="Heritage — Zhilakai, Nahyrin… (optional)"></div>
     </div>
+    <!-- Asked, not guessed. the pronouns field was in the form's state and had no input
+         anywhere, so every character ever made through this screen was saved as
+         they/them: a roster of seven had two sets of real pronouns and both came from
+         fixture files. The sheet exists precisely so the narrator does not guess — the
+         bug it was added for was a character called "him" and "her" in consecutive
+         sentences — and an empty field made it guess the same wrong thing every time. -->
+    <p class="note" style="margin-top:12px">Their pronouns. The narration uses these
+      and nothing else reads them. Two are offered; a table that wants others turns them
+      on in the house rules, and anything written here is taken as given.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${(opts.pronouns || ["she/her", "he/him"]).map(pr => `
+        <button class="quiet" data-crpronoun="${pr}" style="${
+          f.pronouns === pr ? "border-color:var(--accent);color:#f0dcae" : ""
+        }">${pr}</button>`).join("")}
+      <input type="text" data-cr="pronouns" value="${esc(f.pronouns)}"
+        placeholder="or write them" style="max-width:220px">
+    </div>
 
     <h2 class="sect">Race</h2>
     <div class="cards tight">${opts.races.map(r => `
@@ -1737,6 +1754,8 @@ document.addEventListener("click", async e => {
     }
     const bonus = e.target.closest("[data-crbonus]");
     if (bonus) { f.bonus_ability = bonus.dataset.crbonus; render(); return; }
+    const pronoun = e.target.closest("[data-crpronoun]");
+    if (pronoun) { f.pronouns = pronoun.dataset.crpronoun; render(); return; }
     const addfeat = e.target.closest("[data-craddfeat]");
     if (addfeat) {
       f.feats = [...new Set([...f.feats, addfeat.dataset.craddfeat])];

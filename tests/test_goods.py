@@ -375,6 +375,7 @@ def test_a_new_character_is_wearing_something():
     built, problems = creation.build({
         "name": "Clothed", "race": "half-orc", "bonus_ability": "str",
         "class": "fighter",
+        "pronouns": "she/her",
         "abilities": {"str": 14, "dex": 12, "con": 12, "int": 10, "wis": 10, "cha": 10},
         "skills": [], "feats": [],
     })
@@ -396,9 +397,11 @@ def test_every_class_walks_out_dressed():
         built, problems = creation.build({
             "name": f"Dressed {cid['id']}", "race": "human", "bonus_ability": "con",
             "class": cid["id"],
+            "pronouns": "she/her",
             "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
                           "wis": 12, "cha": 12},
             "skills": [], "feats": [], "paths": cid.get("paths", [])[:1],
+                "spellbook": creation.starter_spells(cid["id"]),
         })
         assert problems == [], (cid["id"], problems)
         actor = from_dict(built["sheet"])

@@ -54,7 +54,17 @@ ABILITY_CAPS = [
     {"cap": 0, "name": "No cap", "book": False},
 ]
 
-DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18}
+DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
+            "pronoun_sets": []}
+
+# What the character forge offers everybody. Two, because that is what the table asked
+# for: "male and female should be the only options default".
+#
+# Anything else is opt-in and arrives one of two ways — the player writes it themselves
+# in the free field, or the table turns a set on here, which is how a world of winged
+# people or constructs makes its own pronouns a first-class choice rather than a thing
+# every player has to retype. Nothing is offered by default that nobody asked for.
+DEFAULT_PRONOUNS = ("she/her", "he/him")
 
 
 def _path() -> Path:
@@ -84,6 +94,13 @@ def active() -> dict:
         out["magic_stacking"] = bool(raw.get("magic_stacking", False))
         if raw.get("ability_cap") in {c["cap"] for c in ABILITY_CAPS}:
             out["ability_cap"] = int(raw["ability_cap"])
+        # Re-read the same way it is written. `set_active` validated these on the way in,
+        # and a key this function does not name is silently dropped — which is the point
+        # of the whitelist and was why a saved set came back as the defaults.
+        sets = raw.get("pronoun_sets")
+        if isinstance(sets, (list, tuple)):
+            out["pronoun_sets"] = [" ".join(str(p).split()).lower() for p in sets
+                                   if str(p).strip()]
     return out
 
 
@@ -105,6 +122,29 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
             current["point_buy"] = points
     if "magic_stacking" in updates:
         current["magic_stacking"] = bool(updates["magic_stacking"])
+    if "pronoun_sets" in updates:
+        raw = updates["pronoun_sets"]
+        if isinstance(raw, str):
+            # Typed into a textarea, one per line or comma separated. Built with chr(10)
+            # rather than an escape: this line was written through a heredoc once and the
+            # backslash-n became a real newline in the source, which is the trap
+            # CLAUDE.md records for exactly this.
+            raw = raw.replace(",", chr(10)).split(chr(10))
+        if not isinstance(raw, (list, tuple)):
+            problems.append("Pronoun sets are a list of forms like 'ze/hir'.")
+        else:
+            kept = []
+            for one in raw:
+                said = " ".join(str(one).split()).strip().lower()
+                if not said:
+                    continue
+                if "/" not in said or len(said) > 40:
+                    problems.append(
+                        f"{one!r} is not a pronoun set; write them as 'ze/hir'.")
+                    continue
+                if said not in kept and said not in DEFAULT_PRONOUNS:
+                    kept.append(said)
+            current["pronoun_sets"] = kept
     if "ability_cap" in updates:
         allowed = {c["cap"] for c in ABILITY_CAPS}
         try:
@@ -133,3 +173,11 @@ def magic_stacking() -> bool:
 def ability_cap() -> int:
     """The highest a single score may be bought to. 0 means no ceiling."""
     return int(active()["ability_cap"])
+
+
+def pronoun_sets() -> list[str]:
+    """Every pronoun set the forge should offer: the two defaults, then any this table
+    has turned on. Order matters — the defaults come first because they are what most
+    characters use, and the rest are there because somebody asked for them."""
+    extra = active().get("pronoun_sets") or []
+    return list(DEFAULT_PRONOUNS) + [p for p in extra if p not in DEFAULT_PRONOUNS]

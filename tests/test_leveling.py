@@ -20,6 +20,7 @@ def bender(**over):
     base = {
         "name": "Path Test", "race": "half-orc", "bonus_ability": "con",
         "class": "blood bending",
+        "pronouns": "she/her",
         "abilities": {"str": 12, "dex": 12, "con": 14, "int": 10, "wis": 10, "cha": 10},
         "skills": [], "feats": [], "paths": ["battle blood"],
     }

@@ -25,7 +25,7 @@ def isolated(tmp_path, settings):
 
 def spec(**over):
     base = {
-        "name": "Tier Test", "race": "dwarf", "class": "fighter",
+        "name": "Tier Test", "race": "dwarf", "class": "fighter", "pronouns": "she/her",
         "abilities": {"str": 16, "dex": 14, "con": 14, "int": 10, "wis": 12, "cha": 8},
         "skills": ["climb", "intimidate"],
         "feats": ["power attack", "weapon focus"],
@@ -89,7 +89,7 @@ def test_a_mangled_rules_file_falls_back_to_the_book(isolated):
 def _actor():
     from rules.sheet import from_dict
 
-    return from_dict({"name": "Ward Test", "class": "fighter", "level": 1,
+    return from_dict({"name": "Ward Test", "class": "fighter", "pronouns": "she/her", "level": 1,
                       "abilities": {"str": 10, "dex": 10, "con": 10,
                                     "int": 10, "wis": 10, "cha": 10},
                       "hp": 10, "hp_max": 10})
@@ -132,8 +132,10 @@ def client(isolated):
 
 def test_the_rules_endpoint_round_trips(client):
     d = client.get("/api/homebrew/rules").json()
+    # `pronoun_sets` is empty until a table turns some on: the forge offers she/her and
+    # he/him to everybody, and anything else is opt-in.
     assert d["rules"] == {"point_buy": 20, "magic_stacking": False,
-                          "ability_cap": 18}
+                          "ability_cap": 18, "pronoun_sets": []}
     assert d["tiers"][-1]["points"] == 100
 
     r = client.post("/api/homebrew/rules",
@@ -141,7 +143,7 @@ def test_the_rules_endpoint_round_trips(client):
                     content_type="application/json")
     assert r.status_code == 200
     assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True,
-                                 "ability_cap": 18}
+                                 "ability_cap": 18, "pronoun_sets": []}
 
     r = client.post("/api/homebrew/rules", data=json.dumps({"point_buy": 37}),
                     content_type="application/json")
