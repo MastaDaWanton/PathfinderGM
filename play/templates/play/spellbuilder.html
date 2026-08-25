@@ -1,0 +1,259 @@
+{% load static %}
+<title>Spell builder — Pathfinder GM</title>
+<style>
+  /* The app's own vocabulary, taken from the craft bench and the class builder rather
+     than re-invented — a page that looks like a different application is the thing the
+     class-builder restyle was asked to fix, and this is its sibling. */
+  :root {
+    --ink: #e6dcc6; --dim: #9a8b6f; --gold: #d9c08a; --gold-dim: #7a6543;
+    --sunk: #0c0a08; --alarm: #6e1f1f; --brew: #6fcf8f;
+    --body: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --display: Cinzel, Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; height: 100vh; overflow: hidden;
+    color: var(--ink); font: 400 15px/1.55 var(--body);
+    background: url("{% static 'img/grimoire-leather.jpg' %}") center / cover fixed #1a140c;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; padding: 12px 26px;
+    border-bottom: 1px solid var(--gold-dim);
+    background: url("{% static 'img/card-leather.jpg' %}") center / cover #241d15;
+  }
+  header h1 {
+    margin: 0; color: var(--gold); font: 400 21px/1 var(--display);
+    letter-spacing: .16em; text-transform: uppercase;
+  }
+  header small { color: var(--dim); font-style: italic; }
+  header .spacer { flex: 1; }
+  a.back { color: var(--gold); text-decoration: none; font-size: 13px; }
+  a.back:hover { color: #ffe7b4; }
+
+  main { height: calc(100vh - 52px); overflow: auto; padding: 22px 26px 60px; }
+  /* The writing surface, matched to the class builder's `.leaf` rather than approximated:
+     card-leather at 400px with a dark wash over it. Tiling `leather-tile` raw came out
+     several shades too pale against this page, which is the kind of near-miss that makes
+     a sibling page read as a different application. */
+  .leaf {
+    max-width: 900px; margin: 0 auto; padding: 20px 26px 30px;
+    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+  }
+  h2.sect {
+    margin: 26px 0 4px; padding-bottom: 5px; color: var(--gold);
+    border-bottom: 1px solid #2b2319; font: 400 14px/1 var(--display);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  h2.sect:first-child { margin-top: 0; }
+  label { display: block; margin-top: 12px; color: var(--ink); font-size: 13.5px; }
+  .note { margin: 2px 0 0; color: var(--dim); font: italic 12.5px/1.4 var(--body); }
+  input[type=text], textarea, select {
+    width: 100%; margin-top: 4px; padding: 7px 9px; border-radius: 2px;
+    border: 1px solid rgba(150,120,60,.35); background: var(--sunk);
+    color: var(--ink); font: 400 14px/1.4 var(--body);
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }
+  textarea { min-height: 90px; resize: vertical; }
+  button {
+    padding: 7px 14px; border-radius: 2px; cursor: pointer;
+    border: 1px solid var(--gold-dim); color: var(--ink);
+    background: linear-gradient(#2a2114, #1a140c);
+    font: 400 13px/1 var(--body);
+  }
+  button:hover { border-color: var(--gold); color: #ffe7b4; }
+  button.go { color: var(--gold); }
+
+  /* The starting-point picker. Deliberately the first thing on the page: "fireball,
+     but…" is how almost every homebrew spell begins, and burying it under the form
+     would mean retyping thirty fields that already exist. */
+  .startfrom {
+    display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 6px; border-radius: 3px;
+    border: 1px solid var(--gold-dim);
+    background: linear-gradient(rgba(60,48,26,.4), rgba(32,25,14,.45));
+  }
+  .startfrom .grow { flex: 1; min-width: 220px; }
+  .startfrom label { margin-top: 0; }
+  .banner { margin: 10px 0 0; padding: 9px 12px; border-radius: 2px; font-size: 13.5px; }
+  .banner.ok { color: var(--brew); border-left: 3px solid var(--brew);
+               background: rgba(31,110,63,.12); }
+  .banner.bad { color: #d08a7c; border-left: 3px solid var(--alarm);
+                background: rgba(110,31,31,.14); }
+</style>
+
+<header>
+  <h1>Spell builder</h1>
+  <small>Every field a spell has. Start from one that exists, or from nothing.</small>
+  <span class="spacer"></span>
+  <a class="back" href="/">← the shelf</a>
+</header>
+
+<main>
+  <div class="leaf">
+    <!-- Start from an existing spell. Everything is copied except the name, because a
+         copied name would make Save overwrite the spell being learned from. -->
+    <div class="startfrom">
+      <div class="grow">
+        <label for="find">Start from an existing spell</label>
+        <p class="note">Copies everything except the name — that one is yours to give.</p>
+        <!-- The search box the picker needs rather than mentions. 3,040 spells do not
+             fit in a select, so the list is the first 400 by name: without a way to
+             narrow it, everything past "C" is unreachable. -->
+        <input type="text" id="find" placeholder="search by name — fireball, cure, wall">
+        <select id="pick" style="margin-top:6px">
+          <option value="">— begin with an empty spell —</option></select>
+      </div>
+      <button type="button" id="load">Load as a starting point</button>
+    </div>
+    <p class="note" id="pickcount"></p>
+    <div id="startnote"></div>
+
+    <div id="form"></div>
+
+    <div style="margin-top:22px;display:flex;gap:10px;align-items:center">
+      <button type="button" class="go" id="save">Save to my homebrew</button>
+      <button type="button" id="fresh">Start fresh</button>
+      <span id="msg"></span>
+    </div>
+    <div id="banner"></div>
+  </div>
+</main>
+
+<script>
+const STATE = {{ state_json|safe }};
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let DRAFT = {};
+let STARTED_FROM = "";
+
+function csrf() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : "";
+}
+
+// One field, drawn from the Kind's own declaration. Nothing here knows what a spell is:
+// adding a field to the registry entry makes it appear, which is the bargain that keeps
+// this form from drifting away from what the loader reads.
+function drawField(f) {
+  const v = DRAFT[f.name];
+  const val = v == null ? "" : (typeof v === "object" ? JSON.stringify(v, null, 1) : v);
+  const help = f.help ? `<p class="note">${esc(f.help)}</p>` : "";
+  const req = f.required ? ' <span style="color:var(--gold)">*</span>' : "";
+  if (f.type === "choice") {
+    const opts = (f.choices || []).map(c => {
+      const id = typeof c === "object" ? c.id : c;
+      const name = typeof c === "object" ? (c.name || c.id) : c;
+      return `<option value="${esc(id)}" ${String(id) === String(val) ? "selected" : ""}
+              >${esc(name)}</option>`;
+    }).join("");
+    return `<label>${esc(f.label)}${req}</label>${help}
+      <select data-f="${esc(f.name)}"><option value="">—</option>${opts}</select>`;
+  }
+  if (f.type === "textarea" || f.type === "effects" || typeof v === "object") {
+    return `<label>${esc(f.label)}${req}</label>${help}
+      <textarea data-f="${esc(f.name)}">${esc(val)}</textarea>`;
+  }
+  return `<label>${esc(f.label)}${req}</label>${help}
+    <input type="text" data-f="${esc(f.name)}" value="${esc(val)}">`;
+}
+
+function drawForm() {
+  $("#form").innerHTML = `<h2 class="sect">The spell</h2>`
+    + STATE.fields.map(drawField).join("\n");
+}
+
+document.addEventListener("input", e => {
+  const el = e.target.closest("[data-f]");
+  if (!el) return;
+  const name = el.dataset.f;
+  const raw = el.value;
+  // A field that held a list or a mapping goes back as one. Read as text it would be
+  // saved as the string "['fire']", which loads and is silently wrong.
+  if (el.tagName === "TEXTAREA" && raw.trim().startsWith("[")
+      || raw.trim().startsWith("{")) {
+    try { DRAFT[name] = JSON.parse(raw); return; } catch { /* still being typed */ }
+  }
+  DRAFT[name] = raw;
+});
+
+async function fillPicker(q) {
+  const d = await (await fetch(
+    "/api/spells/list" + (q ? `?q=${encodeURIComponent(q)}` : ""))).json();
+  $("#pick").innerHTML = `<option value="">— begin with an empty spell —</option>`
+    + d.spells.map(s =>
+        `<option value="${esc(s.id)}">${esc(s.name)} — ${esc(s.school)}</option>`).join("");
+  // Said in the picker's own note rather than in `#startnote`, which belongs to the
+  // "started from X" banner — writing both to one element meant loading a spell wiped
+  // the count and the count wiped the banner.
+  $("#pickcount").textContent = d.total > d.spells.length
+    ? `Showing ${d.spells.length} of ${d.total} — search to narrow it.`
+    : `${d.total} spell${d.total === 1 ? "" : "s"}.`;
+}
+
+let _findTimer = null;
+document.addEventListener("input", e => {
+  if (!e.target.closest("#find")) return;
+  clearTimeout(_findTimer);
+  _findTimer = setTimeout(() => fillPicker(e.target.value.trim()), 250);
+});
+
+$("#load").addEventListener("click", async () => {
+  const id = $("#pick").value;
+  if (!id) { DRAFT = {}; STARTED_FROM = ""; drawForm(); return; }
+  try {
+    const d = await (await fetch(`/api/spells/start/${encodeURIComponent(id)}`)).json();
+    DRAFT = d.draft || {};
+    STARTED_FROM = d.started_from || "";
+    drawForm();
+    $("#startnote").innerHTML = `<div class="banner ok">Started from <b>${
+      esc(STARTED_FROM)}</b>. Everything was copied except the name — give it one and it
+      becomes a spell of your own. ${esc(STARTED_FROM)} itself is untouched.</div>`;
+    $("#banner").innerHTML = "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) { $("#banner").innerHTML = `<div class="banner bad">${esc(err.message)}</div>`; }
+});
+
+$("#fresh").addEventListener("click", () => {
+  DRAFT = {}; STARTED_FROM = "";
+  drawForm();
+  $("#startnote").innerHTML = "";
+  $("#banner").innerHTML = "";
+  $("#pick").value = "";
+});
+
+$("#save").addEventListener("click", async () => {
+  $("#banner").innerHTML = "";
+  try {
+    const r = await fetch("/api/spells/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify(DRAFT),
+    });
+    const raw = await r.text();
+    let d;
+    try { d = JSON.parse(raw); }
+    catch { throw new Error(`The server failed (HTTP ${r.status}).`); }
+    if (!r.ok) {
+      const list = (d.problems || [d.error]).map(p => `<li>${esc(p)}</li>`).join("");
+      $("#banner").innerHTML = `<div class="banner bad">This spell cannot be saved yet:
+        <ul style="margin:6px 0 0">${list}</ul></div>`;
+      return;
+    }
+    $("#banner").innerHTML = `<div class="banner ok">Saved. It is castable now, and it
+      will show on the spells shelf marked as yours.</div>`;
+    fillPicker();
+  } catch (err) {
+    $("#banner").innerHTML = `<div class="banner bad">${esc(err.message)}</div>`;
+  }
+});
+
+drawForm();
+fillPicker();
+</script>

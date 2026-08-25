@@ -1086,17 +1086,18 @@ function paneHomebrew() {
       <p class="note"><b style="color:var(--ink)">${b.yours || "nothing"}</b> authored by
         you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
-      ${b.id === "spells" ? paneSpells() : ""}
-      ${b.id === "rulesets" ? paneRules() : ""}
-      ${b.builder === "effects" ? paneBuild(b) : ""}
       ${b.builder === "page" ? `<p class="note"><a style="display:inline-block;
         padding:8px 14px;border:1px solid var(--gold-dim);border-radius:2px;
         color:var(--gold);text-decoration:none;cursor:pointer;
         background:linear-gradient(#2a2114,#1a140c)"
-        href="${esc(b.builder_url)}">Open the class builder →</a></p>
-        <p class="note">A class is a level table, a set of features and — if it wants
-        them — paths with tiered abilities. Too much shape for the form the other
-        benches share, so it has a page of its own.</p>` : ""}
+        href="${esc(b.builder_url)}">${b.id === "spells"
+          ? "Write a spell →" : "Open the class builder →"}</a></p>
+        <p class="note">${b.id === "spells"
+          ? "Every field a spell has, on a page of its own — and you can start from any spell that already exists rather than typing thirty fields again."
+          : "A class is a level table, a set of features and — if it wants them — paths with tiered abilities. Too much shape for the form the other benches share, so it has a page of its own."}</p>` : ""}
+      ${b.id === "spells" ? paneSpells() : ""}
+      ${b.id === "rulesets" ? paneRules() : ""}
+      ${b.builder === "effects" ? paneBuild(b) : ""}
       ${BENCH.rows.length ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
              ${r.id ? `data-open="${esc(r.id)}"` : ""}>

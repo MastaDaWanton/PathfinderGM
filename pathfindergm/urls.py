@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.staticfiles.views import serve as static_serve
 from django.urls import path, re_path
 
-from play import class_views, craft_views, home_views, views
+from play import class_views, spell_views, craft_views, home_views, views
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -42,6 +42,11 @@ urlpatterns = [
     path("api/bench/<str:bench_id>/open/<str:thing_id>", home_views.open_thing,
          name="open_thing"),
     path("api/bench/<str:bench_id>/save", home_views.save_thing, name="save_thing"),
+    # These three sit above `api/spells/<spell_id>` deliberately: Django takes the first
+    # match, and that pattern happily reads "list" and "save" as the name of a spell.
+    path("api/spells/list", spell_views.spell_list, name="spell_list"),
+    path("api/spells/start/<str:spell_id>", spell_views.spell_start, name="spell_start"),
+    path("api/spells/save", spell_views.spell_save, name="spell_save"),
     path("api/spells", home_views.spell_search, name="spell_search"),
     path("api/spells/<str:spell_id>", home_views.spell_detail, name="spell_detail"),
     path("api/craft/ingredients", craft_views.craft_ingredients, name="craft_ingredients"),
@@ -60,6 +65,7 @@ urlpatterns = [
     # form: its level table and its paths are repeating structures, and the effect
     # builder's one-card-per-thing shape cannot hold either.
     path("homebrew/classes/", class_views.class_builder, name="class_builder"),
+    path("homebrew/spells/", spell_views.spell_builder, name="spell_builder"),
     path("api/classes/catalogue", class_views.class_catalogue, name="class_catalogue"),
     path("api/classes/scaffold/<str:kind>", class_views.class_scaffold,
          name="class_scaffold"),

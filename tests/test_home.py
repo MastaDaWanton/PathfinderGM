@@ -389,3 +389,44 @@ def test_the_shelf_can_be_reread_without_reloading_the_page(client):
     before = len(client.get("/api/worlds").json()["worlds"])
     _upload(client, "another.json", _export("Another"))
     assert len(client.get("/api/worlds").json()["worlds"]) == before + 1
+
+
+def test_the_spells_bench_sends_you_to_the_spell_builder(client):
+    """The spell form was a panel underneath a 3,040-row browse table — you reached the
+    Name field by scrolling past every spell in the game, and the two halves fought over
+    one screen. It has a page of its own now, and the bench's job is the way in."""
+    d = client.get("/api/bench/spells").json()
+    assert d["bench"]["builder"] == "page"
+    assert d["bench"]["builder_url"] == "/homebrew/spells/"
+
+
+def test_starting_from_a_spell_copies_everything_but_the_name(client):
+    """The one field that must not be inherited. A copied name would make Save overwrite
+    the spell the author was learning from, which is the single mistake a
+    start-from-this feature can make that destroys somebody else's work."""
+    d = client.get("/api/spells/start/fireball").json()
+    draft = d["draft"]
+    assert d["started_from"] == "Fireball"
+    assert draft["name"] == ""                    # empty, not absent
+    assert "id" not in draft
+    assert draft["school"] == "evocation"         # and everything else came along
+    assert draft["saving_throw"].lower().startswith("reflex")
+
+
+def test_the_picker_can_reach_a_spell_past_the_first_four_hundred(client):
+    """The list is capped so a select is not a megabyte, which put everything after "C"
+    out of reach — the page said "type in the box to narrow it" while having no box.
+    Fireball is the proof: it is nowhere near the first 400 by name."""
+    plain = client.get("/api/spells/list").json()
+    assert plain["total"] == 3040
+    assert "fireball" not in {s["id"] for s in plain["spells"]}
+
+    found = client.get("/api/spells/list?q=fireball").json()
+    assert "fireball" in {s["id"] for s in found["spells"]}
+
+
+def test_the_literal_spell_routes_are_not_read_as_spell_names(client):
+    """`api/spells/<spell_id>` already existed, and Django takes the first match — so
+    /api/spells/list came back 404 "no spell 'list'". Ordering, pinned."""
+    assert client.get("/api/spells/list").status_code == 200
+    assert client.get("/api/spells/fireball").status_code == 200

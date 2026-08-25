@@ -62,7 +62,8 @@ def _count(name: str, key: str) -> int:
 # Benches whose authoring lives on a page of its own rather than in the generated
 # form. Keyed by bench id, valued by the URL. One entry today; a second kind with
 # repeating structure would be one line here rather than a branch in the template.
-PAGE_BUILDERS = {"classes": "/homebrew/classes/"}
+PAGE_BUILDERS = {"classes": "/homebrew/classes/",
+                 "spells": "/homebrew/spells/"}
 
 
 @dataclass
