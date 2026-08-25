@@ -173,3 +173,34 @@ def test_a_new_day_restocks_the_stall(client):
                     data=json.dumps({"action": "blacksmith:buy"}),
                     content_type="application/json")
     assert r.status_code == 200, r.content[:200]
+
+
+def test_there_is_no_stall_in_an_empty_field(client):
+    """Measured in play. Grist walked out of Zhilvarnia into open grassland — `travel`
+    moved the biome and shed the bystander correctly — and all five "buy" cards were
+    still offered, because `_at_market` read only the location's *kind* and `travel`
+    never touches `location_id`. The scene still pointed at a CITY, so an ironmonger
+    sold Iron to a character with nothing around them but grass."""
+    c = cm.current()
+    c.scene.pc().purse = {"gp": 500}
+    c.scene.biome = "urban"
+    c.save()
+    d = client.get("/api/craft/actions").json()
+    markets = [a for a in d["actions"] if a["requires"] == "market"]
+    assert markets, "no market excursions at all"
+    assert all(a["available"] for a in markets), "cannot buy in town"
+
+    c = cm.current()
+    c.scene.biome = "grassland"                 # walked out past the walls
+    c.save()
+    d = client.get("/api/craft/actions").json()
+    markets = [a for a in d["actions"] if a["requires"] == "market"]
+    assert all(not a["available"] for a in markets), "a stall in an empty field"
+    assert all("nobody here selling" in a["why"] for a in markets)
+
+    # And the endpoint refuses it, not just the button.
+    r = client.post("/api/craft/excursion",
+                    data=json.dumps({"action": "blacksmith:buy"}),
+                    content_type="application/json")
+    assert r.status_code == 409
+    assert "nobody here selling" in r.json()["error"]

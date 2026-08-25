@@ -782,10 +782,24 @@ def _at_market(c) -> bool:
     Read off the world's own entity kind rather than a list of place names: World Bible
     says what a settlement is, and a second opinion here would disagree with it the
     first time somebody wrote a new kind of town.
+
+    The ground has to agree. `travel` moves `scene.biome` and never touches
+    `location_id` — it does not know where you went, only what you are standing on — so
+    walking out of Zhilvarnia into open grassland left the scene still pointing at a
+    CITY. Measured in play: out in empty scrub, miles from the walls, all five market
+    cards were offered, and an ironmonger sold Iron to a character with nothing around
+    them but grass.
+
+    Requiring urban ground as well is deliberately the fail-safe direction. A coastal
+    fishing village whose own biome is `coast` would be refused here, which costs the
+    player a `travel` to say they have gone into the streets; the other way round the
+    world contains a stall wherever anybody happens to be standing.
     """
     loc = getattr(c, "location", None)
     kind = str(getattr(loc, "kind", "") or "").upper()
-    return kind in ("CITY", "TOWN", "VILLAGE", "SETTLEMENT")
+    if kind not in ("CITY", "TOWN", "VILLAGE", "SETTLEMENT"):
+        return False
+    return str(getattr(c, "biome", "") or "").strip().lower() == "urban"
 
 
 def _excursions(c) -> list[dict]:
