@@ -176,9 +176,19 @@ def credit(purse: dict, amount_cp: int) -> dict:
 
     The counterpart to `spend`. There was no public one until treasure started coming
     off the fallen, because until then nothing in the game ever paid the player.
+
+    The *whole* purse is recounted, not just the coin arriving. `_add_change` only ever
+    carried the new amount, so what was already there kept its shape and the piles grew
+    sideways: measured in play after two sales, Thessaly's purse read
+
+        {'gp': 9, 'sp': 18, 'cp': 12}
+
+    which is eighteen silver pieces and twelve coppers — 1,092 copper written in a way
+    no purse in the world has ever been counted. Nobody carries twelve coppers when ten
+    of them are a silver.
     """
-    return _add_change({c: int(n) for c, n in (purse or {}).items() if int(n) > 0},
-                       max(0, int(amount_cp)))
+    total = in_copper(purse) + max(0, int(amount_cp))
+    return _add_change({}, total)
 
 
 def coins_for(amount_cp: int) -> dict:

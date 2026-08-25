@@ -889,6 +889,22 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     (r"\bdc\s*\d+", "states a DC in prose; the DC belongs in the intent"),
     (r"\broll(?:s|ed)? a\s*\d+", "states a die result"),
     (r"\bnatural (?:20|one|1)\b", "states a die result"),
+    # Money. The same failure as a damage number, and it arrived the first time a sale
+    # was played through the narrator rather than the counter. The engine priced the jar
+    # and credited the purse; the prose, in the same turn, had the stallholder *charging*
+    # her — "'That'll be 5 silver crescents, please.' As you hand over your payment..."
+    # — and the consequence beat carried on with "you hand over more coins than she asked
+    # for". The direction of the transaction was inverted and the sum invented, while the
+    # engine's own tell said she had been paid.
+    #
+    # What a price *is* in this app is `rules.pricing`'s answer, arrived at from tier and
+    # potency, and the narrator has no way to know it. Sums are the engine's to state.
+    (r"\b\d+\s*(?:gold|silver|copper|platinum)\b", "states a sum of money"),
+    (r"\b\d+\s*(?:gp|sp|cp|pp)\b", "states a sum of money"),
+    (r"\bthat'?ll be\b|\bthat will be\b|\bcosts? you\b|\bfor the price of\b",
+     "states a price"),
+    (r"\bhand(?:s|ing)? over (?:your|the) (?:payment|coins?|money|purse)\b",
+     "states the player paying"),
 ]
 
 OUTCOME_RE = [(re.compile(p, re.IGNORECASE), why) for p, why in _OUTCOME_PATTERNS]

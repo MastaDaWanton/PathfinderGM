@@ -439,6 +439,14 @@ class GMAgent:
         # deleting true ones. 940 words for this world, and it contains none of Keldor,
         # Thalassk or Zorath, which were the genuine inventions.
         names |= self._world_vocabulary()
+        # And what the player is actually carrying. "Musk Muddle Tincture" is a jar in
+        # her own satchel, and `Tincture` was reported as a person the moment she sold
+        # one — the catalogue vocabulary covers materials the world sells, not things a
+        # character crafted, and the narrator is entitled to name what it can see.
+        for actor in self.engine.scene.actors.values():
+            for item in (getattr(actor, "stock", {}) or {}).values():
+                names.add(str(getattr(item, "name", "")))
+                names.add(str(getattr(item, "base", "")))
         return {n for n in names if n}
 
     _VOCAB: dict[int, set[str]] = {}

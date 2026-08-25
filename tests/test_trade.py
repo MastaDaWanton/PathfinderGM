@@ -524,3 +524,79 @@ def test_the_guard_is_one_helper_and_not_four_copies():
     for door in ("def trade_do", "def use_item", "def combat_act"):
         body = src.split(door, 1)[1][:1600]
         assert "_cannot_act(" in body, f"{door} does not ask whether the player can act"
+
+
+
+# --- what a played sale actually did ------------------------------------------------------
+
+def test_a_purse_carries_rather_than_growing_sideways():
+    """Measured in play, after two sales through the counter and one through the narrator:
+
+        {'gp': 9, 'sp': 18, 'cp': 12}
+
+    Eighteen silver pieces and twelve coppers. 1,092 copper written in a way no purse in
+    the world has ever been counted — nobody carries twelve coppers when ten of them are
+    a silver.
+
+    `credit` called `_add_change` on the existing purse, which only ever carried the coin
+    *arriving*. Whatever was already there kept its shape, so the piles grew sideways
+    every time somebody was paid."""
+    from rules import goods
+
+    broken = {"gp": 9, "sp": 18, "cp": 12}
+    assert goods.in_copper(broken) == 1092
+    recounted = goods.credit(broken, 0)
+    assert goods.in_copper(recounted) == 1092, "recounting changed the money"
+    assert all(n < 10 for cid, n in recounted.items() if cid != "pp"), recounted
+
+    # And it stays counted as it grows.
+    purse = {}
+    for _ in range(30):
+        purse = goods.credit(purse, 37)
+    assert goods.in_copper(purse) == 30 * 37
+    assert all(n < 10 for cid, n in purse.items() if cid != "pp"), purse
+
+
+def test_the_narration_may_not_name_a_price():
+    """The first sale played through the narrator rather than the counter. The engine
+    priced the jar and credited the purse; the prose, in the same turn, had the
+    stallholder *charging* her —
+
+        "'That'll be 5 silver crescents, please.' As you hand over your payment..."
+
+    — and the consequence beat carried on with "you hand over more coins than she asked
+    for". The direction of the transaction was inverted and the sum invented, while the
+    engine's own tell in the same transcript said she had been paid.
+
+    Same family as a damage number. What a price *is* here is `rules.pricing`'s answer,
+    from tier and potency, and the narrator has no way to know it."""
+    from rules.intents import find_outcome_claims
+
+    said = ("She takes the vial. 'That'll be 5 silver crescents, please.' As you hand "
+            "over your payment, she smiles.")
+    why = {c.why for c in find_outcome_claims(said)}
+    assert "states a sum of money" in why
+    assert "states a price" in why
+    assert "states the player paying" in why
+
+
+def test_prose_that_names_no_sum_is_left_alone():
+    """A sale still has to be describable. Only the numbers are the engine's."""
+    from rules.intents import find_outcome_claims
+
+    said = ("She turns the vial over twice, holds it up to the light, and counts coins "
+            "into your palm without saying anything at all.")
+    assert not find_outcome_claims(said)
+
+
+def test_a_jar_in_the_satchel_is_not_a_person():
+    """"Musk Muddle Tincture" is a jar she crafted, and `Tincture` was reported as an
+    invented person the moment she sold one. The catalogue vocabulary covers materials the
+    world *sells*; it had never heard of anything a character made."""
+    import inspect
+
+    from gm.agent import GMAgent
+
+    src = inspect.getsource(GMAgent._known_names)
+    assert 'getattr(actor, "stock"' in src, \
+        "the satchel is not part of the vocabulary"
