@@ -243,10 +243,39 @@ def main() -> None:
     env = dict(os.environ, PATHFINDER_GM_DATA=str(data))
     proc = subprocess.Popen([str(exe), "--no-browser"], env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    base = f"http://127.0.0.1:{args.port}"
     try:
-        http = Http(base)
+        # Discover the server through the same handshake the Electron shell will use —
+        # the portfile IS the contract, so the prover dogfoods it instead of assuming
+        # the preferred port.
+        portfile = data / "server.json"
         for _ in range(120):
+            if portfile.exists():
+                break
+            time.sleep(1)
+        else:
+            print("no server.json handshake ever appeared"); sys.exit(2)
+        hand = json.loads(portfile.read_text(encoding="utf-8"))
+        faults = []
+        # The portfile pid is the PyInstaller CHILD — the process actually holding
+        # the port — not the bootloader this prover spawned. Asserting equality was
+        # this prover's first wrong guess about the contract (launched 2064, portfile
+        # 22556); what a consumer actually needs is that the pid is alive.
+        pid = hand.get("pid")
+        if not isinstance(pid, int):
+            faults.append(f"portfile pid {pid!r}")
+        else:
+            alive = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True, text=True).stdout
+            if str(pid) not in alive:
+                faults.append(f"portfile pid {pid} is not a running process")
+        if not isinstance(hand.get("port"), int):
+            faults.append(f"portfile port {hand.get('port')!r}")
+        note("portfile handshake", faults)
+        base = hand.get("url", f"http://127.0.0.1:{hand.get('port')}/").rstrip("/")
+
+        http = Http(base)
+        for _ in range(60):
             try:
                 s, _b = http.get("/")
                 if s == 200:
@@ -255,9 +284,21 @@ def main() -> None:
                 pass
             time.sleep(1)
         else:
-            print("the exe never answered"); sys.exit(2)
+            print("the exe never answered at its own portfile url"); sys.exit(2)
 
         run_checks(http, repo)
+
+        logfile = data / "logs" / "pathfindergm.log"
+        faults = []
+        if not logfile.exists():
+            faults.append("no log file under the data directory")
+        else:
+            body = logfile.read_text(encoding="utf-8", errors="replace")
+            if "Pathfinder GM" not in body or "serving" not in body:
+                faults.append("log exists but carries no banner")
+            if "=== launch" not in body:
+                faults.append("log has no dated launch header")
+        note("log file carries the banner", faults)
     finally:
         # The whole tree, not the process. A PyInstaller onefile exe is a bootloader
         # that spawns the real app as a child; terminate() killed the parent and left

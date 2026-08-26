@@ -29,12 +29,16 @@ back. `console=False` in the spec is a later decision, and it needs a log file f
 """
 from __future__ import annotations
 
+import io
+import json
 import os
 import socket
 import sys
 import threading
 import time
 import webbrowser
+from datetime import datetime
+from pathlib import Path
 
 # The port is arbitrary but fixed, so a bookmark keeps working between launches. High
 # enough to be outside anything registered, and not one of the common dev-server ports
@@ -67,6 +71,96 @@ def _bind(host: str, port: int):
             continue
         return server
     raise SystemExit(f"could not bind {host} on any port")
+
+
+class _Tee(io.TextIOBase):
+    """Everything the console sees, the log file sees too.
+
+    A wrapper rather than a redirect, because the console window is still the only
+    quit affordance the unwrapped build has and blanking it would strand the user.
+    Both streams go through this — Django's request lines arrive on stderr, the banner
+    on stdout, and a diagnosis that only holds half the story has misled once already
+    (the first packaged run logged requests and no banner). Write failures are
+    swallowed: a full disk must degrade to "no log", never to "no game".
+    """
+
+    def __init__(self, console, logfile):
+        self._console = console
+        self._log = logfile
+
+    def write(self, s: str) -> int:
+        n = self._console.write(s)
+        try:
+            self._log.write(s)
+            self._log.flush()
+        except OSError:
+            pass
+        return n
+
+    def flush(self) -> None:
+        self._console.flush()
+        try:
+            self._log.flush()
+        except OSError:
+            pass
+
+
+def _start_log(data_root: Path):
+    """The log file the Electron shell needs to exist before it can hide the console.
+
+    Under the user data directory, appended across launches with a dated header —
+    the run *before* the crash is usually the one a bug report needs — and truncated
+    at 2 MB on launch rather than rotated, because a desktop game's log is a
+    diagnostic, not an archive. This is runtime output like a save, not a derived
+    cache: nothing ever reads it back, so it cannot go stale and does not carry
+    `paths.CACHE_VERSION`.
+
+    Returns the open file, or None with the app running fine without it.
+    """
+    try:
+        logdir = data_root / "logs"
+        logdir.mkdir(parents=True, exist_ok=True)
+        path = logdir / "pathfindergm.log"
+        if path.exists() and path.stat().st_size > 2_000_000:
+            path.unlink()
+        log = open(path, "a", encoding="utf-8", errors="replace")
+        log.write(f"\n=== launch {datetime.now():%Y-%m-%d %H:%M:%S} ===\n")
+        log.flush()
+    except OSError:
+        return None
+    sys.stdout = _Tee(sys.stdout, log)
+    sys.stderr = _Tee(sys.stderr, log)
+    return log
+
+
+def _write_portfile(data_root: Path, port: int, url: str) -> Path | None:
+    """Where the server actually is, machine-readable, for whatever launched us.
+
+    The Electron shell cannot assume 8917 — the fallback to a free port is real and
+    verified — and parsing a human banner is how the browser-thread ValueError
+    happened. Written atomically (tmp then replace) so a reader never sees half a
+    JSON document, and carrying the pid so a shell that finds a stale file from a
+    dead run can tell it is stale. The caller deletes it on clean shutdown; the pid
+    check is for the unclean ones.
+
+    Frozen, this pid is NOT the process the launcher spawned: a onefile exe is a
+    bootloader whose child runs the app, and `os.getpid()` here is the child — the
+    process actually holding the port, which is the one a liveness check or an axe
+    should be aimed at. The build prover measured the difference the first time it
+    looked (launched 2064, portfile 22556).
+    """
+    try:
+        path = data_root / "server.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({
+            "port": port, "url": url, "pid": os.getpid(), "host": HOST,
+        }), encoding="utf-8")
+        os.replace(tmp, path)
+        return path
+    except OSError:
+        # A shell that cannot find the portfile falls back to scraping the banner or
+        # trying the preferred port; the game itself owes it nothing.
+        return None
 
 
 def _open_browser_when_up(url: str, port: int) -> None:
@@ -125,6 +219,30 @@ def main(argv: list[str] | None = None) -> int:
 
     from pathfindergm.paths import install_root, resource_root, user_data_root
 
+    # The log first, so the banner below is its opening lines; the portfile second, so
+    # nothing that launched us reads an address the log has not yet vouched for.
+    _start_log(user_data_root())
+    portfile = _write_portfile(user_data_root(), port, url)
+
+    # The line the Electron shell waits for — same contract as World Bible's, whose
+    # shell this app's is ported from. Printed after bind so the URL is real, before
+    # serve_forever so the shell is never waiting on a server that is already up.
+    print(f"PATHFINDERGM_READY {url}", flush=True)
+
+    if "--watch-stdin" in argv:
+        # Stdin closing is how the shell says stop — the graceful half of shutdown.
+        # The taskkill fallback exists for shells that die without closing it, but a
+        # clean quit should not need the axe: `server.shutdown()` lets the request in
+        # flight finish, and the `finally` below removes the portfile, which is what
+        # marks the exit as clean. Daemon, so a broken stdin cannot hold the exit.
+        def _watch():
+            try:
+                sys.stdin.read()
+            except Exception:
+                pass
+            server.shutdown()
+        threading.Thread(target=_watch, daemon=True).start()
+
     # `flush=True` on every line, and it is not decoration. Frozen, stdout is a pipe
     # rather than a console whenever anything captures it, so Python block-buffers it and
     # nothing appears until 8 KB have accumulated — which for six lines is never. The
@@ -149,6 +267,13 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         server.server_close()
+        # Best-effort: a portfile left by a crash still carries our (now dead) pid,
+        # which is what lets a shell distinguish stale from current.
+        if portfile is not None:
+            try:
+                portfile.unlink()
+            except OSError:
+                pass
     return 0
 
 

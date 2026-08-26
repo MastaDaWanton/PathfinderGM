@@ -20,3 +20,5 @@ dist/
 !pathfindergm.spec
 node_modules/
 z-image-turbo_*.png
+electron/node_modules/
+electron/release/

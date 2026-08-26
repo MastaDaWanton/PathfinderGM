@@ -112,7 +112,11 @@ _FILE_ANCHOR_ALLOWED = {"pathfindergm/paths.py"}
 # Dev-time only, never imported by the running app. `tools/` builds content files from
 # PDFs and `reference/` extracts the rulebooks; neither is in the bundle (see the spec's
 # "Deliberately NOT bundled" note), so `__file__` in them is correct and cheap.
-_FILE_ANCHOR_IGNORED_DIRS = {"tools", "reference", "tests", "build", "dist", "docs"}
+# `electron/` is the desktop shell: its node_modules vendors third-party Python
+# (node-gyp) that this rule has no jurisdiction over, and the shell itself ships no
+# Python at all.
+_FILE_ANCHOR_IGNORED_DIRS = {"tools", "reference", "tests", "build", "dist", "docs",
+                             "electron"}
 
 
 def _shipped_python_files() -> list[Path]:
@@ -498,3 +502,75 @@ def test_the_frozen_build_turns_debug_off_and_keeps_its_own_key():
     first = paths.secret_key()
     assert len(first) >= 50
     assert paths.secret_key() == first, "the key changes between calls"
+
+
+
+def test_the_portfile_is_the_handshake_a_shell_can_trust(tmp_path):
+    """The Electron shell cannot assume 8917 — the free-port fallback is real — and
+    parsing the human banner is how the browser thread died of a ValueError once.
+    `server.json` carries port, url and pid; the pid is what lets a shell tell a stale
+    file from a crashed run apart from a live one."""
+    import json
+    import os
+
+    import desktop
+
+    p = desktop._write_portfile(tmp_path, 49221, "http://127.0.0.1:49221/")
+    assert p == tmp_path / "server.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    assert d["port"] == 49221
+    assert d["pid"] == os.getpid()
+    assert d["url"].endswith(":49221/")
+    # And no half-written temp file is left beside it.
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_the_log_file_survives_the_console_being_hidden(tmp_path, capsys):
+    """`console=False` needs a log file first — packaging.md has said so since the
+    first build. Appended across launches with a dated header (the run before the
+    crash is the one a bug report needs), truncated at 2 MB rather than rotated, and
+    the console still sees everything: the tee is a wrapper, not a redirect, because
+    the console window is the unwrapped build's only quit affordance."""
+    import sys
+
+    import desktop
+
+    real_out, real_err = sys.stdout, sys.stderr
+    try:
+        log = desktop._start_log(tmp_path)
+        assert log is not None
+        print("both places, please")
+        sys.stdout.flush()
+    finally:
+        sys.stdout, sys.stderr = real_out, real_err
+        if log:
+            log.close()
+
+    body = (tmp_path / "logs" / "pathfindergm.log").read_text(encoding="utf-8")
+    assert "=== launch" in body
+    assert "both places, please" in body
+    assert "both places, please" in capsys.readouterr().out
+
+    # A bloated log is truncated at the next launch, not grown forever.
+    big = tmp_path / "logs" / "pathfindergm.log"
+    big.write_text("x" * 2_100_000, encoding="utf-8")
+    try:
+        log = desktop._start_log(tmp_path)
+    finally:
+        sys.stdout, sys.stderr = real_out, real_err
+        if log:
+            log.close()
+    assert big.stat().st_size < 1_000
+
+
+def test_the_portfile_is_written_after_bind_and_removed_on_shutdown():
+    """Source pin: the handshake must carry the *real* port (after `_bind`, which may
+    have fallen back), and a clean shutdown takes the file with it so only crashed
+    runs leave one — with a dead pid, which is the tell."""
+    import inspect
+
+    import desktop
+
+    src = inspect.getsource(desktop.main)
+    assert src.index("_bind(") < src.index("_write_portfile(")
+    assert "portfile.unlink()" in src

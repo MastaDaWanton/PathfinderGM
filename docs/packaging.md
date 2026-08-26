@@ -242,14 +242,53 @@ Two 404s in that browser log, both honest and neither a packaging regression:
 
 ---
 
+## The desktop shell (2026-08-26)
+
+`electron/` wraps the exe in the app window the architecture doc always intended,
+ported from World Bible's shell and deliberately thinner (no auto-updater — there is no
+release pipeline to update from; no quit guard — a turn in flight costs one unanswered
+sentence, not an hour of generation). Electron owns the window; the exe owns everything
+else.
+
+The contracts between them, all landed exe-side first and pinned by `prove_build.py`
+before any JavaScript existed:
+
+- **`PATHFINDERGM_READY <url>`** on stdout after bind — the line the shell waits for,
+  carrying the real port (the free-port fallback means it cannot assume 8917).
+- **`--watch-stdin`** — stdin closing is how the shell says stop; `server.shutdown()`
+  lets the request in flight finish and removes the portfile, which is what marks the
+  exit as clean. The shell's delayed `taskkill /T` is the axe for a backend that never
+  noticed — tree-wide, because `kill()` alone orphans the PyInstaller child, the exact
+  port-holding ghost the prove harness once left behind.
+- **`<data>/server.json`** — port, url and pid, written atomically after bind, deleted
+  on clean shutdown. The pid is the PyInstaller *child* (the process holding the port),
+  not the bootloader a launcher spawned — the prover measured the difference the first
+  time it looked.
+- **`<data>/logs/pathfindergm.log`** — the banner and request log, teed rather than
+  redirected (the console is still the unwrapped build's quit affordance), appended
+  across launches with a dated header, truncated at 2 MB. Runtime output like a save,
+  not a derived cache — nothing reads it back, so it carries no `CACHE_VERSION`.
+
+`tools/prove_shell.py` runs the lifecycle a person cannot see failing: shell up →
+portfile appears with a live pid → the URL answers → kill the shell's tree → **no
+backend survives**. Green in both dev mode (`electron .` over this machine's Python)
+and against the electron-builder output. `npm run dist` in `electron/` builds
+`release/Pathfinder GM Setup 0.1.0.exe` (119 MB NSIS installer, backend exe bundled as
+an extraResource).
+
 ## What remains unproven
 
 - **Only ever built and run on the machine it was built on.** Never installed onto a clean
   Windows box with no Python, which is the only test that proves the "no `pip install`"
   half of the constraint. A missing VC++ runtime or a Defender SmartScreen prompt on an
-  unsigned binary would both appear there and nowhere else.
-- **The exe is unsigned.** SmartScreen will warn on first run on any machine that did not
-  build it.
+  unsigned binary would both appear there and nowhere else. This now applies doubly: the
+  NSIS installer has never been *installed*, only its unpacked app run in place.
+- **The exe and the installer are unsigned.** SmartScreen will warn on first run on any
+  machine that did not build them.
+- **No human eye has seen the wrapped window.** `prove_shell.py` proves the lifecycle
+  (backend up, URL answering, no orphan) and `ready-to-show` gates the reveal on a
+  render, but "the grimoire looks right inside the Electron chrome" is a judgment only a
+  person double-clicking `electron/release/win-unpacked/Pathfinder GM.exe` can make.
 - **`console=True`.** The window is deliberate for this first build: an app that dies before
   it can draw anything has nowhere to say why, and the request log is the only diagnostic a
   user could send back. Turning it off needs a log file under the user data directory
