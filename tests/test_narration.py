@@ -1356,3 +1356,39 @@ def test_the_polish_retry_only_chases_what_no_backstop_repairs():
     assert "echoes-the-examples" in GMAgent._NO_BACKSTOP
     assert "too-short" in GMAgent._NO_BACKSTOP
     assert "misgendered-pc" in GMAgent._NO_BACKSTOP
+
+
+
+def test_no_schema_asks_ollama_for_a_grammar_it_cannot_compile():
+    """The first shipped maxLength was 2,200 characters, and every single call in the
+    next audit run came back 503 — Ollama's grammar compiler turns maxLength into a
+    bounded repetition and stops compiling somewhere between 2,000 and 2,100 (measured by
+    bisection on llama3.1:8b: 1800 OK, 2000 OK, 2100 fails). A schema meant to prevent
+    truncation took the entire app down instead.
+
+    Every schema builder clamps at the measured ceiling, and this walks them all."""
+    import json
+
+    def caps(schema):
+        found = []
+        def walk(node):
+            if isinstance(node, dict):
+                if "maxLength" in node:
+                    found.append(node["maxLength"])
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(schema)
+        return found
+
+    schemas = [
+        prompts.prose_schema(max_chars=99999),
+        prompts.turn_schema(fighting=False, refs=("pc",), min_chars=600),
+        prompts.turn_schema(fighting=True, refs=("pc", "c1")),
+    ]
+    for schema in schemas:
+        for cap in caps(schema):
+            assert cap <= prompts.GRAMMAR_MAXLENGTH_CEILING, json.dumps(schema)[:120]
+    assert prompts.GRAMMAR_MAXLENGTH_CEILING == 2000

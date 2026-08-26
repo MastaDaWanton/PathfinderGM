@@ -247,6 +247,55 @@ confident, wrong answers.
     speech        44 of 57 turns contain somebody speaking
     openings      21% share the commonest
 
+## The grooming pipeline
+
+Diagnosed with a full census before anything was built: 132 findings across 175 logged
+turns in all seven saves, 46% shipped unrepaired, and one door — `npc_turn` — whose
+prose reached the transcript with **no review at all**. Four inline copies of the prose
+chain had drifted exactly as CLAUDE.md predicts.
+
+The chain lives once now (`GMAgent._groom`), all four doors go through it, and under
+the one model rewrite sit deterministic backstops for everything that used to lose the
+coin toss: invented people are un-named ("the stranger") before they ever ship, repeated
+sentences are deleted, the narrator's own me/my turn back onto the player where provably
+safe, mid-sentence stutter periods are repaired, the hand-back is appended, the wrong
+body is corrected. A first-appearance invented name can no longer reach the transcript,
+which also dries up recurrence at the source — the next turn's model never sees it.
+
+Sampler schemas now cover every model call, with an honest note: `as_json` was already
+a grammar, the live "Unterminated string" was the token budget dying mid-string, and
+what the schemas add is required keys plus `maxLength` ceilings sized so strings close
+while budget remains. **Ollama's grammar compiler fails between 2,000 and 2,100
+characters of bounded repetition** (bisected live; the first shipped value of 2,200
+turned every call into a 503 for one whole audit run) — both schema builders clamp at
+2,000 and a test walks every schema.
+
+Measured, same script, same model, same machine, GPU otherwise quiet:
+
+| | clean | invented names | stutters | parse errors | prose |
+|---|---|---|---|---|---|
+| before (honest baseline) | 14/20 (70%) | 3 | present | 2 classes | mean 839 |
+| after the pipeline | **19/20 (95%)** | **0** | **0** | **0** | mean 1044, min 604 |
+
+The one fault is the honest kind: a turn the planner could not produce in seven
+attempts, reported to the player as such. The prose lengthened because the 600 floor
+now bites (shortest turn 604), and 17 of 19 turns carry speech.
+
+And the long horizon, 60 distinct turns, same conditions:
+
+| | clean | prose faults of any kind |
+|---|---|---|
+| before (best of three pre-pipeline runs) | 46/60 (76%) | 10+ invented names per run |
+| after the pipeline | **57/60 (95%)** | **0** |
+
+Not one invented name, first-person slip, third-person slip, repeat, or wrong body
+across the whole session; all three faults are the planner honestly giving up. The
+openings drift 16% → 37% → 11% by third — the middle third bulges and the
+`formulaic-opening` repair pulls it back, rather than the old monotone narrowing to 48%.
+
+Twenty and sixty turns are baselines, not proofs; the numbers above say what was
+measured and no more.
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put

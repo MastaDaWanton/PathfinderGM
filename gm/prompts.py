@@ -1059,9 +1059,18 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
     if min_chars:
         narration["minLength"] = int(min_chars)
     if max_chars:
-        narration["maxLength"] = int(max_chars)
+        narration["maxLength"] = min(int(max_chars), GRAMMAR_MAXLENGTH_CEILING)
     return {"type": "object", "properties": {"narration": narration},
             "required": ["narration"]}
+
+
+# Ollama's grammar compiler turns `maxLength` into a bounded repetition, and somewhere
+# between 2,000 and 2,100 it stops compiling: HTTP 500 on every request carrying the
+# schema. Measured by bisection on llama3.1:8b, 2026-08-25 — 1800 OK, 2000 OK, 2100
+# fails, 2200 fails. The first value shipped was 2200, and every single call in the
+# audit run came back 503. Both schema builders clamp here so nobody can reintroduce
+# that by passing a bigger number.
+GRAMMAR_MAXLENGTH_CEILING = 2000
 
 
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
@@ -1161,8 +1170,9 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     # "Expecting ',' delimiter" at around character 420 — the token budget dying inside
     # the narration string, which no grammar prevents but a length ceiling makes room
     # for: a string that must close by N characters closes while there is still budget
-    # to write the intents after it.
-    narration["maxLength"] = 800 if fighting else 2200
+    # to write the intents after it. Clamped to what Ollama's grammar compiler can
+    # actually build — see GRAMMAR_MAXLENGTH_CEILING.
+    narration["maxLength"] = min(800 if fighting else 2000, GRAMMAR_MAXLENGTH_CEILING)
     return {
         "type": "object",
         "properties": {
