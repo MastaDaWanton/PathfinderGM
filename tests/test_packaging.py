@@ -116,7 +116,7 @@ _FILE_ANCHOR_ALLOWED = {"pathfindergm/paths.py"}
 # (node-gyp) that this rule has no jurisdiction over, and the shell itself ships no
 # Python at all.
 _FILE_ANCHOR_IGNORED_DIRS = {"tools", "reference", "tests", "build", "dist", "docs",
-                             "electron"}
+                             "electron", ".claude"}
 
 
 def _shipped_python_files() -> list[Path]:
