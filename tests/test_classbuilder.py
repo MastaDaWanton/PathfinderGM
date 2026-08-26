@@ -457,10 +457,13 @@ def test_blood_bending_reports_exactly_its_nine_known_gaps():
     `engine_op`s — which is the reason `validate_effect` exists.
     """
     problems = cb.validate_class(blood_bending())
-    assert len(problems) == 8, problems
+    assert problems == [], problems
     # All eight are the same defect: a save whose DC is written in a note rather than
     # in the field the engine reads, so nothing rolls against it.
-    assert sum("Saving throw needs dc" in p for p in problems) == 8
+    # The eight were fixed 2026-08-27 — the DC moved from the prose note into the
+    # field the engine reads (10 + level/2 + con_mod) — so the pin flips to zero,
+    # and any NEW save without a dc fails this test the day it is authored.
+    assert sum("Saving throw needs dc" in p for p in problems) == 0
 
 
 def test_the_class_layer_extensions_are_not_reported_as_missing_fields():
@@ -474,8 +477,10 @@ def test_the_class_layer_extensions_are_not_reported_as_missing_fields():
              for ability, specs in (path.get("effects") or {}).items()
              for spec in specs
              for p in effectspec.validate(spec, ability)]
-    assert len(naive) == 23
-    assert len(cb.validate_class(blood_bending())) == 8
+    # 15 false positives once the eight real DC gaps were filled: the naive count
+    # dropped from 23 with them to 15 without, and validate_class reports none.
+    assert len(naive) == 15
+    assert len(cb.validate_class(blood_bending())) == 0
 
 
 # --- the page ------------------------------------------------------------------------------
