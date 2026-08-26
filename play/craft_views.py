@@ -18,6 +18,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from rules import (benches, biomes, consumables, crafting, foraging, goods,
                    ingredients, market, worldclass)
+from rules.dice import BadDice
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -1122,50 +1123,90 @@ def craft_action(request):
     pc = c.scene.pc()
     if pc is None:
         return JsonResponse({"error": "nobody is being played"}, status=409)
-    action = str(body.get("action", "forage")).strip().lower()
-    if action != "forage":
-        return JsonResponse(
-            {"error": f"{action!r} is not a craft action yet — foraging only."},
-            status=400)
 
-    hours = read_int(body, "hours", 1, lo=1, hi=48)
-    place, when = _forage_scene(c)
-    from play import modelcfg
+    face = body.get("face")
+    if face is not None:
+        # The second half of the round trip: the excursion suspended on the player's
+        # Survival check, and this is the face coming back. The hours are read off the
+        # engine's own frozen intent rather than trusted from the client twice.
+        if not c.scene.awaiting:
+            return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
+        # Same door discipline as the bench: only the roll this endpoint opened.
+        if c.scene.awaiting.get("door") != "excursion":
+            return JsonResponse({"error": (
+                "The pending roll is not the excursion's to answer — the table's "
+                "dice popup has it.")}, status=409)
+        pending = c.scene.pending_intents[0] if c.scene.pending_intents else {}
+        hours = max(1, int((pending.get("params") or {}).get("hours", 1) or 1))
+        if face == "auto":
+            from rules.dice import Dice
 
-    cfg = modelcfg.for_role("narrator")
+            face = Dice().roll("1d20").raw
+        try:
+            resolution = c.engine().resume(int(face))
+        except (ValueError, BadDice) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        opening = next((t["text"] for t in reversed(c.transcript)
+                        if t.get("who") == "gm"), "")
+        place, when = _forage_scene(c)
+        from play import modelcfg
 
-    # 1. The setting out. Written to the transcript before the roll, because that is
-    # the order it happens in at a table.
-    opening = _narrate([
-        {"role": "system",
-         "content": "You narrate a solo Pathfinder game. Two or three sentences, second "
-                     "person, present tense. Never invent named people or places. Never "
-                     "ask a question. Stop before anything is found."},
-        {"role": "user",
-         "content": f"{pc.name} sets out to forage for herbs. Terrain: {c.biome}. "
-                     f"Near {place}, {when}. They mean to spend {hours} hour(s) "
-                     f"searching. Narrate them beginning the search."},
-    ], cfg, num_predict=140)
-    if not opening or not str(opening).strip():
-        opening = (f"You shoulder your satchel and work away from {place}, eyes on "
-                   f"the ground, the {c.biome} closing in around you. {hours} hour"
-                   f"{'s' if hours != 1 else ''} of searching lie ahead.")
-    opening = str(opening).strip()
-    c.transcript.append({"who": "gm", "text": opening})
+        cfg = modelcfg.for_role("narrator")
+    else:
+        action = str(body.get("action", "forage")).strip().lower()
+        if action != "forage":
+            return JsonResponse(
+                {"error": f"{action!r} is not a craft action yet — foraging only."},
+                status=400)
+        if c.scene.awaiting:
+            return JsonResponse({"error": "There is a roll waiting on you."},
+                                status=409)
 
-    # 2. The dice decide. Same op as the bench; the client lands the visible die on the
-    # first real d100 this rolled.
-    try:
-        resolution = c.engine().run(c.engine().validate([{
-            "op": "forage", "actor": "pc",
-            "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
-            "params": {"hours": hours},
-        }]))
-    except IntentError as exc:
-        # The opening already happened in the fiction; take it back out rather than
-        # narrating a search the engine refused.
-        c.transcript.pop()
-        return JsonResponse({"error": str(exc)}, status=400)
+        hours = read_int(body, "hours", 1, lo=1, hi=48)
+        place, when = _forage_scene(c)
+        from play import modelcfg
+
+        cfg = modelcfg.for_role("narrator")
+
+        # 1. The setting out. Written to the transcript before the roll, because that is
+        # the order it happens in at a table.
+        opening = _narrate([
+            {"role": "system",
+             "content": "You narrate a solo Pathfinder game. Two or three sentences, "
+                         "second person, present tense. Never invent named people or "
+                         "places. Never ask a question. Stop before anything is found."},
+            {"role": "user",
+             "content": f"{pc.name} sets out to forage for herbs. Terrain: {c.biome}. "
+                         f"Near {place}, {when}. They mean to spend {hours} hour(s) "
+                         f"searching. Narrate them beginning the search."},
+        ], cfg, num_predict=140)
+        if not opening or not str(opening).strip():
+            opening = (f"You shoulder your satchel and work away from {place}, eyes on "
+                       f"the ground, the {c.biome} closing in around you. {hours} hour"
+                       f"{'s' if hours != 1 else ''} of searching lie ahead.")
+        opening = str(opening).strip()
+        c.transcript.append({"who": "gm", "text": opening})
+
+        # 2. The dice decide. Same op as the bench, and the same suspend: the Survival
+        # check is the player's own, herbalism bonus in the breakdown. The opening stays
+        # in the book across the suspend — the character has set out; the roll is what
+        # happens next.
+        try:
+            resolution = c.engine().run(c.engine().validate([{
+                "op": "forage", "actor": "pc",
+                "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
+                "params": {"hours": hours},
+            }]))
+        except IntentError as exc:
+            # The opening already happened in the fiction; take it back out rather than
+            # narrating a search the engine refused.
+            c.transcript.pop()
+            return JsonResponse({"error": str(exc)}, status=400)
+        if resolution.awaiting:
+            c.scene.awaiting["door"] = "excursion"
+            c.save()
+            return JsonResponse({"opening": opening, "roll": resolution.awaiting,
+                                 "hours": hours})
 
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
     effects = [e for o in resolution.outcomes for e in o.effects
@@ -1246,24 +1287,61 @@ def craft_action(request):
 @require_POST
 def forage_do(request):
     """Walk the ground and see what turns up. Routed through the engine's `forage` op so
-    the bench and the table roll on exactly the same machinery."""
+    the bench and the table roll on exactly the same machinery.
+
+    Two posts make one forage now. The first suspends on the player's own Survival check
+    — the herbalism bonus sits in the prompt's breakdown, which is the first time the
+    track's ground bonus has ever been *visible* — and comes back as `{"roll": ...}`.
+    The second carries `face` (or "auto" for "roll it for me", the same courtesy
+    `views.roll` extends) and resumes. The table's dice popup can also answer it via
+    `/api/roll`; the scene holds one pending roll either way.
+    """
     body = read_body(request)
     c = campaign_mod.current()
-    # No biome is sent. You forage where you are standing; the ground is `travel`'s to
-    # change, and the bench has no business claiming to be somewhere else.
-    params = {}
-    # Clamped rather than trusted. The slider stops at 48, and a hand-written request for
-    # a thousand hours would spend a thousand rolls before the body ever got a word in.
-    hours = read_int(body, "hours", 1, lo=1, hi=48)
-    params["hours"] = hours
-    try:
-        resolution = c.engine().run(c.engine().validate([{
-            "op": "forage", "actor": "pc",
-            "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
-            "params": params,
-        }]))
-    except IntentError as exc:
-        return JsonResponse({"error": str(exc)}, status=400)
+
+    face = body.get("face")
+    if face is not None:
+        if not c.scene.awaiting:
+            return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
+        # Only the roll this door opened. A stale bench tab must not complete a spoken
+        # turn's Perception check — the face would land on somebody else's dice and the
+        # rest of that turn would resolve through the wrong door's tail. The table's
+        # /api/roll stays the universal answerer; these stamps only narrow the *bench*
+        # and *excursion* endpoints to their own suspends.
+        if c.scene.awaiting.get("door") != "bench":
+            return JsonResponse({"error": (
+                "The pending roll is not the bench's to answer — the table's dice "
+                "popup has it.")}, status=409)
+        if face == "auto":
+            from rules.dice import Dice
+
+            face = Dice().roll("1d20").raw
+        try:
+            resolution = c.engine().resume(int(face))
+        except (ValueError, BadDice) as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+    else:
+        if c.scene.awaiting:
+            return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+        # No biome is sent. You forage where you are standing; the ground is `travel`'s
+        # to change, and the bench has no business claiming to be somewhere else.
+        params = {}
+        # Clamped rather than trusted. The slider stops at 48, and a hand-written request
+        # for a thousand hours would spend a thousand rolls before the body got a word in.
+        hours = read_int(body, "hours", 1, lo=1, hi=48)
+        params["hours"] = hours
+        try:
+            resolution = c.engine().run(c.engine().validate([{
+                "op": "forage", "actor": "pc",
+                "because": f"{hours} hour{'s' if hours != 1 else ''} spent looking",
+                "params": params,
+            }]))
+        except IntentError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        if resolution.awaiting:
+            c.scene.awaiting["door"] = "bench"
+            c.save()
+            return JsonResponse({"roll": resolution.awaiting})
 
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})

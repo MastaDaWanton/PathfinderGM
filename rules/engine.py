@@ -2215,16 +2215,41 @@ class Engine:
         level = actor.track(track.id).level
         ceiling = worldclass.tier_rank(track.at(level).max_tier)
 
+        hours = max(1, int(intent.params.get("hours", 1) or 1))
+
+        # The player rolls their own Survival — the popup, with the herbalism bonus in
+        # the breakdown where they can see what the track is worth. Raised before
+        # `pass_hours` because everything below this line mutates: a suspend after the
+        # toll would charge the body twice for the same day when the roll came back.
+        # The player's face is spent on the first hour; the engine rolls the rest.
+        face = None
+        if actor.is_pc:
+            if "player_face" in partial:
+                face = int(partial.pop("player_face"))
+            else:
+                mods = foraging.check_mods(actor, level)
+                raise _NeedsPlayerRoll({
+                    "label": f"Survival check — foraging ({biome})",
+                    "die": "1d20",
+                    "actor": actor.name,
+                    "min": 1,
+                    "max": 20,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": foraging.dc_for(biome),
+                    "because": intent.because,
+                    "intent_id": intent.id,
+                }, {})
+
         # Foraging takes real time now, a minimum of an hour and as long as the player
         # asks for. The body is consulted for every hour of it — see rules/survival.py —
         # and a character who goes over is stopped at the hour they actually fell over
         # rather than at the end of the stretch they meant to work.
-        hours = max(1, int(intent.params.get("hours", 1) or 1))
         toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
         worked = max(1, toll.hours)
 
         result = foraging.forage(biome, level, ceiling, self.dice, hours=worked,
-                                 actor=actor)
+                                 actor=actor, first_face=face)
         result["asked_for"] = hours
         result["toll"] = toll.as_dict()
         for iid, n in result["found"].items():

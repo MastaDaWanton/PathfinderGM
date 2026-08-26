@@ -157,6 +157,12 @@ DEFAULT_FORAGE_DC = 15
 # ground — the brief's "single destroyed leaf" — and it is named, because being told you
 # tore the roots off a Woundwart is a different fact from being told the wood was bare.
 # Nothing is carried either way; only one of them tells the player something.
+#
+# The top band is a floor, not a roof. "The base numbers of items foraged should continue
+# going up as my roll gets higher" — so every OVER_STEP points of margin past the top
+# floor is one more virtual band above it: more kinds found, bigger patches of each. The
+# rarity ceiling does not keep lifting, because the ceiling is what the character can
+# handle and luck does not teach them.
 BANDS = (
     (20, "a garden's worth", 8, 2, True),
     (15, "an excellent hour", 5, 1, True),
@@ -167,6 +173,8 @@ BANDS = (
 )
 RUINED = ("a ruined handful", 0, 0, False)
 RUINED_AT = -5
+OVER_STEP = 5           # margin per virtual band above the top
+OVER_FINDS = 2          # extra kinds per virtual band
 
 # How many of a thing you get when you find it. The count in the bands above is how many
 # *kinds* the hour turns up; this is how many of each.
@@ -186,17 +194,41 @@ BATCH_STEP = 2
 
 
 def batch_for(rank: int, band_index: int) -> int:
-    """How many of a rank-`rank` plant a hour at `band_index` yields, top band being 0."""
+    """How many of a rank-`rank` plant a hour at `band_index` yields, top band being 0.
+
+    A negative index is an hour *above* the top band — see `band_index` — and the same
+    arithmetic keeps climbing: the clamp that used to sit here was the plateau the table
+    asked to have removed.
+    """
     top = BATCH_TOP.get(int(rank), 2)
-    return max(1, top - BATCH_STEP * max(0, int(band_index)))
+    return max(1, top - BATCH_STEP * int(band_index))
 
 
 def dc_for(biome: str) -> int:
     return FORAGE_DC.get((biome or "").strip().lower(), DEFAULT_FORAGE_DC)
 
 
+def over_bands(margin: int) -> int:
+    """How many virtual bands above the top this margin reaches. 0 at the top band."""
+    top_floor = BANDS[0][0]
+    if margin < top_floor + OVER_STEP:
+        return 0
+    return (int(margin) - top_floor) // OVER_STEP
+
+
 def band_for(margin: int) -> tuple:
-    """(label, finds, ceiling lift, pristine) for how far the check beat the ground."""
+    """(label, finds, ceiling lift, pristine) for how far the check beat the ground.
+
+    Above the top band the label holds but the finds keep growing — `OVER_FINDS` more
+    kinds per `OVER_STEP` of margin, without limit. The table itself is the only cap: an
+    hour that asks for more species than grow here simply runs out, which is the wood
+    being poor rather than the roll being wasted, and the batch bonus (`batch_for` with a
+    negative index) still pays on everything that was found.
+    """
+    over = over_bands(margin)
+    if over:
+        floor, label, finds, lift, pristine = BANDS[0]
+        return (label, finds + OVER_FINDS * over, lift, pristine)
     for floor, label, finds, lift, pristine in BANDS:
         if margin >= floor:
             return (label, finds, lift, pristine)
@@ -204,34 +236,58 @@ def band_for(margin: int) -> tuple:
 
 
 def band_index(margin: int) -> int:
-    """Which band this is, counting from the best. Feeds `batch_for`."""
+    """Which band this is, counting from the best. Feeds `batch_for`.
+
+    Negative above the top band — margin 25 in a wood with a top floor of 20 is index
+    -1, margin 30 is -2 — so `batch_for`'s `top - step * index` keeps rising instead of
+    plateauing the moment the roll clears the best named band.
+    """
+    over = over_bands(margin)
+    if over:
+        return -over
     for i, (floor, *_rest) in enumerate(BANDS):
         if margin >= floor:
             return i
     return len(BANDS)
 
 
-def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None) -> dict:
+def check_mods(actor, level: int) -> list:
+    """The modifiers on a foraging Survival check, in one place.
+
+    Built here rather than inline in `forage_hour` because the dice popup shows the
+    player a breakdown *before* the roll, and the engine applies the modifiers *after* —
+    two call sites that must never disagree about what the herbalism level is worth.
+    """
+    mods = []
+    if actor is not None:
+        mods = list(actor.skill_modifiers("survival"))
+        if int(level) > 0:
+            from .dice import Modifier
+
+            mods.append(Modifier(int(level), "herbalism"))
+    return mods
+
+
+def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None,
+                face: int | None = None) -> dict:
     """One hour of looking, as one Survival check and what it turned up.
 
     The check is the character's own Survival, and the world class adds to it on top —
     an Herbalist knows where to look as well as what they are looking at. That bonus is
     the track's payoff on the ground, the way `attempts_for` is its payoff in yield.
-    """
-    from . import worldclass
 
+    `face` is a d20 the player already rolled on the popup; the engine still owns the
+    modifiers and the total. When it is None the engine rolls, which is what every hour
+    after the first does — one session is one popup, not one per hour of an 18-hour day.
+    """
     table = table_for(biome, rank_ceiling)
     dc = dc_for(biome)
 
-    mods = []
-    if actor is not None:
-        mods = list(actor.skill_modifiers("survival"))
-        level = int(level)
-        if level > 0:
-            from .dice import Modifier
-
-            mods.append(Modifier(level, "herbalism"))
-    roll = dice.d20(mods, label=f"Foraging ({table.biome})", visibility="player")
+    mods = check_mods(actor, level)
+    if face is not None:
+        roll = dice.given(face, mods, label=f"Foraging ({table.biome})")
+    else:
+        roll = dice.d20(mods, label=f"Foraging ({table.biome})", visibility="player")
     margin = roll.total - dc
     label, finds, lift, pristine = band_for(margin)
 
@@ -285,20 +341,24 @@ def forage_hour(biome: str, level: int, rank_ceiling: int, dice, actor=None) -> 
 
 
 def forage(biome: str, level: int, rank_ceiling: int, dice, hours: int = 1,
-           actor=None) -> dict:
+           actor=None, first_face: int | None = None) -> dict:
     """A foraging session of however many hours the player asked for.
 
     Hour by hour rather than one roll for the stretch. Each hour is its own check, so a
     long day is a spread of good and bad hours rather than a single verdict — and when
     something stops the character partway, the hours before it still happened.
+
+    `first_face` is the player's own d20 from the popup, spent on the first hour; the
+    engine rolls the rest of the day itself.
     """
     hours = max(1, int(hours))
     found: dict[str, int] = {}
     pristine: dict[str, int] = {}
     each = []
 
-    for _ in range(hours):
-        hour = forage_hour(biome, level, rank_ceiling, dice, actor=actor)
+    for n in range(hours):
+        hour = forage_hour(biome, level, rank_ceiling, dice, actor=actor,
+                           face=first_face if n == 0 else None)
         each.append(hour)
         for iid, n in hour["found"].items():
             found[iid] = found.get(iid, 0) + n

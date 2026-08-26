@@ -2072,7 +2072,7 @@ document.addEventListener("click", async e => {
   $("#craftpanel").hidden = true;
   busy(true);
   try {
-    const d = await post("/api/craftaction", { action: "forage", hours });
+    let d = await post("/api/craftaction", { action: "forage", hours });
     busy(false);
     // The opening lands in the book at once, so the die falls inside the fiction
     // rather than in front of it.
@@ -2081,6 +2081,22 @@ document.addEventListener("click", async e => {
     // Counted as seen, or the full render a moment later re-runs its entrance.
     window._beatsSeen = (window._beatsSeen || 0) + 1;
     $("#story").scrollTop = $("#story").scrollHeight;
+    if (d.roll) {
+      // The Survival check is the player's own now — same solid, same terms as every
+      // awaiting popup, but the face goes back to the excursion rather than /api/roll
+      // so the tally and the closing beat still happen.
+      const p = d.roll;
+      const terms = p.breakdown.map(m => ({ label: m.source, value: sign(m.value) }));
+      terms.push({ label: "your modifier", value: sign(p.modifier), total: true });
+      if (p.dc != null) terms.push({ label: "beat", value: p.dc });
+      const face = await Dice3D.ask({
+        title: p.label, why: p.because || "", sides: 20, lo: 1, hi: 20, die: "1d20",
+        terms,
+      });
+      busy(true);
+      d = await post("/api/craftaction", { face: face == null ? "auto" : face });
+      busy(false);
+    }
     if (d.rolls && d.rolls.length) {
       await Dice3D.land({
         title: "Foraging", why: `${d.hours} hour${d.hours === 1 ? "" : "s"} on the ground`,

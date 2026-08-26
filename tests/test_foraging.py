@@ -242,12 +242,20 @@ def test_an_invented_biome_is_refused_with_the_ones_that_exist(client):
 
 
 def test_foraging_fills_the_satchel(client):
+    """Two posts make one forage now: the first suspends on the player's own Survival
+    check, the second carries the face back. "Roll it for me" is the same courtesy
+    `/api/roll` extends."""
     from play import campaign as cm
 
     client.post("/api/travel", data=json.dumps({"biome": "forest"}),
                 content_type="application/json")
     for _ in range(8):
-        client.post("/api/forage", data=json.dumps({}), content_type="application/json")
+        r = client.post("/api/forage", data=json.dumps({}),
+                        content_type="application/json").json()
+        if "roll" in r:
+            assert "Survival" in r["roll"]["label"]
+            client.post("/api/forage", data=json.dumps({"face": "auto"}),
+                        content_type="application/json")
     assert cm.current().scene.pc().inventory
 
 
@@ -292,10 +300,19 @@ def treeline():
     return s, Engine(s, _Dice(seed=5)), instantiate
 
 
-def _forage(engine, **params):
-    return engine.run(engine.validate([
+def _forage(engine, face=11, **params):
+    """Run a forage to completion, answering the Survival popup with `face`.
+
+    The suspend is part of the contract now — "I should be forced to roll a survival
+    check" — so this helper asserts it fired rather than working around it.
+    """
+    resolution = engine.run(engine.validate([
         {"op": "forage", "actor": "pc", "because": "she works the treeline",
          "params": {"hours": 1, **params}}]))
+    if resolution.awaiting is None:
+        return resolution
+    assert "Survival" in resolution.awaiting["label"]
+    return engine.resume(face)
 
 
 def test_foraging_alone_on_open_ground_still_works(treeline):
@@ -353,7 +370,10 @@ def test_foraging_searches_the_ground_underfoot_whatever_it_is_asked_for(treelin
     """
     scene, engine, _ = treeline
     scene.biome = "urban"
-    resolution = _forage(engine, biome="forest")
+    # Face 18: under this seed the urban table's hidden d100s land on the leaves. A
+    # middling face clears the DC but every pick misses — an honest empty hour, useless
+    # to this test.
+    resolution = _forage(engine, face=18, biome="forest")
     found = [e for o in resolution.outcomes for e in o.effects
              if e.get("kind") == "forage"]
     assert [e for e in found if e.get("biome") == "urban"], found
@@ -382,3 +402,126 @@ def test_the_bench_says_why_foraging_is_refused_before_it_is_pressed(client):
                     content_type="application/json")
     assert r.status_code == 400
     assert "the thug" in r.json()["error"]
+
+
+
+# --- the roll is the player's, and the bonus is finally visible ---------------------------
+#
+# "I should be forced to roll a survival check but I should get a bonus for my herbalism
+# lvl. also the base numbers of items foraged should continue going up as my roll get
+# higher."
+#
+# The herbalism bonus had existed inside `forage_hour` since the foraging rebuild — and
+# the player had no way to know, because the check resolved invisibly inside the op. A
+# bonus nobody can see is indistinguishable from a bonus that does not exist.
+
+def test_the_forage_check_is_the_players_and_shows_the_herbalism_bonus(treeline):
+    """The suspend fires before any time is paid, and the popup's breakdown carries the
+    herbalism modifier next to ranks and Wis — the first time the track's ground bonus
+    has ever been on screen."""
+    scene, engine, _ = treeline
+    pc = scene.pc()
+    pc.track("herbalist").level = 3      # track() begins the class on first use
+    awake_before = pc.awake_minutes
+
+    resolution = engine.run(engine.validate([
+        {"op": "forage", "actor": "pc", "because": "she works the treeline",
+         "params": {"hours": 2}}]))
+
+    assert resolution.awaiting is not None
+    prompt = resolution.awaiting
+    assert "Survival" in prompt["label"]
+    sources = {m["source"]: m["value"] for m in prompt["breakdown"]}
+    assert sources.get("herbalism") == 3
+    # Suspended BEFORE the toll: a suspend after `pass_hours` would charge the body
+    # twice for the same day when the roll came back.
+    assert pc.awake_minutes == awake_before
+    assert scene.clock_minutes == 0
+
+    done = engine.resume(18)
+    assert done.awaiting is None
+    forage = next(e for o in done.outcomes for e in o.effects
+                  if e.get("kind") == "forage")
+    # The player's face is spent on the first hour; the engine rolls the second.
+    assert forage["hourly"][0]["roll"] == 18 + sum(sources.values())
+    assert scene.clock_minutes == 120
+    assert pc.awake_minutes == awake_before + 120
+
+
+def test_an_npc_forage_never_opens_the_popup(treeline):
+    """The player rolls their own; everything else the engine rolls and hands to the GM
+    as a fact. An NPC forage suspending would hang the world tick on a popup nobody is
+    looking at."""
+    scene, engine, instantiate = treeline
+    del scene.actors["pc"]
+    thug = instantiate("thug", scene=scene, name="the gatherer")
+    scene.add(thug)
+    resolution = engine.run(engine.validate([
+        {"op": "forage", "actor": thug.ref, "because": "sent to gather",
+         "params": {"hours": 1}}]))
+    assert resolution.awaiting is None
+    assert any(e.get("kind") == "forage" for o in resolution.outcomes
+               for e in o.effects)
+
+
+def test_the_yield_keeps_climbing_past_the_top_band():
+    """The bands plateaued at margin 20: a 25 and a 45 came back with identical hauls,
+    so past a modest Survival bonus every extra point the player earned bought nothing.
+    Now every 5 of margin over the top floor is a virtual band above it — more kinds,
+    bigger patches, without limit."""
+    from rules import foraging
+
+    # Kinds found: 8 at the top band, then +2 per 5 margin over, open-ended.
+    assert foraging.band_for(20)[1] == 8
+    assert foraging.band_for(25)[1] == 10
+    assert foraging.band_for(45)[1] == 18
+    assert foraging.band_for(120)[1] == 48
+
+    # Patch size: the index goes negative above the top band and the same arithmetic
+    # keeps climbing. A common plant: 10 at the top band, 12 one virtual band up, and
+    # never the old plateau.
+    assert foraging.band_index(20) == 0
+    assert foraging.band_index(25) == -1
+    assert foraging.band_index(45) == -5
+    assert foraging.batch_for(1, 0) == 10
+    assert foraging.batch_for(1, -1) == 12
+    assert foraging.batch_for(1, -5) == 20
+    # A legendary herb scales too — 2 at the top, climbing with the roll.
+    assert foraging.batch_for(5, -5) == 12
+
+    # Monotone: a better roll is never a worse haul.
+    hauls = [foraging.batch_for(1, foraging.band_index(m)) for m in range(0, 60)]
+    assert hauls == sorted(hauls)
+
+    # Below the top nothing changed: the named bands still pay what they paid.
+    assert foraging.band_for(17) == ("an excellent hour", 5, 1, True)
+    assert foraging.band_for(3) == ("a meagre hour", 1, 0, False)
+    assert foraging.band_index(12) == 2
+
+
+
+def test_a_stale_bench_face_cannot_answer_somebody_elses_roll(client):
+    """A face posted to /api/forage while a spoken turn's check is pending would land on
+    a stranger's dice and drag that turn's resolution through the bench's tail. The
+    prompt carries which door opened it; the bench and the excursion answer only their
+    own, and the table's /api/roll stays the universal answerer either way."""
+    from play import campaign as cm
+
+    c = cm.current()
+    keep = (c.scene.awaiting, list(c.scene.pending_intents),
+            list(c.scene.pending_outcomes), dict(c.scene.pending_partial))
+    try:
+        c.scene.awaiting = {"label": "Perception check", "die": "1d20", "dc": 15,
+                            "because": "sensing a presence", "intent_id": "i1"}
+        c.scene.pending_intents = [{"op": "check", "actor": "pc",
+                                    "params": {"skill": "perception",
+                                               "dc": {"band": "tough"}}}]
+        for url in ("/api/forage", "/api/craftaction"):
+            r = client.post(url, data=json.dumps({"face": 12}),
+                            content_type="application/json")
+            assert r.status_code == 409, url
+            assert "dice popup has it" in r.json()["error"], url
+        assert c.scene.awaiting["label"] == "Perception check"   # untouched
+    finally:
+        (c.scene.awaiting, c.scene.pending_intents,
+         c.scene.pending_outcomes, c.scene.pending_partial) = keep

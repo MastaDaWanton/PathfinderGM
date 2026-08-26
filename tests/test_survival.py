@@ -47,10 +47,16 @@ def wood(forager):
     return s, Engine(s, Dice(seed=5))
 
 
-def forage(engine, hours=1):
-    return engine.run(engine.validate([
+def forage(engine, hours=1, face=11):
+    """Run a forage to completion, answering the Survival popup with `face` — the
+    suspend is the contract now, and this file's business is the clock either side
+    of it."""
+    resolution = engine.run(engine.validate([
         {"op": "forage", "actor": "pc", "because": "she works the treeline",
          "params": {"hours": hours}}]))
+    if resolution.awaiting is None:
+        return resolution
+    return engine.resume(face)
 
 
 # --- an hour is an hour ------------------------------------------------------------------

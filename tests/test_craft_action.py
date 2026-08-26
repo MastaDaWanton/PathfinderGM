@@ -37,8 +37,15 @@ def client(tmp_path, monkeypatch):
 
 
 def _forage(client, hours=2):
-    return client.post("/api/craftaction",
-                       data=json.dumps({"action": "forage", "hours": hours}),
+    """The excursion is two posts now: the first suspends on the player's own Survival
+    check, the second carries the face back and gets the tally."""
+    r = client.post("/api/craftaction",
+                    data=json.dumps({"action": "forage", "hours": hours}),
+                    content_type="application/json")
+    if r.status_code != 200 or "roll" not in r.json():
+        return r
+    assert "Survival" in r.json()["roll"]["label"]
+    return client.post("/api/craftaction", data=json.dumps({"face": "auto"}),
                        content_type="application/json")
 
 

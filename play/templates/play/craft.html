@@ -720,6 +720,24 @@ function renderBench() {
   renderShelf();
 }
 
+function renderForageRoll(roll) {
+  // The bench's half of the dice popup: the roll is the player's to make, and the
+  // breakdown is where the herbalism bonus finally shows its face. Rendered into #err
+  // because that strip already carries every forage message the bench prints.
+  const parts = (roll.breakdown || [])
+    .map(m => `${m.value >= 0 ? "+" : ""}${m.value} ${esc(m.source)}`).join(", ");
+  $("#err").innerHTML = `
+    <span class="forageroll">
+      <strong>${esc(roll.label || "Survival check")}</strong>
+      — d20 ${roll.modifier >= 0 ? "+" : ""}${roll.modifier} vs DC ${roll.dc}
+      ${parts ? `<em>(${parts})</em>` : ""}
+      <input id="forageface" type="number" min="1" max="20" placeholder="d20"
+             style="width:4em">
+      <button id="forageface-go" type="button">Use my roll</button>
+      <button id="forageface-auto" type="button">Roll it for me</button>
+    </span>`;
+}
+
 function renderGround() {
   const g = $("#ground");
   if (!g) return;
@@ -1099,10 +1117,30 @@ document.addEventListener("click", async e => {
     btn.disabled = true;
     try {
       const d = await post("/api/forage", { hours: FORAGE_HOURS });
+      // The first post suspends on the player's own Survival check — the roll is
+      // theirs to make, and the breakdown is where the herbalism bonus is finally
+      // visible. The face goes back in a second post.
+      if (d.roll) { renderForageRoll(d.roll); }
+      else {
+        $("#err").innerHTML = `<span style="color:var(--brew)">${esc(d.tell)}</span>`;
+        await reloadShelf();
+      }
+    } catch (err) { $("#err").textContent = err.message; }
+    btn.disabled = false;
+    return;
+  }
+  if (e.target.closest("#forageface-go") || e.target.closest("#forageface-auto")) {
+    const mine = !!e.target.closest("#forageface-go");
+    const face = mine ? parseInt($("#forageface").value, 10) : "auto";
+    if (mine && !(face >= 1 && face <= 20)) {
+      $("#err").textContent = "A d20 lands on 1 to 20.";
+      return;
+    }
+    try {
+      const d = await post("/api/forage", { face });
       $("#err").innerHTML = `<span style="color:var(--brew)">${esc(d.tell)}</span>`;
       await reloadShelf();
     } catch (err) { $("#err").textContent = err.message; }
-    btn.disabled = false;
     return;
   }
   const made = e.target.closest("[data-stock]");
