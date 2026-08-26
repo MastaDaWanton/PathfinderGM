@@ -82,6 +82,7 @@ def chat(
     provider: str = "ollama",
     api_key: str = "",
     schema: dict | None = None,
+    think: bool | None = None,
 ) -> Reply:
     """
     The timeout is generous because a cold load is genuinely slow: measured on this
@@ -110,6 +111,14 @@ def chat(
         payload["format"] = schema
     elif as_json:
         payload["format"] = "json"
+    # Whether a reasoning model may think before it answers. Measured on the watcher's
+    # garnish call: deepseek-r1:8b spent its ENTIRE budget in the `thinking` channel —
+    # 900 and 2,000 tokens both ended done_reason=length with content "" — because the
+    # format grammar constrains only the content, which never started. With
+    # think=False the same call answered in 0.4s. None sends nothing, because Ollama
+    # refuses the key outright for models with no thinking to switch off.
+    if think is not None:
+        payload["think"] = think
 
     req = urllib.request.Request(
         f"{host.rstrip('/')}/api/chat",

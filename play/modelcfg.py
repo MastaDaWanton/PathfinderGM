@@ -6,11 +6,11 @@ the *override* — a small JSON file in the user's data directory, read fresh on
 ask for the same reason the house rules are, because a cached copy of a model the
 player just changed is a model that silently is not in use.
 
-**Three jobs, and they are genuinely different.** The narrator writes the scene and has
+**Four jobs, and they are genuinely different.** The narrator writes the scene and has
 to satisfy a schema. The event watcher reads what happened and decides what changed —
-a reasoning model suits it, and it is still wired to nothing (see `settings.py`). The
-backup narrator exists because a model that refuses is a lost turn: it takes the last
-two slots of the schedule when the first has burned all five of its own.
+a reasoning model suits it, and it runs off-turn from `gm/watcher.py`. The backup
+narrator exists because a model that refuses is a lost turn: it takes the last two
+slots of the schedule when the first has burned all five of its own.
 
 **Keys never come back out.** They are written here and read by the client; what the
 page is sent is whether a key is set and its last four characters, which is enough to
@@ -35,8 +35,9 @@ ROLES = (
      "Says what the dice did, in two or three sentences. No schema to satisfy — this "
      "is the half a creative-writing tune is good at. Falls back to the narrator."),
     ("watcher", "Event watcher",
-     "Reads the log and decides what changed in the world. A reasoning model suits "
-     "reading a record and drawing a conclusion. Not yet wired to anything."),
+     "Reads the log and decides what changed in the world, off-turn: it may leave "
+     "one keepsake on the freshly dead, and it keeps the campaign's hidden thread "
+     "moving. A reasoning model suits reading a record and drawing a conclusion."),
     ("fallback", "Backup narrator",
      "Takes the turn when the narrator has burned all five of its attempts. Worth "
      "pointing at a small abliterated model — a 4B one loads fast and will push a "

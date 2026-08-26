@@ -111,18 +111,17 @@ MODELS = {
     "fallback": {"provider": "ollama",
                  "model": "richardyoung/qwen3-4b-instruct-2507-abliterated",
                  "host": "http://localhost:11434"},
-    # RESERVED, AND CURRENTLY WIRED TO NOTHING. The world-state agent of
-    # `docs/architecture.md` — the cheap model that would watch play, move factions
-    # between scenes and turn a burned bridge into a hook — has not been built. There is
-    # no event queue for it to read (intent-protocol.md §8 describes one; nothing emits
-    # to it and nothing consumes it), so this row configures a model that is never
-    # loaded and never called. Kept because the role is a settled design decision and
-    # deleting it would lose that; labelled because a configurable model that silently
-    # does nothing reads exactly like a feature that is running.
+    # The event watcher — `gm/watcher.py`. It wakes on a daemon thread after a
+    # finished turn and never blocks one: it may slip one flavour item into a freshly
+    # dead actor's pockets (validated against the tables, applied only if the corpse
+    # is still there and untouched), and every few turns it re-reads the GM's private
+    # undercurrent note against the transcript and advances or replaces it. The
+    # faction clock of `docs/architecture.md` is still unbuilt; this is the first
+    # thing the role has ever actually been called for.
     #
     # deepseek-r1:8b by choice: a reasoning model suits a role that reads a log and
-    # decides what changed, the same split World Bible used it for (proofreader beside a
-    # generator). When the queue exists this is the model that should wake.
+    # decides what changed, the same split World Bible used it for (proofreader beside
+    # a generator).
     "watcher": {"provider": "ollama", "model": "deepseek-r1:8b",
                 "host": "http://localhost:11434"},
 }

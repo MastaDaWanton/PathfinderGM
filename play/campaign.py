@@ -265,18 +265,15 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
     # The campaign's opening undercurrent — the first world-state this app has ever
-    # actually held. The "event watcher" role was configured and never once called;
-    # every campaign began with no live thread at all. Rolled from the world's own
-    # unwritten hooks when it has them, from a world-agnostic table when it does not,
-    # and planted in history as the GM's private note so it rides every turn's
-    # context from turn one without a single prompt-builder signature changing.
+    # actually held. Rolled from the world's own unwritten hooks when it has them,
+    # from a world-agnostic table when it does not, and planted in history as the
+    # GM's private note so it rides every turn's context from turn one without a
+    # single prompt-builder signature changing. The framing lives in
+    # `opening.private_note` because `gm/watcher.py` rewrites this entry in place and
+    # finds it by its prefix — two copies of the wrapper is how the search misses one.
     thread = opening.undercurrent(world, seed)
     if thread:
-        c.history.append({
-            "role": "user",
-            "content": f"(The GM's private note for this campaign: {thread} The "
-                       f"player does not know this. Let it surface in small ways; "
-                       f"never announce it.)"})
+        c.history.append({"role": "user", "content": opening.private_note(thread)})
     return c
 
 

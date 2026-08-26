@@ -28,6 +28,7 @@ never wrote, which is the failure `CLAUDE.md` files under "ground every name".
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from rules.dice import Dice
@@ -265,6 +266,27 @@ UNDERCURRENTS = [
 ]
 
 
+def hook_texts(world) -> list[str]:
+    """The world's own unwritten hooks, as sentences.
+
+    The export's shape: {"name": "Kaelvyr", "kind": "CHARACTER", "why": "Nirkor
+    engineer who discovered the hidden vein of salt"}. The `why` is the hook; the name
+    alone is just a stranger. One parser for the two readers — the opening roll and
+    the event watcher — because a rule with two copies is how the stale one ships.
+    """
+    hooks = []
+    for u in getattr(world, "unwritten", None) or []:
+        if isinstance(u, dict):
+            name = str(u.get("name") or "").strip()
+            why = str(u.get("why") or u.get("text") or u.get("hook") or "").strip()
+            text = f"{name} — {why}" if name and why else (why or name)
+        else:
+            text = str(u)
+        if text and text.strip():
+            hooks.append(text.strip())
+    return hooks
+
+
 def undercurrent(world, seed: int | None = None) -> str:
     """The campaign's live thread, rolled once at the start.
 
@@ -274,18 +296,27 @@ def undercurrent(world, seed: int | None = None) -> str:
     is a genuinely different evening.
     """
     d = Dice(seed=seed)
-    hooks = []
-    for u in getattr(world, "unwritten", None) or []:
-        if isinstance(u, dict):
-            # The export's shape: {"name": "Kaelvyr", "kind": "CHARACTER", "why":
-            # "Nirkor engineer who discovered the hidden vein of salt"}. The `why` is
-            # the hook; the name alone is just a stranger.
-            name = str(u.get("name") or "").strip()
-            why = str(u.get("why") or u.get("text") or u.get("hook") or "").strip()
-            text = f"{name} — {why}" if name and why else (why or name)
-        else:
-            text = str(u)
-        if text and text.strip():
-            hooks.append(text.strip())
-    pool = hooks or UNDERCURRENTS
+    pool = hook_texts(world) or UNDERCURRENTS
     return pool[d.roll(f"1d{len(pool)}").total - 1] if pool else ""
+
+
+# The GM's private note: how the undercurrent rides in `history`. One writer at the
+# start (`new_campaign`) and one rewriter forever after (`gm/watcher.py`), and both
+# must produce byte-identical framing or the prefix search finds two notes where the
+# rule says one.
+NOTE_PREFIX = "(The GM's private note"
+
+_NOTE_BODY = re.compile(
+    r"for this campaign:\s*(.*?)\s*The player does not know this", re.S)
+
+
+def private_note(thread: str) -> str:
+    return (f"(The GM's private note for this campaign: {thread} The "
+            f"player does not know this. Let it surface in small ways; "
+            f"never announce it.)")
+
+
+def note_thread(content: str) -> str:
+    """The thread back out of the note's framing, or ""."""
+    m = _NOTE_BODY.search(str(content or ""))
+    return m.group(1).strip() if m else ""

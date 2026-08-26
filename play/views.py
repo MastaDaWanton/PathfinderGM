@@ -15,7 +15,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import judgement, prompts
+from gm import judgement, prompts, watcher
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -326,7 +326,14 @@ def table(request):
 
 @require_GET
 def state(request):
-    return JsonResponse(_state(campaign_mod.current()))
+    c = campaign_mod.current()
+    # Anything the event watcher decided while the player was thinking lands here, on
+    # the request thread, against the live state — never from the watcher's own thread,
+    # which would race the save. Not while a roll is suspended: resolution is genuinely
+    # stopped mid-list, and nothing else may move underneath it.
+    if not c.scene.awaiting:
+        watcher.drain(c)
+    return JsonResponse(_state(c))
 
 
 @require_GET
@@ -589,6 +596,10 @@ def say(request):
         return JsonResponse(
             {"error": "There is a roll waiting on you."}, status=409
         )
+    # The watcher's pending work applies before the turn is read, so "I loot the
+    # watchman" finds whatever the watcher slipped into his coat while the player was
+    # typing — the garnish rides out with everything else `_op_loot` moves.
+    watcher.drain(c)
 
     body = read_body(request)
     text = (body.get("text") or "").strip()
@@ -908,6 +919,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     if plan is not None:
         c.last_intent_signature = judgement._signature(plan.intents)
     c.save()
+    # The turn is finished and on disk; now the event watcher may look at it. A daemon
+    # thread and snapshots only — this call never blocks the response, and the model's
+    # answer lands through `watcher.drain` on a later request, staleness-checked.
+    watcher.kick(c)
     return JsonResponse(_state(c))
 
 
