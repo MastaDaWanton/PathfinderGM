@@ -218,6 +218,42 @@ def fix_hand_back(text: str) -> tuple[str, str]:
     return " ".join(fixed.split()), gone
 
 
+# What every worked example in `prompts.EXAMPLES` ends on, word for word. Kept as one
+# constant because two places now write it and a hand-back that differed between them
+# would read as two different narrators.
+HAND_BACK = "What do you do?"
+
+
+def ensure_hand_back(text: str) -> tuple[str, bool]:
+    """Give the turn back to the player when it has forgotten to.
+
+    `fix_hand_back` handles the *wrong* question — "What do you see?", the GM asking the
+    player to do the GM's job. It cannot handle a missing one: `_closing_question` returns
+    None the moment the text does not end in "?", so it bows out of exactly the case
+    `no-hand-back` names.
+
+    Measured over fourteen turns of one live campaign: six shipped without a closing
+    question, every one of them logged `unrepaired: no-hand-back`. The model was asked to
+    rewrite and its rewrite lost, six times out of six.
+
+    Appending is always safe, which is what makes this a backstop rather than a guess —
+    every example in the prompt ends on this exact sentence, and a turn that has run out
+    of things to say still has to hand over.
+    """
+    said = (text or "").rstrip()
+    if not said or said.endswith("?"):
+        return text, False
+    # A turn that trails off mid-sentence gets its full stop as well; "almost. alive"
+    # and friends are what the model does when it runs out of budget.
+    #
+    # Closing quote marks do not count as missing punctuation. A beat that ends on
+    # "...but what it is remains unclear.'" already has its stop *inside* the speech, and
+    # adding another produced ".'. What do you do?".
+    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", ""):
+        said += "."
+    return f"{said} {HAND_BACK}", True
+
+
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,

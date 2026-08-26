@@ -294,6 +294,19 @@ class GMAgent:
                 prose_repairs = prose_repairs + [
                     f"asked the player to narrate: replaced {outsourced!r}"]
 
+            # And the case `fix_hand_back` cannot reach: no question at all. Six of
+            # fourteen turns in one live campaign shipped without one, every one logged
+            # `unrepaired: no-hand-back` — the model was asked to rewrite and its rewrite
+            # lost, six times out of six.
+            #
+            # Unconditional, like the two backstops above it. Every turn `plan_turn`
+            # produces is the player's turn to answer, in a fight or out of one; the
+            # consequence call is the one that hands nothing back, and it does not come
+            # through here.
+            narration, added = narration_mod.ensure_hand_back(narration)
+            if added:
+                prose_repairs = prose_repairs + ["no hand-back: added the question"]
+
             # Same reason, same place. Measured on the turn that prompted it: the review
             # found `wrong-body`, the rewrite was asked for, and it lost — the turn
             # carried three findings at once and the repair could not beat all of them —
@@ -682,6 +695,9 @@ class GMAgent:
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs = repairs + [f"asked the player to narrate: replaced {outsourced!r}"]
+        text, added = narration_mod.ensure_hand_back(text)
+        if added:
+            repairs = repairs + ["no hand-back: added the question"]
         text, swapped = narration_mod.right_body(text, self._pc_gender(),
                                                  self._other_names())
         if swapped:

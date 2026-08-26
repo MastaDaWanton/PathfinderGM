@@ -1087,3 +1087,62 @@ def test_the_vocabulary_is_read_off_the_world_rather_than_listed_here():
     src = inspect.getsource(GMAgent._world_vocabulary)
     assert "entities.values()" in src and "facts" in src
     assert "_VOCAB" in src, "not cached; this walks every entity's prose"
+
+
+
+# --- the repair that was never reachable --------------------------------------------------
+
+def test_a_turn_that_forgot_to_hand_back_gets_the_question_added():
+    """Measured across fourteen turns of one live campaign: six shipped without a closing
+    question, and every one logged `unrepaired: no-hand-back`. The model was asked to
+    rewrite and its rewrite lost, six times out of six.
+
+    `fix_hand_back` could never have helped. It handles the *wrong* question — "What do
+    you see?", the GM asking the player to do the GM's job — and `_closing_question`
+    returns None the moment the text does not end in "?", so it bows out of exactly the
+    case `no-hand-back` names. A backstop existed for the harder half of this rule and
+    none at all for the easier one.
+
+    Appending is always safe, which is what makes it a backstop rather than a guess: every
+    worked example in the prompt ends on this exact sentence."""
+    said = ("You come round about an hour later, face down where you fell, on one hit "
+            "point. Whoever was standing over you has gone.")
+    fixed, added = narration.ensure_hand_back(said)
+    assert added and fixed.endswith(narration.HAND_BACK)
+
+    r = narration.review(fixed, min_chars=len(said) - 10)
+    assert not any(f.kind == "no-hand-back" for f in r.findings)
+
+
+def test_a_turn_that_already_hands_back_is_untouched():
+    said = "The gate hangs open on one hinge. What do you do?"
+    assert narration.ensure_hand_back(said) == (said, False)
+
+
+def test_a_beat_that_trails_off_gets_its_full_stop_too():
+    """"making them feel almost. alive" is what the model does when it runs out of budget,
+    and appending straight onto it produced "alive What do you do?"."""
+    fixed, _ = narration.ensure_hand_back("the gutter spills over the sill")
+    assert fixed == "the gutter spills over the sill. What do you do?"
+
+
+def test_a_closing_quote_is_not_missing_punctuation():
+    """A beat ending "...but what it is remains unclear.'" already has its stop *inside*
+    the speech. Counting the quote mark as unpunctuated produced ".'. What do you do?"."""
+    fixed, _ = narration.ensure_hand_back("'...but what it is remains unclear.'")
+    assert ".'. " not in fixed
+    assert fixed.endswith("unclear.' " + narration.HAND_BACK)
+
+
+def test_both_backstops_run_and_in_the_right_order():
+    """`fix_hand_back` replaces a bad question; `ensure_hand_back` adds a missing one. The
+    replacement has to go first, or the added question lands after the bad one and the
+    turn ends with two."""
+    import inspect
+
+    from gm import agent as agent_mod
+
+    for fn in (agent_mod.GMAgent.plan_turn, agent_mod.GMAgent.narrate_turn):
+        src = inspect.getsource(fn)
+        assert "fix_hand_back(" in src and "ensure_hand_back(" in src, fn.__name__
+        assert src.index("fix_hand_back(") < src.index("ensure_hand_back("), fn.__name__
