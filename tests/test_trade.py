@@ -969,3 +969,80 @@ def test_prose_that_grants_the_cheat_is_an_outcome_claim():
     ]
     for said in legit:
         assert not find_outcome_claims(said), said
+
+
+
+# --- looting the fallen -------------------------------------------------------------------
+
+def test_looting_a_corpse_moves_everything_it_carried():
+    """"I loot the watchman I take everything" got a paragraph of coins, trinkets and
+    a sword — and the inventory page showed a traveler's outfit. Same class as the
+    sale that was prose and nothing else: the op did not exist."""
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    thug = instantiate("thug", scene=scene, name="the watchman")
+    scene.add(thug)
+    thug.hp = -13
+    thug.purse = {"gp": 7}
+    thug.inventory["silver-earring"] = 1
+    had_weapons = list(thug.weapons)
+    assert had_weapons
+
+    eng = Engine(scene, Dice(seed=3))
+    out = eng.run(eng.validate([{"op": "loot", "actor": "pc",
+                                 "params": {"from": thug.ref},
+                                 "because": "taking everything"}])).outcomes[0]
+    assert out.effects and out.effects[0]["kind"] == "took"
+    for w in had_weapons:
+        assert w in pc.weapons
+    assert pc.purse.get("gp", 0) >= 7
+    assert pc.inventory.get("silver-earring") == 1
+    assert thug.weapons == [] and thug.purse == {} and thug.inventory == {}
+    # A second pass finds honest emptiness, not a duplicate haul.
+    out = eng.run(eng.validate([{"op": "loot", "actor": "pc",
+                                 "params": {"from": thug.ref},
+                                 "because": "again"}])).outcomes[0]
+    assert "nothing left" in out.tell
+
+
+def test_the_living_keep_their_pockets():
+    """Taking from somebody on their feet is a steal manoeuvre with an opposed roll —
+    loot refuses in the fiction, costing nothing."""
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    thug = instantiate("thug", scene=scene, name="the guard")
+    scene.add(thug)
+    out = Engine(scene, Dice(seed=3)).run(
+        Engine(scene, Dice(seed=3)).validate(
+            [{"op": "loot", "actor": "pc", "params": {"from": thug.ref},
+              "because": "x"}]))
+    assert "steal" in out.outcomes[0].tell
+    assert thug.weapons
+
+
+def test_a_declared_looting_reaches_the_engine():
+    """Twelfth injector, same measurement as the other eleven."""
+    from gm import judgement
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    thug = instantiate("thug", scene=scene, name="the watchman")
+    scene.add(thug)
+    thug.hp = -13
+
+    raw = judgement.inject_loot([{"op": "narrate_only", "params": {}}],
+                                "I loot the watchman I take everything", scene)
+    assert raw[-1]["op"] == "loot"
+    assert raw[-1]["params"]["from"] == thug.ref
+    assert "loot" in judgement.declared_ops("I search the body", scene)
+
+    # Nobody dead here: nothing to declare, and no op forced on the schema.
+    thug.hp = 11
+    assert judgement.inject_loot([{"op": "narrate_only", "params": {}}],
+                                 "I loot the watchman", scene) ==         [{"op": "narrate_only", "params": {}}]

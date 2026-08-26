@@ -897,6 +897,11 @@ class Engine:
             raise IntentError(
                 f"{intent.op}: unknown ref {to!r} in params.to", "refs", index
             )
+        frm = intent.params.get("from_")
+        if intent.op == "loot" and frm and not self._known(frm, extra):
+            raise IntentError(
+                f"{intent.op}: unknown ref {frm!r} in params.from", "refs", index
+            )
 
     def _check_legality(self, intent: Intent, index: int) -> None:
         if intent.op == "rest" and self.scene.in_encounter:
@@ -2185,6 +2190,63 @@ class Engine:
             return (f"You are with {names}{more}. Foraging takes hours alone — "
                     f"leave the scene first.")
         return ""
+
+    def _op_loot(self, intent: Intent, partial: dict) -> Outcome:
+        """Strip a body, and mean it: everything it carried moves to the looter.
+
+        The measured gap, same class as the sale that was prose and nothing else: "I
+        loot the watchman I take everything" got a paragraph of coins, trinkets and a
+        sword, and the inventory page showed a traveler's outfit. The engine owns the
+        corpse's pockets. Only the down and the dead can be looted — taking from
+        somebody on their feet is a steal manoeuvre with an opposed roll, not this.
+        """
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        looter = self.scene.actors.get(who) if who else None
+        if looter is None:
+            raise IntentError("loot: nobody here to do the taking", "refs")
+        body = self.scene.actors.get(str(intent.params.get("from_", "")))
+        if body is None:
+            raise IntentError("loot: no such body here", "refs")
+        if body.hp > 0 and not body.has_condition("unconscious"):
+            return Outcome(
+                intent_id=intent.id, op="loot", effects=[],
+                tell=(f"{body.name} is on their feet and very much attached to their "
+                      f"belongings. Taking from the living is a steal, and they get "
+                      f"a say in it."), because=intent.because)
+
+        taken: list[str] = []
+        effects: list[dict] = []
+        for w in list(body.weapons):
+            if w and w != "unarmed":
+                looter.weapons.append(w)
+                taken.append(w)
+        body.weapons = []
+        if body.armour and body.armour != "none":
+            looter.carry(body.armour.replace(" ", "-"), 1)
+            taken.append(body.armour)
+            body.armour = "none"
+        for coin, n in dict(body.purse).items():
+            looter.purse[coin] = looter.purse.get(coin, 0) + n
+            taken.append(f"{n} {coin}")
+        body.purse = {}
+        for iid, n in dict(body.inventory).items():
+            looter.carry(iid, n)
+            taken.append(f"{n}x {iid}")
+        body.inventory = {}
+        for sid, stock in dict(body.stock).items():
+            looter.add_stock(stock, stock.count)
+            taken.append(stock.name)
+        body.stock = {}
+        if taken:
+            effects.append({"ref": looter.ref, "kind": "took",
+                            "from": body.ref, "items": taken})
+            tell = (f"{looter.name} strips {body.name}: "
+                    + ", ".join(taken) + ". It is all real now — carried, counted, "
+                    f"and on the sheet.")
+        else:
+            tell = f"{body.name} has nothing left worth taking."
+        return Outcome(intent_id=intent.id, op="loot", effects=effects,
+                       tell=tell, because=intent.because)
 
     def _op_forage(self, intent: Intent, partial: dict) -> Outcome:
         """Search the ground here for what grows on it.

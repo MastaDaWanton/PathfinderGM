@@ -209,6 +209,7 @@ class GMAgent:
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
+                raw = judgement.inject_loot(raw, player_input, self.engine.scene)
                 # Last, and after the target fills: a fight the player declared and the
                 # GM only described. Runs once there is certainly nobody to fight, so it
                 # cannot steal a turn from `fill_obvious_targets`.
@@ -611,6 +612,19 @@ class GMAgent:
                                                  self._other_names())
         if swapped:
             repairs.append(f"wrong body: replaced {', '.join(swapped)}")
+        # Nobody left standing means nobody "presses forward". Measured: the engine
+        # printed "The fight is over" under prose that had officials regaining their
+        # composure and pressing forward — combatants the scene never contained. The
+        # cut runs only when the scene is genuinely empty of living opposition, so a
+        # real second wave (spawned, existing) is never touched.
+        alone = not [a for r, a in self.engine.scene.actors.items()
+                     if not a.is_pc and a.hp > 0]
+        if alone:
+            text, ghosts = narration_mod.cut_phantom_opposition(text)
+            if ghosts:
+                repairs.append(
+                    f"phantom opposition: cut {len(ghosts)} sentence(s) of enemies "
+                    f"who are not in the scene")
         return text, repairs, attempts
 
     # The finding kinds with no deterministic backstop below them — the only ones worth

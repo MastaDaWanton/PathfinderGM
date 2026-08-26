@@ -1104,6 +1104,43 @@ def narrator_in_first_person(text: str) -> list[str]:
     return sorted(found)
 
 
+# Enemies who exist only in the prose. Measured at the Zhilvarnia gate: the engine
+# printed "The fight is over" while the narration had officials "regain their composure
+# and press forward, trying to overwhelm you with sheer numbers" — a group the scene
+# never contained. A group-noun within reach of a closing-in verb is the shape; the
+# caller gates it on the scene actually holding no living opposition, so a real second
+# wave is never touched.
+_PHANTOM_OPPOSITION = re.compile(
+    r"\b(?:guards?|officials?|soldiers?|watchmen|attackers?|enemies|assailants?|"
+    r"the\s+rest\s+of\s+them|they)\b[^.!?]{0,80}?"
+    r"\b(?:closing\s+in|close\s+in|press(?:es|ing)?\s+forward|surround(?:ing)?|"
+    r"advance|advancing|charg(?:e|es|ing)|moving\s+to\s+(?:surround|attack)|"
+    r"overwhelm|regroup(?:ing)?|form(?:ing)?\s+a\s+(?:defensive\s+)?line)\b", re.I)
+
+
+def cut_phantom_opposition(text: str) -> tuple[str, list[str]]:
+    """Drop sentences that press an attack nobody is present to press.
+
+    Sentence-level, like `drop_repeated_beats`: the surrounding prose (the crowd, the
+    aftermath, the hand-back) is usually fine, and one sentence of ghosts does not
+    forfeit the paragraph. Quoted speech is exempt — a frightened bystander may say
+    the guards are coming, and being wrong out loud is in character.
+    """
+    if not text:
+        return text or "", []
+    kept, cut = [], []
+    for m in _SENTENCE.finditer(text):
+        s = m.group(0)
+        if _PHANTOM_OPPOSITION.search(s) and not _OPENS_SPEECH.search(s) \
+                and '"' not in s and "“" not in s:
+            cut.append(s.strip())
+            continue
+        kept.append(s.strip())
+    if not cut:
+        return text, []
+    return " ".join(kept), cut
+
+
 # An ally the player has not got. Measured in the tavern: the killing blow came back as
 # "your fist connects with a meaty impact, and **your companion's** next swing brings you
 # another crushing blow" — Grist was alone in that fight, and had been for the whole

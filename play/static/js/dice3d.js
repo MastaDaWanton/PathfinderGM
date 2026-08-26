@@ -251,6 +251,11 @@
 
   /* --- the mat ---------------------------------------------------------------------- */
   var STYLE = [
+    // The waiting die turns on the compositor, not in script: a CSS animation keeps
+    // drifting when script callbacks are throttled (embedded panes, background
+    // windows), and it is the cheaper path besides.
+    "@keyframes d3d-drift{from{transform:rotateX(-18deg) rotateY(24deg)}",
+    "to{transform:rotateX(342deg) rotateY(384deg)}}",
     "#d3d-mat{position:fixed;inset:0;z-index:60;display:none;align-items:center;",
     "justify-content:center;background:radial-gradient(60% 50% at 50% 40%,",
     "rgba(10,8,6,.74),rgba(4,3,3,.92));font:15px/1.55 'Palatino Linotype',Palatino,Georgia,serif}",
@@ -541,16 +546,47 @@
     mat.querySelector("#d3d-debug").style.display = "";
     showOwn(debugOn());
 
+    // The die turns slowly while it waits — "it should spin slowly and then when i
+    // hit roll it should look like its getting cast and rolling." The idle is a CSS
+    // keyframe loop on the compositor, and the cast freezes the animation at its
+    // current pose (the computed matrix) before throwing, so there is no snap.
+    die.style.animation = "d3d-drift 26s linear infinite";
+
+    function cast() {
+      var pose = getComputedStyle(die).transform;
+      die.style.animation = "none";
+      die.style.transform = pose === "none"
+        ? "rotateX(-18deg) rotateY(24deg)" : pose;
+      void die.offsetWidth;                     // commit the freeze before the throw
+      return new Promise(function (r) {
+        // Up, over, and down: a throw reads as a throw because it leaves the table.
+        die.style.transition = "transform .35s cubic-bezier(.3,.7,.6,1)";
+        die.style.transform += " translateY(-46px) rotateX(200deg) rotateY(260deg)";
+        setTimeout(function () {
+          die.style.transition = "transform .55s cubic-bezier(.15,.85,.25,1)";
+          die.style.transform = die.style.transform
+            .replace("translateY(-46px)", "translateY(0)")
+            .replace("rotateX(200deg)", "rotateX(560deg)")
+            .replace("rotateY(260deg)", "rotateY(740deg)");
+          setTimeout(r, 560);
+        }, 350);
+      });
+    }
+
     return new Promise(function (done) {
-      function close(value) { mat.classList.remove("on"); done(value); }
+      function close(value) {
+        die.style.animation = "";
+        mat.classList.remove("on");
+        done(value);
+      }
       mat.querySelector("#d3d-go").onclick = function () {
+        var v = null;
         if (debugOn()) {
-          var v = parseInt(face.value, 10);
+          v = parseInt(face.value, 10);
           if (!(v >= lo && v <= hi)) { face.focus(); return; }
-          close(v);
-        } else {
-          close(null);
         }
+        mat.querySelector("#d3d-go").disabled = true;
+        cast().then(function () { close(v); });
       };
       face.onkeydown = function (e) {
         if (e.key === "Enter") mat.querySelector("#d3d-go").click();

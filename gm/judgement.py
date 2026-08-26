@@ -1492,6 +1492,42 @@ _GATHERS_PLANTS = re.compile(
 _FOR_HOURS = re.compile(r"\b(?:for\s+)?(\d{1,2})\s+hours?\b", re.I)
 
 
+_LOOTS = re.compile(
+    r"\b(?:loot|strip|rifle)\b|\bsearch\s+(?:the\s+)?(?:body|bodies|corpse)"
+    r"|\btake\s+everything\b", re.I)
+
+
+def inject_loot(raw_intents, player_text: str, scene) -> list:
+    """A declared looting reaches the engine — the corpse's pockets are its business.
+
+    Twelfth injector, same measurement as the other eleven: "I loot the watchman I
+    take everything" produced a paragraph of coins and a sword and moved nothing.
+    Fires only when somebody down-or-dead is actually here; the body is the nearest
+    such, because the player pointing at a specific corpse in a room of one is the
+    common case and the engine's tell names what actually came off it either way.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text or not _LOOTS.search(player_text):
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "loot"
+           for r in raw_intents):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    body = next((a for ref, a in scene.actors.items()
+                 if not a.is_pc and (a.hp <= 0 or a.has_condition("unconscious"))),
+                None)
+    if body is None:
+        return raw_intents
+    return list(raw_intents) + [{
+        "op": "loot", "actor": pc.ref,
+        "because": "the player said they take it",
+        "params": {"from": body.ref},
+    }]
+
+
 def inject_forage(raw_intents, player_text: str, scene) -> list:
     """Make a declared forage reach the engine.
 
@@ -1548,6 +1584,7 @@ _DECLARERS = (
     # rolls its tables — the other way round forages the old ground, or errors
     # "nowhere in particular" when there is none.
     ("forage", lambda raw, text, scene, world: inject_forage(raw, text, scene)),
+    ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
 )
 

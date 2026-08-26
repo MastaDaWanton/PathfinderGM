@@ -1408,3 +1408,23 @@ def test_no_schema_asks_ollama_for_a_grammar_it_cannot_compile():
         for cap in caps(schema):
             assert cap <= prompts.GRAMMAR_MAXLENGTH_CEILING, json.dumps(schema)[:120]
     assert prompts.GRAMMAR_MAXLENGTH_CEILING == 2000
+
+
+
+def test_enemies_who_exist_only_in_prose_are_cut_when_nobody_is_left():
+    """The engine printed "The fight is over" while the narration had officials
+    "regain their composure and press forward, trying to overwhelm you with sheer
+    numbers" — a group the scene never contained. Group noun + closing-in verb,
+    sentence-cut, only ever applied when the scene holds no living opposition."""
+    said = ("The official stumbles backward, clutching at his side. The rest of them "
+            "waver for a moment, but then they regain their composure and press "
+            "forward, trying to overwhelm you with sheer numbers. Dust settles over "
+            "the empty street.")
+    fixed, cut = narration.cut_phantom_opposition(said)
+    assert len(cut) == 1 and "press" in cut[0]
+    assert "overwhelm" not in fixed
+    assert "Dust settles" in fixed
+
+    # A frightened bystander may be wrong out loud — quoted speech is exempt.
+    speech = chr(34) + "The guards are closing in!" + chr(34) + " she cries."
+    assert narration.cut_phantom_opposition(speech) == (speech, [])

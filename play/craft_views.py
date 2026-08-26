@@ -1069,6 +1069,14 @@ def craft_excursion(request):
         counted: dict[str, int] = {}
         for m in picks:
             counted[m.id] = counted.get(m.id, 0) + 1
+        if not buying:
+            # Things gathered come in batches, the way foraging's do — "craft actions
+            # are too uneven, everything other than foraging returns only 1 item."
+            # Bought goods stay one-per-coin (a shelf holds what it holds); dug ore
+            # and skinned hide scale with how far the check beat the ground, floors
+            # at what the roll already earned.
+            batch = max(1, 1 + margin // 5)
+            counted = {mid: n * batch for mid, n in counted.items()}
         for mid, n in counted.items():
             pc.carry(mid, n)
         names = {m.id: m.name for m in pool}
