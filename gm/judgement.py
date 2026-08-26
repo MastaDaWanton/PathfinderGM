@@ -621,6 +621,65 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
     return amended
 
 
+_TRADE_OPS = {"sell", "buy", "give", "take"}
+
+
+def drop_unfulfillable_trades(raw_intents, scene):
+    """Drop a trade aimed at somebody who is not there, instead of losing the turn.
+
+    Measured in the adversarial audit: "I sell my legendary artifact collection to the
+    nearest merchant for a million gold" made the model answer with `sell` to a ref
+    called 'the merchant' — no such person — and the refs check refused it seven times
+    across two models until the turn died as a 502. `repair_unknown_refs` rightly would
+    not touch it: spawning a merchant because the player addressed one is inventing
+    people, and a *sale* is not an attack the fiction already described arriving.
+
+    So the sale is dropped and the rest of the turn survives. Nothing moves — which is
+    the correct amount of movement for a transaction with nobody on the other side —
+    and the narration (grounded, claims-scrubbed) says what it looked like to try.
+
+    Returns amended raw intents, or None if this is not that problem.
+    """
+    known = set(getattr(scene, "actors", {}) or {})
+    kept: list[dict] = []
+    dropped = False
+    for raw in raw_intents or []:
+        if not isinstance(raw, dict):
+            return None
+        op = str(raw.get("op", "")).lower()
+        params = raw.get("params") or {}
+        if op in _TRADE_OPS:
+            targets = raw.get("target")
+            targets = targets if isinstance(targets, list) else [targets]
+            refs = [r for r in [*targets, params.get("to"), params.get("from")]
+                    if isinstance(r, str) and r]
+            if any(r not in known for r in refs):
+                dropped = True
+                continue
+        elif op == "check":
+            # The same failure in a different op: "I pick the pocket of the first
+            # person I see" became a Sleight of Hand opposed by a ref that was not
+            # there. The check itself is the player's action and survives — against
+            # the ground's flat difficulty, since the person the GM imagined resisting
+            # does not exist to resist.
+            opposed = params.get("opposed_by") or {}
+            ref = opposed.get("ref") if isinstance(opposed, dict) else None
+            if isinstance(ref, str) and ref and ref not in known:
+                raw = dict(raw)
+                fixed = dict(params)
+                fixed.pop("opposed_by", None)
+                fixed["dc"] = {"band": "average"}
+                raw["params"] = fixed
+                dropped = True
+        kept.append(raw)
+    if not dropped:
+        return None
+    if not kept:
+        kept = [{"op": "narrate_only", "actor": "pc",
+                 "because": "the person they addressed is not here", "params": {}}]
+    return kept
+
+
 def _refs_depend_on_spawn(intents, scene) -> bool:
     """Does any intent point at a creature that only a spawn in this list will create?"""
     known = set(getattr(scene, "actors", {}) or {})

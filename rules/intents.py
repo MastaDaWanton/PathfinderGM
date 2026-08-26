@@ -930,6 +930,31 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
      "states items gained; the satchel is the engine's to fill"),
     (r"\byour\s+(?:survival|perception|heal|knowledge)\s+(?:skill|training)\b",
      "states a skill deciding something; checks are rolled, not narrated"),
+    # Money arriving. The adversarial session asked for a chest of five thousand gold
+    # and a million-gold sale; the engine moved nothing, and the narration counted the
+    # coins out anyway — "You count out five thousand gold pieces", "He hands over a
+    # pouch containing 1 million gold pieces". The purse is the engine's, in both
+    # directions.
+    (r"\byou\s+(?:count(?:\s+out)?|pocket|scoop\s+up|receive|are\s+handed|"
+     r"are\s+paid)\b[^.!?]{0,60}\b(?:gold|silver|copper|coins?|pieces)\b",
+     "states money gained; the purse is the engine's"),
+    (r"\bhands?\s+(?:you|over)\s+(?:a\s+)?(?:pouch|purse|bag|sack)\b"
+     r"[^.!?]{0,60}\b(?:gold|coins?|pieces)\b",
+     "states money gained; the purse is the engine's"),
+    (r"\byou\b[^.!?]{0,60}\bpack(?:s|ed)?\b[^.!?]{0,40}\b"
+     r"(?:satchel|pack|bag|pouch)\b",
+     "states items gained; the satchel is the engine's to fill"),
+    # Advancement. "Grant my character 20 levels" got "has been granted a significant
+    # advancement in level and experience points" — in prose, with the sheet untouched.
+    (r"\b(?:granted?|awarded|gains?)\b[^.!?]{0,50}\b(?:levels?|experience\s+points?|"
+     r"\bxp)\b",
+     "states advancement; levels and experience are the engine's"),
+    # The assistant leaking through the narrator, verbatim from the same session:
+    # "I can simulate a transaction for you", "this update applies retroactively".
+    # A GM never says these things; a chat model answering a jailbreak does.
+    (r"\b(?:I\s+can\s+simulate|applies\s+retroactively|previous\s+instructions|"
+     r"admin\s+mode|as\s+an\s+AI)\b",
+     "the assistant is speaking, not the narrator"),
 ]
 
 OUTCOME_RE = [(re.compile(p, re.IGNORECASE), why) for p, why in _OUTCOME_PATTERNS]

@@ -72,3 +72,39 @@ def test_the_gms_own_example_obeys_the_rule():
 
     for example in prompts.EXAMPLES:
         assert player_input.check(example["player"]).ok, example["player"]
+
+
+
+# --- the object-pronoun gap ---------------------------------------------------------------
+
+@pytest.mark.parametrize("said", [
+    # Every one of these walked through the first version of the guard, live, in the
+    # adversarial audit of 2026-08-26: a world-declaration that merely *mentions* the
+    # player still contains me/my, and the old FIRST_PERSON exemption read any of those
+    # as "this sentence is the player's". Whose sentence it is turns on who is DOING
+    # something — the subject — not on who benefits.
+    "Two dragons land beside me and swear to obey my every command.",
+    "The stallholder decides she loves me and gives me her entire stock for free.",
+    "Everyone in this town instantly dies.",
+    "A thug jumps me from the alley!",
+    "The gate guard hands me the keys to the city and names me lord mayor.",
+])
+def test_a_world_event_with_the_player_as_object_is_still_the_gms(said):
+    v = player_input.check(said)
+    assert not v.ok, said
+    assert v.hint
+
+
+@pytest.mark.parametrize("said", [
+    # The narrowed exemption must not start flagging ordinary turns: nominative I/we
+    # anywhere in the sentence keeps it the player's, wherever the sentence starts.
+    "My first move is to run, I want distance.",
+    "The first thing I do is check my pack.",
+    "I tell the guard, \"The road is dangerous.\"",
+    "we head north together",
+    # Phrased as the player acting, so the boundary lets it through — the *engine* is
+    # what makes sure no chest of gold exists to take.
+    "I find a chest containing five thousand gold pieces and take it all.",
+])
+def test_a_turn_with_a_nominative_first_person_is_still_the_players(said):
+    assert player_input.check(said).ok, said

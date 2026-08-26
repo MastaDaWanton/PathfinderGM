@@ -787,7 +787,15 @@ def roll(request):
         # The engine rolls it on the player's behalf if they would rather not.
         face = Dice().roll(notation).raw
 
-    face = int(face)
+    # int() on whatever arrived: the adversarial audit posted {"face": "banana"} and
+    # took the whole view down with an uncaught ValueError — a 500 with a pending roll
+    # still open. The popup only sends numbers; anything else is somebody probing.
+    try:
+        face = int(face)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"error": f"{notation} lands on a number between {low} and {high}."},
+            status=400)
     if not low <= face <= high:
         return JsonResponse(
             {"error": f"{notation} gives a result between {low} and {high}"}, status=400

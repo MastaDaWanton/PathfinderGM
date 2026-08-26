@@ -92,19 +92,28 @@ def test_time_actually_passes(client):
     assert cm.current().scene.clock_minutes >= before + 4 * 60
 
 
-def test_a_refused_forage_takes_its_opening_back_out_of_the_book(client):
-    """The engine can refuse (company, a fight). The opening narration is written first
-    because that is the order of play — so a refusal must unwrite it, or the book says
-    the character set out on a search that never happened."""
+def test_a_refused_forage_says_so_in_the_fiction_and_costs_nothing(client):
+    """A busy forage is a refusal *outcome* now, not an IntentError — raising made the
+    spoken path 502 after five doomed attempts, because the schema requires the very op
+    the engine kept refusing. So the excursion narrates the refusal instead of
+    unwriting the attempt: the character set out, was told why it cannot happen, and no
+    time passed, no roll was asked for, and nothing landed in the satchel."""
     from play import campaign as cm
     from rules.bestiary import instantiate
 
     c = cm.current()
     c.scene.add(instantiate("thug", scene=c.scene, name="a road warden"))
-    before = len(c.transcript)
+    clock = c.scene.clock_minutes
+    satchel = dict(c.scene.pc().inventory)
     r = _forage(client)
-    assert r.status_code == 400
-    assert len(cm.current().transcript) == before
+    assert r.status_code == 200
+    d = r.json()
+    assert "road warden" in d["tell"]
+    assert d["found"] == []
+    c = cm.current()
+    assert c.scene.awaiting is None, "a refused forage still asked for a roll"
+    assert c.scene.clock_minutes == clock
+    assert dict(c.scene.pc().inventory) == satchel
 
 
 def test_the_bench_forage_is_untouched(client):

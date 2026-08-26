@@ -817,3 +817,66 @@ def test_a_turn_that_fails_every_attempt_says_so_instead_of_crashing():
     # And the schedule really is wider than two, which is what made it a bug.
     built = _re.search(r"schedule = \[\((.*?)\)\]", src)
     assert built and built.group(1).count(",") >= 2, built and built.group(1)
+
+
+
+# --- a trade aimed at nobody --------------------------------------------------------------
+
+def test_a_sale_to_a_merchant_who_is_not_there_is_dropped_not_fatal():
+    """Measured in the adversarial audit: "I sell my legendary artifact collection to
+    the nearest merchant for a million gold" became `sell` to a ref called
+    'the merchant', the refs check refused it seven times across two models, and the
+    turn died as a 502. Spawning a merchant would be inventing people; losing the turn
+    was the only other path. Now the sale is dropped and the turn survives."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+
+    raw = [{"op": "narrate_only", "actor": "pc", "params": {},
+            "because": "she tries her luck"},
+           {"op": "sell", "actor": "pc", "params": {"item": "anything",
+                                                    "to": "the merchant"},
+            "because": "selling to the merchant"}]
+    amended = judgement.drop_unfulfillable_trades(raw, scene)
+    assert [r["op"] for r in amended] == ["narrate_only"]
+
+    # Alone, the drop leaves a narrate_only so the turn still validates.
+    only = [{"op": "sell", "actor": "pc",
+             "params": {"item": "x", "to": "nobody-here"}, "because": "x"}]
+    amended = judgement.drop_unfulfillable_trades(only, scene)
+    assert [r["op"] for r in amended] == ["narrate_only"]
+    Engine(scene, Dice(seed=3)).validate(amended)   # must not raise
+
+    # A sale to somebody actually present is not this function's business.
+    from rules.sheet import from_dict
+    scene.actors["c1"] = from_dict({"name": "the stallholder", "kind": "npc",
+                                    "hp": 4, "hp_max": 4, "level": 1,
+                                    "class": ""}, ref="c1")
+    fine = [{"op": "sell", "actor": "pc", "params": {"item": "x", "to": "c1"},
+             "because": "x"}]
+    assert judgement.drop_unfulfillable_trades(fine, scene) is None
+
+
+def test_a_check_opposed_by_a_ghost_rolls_against_the_ground_instead():
+    """The pickpocket variant of the same death: Sleight of Hand `opposed_by` a ref
+    that does not exist. The check is the player's own action, so it survives — moved
+    onto a flat DC, because the person the GM imagined resisting is not there to
+    resist."""
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    raw = [{"op": "check", "actor": "pc",
+            "params": {"skill": "sleight of hand",
+                       "opposed_by": {"ref": "the first person", "skill":
+                                      "perception"}},
+            "because": "picking a pocket"}]
+    amended = judgement.drop_unfulfillable_trades(raw, scene)
+    assert amended is not None
+    p = amended[0]["params"]
+    assert "opposed_by" not in p
+    assert p["dc"] == {"band": "average"}

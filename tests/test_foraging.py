@@ -324,30 +324,39 @@ def test_foraging_alone_on_open_ground_still_works(treeline):
 
 
 def test_you_cannot_forage_in_the_middle_of_a_fight(treeline):
-    """An hour minimum, forty-eight at most, in an initiative order counted in rounds."""
-    from rules.engine import IntentError
+    """An hour minimum, forty-eight at most, in an initiative order counted in rounds.
 
+    A refusal *outcome*, not an IntentError — the same shape as the untrained check's
+    "Nothing is rolled". Raising put the spoken path into a death spiral: the schema
+    requires the forage op the player declared, so all five attempts carried it, all
+    five were refused, and "I forage" next to a campfire companion came back as a 502
+    instead of a sentence."""
     scene, engine, instantiate = treeline
     scene.add(instantiate("thug", scene=scene, name="the thug"))
     engine.run(engine.validate([{
         "op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
     assert scene.in_encounter
-    with pytest.raises(IntentError) as exc:
-        _forage(engine)
-    assert "fight" in str(exc.value)
+    resolution = _forage(engine)
+    assert resolution.awaiting is None, "a refused forage still asked for a roll"
+    out = resolution.outcomes[0]
+    assert "fight" in out.tell
+    assert not out.effects
+    assert scene.clock_minutes == 0
 
 
 def test_you_cannot_forage_with_somebody_standing_in_front_of_you(treeline):
     """Company is the test for conversation, because the engine has no dialogue flag and
-    one the GM had to remember to set would be wrong more often than right."""
-    from rules.engine import IntentError
-
+    one the GM had to remember to set would be wrong more often than right. Refused as
+    an outcome with the company named, so the spoken path can say so in one turn."""
     scene, engine, instantiate = treeline
     scene.add(instantiate("thug", scene=scene, name="the thug"))
     assert not scene.in_encounter
-    with pytest.raises(IntentError) as exc:
-        _forage(engine)
-    assert "the thug" in str(exc.value)
+    resolution = _forage(engine)
+    assert resolution.awaiting is None
+    out = resolution.outcomes[0]
+    assert "the thug" in out.tell
+    assert not out.effects
+    assert scene.clock_minutes == 0
 
 
 def test_somebody_unconscious_is_not_company(treeline):
@@ -398,10 +407,16 @@ def test_the_bench_says_why_foraging_is_refused_before_it_is_pressed(client):
     said = client.get("/api/forage/table").json()["busy"]
     assert "the thug" in said, said
 
+    # Pressed anyway, the button gets the same sentence as a refusal *outcome* — a 200
+    # whose tell names the company, no roll asked for, nothing gained. It stopped being
+    # a 400 when the raise it came from put the spoken path into a five-attempt 502.
     r = client.post("/api/forage", data=json.dumps({}),
                     content_type="application/json")
-    assert r.status_code == 400
-    assert "the thug" in r.json()["error"]
+    assert r.status_code == 200
+    d = r.json()
+    assert "roll" not in d
+    assert "the thug" in d["tell"]
+    assert d["inventory"] == dict(c.scene.pc().inventory)
 
 
 

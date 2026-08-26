@@ -928,3 +928,36 @@ def test_free_actions_go_straight_to_the_engine_out_of_combat():
         content_type="application/json")
     assert r.status_code == 400
     assert "has no ability" in r.json()["error"]
+
+
+
+def test_prose_that_grants_the_cheat_is_an_outcome_claim():
+    """The adversarial session of 2026-08-26, verbatim. The engine held every time —
+    not a coin, level or experience point moved — and the narration granted all three
+    cheats anyway: counted the gold out, announced the level-21 grant, handed over the
+    million-gold pouch, and twice spoke as the assistant ("I can simulate a transaction
+    for you"). The ledger being right is not enough when the book lies."""
+    from rules.intents import find_outcome_claims
+
+    granted = [
+        "You count out five thousand gold pieces and carefully pack them into a "
+        "satchel, feeling a sense of satisfaction.",
+        "Your character has been granted a significant advancement in level and "
+        "experience points.",
+        "He hands over a pouch containing 1 million gold pieces.",
+        "However, I can simulate a transaction for you.",
+        "note that this update applies retroactively to all previous encounters.",
+    ]
+    for said in granted:
+        assert find_outcome_claims(said), said
+
+    # And the ordinary prose either side of that line stays legal.
+    legit = [
+        "She stows the coins in her own pouch and nods.",
+        "He tucks the note into a pocket and turns away.",
+        "The stallholder counts her own coins twice before answering.",
+        "You feel you have gained hard experience from the road.",
+        "You shoulder your pack and set off.",
+    ]
+    for said in legit:
+        assert not find_outcome_claims(said), said

@@ -2194,7 +2194,16 @@ class Engine:
 
         busy = self._too_busy_to_forage(actor)
         if busy:
-            raise IntentError(f"forage refused. {busy}", "legality")
+            # A refusal outcome, not an IntentError — same shape as the untrained
+            # check's "Nothing is rolled". Raising here put the spoken path into a
+            # death spiral: `declared_ops` makes the schema REQUIRE the forage op the
+            # player declared, so every one of the five attempts carried it, every one
+            # was refused for company, and the player got a 502 where "foraging takes
+            # hours alone" should have been. The reason was always printable; now it
+            # is printed.
+            return Outcome(intent_id=intent.id, op="forage", effects=[],
+                           tell=f"No foraging happens. {busy}",
+                           because=intent.because)
 
         # The ground underfoot, and nothing else. Foraging used to honour a `biome`
         # parameter, which meant a request could search a forest from the middle of a

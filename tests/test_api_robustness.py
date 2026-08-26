@@ -146,3 +146,32 @@ def test_no_endpoint_answers_a_bad_body_with_a_traceback(client, url):
                  {}, [1, 2, 3]):
         r = client.post(url, data=json.dumps(body), content_type="application/json")
         assert r.status_code < 500, f"{url} -> {r.status_code} on {body}"
+
+
+
+def test_a_face_that_is_not_a_number_is_refused_not_crashed(client):
+    """The adversarial audit posted {"face": "banana"} at a pending roll and took the
+    view down with an uncaught ValueError — a 500 with the roll still open. A garbage
+    face must 400 with the roll intact, and a real face must still land afterwards."""
+    import json as _json
+
+    from play import campaign as cm
+
+    c = cm.current()
+    if c.scene.pc() is None or c.scene.awaiting or c.scene.in_encounter:
+        pytest.skip("needs a quiet live campaign")
+    had_company = [r for r, a in c.scene.actors.items() if not a.is_pc]
+    if had_company:
+        pytest.skip("foraging needs solitude and this scene has company")
+
+    r = client.post("/api/forage", data="{}", content_type="application/json")
+    if r.status_code != 200 or "roll" not in r.json():
+        pytest.skip(f"could not open a roll here: {r.status_code}")
+    try:
+        r = client.post("/api/roll", data=_json.dumps({"face": "banana"}),
+                        content_type="application/json")
+        assert r.status_code == 400
+        assert "between" in r.json()["error"]
+        assert cm.current().scene.awaiting, "the garbage face consumed the roll"
+    finally:
+        client.post("/api/roll", data="{}", content_type="application/json")

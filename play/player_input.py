@@ -18,22 +18,33 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-FIRST_PERSON = re.compile(r"\b(i|i'm|i'd|i'll|i've|me|my|mine|myself|we|us|our)\b", re.I)
+# Only the nominative forms. The first cut of this exempted any sentence containing
+# me/my/mine/us/our — and an adversarial audit walked straight through the gap: "Two
+# dragons land beside ME and swear to obey MY every command" and "The stallholder
+# decides she loves ME and gives ME her entire stock for free" both passed, because a
+# world-declaration with the player as its *object* still mentions them. Whose sentence
+# it is turns on who is doing something, and that is the subject, not the beneficiary.
+FIRST_PERSON = re.compile(r"\b(i|i'm|i'd|i'll|i've|we|we're|we'd|we'll|we've)\b", re.I)
 
 # Things happening in the world, told rather than asked. The verb list is what a player
-# reaches for when they narrate an arrival or an NPC's action.
+# reaches for when they narrate an arrival, an NPC's action — or, the audit added, an
+# NPC's generosity: decides, gives, swears, grants came from the lines that got through.
 WORLD_VERB = re.compile(
     r"\b(comes?|coming|steps?|stepping|walks?|appears?|arrives?|emerges?|enters?|"
     r"rounds?|rushes|charges?|attacks?|swings?|draws?|grabs?|shouts?|yells?|says?|"
     r"falls?|drops?|opens?|closes?|slams?|blocks?|leaps?|jumps?|lunges?|turns?|"
-    r"stands?|sits?|dies?|flees?|runs?|bursts?|slips?|throws?)\b",
+    r"stands?|sits?|dies?|flees?|runs?|bursts?|slips?|throws?|lands?|landing|"
+    r"swoops?|descends?|kneels?|bows?|decides?|deciding|gives?|giving|hands?|"
+    r"handing|offers?|agrees?|swears?|grants?|names?|obeys?|surrenders?)\b",
     re.I,
 )
 
 # A sentence that starts by naming somebody or something other than the player.
+# "everyone"/"nobody" joined after "Everyone in this town instantly dies" opened a
+# sentence no pattern owned.
 SUBJECT = re.compile(
     r"^\s*(the|a|an|two|three|four|five|six|several|some|a few|another|one of|"
-    r"his|her|their|its|\d+)\b",
+    r"his|her|their|its|everyone|everybody|nobody|no one|all of|each of|\d+)\b",
     re.I,
 )
 

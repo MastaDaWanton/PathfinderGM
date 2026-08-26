@@ -224,6 +224,23 @@ class GMAgent:
                         except IntentError:
                             amended = None
                     if not amended:
+                        # A sale addressed to somebody who is not here is not the
+                        # spawn repair's business — a merchant must not pop into
+                        # existence because the player addressed one — but it must not
+                        # cost the turn either: seven attempts died on exactly this
+                        # before the drop existed.
+                        amended = judgement.drop_unfulfillable_trades(
+                            data.get("intents"), self.engine.scene)
+                        if amended:
+                            try:
+                                intents = self.engine.validate(amended)
+                                rejections.append(
+                                    f"attempt {n + 1} [refs, dropped]: a trade aimed "
+                                    f"at nobody present was dropped")
+                                data = dict(data, intents=amended)
+                            except IntentError:
+                                amended = None
+                    if not amended:
                         rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
                         messages = _with_correction(base, reply.text, str(exc))
                         continue

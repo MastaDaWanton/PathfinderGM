@@ -195,6 +195,16 @@ the stamp has to be written and compared before the suite goes green.
 
 ## What was verified against the real exe
 
+The 2026-08-24 verification below was a one-off script; it is now a committed tool —
+`python tools/prove_build.py` launches `dist/PathfinderGM.exe` against a fresh throwaway
+data directory and drives it over HTTP, importing nothing from the app. Re-run on
+2026-08-26 against a rebuild carrying the week's changes: **16/16 clean**, including the
+merchant-gated trade panel, the out-of-combat combat-panel gates, the player-boundary
+hand-back (which runs before the model, so the check needs no Ollama), the full forage
+suspend/resume round trip (Survival prompt with breakdown → garbage face refused with
+the roll intact → the player's face resolving the session), and the world-upload cache
+surviving a broken overwrite inside one mtime tick.
+
 All of this against `dist/PathfinderGM.exe` with `PATHFINDER_GM_DATA` pointed at a fresh
 throwaway directory, driven over HTTP by a script that imports nothing from the app.
 
