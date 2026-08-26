@@ -194,6 +194,10 @@ def heal_name(base: str) -> str:
     # Tincture" — where it blocks the strip loop from ever reaching the words in front of
     # it. The real concentration is a field on the jar; this is only ever a duplicate.
     name = re.sub(r"\s*\(Tier \d+\)", "", str(base or "")).strip()
+    # Ellipses accumulate one per re-craft the same way shape words did — a real live
+    # jar reads "Blackthorn Tincture (Acacia Infusion, Allnight Infusion…………) Purified
+    # Draught", four crafts deep. Any run of dots or ellipsis characters is one elision.
+    name = re.sub(r"(?:…|\.\.){2,}\.?|…\.+|\.{4,}", "…", name)
     words = sorted(set(SHAPE_WORDS.values()) | {"Preparation"}, key=len, reverse=True)
     tail = ""
     for word in words:

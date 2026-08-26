@@ -1034,6 +1034,36 @@ NARRATION_REPAIR_EXAMPLE = {
 }
 
 
+def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
+    """The one-field schema for every call that only writes prose.
+
+    Honest about what it buys, because the first version of this docstring overclaimed
+    and the call-site audit corrected it. `as_json=True` already puts a JSON grammar at
+    the sampler on Ollama, so the live failure —
+
+        polish failed: Unterminated string starting at: line 1 column 15 (char 14)
+
+    — was not an unconstrained sampler. It was the token budget dying mid-string
+    (`num_predict` stops generation regardless of grammar state), which no schema
+    prevents and the callers' try/except still catches. Three things this *does* buy:
+
+      * the required `narration` key, so a structurally empty reply is unsamplable;
+      * `maxLength`, which is the real truncation fix — a ceiling the token budget can
+        comfortably afford means the string closes before the budget dies (six call-1
+        rejections in the census were "Expecting ',' delimiter" at ~char 420, all
+        budget deaths);
+      * nothing at all on hosted providers, which silently ignore `schema=` — the
+        guarantee is Ollama-only, and the except paths are why that is survivable.
+    """
+    narration: dict = {"type": "string"}
+    if min_chars:
+        narration["minLength"] = int(min_chars)
+    if max_chars:
+        narration["maxLength"] = int(max_chars)
+    return {"type": "object", "properties": {"narration": narration},
+            "required": ["narration"]}
+
+
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
                               scene_brief: str = "") -> list[dict]:
     """The rewrite call, given something to write *about*.
@@ -1127,6 +1157,12 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     narration = {"type": "string"}
     if min_chars:
         narration["minLength"] = int(min_chars)
+    # A ceiling as well as a floor. Six planner rejections in the all-saves census were
+    # "Expecting ',' delimiter" at around character 420 — the token budget dying inside
+    # the narration string, which no grammar prevents but a length ceiling makes room
+    # for: a string that must close by N characters closes while there is still budget
+    # to write the intents after it.
+    narration["maxLength"] = 800 if fighting else 2200
     return {
         "type": "object",
         "properties": {

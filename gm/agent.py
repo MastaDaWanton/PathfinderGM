@@ -265,64 +265,18 @@ class GMAgent:
                                 suggestions=_suggestions(data), attempts=attempts,
                                 repairs=repairs, rejections=rejections)
 
-            # Check 4 is the only one that gets a targeted repair, because the narration
-            # around the claim is worth keeping.
-            narration = judgement.name_refs(narration, self.engine.scene)
-            # The player's own turn bleeds the worked examples' cast the same way NPC
-            # turns do — the player's words join the cast as context, so "I pay the
-            # thug" stays sayable even before the thug is an actor.
-            narration = narration_mod.strip_example_cast(
-                narration,
-                player_input + " "
-                + " ".join(a.name for a in self.engine.scene.actors.values()))
-            narration, claim_repairs, repair_attempts = self._repair_outcome_claims(narration)
-            attempts.extend(repair_attempts)
-            narration, prose_repairs, prose_attempts = self.polish(
+            narration, prose_repairs, prose_attempts = self._groom(
                 narration, earlier=recent_narration or [],
                 min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
                            else narration_mod.MIN_SCENE_CHARS),
                 max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
-                player_input=player_input, scene_brief=brief)
+                player_input=player_input, brief=brief, hand_back=True, claims=True)
             attempts.extend(prose_attempts)
-
-            # Last, and unconditional. `polish` keeps the original whenever its rewrite
-            # is no better, so a narration that outsources the description can survive
-            # the repair — and the one thing that must never reach the player is the GM
-            # asking them what they can see.
-            narration, outsourced = narration_mod.fix_hand_back(narration)
-            if outsourced:
-                prose_repairs = prose_repairs + [
-                    f"asked the player to narrate: replaced {outsourced!r}"]
-
-            # And the case `fix_hand_back` cannot reach: no question at all. Six of
-            # fourteen turns in one live campaign shipped without one, every one logged
-            # `unrepaired: no-hand-back` — the model was asked to rewrite and its rewrite
-            # lost, six times out of six.
-            #
-            # Unconditional, like the two backstops above it. Every turn `plan_turn`
-            # produces is the player's turn to answer, in a fight or out of one; the
-            # consequence call is the one that hands nothing back, and it does not come
-            # through here.
-            narration, added = narration_mod.ensure_hand_back(narration)
-            if added:
-                prose_repairs = prose_repairs + ["no hand-back: added the question"]
-
-            # Same reason, same place. Measured on the turn that prompted it: the review
-            # found `wrong-body`, the rewrite was asked for, and it lost — the turn
-            # carried three findings at once and the repair could not beat all of them —
-            # so "your pectoralis major muscles" reached the player for a second time.
-            # Telling somebody their character has a body she does not have is not a
-            # prose nit to lose a coin-toss over.
-            narration, swapped = narration_mod.right_body(
-                narration, self._pc_gender(), self._other_names())
-            if swapped:
-                prose_repairs = prose_repairs + [
-                    f"wrong body: replaced {', '.join(repr(s) for s in swapped)}"]
 
             return TurnPlan(narration=narration, intents=intents,
                             suggestions=_suggestions(data),
                             attempts=attempts,
-                            repairs=repairs + claim_repairs + prose_repairs,
+                            repairs=repairs + prose_repairs,
                             rejections=rejections)
 
         # `schedule` holds (model, host, provider, key). Unpacked as a pair, this line
@@ -356,9 +310,17 @@ class GMAgent:
         rejections: list[str] = []
 
         for n in range(max_attempts):
-            reply = client.chat(messages, self.model, self.host, as_json=True, provider=self.provider,
-                api_key=self.api_key,
-                                temperature=0.7, num_predict=400)
+            reply = client.chat(messages, self.model, self.host, as_json=True,
+                                provider=self.provider, api_key=self.api_key,
+                                temperature=0.7, num_predict=400,
+                                # The same grammar every other turn call carries. This
+                                # one ran bare, so none of turn_schema's guarantees —
+                                # ref enums, the fight-op restriction, minItems — ever
+                                # applied to NPC turns, and malformed shapes cost the
+                                # retry loop the schema exists to eliminate.
+                                schema=prompts.turn_schema(
+                                    fighting=self.engine.scene.in_encounter,
+                                    refs=tuple(self.engine.scene.actors)))
             attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()
@@ -368,19 +330,22 @@ class GMAgent:
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
 
-            narration = judgement.name_refs(
-                str(data.get("narration", "")).strip(), self.engine.scene)
-            # The worked examples' own cast, playing themselves: a bear's turn narrated
-            # as "The thug... swinging the sap". The scene's real cast is the context —
-            # a genuine thug keeps his sentences.
-            cast = " ".join(a.name for a in self.engine.scene.actors.values())
-            narration = narration_mod.strip_example_cast(narration, cast)
-            narration, repairs, repair_attempts = self._repair_outcome_claims(narration)
-            attempts.extend(repair_attempts)
-            narration, outsourced = narration_mod.fix_hand_back(narration)
-            if outsourced:
-                repairs = repairs + [
-                    f"asked the player to narrate: replaced {outsourced!r}"]
+            # The census over all seven saves found this was the one door with no review
+            # at all: NPC prose reached the transcript having seen only name_refs, the
+            # example-cast strip, the claim repair and the bad-question fix — no invented
+            # names, no third person, no wrong body, nothing. In a fight, half of what
+            # the player reads comes through here.
+            #
+            # `rewrite=False`: the deterministic backstops close the hole for free, and a
+            # ~10s polish call per NPC per round is a price a fight cannot pay.
+            # `hand_back=False`: an NPC beat mid-round hands nothing back.
+            narration, repairs, groom_attempts = self._groom(
+                str(data.get("narration", "")).strip(),
+                earlier=None, min_chars=0,
+                max_chars=narration_mod.MAX_COMBAT_CHARS,
+                player_input="", brief=brief, hand_back=False, claims=True,
+                rewrite=False)
+            attempts.extend(groom_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
                             repairs=repairs, rejections=rejections)
 
@@ -550,46 +515,143 @@ class GMAgent:
                   if not a.is_pc and a.hp > 0]
         return not others
 
+    def _groom(self, text: str, *, earlier: list[str] | None = None,
+               min_chars: int = 0, max_chars: int = 0, player_input: str = "",
+               brief: str = "", hand_back: bool = True, claims: bool = True,
+               rewrite: bool = True) -> tuple[str, list[str], list[Attempt]]:
+        """Every mechanical treatment a piece of GM prose gets, in one place.
+
+        There used to be four copies of this chain and they had drifted — the census over
+        all seven saved campaigns found that `npc_turn` prose reached the transcript with
+        no review at all, and the consequence call had no third-person check for months.
+        One rule, one home, per CLAUDE.md's own law about rules with more than one copy.
+
+        Order matters and is deliberate:
+          1. `destutter` first, so every sentence-splitting detector below reads repaired
+             punctuation — the stray period in "My chest is. muscular" once broke the
+             ownership detector itself.
+          2. `drop_repeated_beats` before review, so the length floor and the hand-back
+             backstop judge the post-cut text.
+          3. the claim repair, then the one model rewrite (`polish`).
+          4. the deterministic backstops, which run whether or not the rewrite landed —
+             46% of everything the reviewer caught used to ship anyway, because the
+             rewrite losing was the end of the road.
+        """
+        repairs: list[str] = []
+        attempts: list[Attempt] = []
+        if not text:
+            return text or "", repairs, attempts
+
+        text = narration_mod.destutter(text)
+        text, cut = narration_mod.drop_repeated_beats(text, earlier)
+        if cut:
+            repairs.append(f"repeated beats: cut {cut}")
+        text = judgement.name_refs(text, self.engine.scene)
+        cast = " ".join(a.name for a in self.engine.scene.actors.values())
+        text = narration_mod.strip_example_cast(text, f"{player_input} {cast}")
+        if claims:
+            text, claim_repairs, claim_attempts = self._repair_outcome_claims(text)
+            repairs += claim_repairs
+            attempts += claim_attempts
+
+        # A legacy campaign's woven-in people count as known from here down, so the
+        # reviewer stops burning rewrites on Vorgath and the un-namer leaves him be.
+        extra = narration_mod.established_names(earlier)
+        if rewrite:
+            text, p_repairs, p_attempts = self.polish(
+                text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
+                player_input=player_input, scene_brief=brief, extra_known=extra)
+            repairs += p_repairs
+            attempts += p_attempts
+
+        known = self._known_names() | extra
+        text, unnamed = narration_mod.unname_strangers(text, known)
+        if unnamed:
+            repairs.append(f"people from nowhere: un-named {', '.join(unnamed)}")
+        if narration_mod.narrator_in_first_person(text):
+            text, fp = narration_mod.second_person_narrator(text)
+            if fp:
+                repairs.append(f"narrator in the scene: swapped {', '.join(fp)}")
+        text, outsourced = narration_mod.fix_hand_back(text)
+        if outsourced:
+            repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
+        if hand_back:
+            text, added = narration_mod.ensure_hand_back(text)
+            if added:
+                repairs.append("no hand-back: added the question")
+        text, swapped = narration_mod.right_body(text, self._pc_gender(),
+                                                 self._other_names())
+        if swapped:
+            repairs.append(f"wrong body: replaced {', '.join(swapped)}")
+        return text, repairs, attempts
+
+    # The finding kinds with no deterministic backstop below them — the only ones worth
+    # a second model call, because for everything else the backstop repairs for free
+    # what the retry would chase. `repeats-an-earlier-beat` left this set the day the
+    # cut became mechanical; `no-hand-back` the day the question became appendable.
+    _NO_BACKSTOP = frozenset({
+        "echoes-the-examples", "misgendered-pc", "formulaic-opening",
+        "third-person-pc", "too-short", "too-long-for-a-fight",
+        "invented-companion",
+    })
+
     def polish(self, text: str, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
-               scene_brief: str = "") -> tuple[str, list[str], list[Attempt]]:
-        """One targeted rewrite when the prose breaks a rule about prose.
+               scene_brief: str = "",
+               extra_known: set[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+        """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
         model to repair only what was found. If the rewrite is no better the original is
         kept — blander prose is worth less than a lost turn.
+
+        One retry, narrowly gated. Measured across the seven saved campaigns, 46% of
+        everything the reviewer caught shipped unrepaired, and the losing rewrites were
+        the ones handed several findings at once — a model asked for N things answers in
+        parallel, which is the five-factions lesson wearing a new hat. The retry names
+        ONLY the heaviest finding, and only fires when that finding has no deterministic
+        backstop (a backstop repairs for free what the retry would chase) and the scene
+        is not a fight (a second ~10s call mid-combat costs more than the finding).
         """
-        review = narration_mod.review(
-            text, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier,
-            min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
-            pronouns=self._pc_pronouns(), others=self._other_names(),
-            gender=self._pc_gender(),
-        )
+        known = self._known_names() | (extra_known or set())
+
+        def _review(t: str):
+            return narration_mod.review(
+                t, pc_name=self._pc_name(), echo_index=self._echo_index(),
+                known_names=known, earlier=earlier,
+                min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
+                pronouns=self._pc_pronouns(), others=self._other_names(),
+                gender=self._pc_gender(),
+            )
+
+        review = _review(text)
         if review.ok:
             return text, [], []
 
-        try:
+        def _rewrite(complaint: str, note: str):
             reply = client.chat(
                 prompts.narration_repair_messages(
-                    text, review.complaint(), player_input, scene_brief),
+                    text, complaint, player_input, scene_brief),
                 self.model, self.host, as_json=True, provider=self.provider,
                 api_key=self.api_key, temperature=0.6, num_predict=900,
+                # Structural insurance, not a truncation cure: `as_json` already puts a
+                # JSON grammar at the sampler, and the live "Unterminated string" failure
+                # was the token budget dying mid-string — which no grammar prevents and
+                # the except below still catches. What the schema adds is the required
+                # key and a length ceiling the budget can actually afford.
+                schema=prompts.prose_schema(max_chars=1600),
             )
-            attempt = Attempt("polish", reply.seconds, reply.model, reply.text,
-                              note="; ".join(review.as_log()))
-            fixed = str(reply.json().get("narration", "")).strip()
+            return (str(reply.json().get("narration", "")).strip(),
+                    Attempt("polish", reply.seconds, reply.model, reply.text, note=note))
+
+        attempts: list[Attempt] = []
+        try:
+            fixed, attempt = _rewrite(review.complaint(), "; ".join(review.as_log()))
+            attempts.append(attempt)
         except Exception as exc:
             return text, [f"polish failed: {exc}"], [
                 Attempt("polish", 0.0, self.model, note=str(exc)[:120])]
 
-        after = narration_mod.review(
-            fixed, pc_name=self._pc_name(), echo_index=self._echo_index(),
-            known_names=self._known_names(), earlier=earlier,
-            min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
-            pronouns=self._pc_pronouns(), others=self._other_names(),
-            gender=self._pc_gender(),
-        )
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
         # that had removed twenty of twenty-one borrowed phrases, and the plagiarised
         # original was kept every single time.
@@ -598,10 +660,31 @@ class GMAgent:
         # phrases it had copied, the model returned "..." — three characters, which scores
         # far better than the plagiarism and is very much worse. So a repair may not
         # introduce a kind of problem the original did not have.
-        was, now = {f.kind for f in review.findings}, {f.kind for f in after.findings}
-        if fixed and after.score < review.score and not (now - was):
-            return fixed, review.as_log(), [attempt]
-        return text, [f"unrepaired: {', '.join(review.as_log())}"], [attempt]
+        was = {f.kind for f in review.findings}
+
+        def _accept(candidate: str) -> bool:
+            after = _review(candidate)
+            return bool(candidate) and after.score < review.score \
+                and not ({f.kind for f in after.findings} - was)
+
+        if _accept(fixed):
+            return fixed, review.as_log(), attempts
+
+        heaviest = max(review.findings, key=lambda f: f.weight)
+        if (heaviest.kind in self._NO_BACKSTOP
+                and not self.engine.scene.in_encounter):
+            try:
+                second, attempt = _rewrite(
+                    heaviest.fix_hint or heaviest.detail,
+                    f"retry, {heaviest.kind} only")
+                attempts.append(attempt)
+                if _accept(second):
+                    return second, review.as_log(), attempts
+            except Exception as exc:
+                attempts.append(Attempt("polish", 0.0, self.model,
+                                        note=f"retry failed: {str(exc)[:100]}"))
+
+        return text, [f"unrepaired: {', '.join(review.as_log())}"], attempts
 
     def _pc_name(self) -> str:
         pc = self.engine.scene.pc()
@@ -628,6 +711,13 @@ class GMAgent:
                 reply = client.chat(
                     prompts.repair_messages(claim.sentence, claim.why),
                     self.model, self.host, as_json=True, temperature=0.3, num_predict=200,
+                    # 200 tokens is roomy for one sentence, and the ceiling means the
+                    # string closes before the budget can die mid-word — the failure
+                    # the census counted six times on the unconstrained calls.
+                    schema={"type": "object",
+                            "properties": {"sentence": {"type": "string",
+                                                        "maxLength": 400}},
+                            "required": ["sentence"]},
                 )
                 attempts.append(Attempt("repair", reply.seconds, reply.model, reply.text,
                                         note=claim.why))
@@ -674,34 +764,25 @@ class GMAgent:
                                             in_combat=fighting,
                                             enemy=self._current_enemy()),
                 self.prose_model, self.prose_host, as_json=True, temperature=0.8,
-                num_predict=900, provider=self.prose_provider, api_key=self.prose_key)
+                num_predict=900, provider=self.prose_provider, api_key=self.prose_key,
+                schema=prompts.prose_schema(
+                    narration_mod.MIN_COMBAT_CHARS if fighting
+                    else narration_mod.MIN_SCENE_CHARS, max_chars=2200))
             text = str(reply.json().get("narration", "")).strip()
         except Exception as exc:
             return "", [f"prose failed: {exc}"], [
                 Attempt("prose", 0.0, self.prose_model, note=str(exc)[:120])]
 
         attempts = [Attempt("prose", reply.seconds, reply.model, reply.text)]
-        text = judgement.name_refs(text, self.engine.scene)
-        text = narration_mod.strip_example_cast(
-            text, player_input + " "
-            + " ".join(a.name for a in self.engine.scene.actors.values()))
-        text, repairs, polish_attempts = self.polish(
+        # No claim repair here on purpose: the engine has already resolved the turn, so
+        # "the blow lands" is a fact being reported, not an outcome being invented.
+        text, repairs, groom_attempts = self._groom(
             text, earlier=earlier or [],
             min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
                        else narration_mod.MIN_SCENE_CHARS),
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
-            player_input=player_input, scene_brief=brief)
-        attempts.extend(polish_attempts)
-        text, outsourced = narration_mod.fix_hand_back(text)
-        if outsourced:
-            repairs = repairs + [f"asked the player to narrate: replaced {outsourced!r}"]
-        text, added = narration_mod.ensure_hand_back(text)
-        if added:
-            repairs = repairs + ["no hand-back: added the question"]
-        text, swapped = narration_mod.right_body(text, self._pc_gender(),
-                                                 self._other_names())
-        if swapped:
-            repairs = repairs + [f"wrong body: replaced {', '.join(swapped)}"]
+            player_input=player_input, brief=brief, hand_back=True, claims=False)
+        attempts.extend(groom_attempts)
         return text, repairs, attempts
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
@@ -740,35 +821,20 @@ class GMAgent:
             # example's old man bleeding through.
             context=f"{player_input} {narration} "
                     + " ".join(a.name for a in self.engine.scene.actors.values()))
-        text = judgement.name_refs(cleaned, self.engine.scene)
-        # Call 2 says what the dice did; it has even less business asking the player
-        # what they perceive than call 1 does.
-        text, _ = narration_mod.fix_hand_back(text)
-
-        # And every other prose rule, which this call had never been subject to.
+        # The full grooming pipeline, which this call went months without — two live
+        # consequence beats introduced the player's own character as a stranger and then
+        # narrated her fight in the third person, because call 2 got `clean_consequence`,
+        # `name_refs` and the hand-back fix and nothing else. Roughly half of what the
+        # player reads comes through here.
         #
-        # Found by reading a real transcript: two consequence beats in Thessaly's campaign
-        # introduced the player's own character as a stranger — "you notice Thessaly Corr
-        # stepping out of the shadows at the edge of the fountain, her eyes fixed on you"
-        # — and then narrated the whole fight about her in the third person: "The thug's
-        # blow crashes into Thessaly... She gasps in pain as she struggles to sit up."
-        #
-        # `plan_turn` reviews and polishes call 1's narration. Call 2 got
-        # `clean_consequence`, `name_refs` and the hand-back fix, and nothing else — no
-        # third-person check, no invented names, no misgendering, no wrong body. Roughly
-        # half of what the player reads was never checked at all, which is also why the
-        # audit's fault rates rose the moment it started reading both beats instead of
-        # one.
-        #
-        # `min_chars` stays 0: this is meant to be two or three sentences, and a length
-        # floor here would pad the one call in the app that should be short.
-        text, repairs, more = self.polish(text, player_input=player_input,
-                                          scene_brief="")
-        text, swapped = narration_mod.right_body(text, self._pc_gender(),
-                                                 self._other_names())
+        # `claims=False`: the engine has already resolved the turn, so "the blow lands"
+        # is reporting, not invention. `hand_back=False`: two or three sentences about
+        # what the dice did hand nothing back. `min_chars` stays 0 for the same reason.
+        text, repairs, _more = self._groom(
+            cleaned, earlier=None, min_chars=0, max_chars=0,
+            player_input=player_input, brief="", hand_back=False, claims=False)
         attempt = Attempt("consequence", reply.seconds, reply.model, reply.text,
-                          note="; ".join(repairs + ([f"wrong body: {', '.join(swapped)}"]
-                                                    if swapped else [])))
+                          note="; ".join(repairs))
         return text, attempt
 
 

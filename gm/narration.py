@@ -218,6 +218,284 @@ def fix_hand_back(text: str) -> tuple[str, str]:
     return " ".join(fixed.split()), gone
 
 
+# --- the decoding stutter ---------------------------------------------------------------
+#
+# A period, a space, and a lowercase continuation: "making them feel almost. alive",
+# "some sort of. marking?", "'My chest is. muscular". Fourteen instances measured across
+# the live saves, one of which broke a *detector* — the stray period in "My chest is.
+# muscular" is why `_owner_of` had to read ownership backwards.
+#
+# Two different model errors share the surface and need opposite repairs. When the word
+# before the period cannot end an English sentence ("almost.", "of.", "is.") the period
+# is a stutter and is removed. When it could ("He stops. dead ahead, the bridge looms")
+# deleting the period would silently merge two sentences into a fluent run-on that says
+# something else — so the following letter is capitalised instead, which repairs the
+# dropped-capital case and is harmless if the model really had finished the sentence.
+_ABBREVIATIONS = {"mr", "mrs", "dr", "st", "vs", "etc", "ft", "no"}
+_NEVER_ENDS_A_SENTENCE = {
+    "a", "an", "the", "of", "to", "and", "or", "but", "nor", "is", "was", "are",
+    "were", "be", "being", "been", "am", "has", "have", "had", "do", "does", "did",
+    "will", "would", "shall", "should", "can", "could", "may", "might", "must",
+    "than", "as", "at", "by", "for", "from", "in", "into", "on", "onto", "with",
+    "without", "almost", "very", "quite", "rather", "so", "too", "such", "about",
+    "their", "his", "her", "its", "your", "my", "our", "some", "any", "each",
+    "every", "if", "when", "while", "because", "although", "whose", "which",
+}
+# One period only — "and then... nothing" is deliberate trailing, and eating a dot out
+# of an ellipsis mangles it.
+_STUTTER = re.compile(r"([A-Za-z']+)(?<!\.)\.(?!\.)(\s+)([a-z])")
+
+
+def destutter(text: str) -> str:
+    """Repair the mid-sentence stray period, both ways it happens."""
+    def _fix(m: re.Match) -> str:
+        word = m.group(1).lower().lstrip("'")
+        if word in _ABBREVIATIONS:
+            return m.group(0)
+        if word in _NEVER_ENDS_A_SENTENCE:
+            return f"{m.group(1)}{m.group(2)}{m.group(3)}"
+        return f"{m.group(1)}.{m.group(2)}{m.group(3).upper()}"
+
+    return _STUTTER.sub(_fix, text or "")
+
+
+# --- the model looping -------------------------------------------------------------------
+
+# A sentence that begins speech. Straight and curly doubles always; a single quote only
+# when it follows a word boundary, because an apostrophe is intra-word and almost every
+# sentence of prose has one.
+_OPENS_SPEECH = re.compile(r"(?:^|\s)[\'‘\"“]")
+
+
+def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]:
+    """Delete sentences the player has already read, mechanically.
+
+    Promotion of `repeats-an-earlier-beat` to the deterministic tier: measured across all
+    seven saves, 6 of 11 repeat findings shipped unrepaired — three consecutive turns of
+    one campaign ended on the identical clause "...labels and bottles before turning to
+    you." Deleting a repeat is always safe *in narration*: the player has read it.
+
+    Spoken repetition is exempt. A guard repeating his refusal word for word when the
+    player tries the door twice is characterisation, not degeneration, and the sentence
+    that carries quote marks is his to repeat.
+    """
+    if not text or not earlier:
+        return text or "", 0
+    recent = {s.strip().lower() for e in earlier[-6:]
+              for s in _SENTENCE.findall(e or "") if len(s.strip()) > 30}
+    if not recent:
+        return text, 0
+    kept: list[str] = []
+    cut = 0
+    for sentence in _SENTENCE.findall(text):
+        s = sentence.strip()
+        if (len(s) > 30 and s.lower() in recent
+                and not _OPENS_SPEECH.search(s)):
+            cut += 1
+            continue
+        kept.append(s)
+    if not kept or not cut:
+        # Cutting everything would be worse than repeating; and zero cuts means the
+        # original spacing is kept rather than re-joined for nothing.
+        return text, 0
+    return " ".join(kept), cut
+
+
+# --- people from nowhere: the deterministic end of it ------------------------------------
+#
+# `invented-name` shipped unrepaired 23 of 41 times across the live saves — worse than a
+# coin toss — and the people it shipped became fixtures: Kaida persists across eight
+# turns of one campaign, Vorgath across a dozen of another, neither ever an actor the
+# engine knows. The rewrite is still asked for first; this is what happens when it loses,
+# on the same bargain as `right_body`: never invent, only stop asserting. The module
+# already states the trade — a bland sentence is far cheaper than a person who does not
+# exist entering the campaign.
+_STRANGER_WORDS = ("the stranger", "the onlooker", "the passer-by")
+# A name directly after one of these is a *place* being named, and "the corner of the
+# stranger" is garbage. The sentence is cut instead, which is always safe. Deliberately
+# NOT to/at/from/in — those precede people constantly ("she glances at Vorgath", "he
+# confides in Kaida"), and the first version cut a perfectly repairable glance because
+# "at" was on the list.
+_PLACE_BEFORE = re.compile(r"\b(?:of|into|near|toward|towards)\s+$", re.I)
+_CAP_TOKEN_BEFORE = re.compile(r"([A-Z][a-zA-Z'’-]{2,})\s+$")
+
+
+def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
+    """Replace first-appearance invented people with an unnamed descriptor.
+
+    Names the engine knows stay; so do a legacy campaign's established people (the caller
+    widens `known` with them). Everything else is somebody the model conjured this turn,
+    and they leave before the player ever meets them — which is also what stops them
+    recurring, because the transcript the next turn reads never contains them.
+
+    Span edits on the original text, never a sentence re-join: the first version split
+    into sentences and glued them back with spaces, and "Stay back, Kaida!' the guard
+    shouts" came out with a stray space inside the closing quote.
+    """
+    found = invented_names(text, known)
+    if not found:
+        return text, []
+    known_words = {w.lower() for name in known for w in _WORD.findall(name.lower())}
+
+    alt = "|".join(re.escape(n) for n in found)
+    run = re.compile(rf"\b(?:{alt})(?:\s+(?:{alt}))*(['’]s)?\b")
+
+    # (start, end, matched, possessive) in absolute offsets, with each match extended
+    # leftward over adjacent capitalised tokens the detector's sentence-initial blind
+    # spot missed — "Serath Vale" where only "Vale" was flaggable is one person, and
+    # half-replacing him gave "Serath the stranger".
+    spans: list[tuple[int, int, str, str]] = []
+    for m in run.finditer(text):
+        start = m.start()
+        while True:
+            lead = _CAP_TOKEN_BEFORE.search(text[:start])
+            if not lead:
+                break
+            token = lead.group(1)
+            stem = re.sub(r"['’]s$", "", token.lower())
+            # The stem too, or "There's Glimble" swallows "There's" — "there" is on the
+            # not-a-name list but "there's" is not.
+            if (token.lower() in known_words or stem in known_words
+                    or token.lower() in _NOT_A_NAME or stem in _NOT_A_NAME):
+                break
+            start = lead.start(1)
+        spans.append((start, m.end(), text[start:m.end()], m.group(1) or ""))
+
+    if not spans:
+        return text, []
+
+    # Sentences that name a place get cut whole rather than repaired into nonsense.
+    sentence_spans = [sm.span() for sm in _SENTENCE.finditer(text)]
+
+    def _sentence_of(pos: int) -> tuple[int, int]:
+        for lo, hi in sentence_spans:
+            if lo <= pos < hi:
+                return lo, hi
+        return pos, pos
+
+    cut: list[tuple[int, int]] = []
+    keep: list[tuple[int, int, str, str]] = []
+    for start, end, matched, poss in spans:
+        lo, hi = _sentence_of(start)
+        if _PLACE_BEFORE.search(text[lo:start]):
+            # Take the orphan closing quote with the sentence, or "'There's Glimble at
+            # the corner of Wind and Elm.'" leaves a floating "'" glued to what remains.
+            while hi < len(text) and text[hi] in "\"“”'‘’ ":
+                hi += 1
+            if (lo, hi) not in cut:
+                cut.append((lo, hi))
+        else:
+            keep.append((start, end, matched, poss))
+
+    by_person: dict[str, str] = {}
+
+    def _descriptor(matched: str) -> str:
+        key = re.sub(r"['’]s$", "", matched).strip().lower()
+        if key not in by_person:
+            by_person[key] = _STRANGER_WORDS[min(len(by_person),
+                                                 len(_STRANGER_WORDS) - 1)]
+        return by_person[key]
+
+    replaced = sorted({matched for _, _, matched, _ in spans})
+    # A cut leaves one space behind, not nothing — gluing "leans in." to "He waits."
+    # is what nothing produced.
+    edits: list[tuple[int, int, str]] = [(lo, hi, " ") for lo, hi in cut]
+    for start, end, matched, poss in keep:
+        if any(lo <= start < hi for lo, hi, _ in edits):
+            continue                       # inside a sentence already being cut
+        descriptor = _descriptor(matched)
+        before = text[:start].rstrip()
+        if before.endswith(","):
+            # Direct address — "Stay back, Vorgath!" — takes the bare word.
+            replacement = descriptor.split()[-1]
+        else:
+            replacement = descriptor
+            head = text[max(0, start - 24):start]
+            if not head.strip() or re.search(r"[.!?]\s*[\"“”'‘’]?\s*$", head):
+                replacement = replacement[0].upper() + replacement[1:]
+        stripped = re.sub(r"['’]s$", "", matched)
+        replacement += poss if matched.endswith(("'s", "’s")) and stripped else ""
+        edits.append((start, end, replacement))
+
+    out = text
+    for start, end, replacement in sorted(edits, key=lambda e: -e[0]):
+        out = out[:start] + replacement + out[end:]
+    out = re.sub(r"  +", " ", out).strip()
+    if not out or not re.search(r"[a-zA-Z]", out):
+        return text, []
+    return out, replaced
+
+
+def established_names(earlier: list[str] | None, minimum: int = 2) -> set[str]:
+    """Names woven into the campaign before the un-naming backstop existed.
+
+    A capitalised token appearing in `minimum`+ distinct earlier GM beats is part of this
+    campaign's fiction — Vorgath and Lyra are in sixty turns of one live save — and
+    retroactively scrubbing an established person mid-conversation is its own
+    people-out-of-thin-air weirdness, run backwards.
+
+    Player beats deliberately do not count. The measured Glimble case shipped "Head to
+    Glimble's immediately" as a suggestion chip; one click would have laundered the
+    invention into permanence. And because `unname_strangers` stops new names ever
+    shipping once, this set can only be reached by pre-fix saves — which is the right
+    set, and shrinks to nothing on campaigns started after today.
+    """
+    counts: dict[str, int] = {}
+    for beat in (earlier or []):
+        for tok in set(re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", beat or "")):
+            counts[tok] = counts.get(tok, 0) + 1
+    return {t for t, n in counts.items() if n >= minimum}
+
+
+# --- the narrator in the scene: the deterministic end of it ------------------------------
+
+# Sentences that report a written thing — a note, a sign, an inscription — legitimately
+# carry first person in narration and are not the narrator slipping in.
+_WRITTEN_ARTIFACT = re.compile(
+    r"\b(?:reads?|inscribed|carved|etched|scrawled|written|note|letter|sign|plaque)\b",
+    re.I)
+_NOMINATIVE_I = re.compile(r"\bI(?:'m|'ll|'ve|'d)?\b")
+_FIRST_TO_SECOND = {"me": "you", "my": "your", "myself": "yourself"}
+
+
+def second_person_narrator(text: str) -> tuple[str, list[str]]:
+    """Turn the narrator's own me/my back onto the player, where it can be done safely.
+
+    The measured case: "Lyra stands beside me, her gaze locked onto the mirror, her eyes
+    scanning every detail of my image" — the narrator meant the player, and you/your is
+    the correct reading. Only sentences with no quote character at all are touched
+    (speech is everybody's right to the first person), only me/my/myself are swapped
+    ("mine" is a hole in the ground far more often than a pronoun in this genre), and a
+    sentence containing nominative I is skipped whole — "I draw my blade" half-swapped
+    would be worse than the defect.
+    """
+    if not text:
+        return text or "", []
+    out: list[str] = []
+    swapped: list[str] = []
+    changed = False
+    for sentence in _SENTENCE.findall(text):
+        s = sentence
+        if ('"' not in s and "“" not in s and "”" not in s
+                and not _OPENS_SPEECH.search(s)
+                and not _WRITTEN_ARTIFACT.search(s)
+                and not _NOMINATIVE_I.search(s)):
+            def _swap(m: re.Match) -> str:
+                low = m.group(0).lower()
+                new = _FIRST_TO_SECOND[low]
+                swapped.append(low)
+                return new.capitalize() if m.group(0)[0].isupper() else new
+
+            fixed = re.sub(r"\b(?:me|my|myself)\b", _swap, s, flags=re.I)
+            if fixed != s:
+                changed = True
+            s = fixed
+        out.append(s.strip())
+    if not changed:
+        return text, []
+    return " ".join(out), sorted(set(swapped))
+
+
 # What every worked example in `prompts.EXAMPLES` ends on, word for word. Kept as one
 # constant because two places now write it and a hand-back that differed between them
 # would read as two different narrators.

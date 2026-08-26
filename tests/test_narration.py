@@ -709,14 +709,20 @@ def test_the_backstop_has_no_opinion_without_a_gender():
 
 
 def test_the_backstop_is_wired_in_after_polish():
-    """Unconditional and last, beside `fix_hand_back`, for the same reason: `polish` keeps
-    the original whenever its rewrite is no better, so a finding can survive the repair."""
-    from pathlib import Path as _P
+    """Unconditional and after the rewrite, inside the one grooming pipeline.
 
-    src = (_P(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
-        encoding="utf-8")
-    assert "narration_mod.right_body(" in src
-    assert src.index("fix_hand_back(narration)") < src.index("right_body(")
+    This used to assert the ordering inside `plan_turn`'s inline chain. That chain had
+    four copies across four doors, and the census over every saved campaign found they
+    had drifted exactly as CLAUDE.md predicts — `npc_turn` prose reached the transcript
+    with no review at all. The chain lives once now, in `_groom`."""
+    import inspect
+
+    from gm.agent import GMAgent
+
+    src = inspect.getsource(GMAgent._groom)
+    assert "self.polish(" in src and "right_body(" in src
+    assert src.index("self.polish(") < src.index("right_body(")
+    assert src.index("fix_hand_back(") < src.index("right_body(")
 
 
 
@@ -1134,15 +1140,219 @@ def test_a_closing_quote_is_not_missing_punctuation():
     assert fixed.endswith("unclear.' " + narration.HAND_BACK)
 
 
-def test_both_backstops_run_and_in_the_right_order():
+def test_every_prose_door_goes_through_the_one_pipeline():
     """`fix_hand_back` replaces a bad question; `ensure_hand_back` adds a missing one. The
     replacement has to go first, or the added question lands after the bad one and the
-    turn ends with two."""
+    turn ends with two — and the order has to live ONCE, because four inline copies of
+    this chain drifted until NPC prose was reaching the transcript with no review at all.
+    Every door that produces GM prose calls `_groom`; `_groom` owns the order."""
     import inspect
 
     from gm import agent as agent_mod
 
-    for fn in (agent_mod.GMAgent.plan_turn, agent_mod.GMAgent.narrate_turn):
-        src = inspect.getsource(fn)
-        assert "fix_hand_back(" in src and "ensure_hand_back(" in src, fn.__name__
-        assert src.index("fix_hand_back(") < src.index("ensure_hand_back("), fn.__name__
+    src = inspect.getsource(agent_mod.GMAgent._groom)
+    assert "fix_hand_back(" in src and "ensure_hand_back(" in src
+    assert src.index("fix_hand_back(") < src.index("ensure_hand_back(")
+
+    for fn in (agent_mod.GMAgent.plan_turn, agent_mod.GMAgent.narrate_turn,
+               agent_mod.GMAgent.narrate_outcome, agent_mod.GMAgent.npc_turn):
+        door = inspect.getsource(fn)
+        assert "self._groom(" in door, f"{fn.__name__} bypasses the pipeline"
+
+
+
+# --- the decoding stutter ----------------------------------------------------------------
+
+def test_the_stray_period_is_removed_when_the_word_before_cannot_end_a_sentence():
+    """Fourteen instances measured across the seven live saves — "making them feel
+    almost. alive", "some sort of. marking?", "'My chest is. muscular" — one of which
+    broke a *detector*: the stray period is why `_owner_of` reads ownership backwards."""
+    for said, want in (
+            ("making them feel almost. alive.", "making them feel almost alive."),
+            ("some sort of. marking?", "some sort of marking?"),
+            ("'My chest is. muscular, and broad'", "'My chest is muscular, and broad'"),
+            ("a reputation for being. particular", "a reputation for being particular"),
+            ("rather than. drawing attention", "rather than drawing attention")):
+        assert narration.destutter(said) == want, said
+
+
+def test_a_possible_sentence_end_is_capitalised_rather_than_merged():
+    """The other error wearing the same surface. "He stops. dead ahead, the bridge looms"
+    merged would read "He stops dead ahead" — fluent, grammatical, and saying something
+    else, which is worse than the visible stutter. Real cases from the saves come out as
+    correct English under capitalisation: "'And for tanning. Well, you might…"."""
+    assert narration.destutter("He stops. dead ahead, the bridge looms.") == \
+        "He stops. Dead ahead, the bridge looms."
+    assert narration.destutter("'And for tanning. well, you might want'") == \
+        "'And for tanning. Well, you might want'"
+    assert narration.destutter("We see strength. And we see. something more.") == \
+        "We see strength. And we see. Something more."
+
+
+def test_a_deliberate_ellipsis_is_not_a_stutter():
+    said = "and then... nothing moved at all."
+    assert narration.destutter(said) == said
+
+
+# --- deleting what the player already read -----------------------------------------------
+
+def test_a_sentence_the_player_already_read_is_deleted_not_negotiated():
+    """Promotion of `repeats-an-earlier-beat` to the deterministic tier. Measured: 6 of 11
+    repeat findings shipped unrepaired, and three consecutive turns of one campaign ended
+    on the identical clause "...labels and bottles before turning to you"."""
+    earlier = ["You approach the stall owner, an elderly woman with a kind face, and she "
+               "arranges her labels and bottles before turning to you."]
+    text = ("You approach the stall owner, an elderly woman with a kind face, and she "
+            "arranges her labels and bottles before turning to you. "
+            "The morning light catches the glass. What do you do?")
+    out, cut = narration.drop_repeated_beats(text, earlier)
+    assert cut == 1
+    assert out == "The morning light catches the glass. What do you do?"
+
+
+def test_a_character_repeating_themselves_out_loud_is_characterisation():
+    """A guard giving the same refusal word for word when the player tries the door twice
+    is his to repeat. The sentence that carries speech marks is exempt."""
+    spoken = "'I told you once and I will tell you once more, the answer is no,' he says."
+    out, cut = narration.drop_repeated_beats(spoken, [spoken])
+    assert cut == 0 and out == spoken
+
+
+def test_cutting_everything_would_be_worse_than_repeating():
+    beat = "The gate hangs open on one hinge and the yard beyond is dark and quiet."
+    out, cut = narration.drop_repeated_beats(beat, [beat])
+    assert cut == 0 and out == beat
+
+
+# --- people from nowhere: the deterministic end ------------------------------------------
+
+KNOWN_SMALL = {"Thessaly Corr", "Pangrella", "thug"}
+
+
+def test_an_invented_person_is_unnamed_before_the_player_meets_them():
+    """`invented-name` shipped unrepaired 23 of 41 times across the saves — worse than a
+    coin toss — and the shipped people became fixtures: Kaida persists across eight turns
+    of one campaign, Vorgath across a dozen of another. Same bargain as `right_body`:
+    never invent, only stop asserting. And because the shipped transcript never contains
+    the name, the next turn's model never sees it — the recurrence dries up at source."""
+    said = ("She glances at Vorgath. Vorgath stands behind her, his arms crossed. "
+            "Vorgath's eyes narrow as the thug shifts.")
+    out, replaced = narration.unname_strangers(said, KNOWN_SMALL)
+    assert "Vorgath" not in out
+    assert "the stranger" in out and "The stranger's eyes" in out
+    assert "thug" in out, "the real actor was touched"
+
+
+def test_a_two_token_name_is_one_person():
+    """Only "Vale" is flaggable in "Serath Vale steps out" (the detector's
+    sentence-initial blind spot covers "Serath" elsewhere) — and half-replacing him
+    produced "Serath the stranger"."""
+    said = "The arch is empty until Serath Vale steps out of it, and Serath Vale waits."
+    out, _ = narration.unname_strangers(said, KNOWN_SMALL)
+    assert "Serath" not in out and "Vale" not in out
+    assert out.count("the stranger") == 2
+
+
+def test_a_vocative_takes_the_bare_word():
+    said = "'Stay back, Kaida!' the guard shouts as Kaida draws her blade."
+    out, _ = narration.unname_strangers(said, KNOWN_SMALL)
+    assert "'Stay back, stranger!'" in out
+
+
+def test_a_named_place_cuts_the_sentence_rather_than_garbling_it():
+    """"the corner of Wind and Elm" as "the corner of the stranger and the onlooker" is
+    nonsense the player reads. Cutting is always safe — the doctrine strip_example_cast
+    already runs on."""
+    said = "The stranger leans in. 'There's Glimble at the corner of Wind and Elm.' He waits."
+    out, _ = narration.unname_strangers(said, KNOWN_SMALL)
+    assert "Wind" not in out and "Elm" not in out and "Glimble" not in out
+    assert "He waits." in out
+
+
+def test_a_glance_at_a_person_is_repaired_not_cut():
+    """to/at/from/in precede people constantly — "she glances at Vorgath" — and the first
+    version cut the whole glance because "at" was on the place list. Only of/into/near/
+    toward name places strongly enough to cut over."""
+    said = "She glances at Kaida and says nothing."
+    out, _ = narration.unname_strangers(said, KNOWN_SMALL)
+    assert out == "She glances at the stranger and says nothing."
+
+
+def test_two_strangers_do_not_collapse_into_one():
+    """Both mid-sentence, because the detector's sentence-initial exemption works by token
+    value — a sentence led by "Kaida" shields every Kaida in it, which is the documented
+    conservative blind spot, not a fixture for this test to trip over."""
+    said = "The door opens and Kaida slips in while Marcellus counts the coins."
+    out, _ = narration.unname_strangers(said, KNOWN_SMALL)
+    assert "the stranger" in out and "the onlooker" in out
+    assert "Kaida" not in out and "Marcellus" not in out
+
+
+def test_a_legacy_campaigns_woven_people_are_established():
+    """Vorgath and Lyra are in sixty shipped turns of a live save. Scrubbing an
+    established person mid-conversation is people-out-of-thin-air run backwards, so 2+
+    earlier GM beats grandfather a name — and because the backstop stops new names ever
+    shipping once, this set is only reachable by pre-fix saves.
+
+    Player beats deliberately never count: the measured Glimble case shipped "Head to
+    Glimble's immediately" as a suggestion chip, and one click would have laundered the
+    invention into permanence."""
+    beats = ["Vorgath watches from the arch.", "Lyra smiles at Vorgath.",
+             "Lyra turns away.", "The rain begins again."]
+    established = narration.established_names(beats)
+    assert established == {"Vorgath", "Lyra"}
+
+    out, replaced = narration.unname_strangers(
+        "Vorgath frowns at the gate.", KNOWN_SMALL | established)
+    assert replaced == [] and "Vorgath" in out
+
+
+# --- the narrator in the scene: the deterministic end ------------------------------------
+
+def test_the_narrators_me_and_my_turn_back_onto_the_player():
+    """The measured case, from a live consequence beat: the narrator meant the player,
+    and you/your is the correct reading."""
+    said = ("Lyra stands beside me, her gaze locked onto the mirror, her eyes scanning "
+            "every detail of my image.")
+    out, swapped = narration.second_person_narrator(said)
+    assert out == ("Lyra stands beside you, her gaze locked onto the mirror, her eyes "
+                   "scanning every detail of your image.")
+    assert swapped == ["me", "my"]
+
+
+def test_speech_keeps_its_first_person():
+    said = "'My lord, I did not see you,' the guard says."
+    assert narration.second_person_narrator(said) == (said, [])
+
+
+def test_a_sentence_with_nominative_i_is_left_whole():
+    """"I draw my blade" half-swapped into "I draw your blade" would be worse than the
+    defect. Verb agreement makes bare I unswappable, so the sentence is skipped whole."""
+    said = "I draw my blade and step back."
+    assert narration.second_person_narrator(said) == (said, [])
+
+
+def test_a_written_artifact_keeps_its_first_person():
+    said = "The note says: my dearest son, come home to me."
+    assert narration.second_person_narrator(said) == (said, [])
+
+
+# --- the retry, narrowly gated -----------------------------------------------------------
+
+def test_the_polish_retry_only_chases_what_no_backstop_repairs():
+    """Measured across the seven saves: 46% of everything the reviewer caught shipped
+    unrepaired, and the losing rewrites were the ones handed several findings at once.
+    The retry names only the heaviest finding — but never fires for a finding kind a
+    deterministic backstop repairs for free, and never mid-fight, where a second ~10s
+    call costs more than the finding."""
+    from gm.agent import GMAgent
+
+    assert "no-hand-back" not in GMAgent._NO_BACKSTOP
+    assert "invented-name" not in GMAgent._NO_BACKSTOP
+    assert "repeats-an-earlier-beat" not in GMAgent._NO_BACKSTOP
+    assert "wrong-body" not in GMAgent._NO_BACKSTOP
+    assert "narrator-in-first-person" not in GMAgent._NO_BACKSTOP
+    # The ones still worth a model call, because nothing mechanical can write content.
+    assert "echoes-the-examples" in GMAgent._NO_BACKSTOP
+    assert "too-short" in GMAgent._NO_BACKSTOP
+    assert "misgendered-pc" in GMAgent._NO_BACKSTOP
