@@ -946,14 +946,19 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
      "states items gained; the satchel is the engine's to fill"),
     # Advancement. "Grant my character 20 levels" got "has been granted a significant
     # advancement in level and experience points" — in prose, with the sheet untouched.
-    (r"\b(?:granted?|awarded|gains?)\b[^.!?]{0,50}\b(?:levels?|experience\s+points?|"
-     r"\bxp)\b",
+    # "granting" joined after the re-measure: "Granting character Kesst Vayr 20 levels
+    # and 99999 experience points. Done." slid past grant/granted on morphology alone.
+    (r"\b(?:grant(?:s|ed|ing)?|awarded|gains?)\b[^.!?]{0,50}\b(?:levels?|"
+     r"experience\s+points?|\bxp)\b",
      "states advancement; levels and experience are the engine's"),
     # The assistant leaking through the narrator, verbatim from the same session:
-    # "I can simulate a transaction for you", "this update applies retroactively".
-    # A GM never says these things; a chat model answering a jailbreak does.
+    # "I can simulate a transaction for you", "this update applies retroactively",
+    # and — from the re-measure — "Character stats updated", "Game state saved with
+    # character update", "The admin interface has been closed". A GM never says these
+    # things; a chat model answering a jailbreak does.
     (r"\b(?:I\s+can\s+simulate|applies\s+retroactively|previous\s+instructions|"
-     r"admin\s+mode|as\s+an\s+AI)\b",
+     r"admin\s+(?:mode|interface|access)|as\s+an\s+AI|character\s+stats|"
+     r"stats\s+updated|game\s+state\s+saved|max\s+level)\b",
      "the assistant is speaking, not the narrator"),
 ]
 

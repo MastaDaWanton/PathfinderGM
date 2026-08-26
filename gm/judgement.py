@@ -1152,13 +1152,38 @@ _CHECK_VERBS = (
 _DECLARES = r"\bi\s+(?:try\s+to\s+|attempt\s+to\s+|carefully\s+|quietly\s+|quickly\s+)?"
 
 
+def fill_bare_checks(raw_intents) -> list:
+    """A check with nothing to beat gets the average band, before validation sees it.
+
+    `inject_checks` below used to leave its DC "to the engine's own default band" — a
+    default that does not exist: `_check_params` refuses a check carrying neither `dc`
+    nor `opposed_by`. So every injected check, and every bare check the model wrote,
+    died in validation and lived or died on the retry loop learning the correction.
+    Measured on the 60-turn audit: the four failed turns were climb, track and search
+    lines — check verbs, every one. The band is a plain fact to fill, not a thing to
+    ask a model to remember.
+    """
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for raw in raw_intents:
+        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "check"):
+            params = dict(raw.get("params") or {})
+            if not params.get("dc") and not params.get("opposed_by"):
+                raw = dict(raw)
+                params["dc"] = {"band": "average"}
+                raw["params"] = params
+        out.append(raw)
+    return out
+
+
 def inject_checks(raw_intents, player_text: str, scene) -> list:
     """A declared risky action reaches the dice.
 
     Only when the GM's own plan rolled nothing: a turn that already carries a check,
     an attack or a manoeuvre is a turn where the dice are coming out anyway, and a
     second roll for the same sentence would be the injection double-charging. The DC
-    is left to the engine's own default band rather than invented here.
+    comes from `fill_bare_checks`, which runs after this in the chain.
     """
     import re as _re
 

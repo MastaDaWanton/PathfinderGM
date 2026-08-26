@@ -30,7 +30,15 @@ from dataclasses import dataclass, field
 ECHO_LENGTH = 6
 
 _WORD = re.compile(r"[a-z']+")
-_QUOTED = re.compile(r"[\"“”'‘’][^\"“”]{0,300}?[\"“”]|'[^']{8,300}?'")
+# The single-quote alternative pairs on word boundaries, because an apostrophe inside a
+# word is never a closing quote. The old form (`'[^']{8,300}?'`) could not cross
+# "that's" or "I'll", so a boatman's speech riddled with contractions was carved at the
+# wrong boundaries and "between you and me" leaked into narration — where the
+# first-person detector read it as the narrator having a body. An opener must follow
+# whitespace (or start); a closer must precede whitespace, punctuation or the end.
+_QUOTED = re.compile(
+    r"[\"“”‘][^\"“”]{0,300}?[\"“”]"
+    r"|(?:^|(?<=\s))'[^\n]{2,300}?'(?=$|[\s.,!?;:)\]])")
 _SENTENCE = re.compile(r"[^.!?]+[.!?]?")
 
 # Capitalised words that are not names.

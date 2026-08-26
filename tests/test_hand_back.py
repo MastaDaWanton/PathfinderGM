@@ -209,3 +209,22 @@ def test_continue_is_not_run_through_the_declaration_check():
     view = Path("play/views.py").read_text(encoding="utf-8")
     assert "if not carry_on:" in view
     assert "said = player_input.check(text)" in view
+
+
+
+def test_dialogue_full_of_contractions_is_still_dialogue():
+    """Measured on the 60-turn audit of 2026-08-26: a boatman's speech in single
+    quotes — "'But that's just between you and me, right?'" — was carved at its
+    contractions by a single-quote pattern that could not cross an apostrophe, and
+    "between you and me" leaked into narration, where the first-person detector read
+    the narrator as having a body. An apostrophe inside a word is never a closing
+    quote; the pair boundaries are whitespace ones."""
+    speech = ("'We carry all sorts of goods,' he says. 'But I'll let you in "
+              "on a little secret: that's just between you and me, right?' "
+              "He glances around the dock.")
+    assert narration.narrator_in_first_person(speech) == []
+
+    # And a possessive is not an opening quote: nothing here is dialogue, and the
+    # narrator's own unquoted "I" must stay visible to the detector.
+    told = "The guards' spears crossed the miners' path, and I watched them go."
+    assert "I" in narration.unquoted(told)

@@ -880,3 +880,39 @@ def test_a_check_opposed_by_a_ghost_rolls_against_the_ground_instead():
     p = amended[0]["params"]
     assert "opposed_by" not in p
     assert p["dc"] == {"band": "average"}
+
+
+
+def test_a_bare_check_is_given_the_average_band_not_five_rejections():
+    """`inject_checks` left its DC "to the engine's own default band" — a default that
+    does not exist: validation refuses a check with neither dc nor opposed_by. Every
+    injected check and every bare model check paid a retry to learn the correction,
+    and on the 60-turn audit four turns (climb, track, search — check verbs all) never
+    recovered. The band is a fact to fill, not a thing to ask a model to remember."""
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    eng = Engine(scene, Dice(seed=3))
+
+    raw = judgement.fill_bare_checks([
+        {"op": "check", "actor": "pc", "params": {"skill": "climb"},
+         "because": "the rise is steep"}])
+    assert raw[0]["params"]["dc"] == {"band": "average"}
+    assert [i.op for i in eng.validate(raw)] == ["check"]
+
+    # A check that already knows what it is up against is not touched.
+    keep_dc = [{"op": "check", "actor": "pc",
+                "params": {"skill": "climb", "dc": {"band": "tough"}},
+                "because": "x"}]
+    assert judgement.fill_bare_checks(keep_dc)[0]["params"]["dc"] == {"band": "tough"}
+    opposed = [{"op": "check", "actor": "pc",
+                "params": {"skill": "stealth",
+                           "opposed_by": {"ref": "pc", "skill": "perception"}},
+                "because": "x"}]
+    assert "dc" not in judgement.fill_bare_checks(opposed)[0]["params"]
+
+    # And the whole chain agrees: an injected check comes out the far end legal.
+    chained = judgement.inject_checks(
+        [{"op": "narrate_only", "actor": "pc", "params": {}, "because": "x"}],
+        "I climb the nearest rise to see further.", scene)
+    chained = judgement.fill_bare_checks(chained)
+    assert [i.op for i in eng.validate(chained)] == ["narrate_only", "check"]
