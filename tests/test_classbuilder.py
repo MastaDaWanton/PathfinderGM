@@ -501,11 +501,17 @@ def test_a_scaffold_can_be_fetched_and_a_bad_one_404s(client):
 
 def test_a_shipped_class_opens_for_editing(client):
     """A shipped entry that cannot be opened is a table nobody can correct — the failure
-    `registry.find` was written to end, and the same rule applies to classes."""
+    `registry.find` was written to end, and the same rule applies to classes.
+
+    This used to pin len(problems) == 8: the eight save_gate effects whose DC lived in
+    a prose note ("DC 10+12LVL+CONmod — the class's formula") rather than the `dc`
+    field the engine reads. The player found the list on the class page and asked for
+    it fixed before playing; every one now declares 10 + level/2 + con_mod, so the
+    shipped class validates clean — and stays clean."""
     data = client.get("/api/classes/open/blood bending").json()
     assert data["class"]["name"] == "Blood Bending"
     assert len(data["class"]["paths"]) == 4
-    assert len(data["problems"]) == 8
+    assert data["problems"] == []
 
 
 def test_saving_an_invalid_class_writes_nothing_and_says_why(client, mine):
