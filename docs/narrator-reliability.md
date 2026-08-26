@@ -296,6 +296,33 @@ openings drift 16% → 37% → 11% by third — the middle third bulges and the
 Twenty and sixty turns are baselines, not proofs; the numbers above say what was
 measured and no more.
 
+## The 2026-08-26 re-measure: the last failure class, and the instrument itself
+
+Full narrative in `docs/playtest-2026-08-26.md`; the numbers belong in this table too.
+Same script, same model, same conditions, three runs in one day:
+
+| | clean | turn-failed | prose faults |
+|---|---|---|---|
+| after the pipeline (above) | 57/60 (95%) | 3 | 0 |
+| after the adversarial-session fixes | 56/60 (93%) | 4 | 0 |
+| after `fill_bare_checks` | 58/60 (96%) | **0** | 2 |
+| same run, corrected detector | **59/60 (98%)** | **0** | 1 |
+
+The `turn-failed` class — every residual fault in the two 95% runs — died at its root:
+`inject_checks` left its DC "to the engine's own default band", and no such default
+exists, so every bare check paid a retry to learn the correction and sometimes ran out.
+`fill_bare_checks` fills the average band in code before validation looks. All sixty
+turns completed for the first time.
+
+Of the two prose faults in the post-fill run, one was the measuring stick: dialogue
+full of contractions ("that's", "I'll") was carved at its apostrophes by a single-quote
+regex that could not cross them, and "between you and me" leaked from a boatman's mouth
+into what the first-person detector read as the narrator having a body. The quote
+pairing is word-boundary-aware now; re-scoring the same sixty saved narrations gives
+the honest 59/60. The one real fault is a mid-paragraph first-person slip ("As I push
+aside the tangled branches") — the weight-2 class the bundled rewrite occasionally
+loses, and the open front.
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put
