@@ -344,8 +344,12 @@ def switch_to(character_id: str) -> Campaign:
     set_active(campaign_id)
     if campaign_id not in _LIVE and not _save_path(campaign_id).exists():
         # Enrolled but never played — begin their campaign now, without enrolling them
-        # a second time.
-        c = new_campaign(campaign_id, character=entry.actor)
+        # a second time. In the world they were made for: this call passed no
+        # world_source, so a character parked from an imported world's forge began in
+        # the shipped default when finally played. Empty still means the default, which
+        # is what every entry written before the field existed carries.
+        c = new_campaign(campaign_id, character=entry.actor,
+                         world_source=entry.world_source or None)
         c.character_id = character_id
         c.transcript.append({"who": "gm", "text": opening_text(c)})
         c.save()
@@ -473,6 +477,11 @@ def begin_with(character, world_source=None) -> Campaign:
     c = new_campaign(entry.id, character=character, world_source=world_source)
     c.character_id = entry.id
     entry.campaign_id = entry.id
+    # The *resolved* world, not the argument: `new_campaign` fills a missing source with
+    # the shipped default, and the entry should record what actually happened either way
+    # — a character forged from Fantasia's page was starting in Pangrella because nothing
+    # anywhere wrote the choice down.
+    entry.world_source = str(c.world_source or "")
     roster.save(entry)
     c.transcript.append({"who": "gm", "text": opening_text(c)})
     c.save()

@@ -138,6 +138,9 @@ def _state(c) -> dict:
         "coinage": [{"id": x.id, "name": x.name, "plural": x.plural,
                      "copper": x.copper, "coined": x.coined} for x in coins],
         "suggestions": list(getattr(c, "suggestions", []) or []),
+        # Whether the trade panel would open, decided here so the button and the
+        # endpoint cannot disagree — the rule lives in `_merchant_here` and nowhere else.
+        "merchant": (_merchant_here(c.scene).name if _merchant_here(c.scene) else ""),
         "awaiting": c.scene.awaiting,
         "pc": pc.summary() if pc else None,
         "scene": {
@@ -638,6 +641,18 @@ def say(request):
     world = c.world
     agent = GMAgent(world, c.engine())
 
+    # Free actions taken since the last spoken turn ride along as context rather than
+    # having cost turns of their own. Into `history`, not `player_input`: the injectors
+    # read the player's words with regexes, and a note saying "formed the blood
+    # armament" must not be re-read as a fresh declaration of anything.
+    pending = list(getattr(c, "pending_free", []) or [])
+    if pending:
+        c.pending_free = []
+        c.history.append({
+            "role": "user",
+            "content": "(Since their last turn, spending no time: "
+                       + "; ".join(pending) + ".)"})
+
     try:
         plan = agent.plan_turn(
             text, c.history, location=c.location,
@@ -687,14 +702,23 @@ def combat_act(request):
         return refusal
     if scene.awaiting:
         return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
-    if not scene.in_encounter:
-        return JsonResponse({"error": "No fight is on."}, status=409)
-    if scene.current_ref() != pc.ref:
-        return JsonResponse({"error": "It is not your turn."}, status=409)
 
     actions = body.get("actions") or []
     label = str(body.get("label", "")).strip()
     end_turn = bool(body.get("end_turn"))
+
+    # Out of a fight, this door opens only for free actions — a toggle that arms your
+    # own body has nothing in it for a narrator to decide, and routing it through the
+    # spoken turn is how forming the blood armament cost a whole turn, invited the model
+    # to dress it as a Knowledge (Arcana) check it then failed as untrained, and let an
+    # `advance_time` ride along. A free action spends no time and asks nobody's
+    # permission; everything else out of combat is still a spoken turn.
+    if not scene.in_encounter:
+        if end_turn or any(str(a.get("op", "")).lower() != "use_ability"
+                           for a in actions if isinstance(a, dict)) or not actions:
+            return JsonResponse({"error": "No fight is on."}, status=409)
+    elif scene.current_ref() != pc.ref:
+        return JsonResponse({"error": "It is not your turn."}, status=409)
 
     raw = []
     for a in actions:
@@ -731,6 +755,12 @@ def combat_act(request):
     except (IntentError, ValueError) as exc:
         c.transcript.pop()
         return JsonResponse({"error": str(exc)}, status=400)
+
+    # A free action is remembered for the next spoken turn, so the narrator hears about
+    # it without a turn ever having been spent on it. In-memory on purpose: it is a note
+    # between two turns of one sitting, not campaign state.
+    if not end_turn and label:
+        c.pending_free = list(getattr(c, "pending_free", []) or []) + [label]
 
     # A turn the player has not finished does not pass to anybody. This is what
     # `end_turn` was always supposed to mean.
@@ -1181,12 +1211,44 @@ def set_gender(request):
 # picking a jar off a list and being paid for it has nothing in it for a model to decide.
 
 
+# Somebody who keeps a counter. Matched on the actor's name or kind, because that is
+# how the engine's people arrive — "the stallholder", "a vendor", a spawned merchant.
+_MERCHANT = re.compile(
+    r"\b(?:merchant|vendor|stall|shop|trader|trades|peddler|apothecary|grocer|"
+    r"keeper|monger|seller|smith|barkeep|innkeep)\w*\b", re.I)
+
+
+def _merchant_here(scene):
+    """The merchant standing in this scene, or None.
+
+    The trade panel opens only across a real counter — "The trade button should only
+    work when the user is in a dialogue with a merchant, otherwise the exchange of
+    objects can be handled through the prompts." The narrated path (the sell/buy
+    injectors) deliberately keeps working anywhere; this gates only the panel.
+    """
+    for ref, a in scene.actors.items():
+        if a.is_pc or a.hp <= 0:
+            continue
+        if _MERCHANT.search(str(a.name or "")) or _MERCHANT.search(str(a.kind or "")):
+            return a
+    return None
+
+
 def _stall_of(c) -> tuple[str, str, int]:
     """Which shop, on which day. Read the same way `craft_views` reads it, so a stall's
-    money and its stock agree about where and when this is."""
+    money and its stock agree about where and when this is.
+
+    A present merchant names the stall, so two different vendors in one town are two
+    different shelves and two different tills — and the same vendor's stock holds for
+    the in-game day (`day_of` is the clock in 24-hour windows), which is the persistence
+    the table asked for.
+    """
     from rules import market
 
-    return (str(c.scene.location_id or "nowhere"), "market",
+    merchant = _merchant_here(c.scene)
+    stall = re.sub(r"[^a-z0-9]+", "-", str(merchant.name).lower()).strip("-") \
+        if merchant else "market"
+    return (str(c.scene.location_id or "nowhere"), stall,
             market.day_of(c.scene.clock_minutes))
 
 
@@ -1210,6 +1272,12 @@ def trade(request):
     pc = c.scene.pc()
     if pc is None:
         return JsonResponse({"error": "nobody is being played"}, status=409)
+
+    if _merchant_here(c.scene) is None:
+        return JsonResponse({"error": (
+            "There is nobody here to trade with. Find a stall and speak to whoever "
+            "keeps it — or simply say what you sell or buy, and the scene handles "
+            "it.")}, status=409)
 
     body = read_body(request)
     place, stall, day = _stall_of(c)
@@ -1252,6 +1320,9 @@ def trade_do(request):
     refusal = _cannot_act(pc, "trade")
     if refusal:
         return refusal
+    if _merchant_here(c.scene) is None:
+        return JsonResponse({"error": "There is nobody here to trade with."},
+                            status=409)
 
     body = read_body(request)
     op = str(body.get("op", "")).strip().lower()

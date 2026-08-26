@@ -1570,7 +1570,7 @@ function paneForge() {
 
 async function forgeSubmit(begin) {
   const f = FORGE.form;
-  const payload = { ...f, begin: !!begin };
+  const payload = { ...f, begin: !!begin, world: (FORGE && FORGE.world) || "" };
   delete payload.featstext; delete payload.spellstext;
   const say = lines => { $("#forgeproblems").innerHTML = `<div class="problems">${
     lines.map(p => `<div>${esc(p)}</div>`).join("")}</div>`; };
@@ -1740,7 +1740,11 @@ document.addEventListener("click", async e => {
 
   if (e.target.closest("[data-forge]")) {
     const opts = await (await fetch("/api/create/options")).json();
-    FORGE = { opts, form: forgeDefaults(opts) };
+    // The world whose page the forge was opened from rides with the form. Discarding
+    // it here is why a character built from Fantasia's own page began in Pangrella —
+    // the server fills a missing world with the shipped default, silently. Null when
+    // the forge is opened from the shelf or roster tabs, which keeps meaning "default".
+    FORGE = { opts, form: forgeDefaults(opts), world: WORLD ? WORLD.id : "" };
     render(); return;
   }
   if (e.target.closest("[data-unforge]")) { FORGE = null; render(); return; }

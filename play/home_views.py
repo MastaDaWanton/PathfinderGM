@@ -470,16 +470,34 @@ def create_character(request):
 
     actor = from_dict(built["sheet"], ref="pc")
 
+    # Which world the forge was opened from. Nothing carried this before, so a character
+    # made from Fantasia's own page began in Pangrella — `new_campaign` fills a missing
+    # source with the shipped default, silently. Empty still means the default, which is
+    # what the forge posts when opened from the shelf or roster tabs rather than a
+    # world's page. Validated the same way `start_in_world` validates its world, because
+    # an unreadable source should refuse here, not traceback at the table.
+    world_id = str(body.get("world", "")).strip()
+    world_src = None
+    if world_id:
+        try:
+            card = library.get(world_id)
+        except LookupError as exc:
+            return JsonResponse({"error": str(exc)}, status=404)
+        if not card.playable:
+            return JsonResponse({"error": card.problem}, status=400)
+        world_src = card.source
+
     # Exactly one enrolment, whichever button was pressed. `begin_with` enrols the
     # character itself, so calling `enrol` first and then `begin_with` put two of them
     # on the roster — and once beginning a game started retiring abandoned starts, the
     # first of the pair was retired on the spot and the campaign ran on the duplicate.
     # "Create & play" therefore reported making a character it had just shelved.
     if body.get("begin"):
-        campaign = campaign_mod.begin_with(actor)
+        campaign = campaign_mod.begin_with(actor, world_source=world_src)
         entry_id, begun = campaign.character_id, True
     else:
-        entry_id, begun = enrol(actor).id, False
+        entry_id = enrol(actor, world_source=str(world_src or "")).id
+        begun = False
 
     return JsonResponse({"ok": True, "id": entry_id, "name": actor.name,
                          "warnings": built["warnings"], "begun": begun})

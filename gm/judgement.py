@@ -1337,6 +1337,64 @@ def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
 # The injectors stay, demoted to backstop. Same doctrine as `right_body` under a brief
 # that already states the fact: say it first, catch it after.
 #
+# --- going out for material --------------------------------------------------------------
+#
+# The eleventh, and the same measurement as every one before it. A live session typed
+# "I get my water and then I go out to the forest to forage" and the narration invented
+# the entire outcome — chanterelle mushrooms, identified by "your Survival skill",
+# "added to your satchel" — while the engine ran nothing and the ingredients panel
+# truthfully showed an empty satchel. The forage op has existed all along; only the door
+# from a typed sentence was missing.
+#
+# The bare verb is the anchor — it is the word the live player actually typed, and it is
+# unambiguous. The gather-family verbs only count with a plant noun as their object, so
+# "I pick up the sword" and "I gather my things" cannot fire; a false forage charges an
+# hour of world clock and a Survival toll to somebody who never asked to spend either.
+_FORAGES = re.compile(r"\bforag(?:e|es|ing)\b", re.I)
+_GATHERS_PLANTS = re.compile(
+    r"\b(?:gather|pick|harvest|collect|look\s+for|search\s+for|hunt\s+for)\b"
+    r"[^.!?]{0,30}?"
+    r"\b(?:herbs?|plants?|mushrooms?|roots?|berries|flowers?|fungi|ingredients?|"
+    r"reagents?)\b", re.I)
+_FOR_HOURS = re.compile(r"\b(?:for\s+)?(\d{1,2})\s+hours?\b", re.I)
+
+
+def inject_forage(raw_intents, player_text: str, scene) -> list:
+    """Make a declared forage reach the engine.
+
+    The params stay empty on purpose — no biome, no track. The engine reads the ground
+    off the scene and refuses "nowhere in particular" with a printable reason, and the
+    track defaults to herbalist; an injector guessing either would be overriding the one
+    component that actually knows. Only a typed duration rides along.
+
+    Not gated on company or a fight: `_too_busy_to_forage` refuses those with a reason
+    the player can read, which is the same deliberate trade `inject_survival` documents
+    for rest.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "forage" in present:
+        return raw_intents
+    if not (_FORAGES.search(player_text) or _GATHERS_PLANTS.search(player_text)):
+        return raw_intents
+
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    params: dict = {}
+    hours = _FOR_HOURS.search(player_text)
+    if hours:
+        params["hours"] = max(1, min(48, int(hours.group(1))))
+    return list(raw_intents) + [{
+        "op": "forage", "actor": pc.ref, "params": params,
+        "because": "the player said they forage",
+    }]
+
+
 # Read by running the injectors themselves rather than by a second copy of their patterns.
 # CLAUDE.md records what a duplicated rule costs — a consequence rule was fixed in one
 # prompt and left stale in the other, and the bug went on shipping from the copy nobody
@@ -1352,6 +1410,11 @@ _DECLARERS = (
     ("cast", lambda raw, text, scene, world: inject_cast(raw, text, scene)),
     ("checks", lambda raw, text, scene, world: inject_checks(raw, text, scene)),
     ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
+    # After travel, and the ordering is load-bearing: "I go out to the forest to forage"
+    # must append travel first, so the intent list executes the move before the forage
+    # rolls its tables — the other way round forages the old ground, or errors
+    # "nowhere in particular" when there is none.
+    ("forage", lambda raw, text, scene, world: inject_forage(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
 )
 

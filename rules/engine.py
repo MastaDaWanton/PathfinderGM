@@ -1116,9 +1116,23 @@ class Engine:
     # check ------------------------------------------------------------------------------
 
     def _op_check(self, intent: Intent, partial: dict) -> Outcome:
+        from .sheet import IllegalSheet
+
         actor = self.scene.actors[intent.actor]
         skill = intent.params["skill"]
-        mods = actor.skill_modifiers(skill)
+        # A trained-only skill the character has no ranks in resolves as a refusal, not
+        # an exception. Measured live: a player toggled their class's blood armament out
+        # of combat, the spoken path invited the model to dress it as a Knowledge
+        # (Arcana) check, and `skill_modifiers` raised straight through the turn —
+        # "cannot attempt knowledge (arcana) untrained" cost the whole action. The rule
+        # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
+        # rolled, the player is told why, and the turn survives.
+        try:
+            mods = actor.skill_modifiers(skill)
+        except IllegalSheet as exc:
+            return Outcome(
+                intent_id=intent.id, op="check", effects=[],
+                tell=f"{exc}. Nothing is rolled.", because=intent.because)
         opposed = intent.params.get("opposed_by")
 
         # The opposing side is rolled first and kept in `partial`, so the player's prompt

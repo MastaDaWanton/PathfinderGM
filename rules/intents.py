@@ -910,6 +910,26 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     # is left with a sale nobody was seen to pay for.
     (r"\byou hand(?:ed)? over (?:your|the) (?:payment|coins?|money|purse)\b",
      "states the player paying"),
+    # Items gained. Same family as money, and it arrived the same way: a declared forage
+    # produced narration that identified chanterelle mushrooms with "your Survival skill"
+    # and "added them to your satchel" — an entire haul invented in setup prose while the
+    # engine ran nothing and the ingredients panel truthfully showed an empty satchel.
+    # The satchel is the engine's to fill; a *real* haul is reported by the consequence
+    # call, which runs with claims switched off precisely so true reporting stays legal.
+    # Anchored on "your" so an NPC stowing their own goods is nobody's business.
+    (r"\b(?:adds?|added|tucks?|tucked|slips?|slipped|stows?|stowed|puts?|placed?|"
+     r"places)\b[^.!?]{0,40}\b(?:in|into|to)\s+your\s+"
+     r"(?:satchel|pack|bag|bags|pouch|inventory)\b",
+     "states items gained; the satchel is the engine's to fill"),
+    # The same invention by state instead of by verb. Caught live on the very first
+    # verified forage turn: "your satchel is full to bursting with wild mushrooms,
+    # berries, and other edible plants" — written before a single die was rolled, and
+    # the engine's actual haul an hour later was rue and pomegranate.
+    (r"\byour\s+(?:satchel|pack|bag|bags|pouch)\s+(?:is|was)\s+"
+     r"(?:now\s+)?(?:full|filled|bursting|overflowing|heavy|laden)\b",
+     "states items gained; the satchel is the engine's to fill"),
+    (r"\byour\s+(?:survival|perception|heal|knowledge)\s+(?:skill|training)\b",
+     "states a skill deciding something; checks are rolled, not narrated"),
 ]
 
 OUTCOME_RE = [(re.compile(p, re.IGNORECASE), why) for p, why in _OUTCOME_PATTERNS]

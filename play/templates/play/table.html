@@ -1654,6 +1654,7 @@ async function post(url, body) {
 function render(s) {
   STATE = s;
   renderCombat(s);
+  reflectMerchant(s);
   // `fresh` marks only the beats that were not on the page a moment ago, because this
   // rebuilds the whole transcript each state: without the gate, every line re-ran its
   // ink-bleed entrance on every turn, which reads as the book flickering rather than
@@ -1803,7 +1804,11 @@ document.addEventListener("click", async e => {
   // spoken-turn path, which ends the turn and runs every NPC after it — so a free
   // action handed the bear a swing. Toggles and free actions go straight to the engine
   // with the turn left open; everything else is a turn as it always was.
-  if (btn.dataset.free === "1" && STATE.scene && STATE.scene.in_encounter) {
+  // In a fight or out of one: a free action goes straight to the engine either way.
+  // The out-of-combat branch used to fall through to the spoken path, which cost a
+  // whole narrated turn, let the model reinvent the toggle as a Knowledge (Arcana)
+  // check, and let an advance_time ride along — a free action spending an afternoon.
+  if (btn.dataset.free === "1") {
     busy(true);
     try {
       render(await post("/api/combat/act", {
@@ -3313,6 +3318,19 @@ async function closeTrade() {
 }
 
 $("#tradeaction").onclick = openTrade;
+
+// The button follows the server's answer rather than keeping its own copy of the rule.
+// Disabled is deliberate over hidden: a player who wonders why sees the reason in the
+// title, instead of wondering where the button went.
+function reflectMerchant(s) {
+  const btn = $("#tradeaction");
+  if (!btn) return;
+  const who = (s && s.merchant) || "";
+  btn.disabled = !who;
+  btn.title = who ? `Trade with ${who}`
+                  : "Nobody here keeps a counter — say what you sell or buy, "
+                    + "or find a stall.";
+}
 
 function tradeRow(x, side) {
   const on = PICK && PICK.side === side && PICK.id === x.id ? " on" : "";

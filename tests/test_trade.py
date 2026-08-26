@@ -769,3 +769,162 @@ def test_a_cosmetic_spell_does_not_move_the_price():
     gleaming = jar(base="Sweetspire Tea", tier="common", potency=1.0,
                    specs=[{"type": "heal", "dice": "1d4"}])
     assert pricing.worth(gleaming) == pricing.worth(plain)
+
+
+
+# --- the five findings of the 2026-08-26 session -----------------------------------------
+
+def test_a_declared_forage_reaches_the_engine():
+    """The eleventh injector, and the same measurement as every one before it. A live
+    session typed "I get my water and then I go out to the forest to forage" and the
+    narration invented the entire outcome — chanterelle mushrooms, identified by "your
+    Survival skill", "added to your satchel" — while the engine ran nothing and the
+    ingredients panel truthfully showed an empty satchel."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    said = "I get my water and then I go out to the forest to forage"
+    ops = judgement.declared_ops(said, scene)
+    # Travel AND forage, in that order — the move must resolve first or the forage
+    # rolls the old ground's tables.
+    assert "forage" in ops
+    assert ops.index("travel") < ops.index("forage")
+
+    raw = judgement.inject_forage([{"op": "narrate_only", "params": {}}],
+                                  "I forage for 3 hours", scene)
+    assert raw[-1]["op"] == "forage"
+    assert raw[-1]["params"] == {"hours": 3}
+    # No biome, no track, ever: the engine reads the ground off the scene and refuses
+    # "nowhere in particular" with a printable reason; an injector guessing either
+    # would be overriding the one component that actually knows.
+    assert "biome" not in raw[-1]["params"] and "track" not in raw[-1]["params"]
+
+
+def test_gathering_needs_a_plant_and_a_sword_is_not_one():
+    """A false forage charges an hour of world clock and a Survival toll to somebody who
+    never asked to spend either, so the gather-family verbs require a plant noun."""
+    from gm import judgement
+
+    scene = _scene_with_a_satchel()
+    for said in ("I pick up the sword", "I gather my things and leave",
+                 "should I forage here?"):
+        raw = judgement.inject_forage([{"op": "narrate_only", "params": {}}],
+                                      said, scene)
+        assert [r["op"] for r in raw] == ["narrate_only"], said
+    raw = judgement.inject_forage([{"op": "narrate_only", "params": {}}],
+                                  "I gather herbs by the stream", scene)
+    assert raw[-1]["op"] == "forage"
+
+
+def test_an_invented_haul_is_an_outcome_claim():
+    """The exact narration the live session shipped. The satchel is the engine's to
+    fill; a *real* haul is reported by the consequence call, which runs with claims
+    switched off precisely so true reporting stays legal."""
+    from rules.intents import find_outcome_claims
+
+    said = ("You take out your Survival skill to identify them. You add them to your "
+            "satchel, along with some other foraged plants and berries.")
+    why = {c.why for c in find_outcome_claims(said)}
+    assert any("satchel is the engine's" in w for w in why)
+    assert any("checks are rolled" in w for w in why)
+    # An NPC stowing their own goods is nobody's business.
+    assert not find_outcome_claims("She stows the coins in her own pouch and nods.")
+
+    # The state-claim variant, caught on the first live verification of the fix above:
+    # the same haul invented with no gaining verb at all, before a single die was
+    # rolled — and the engine's actual haul an hour later was rue and pomegranate.
+    said = ("After an hour of searching, your satchel is full to bursting with wild "
+            "mushrooms, berries, and other edible plants.")
+    assert any("satchel is the engine's" in c.why for c in find_outcome_claims(said))
+
+
+def test_an_untrained_check_refuses_instead_of_crashing():
+    """Measured live: toggling the class's blood armament out of combat went through the
+    spoken path, the model dressed it as a Knowledge (Arcana) check, and
+    `skill_modifiers` raised IllegalSheet straight through the turn — "cannot attempt
+    knowledge (arcana) untrained" cost the whole action. The rule is right (1e knowledge
+    checks are trained-only); the crash was not."""
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.ranks.pop("knowledge (arcana)", None)
+    scene.add(pc)
+    eng = Engine(scene, Dice(seed=3))
+
+    out = eng.run(eng.validate([{"op": "check", "actor": "pc",
+                                 "params": {"skill": "knowledge (arcana)",
+                                            "dc": {"band": "average"}}}])).outcomes
+    assert "untrained" in out[0].tell
+    assert "Nothing is rolled" in out[0].tell
+
+
+def test_the_trade_panel_needs_a_merchant_and_the_state_says_so():
+    """"The trade button should only work when the user is in a dialogue with a
+    merchant, otherwise the exchange of objects can be handled through the prompts."
+
+    The narrated path (the sell/buy injectors) keeps working anywhere; only the panel is
+    gated, the rule lives in one place (`_merchant_here`), and /api/state carries the
+    answer so the button and the endpoint cannot disagree."""
+    import json as _json
+
+    from django.test import Client
+
+    from play import campaign as cm
+    from play.views import _merchant_here
+
+    c = cm.current()
+    if c.scene.pc() is None:
+        pytest.skip("no live campaign")
+
+    try:
+        # With no merchant present the panel refuses... (the live scene may happen to
+        # hold one already, in which case only the open-counter half runs)
+        if _merchant_here(c.scene) is None:
+            r = Client().post("/api/trade", data="{}",
+                              content_type="application/json")
+            assert r.status_code == 409
+            assert "nobody here to trade" in r.json()["error"].lower()
+        # ...and with one, it opens, keyed to that merchant's own stall.
+        from rules.sheet import from_dict
+        added = from_dict({"name": "the stallholder", "kind": "npc", "hp": 4,
+                           "hp_max": 4, "class": "", "level": 1}, ref="m1")
+        c.scene.actors["m1"] = added
+        assert _merchant_here(c.scene) is not None
+        r = Client().post("/api/trade", data="{}", content_type="application/json")
+        assert r.status_code == 200
+        assert r.json()["stall"] == "the-stallholder"
+    finally:
+        c.scene.actors.pop("m1", None)
+
+
+def test_free_actions_go_straight_to_the_engine_out_of_combat():
+    """Measured live: out of a fight, the toggle button fell through to the spoken path
+    — a whole narrated turn for a free action, which invited the arcana check above and
+    let an `advance_time` ride along. The combat-panel door now opens out of combat for
+    free `use_ability` actions only, with the turn left open."""
+    import json as _json
+
+    from django.test import Client
+
+    from play import campaign as cm
+
+    c = cm.current()
+    if c.scene.pc() is None or c.scene.in_encounter or c.scene.awaiting:
+        pytest.skip("needs a quiet live campaign")
+
+    # A non-free shape is still refused out of combat...
+    r = Client().post("/api/combat/act", data=_json.dumps(
+        {"actions": [{"op": "attack", "params": {}}], "label": "x",
+         "end_turn": False}), content_type="application/json")
+    assert r.status_code == 409 and "No fight" in r.json()["error"]
+
+    # ...but a free-action use_ability gets PAST that gate. The ability is deliberately
+    # one nobody has: the engine's own refusal ("has no ability called...") proves the
+    # door opened, and an IntentError pops the transcript and saves nothing — so the
+    # test cannot flip a real toggle on whatever campaign is live.
+    r = Client().post("/api/combat/act", data=_json.dumps(
+        {"actions": [{"op": "use_ability",
+                      "params": {"ability": "An Ability No Test Should Grant"}}],
+         "label": "free: nothing", "end_turn": False}),
+        content_type="application/json")
+    assert r.status_code == 400
+    assert "has no ability" in r.json()["error"]

@@ -227,3 +227,29 @@ def test_what_this_place_remembers_now_reaches_the_gms_brief(world):
     # Undated events are legitimate and must not print "None" at the model.
     assert "undated: The Founding of Pangrella" in brief
     assert "None:" not in brief
+
+
+
+def test_two_writes_in_one_clock_tick_do_not_serve_stale_content(tmp_path):
+    """Measured on this machine: 46 of 50 back-to-back rewrites carried the identical
+    st_mtime — Windows stamps files from a cached clock that ticks every ~15ms. With
+    the cache keyed on (path, mtime) alone, an upload overwriting a same-named world
+    inside one tick was *validated against the previous file's parse*: the broken-
+    upload rollback test saw `{ not json` accepted with a 200. Size joined the key.
+
+    The collision is forced with `os.utime` rather than raced, so this fails every
+    time or never."""
+    import os
+
+    from world.loader import load_cached
+
+    data = json.load(open(EXPORT, encoding="utf-8"))
+    p = tmp_path / "shared.json"
+    p.write_text(json.dumps(data), encoding="utf-8")
+    stamp = p.stat().st_mtime_ns
+    assert load_cached(p).name == "Pangrella"
+
+    p.write_text("{ not json", encoding="utf-8")
+    os.utime(p, ns=(stamp, stamp))          # the same tick, on purpose
+    with pytest.raises(Exception):
+        load_cached(p)

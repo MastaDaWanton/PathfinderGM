@@ -264,7 +264,7 @@ def load(path: str | Path) -> World:
 
 
 @lru_cache(maxsize=4)
-def _cached(path_str: str, mtime: float) -> World:
+def _cached(path_str: str, mtime_ns: int, size: int) -> World:
     return load(path_str)
 
 
@@ -273,6 +273,11 @@ def load_cached(path: str | Path) -> World:
 
     Keyed on content-changing metadata, not on "have we loaded something before" — the
     staleness bug in World Bible came from a check that only ever answered "fresh".
+    Size is part of the key because mtime alone is not content-changing metadata on
+    this machine: 46 of 50 back-to-back rewrites carried the identical st_mtime
+    (Windows stamps from a cached clock that ticks every ~15ms), which let an upload's
+    validation read the *previous* file's parse for the new file's bytes.
     """
     path = Path(path)
-    return _cached(str(path), path.stat().st_mtime)
+    st = path.stat()
+    return _cached(str(path), st.st_mtime_ns, st.st_size)

@@ -50,6 +50,13 @@ class Entry:
     epitaph: str = ""
     campaign_id: str = ""
     turns_played: int = 0
+    # Which world this character was made for. Nothing recorded it, so a character
+    # forged from Fantasia's own page began in Pangrella: `new_campaign` fills a missing
+    # world with the shipped default, silently, and the roster had nowhere to say
+    # otherwise. Empty still means the shipped default — every entry written before the
+    # field existed reads back that way, and ROSTER_VERSION is deliberately NOT bumped:
+    # `load` checks it for equality, so a bump would vanish every existing character.
+    world_source: str = ""
 
     @property
     def actor(self) -> Actor:
@@ -79,6 +86,7 @@ def save(entry: Entry) -> Path:
         "created": entry.created or datetime.now().isoformat(timespec="seconds"),
         "died": entry.died, "epitaph": entry.epitaph,
         "campaign_id": entry.campaign_id, "turns_played": entry.turns_played,
+        "world_source": entry.world_source,
         "sheet": entry.sheet,
     }
     p = path_for(entry.id)
@@ -101,6 +109,7 @@ def load(character_id: str) -> Entry | None:
         sheet=d.get("sheet", {}), created=d.get("created", ""), died=d.get("died", ""),
         epitaph=d.get("epitaph", ""), campaign_id=d.get("campaign_id", ""),
         turns_played=d.get("turns_played", 0),
+        world_source=d.get("world_source", ""),
     )
 
 
@@ -111,11 +120,16 @@ def everyone() -> list[Entry]:
     return out
 
 
-def enrol(actor: Actor, campaign_id: str = "") -> Entry:
-    """Put a character on the roster, or return the one already there."""
+def enrol(actor: Actor, campaign_id: str = "", world_source: str = "") -> Entry:
+    """Put a character on the roster, or return the one already there.
+
+    `campaign_id` stays empty for roster-only creation on purpose: `begin_with` retires
+    stale alive-with-campaign-no-turns characters, and a parked character survives that
+    sweep only because their campaign_id is blank.
+    """
     cid = unique_id(slugify(actor.name))
     entry = Entry(id=cid, name=actor.name, status=ALIVE, sheet=to_dict(actor),
-                  campaign_id=campaign_id,
+                  campaign_id=campaign_id, world_source=world_source,
                   created=datetime.now().isoformat(timespec="seconds"))
     save(entry)
     return entry
