@@ -449,3 +449,51 @@ def test_the_literal_spell_routes_are_not_read_as_spell_names(client):
     /api/spells/list came back 404 "no spell 'list'". Ordering, pinned."""
     assert client.get("/api/spells/list").status_code == 200
     assert client.get("/api/spells/fireball").status_code == 200
+
+
+
+def test_the_spawned_arrive_with_pockets_worth_looting():
+    """The loot op made empty pockets visible: "take everything" off a thug who owns a
+    sap is a hollow sentence. Kits are tables rolled at spawn — wealth dice, carried
+    things, armour worn and lootable with flat_ac already counting it — and never a
+    model's guess, because a model-authored inventory is unpriceable garbage in the
+    ledger. Animals carry teeth, not coin."""
+    from rules.bestiary import instantiate
+    from rules.engine import Scene
+
+    s = Scene()
+    thug = instantiate("thug", scene=s, name="the tough")
+    assert thug.purse.get("sp", 0) >= 2            # 2d4 sp, rolled
+    assert thug.inventory                          # the pockets
+    assert thug.armour == "leather"                # worn, hence lootable
+    dog = instantiate("guard dog", scene=s, name="the dog")
+    assert dog.purse == {} and dog.inventory == {}
+
+
+def test_every_campaign_begins_with_a_live_thread():
+    """The event-watcher role was configured and never once called: every campaign
+    began with no world state at all. The undercurrent is rolled at creation — the
+    world's own unwritten hooks first (name and why, not the bare name), a
+    world-agnostic table when the export ships none — and planted in history as the
+    GM's private note."""
+    from django.conf import settings
+
+    from play import opening
+    from world.loader import load_cached
+
+    w = load_cached(settings.WORLD_EXPORT)
+    rolled = opening.undercurrent(w, seed=7)
+    assert " — " in rolled or rolled                # a name AND its why
+
+    class Bare:
+        unwritten = []
+    fallback = opening.undercurrent(Bare(), seed=3)
+    assert fallback in opening.UNDERCURRENTS
+
+    from play import campaign as cm
+    from rules.sheet import load_pc
+    c = cm.new_campaign("undercurrent-test", seed=5,
+                        character=load_pc("fixtures/pc-kesst.json"))
+    notes = [h for h in c.history if "private note" in str(h.get("content", ""))]
+    assert len(notes) == 1
+    assert "never announce it" in notes[0]["content"]

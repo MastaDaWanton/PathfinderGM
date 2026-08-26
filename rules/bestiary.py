@@ -45,6 +45,8 @@ TEMPLATES: dict[str, dict] = {
         "flat_cmd": 11,
         "equipped": "club",
         "weapons": ["club"],
+        "wealth": "1d4 sp",
+        "pockets": ["work gloves", "chalk stub"],
         "notes": "Commoner 1. Tired, half-attentive, not paid enough to fight.",
     },
     "watchman": {
@@ -61,6 +63,9 @@ TEMPLATES: dict[str, dict] = {
         "flat_cmd": 14,
         "equipped": "shortsword",
         "weapons": ["shortsword", "club"],
+        "armour": "chain shirt",
+        "wealth": "1d6 sp",
+        "pockets": ["watch whistle", "rations"],
         "notes": "Warrior 1 in a chain shirt. Will shout before drawing.",
     },
     "thug": {
@@ -77,6 +82,9 @@ TEMPLATES: dict[str, dict] = {
         "flat_cmd": 15,
         "equipped": "sap",
         "weapons": ["sap", "dagger"],
+        "armour": "leather",
+        "wealth": "2d4 sp",
+        "pockets": ["dice of bone", "strip of dried meat"],
         "notes": "Warrior 1. Prefers a sap: a body that wakes up cannot testify to a killing.",
     },
     "guard dog": {
@@ -129,7 +137,35 @@ def instantiate(
         data["name"] = name
     data["world_entity_id"] = world_entity_id
     actor = from_dict(data, ref=_next_ref(scene))
+    _assemble_kit(actor, data)
     return actor
+
+
+def _assemble_kit(actor, data: dict) -> None:
+    """Pockets for the spawned: a purse, worn armour, small carried things.
+
+    The loot op made empty pockets visible — "I take everything" off a thug who owns a
+    sap and nothing else is a hollow sentence. Kits are TABLES, not model output: every
+    quality lesson in this repo says a model-authored inventory is unpriceable
+    narrative garbage in the ledger, so a template declares `wealth` (dice, rolled at
+    spawn) and `pockets` (carried ids), and anything undeclared derives from what the
+    stat block already says. Worn armour is loot, not arithmetic: `flat_ac` already
+    includes it, so nothing here touches a number.
+    """
+    from . import creation as creation_mod
+    from .dice import Dice
+
+    if int((data.get("abilities") or {}).get("int", 10) or 10) <= 2:
+        return                                  # animals carry teeth, not coin
+    wealth = str(data.get("wealth") or "").strip()
+    if not wealth and data.get("kind") == "npc":
+        # Derived, roughly: what defeating them is worth maps to what they carry.
+        xp = int(data.get("xp_value", 0) or 0)
+        wealth = "2d6 sp" if xp >= 100 else "1d4 sp"
+    if wealth:
+        actor.purse = creation_mod.starting_purse({"starting_wealth": wealth}) or {}
+    for thing in data.get("pockets") or []:
+        actor.carry(str(thing).strip().lower().replace(" ", "-"), 1)
 
 
 def _next_ref(scene) -> str:

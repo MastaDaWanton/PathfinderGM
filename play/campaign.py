@@ -261,9 +261,23 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     here = opening.roll(campaign_id, seed)
     scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
-    return Campaign(
+    c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
+    # The campaign's opening undercurrent — the first world-state this app has ever
+    # actually held. The "event watcher" role was configured and never once called;
+    # every campaign began with no live thread at all. Rolled from the world's own
+    # unwritten hooks when it has them, from a world-agnostic table when it does not,
+    # and planted in history as the GM's private note so it rides every turn's
+    # context from turn one without a single prompt-builder signature changing.
+    thread = opening.undercurrent(world, seed)
+    if thread:
+        c.history.append({
+            "role": "user",
+            "content": f"(The GM's private note for this campaign: {thread} The "
+                       f"player does not know this. Let it surface in small ways; "
+                       f"never announce it.)"})
+    return c
 
 
 def opening_text(campaign: Campaign) -> str:

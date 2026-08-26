@@ -245,3 +245,47 @@ def compose(campaign, standing: str) -> str:
         f"\n\nWhat do you do?",
     ) if p]
     return "\n\n".join(parts)
+
+
+# World-agnostic undercurrents, for a world that ships no unwritten hooks. Shapes, not
+# stories: each names a tension the GM can hang anything local on, and none names a
+# person or place the world would have to contain.
+UNDERCURRENTS = [
+    "An old debt in this place is being called in, and the collector is not patient.",
+    "Something that should have arrived days ago has not, and people who know are "
+    "starting to change their routines.",
+    "Two people who publicly cooperate are privately at war, and each is recruiting.",
+    "A recent death everyone calls natural was not, and one person here knows it.",
+    "Somebody powerful is quietly selling what is not theirs to sell.",
+    "A stranger has been asking questions about the player's kind of person.",
+    "The cheapest goods in the market are cheap for a reason nobody says aloud.",
+    "An institution here is weeks from failing, and its keepers are hiding it.",
+    "Someone is leaving, soon and secretly, and needs one thing before they go.",
+    "What was stolen last season is about to resurface in the wrong hands.",
+]
+
+
+def undercurrent(world, seed: int | None = None) -> str:
+    """The campaign's live thread, rolled once at the start.
+
+    The world's own `unwritten` hooks first — they are exactly this, authored by the
+    world's generator and reaching nothing until now — and the agnostic table only
+    when the export ships none. Seeded from the campaign seed so a rerolled campaign
+    is a genuinely different evening.
+    """
+    d = Dice(seed=seed)
+    hooks = []
+    for u in getattr(world, "unwritten", None) or []:
+        if isinstance(u, dict):
+            # The export's shape: {"name": "Kaelvyr", "kind": "CHARACTER", "why":
+            # "Nirkor engineer who discovered the hidden vein of salt"}. The `why` is
+            # the hook; the name alone is just a stranger.
+            name = str(u.get("name") or "").strip()
+            why = str(u.get("why") or u.get("text") or u.get("hook") or "").strip()
+            text = f"{name} — {why}" if name and why else (why or name)
+        else:
+            text = str(u)
+        if text and text.strip():
+            hooks.append(text.strip())
+    pool = hooks or UNDERCURRENTS
+    return pool[d.roll(f"1d{len(pool)}").total - 1] if pool else ""
