@@ -179,6 +179,10 @@ class GMAgent:
                 # `eat` and `drink` for the sleep and meals both models narrate and
                 # neither ever proposes, worked example notwithstanding.
                 raw = data.get("intents")
+                # First, because everything downstream reads the shapes this
+                # straightens: a target pocketed in params is invisible to the misaim
+                # check, and an invented param is a schema refusal five lines later.
+                raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)

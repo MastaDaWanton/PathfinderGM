@@ -97,13 +97,25 @@ def test_a_held_weapon_never_carries_the_armament():
         assert not any("fist die" in m.source for m in roll.modifiers)
 
 
-def test_the_panel_offers_the_punch_only_while_formed():
+def test_the_panel_offers_the_fists_only_while_formed_and_only_beside_a_weapon():
+    """The armament stopped being a separately named weapon: `Actor.weapon` rides it
+    on every unarmed strike while formed, so "unarmed" already MEANS the armament
+    strike. The panel's extra slot exists only so somebody holding a sword can still
+    choose their fists — an unarmed character needs no second entry that would name
+    the same swing twice."""
     from play.views import _attack_slots
 
     pc = _bender()
     assert _attack_slots(pc)["weapons"] == [pc.equipped or "unarmed"]
     pc.add_condition("blood armament", rounds=None, source="test")
-    assert "armed punch" in _attack_slots(pc)["weapons"]
+    if (pc.equipped or "unarmed") != "unarmed":
+        assert _attack_slots(pc)["weapons"] == [pc.equipped, "unarmed"]
+    pc.equipped = "unarmed"
+    assert _attack_slots(pc)["weapons"] == ["unarmed"]
+    # And the single entry really is the armament strike while the toggle holds.
+    assert pc.weapon("unarmed").get("armament") is True
+    pc.remove_condition("blood armament")
+    assert pc.weapon("unarmed").get("armament") is None
 
 
 def test_the_ability_button_reports_its_state():
@@ -264,3 +276,45 @@ def _tmpdir():
     import tempfile
     from pathlib import Path
     return Path(tempfile.mkdtemp()) / "campaigns"
+
+
+
+def test_both_armament_dice_are_the_players_own():
+    """"when striking with my fist and my armament on i deal fist dmg and blood dmg
+    but i only roll blood dmg fist gets rolled for me." The fist die was an
+    engine-rolled hidden rider; now each die is its own popup, named."""
+    scene, e = _fight()
+    scene.actors["pc"].equipped = "unarmed"
+    _use(e)                                                # form the armament
+    faces = []
+    r = e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                           "because": "she swings", "params": {}}]))
+    for _ in range(6):
+        if r.awaiting is None:
+            break
+        label = r.awaiting["label"]
+        faces.append(label)
+        r = e.resume(4 if label.startswith("Fist")
+                     else 6 if label.startswith("Blood") else 19)
+    assert any(l.startswith("Fist die") for l in faces), faces
+    assert any(l.startswith("Blood die") for l in faces), faces
+    dmg_roll = next(x for o in r.outcomes for x in o.as_dict()["rolls"]
+                    if x["label"].startswith("Blood die"))
+    assert any(m["source"].startswith("fist die") and m["value"] == 4
+               for m in dmg_roll["modifiers"])
+
+
+def test_the_unarmed_strike_wears_the_armament_automatically():
+    """"the default attack should be unarmed strike unless otherwise prompted, and in
+    the case that something should alter the unarmed strike (like Extracorporeal
+    Blood Armament) it should be applied." An attack that names no weapon, on a
+    bender with the toggle on, is the armament strike — nobody has to know a magic
+    weapon name."""
+    pc = _bender()
+    pc.equipped = "unarmed"
+    pc.add_condition("blood armament", rounds=None, source="test")
+    w = pc.weapon(None)
+    assert w.get("armament") is True
+    assert w["name"] == "unarmed strike (blood armament)"
+    pc.remove_condition("blood armament")
+    assert pc.weapon(None).get("armament") is None

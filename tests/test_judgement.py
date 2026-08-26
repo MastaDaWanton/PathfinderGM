@@ -916,3 +916,32 @@ def test_a_bare_check_is_given_the_average_band_not_five_rejections():
         "I climb the nearest rise to see further.", scene)
     chained = judgement.fill_bare_checks(chained)
     assert [i.op for i in eng.validate(chained)] == ["narrate_only", "check"]
+
+
+
+def test_a_bent_attack_is_straightened_not_refused_seven_times():
+    """Measured live: "I attack the closest person" died in SEVEN attempts across two
+    models — target pocketed in params (the schema refuses unknown params), an
+    invented `action` param, and a weapon name filed as a manoeuvre. Every one is
+    information in the wrong pocket, movable in code."""
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    thug = instantiate("thug", scene=scene, name="the thug")
+    scene.add(thug)
+
+    raw = [{"op": "attack", "actor": "pc",
+            "params": {"target": thug.ref, "action": "full_attack",
+                       "manoeuvre": "armed punch"},
+            "because": "she swings"}]
+    fixed = judgement.normalize_attacks(raw, scene)
+    assert fixed is not None
+    a = fixed[0]
+    assert a["target"] == thug.ref
+    assert "target" not in a["params"] and "action" not in a["params"]
+    assert "manoeuvre" not in a["params"]
+    assert a["params"]["weapon"] == "armed punch"
+
+    # A real manoeuvre and a clean shape are not this function's business.
+    fine = [{"op": "attack", "actor": "pc", "target": thug.ref,
+             "params": {"manoeuvre": "trip"}, "because": "x"}]
+    assert judgement.normalize_attacks(fine, scene) is None

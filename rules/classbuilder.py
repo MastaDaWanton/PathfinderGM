@@ -876,6 +876,26 @@ def validate_class(d: dict) -> list[str]:
         problems.append("hit_dice_per_level: 1 or more, and leave it out entirely for the "
                         "usual one die a level.")
 
+    # `creation.starting_purse` reads this at character creation, and both of its quiet
+    # failure shapes have now happened: a string the pattern cannot read becomes an
+    # EMPTY purse with no warning, and a Storm Lord's "300d100 x 100 gp" crashed the
+    # forge with a 500 before implausible dice learned to pay their average. Say both
+    # things here, where the author can still fix the words.
+    wealth = str(d.get("starting_wealth") or "").strip()
+    if wealth:
+        import re as _re
+        m = _re.fullmatch(r"(\d+)d(\d+)\s*(?:[x×*]\s*(\d+))?\s*([a-z]{2})?",
+                          wealth.lower())
+        if not m:
+            problems.append(
+                f"starting_wealth: {wealth!r} is not a wealth roll the forge can read. "
+                f"Write it like '5d6 x 10 gp' — dice, an optional multiplier, a coin.")
+        elif int(m.group(1)) > 100 or int(m.group(2)) > 1000:
+            problems.append(
+                f"starting_wealth: {wealth!r} is more dice than anyone rolls. It will "
+                f"work — the forge pays its average instead of rolling — but if you "
+                f"meant a number, '2d4 x 1000 gp' reads better than three hundred dice.")
+
     ranks = d.get("skill_ranks")
     if ranks in (None, ""):
         problems.append("skill_ranks: how many skill ranks a level, before Intelligence. "

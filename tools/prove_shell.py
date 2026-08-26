@@ -98,6 +98,30 @@ def main() -> None:
     note("no backend outlives the shell",
          [] if backend_dead else [f"backend pid {pid} still running — the orphan"])
 
+    # And none AT ALL, not merely not-ours: the single-instance quit path once
+    # spawned a backend and abandoned it while app.quit() tore the shell down, which
+    # per-pid bookkeeping cannot see. A sweep is the only honest check.
+    time.sleep(2)
+    stray = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq PathfinderGM.exe", "/NH"],
+        capture_output=True, text=True).stdout
+    note("no stray PathfinderGM.exe anywhere",
+         [] if "PathfinderGM.exe" not in stray
+         else [f"survivors: {' '.join(stray.split())[:120]}"])
+    # The shell's own family too. Four orphaned "Pathfinder GM" processes (gpu,
+    # renderer, utility — Electron is many) once sat holding the single-instance lock
+    # and the build directory: every later launch quit as a "second instance" and
+    # electron-builder could not overwrite its own output. Killing a main process
+    # that has already exited leaves its children unparented, and only a sweep sees
+    # them.
+    if args.packaged:
+        stray = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq Pathfinder GM.exe", "/NH"],
+            capture_output=True, text=True).stdout
+        note("no stray shell processes holding the lock",
+             [] if "Pathfinder GM.exe" not in stray
+             else [f"survivors: {' '.join(stray.split())[:120]}"])
+
     print(f"\n{'ALL CLEAN' if not FAULTS else f'{len(FAULTS)} FAULT(S)'}")
     for f in FAULTS:
         print(" -", f)

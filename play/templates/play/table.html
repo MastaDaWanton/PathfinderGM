@@ -2326,8 +2326,11 @@ document.addEventListener("click", async e => {
   if (t.closest("#cb-fullatk")) {
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
     const seq = (STATE.attacks || {}).sequence || [0];
+    // A toggle is a free action whatever its text says — the armament and Blood Rage
+    // sat in this list as "attacks", and picking one wasted a swing on something the
+    // chips row below gives away for nothing.
     const abil = (STATE.abilities || []).filter(a =>
-      !["swift", "free", "immediate"].includes(actionKind(a.text)));
+      !a.toggle && !["swift", "free", "immediate"].includes(actionKind(a.text)));
     const arms = (STATE.attacks || {}).weapons || [];
     const options = (i) => `<option value="">weapon (${seq[i] >= 0 ? "+" : ""}${
       seq[i]})</option>` + (arms.length > 1 ? arms.slice(1).map(w =>
@@ -2358,7 +2361,10 @@ document.addEventListener("click", async e => {
   }
 
   const menuFor = (kinds, slot) => {
-    const list = (STATE.abilities || []).filter(a => kinds.includes(actionKind(a.text)));
+    // Toggles count as free here too, so the armament reaches the free menu and
+    // stays out of the standard one.
+    const list = (STATE.abilities || []).filter(a =>
+      kinds.includes(a.toggle ? "free" : actionKind(a.text)));
     if (!list.length) { combatMenu(`<span class="cb-note">Nothing ${
       kinds[0]} to use.</span>`); return; }
     combatMenu(list.map(a => `<button data-pick="${slot}:${esc(a.name)}"

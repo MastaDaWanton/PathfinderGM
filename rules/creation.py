@@ -246,7 +246,15 @@ def starting_purse(cls: dict) -> dict[str, int]:
     count, faces = int(m.group(1)), int(m.group(2))
     times = int(m.group(3) or 1)
     coin = m.group(4) or "gp"
-    total = dice.Dice().roll(f"{count}d{faces}").total * times
+    try:
+        total = dice.Dice().roll(f"{count}d{faces}").total * times
+    except dice.BadDice:
+        # A homebrew class wrote "300d100 x 100 gp" and the uncaught BadDice came out
+        # of character creation as a 500 with the forge's picks all filled in. The
+        # author's extravagance is theirs to have — it is their class and their game —
+        # so implausible dice pay their expected value instead of rolling: at three
+        # hundred dice the spread is noise on the mean anyway.
+        total = round(count * (faces + 1) / 2) * times
     return {coin: total} if total else {}
 
 
@@ -496,7 +504,12 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         return None, problems
 
     # --- assemble, exactly the pregen shape ------------------------------------------
-    kit = KITS.get(cid, {"weapons": ["dagger"], "armour": "none"})
+    # A class with no authored kit starts with its hands. The old fallback was a
+    # dagger, and a Blood Bending player met it mid-fight: the panel opened their
+    # first attack with a knife they never chose, never saw in their inventory, and
+    # rightly said they were not carrying. Every creature has an unarmed strike; no
+    # homebrew class has a dagger until somebody writes one down.
+    kit = KITS.get(cid, {"weapons": ["unarmed"], "armour": "none"})
     outfit = OUTFITS.get(cid, DEFAULT_OUTFIT)
     hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
     sheet = {

@@ -853,17 +853,27 @@ class Actor:
         from . import weapons as weapons_mod
 
         wanted = (key or self.equipped or "unarmed").strip().lower()
+        # The armament rides every unarmed strike while it is formed. It used to be a
+        # separately named weapon ("armed punch") the player had to know to pick, and
+        # a live session met the consequence: the panel defaulted to a phantom dagger,
+        # and a Blood Bender with the armament visibly ON was told their swing was
+        # "armed punch" — "it should be unarmed strike and the armament should
+        # automatically know to apply."
+        if wanted in ("unarmed", "unarmed strike", "fist", "fists", "punch") and \
+                self.has_condition("blood armament"):
+            wanted = "armed punch"
         # The armament's own weapon. Built here rather than in the weapons table
         # because its damage die is the class table's blood column at this character's
         # level — a table entry cannot know who is asking. It arms the fist and only
-        # the fist: a held weapon never carries the armament, which is why this is a
-        # separate weapon rather than a bonus on whatever is equipped. The fist die
-        # rides at damage time as an itemised modifier (see `_op_attack`).
+        # the fist: a held weapon never carries the armament. `armament: True` is the
+        # flag the engine keys on — name comparison broke the moment the display name
+        # started telling the truth.
         if wanted in ("armed punch", "armed punches", "blood gauntlets"):
             from . import leveling
 
             base = dict(weapons_mod.get("unarmed"))
-            base["name"] = "armed punch"
+            base["name"] = "unarmed strike (blood armament)"
+            base["armament"] = True
             base["damage"] = leveling.table_die(self, "blood") or "1d8"
             base["type"] = "bludgeoning and piercing"
             return base

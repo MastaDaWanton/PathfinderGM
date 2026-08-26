@@ -1285,10 +1285,12 @@ class Engine:
         self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
-        # The armed punch exists only while the armament is formed. Refused here with
-        # the toggle's own name, because a swing with a weapon you are not wearing is
-        # not a miss — it is a turn that should never have been declared.
-        if weapon["name"] == "armed punch" and not actor.has_condition("blood armament"):
+        # The armament strike exists only while the armament is formed. Refused here
+        # with the toggle's own name, because a swing with a weapon you are not
+        # wearing is not a miss — it is a turn that should never have been declared.
+        # (A plain unarmed strike never reaches this: `Actor.weapon` only returns the
+        # armament weapon when the ask named it or the condition holds.)
+        if weapon.get("armament") and not actor.has_condition("blood armament"):
             raise IntentError(
                 "attack: the blood armament is not formed. Use Extracorporeal Blood "
                 "Armament to form it first.", "legality")
@@ -1421,19 +1423,24 @@ class Engine:
                 mult = weapon["crit_mult"] if state.get("crit") else 1
                 dice_notation = _multiply_dice(weapon["damage"], mult)
                 dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power)
-                if weapon["name"] == "armed punch":
-                    # Blood DMG + Fist DMG + STR: the blood die is the weapon's own
-                    # and the player rolls it; the fist die rides as an itemised
-                    # modifier the engine rolls, because the dice pipeline speaks one
-                    # notation per roll and a hidden rider keeps every number named
-                    # rather than folded into a fake die. Riders do not multiply on a
+                if weapon.get("armament"):
+                    # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
+                    # The fist die used to be an engine-rolled hidden rider — "when
+                    # striking with my fist and my armament on i deal fist dmg and
+                    # blood dmg but i only roll blood dmg fist gets rolled for me" —
+                    # so it is its own suspended stage now: one popup for the fist,
+                    # one for the blood, each die named. Riders do not multiply on a
                     # crit, same as 1e treats extra damage dice.
                     from . import leveling as leveling_mod
 
                     fist = leveling_mod.table_die(actor, "fist") or "1d6"
-                    fist_roll = self.dice.roll(fist, label="fist die",
-                                               visibility="hidden")
-                    dmg_mods = dmg_mods + [Modifier(fist_roll.total,
+                    if "fist_total" not in state:
+                        fist_roll = self._roll_or_suspend_stage(
+                            intent, actor, [], f"Fist die ({fist})", None,
+                            partial, state, fist)
+                        state["fist_total"] = fist_roll.total
+                        state["rolls"].append(fist_roll.as_dict())
+                    dmg_mods = dmg_mods + [Modifier(state["fist_total"],
                                                     f"fist die ({fist})")]
                 if mult > 1:
                     dmg_mods = [Modifier(m.value * mult, f"{m.source} x{mult}")
@@ -1441,13 +1448,13 @@ class Engine:
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # The armament's damage is three named things — Blood DMG + Fist DMG
-                    # + STR — and the label said only "armed punch", so a player watching
-                    # 8 damage land could not tell whether the blood die was in it. It
-                    # was; it is the weapon's own die. Naming it is the whole fix.
-                    f"Damage ({weapon['name']}"
-                    + (f": blood {weapon['damage']} + fist"
-                       if weapon["name"] == "armed punch" else "")
-                    + (" — CRITICAL" if mult > 1 else "") + ")",
+                    # + STR — and the label used to say only "armed punch", so a player
+                    # watching 8 damage land could not tell whether the blood die was in
+                    # it. The blood die is this roll; the fist die was the popup before.
+                    (f"Blood die ({weapon['damage']})"
+                     if weapon.get("armament") else f"Damage ({weapon['name']}")
+                    + (" — CRITICAL" if mult > 1 else "")
+                    + ("" if weapon.get("armament") else ")"),
                     None, partial, state, dice_notation,
                 )
                 state["rolls"].append(dmg.as_dict())

@@ -76,11 +76,13 @@ def _attack_slots(pc) -> dict:
         return {"sequence": [], "weapon": "", "replaceable": False}
     from rules.tables import iterative_attacks
 
-    # Every weapon a swing may declare. More than one only while a toggle grants an
-    # alternative — the armed punch exists exactly as long as the armament is formed.
+    # Every weapon a swing may declare. The armament is not a separate entry any
+    # more: `Actor.weapon` makes it ride every unarmed strike while it is formed, so
+    # "unarmed" already means the armament strike when the toggle is on. The extra
+    # slot only exists so somebody holding a sword can still choose their fists.
     weapons = [pc.equipped or "unarmed"]
-    if pc.has_condition("blood armament"):
-        weapons.append("armed punch")
+    if pc.has_condition("blood armament") and (pc.equipped or "unarmed") != "unarmed":
+        weapons.append("unarmed")
     return {
         "sequence": iterative_attacks(pc.bab),
         "weapon": (pc.equipped or "unarmed"),

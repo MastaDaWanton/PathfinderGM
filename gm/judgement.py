@@ -621,6 +621,55 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
     return amended
 
 
+_ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iteration"}
+
+
+def normalize_attacks(raw_intents, scene):
+    """Straighten the attack shapes the model bends, before validation refuses them.
+
+    Measured live: "I attack the closest person" died in SEVEN attempts across two
+    models, every one a shape problem the correction loop could not teach past —
+    `target` written into params (the schema rightly refuses unknown params), an
+    invented `action` param, and a weapon name ('armed punch') filed as a manoeuvre.
+    Each is a mechanical move, not a judgement call: the information is present and in
+    the wrong pocket.
+
+    Returns amended raw intents, or None when nothing needed straightening.
+    """
+    from rules import tables
+
+    changed = False
+    out: list[dict] = []
+    for raw in raw_intents or []:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"):
+            out.append(raw)
+            continue
+        raw = dict(raw)
+        params = dict(raw.get("params") or {})
+        # The target belongs at the top level, and the model keeps pocketing it.
+        if not raw.get("target") and isinstance(params.get("target"), str):
+            raw["target"] = params["target"]
+            changed = True
+        # A weapon filed as a manoeuvre: legal manoeuvres are a closed set with an
+        # alias table; anything a weapon lookup knows goes to `weapon`, anything
+        # neither knows is dropped — a plain attack is what the player described.
+        man = str(params.get("manoeuvre", "") or "").strip().lower()
+        if man and man not in tables.MANEUVERS and \
+                man not in tables.MANEUVER_ALIASES:
+            params.pop("manoeuvre")
+            if not params.get("weapon"):
+                params["weapon"] = man
+            changed = True
+        # Unknown params ('action', 'target' now that it has moved) are refusals
+        # waiting to happen; the schema names the legal five.
+        for key in [k for k in params if k not in _ATTACK_PARAMS]:
+            params.pop(key)
+            changed = True
+        raw["params"] = params
+        out.append(raw)
+    return out if changed else None
+
+
 _TRADE_OPS = {"sell", "buy", "give", "take"}
 
 

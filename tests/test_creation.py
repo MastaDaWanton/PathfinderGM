@@ -600,3 +600,28 @@ def test_a_caster_may_not_walk_out_with_an_empty_spellbook():
     assert problems == [], problems
     # A fighter is not a caster and is not nagged about it.
     assert creation.build(spec())[1] == []
+
+
+
+def test_an_extravagant_homebrew_wealth_pays_its_average_instead_of_crashing():
+    """A homebrew class declared starting_wealth "300d100 x 100 gp" and the uncaught
+    BadDice came out of the forge as a 500 with every pick filled in. The author's
+    extravagance is theirs to have; implausible dice pay their expected value."""
+    purse = creation.starting_purse({"starting_wealth": "300d100 x 100 gp"})
+    assert purse == {"gp": round(300 * 101 / 2) * 100}
+    # Plausible wealth still rolls.
+    rolled = creation.starting_purse({"starting_wealth": "5d6 x 10 gp"})
+    assert 50 <= rolled["gp"] <= 300
+
+
+def test_a_class_without_a_kit_starts_with_its_hands():
+    """The old fallback was a dagger, and a Blood Bending player met it mid-fight: an
+    opening attack with a knife they never chose and rightly said they were not
+    carrying. No homebrew class has a dagger until somebody writes one down."""
+    built, problems = creation.build(spec(**{"class": "blood bending",
+                                             "paths": ["battle blood"],
+                                             "skills": ["climb", "acrobatics"],
+                                             "feats": ["toughness"]}))
+    assert problems == []
+    assert built["sheet"]["weapons"] == ["unarmed"]
+    assert built["sheet"]["equipped"] == "unarmed"

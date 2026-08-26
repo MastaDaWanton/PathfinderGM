@@ -408,6 +408,8 @@ def _chain(said, scene, world=None):
             raw = fn(raw, scene)
         elif name == "fill_bare_checks":
             raw = fn(raw)
+        elif name == "normalize_attacks":
+            raw = fn(raw, scene) or raw
         else:
             raw = fn(raw, said, scene)
     return raw, names

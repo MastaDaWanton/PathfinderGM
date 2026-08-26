@@ -174,22 +174,13 @@ function showStartupFailure(error) {
   app.exit(1);
 }
 
-app.whenReady().then(async () => {
-  // The grimoire is dark in every scheme; a system-light title bar on top of it
-  // reads as somebody else's window. Same fix as World Bible's.
-  nativeTheme.themeSource = 'dark';
-  try {
-    const url = await startBackend();
-    createWindow(url);
-  } catch (error) {
-    showStartupFailure(error);
-  }
-});
-
 // One window per player. The backend can run twice (the port fallback exists for
 // exactly that), but two shells on one campaign directory is two writers on one
-// save file, and second-guessing which window the player meant is not this file's
-// job.
+// save file. The lock is taken BEFORE the whenReady handler is registered, and the
+// ordering is load-bearing: with the handler registered first, a denied second
+// instance still reached startBackend while app.quit() was tearing down, spawned a
+// backend, and abandoned it — two orphaned servers holding 8917 were found an hour
+// later by a packaging test that could not bind it.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -197,6 +188,18 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(async () => {
+    // The grimoire is dark in every scheme; a system-light title bar on top of it
+    // reads as somebody else's window. Same fix as World Bible's.
+    nativeTheme.themeSource = 'dark';
+    try {
+      const url = await startBackend();
+      createWindow(url);
+    } catch (error) {
+      showStartupFailure(error);
     }
   });
 }
