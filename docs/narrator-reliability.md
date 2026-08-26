@@ -319,9 +319,16 @@ full of contractions ("that's", "I'll") was carved at its apostrophes by a singl
 regex that could not cross them, and "between you and me" leaked from a boatman's mouth
 into what the first-person detector read as the narrator having a body. The quote
 pairing is word-boundary-aware now; re-scoring the same sixty saved narrations gives
-the honest 59/60. The one real fault is a mid-paragraph first-person slip ("As I push
-aside the tangled branches") — the weight-2 class the bundled rewrite occasionally
-loses, and the open front.
+the honest 59/60. The one real fault was a mid-paragraph first-person slip ("As I push
+aside the tangled branches") — and closing it found the detector had been blind to the
+word all along: `_FIRST_PERSON` compiled without `re.I`, so its lowercase `i` could
+never match the always-capitalised pronoun, and that turn was only caught because the
+same sentence said "myself". The detector sees the word now, and the converter turns
+the whole set — I/I'm/I'll/I've/I'd with me/my/myself, am→are and was→were agreed —
+outside `_QUOTED` spans, so no sentence can come out half-turned (the fear that
+justified the old skip). Re-scored against the same sixty narrations: one turn flagged,
+converter output flags nothing. The class is detected *and* deterministically repaired,
+no model call spent.
 
 ## Still open
 

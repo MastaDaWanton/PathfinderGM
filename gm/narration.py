@@ -462,39 +462,60 @@ def established_names(earlier: list[str] | None, minimum: int = 2) -> set[str]:
 _WRITTEN_ARTIFACT = re.compile(
     r"\b(?:reads?|inscribed|carved|etched|scrawled|written|note|letter|sign|plaque)\b",
     re.I)
-_NOMINATIVE_I = re.compile(r"\bI(?:'m|'ll|'ve|'d)?\b")
-_FIRST_TO_SECOND = {"me": "you", "my": "your", "myself": "yourself"}
+_FIRST_TO_SECOND = {
+    "me": "you", "my": "your", "myself": "yourself",
+    "i": "you", "i'm": "you're", "i'll": "you'll", "i've": "you've", "i'd": "you'd",
+}
+_FP_TOKEN = re.compile(r"\b(?:i'm|i'll|i've|i'd|i|me|my|myself)\b", re.I)
 
 
 def second_person_narrator(text: str) -> tuple[str, list[str]]:
-    """Turn the narrator's own me/my back onto the player, where it can be done safely.
+    """Turn the narrator's first person back onto the player, where it can be done
+    safely.
 
-    The measured case: "Lyra stands beside me, her gaze locked onto the mirror, her eyes
-    scanning every detail of my image" — the narrator meant the player, and you/your is
-    the correct reading. Only sentences with no quote character at all are touched
-    (speech is everybody's right to the first person), only me/my/myself are swapped
-    ("mine" is a hole in the ground far more often than a pronoun in this genre), and a
-    sentence containing nominative I is skipped whole — "I draw my blade" half-swapped
-    would be worse than the defect.
+    The measured cases, in the order they taught this function: "Lyra stands beside me,
+    her gaze scanning every detail of my image" (me/my — the original), then "As I push
+    aside the tangled branches and leaves, I find myself face-to-face with a dense
+    thicket" — which shipped, because a sentence containing nominative I used to be
+    skipped whole on the theory that "I draw my blade" half-swapped would be worse than
+    the defect. The theory was right and the conclusion wrong: the fix for
+    half-swapping is swapping the *whole* set — I/I'm/I'll/I've/I'd with me/my/myself —
+    with the two verb agreements English actually demands (am→are, was→were), so no
+    sentence can come out half-turned.
+
+    Speech keeps its first person by span, not by guesswork: any sentence overlapping a
+    `_QUOTED` match is left alone, which protects multi-sentence dialogue in single
+    quotes — the shape the old per-sentence quote-character checks could not see.
+    Written artifacts (a note that reads "I will come at dusk") stay exempt, and "mine"
+    stays unswapped: it is a hole in the ground far more often than a pronoun in this
+    genre.
     """
     if not text:
         return text or "", []
+    protected = [m.span() for m in _QUOTED.finditer(text)]
     out: list[str] = []
     swapped: list[str] = []
     changed = False
-    for sentence in _SENTENCE.findall(text):
-        s = sentence
-        if ('"' not in s and "“" not in s and "”" not in s
+    for m in _SENTENCE.finditer(text):
+        s, lo, hi = m.group(0), m.start(), m.end()
+        touches_speech = any(qlo < hi and lo < qhi for qlo, qhi in protected)
+        if (not touches_speech
+                and '"' not in s and "“" not in s and "”" not in s
                 and not _OPENS_SPEECH.search(s)
-                and not _WRITTEN_ARTIFACT.search(s)
-                and not _NOMINATIVE_I.search(s)):
-            def _swap(m: re.Match) -> str:
-                low = m.group(0).lower()
+                and not _WRITTEN_ARTIFACT.search(s)):
+            first_alpha = next((i for i, ch in enumerate(s) if ch.isalpha()), -1)
+
+            def _swap(mt: re.Match, _first: int = first_alpha) -> str:
+                low = mt.group(0).lower()
                 new = _FIRST_TO_SECOND[low]
                 swapped.append(low)
-                return new.capitalize() if m.group(0)[0].isupper() else new
+                # Sentence-position-aware, not case-aware: "I" is capitalised wherever
+                # it stands, so copying its case would write "as You push" mid-clause.
+                return new.capitalize() if mt.start() == _first else new
 
-            fixed = re.sub(r"\b(?:me|my|myself)\b", _swap, s, flags=re.I)
+            fixed = _FP_TOKEN.sub(_swap, s)
+            fixed = re.sub(r"\b([Yy]ou) am\b", r"\1 are", fixed)
+            fixed = re.sub(r"\b([Yy]ou) was\b", r"\1 were", fixed)
             if fixed != s:
                 changed = True
             s = fixed
@@ -1063,12 +1084,24 @@ def right_body(text: str, gender: str,
 # and has no image. This is the third-person slip inverted — instead of pushing the
 # player out to arm's length it pulls the narrator in — and the existing check cannot see
 # it, because it looks for the player's *name* and there is none here.
-_FIRST_PERSON = re.compile(r"\b(?:i|me|my|mine|myself)\b")
+# Case-insensitive, and that flag is load-bearing: without it the lowercase `i` in
+# this pattern can never match the always-capitalised pronoun, and the detector spent
+# its whole life blind to the single commonest first-person word. "As I push through,
+# the wood darkens" shipped undetected; the audit only caught its neighbour because
+# the same sentence also said "myself".
+_FIRST_PERSON = re.compile(r"\b(?:i|me|my|mine|myself)\b", re.I)
 
 
 def narrator_in_first_person(text: str) -> list[str]:
-    """First-person words in narration. Dialogue is exempt — everybody says "I"."""
-    return sorted({m.group(0).lower() for m in _FIRST_PERSON.finditer(unquoted(text or ""))})
+    """First-person words in narration. Dialogue is exempt — everybody says "I" — and
+    so is a sentence reporting a written thing, the same exemption the converter makes:
+    a sign that reads "I buy old iron" is the sign speaking, not the narrator."""
+    found: set[str] = set()
+    for sentence in _SENTENCE.findall(unquoted(text or "")):
+        if _WRITTEN_ARTIFACT.search(sentence):
+            continue
+        found |= {m.group(0).lower() for m in _FIRST_PERSON.finditer(sentence)}
+    return sorted(found)
 
 
 # An ally the player has not got. Measured in the tavern: the killing blow came back as

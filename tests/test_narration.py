@@ -1325,11 +1325,27 @@ def test_speech_keeps_its_first_person():
     assert narration.second_person_narrator(said) == (said, [])
 
 
-def test_a_sentence_with_nominative_i_is_left_whole():
-    """"I draw my blade" half-swapped into "I draw your blade" would be worse than the
-    defect. Verb agreement makes bare I unswappable, so the sentence is skipped whole."""
-    said = "I draw my blade and step back."
-    assert narration.second_person_narrator(said) == (said, [])
+def test_a_sentence_with_nominative_i_is_turned_whole():
+    """This test used to pin the opposite: nominative-I sentences were skipped entirely,
+    on the theory that "I draw my blade" half-swapped would be worse than the defect,
+    and that verb agreement made bare I unswappable. The theory about half-swapping was
+    right and the conclusion wrong — the 59/60 run's one real fault was "As I push
+    aside the tangled branches and leaves, I find myself face-to-face with a dense
+    thicket", shipped by this very skip. English demands exactly two agreements for
+    I→you (am→are, was→were), and with the whole set swapped nothing comes out
+    half-turned."""
+    fixed, swapped = narration.second_person_narrator(
+        "As I push aside the tangled branches, I find myself face-to-face with a "
+        "dense thicket. I am certain I was followed.")
+    assert fixed == ("As you push aside the tangled branches, you find yourself "
+                     "face-to-face with a dense thicket. You are certain you were "
+                     "followed.")
+    assert "i" in swapped
+
+    # And multi-sentence dialogue in single quotes keeps its first person by span —
+    # the shape the old per-sentence quote-character checks could not see.
+    speech = "'I am the keeper. I watch the gate,' he says, and turns away."
+    assert narration.second_person_narrator(speech) == (speech, [])
 
 
 def test_a_written_artifact_keeps_its_first_person():
