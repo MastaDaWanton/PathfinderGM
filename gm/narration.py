@@ -1126,7 +1126,9 @@ _PHANTOM_OPPOSITION = re.compile(
 # to do; both shapes are cut whole.
 _LEAKED_OPTIONS = re.compile(
     r"\s\*\s|\bNone required\b|\byou'?ve already acted\b|\bchoose one of\b|"
-    r"\byour options are\b", re.I)
+    # "(Combat is now ongoing." and "(You are still in the midst of a fight. )" —
+    # the GM whispering stage directions in parentheses, measured twice live.
+    r"\byour options are\b|\(\s*Combat is now|\(\s*You are still in the midst", re.I)
 
 
 def strip_leaked_options(text: str) -> tuple[str, list[str]]:

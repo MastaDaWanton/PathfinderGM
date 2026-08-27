@@ -410,6 +410,8 @@ def _chain(said, scene, world=None):
             raw = fn(raw)
         elif name == "normalize_attacks":
             raw = fn(raw, scene) or raw
+        elif name == "drop_stray_checks":
+            raw = fn(raw, said)
         else:
             raw = fn(raw, said, scene)
     return raw, names

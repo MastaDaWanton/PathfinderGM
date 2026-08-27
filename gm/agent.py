@@ -203,6 +203,7 @@ class GMAgent:
                 # After inject_checks so its product is covered too: a check with
                 # neither dc nor opposed_by is refused by validation, and the "engine
                 # default band" the old docstring promised never existed.
+                raw = judgement.drop_stray_checks(raw, player_input)
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)

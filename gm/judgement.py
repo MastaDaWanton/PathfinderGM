@@ -1201,6 +1201,39 @@ _CHECK_VERBS = (
 _DECLARES = r"\bi\s+(?:try\s+to\s+|attempt\s+to\s+|carefully\s+|quietly\s+|quickly\s+)?"
 
 
+def drop_stray_checks(raw_intents, player_text: str) -> list:
+    """A check the player never implied, riding a turn that already has its action.
+
+    `fill_bare_checks` made bare checks survivable — and survivable includes the
+    model's inventions: "I attack them" arrived with a check(climb) nobody asked for,
+    and the player was handed a Climb popup mid-punch. When the turn carries an
+    attack or manoeuvre, a check whose skill the player's own words do not reach
+    (via the same verb table `inject_checks` reads) is the model decorating, and it
+    is dropped.
+    """
+    import re as _re
+
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    has_attack = any(isinstance(r, dict) and
+                     str(r.get("op", "")).lower() in ("attack", "manoeuvre")
+                     for r in raw_intents)
+    if not has_attack:
+        return raw_intents
+    said = (player_text or "").lower()
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "check":
+            skill = str((r.get("params") or {}).get("skill", "")).lower()
+            verbs = dict(_CHECK_VERBS).get(skill)
+            implied = skill and (skill in said or
+                                 (verbs and _re.search(verbs, said, _re.I)))
+            if not implied:
+                continue
+        out.append(r)
+    return out
+
+
 def fill_bare_checks(raw_intents) -> list:
     """A check with nothing to beat gets the average band, before validation sees it.
 

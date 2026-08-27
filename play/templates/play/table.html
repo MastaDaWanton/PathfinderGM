@@ -2849,8 +2849,12 @@ function tabInventory(s) {
     </div>
     <div class="card wide">
       <h3>Carried</h3>
-      ${carried.length ? `<table class="sheet">
+      ${(carried.length || (s.equipment.weapons || []).length) ? `<table class="sheet">
         <tr><th>Thing</th><th>How many</th><th>What the engine knows</th></tr>
+        ${(s.equipment.weapons || []).filter(w => w.name !== "unarmed").map(w => `<tr>
+          <td><b>${esc(w.name)}</b></td><td>1</td>
+          <td class="why">a weapon — ${w.equipped ? "drawn; " : ""}swing it from the
+          combat panel</td></tr>`).join("")}
         ${carried.map(i => `<tr class="${i.known ? "" : "dim"}">
           <td><b>${esc(i.name)}</b></td><td>${i.count}</td>
           <td class="why">${esc(i.line)}</td></tr>`).join("")}</table>`
