@@ -1013,7 +1013,8 @@
    "effects_converted": true,
    "passive": [
     "Swift Strikes",
-    "Uncanny Dodge"
+    "Uncanny Dodge",
+    "Extracorporeal Blood Rage Armor"
    ],
    "toggles": {
     "Extracorporeal Blood Armament": "blood armament",
@@ -1054,6 +1055,9 @@
      "temp_hp": {"scales_by": "control_blood",
       "by_tier": {"1": {"per_hit_die": 2}, "3": {"per_hit_die": 3},
                   "5": {"per_hit_die": 4}}},
+     "resist": {"scales_by": "control_blood",
+      "by_tier": {"3": {"against": "physical", "percent": 50}}},
+     "_resist_note": "Extracorporeal Blood Rage Armor, tier 3: 'Gain 50% resistance to physical damage while in Blood Rage.' It is a property of the rage, so it rides the rage's own document and arrives at the tier the armor unlocks.",
      "tell": "{name} enters Blood Rage: the pulse rises and the blood answers.",
      "tell_off": "{name} lets the rage drain away, and its borrowed vigour with it."
     }

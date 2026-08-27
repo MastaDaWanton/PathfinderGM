@@ -3188,9 +3188,11 @@ function tabEquipment(s) {
           ? `<ul style="margin:0;padding-left:18px">${e.weapons.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
           : `<div class="empty">Nothing.</div>`}
         <div class="why" style="margin-top:10px">
-          Slots record what is worn. Their effects are not applied to your numbers yet —
-          a ring of protection here will not move your AC until magic items are modelled.
-          Gear, coin and encumbrance are not tracked either.
+          A worn magic item the catalogue knows — a ring of protection, a cloak of
+          resistance, a belt of giant strength — applies to your numbers while it sits
+          in a slot, with its bonus named in every dice popup. A name the catalogue
+          does not know is recorded and does nothing, and slots past the rules limit
+          are worn, not working. Encumbrance is not tracked.
         </div>
       </div>
     </div>`;

@@ -20,7 +20,7 @@ import re
 from . import goods
 from . import houserules
 from .activeeffect import ActiveEffect
-from .dice import Modifier
+from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
     CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
@@ -30,6 +30,17 @@ from .tables import (
     is_physical, iterative_attacks, material_for, normalise_damage_type,
     power_attack_terms, save_for,
 )
+
+
+def _bonus_type(value) -> str:
+    """One spelling per bonus type, so "armor" and "armour" collide as 1e intends.
+
+    The stacking rule keys on the type's name; two spellings of the same type would
+    quietly stack with each other, which is the exact failure the channel exists to
+    stop.
+    """
+    t = " ".join(str(value or "").split()).strip().lower()
+    return {"armor": "armour", "natural armor": "natural armour"}.get(t, t)
 
 
 class IllegalSheet(ValueError):
@@ -511,20 +522,39 @@ class Actor:
         never-ending buff nothing could clear or a cloak that stopped working after an
         hour. Same four modifier families the effect vocabulary defines, so anything
         an enchantment or a hide can say lands here without a translation table.
+
+        Two sources feed it: crafted records (`worn`), and the magic-item catalogue
+        looked up by the plain string in the slot — the ring of protection the sheet
+        page used to disclaim. A slot past the rules limit contributes nothing: the
+        third ring is worn, not working.
         """
         want = str(target).lower()
         out: list[Modifier] = []
-        for rec in self.worn_items():
-            for spec in rec.get("specs") or []:
-                if not isinstance(spec, dict):
-                    continue
-                if spec.get("type") != kind:
+
+        def read(specs, name: str):
+            for spec in specs or []:
+                if not isinstance(spec, dict) or spec.get("type") != kind:
                     continue
                 if str(spec.get("target", "")).lower() != want:
                     continue
                 amount = int(spec.get("amount", 0) or 0)
                 if amount:
-                    out.append(Modifier(amount, str(rec.get("name") or "worn gear")))
+                    out.append(Modifier(amount, name,
+                                        _bonus_type(spec.get("bonus_type"))))
+
+        crafted = {k for k in self.worn}
+        for rec in self.worn_items():
+            read(rec.get("specs"), str(rec.get("name") or "worn gear"))
+        from . import magicitem
+
+        for slot_key, items in self.slots.items():
+            limit = SLOT_RULES_LIMIT.get(slot_key, 1)
+            for i, item in enumerate(items):
+                if not item or i >= limit:
+                    continue
+                if str(item).strip().lower() in crafted:
+                    continue                    # already read as a crafted record
+                read(magicitem.worn_specs(str(item)), str(item))
         return out
 
     # --- the effect engine ---------------------------------------------------------
@@ -894,7 +924,7 @@ class Actor:
 
         mods.extend(self._condition_mods("skills"))
         mods.extend(self._buff_mods("skill_mod", skill))
-        return mods
+        return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
 
@@ -929,7 +959,7 @@ class Actor:
 
         mods.extend(self._condition_mods("saves"))
         mods.extend(self._buff_mods("save_mod", save))
-        return mods
+        return stack(mods)
 
     # --- initiative -------------------------------------------------------------------
 
@@ -946,7 +976,7 @@ class Actor:
                 if bonus:
                     mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
         mods.extend(self._buff_mods("combat_mod", "initiative"))
-        return mods
+        return stack(mods)
 
     # --- attack and damage --------------------------------------------------------------
 
@@ -1117,7 +1147,7 @@ class Actor:
         if w["category"] == "melee":
             mods.extend(self._condition_mods("melee_attack"))
         mods.extend(self._buff_mods("combat_mod", "attack"))
-        return mods
+        return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
         """How many attacks, at which iteration index. Iteratives are the exact kind of
@@ -1151,7 +1181,7 @@ class Actor:
         # damage was accepted, saved, shown on the sheet — and absent from every
         # damage roll. Found by Blood Rage's +2 damage the day it became a document.
         mods.extend(self._buff_mods("combat_mod", "damage"))
-        return mods
+        return stack(mods)
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
         if self.flat_damage and weapon_key is None:
@@ -1168,12 +1198,16 @@ class Actor:
         else:
             armour = ARMOUR.get(self.armour, ARMOUR["none"])
             shield = SHIELDS.get(self.shield, SHIELDS["none"])
+            # Typed, so the channels collide as 1e intends: bracers of armour over a
+            # breastplate is the better of the two, not the sum, while a ring's
+            # deflection sits beside either untouched.
             if armour["ac"]:
-                mods.append(Modifier(armour["ac"], armour["name"]))
+                mods.append(Modifier(armour["ac"], armour["name"], "armour"))
             if shield["ac"]:
-                mods.append(Modifier(shield["ac"], shield["name"]))
+                mods.append(Modifier(shield["ac"], shield["name"], "shield"))
             if self.natural_armour:
-                mods.append(Modifier(self.natural_armour, "natural armour"))
+                mods.append(Modifier(self.natural_armour, "natural armour",
+                                     "natural armour"))
 
             loses_dex = flat_footed or any(
                 c.data.get("lose_dex_to_ac") for c in self.conditions
@@ -1195,7 +1229,7 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
-        return mods
+        return stack(mods)
 
     def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed))
@@ -1230,7 +1264,7 @@ class Actor:
                 mods.append(Modifier(2, f"Greater {maneuver.title()}"))
 
         mods.extend(self._condition_mods("attack"))
-        return [m for m in mods if m.value]
+        return stack([m for m in mods if m.value])
 
     def cmd_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
         if self.flat_cmd is not None:
@@ -1252,7 +1286,7 @@ class Actor:
 
         # "Any penalties to a creature's AC also apply to its CMD."
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
-        return [m for m in mods if m.value]
+        return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:
         return sum(m.value for m in self.cmd_modifiers(flat_footed))
@@ -1453,6 +1487,32 @@ class Actor:
             return base + self.temp_hp
         return base
 
+    def _percent_resist(self, amount: int, dtype: str) -> tuple[int, str]:
+        """How much a standing percent-resistance shrugs off, and whose it is.
+
+        Carried in an effect's payload as {"resist": {"against": "physical",
+        "percent": 50}}; "physical" answers for the three weapon types, and a named
+        energy answers for itself. The best single effect applies — percentages do
+        not stack, for the same reason two resist-fire ratings do not.
+        """
+        if amount <= 0:
+            return 0, ""
+        best, why = 0, ""
+        for e in self.effects:
+            r = (e.payload or {}).get("resist")
+            if not isinstance(r, dict):
+                continue
+            pct = int(r.get("percent", 0) or 0)
+            against = str(r.get("against", "")).strip().lower()
+            hits = (against == "physical" and is_physical(dtype)) or (
+                against not in ("", "physical")
+                and normalise_damage_type(against) == normalise_damage_type(dtype))
+            if hits and pct > best:
+                best, why = pct, e.source or e.name
+        # Rounded in the defender's favour: 50% of 7 shrugs off 4, not 3 — half the
+        # blow "resisted" should never leave the bigger half landing.
+        return -(-amount * min(100, best) // 100) if best else 0, why
+
     def take_nonlethal(self, amount: int) -> dict:
         """Non-lethal damage accumulates on its own rather than coming off hit points.
 
@@ -1508,6 +1568,14 @@ class Actor:
         reduced = min(after_type, dr.amount) if dr else 0
         after_dr = after_type - reduced
 
+        # Percent resistance from a standing effect — Blood Bending's "50% resistance
+        # to physical damage while in Blood Rage", promised by the class text and
+        # undeliverable until effects could carry it. The best one applies, same as
+        # every resistance in 1e; it sits after DR because it is a property of the
+        # raging body, not of the armour, and rounds in the defender's favour.
+        factored, factored_by = self._percent_resist(after_dr, dtype)
+        after_dr -= factored
+
         absorbed = self._spend_temp_hp(min(self.temp_hp, after_dr))
         taken = after_dr - absorbed
         # Non-lethal still spends temporary hit points first — they are hit points — but
@@ -1522,6 +1590,7 @@ class Actor:
             # point: "20 fire, half again for vulnerability, 30" has to be readable back.
             "immune": immune, "vulnerable": vulnerable, "resisted": resisted,
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
+            "factored": factored, "factored_by": factored_by if factored else "",
             "absorbed": absorbed, "taken": taken, "lethality": lethality,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
@@ -1795,7 +1864,8 @@ class Actor:
                 amount = int(m.get("amount", 0) or 0)
                 if m.get("kind") == kind and str(m.get("target", "")).lower() == want \
                         and amount:
-                    out.append(Modifier(amount, e.source or e.name or "a preparation"))
+                    out.append(Modifier(amount, e.source or e.name or "a preparation",
+                                        _bonus_type(m.get("bonus_type"))))
         return out + self._standing_mods(kind, target)
 
     def remove_condition(self, key: str) -> None:

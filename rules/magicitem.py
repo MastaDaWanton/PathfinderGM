@@ -169,6 +169,32 @@ def get(item_id: str) -> Item:
     return found
 
 
+def worn_specs(name: str) -> list[dict]:
+    """The authored effects of a worn magic item, found by its printed name.
+
+    Stage 4 of docs/states-effects-tells.md. A slot has always held a plain string —
+    "Ring of Protection +1" — and the string did nothing: the sheet page itself
+    admitted "a ring of protection here will not move your AC until magic items are
+    modelled". The catalogue has carried the item's effects the whole time; this is
+    the lookup that joins the two, so a worn slot becomes a standing effect with no
+    clock — an infinite effect granted by wearing.
+
+    Matched case-insensitively on the entry's own name. An unknown name answers []
+    and stays the inert string it always was — a guessed effect would be worse.
+
+    Searched fresh each call rather than through a name index built once: the
+    catalogue itself is cached and layered with homebrew, and a second cache over it
+    is exactly the stale-derived-cache trap CLAUDE.md records.
+    """
+    want = " ".join(str(name or "").split()).strip().lower()
+    if not want:
+        return []
+    for entry in catalogue().values():
+        if entry.name.strip().lower() == want:
+            return [dict(spec) for spec in entry.effects if isinstance(spec, dict)]
+    return []
+
+
 # --- pricing ------------------------------------------------------------------------------
 
 def market_price(kind: str, total_bonus: int, wondrous_gp: int = 0) -> int:

@@ -3953,9 +3953,17 @@ class Engine:
                              "amount": int(drain.get("amount", 1) or 1),
                              "or_ends": True})
         payload = {}
-        for carried in ("weapon", "resist"):
-            if isinstance(doc.get(carried), dict):
-                payload[carried] = dict(doc[carried])
+        if isinstance(doc.get("weapon"), dict):
+            payload["weapon"] = dict(doc["weapon"])
+        if isinstance(doc.get("resist"), dict):
+            # Percent resistance, tier-scaled like everything else — Blood Rage
+            # Armor's 50% arrives at the rung the class file says, not before.
+            r = leveling.resolve_effect(dict(doc["resist"]), actor, path)
+            pct = int(r.get("percent", 0) or 0)
+            if pct > 0 and not r.get("inactive"):
+                against = str(r.get("against", "physical") or "physical")
+                payload["resist"] = {"against": against, "percent": pct}
+                said.append(f"{pct}% resistance to {against} damage")
 
         actor.apply_effect(ActiveEffect(
             name=found.title(), kind="condition", key=key, source=found.title(),
@@ -4529,6 +4537,10 @@ def _damage_note(d: dict) -> str:
     bits = []
     if d["reduced"]:
         bits.append(f"less {d['reduced_by']} ({d['reduced']})")
+    if d.get("factored"):
+        # Percent resistance is the third way damage vanishes, and it must say so
+        # for the same reason DR does — the GM narrates the number that landed.
+        bits.append(f"{d['factored']} shrugged off by {d.get('factored_by') or 'resistance'}")
     if d["absorbed"]:
         bits.append(f"{d['absorbed']} off temporary")
     if d.get("lethality") == "nonlethal" and d.get("taken"):

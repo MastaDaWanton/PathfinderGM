@@ -921,6 +921,22 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                     f"{gat}.temp_hp: needs per_hit_die as a number — flat "
                     f"({{\"per_hit_die\": 2}}) or tiered ({{\"by_tier\": {{\"1\": "
                     f"{{\"per_hit_die\": 2}}}}}}).")
+        resist = doc.get("resist")
+        if resist is not None:
+            rungs = (resist.get("by_tier") or {}) if isinstance(resist, dict) else {}
+            flat = ([resist] if isinstance(resist, dict)
+                    and resist.get("percent") is not None else [])
+            entries = list(rungs.values()) + flat
+            if not isinstance(resist, dict) or not entries or any(
+                    not isinstance(r, dict)
+                    or _int(r.get("percent")) is None
+                    or not str(r.get("against", "physical")).strip()
+                    for r in entries):
+                problems.append(
+                    f"{gat}.resist: needs a percent and what it is against — "
+                    f"{{\"against\": \"physical\", \"percent\": 50}}, flat or under "
+                    f"by_tier. \"physical\" covers the three weapon types; a named "
+                    f"energy covers itself.")
         weapon = doc.get("weapon")
         if weapon is not None:
             if not isinstance(weapon, dict):
@@ -937,7 +953,7 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                         f"{gat}.weapon: needs a name — what the dice popup and the "
                         f"attack panel call the strike.")
         standing = any(doc.get(k) for k in ("modifiers", "temp_hp", "weapon",
-                                            "tags", "drain"))
+                                            "tags", "drain", "resist"))
         if standing and str(name) not in toggle_names:
             problems.append(
                 f"{gat}: this document has standing parts (modifiers, tags, a weapon, "

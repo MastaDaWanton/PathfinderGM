@@ -24,12 +24,53 @@ class Modifier:
     The name is not decoration. Itemised modifiers are the whole point of offloading 1e
     bookkeeping: a wrong total has to be traceable to the term that produced it, and a
     test has to be able to assert on the terms rather than the sum.
+
+    `type` is 1e's bonus type — deflection, enhancement, morale — and "" for the
+    untyped kind. It is what `stack` reads: two deflection bonuses are not a sum, they
+    are the better one, and the type is how the aggregator knows.
     """
     value: int
     source: str
+    type: str = ""
 
     def as_dict(self) -> dict:
-        return {"value": self.value, "source": self.source}
+        d = {"value": self.value, "source": self.source}
+        if self.type:
+            d["type"] = self.type
+        return d
+
+
+# The bonus types that DO stack with themselves. 1e names exactly two — dodge and
+# circumstance — and untyped bonuses stack because there is no type to collide on.
+# This is deliberately not GAS's additive-then-multiplicative order: 1e has no
+# multiplicative channel, and same-typed-takes-best is the better rule for this game
+# (docs/states-effects-tells.md, "what was deliberately not taken").
+_SELF_STACKING = {"", "untyped", "dodge", "circumstance"}
+
+
+def stack(mods: list[Modifier]) -> list[Modifier]:
+    """1e's stacking rule, applied to a finished modifier list.
+
+    Two bonuses of the same named type do not add — the best applies and the rest are
+    dropped from the list, so the popup's terms are the terms that are really in the
+    total. Penalties always stack, whatever their type; dodge, circumstance and
+    untyped stack; everything else collides on its type name.
+    """
+    best: dict[str, Modifier] = {}
+    out: list[Modifier] = []
+    for m in mods:
+        t = (m.type or "").strip().lower()
+        if m.value <= 0 or t in _SELF_STACKING:
+            out.append(m)
+            continue
+        have = best.get(t)
+        if have is None:
+            best[t] = m
+            out.append(m)
+        elif m.value > have.value:
+            out[out.index(have)] = m
+            best[t] = m
+    return out
 
 
 @dataclass
