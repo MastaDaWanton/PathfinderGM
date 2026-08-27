@@ -1118,6 +1118,30 @@ _PHANTOM_OPPOSITION = re.compile(
     r"overwhelm|regroup(?:ing)?|form(?:ing)?\s+a\s+(?:defensive\s+)?line)\b", re.I)
 
 
+# The model's own option menu, bleeding into the book. Measured on the second prompt
+# of a live session: "the stranger: * the onlooker off your opponent * the passer-by
+# to disarm or disable them * ... : None required; you've already acted." — a
+# suggestions list, half-mangled by the stranger-renamer, shipped as narration. Prose
+# never bullet-points and a narrator never tells the player what they are "required"
+# to do; both shapes are cut whole.
+_LEAKED_OPTIONS = re.compile(
+    r"\s\*\s|\bNone required\b|\byou'?ve already acted\b|\bchoose one of\b|"
+    r"\byour options are\b", re.I)
+
+
+def strip_leaked_options(text: str) -> tuple[str, list[str]]:
+    """Drop sentences where the option menu leaked into the narration."""
+    if not text:
+        return text or "", []
+    kept, cut = [], []
+    for m in _SENTENCE.finditer(text):
+        s = m.group(0)
+        (cut if _LEAKED_OPTIONS.search(s) else kept).append(s.strip())
+    if not cut:
+        return text, []
+    return " ".join(kept), cut
+
+
 def cut_phantom_opposition(text: str) -> tuple[str, list[str]]:
     """Drop sentences that press an attack nobody is present to press.
 

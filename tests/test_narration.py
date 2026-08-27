@@ -1428,3 +1428,20 @@ def test_enemies_who_exist_only_in_prose_are_cut_when_nobody_is_left():
     # A frightened bystander may be wrong out loud — quoted speech is exempt.
     speech = chr(34) + "The guards are closing in!" + chr(34) + " she cries."
     assert narration.cut_phantom_opposition(speech) == (speech, [])
+
+
+
+def test_the_option_menu_never_ships_as_narration():
+    """Live, second prompt of a session: "the stranger: * the onlooker off your
+    opponent * the passer-by to disarm or disable them * ... : None required; you've
+    already acted." — the model's suggestion list, half-mangled by the stranger
+    renamer, printed as prose. Bullets and "required" talk are menu shapes, cut
+    whole."""
+    said = ("Your fist comes down and strikes with a resounding crack. "
+            "the stranger: * the onlooker off your opponent * the passer-by to "
+            "disarm or disable them. None required; you've already acted. "
+            "The alley falls quiet again.")
+    fixed, cut = narration.strip_leaked_options(said)
+    assert len(cut) == 2
+    assert "*" not in fixed and "already acted" not in fixed
+    assert "resounding crack" in fixed and "falls quiet" in fixed

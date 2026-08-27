@@ -1046,3 +1046,34 @@ def test_a_declared_looting_reaches_the_engine():
     thug.hp = 11
     assert judgement.inject_loot([{"op": "narrate_only", "params": {}}],
                                  "I loot the watchman", scene) ==         [{"op": "narrate_only", "params": {}}]
+
+
+
+def test_a_loot_the_model_left_unaddressed_is_filled_not_refused_seven_times():
+    """Second prompt of a live session: "i take everything from them" made the schema
+    REQUIRE a loot op, the model emitted one with no from_ at all, and seven attempts
+    died on "missing required param(s)" while the injector stood aside because "a loot
+    op is already present". A required op the model cannot shape is the injector's to
+    shape: fill the body from the fallen, or drop the op when nobody lootable is
+    here."""
+    from gm import judgement
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    thug = instantiate("thug", scene=scene, name="the stranger")
+    scene.add(thug)
+    thug.hp = -5
+
+    bare = [{"op": "loot", "actor": "pc", "params": {}, "because": "take it all"}]
+    fixed = judgement.inject_loot(bare, "I take everything from them", scene)
+    assert fixed[0]["params"]["from_"] == thug.ref
+    ops = [i.op for i in Engine(scene, Dice(seed=3)).validate(fixed)]
+    assert ops == ["loot"]
+
+    # Nobody dead: the bare op is dropped rather than left to die in validation.
+    thug.hp = 9
+    gone = judgement.inject_loot(
+        [{"op": "narrate_only", "params": {}}] + bare,
+        "I take everything from them", scene)
+    assert [r["op"] for r in gone] == ["narrate_only"]

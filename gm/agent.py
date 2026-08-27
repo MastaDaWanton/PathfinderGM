@@ -593,6 +593,13 @@ class GMAgent:
             repairs += p_repairs
             attempts += p_attempts
 
+        # Before the stranger-renamer, which once half-mangled a leaked option list
+        # into "the stranger: * the onlooker off your opponent * ..." — cutting the
+        # leak first means there is nothing garbled left to rename.
+        text, leaked = narration_mod.strip_leaked_options(text)
+        if leaked:
+            repairs.append(f"option menu leaked into prose: cut {len(leaked)} "
+                           f"sentence(s)")
         known = self._known_names() | extra
         text, unnamed = narration_mod.unname_strangers(text, known)
         if unnamed:

@@ -1510,21 +1510,39 @@ def inject_loot(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     if "?" in player_text or not _LOOTS.search(player_text):
         return raw_intents
-    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "loot"
-           for r in raw_intents):
-        return raw_intents
     pc = scene.pc()
     if pc is None:
         return raw_intents
-    body = next((a for ref, a in scene.actors.items()
-                 if not a.is_pc and (a.hp <= 0 or a.has_condition("unconscious"))),
-                None)
-    if body is None:
-        return raw_intents
-    return list(raw_intents) + [{
+    bodies = [ref for ref, a in scene.actors.items()
+              if not a.is_pc and (a.hp <= 0 or a.has_condition("unconscious"))]
+
+    # Repair before append: the schema REQUIRES the loot the player declared, so the
+    # model emits one — and on the second turn of a live session it emitted it with no
+    # `from_` at all, seven attempts died on "missing required param(s) from_", and
+    # this injector stood aside because "a loot op is already present". A required op
+    # the model cannot shape is this code's to shape: fill the body from the fallen,
+    # or drop the op entirely when nobody lootable is here.
+    out: list = []
+    have_loot = False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "loot":
+            params = dict(r.get("params") or {})
+            frm = params.get("from_") or params.get("from")
+            if frm not in bodies:
+                if not bodies:
+                    continue                     # nobody to strip: the op goes, quietly
+                r = dict(r)
+                params.pop("from", None)
+                params["from_"] = bodies[0]
+                r["params"] = params
+            have_loot = True
+        out.append(r)
+    if have_loot or not bodies:
+        return out
+    return out + [{
         "op": "loot", "actor": pc.ref,
         "because": "the player said they take it",
-        "params": {"from": body.ref},
+        "params": {"from": bodies[0]},
     }]
 
 
