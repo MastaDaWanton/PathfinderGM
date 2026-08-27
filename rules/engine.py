@@ -3132,8 +3132,10 @@ class Engine:
 
         found: list = []
         if who is not None:
-            found += [b for b in who.buffs if matches(b.source)]
-            found += [c for c in who.conditions if matches(c.source)]
+            # The effect records themselves, not the read-only condition/buff views:
+            # a dispel has to move a real clock, and the views are copies.
+            found += [e for e in who.effects
+                      if e.kind in ("buff", "condition") and matches(e.source)]
         found += [m for m in self.scene.manifests if matches(m.source)]
         return found
 
@@ -3151,10 +3153,8 @@ class Engine:
                 self.scene.lift(holder)
             else:
                 for owner in self.scene.actors.values():
-                    if holder in owner.buffs:
-                        owner.buffs.remove(holder)
-                    elif holder in owner.conditions:
-                        owner.conditions.remove(holder)
+                    if holder in owner.effects:
+                        owner.effects.remove(holder)
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
 
     def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:

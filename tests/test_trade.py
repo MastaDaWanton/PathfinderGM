@@ -519,7 +519,12 @@ def test_an_unconscious_character_cannot_trade_use_items_or_swing():
             assert "no condition to" in r.json().get("error", ""), path
     finally:
         pc.hp = was_hp
-        pc.conditions = [x for x in pc.conditions if x.key in was_conditions]
+        # Through the one applicator's own remover — `conditions` is a read-only view
+        # over the effect store now, and assigning a filtered list to it was the last
+        # place anything edited a condition without the engine knowing.
+        for key in [x.key for x in pc.conditions]:
+            if key not in was_conditions:
+                pc.remove_condition(key)
         c.save()
 
 
