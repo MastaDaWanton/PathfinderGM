@@ -965,6 +965,19 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
      r"admin\s+(?:mode|interface|access)|as\s+an\s+AI|character\s+stats|"
      r"stats\s+updated|game\s+state\s+saved|max\s+level)\b",
      "the assistant is speaking, not the narrator"),
+    # A loot narrated before the engine opened the pockets. Live: the setup beat had
+    # "removing his wallet, a small pouch of coins, and a leather belt with a silver
+    # buckle... Your pockets now hold a few copper pieces, some silver coins, and the
+    # leather belt" — and the corpse actually carried a club, two silver, chalk stubs
+    # and work gloves. The player got the real haul AND a belt that never existed,
+    # which reads as being jipped the moment the sheet disagrees with the sentence.
+    (r"\byour\s+pockets?\s+(?:now\s+)?(?:holds?|contains?)\b",
+     "states items gained; the pockets are the engine's to fill"),
+    (r"\byou\s+take\s+(?:these|those)\s+items\b",
+     "states items gained; the pockets are the engine's to fill"),
+    (r"\b(?:removing|you\s+remove|pulling\s+out|you\s+pull)\b[^.!?]{0,60}"
+     r"\b(?:wallet|coin\s+purse|pouch\s+of\s+coins|belt|rings?)\b",
+     "states items gained; the pockets are the engine's to fill"),
 ]
 
 OUTCOME_RE = [(re.compile(p, re.IGNORECASE), why) for p, why in _OUTCOME_PATTERNS]

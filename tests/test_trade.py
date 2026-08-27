@@ -1077,3 +1077,23 @@ def test_a_loot_the_model_left_unaddressed_is_filled_not_refused_seven_times():
         [{"op": "narrate_only", "params": {}}] + bare,
         "I take everything from them", scene)
     assert [r["op"] for r in gone] == ["narrate_only"]
+
+
+
+def test_a_loot_narrated_before_the_engine_opened_the_pockets_is_a_claim():
+    """Live: the setup beat invented "his wallet, a small pouch of coins, and a
+    leather belt with a silver buckle" and told the player "Your pockets now hold"
+    them — while the corpse actually carried a club, two silver, chalk stubs and work
+    gloves. The real haul arrived in the consequence beat, so the player got the
+    truth AND a belt that never existed. Enumerating a search's contents is the
+    engine's job, in both directions."""
+    from rules.intents import find_outcome_claims
+
+    said = ("You rummage through his clothes, removing his wallet, a small pouch of "
+            "coins, and a leather belt with a silver buckle. You take these items. "
+            "Your pockets now hold a few copper pieces and the leather belt.")
+    assert len(find_outcome_claims(said)) == 3
+    for fine in ("He tightens his belt and turns away.",
+                 "You pull your cloak against the rain.",
+                 "She removes her helmet and sets it down."):
+        assert not find_outcome_claims(fine), fine
