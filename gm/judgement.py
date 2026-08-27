@@ -1201,6 +1201,51 @@ _CHECK_VERBS = (
 _DECLARES = r"\bi\s+(?:try\s+to\s+|attempt\s+to\s+|carefully\s+|quietly\s+|quickly\s+)?"
 
 
+def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
+    """An attack aimed at the dead becomes an attack on somebody real.
+
+    Read out of a live save: both refs in the scene were corpses, the prose had been
+    describing guardsmen for three turns, and the model — forced to choose a legal
+    ref — aimed every swing at a body. One living combatant means no encounter can
+    form, so the combat bar never appeared while the player 'fought' a crowd that
+    existed only in sentences. When the player's own words name opposition (the same
+    template cues the spawn repair reads), the attack gets a freshly spawned target;
+    when they do not, the swing at the corpse stands — kicking the fallen is a thing
+    a player may genuinely mean.
+
+    Returns amended raw intents, or None when nothing needed redirecting.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return None
+    dead = {r for r, a in scene.actors.items()
+            if not a.is_pc and a.hp <= 0}
+    living = [r for r, a in scene.actors.items() if not a.is_pc and a.hp > 0]
+    targets_dead = [r for r in raw_intents
+                    if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
+                    and str(r.get("target", "")) in dead]
+    if not targets_dead:
+        return None
+    if living:
+        swap = living[0]
+        out = [dict(r, target=swap) if r in targets_dead else r for r in raw_intents]
+        return out
+    template = None
+    for cue, name in _TEMPLATE_CUES:
+        if cue.search(player_text or ""):
+            template = name
+            break
+    if template is None:
+        return None                       # kicking the fallen: let it stand
+    known = set(scene.actors)
+    ref = next(f"c{i}" for i in range(1, len(known) + 3) if f"c{i}" not in known)
+    out: list = [{"op": "spawn",
+                  "because": "the fight the fiction has been describing",
+                  "params": {"template": template, "count": 1}}]
+    for r in raw_intents:
+        out.append(dict(r, target=ref) if r in targets_dead else r)
+    return out
+
+
 def drop_premature_end(raw_intents) -> list:
     """The GM does not get to end the fight it is starting.
 

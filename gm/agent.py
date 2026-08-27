@@ -186,6 +186,8 @@ class GMAgent:
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
+                raw = judgement.redirect_attacks_off_corpses(
+                    raw, player_input, self.engine.scene) or raw
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
                 # Sale first, then goods. Selling is the more specific reading of handing
                 # something over and it is the one that pays — and the order was the other

@@ -960,3 +960,31 @@ def test_the_gm_cannot_end_the_fight_it_is_starting():
     assert [r["op"] for r in judgement.drop_premature_end(swung)] == ["attack"]
     talked = [{"op": "end_encounter", "params": {}}]
     assert judgement.drop_premature_end(talked) == talked
+
+
+
+def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
+    """Live save: both refs were corpses, the prose had guardsmen for three turns, and
+    every swing was aimed at a body — one living combatant, so no encounter could
+    form and the combat bar never appeared. When the player's words name opposition,
+    the attack gets a real target; a swing at the corpse with no such words stands."""
+    from gm import judgement
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    body = instantiate("thug", scene=scene, name="the stranger")
+    scene.add(body)
+    body.hp = -9
+
+    raw = [{"op": "attack", "actor": "pc", "target": body.ref, "params": {},
+            "because": "swinging"}]
+    fixed = judgement.redirect_attacks_off_corpses(
+        raw, "i charge at them and punch the closest guard", scene)
+    assert fixed is not None
+    assert fixed[0]["op"] == "spawn" and fixed[0]["params"]["template"] == "watchman"
+    assert fixed[1]["target"] not in (body.ref,)
+
+    # No opposition named: kicking the fallen is a thing a player may mean.
+    assert judgement.redirect_attacks_off_corpses(
+        raw, "I kick him while he is down", scene) is None
