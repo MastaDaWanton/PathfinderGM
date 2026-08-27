@@ -959,30 +959,43 @@ class Actor:
         """
         from . import weapons as weapons_mod
 
-        wanted = (key or self.equipped or "unarmed").strip().lower()
-        # The armament rides every unarmed strike while it is formed. It used to be a
-        # separately named weapon ("armed punch") the player had to know to pick, and
-        # a live session met the consequence: the panel defaulted to a phantom dagger,
-        # and a Blood Bender with the armament visibly ON was told their swing was
-        # "armed punch" — "it should be unarmed strike and the armament should
-        # automatically know to apply."
-        if wanted in ("unarmed", "unarmed strike", "fist", "fists", "punch") and \
-                self.has_condition("blood armament"):
-            wanted = "armed punch"
-        # The armament's own weapon. Built here rather than in the weapons table
-        # because its damage die is the class table's blood column at this character's
-        # level — a table entry cannot know who is asking. It arms the fist and only
-        # the fist: a held weapon never carries the armament. `armament: True` is the
-        # flag the engine keys on — name comparison broke the moment the display name
-        # started telling the truth.
-        if wanted in ("armed punch", "armed punches", "blood gauntlets"):
-            from . import leveling
+        from . import leveling
 
-            base = dict(weapons_mod.get("unarmed"))
-            base["name"] = "unarmed strike (blood armament)"
-            base["armament"] = True
-            base["damage"] = leveling.table_die(self, "blood") or "1d8"
-            base["type"] = "bludgeoning and piercing"
+        wanted = (key or self.equipped or "unarmed").strip().lower()
+        # A granted weapon rides every unarmed strike while its toggle holds, and
+        # answers to its own aliases whether or not it is formed — the engine's gate
+        # refuses the unformed swing with the forming ability's name, which it cannot
+        # do if the weapon refuses to exist first. This used to be the armament's
+        # hand-written special case (name list, condition, blood column, all in code);
+        # now the class document states the same facts and any class stating them gets
+        # the same weapon. A held weapon never carries a grant: it arms the fist and
+        # only the fist.
+        for g in leveling.granted_weapons(self):
+            w = g["weapon"]
+            aliases = {str(a).lower() for a in (w.get("aliases") or ())}
+            rides_unarmed = (
+                wanted in ("unarmed", "unarmed strike", "fist", "fists", "punch")
+                and w.get("applies_to_unarmed") and g["key"]
+                and self.has_condition(g["key"]))
+            if wanted not in aliases and not rides_unarmed:
+                continue
+            base = dict(weapons_mod.get(str(w.get("base") or "unarmed")))
+            base["name"] = str(w.get("name") or g["ability"])
+            # The die is the class table's own column at this character's level — a
+            # weapons-table entry cannot know who is asking, which is why it is built
+            # here.
+            if w.get("damage_column"):
+                base["damage"] = (leveling.table_die(self, str(w["damage_column"]))
+                                  or str(w.get("fallback_damage") or base["damage"]))
+            if w.get("type"):
+                base["type"] = str(w["type"])
+            for carried in ("rider_column", "damage_label", "proficiency_as"):
+                if w.get(carried):
+                    base[carried] = str(w[carried])
+            # The flags the engine keys on: which toggle must hold, and which ability
+            # forms it — so a refusal can name the fix.
+            base["granted_by"] = g["key"]
+            base["formed_with"] = g["ability"]
             return base
         return weapons_mod.get(wanted)
 
@@ -1019,13 +1032,17 @@ class Actor:
         from . import weapons as weapons_mod
 
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
-        # The armament is your own fists with blood over them, so proficiency is the
-        # proficiency you have with your fists. It is not in the weapons table — it is
-        # built on the wearer from the class's blood die — so the table lookup found
-        # nothing, `prof` was None, and a Blood Bender was told they were not proficient
-        # with their own hands: a −4 on every armed punch, visible in the dice popup.
-        if key in ("armed punch", "armed punches", "blood gauntlets"):
-            key = "unarmed"
+        # A granted weapon is your own fists with something over them, so proficiency
+        # is the proficiency the document names (`proficiency_as`, usually unarmed).
+        # It is not in the weapons table — it is built on the wearer from a class
+        # table column — so the table lookup found nothing, `prof` was None, and a
+        # Blood Bender was told they were not proficient with their own hands: a −4
+        # on every armed punch, visible in the dice popup.
+        from . import leveling
+
+        granted = leveling.granted_weapon_named(self, key)
+        if granted:
+            key = str(granted["weapon"].get("proficiency_as") or "unarmed")
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
@@ -1130,6 +1147,10 @@ class Actor:
             _, bonus = self.power_attack_terms(key)
             mods.append(Modifier(bonus, "Power Attack"))
         mods.extend(self._condition_mods("damage"))
+        # The one funnel, which this list alone never read: a `combat_mod` aimed at
+        # damage was accepted, saved, shown on the sheet — and absent from every
+        # damage roll. Found by Blood Rage's +2 damage the day it became a document.
+        mods.extend(self._buff_mods("combat_mod", "damage"))
         return mods
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
