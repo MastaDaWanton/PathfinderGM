@@ -1533,3 +1533,34 @@ def _append_before_hand_back(text: str, line: str) -> str:
     if parts and parts[-1].rstrip().endswith("?"):
         return " ".join(parts[:-1] + [line, parts[-1]]).strip()
     return (text.rstrip() + " " + line).strip()
+
+
+_THREAD_STOP = {"the", "a", "an", "that", "who", "which", "walked", "away", "two",
+                "three", "some", "their", "his", "her", "its", "in", "of", "with",
+                "and", "to", "from", "near", "by"}
+
+
+def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
+    """The subject of a standing engagement cannot vanish from the page.
+
+    Measured live: following two guards toward a market, the next beat was a
+    haunted house and the guards were gone — the model lost the thread, and no
+    instruction has ever held one. So the check is code: if none of the subject's
+    content words survive into the beat, an anchor sentence is added before the
+    hand-back. It re-tethers rather than rewrites — the model's scenery stands,
+    but the person the player is engaged with is put back in it.
+    """
+    subject = str((thread or {}).get("subject") or "").strip()
+    if not subject or not text:
+        return text, ""
+    words = [w for w in re.findall(r"[a-z']+", subject.lower())
+             if w not in _THREAD_STOP and len(w) > 2]
+    if not words:
+        return text, ""
+    if any(re.search(rf"\b{re.escape(w)}", text, re.I) for w in words):
+        return text, ""
+    doing = str(thread.get("doing") or "").strip()
+    anchor = (f"Through it all you keep your attention where you put it: "
+              f"{subject} — you are still {doing or 'on'} them, and they have "
+              f"not slipped away.")
+    return _append_before_hand_back(text, anchor), subject

@@ -645,6 +645,14 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
         if parents:
             lines.append(f"  Within: {', '.join(parents)}")
 
+    # The standing thread, before the cast: what the player is engaged in is the
+    # single fact the prose most needs, and the one it lost live (two followed
+    # guards became a haunted house between beats).
+    from . import judgement as _judgement
+    held = _judgement.thread_brief(scene)
+    if held:
+        lines.append("\n" + held)
+
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():
         if actor.is_pc:

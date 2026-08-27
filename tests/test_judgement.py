@@ -1125,3 +1125,53 @@ def test_a_spawn_the_model_could_not_shape_is_shaped_here():
     out = judgement.repair_bare_spawns(
         [{"op": "spawn", "params": {"template": "thug", "count": 2}}], "whatever")
     assert out[0]["params"] == {"template": "thug", "count": 2}
+
+
+# --- the scene thread: what the player is engaged in between ops ----------------------
+
+def test_the_thread_survives_a_continue():
+    """Measured live: "I follow the guards that walked away", then "I continue to
+    follow" — and the narrator, holding nothing but four words, dropped the guards
+    and wrote a haunted house. The thread is engine state: set by the declaration,
+    held by the continue, cleared by the fight or the journey, aged out after six
+    quiet turns."""
+    from rules.engine import Scene
+
+    s = Scene()
+    judgement.update_thread(s, "I follow the guards that walked away")
+    assert s.thread["doing"] == "following"
+    assert "guards" in s.thread["subject"]
+
+    judgement.update_thread(s, "I continue to follow")
+    assert s.thread["age"] == 0                      # held, not aged
+
+    for _ in range(7):
+        judgement.update_thread(s, "I look at the sky.")
+    assert s.thread == {}                            # aged out
+
+    judgement.update_thread(s, "I watch the tall stranger by the well")
+    assert s.thread["doing"] == "watching"
+    judgement.update_thread(s, "I punch him", ["begin_encounter"])
+    assert s.thread == {}                            # the fight IS the engagement
+
+
+def test_the_thread_brief_and_the_anchor():
+    """The two halves of the constraint: the brief states the engagement as fact,
+    and a beat that drops the subject gets it re-tethered before the hand-back."""
+    from gm import narration
+    from rules.engine import Scene
+
+    s = Scene()
+    judgement.update_thread(s, "I follow the two guards in chain shirts")
+    brief = judgement.thread_brief(s)
+    assert "guards" in brief and "do not change location" in brief
+
+    haunted = ("You push forward into the house, dust and decay all around. "
+               "What do you do next?")
+    out, anchored = narration.keep_the_thread(haunted, s.thread)
+    assert anchored and "guards" in out
+    assert out.endswith("What do you do next?")
+
+    kept = "The guards ahead slow at the market's edge. What do you do?"
+    same, anchored = narration.keep_the_thread(kept, s.thread)
+    assert same == kept and not anchored

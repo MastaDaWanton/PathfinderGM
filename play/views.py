@@ -15,7 +15,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import judgement, prompts, watcher
+from gm import judgement, narration as narration_mod, prompts, watcher
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -937,6 +937,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         c.save()
         return JsonResponse(_state(c))
 
+    # The thread first, so the brief below states the engagement this very turn
+    # declared — "I follow the guards" must constrain the beat that answers it.
+    judgement.update_thread(c.scene, player_input,
+                            [o.op for o in resolution.outcomes])
+
     outcomes = [o for o in resolution.outcomes if o.tell]
     if getattr(agent, "intents_first", False):
         # The experiment's other half: call 1 wrote no prose, so this call writes the
@@ -959,6 +964,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # it can reach the page.
             text = plan.narration
         if text:
+            text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
+            if anchored:
+                repairs.append(f"the thread held: re-tethered {anchored!r}")
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})
     elif outcomes:

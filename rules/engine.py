@@ -107,6 +107,14 @@ class Scene:
     attacked: set[str] = field(default_factory=set)
     round: int = 0
     clock_minutes: int = 0
+    # The narrative thread: what the player is engaged in when no op carries it —
+    # following somebody, questioning somebody, watching a door. Measured live
+    # without it: the player followed two guards toward a market, typed "I continue
+    # to follow", and the narrator wrote them into a haunted house, because the
+    # guards were prose inventions no state anywhere remembered. The thread is
+    # state the engine owns: {"doing", "subject", "age"} — the prose layer is fed
+    # it as fact and scrubbed against it, first slice of the world-state ledger.
+    thread: dict = field(default_factory=dict)
     # What each shop has sold, as "place|stall|day|material" -> count. A stall's shelf is
     # drawn rather than stored (see `rules.market`), so this is the only part that has to
     # survive a save: the one legendary on the shelf has to stay sold once it is bought.

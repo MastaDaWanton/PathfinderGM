@@ -188,6 +188,7 @@ class Campaign:
                 "sides": self.scene.sides,
                 "round": self.scene.round,
                 "clock_minutes": self.scene.clock_minutes,
+                "thread": dict(self.scene.thread),
                 "market_taken": self.scene.market_taken,
                 "biome": self.scene.biome,
                 "pending_intents": self.scene.pending_intents,
@@ -243,6 +244,7 @@ class Campaign:
             sides={k: list(v) for k, v in (s.get("sides") or {}).items()},
             round=s.get("round", 0),
             clock_minutes=s.get("clock_minutes", 0),
+            thread=dict(s.get("thread") or {}),
             # Absent in saves written before shops had shelves: an empty ledger means
             # nothing has been bought today, which is the right answer for them.
             market_taken={str(k): int(v)

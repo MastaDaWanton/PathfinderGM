@@ -1941,3 +1941,59 @@ def repair_bare_spawns(raw_intents, player_text: str):
             r = dict(r, params=params)
         out.append(r)
     return out
+
+
+# --- The scene thread: what the player is engaged in between ops ----------------------
+
+_THREAD_VERBS = re.compile(
+    r"\bI\s+(?:(follow|tail|shadow|track|pursue)|"
+    r"(talk to|question|interrogate|speak (?:to|with)|ask)|"
+    r"(watch|observe|study|keep an eye on)|"
+    r"(wait for|look for|search for))\s+(.{3,60}?)\s*[.!?]?$", re.I)
+_THREAD_CONTINUES = re.compile(
+    r"^\s*(?:i\s+)?(?:continue|keep(?:\s+(?:going|following|watching|at it))?|"
+    r"carry on|press on|stay (?:on|with) (?:them|him|her|it))\b", re.I)
+_THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
+
+
+def update_thread(scene, player_text: str, resolved_ops=None) -> None:
+    """The engine's memory of what the player is engaged in, written mechanically.
+
+    Measured live without it: "I follow the guards that walked away" and then
+    "I continue to follow" — and the narrator, holding nothing but four words and
+    a scene brief, dropped the guards and wrote a haunted house. The thread is
+    state: a fresh declaration sets it, "continue" keeps it, a travel or a fight
+    replaces the engagement (the fight IS the engagement now), and it ages out
+    after six quiet turns rather than haunting a scene that moved on.
+    """
+    if scene is None:
+        return
+    ops = {str(o).lower() for o in (resolved_ops or ())}
+    if ops & {"begin_encounter", "travel"}:
+        scene.thread = {}
+        return
+    text = " ".join(str(player_text or "").split())
+    m = _THREAD_VERBS.search(text)
+    if m:
+        which = next(i for i in range(1, 5) if m.group(i))
+        scene.thread = {"doing": _THREAD_DOINGS[which - 1],
+                        "subject": m.group(5).strip(), "age": 0}
+        return
+    if scene.thread:
+        if _THREAD_CONTINUES.match(text):
+            scene.thread["age"] = 0
+            return
+        scene.thread["age"] = int(scene.thread.get("age", 0)) + 1
+        if scene.thread["age"] > 6:
+            scene.thread = {}
+
+
+def thread_brief(scene) -> str:
+    """The thread as a sentence of fact for the prose call, or ""."""
+    t = getattr(scene, "thread", None) or {}
+    if not t.get("subject"):
+        return ""
+    return (f"STANDING THREAD (fact, not suggestion): the player is currently "
+            f"{t.get('doing', 'engaged with')} {t['subject']}. Keep them and the "
+            f"present surroundings in the scene; do not change location, and do "
+            f"not drop or replace {t['subject']} unless the player does.")
