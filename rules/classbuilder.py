@@ -800,12 +800,16 @@ def _validate_paths(d: dict, columns, problems: list[str]) -> None:
                     f"{at}.resolves: {variant!r} resolves to {str(real)!r}, which has no "
                     f"ability text. Add an entry for {str(real)!r} under abilities.")
 
+        # A tier may list an ability only through its rungs — Iron Clot appears as
+        # "Iron Clot (DR 2/-)" and friends — so the resolved name is on a tier in
+        # every sense that matters to passive/core/undescribed membership.
+        reachable = set(listed) | {str(r) for r in resolves.values()}
         for group, label, hint in (
                 ("passive", "passive", "a passive is an ability the character has"),
                 ("core", "core", "core names a tier ability the Core Rulebook defines"),
                 ("undescribed", "undescribed", "undescribed names a tier ability")):
             for name in (path.get(group) or []):
-                if str(name) not in listed:
+                if str(name) not in reachable:
                     problems.append(
                         f"{at}.{label}: {str(name)!r} is not listed on any tier — "
                         f"{hint}. Add it to a tier, or take it out of {label}.")
@@ -937,6 +941,19 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                     f"{{\"against\": \"physical\", \"percent\": 50}}, flat or under "
                     f"by_tier. \"physical\" covers the three weapon types; a named "
                     f"energy covers itself.")
+        dr = doc.get("dr")
+        if dr is not None:
+            rungs = (dr.get("by_tier") or {}) if isinstance(dr, dict) else {}
+            flat = ([dr] if isinstance(dr, dict) and dr.get("amount") is not None
+                    else [])
+            entries = list(rungs.values()) + flat
+            if not isinstance(dr, dict) or not entries or any(
+                    not isinstance(r, dict) or _int(r.get("amount")) is None
+                    for r in entries):
+                problems.append(
+                    f"{gat}.dr: needs an amount — {{\"amount\": 2}} flat, or rungs "
+                    f"under by_tier with scales_by. bypass is what defeats it "
+                    f"(\"silver\", \"magic\") or absent for the DR/— nothing does.")
         weapon = doc.get("weapon")
         if weapon is not None:
             if not isinstance(weapon, dict):
@@ -953,8 +970,12 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                         f"{gat}.weapon: needs a name — what the dice popup and the "
                         f"attack panel call the strike.")
         standing = any(doc.get(k) for k in ("modifiers", "temp_hp", "weapon",
-                                            "tags", "drain", "resist"))
-        if standing and str(name) not in toggle_names:
+                                            "tags", "drain", "resist", "dr"))
+        # A passive's standing parts never need removing — the ability is never on
+        # or off, it simply holds — so only non-passive documents must be toggles.
+        passive_names = {str(n).lower() for n in (path.get("passive") or [])}
+        if standing and str(name) not in toggle_names \
+                and str(name).lower() not in passive_names:
             problems.append(
                 f"{gat}: this document has standing parts (modifiers, tags, a weapon, "
                 f"temporary hit points or a drain) but {str(name)!r} is not in "

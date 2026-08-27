@@ -246,3 +246,38 @@ def test_coagulated_plate_does_not_stack_with_worn_armour():
     before = pc.ac()
     _plate(e)
     assert pc.ac() == before
+
+
+def test_iron_clot_is_live_read_dr_that_follows_the_level():
+    """Before the `dr` document field, Actor.reductions was statblock-only and the
+    old effectspec branch printed 'DR 2/—' without persisting anything. The rungs
+    are the class text's own: DR 2/5/8/12 at tiers 1/2/3/5 — and tier 4 keeps DR 8,
+    because a tier that grants no new rung leaves the one below in force."""
+    for level, want in ((1, 2), (3, 5), (5, 8), (9, 8), (20, 12)):
+        pc = _coagulator(level=level)
+        dr = pc.damage_reduction("slashing")
+        assert dr is not None and dr.amount == want, (level, want, dr)
+        assert dr.source == "Iron Clot"
+
+
+def test_iron_clot_never_touches_energy_and_never_stacks():
+    """1e's two easy-to-get-generous rules: DR ignores energy damage, and multiple
+    DRs give the best one only — a statblock DR 3/— beside Iron Clot's 2 is 3."""
+    pc = _coagulator(level=1)
+    assert pc.damage_reduction("fire") is None
+    from rules.sheet import Reduction
+    pc.reductions.append(Reduction(3, "", "thick hide"))
+    assert pc.damage_reduction("bludgeoning").amount == 3
+
+
+def test_iron_clot_is_never_a_button():
+    """A passive is never used, it simply happens — using it must refuse, not spend
+    the turn Swift Strikes once swallowed."""
+    import pytest
+    from rules.engine import IntentError
+    pc = _coagulator(level=1)
+    scene = Scene(); scene.add(pc)
+    e = Engine(scene, dice=Dice(seed=11))
+    with pytest.raises(IntentError):
+        e.run(e.validate([{"op": "use_ability", "actor": "pc",
+                           "params": {"ability": "iron clot"}, "because": "t"}]))

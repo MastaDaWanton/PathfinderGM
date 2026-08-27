@@ -174,6 +174,38 @@ def granted_weapon_named(actor, key: str) -> dict | None:
     return None
 
 
+def standing_dr(actor) -> list[dict]:
+    """Damage reduction the followed paths' passive documents grant, live-read.
+
+    Live-read like worn gear rather than applied as an effect, because Iron Clot is
+    "permanent": there is no action that turns it on, no save that could lose it, and
+    the tier rungs must follow the level the moment it changes. Only documents whose
+    ability sits in `paths.<path>.passive` land here — a toggled stance's DR would
+    arrive through its ActiveEffect payload instead.
+
+    Each entry: `{"amount": int, "bypass": str, "source": <resolved name>}`. A rung
+    the character has not reached resolves inactive and contributes nothing.
+    """
+    out: list[dict] = []
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        passives = {str(n).lower() for n in (det.get("passive") or [])}
+        for name, doc in (det.get("grants") or {}).items():
+            if not isinstance(doc, dict) or not isinstance(doc.get("dr"), dict):
+                continue
+            if str(name).lower() not in passives:
+                continue
+            got = resolve_effect(dict(doc["dr"]), actor, path)
+            if got.get("inactive"):
+                continue
+            amount = int(got.get("amount", 0) or 0)
+            if amount > 0:
+                out.append({"amount": amount,
+                            "bypass": str(got.get("bypass") or ""),
+                            "source": str(name)})
+    return out
+
+
 def is_passive(actor, name: str) -> bool:
     """Whether this ability is an always-active passive in a path the actor follows.
 
@@ -186,8 +218,15 @@ def is_passive(actor, name: str) -> bool:
         return False
     for path in (getattr(actor, "paths", None) or []):
         det = path_detail(getattr(actor, "char_class", "") or "", path)
-        if want in {str(n).lower() for n in (det.get("passive") or [])}:
+        passives = {str(n).lower() for n in (det.get("passive") or [])}
+        if want in passives:
             return True
+        # A tier lists Iron Clot only through its rungs — "Iron Clot (DR 2/-)" —
+        # and find_ability hands back the listed variant, so membership has to be
+        # checked through resolves as well or a rung-named passive stays a button.
+        for listed, real in (det.get("resolves") or {}).items():
+            if str(listed).lower() == want and str(real).lower() in passives:
+                return True
     return False
 
 

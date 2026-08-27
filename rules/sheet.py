@@ -1468,7 +1468,20 @@ class Actor:
         """
         if not is_physical(dtype):
             return None
-        usable = [r for r in self.reductions if r.amount > 0 and not r.bypassed_by(traits)]
+        pool = list(self.reductions)
+        # Class documents join the statblock's own DR here rather than by writing
+        # into `reductions`, for the same reason worn gear is live-read: Iron Clot
+        # is permanent and tier-scaled, and an applied copy would go stale the
+        # moment the character levels. Best-only still holds across all sources.
+        from . import leveling
+        for d in leveling.standing_dr(self):
+            pool.append(Reduction(d["amount"], d["bypass"], d["source"]))
+        for e in self.effects:
+            d = e.payload.get("dr") if isinstance(e.payload, dict) else None
+            if isinstance(d, dict) and int(d.get("amount", 0) or 0) > 0:
+                pool.append(Reduction(int(d["amount"]), str(d.get("bypass") or ""),
+                                      e.source or e.name))
+        usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(traits)]
         return max(usable, key=lambda r: r.amount) if usable else None
 
     # --- non-lethal damage ---------------------------------------------------------------

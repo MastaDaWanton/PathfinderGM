@@ -814,11 +814,34 @@
      ],
      "tell": "{name} hardens the blood across their skin into plates of dark armour.",
      "tell_off": "{name} lets the plate soften and run back beneath the skin."
+    },
+    "Iron Clot": {
+     "_note": "'Permanently gain DR/-' at 2, 5, 8 and 12 by the printed rungs. Passive: never used, never toggled \u2014 the sheet live-reads it so the rung follows the level the moment it changes, exactly like worn gear.",
+     "dr": {
+      "scales_by": "control_blood",
+      "by_tier": {
+       "1": {
+        "amount": 2
+       },
+       "2": {
+        "amount": 5
+       },
+       "3": {
+        "amount": 8
+       },
+       "5": {
+        "amount": 12
+       }
+      }
+     }
     }
    },
    "toggles": {
     "Coagulated Plate": "coagulated plate"
-   }
+   },
+   "passive": [
+    "Iron Clot"
+   ]
   },
   "blood commander": {
    "name": "Blood Commander",
