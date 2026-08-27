@@ -1445,11 +1445,16 @@ class Engine:
                             partial, state, fist)
                         state["fist_total"] = fist_roll.total
                         state["rolls"].append(fist_roll.as_dict())
-                    dmg_mods = dmg_mods + [Modifier(state["fist_total"],
-                                                    f"fist die ({fist})")]
                 if mult > 1:
                     dmg_mods = [Modifier(m.value * mult, f"{m.source} x{mult}")
                                 for m in dmg_mods]
+                if weapon.get("armament"):
+                    # AFTER the crit scaling, deliberately: a live critical showed
+                    # "+12 fist die (1d6) x2" — the rider doubled alongside Str,
+                    # while the comment above it promised 1e's rule that extra
+                    # damage DICE never multiply. Order is the whole fix.
+                    dmg_mods = dmg_mods + [Modifier(state["fist_total"],
+                                                    f"fist die ({fist})")]
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # The armament's damage is three named things — Blood DMG + Fist DMG
