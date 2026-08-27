@@ -1032,18 +1032,22 @@ def test_a_group_in_the_players_sentence_spawns_a_group():
         _empty_room())
     spawn = next(i for i in out if i.get("op") == "spawn")
     enc = next(i for i in out if i.get("op") == "begin_encounter")
-    assert spawn["params"]["count"] == 3
-    assert len(enc["params"]["sides"]["them"]) == 3
+    assert spawn["params"]["count"] == 4
+    assert len(enc["params"]["sides"]["them"]) == 4
     atk = next(i for i in out if i.get("op") == "attack")
     assert atk["target"] == enc["params"]["sides"]["them"][0]
 
 
 def test_opponent_count_reads_the_players_own_words():
-    """A stated number wins, collective nouns mean three, a lone man is one, and a
-    dozen is capped at four — a repair must not be a TPB by injector."""
+    """A stated number is honoured in full — the player's own ruling: "if i run
+    into a deadly situation I should have to reap what I've sown." A collective
+    noun means four, a bare plural three, a lone man one. No cap: death is
+    survivable by design (the patron pays for the raising), so the injector owes
+    the player the fight they picked."""
     cases = (("I attack the two bravos", 2), ("I fight both of them", 2),
-             ("I charge the gang", 3), ("I swing at the man", 1),
-             ("I attack all 10 wolves", 4), ("I punch him", 1))
+             ("I charge the gang", 4), ("I swing at the man", 1),
+             ("I attack all 10 wolves", 10), ("I punch him", 1),
+             ("I take on the whole dozen", 12))
     for text, want in cases:
         assert judgement.opponent_count(text) == want, text
 

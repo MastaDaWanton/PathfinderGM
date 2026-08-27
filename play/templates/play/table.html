@@ -1589,6 +1589,14 @@ document.addEventListener("click", async e => {
     $("#deathveil").classList.remove("on");
     return;
   }
+  if (pick.id === "resurrectbtn") {
+    pick.disabled = true;
+    try {
+      render(await post("/api/resurrect", {}));
+      $("#deathveil").classList.remove("on");
+    } catch (err) { $("#err").textContent = err.message; pick.disabled = false; }
+    return;
+  }
   const switching = pick.dataset.switch !== undefined;
   pick.disabled = true;
   try {
@@ -1603,7 +1611,15 @@ document.addEventListener("click", async e => {
 function showDeath(d) {
   $("#deathtitle").textContent = (STATE.pc && STATE.pc.name) ? STATE.pc.name : "Dead";
   $("#deathtext").textContent = d.death || "";
-  $("#deathchoices").innerHTML = (d.choices || []).map(ch => `
+  // Death is a debt, not a wall: somebody in this world can pay for the raising.
+  // First in the list on purpose — continuing the story is the headline offer,
+  // rolling a new body is the fallback.
+  const raise_ = d.resurrectable ? `
+    <button class="pick" id="resurrectbtn">
+      <b>Some weeks later&hellip;</b>
+      <small>Somebody needed your strength enough to pay the priests.</small>
+    </button>` : "";
+  $("#deathchoices").innerHTML = raise_ + (d.choices || []).map(ch => `
     <button class="pick" data-source="${esc(ch.source)}">
       <b>${esc(ch.name)}</b>
       <small>${esc(ch.line)} · ${ch.hp} hp</small>

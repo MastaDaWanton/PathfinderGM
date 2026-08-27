@@ -168,6 +168,18 @@ def bury(character_id: str, actor: Actor, epitaph: str = "") -> Entry | None:
     return entry
 
 
+def revive(character_id: str, actor: Actor) -> Entry | None:
+    """Raised, not resurrected from the roster's point of view: the death happened
+    and the epitaph stays as history, but the character is playable again."""
+    entry = load(character_id)
+    if entry is None:
+        return None
+    entry.status = ALIVE
+    entry.sheet = to_dict(actor)
+    save(entry)
+    return entry
+
+
 # --- Who is available to play ------------------------------------------------------------
 
 def retire_file(character_id: str) -> tuple[bool, str]:

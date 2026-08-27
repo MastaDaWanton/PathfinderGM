@@ -598,28 +598,36 @@ def inject_fight(raw_intents, player_text: str, scene):
 
 
 _NUMBER_WORDS = {"two": 2, "both": 2, "pair": 2, "couple": 2, "three": 3,
-                 "few": 3, "several": 3, "four": 4, "five": 5, "six": 6}
-_GROUP_WORDS = re.compile(
-    r"\b(group|gang|mob|pack|band|crowd|squad|patrol|bunch|men|guards|thugs|"
-    r"bandits|wolves|clansmen|soldiers|watchmen|bravos)\b", re.I)
+                 "few": 3, "several": 3, "four": 4, "five": 5, "six": 6,
+                 "seven": 7, "eight": 8, "dozen": 12}
+_COLLECTIVE = re.compile(
+    r"\b(group|gang|mob|pack|band|crowd|squad|patrol|bunch)\b", re.I)
+_PLURAL_FOES = re.compile(
+    r"\b(men|guards|thugs|bandits|wolves|clansmen|soldiers|watchmen|bravos)\b", re.I)
 
 
 def opponent_count(player_text: str) -> int:
     """How many the player's sentence says they are squaring up against.
 
-    A stated number wins; a collective noun or a bare plural means three; anything
-    else is one. Capped at four — a repair that answers "I fight the crowd" by
-    spawning a dozen thugs at a level-1 character is a TPK by injector, and four is
-    already a fight the dice must be respected in.
+    A stated number is honoured in full — no cap, by the player's own ruling: "if I
+    run into a deadly situation I should have to reap what I've sown." A collective
+    noun means four, a bare plural three, anything else one. Death is survivable by
+    design (a patron pays for the raising), so the injector owes the player the
+    fight they picked, not a safer one.
     """
     text = player_text or ""
-    m = re.search(r"\b(\d{1,2})\b", text)
+    # A number with a unit after it is a measurement, not a head-count: "I shoot
+    # the wolf at 40 feet" is one wolf, found the day this regex read forty.
+    m = re.search(r"\b(\d{1,2})\b(?!\s*(?:-|\s)?\s*(?:feet|foot|ft|paces|yards|"
+                  r"metres|meters|minutes|hours|rounds|gp|sp|cp)\b)", text)
     if m and 1 < int(m.group(1)):
-        return min(4, int(m.group(1)))
+        return int(m.group(1))
     for word, n in _NUMBER_WORDS.items():
         if re.search(rf"\b{word}\b", text, re.I):
-            return min(4, n)
-    if _GROUP_WORDS.search(text):
+            return n
+    if _COLLECTIVE.search(text):
+        return 4
+    if _PLURAL_FOES.search(text):
         return 3
     return 1
 

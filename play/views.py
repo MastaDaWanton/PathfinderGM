@@ -252,7 +252,67 @@ def _ended_payload(c) -> dict:
         "death": downed.death_notice(pc) if pc else "",
         "choices": roster.pregens(),
         "roster": [e.summary() for e in roster.everyone()],
+        # Death is a debt, not a wall: somebody in this world can pay to have the
+        # character raised, and the button that says so lives on the death screen.
+        "resurrectable": c.ended == "died" and pc is not None,
     }
+
+
+@require_POST
+def resurrect(request):
+    """Weeks later, on a cold slab: somebody paid the priests to pull you back.
+
+    The player's own design, in their words: "if the character dies they should be
+    fast forwarded into the future where some person has paid to resurrect them
+    because they needed their strength." So death stays real — the fight was lost,
+    the epitaph stands in the roster — and the continuation is a debt: time passes
+    on the world clock, a patron drawn from the world's own factions foots the
+    bill, and a clockless `life debt` condition (state.obligation.life-debt) sits
+    on the sheet for the world to call in. Engine first, prose second, like every
+    other turn: the mechanics land here, and the narrator dresses the tell.
+    """
+    from rules.dice import Dice
+
+    c = campaign_mod.current()
+    if c.ended != "died":
+        return JsonResponse({"error": "nobody here needs raising"}, status=409)
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "the body is not in the scene"}, status=409)
+
+    # The mechanics, all through the ordinary applicators.
+    for gone in ("dead", "dying", "stable", "unconscious", "disabled"):
+        pc.remove_condition(gone)
+    pc.hp = pc.hp_max
+    pc.nonlethal = 0
+
+    factions = [f.get("name") for f in (c.world.factions or [])
+                if isinstance(f, dict) and f.get("name")]
+    dice = Dice(c.seed)
+    patron = (factions[dice.roll("1d%d" % len(factions), visibility="hidden").total - 1]
+              if factions else "a stranger whose face you never see")
+    days = 7 + dice.roll("2d10", label="days lost", visibility="hidden").total
+    c.scene.clock_minutes += days * 24 * 60
+    pc.add_condition("life debt", source=patron)
+
+    c.scene.end_encounter()
+    # The fight that killed them is long over and far away; the bodies stay there.
+    for ref in [r for r, a in list(c.scene.actors.items()) if not a.is_pc]:
+        c.scene.remove(ref) if hasattr(c.scene, "remove") else c.scene.actors.pop(ref)
+
+    c.ended = ""
+    if c.character_id:
+        roster.revive(c.character_id, pc)
+    beat = (f"{days} days pass in a darkness you do not remember. You wake on a "
+            f"cold slab under temple vaulting, lungs pulling their first borrowed "
+            f"breath: {patron} paid the priests to bring you back — they needed "
+            f"your strength, and they mean to collect. The debt sits on you like "
+            f"a second skin.")
+    c.transcript.append({"who": "gm", "text": beat, "kind": "setup"})
+    c.history.append({"role": "assistant", "content": beat})
+    c.save()
+    return JsonResponse({**_state(c), "resurrected": True, "patron": patron,
+                         "days": days})
 
 
 @require_GET

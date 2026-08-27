@@ -58,6 +58,9 @@ TAGS: dict[str, tuple[str, ...]] = {
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),
     "coagulated plate": ("buff.stance.coagulated-plate",),
+    # The price of coming back: somebody paid the priests, and now the debt sits
+    # on the character. Clockless — the world decides when it is called in.
+    "life debt": ("state.obligation.life-debt",),
 }
 
 

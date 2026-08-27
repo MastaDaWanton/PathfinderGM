@@ -159,6 +159,9 @@ def test_the_turn_is_handed_to_the_fallback_model_before_the_player_sees_red(mon
 
     monkeypatch.setattr(agent_mod.client, "chat", fake_chat)
     gm = agent_mod.GMAgent(FakeWorld(), engine)
+    # This test is about the two-call salvage path, where call 1 writes prose.
+    # Under the intents-first default call 1 writes none by design.
+    gm.intents_first = False
     plan = gm.plan_turn("I head to the gymnasium and work out", history=[])
 
     assert plan.intents and plan.intents[0].op == "narrate_only"

@@ -73,7 +73,13 @@ class GMAgent:
         # The experiment. Off by default and read per agent, so a run can be flipped
         # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
         # being tested and why it is measured rather than argued about.
-        self.intents_first = bool(os.environ.get("GM_INTENTS_FIRST"))
+        # On by default since the player asked for it in as many words: "actors
+        # should be at least partially created before I even receive prose back."
+        # Call 1 plans ops only, the engine resolves them — spawns included — and
+        # the one prose call writes the turn knowing what the dice did and who is
+        # actually on the board. GM_INTENTS_FIRST=0 restores the old order.
+        self.intents_first = (os.environ.get("GM_INTENTS_FIRST", "1").lower()
+                              not in ("", "0", "false", "no"))
 
     # --- Call 1 ---------------------------------------------------------------------
 
