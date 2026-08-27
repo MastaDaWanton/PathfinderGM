@@ -206,6 +206,15 @@ def main(argv: list[str] | None = None) -> int:
     if "--check" in argv:
         return _self_check()
 
+    from pathfindergm.paths import install_root, resource_root, user_data_root
+
+    # The tee must exist before django.setup(): logging.StreamHandler captures
+    # sys.stderr at configuration time, so a tee installed after setup leaves the
+    # log with launch banners and nothing else. Measured on a live 500: the user
+    # saw "Server Error (500)" and the log held not one request line and no
+    # traceback — the only debuggable artefact of a frozen app was blind.
+    _start_log(user_data_root())
+
     import django
     from django.core.wsgi import get_wsgi_application
 
@@ -217,11 +226,8 @@ def main(argv: list[str] | None = None) -> int:
     port = server.server_address[1]
     url = f"http://{HOST}:{port}/"
 
-    from pathfindergm.paths import install_root, resource_root, user_data_root
-
-    # The log first, so the banner below is its opening lines; the portfile second, so
-    # nothing that launched us reads an address the log has not yet vouched for.
-    _start_log(user_data_root())
+    # The portfile after the log, so nothing that launched us reads an address the
+    # log has not yet vouched for.
     portfile = _write_portfile(user_data_root(), port, url)
 
     # The line the Electron shell waits for — same contract as World Bible's, whose

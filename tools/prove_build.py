@@ -298,7 +298,13 @@ def main() -> None:
                 faults.append("log exists but carries no banner")
             if "=== launch" not in body:
                 faults.append("log has no dated launch header")
-        note("log file carries the banner", faults)
+            # Request lines are the proof the tee predates django.setup(). A tee
+            # installed after setup logs banners and nothing else, and a live 500
+            # left no traceback anywhere a user could send back.
+            if "GET /" not in body:
+                faults.append("log carries no request lines — Django's stderr is "
+                              "not reaching the tee")
+        note("log file carries the banner and the request lines", faults)
     finally:
         # The whole tree, not the process. A PyInstaller onefile exe is a bootloader
         # that spawns the real app as a child; terminate() killed the parent and left
