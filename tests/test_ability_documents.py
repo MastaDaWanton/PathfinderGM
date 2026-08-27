@@ -190,3 +190,59 @@ def test_a_homebrew_document_with_a_bad_pool_is_refused_with_the_fix():
     problems = cb.validate_class(d)
     assert any("no pool called 'fury'" in p for p in problems)
     assert any("rage" in p for p in problems)    # the fix names the real pools
+
+
+# --- the coagulator's plate: the first document authored after the grammar shipped ---
+
+def _coagulator(level=1, armour="none"):
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["class"] = "blood bending"
+    d["level"] = level
+    d["ranks"] = {}
+    d["paths"] = ["coagulator"]
+    d["armour"] = armour
+    return from_dict(d, ref="pc")
+
+
+def _plate(e):
+    return e.run(e.validate([{"op": "use_ability", "actor": "pc",
+                              "params": {"ability": "coagulated plate"},
+                              "because": "test"}])).outcomes[-1]
+
+
+def test_coagulated_plate_is_a_document_not_an_engine_branch():
+    """The proof the grammar expands without code: this ability was authored as pure
+    data after stage 3 shipped. Measured before the fix elsewhere: the tell said
+    '+4 ac' while pc.ac() stayed 13 — the effectspec branch reported, never applied."""
+    pc = _coagulator()
+    scene = Scene(); scene.add(pc)
+    e = Engine(scene, dice=Dice(seed=11))
+    before = pc.ac()
+    _plate(e)
+    assert pc.has_state("buff.stance.coagulated-plate")
+    assert pc.ac() == before + 4
+    assert any(m.source == "Coagulated Plate" for m in pc.ac_modifiers())
+    _plate(e)
+    assert pc.ac() == before
+    assert not pc.has_state("buff.stance.coagulated-plate")
+
+
+def test_coagulated_plate_scales_with_control_blood():
+    """'Armor Bonus to AC equal to 3+ControlBloodLevel' — level 9 is tier 4, +7."""
+    pc = _coagulator(level=9)
+    scene = Scene(); scene.add(pc)
+    e = Engine(scene, dice=Dice(seed=11))
+    before = pc.ac()
+    _plate(e)
+    assert pc.ac() == before + 7
+
+
+def test_coagulated_plate_does_not_stack_with_worn_armour():
+    """Armour-typed on purpose. A breastplate is +6; the tier-1 plate is +4; 1e says
+    the better of the two, not ten. Before typing, this test would have read 23."""
+    pc = _coagulator(armour="breastplate")
+    scene = Scene(); scene.add(pc)
+    e = Engine(scene, dice=Dice(seed=11))
+    before = pc.ac()
+    _plate(e)
+    assert pc.ac() == before

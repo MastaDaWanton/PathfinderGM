@@ -782,7 +782,43 @@
      "a save DC computed from level and Constitution"
     ]
    },
-   "effects_converted": true
+   "effects_converted": true,
+   "grants": {
+    "Coagulated Plate": {
+     "action": "free",
+     "_note": "The author's sentence: 'Gain an Armor Bonus to AC equal to 3+ControlBloodLevel. Counts as heavy armor, but has no Max Dex limit or armor check penalty.' Armor-typed on purpose \u2014 it must NOT stack with a worn breastplate, which is exactly what the typed channels exist to say.",
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "ac",
+       "bonus_type": "armour",
+       "scales_by": "control_blood",
+       "by_tier": {
+        "1": {
+         "amount": 4
+        },
+        "2": {
+         "amount": 5
+        },
+        "3": {
+         "amount": 6
+        },
+        "4": {
+         "amount": 7
+        },
+        "5": {
+         "amount": 8
+        }
+       }
+      }
+     ],
+     "tell": "{name} hardens the blood across their skin into plates of dark armour.",
+     "tell_off": "{name} lets the plate soften and run back beneath the skin."
+    }
+   },
+   "toggles": {
+    "Coagulated Plate": "coagulated plate"
+   }
   },
   "blood commander": {
    "name": "Blood Commander",
@@ -1024,7 +1060,11 @@
     "Extracorporeal Blood Armament": {
      "action": "free",
      "weapon": {
-      "aliases": ["armed punch", "armed punches", "blood gauntlets"],
+      "aliases": [
+       "armed punch",
+       "armed punches",
+       "blood gauntlets"
+      ],
       "applies_to_unarmed": true,
       "base": "unarmed",
       "name": "unarmed strike (blood armament)",
@@ -1039,24 +1079,84 @@
     },
     "Blood Rage": {
      "action": "free",
-     "cost": {"pool": "rage", "amount": 1},
-     "drain": {"pool": "rage", "amount": 1},
-     "requires_not": ["state.impaired.fatigued", "state.impaired.exhausted"],
-     "_requires_note": "The Core Rulebook's own rage clause — 'A barbarian cannot enter a new rage while fatigued or exhausted' — which is the rule this class's rage is written against.",
-     "modifiers": [
-      {"type": "combat_mod", "target": "attack", "bonus_type": "morale",
-       "scales_by": "control_blood",
-       "by_tier": {"1": {"amount": 2}, "3": {"amount": 3}, "5": {"amount": 4}}},
-      {"type": "combat_mod", "target": "damage", "bonus_type": "morale",
-       "scales_by": "control_blood",
-       "by_tier": {"1": {"amount": 2}, "3": {"amount": 3}, "5": {"amount": 4}}},
-      {"type": "combat_mod", "target": "ac", "amount": -2, "bonus_type": "untyped"}
+     "cost": {
+      "pool": "rage",
+      "amount": 1
+     },
+     "drain": {
+      "pool": "rage",
+      "amount": 1
+     },
+     "requires_not": [
+      "state.impaired.fatigued",
+      "state.impaired.exhausted"
      ],
-     "temp_hp": {"scales_by": "control_blood",
-      "by_tier": {"1": {"per_hit_die": 2}, "3": {"per_hit_die": 3},
-                  "5": {"per_hit_die": 4}}},
-     "resist": {"scales_by": "control_blood",
-      "by_tier": {"3": {"against": "physical", "percent": 50}}},
+     "_requires_note": "The Core Rulebook's own rage clause \u2014 'A barbarian cannot enter a new rage while fatigued or exhausted' \u2014 which is the rule this class's rage is written against.",
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "attack",
+       "bonus_type": "morale",
+       "scales_by": "control_blood",
+       "by_tier": {
+        "1": {
+         "amount": 2
+        },
+        "3": {
+         "amount": 3
+        },
+        "5": {
+         "amount": 4
+        }
+       }
+      },
+      {
+       "type": "combat_mod",
+       "target": "damage",
+       "bonus_type": "morale",
+       "scales_by": "control_blood",
+       "by_tier": {
+        "1": {
+         "amount": 2
+        },
+        "3": {
+         "amount": 3
+        },
+        "5": {
+         "amount": 4
+        }
+       }
+      },
+      {
+       "type": "combat_mod",
+       "target": "ac",
+       "amount": -2,
+       "bonus_type": "untyped"
+      }
+     ],
+     "temp_hp": {
+      "scales_by": "control_blood",
+      "by_tier": {
+       "1": {
+        "per_hit_die": 2
+       },
+       "3": {
+        "per_hit_die": 3
+       },
+       "5": {
+        "per_hit_die": 4
+       }
+      }
+     },
+     "resist": {
+      "scales_by": "control_blood",
+      "by_tier": {
+       "3": {
+        "against": "physical",
+        "percent": 50
+       }
+      }
+     },
      "_resist_note": "Extracorporeal Blood Rage Armor, tier 3: 'Gain 50% resistance to physical damage while in Blood Rage.' It is a property of the rage, so it rides the rage's own document and arrives at the tier the armor unlocks.",
      "tell": "{name} enters Blood Rage: the pulse rises and the blood answers.",
      "tell_off": "{name} lets the rage drain away, and its borrowed vigour with it."

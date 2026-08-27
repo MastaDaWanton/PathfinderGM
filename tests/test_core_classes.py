@@ -115,3 +115,28 @@ def test_features_read_from_the_level_table():
     assert "greater rage" in classes.features_at("barbarian", 11)
     assert "ki pool" in classes.features_at("monk", 4)
     assert "smite evil 1/day" in classes.features_at("paladin", 1)
+
+
+def test_a_homebrew_path_overlay_cannot_erase_shipped_ability_documents(tmp_path, settings, monkeypatch):
+    """The overlay's `base.update` replaced `paths` wholesale: a homebrew copy of
+    blood bending saved by the in-app editor before `grants`/`toggles` existed
+    silently erased every ability document the shipped file gained afterwards.
+    Measured live: Blood Rage fell back to the old effectspec branch — the tell said
+    '+4 ac' and no number moved. Paths must layer per path and per field."""
+    import json
+    from rules import classes as classes_mod
+
+    home = tmp_path / "homebrew" / "classes"
+    home.mkdir(parents=True)
+    stale = {"id": "blood bending",
+             "paths": {"battle blood": {"summary": "my tweaked summary"}}}
+    (home / "blood bending.json").write_text(json.dumps(stale), encoding="utf-8")
+    settings.CAMPAIGN_DIR = str(tmp_path / "campaigns")
+    monkeypatch.setattr(classes_mod, "_ALL", None)
+    try:
+        got = classes_mod.get("blood bending")["paths"]["battle blood"]
+        assert got["summary"] == "my tweaked summary"
+        assert "Blood Rage" in (got.get("grants") or {})
+        assert (got.get("toggles") or {}).get("Blood Rage")
+    finally:
+        monkeypatch.setattr(classes_mod, "_ALL", None)

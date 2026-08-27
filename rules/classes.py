@@ -62,7 +62,28 @@ def all_classes() -> dict[str, dict]:
                     if not key:
                         continue
                     base = dict(out.get(key, {}))
-                    base.update({k: v for k, v in e.items() if v not in (None, "")})
+                    for k, v in e.items():
+                        if v in (None, ""):
+                            continue
+                        # `paths` layers per path and per field, never wholesale. A
+                        # homebrew copy saved by the in-app editor before `grants` and
+                        # `toggles` existed silently erased every ability document the
+                        # shipped file had gained since — Blood Rage fell back to the
+                        # old effectspec branch and nothing on screen said why.
+                        if k == "paths" and isinstance(v, dict) \
+                                and isinstance(base.get(k), dict):
+                            merged = {pk: dict(pv) for pk, pv in base[k].items()}
+                            for pk, pv in v.items():
+                                if isinstance(pv, dict) and isinstance(
+                                        merged.get(pk), dict):
+                                    merged[pk].update(
+                                        {fk: fv for fk, fv in pv.items()
+                                         if fv not in (None, "")})
+                                else:
+                                    merged[pk] = pv
+                            base[k] = merged
+                        else:
+                            base[k] = v
                     # The engine reads these two off the class, so they have to be the
                     # shapes it expects rather than the shapes a file happens to use.
                     base["good_saves"] = tuple(base.get("good_saves") or ())

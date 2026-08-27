@@ -57,6 +57,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     # The stances play has already minted. Buffs, not states: they are worn by choice.
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),
+    "coagulated plate": ("buff.stance.coagulated-plate",),
 }
 
 
