@@ -83,8 +83,19 @@ def main() -> None:
             ok = False
         note("the shell's URL answers", [] if ok else [f"{url} did not answer"])
     finally:
-        # Kill the SHELL (its whole tree, as a window close would). The question is
-        # what happens to the backend after.
+        # Close the way a PERSON does first — CloseMainWindow, the path taskkill can
+        # never test. A real user close once left four shell processes and a live
+        # backend holding the single-instance lock, and every taskkill-based run of
+        # this prover had passed. The axe below stays as cleanup for whatever the
+        # polite close missed, which the sweeps then report as the fault it is.
+        if args.packaged:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-Process 'Pathfinder GM' -ErrorAction SilentlyContinue | "
+                 "Where-Object {$_.MainWindowHandle -ne 0}) | "
+                 "ForEach-Object { $_.CloseMainWindow() | Out-Null }"],
+                capture_output=True)
+            time.sleep(8)
         subprocess.run(["taskkill", "/PID", str(shell.pid), "/T", "/F"],
                        capture_output=True)
 

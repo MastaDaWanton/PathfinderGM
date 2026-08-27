@@ -207,6 +207,13 @@ if (!app.requestSingleInstanceLock()) {
 app.on('window-all-closed', () => {
   stopBackend();
   if (process.platform !== 'darwin') app.quit();
+  // The hard floor. Measured on a real user close: the window went away and FOUR
+  // shell processes plus a live backend stayed — the child's stdio pipes and the
+  // delayed-kill timer kept the main process alive, the lingering family held the
+  // single-instance lock, and the next launch quit as a "second instance" of a game
+  // nobody could see. A single-window game may never outlive its window by more
+  // than the backend's grace period.
+  setTimeout(() => app.exit(0), 4500);
 });
 
 app.on('before-quit', stopBackend);
