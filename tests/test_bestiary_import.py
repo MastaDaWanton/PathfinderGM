@@ -86,6 +86,7 @@ def test_an_imported_creature_can_actually_hit_the_player():
     wolf = scene.add(bestiary.instantiate("wolf", scene=scene))
 
     engine = Engine(scene, Dice(seed=11))
+    engine._ensure_encounter(wolf.ref)     # the gate defers a swing that opens a fight
     res = engine.run(engine.validate([
         {"op": "attack", "actor": wolf.ref, "target": "pc",
          "because": "it comes out of the dark"},

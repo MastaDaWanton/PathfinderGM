@@ -23,6 +23,15 @@ def engine(scene):
     return Engine(scene, Dice(seed=20250819))
 
 
+@pytest.fixture
+def fight(engine):
+    """An encounter already running, initiator's turn kept — the old auto-start
+    semantics, done in setup. Since the battle gate landed, a first swing out of
+    combat opens the fight and defers; these fixtures test the swing itself."""
+    engine._ensure_encounter("pc")
+    return engine
+
+
 def run(engine, raw):
     return engine.run(engine.validate(raw))
 
@@ -170,7 +179,8 @@ def test_every_outcome_carries_a_tell_written_by_code(engine):
 
 # --- Combat maths --------------------------------------------------------------------------
 
-def test_the_player_rolls_their_own_to_hit_and_their_own_damage(engine, scene):
+def test_the_player_rolls_their_own_to_hit_and_their_own_damage(fight, scene):
+    engine = fight
     """The architecture decision is "player rolls surface on a dice popup and the player
     rolls them" — which has to include the attack roll and the damage roll.
 
@@ -199,7 +209,8 @@ def test_the_player_rolls_their_own_to_hit_and_their_own_damage(engine, scene):
     assert scene.get("c1").hp == 4 - 5                 # 4 on the die, +1 Str
 
 
-def test_a_missed_attack_never_asks_for_damage(engine):
+def test_a_missed_attack_never_asks_for_damage(fight):
+    engine = fight
     """A miss ends the attack. Asking for damage after one would be the clearest
     possible tell that the popup is cosmetic rather than part of resolution."""
     res, prompts = play_through(
@@ -209,7 +220,8 @@ def test_a_missed_attack_never_asks_for_damage(engine):
     assert res.outcomes[0].verdict == "miss"
 
 
-def test_a_full_attack_at_bab_zero_is_still_one_attack(engine):
+def test_a_full_attack_at_bab_zero_is_still_one_attack(fight):
+    engine = fight
     """Kesst is BAB +0. A GM that asks for a full attack does not thereby grant her an
     iterative she has not earned."""
     res, prompts = play_through(
@@ -229,7 +241,8 @@ def test_an_npc_attack_is_rolled_by_the_engine_and_never_prompts(engine, scene):
     assert res.outcomes[0].player_visible()["rolls"] == []
 
 
-def test_a_critical_threat_asks_the_player_to_confirm_it(engine, scene):
+def test_a_critical_threat_asks_the_player_to_confirm_it(fight, scene):
+    engine = fight
     """A rapier threatens on 18-20, and a threat is not a crit until it is confirmed —
     the step a person forgets mid-fight. The confirmation is the player's roll too."""
     res, prompts = play_through(

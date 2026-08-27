@@ -154,6 +154,7 @@ def test_thorn_body_burns_the_attacker_and_not_the_druid_who_cast_it():
     assert (ward.owner, ward.recipient, ward.trigger) == ("pc", "attacker", "when_struck")
 
     druid_hp, thug_hp = scene.actors["pc"].hp, scene.actors["c1"].hp
+    engine._ensure_encounter("c1")         # the gate defers a swing that opens a fight
     hit = engine.run(engine.validate([
         {"op": "attack", "actor": "c1", "target": "pc", "params": {"weapon": "sap"}}
     ])).outcomes[0]

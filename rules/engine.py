@@ -824,6 +824,10 @@ class Engine:
         # world, and an engine built without one falls back to the Core Rulebook's own
         # names rather than refusing to do arithmetic.
         self.world = world
+        # Whether a fight began inside the current batch of intents. Read by the
+        # attack op: a swing riding the same GM turn that opened the battle is
+        # deferred to the player's own first combat turn, never resolved in prose.
+        self._battle_joined = False
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -1019,6 +1023,10 @@ class Engine:
     # --- Running --------------------------------------------------------------------
 
     def run(self, intents: list[Intent]) -> Resolution:
+        # A fresh batch is a fresh question. Reset here and not in `resume`, because a
+        # resume continues the same declared turn — a battle joined before the player
+        # was handed a die is still the battle this batch joined.
+        self._battle_joined = False
         return self._drive([i.as_dict() for i in intents], [], {})
 
     def resume(self, face: int) -> Resolution:
@@ -1312,6 +1320,42 @@ class Engine:
                 "refs",
             )
         defender = self.scene.actors[targets[0]]
+        # The moment of first violence opens the battle and stops there. Measured in
+        # play (2026-08-27): a spoken turn spawned an opponent, began the encounter,
+        # swung, confirmed a critical, killed, ended the fight and paid out XP — an
+        # entire war inside one narrated paragraph, the map never shown and the player
+        # never once at the combat panel. So an attack that finds no fight running, or
+        # one riding the same batch that started the fight, is *deferred*: the
+        # encounter forms (initiative, sides, the grid laid), the tell announces that
+        # battle is joined, and the swing itself is the player's to declare on their
+        # own first combat turn. A swing at somebody already down opens nothing — one
+        # living combatant is no encounter — and resolves as the mercy stroke it is.
+        if partial.get("attack_state") is None:
+            opened = False
+            if not self.scene.in_encounter:
+                opened = self._ensure_encounter(intent.actor)
+            if opened or self._battle_joined:
+                self._battle_joined = True
+                # The initiator keeps the action they declared — the rule
+                # _ensure_encounter has always applied, now honoured whichever door
+                # opened the fight. Without this, a GM-proposed begin_encounter left
+                # the turn on the initiative winner and the hand-over gave the other
+                # side the first swing the announcement had just promised the player.
+                for i, (ref, _) in enumerate(self.scene.initiative):
+                    if ref == intent.actor:
+                        self.scene.turn = i
+                        self.scene.acted.add(intent.actor)
+                        break
+                foes = [a.name for r, a in self.scene.actors.items()
+                        if r != intent.actor and not a.is_pc and a.hp > 0]
+                return Outcome(
+                    intent_id=intent.id, op="attack",
+                    effects=[{"ref": actor.ref, "kind": "battle_joined",
+                              "target": defender.ref}],
+                    tell=(f"Battle is joined: {actor.name} squares off against "
+                          f"{', '.join(foes) or defender.name}. Nothing has landed "
+                          f"yet — the first blow is still to be struck."),
+                    because=intent.because)
         self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
@@ -1641,8 +1685,9 @@ class Engine:
             tell=" ".join(bits), because=intent.because,
         )
 
-    def _ensure_encounter(self, initiator: str) -> None:
+    def _ensure_encounter(self, initiator: str) -> bool:
         """Start a fight the moment someone swings, if one is not already running.
+        Returns whether it opened one — the attack op defers its swing when it did.
 
         Measured in play: asked to attack, the GM emitted a bare `attack` intent and no
         `begin_encounter`. Initiative was never rolled, so nothing tracked turns and the
@@ -1655,10 +1700,10 @@ class Engine:
         already declared.
         """
         if self.scene.in_encounter:
-            return
+            return False
         combatants = [r for r, a in self.scene.actors.items() if a.hp > 0]
         if len(combatants) < 2:
-            return
+            return False
 
         rolls = []
         for ref in combatants:
@@ -1670,14 +1715,20 @@ class Engine:
 
         self.scene.initiative = rolls
         self.scene.round = 1
-        self.scene.sides = {
+        sides = {
             "pc": [r for r in combatants if self.scene.actors[r].is_pc],
             "them": [r for r in combatants if not self.scene.actors[r].is_pc],
         }
+        self.scene.sides = sides
         self.scene.acted = {initiator}
         self.scene.turn = next(
             (i for i, (ref, _) in enumerate(rolls) if ref == initiator), 0
         )
+        # The battlefield goes with the fight, whichever door the fight came in by.
+        # This path skipped the grid entirely: a swing that auto-started an encounter
+        # played on a map that said no ground was mapped.
+        self._lay_battlefield(sides)
+        return True
 
     def _has_acted(self, ref: str) -> bool:
         """Whether this combatant has taken a turn in the current encounter."""
@@ -3551,55 +3602,64 @@ class Engine:
         # their first turn comes round.
         self.scene.acted = set()
         self.scene.sides = {k: list(v) for k, v in intent.params["sides"].items()}
-        # The ground. The map tray has promised "a grid is laid out when a fight starts"
-        # since the grid shipped, and nothing anywhere ever laid one — Scene.grid was
-        # assigned in tests and nowhere else, so every real fight played on a map that
-        # said no ground was mapped. Laid here, once, and only if the GM has not already
-        # put one down; combatants without positions are placed by their zones, the
-        # player's side on the left and everyone else a zone's worth of squares away.
-        if self.scene.grid is None:
-            from .grid import Grid
-
-            self.scene.grid = Grid()
-            mid = self.scene.grid.height // 2
-            pc_side, foe_row = 4, 0
-            for side, refs in intent.params["sides"].items():
-                has_pc = any(self.scene.actors[r].is_pc for r in refs
-                             if r in self.scene.actors)
-                for i, ref in enumerate(refs):
-                    if ref in self.scene.positions or ref not in self.scene.actors:
-                        continue
-                    zone = self.scene.zones.get(ref, "near")
-                    # `engaged` means within reach. Written `3 if near else 8`, the one
-                    # zone that means "close enough to hit" was laid out further away
-                    # than "near" — eight squares, forty feet, across the room.
-                    #
-                    # A distance the spawn actually asked for beats the zone word: a
-                    # bowshot at 120 feet is 24 squares, and the zone vocabulary has no
-                    # way to say anything past `far`.
-                    stated = self.scene.spawn_feet.get(ref)
-                    away = (max(1, stated // FEET_PER_SQUARE) if stated
-                            else SQUARES_BY_ZONE.get(zone, 3))
-                    if pc_side + away >= self.scene.grid.width:
-                        self.scene.grid.width = pc_side + away + 2
-                    if has_pc:
-                        self.scene.positions[ref] = (pc_side, mid + i)
-                    else:
-                        self.scene.positions[ref] = (
-                            min(self.scene.grid.width - 1, pc_side + away),
-                            mid + foe_row)
-                        foe_row += 1
-            self.scene.resync_zones()
+        self._lay_battlefield(intent.params["sides"])
         # The turn pointer starts before the first combatant so the first advance lands
         # on whoever won initiative.
         self.scene.turn = -1
         self.scene.advance_turn()
+        # An attack riding this same batch is deferred: the fight this op opened is
+        # announced, and the first swing belongs to whoever wins the first turn.
+        self._battle_joined = True
         names = ", ".join(self.scene.actors[r].name for r, _ in order)
         return Outcome(
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
             effects=[{"kind": "initiative", "order": order}],
             tell=f"Initiative: {names}.", because=intent.because,
         )
+
+    def _lay_battlefield(self, sides: dict) -> None:
+        """The ground. The map tray has promised "a grid is laid out when a fight
+        starts" since the grid shipped, and nothing anywhere ever laid one —
+        Scene.grid was assigned in tests and nowhere else, so every real fight played
+        on a map that said no ground was mapped. Laid here, once, and only if the GM
+        has not already put one down; combatants without positions are placed by
+        their zones, the player's side on the left and everyone else a zone's worth
+        of squares away. One helper for both doors a fight comes in by —
+        `begin_encounter`, and the swing that auto-starts one."""
+        if self.scene.grid is not None:
+            return
+        from .grid import Grid
+
+        self.scene.grid = Grid()
+        mid = self.scene.grid.height // 2
+        pc_side, foe_row = 4, 0
+        for side, refs in sides.items():
+            has_pc = any(self.scene.actors[r].is_pc for r in refs
+                         if r in self.scene.actors)
+            for i, ref in enumerate(refs):
+                if ref in self.scene.positions or ref not in self.scene.actors:
+                    continue
+                zone = self.scene.zones.get(ref, "near")
+                # `engaged` means within reach. Written `3 if near else 8`, the one
+                # zone that means "close enough to hit" was laid out further away
+                # than "near" — eight squares, forty feet, across the room.
+                #
+                # A distance the spawn actually asked for beats the zone word: a
+                # bowshot at 120 feet is 24 squares, and the zone vocabulary has no
+                # way to say anything past `far`.
+                stated = self.scene.spawn_feet.get(ref)
+                away = (max(1, stated // FEET_PER_SQUARE) if stated
+                        else SQUARES_BY_ZONE.get(zone, 3))
+                if pc_side + away >= self.scene.grid.width:
+                    self.scene.grid.width = pc_side + away + 2
+                if has_pc:
+                    self.scene.positions[ref] = (pc_side, mid + i)
+                else:
+                    self.scene.positions[ref] = (
+                        min(self.scene.grid.width - 1, pc_side + away),
+                        mid + foe_row)
+                    foe_row += 1
+        self.scene.resync_zones()
 
     def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:
         """Stop the fight. The GM's call: they run, they yield, you get clear."""

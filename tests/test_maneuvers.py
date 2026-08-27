@@ -24,7 +24,11 @@ def scene():
 
 @pytest.fixture
 def engine(scene):
-    return Engine(scene, Dice(seed=20260820))
+    e = Engine(scene, Dice(seed=20260820))
+    # The battle gate defers a swing that finds no fight running; every test here
+    # is about the manoeuvre itself, so the fight is already open.
+    e._ensure_encounter("pc")
+    return e
 
 
 def play(engine, raw, faces=()):
@@ -146,6 +150,7 @@ def test_a_trip_that_fails_by_ten_knocks_the_attacker_down(engine, scene):
 def test_a_natural_one_always_fails_and_a_natural_twenty_always_succeeds(scene):
     """CRB p.199, and the reason verdict is not simply `total >= cmd`."""
     engine = Engine(scene, Dice(seed=3))
+    engine._ensure_encounter("pc")
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "trip"}}], faces=[20])
     assert res.outcomes[0].verdict == "success"
@@ -200,6 +205,7 @@ def test_overrun_by_five_or_more_also_knocks_the_target_prone(scene):
     target's space and the target is knocked prone." (CRB p.201)"""
     scene.pc().abilities["str"] = 20        # +5, enough to clear CMD 14 by 5 on a 14
     engine = Engine(scene, Dice(seed=5))
+    engine._ensure_encounter("pc")
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "overrun"}}], faces=[20])
     assert res.outcomes[0].margin >= 5
@@ -211,6 +217,7 @@ def test_bull_rush_reports_the_extra_distance(scene):
     target back an additional 5 feet." (CRB p.199)"""
     scene.pc().abilities["str"] = 20
     engine = Engine(scene, Dice(seed=5))
+    engine._ensure_encounter("pc")
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "bull rush"}}], faces=[20])
     assert "5 feet" in res.outcomes[0].tell

@@ -684,12 +684,18 @@ def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
     assert [i["op"] for i in raw] == ["spawn", "begin_encounter", "attack"]
 
     engine = Engine(scene, Dice(seed=5))
-    engine.run(engine.validate(raw))
+    res = engine.run(engine.validate(raw))
     assert scene.zones["c1"] == "engaged"
     assert scene.distance_between("pc", "c1") == 5, "not within reach of a punch"
-    # And the attack is waiting on the player's d20 rather than silently not happening.
-    assert scene.awaiting and scene.awaiting["die"] == "1d20"
-    assert "Attack" in scene.awaiting["label"]
+    # The swing itself is DEFERRED now, not rolled: a battle that begins and resolves
+    # inside one spoken paragraph was the 2026-08-27 playtest's finding (a spawned
+    # thug fought, killed and paid out without the combat panel ever appearing). The
+    # encounter stands, the tell announces it, and the first blow is the player's to
+    # declare at the panel.
+    assert scene.in_encounter and scene.grid is not None
+    assert not scene.awaiting
+    assert any("Battle is joined" in (o.tell or "") for o in res.outcomes)
+    assert all(e.get("kind") != "damage" for o in res.outcomes for e in o.effects)
 
 
 def test_engaged_is_closer_than_near():

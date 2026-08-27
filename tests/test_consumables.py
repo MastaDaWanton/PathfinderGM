@@ -43,7 +43,11 @@ def board(poison_specs):
     s.add(instantiate("thug", scene=s, name="the beast"))
     pc.stock["tincture#1"] = Stock(base="Dragon Flower Tincture", tier="rare",
                                    potency=1.25, count=3, specs=list(poison_specs))
-    return s, Engine(s, Dice(seed=9))
+    e = Engine(s, Dice(seed=9))
+    # The battle gate defers a first swing out of combat; the coating tests are
+    # about the blade, so the fight is already open.
+    e._ensure_encounter("pc")
+    return s, e
 
 
 def use(engine, **params):

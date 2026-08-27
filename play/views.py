@@ -914,7 +914,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         c.turn_log.append({"kind": "resolution",
                            "outcomes": [o.as_dict() for o in resolution.outcomes]})
 
-    if hand_over:
+    # A battle that just JOINED is not a turn that just ENDED. The deferred first
+    # swing left the player holding the action they declared; running the NPC loop
+    # here would hand the other side the first blow the announcement promised the
+    # player. They act at the combat panel; the loop runs when that turn ends.
+    joined = any(e.get("kind") == "battle_joined"
+                 for o in resolution.outcomes for e in (o.effects or []))
+    if hand_over and not joined:
         _run_npc_turns(c, agent)
     if plan is not None:
         c.last_intent_signature = judgement._signature(plan.intents)

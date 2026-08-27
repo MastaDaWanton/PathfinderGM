@@ -455,6 +455,33 @@ def _player_is_the_one_swinging(text: str) -> bool:
     return not _THIRD_PARTY.search(before)
 
 
+# The words of a coup de grâce. A player finishing a downed creature writes one of
+# these; a player picking a fresh fight does not. Kept deliberately narrow — a phrase
+# here silences the fight-making repairs, and a loose match would silence them for a
+# player who genuinely wants a war.
+_FINISHING = re.compile(
+    r"\b(?:put(?:ting)? (?:him|her|them|it) out of (?:his|her|their|its) misery"
+    r"|out of (?:his|her|their|its) misery"
+    r"|finish(?:ing)? (?:him|her|them|it) off"
+    r"|coup de gr[aâ]ce|mercy (?:stroke|blow|kill)"
+    r"|end(?:ing)? (?:his|her|their|its) suffering"
+    r"|make sure (?:he|she|it|they)(?:'s| is| are)? (?:really |truly )?dead"
+    r"|one (?:final|last) (?:blow|strike|time))\b", re.I)
+
+
+def is_finishing_blow(player_text: str, scene) -> bool:
+    """Whether these words are a coup de grâce on somebody already down.
+
+    Both halves must hold: the sentence says finishing words, and the scene holds a
+    downed non-player body for them to be about. The words alone are not enough — "one
+    last strike" against a standing foe is a fight like any other.
+    """
+    if not _FINISHING.search(player_text or ""):
+        return False
+    return any(not getattr(a, "is_pc", False) and a.has_state("state.down")
+               for a in (getattr(scene, "actors", {}) or {}).values())
+
+
 def inject_fight(raw_intents, player_text: str, scene):
     """The player started a fight and there was nobody there to have it with.
 
@@ -475,6 +502,14 @@ def inject_fight(raw_intents, player_text: str, scene):
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
     if not wants_a_fight(player_text):
+        return raw_intents
+    # A finishing blow is not a fight being started. Measured live (2026-08-27): "i
+    # strike him one final time to put him out of his misery", aimed by the model —
+    # correctly — at the stranger dying at -7, tripped the violence cue, found no
+    # foe that _can_be_fought, and this function spawned its default thug for the
+    # player to fight instead. A thug from nowhere, killed in the same paragraph,
+    # 135 XP awarded, while the man being put out of his misery lay untouched.
+    if is_finishing_blow(player_text, scene):
         return raw_intents
     # Anything the GM already proposed that makes a fight is left alone — but an
     # attack aimed at a corpse is not a fight. Measured live: "I attack it" (a
@@ -1228,6 +1263,11 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
     Returns amended raw intents, or None when nothing needed redirecting.
     """
     if not isinstance(raw_intents, list) or scene is None:
+        return None
+    # A coup de grâce is aimed at the body ON PURPOSE. Retargeting it would swing
+    # the mercy stroke at a living bystander; spawning would invent an opponent for
+    # somebody who asked for neither. The same guard silences inject_fight.
+    if is_finishing_blow(player_text, scene):
         return None
     dead = {r for r, a in scene.actors.items()
             if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))}
