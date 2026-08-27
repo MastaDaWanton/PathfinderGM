@@ -118,6 +118,62 @@ def toggle_key(actor, name: str) -> str:
     return ""
 
 
+def ability_doc(actor, name: str) -> tuple[str, dict]:
+    """The ability's document — requirements, cost, granted effect, tell — and the
+    path that carries it. `("", {})` for an ability that has none.
+
+    Stage 3 of docs/states-effects-tells.md: declared in the class data
+    (`paths.<path>.grants`, keyed by the resolved name like `effects`), so an
+    ability's activation requirements, pool cost, modifiers, granted tags and tells
+    are data the classbuilder validates rather than code the engine special-cases.
+    """
+    want = " ".join(str(name or "").split()).strip().lower()
+    if not want:
+        return "", {}
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        resolved = ""
+        for listed, real in (det.get("resolves") or {}).items():
+            if str(listed).lower() == want:
+                resolved = str(real)
+                break
+        doc = (det.get("grants") or {}).get(resolved or "")
+        if isinstance(doc, dict) and doc:
+            return path, doc
+    return "", {}
+
+
+def granted_weapons(actor) -> list[dict]:
+    """Every weapon a followed path's documents can put in this character's hands.
+
+    Each entry: `{"ability": <resolved name>, "key": <toggle condition>, "weapon":
+    <the document's weapon block>}`. This is what replaced the armament's name-list
+    special case in `Actor.weapon` — the class file says which aliases exist, which
+    table column the die comes from, and which toggle must hold, and a homebrew class
+    stating the same fields gets the same treatment.
+    """
+    out: list[dict] = []
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        toggles = {str(k).lower(): str(v) for k, v in (det.get("toggles") or {}).items()}
+        for name, doc in (det.get("grants") or {}).items():
+            if not isinstance(doc, dict) or not isinstance(doc.get("weapon"), dict):
+                continue
+            out.append({"ability": str(name), "key": toggles.get(str(name).lower(), ""),
+                        "weapon": dict(doc["weapon"])})
+    return out
+
+
+def granted_weapon_named(actor, key: str) -> dict | None:
+    """The grant whose aliases include this weapon name, or None."""
+    want = " ".join(str(key or "").split()).strip().lower()
+    for g in granted_weapons(actor):
+        aliases = {str(a).lower() for a in (g["weapon"].get("aliases") or ())}
+        if want in aliases:
+            return g
+    return None
+
+
 def is_passive(actor, name: str) -> bool:
     """Whether this ability is an always-active passive in a path the actor follows.
 

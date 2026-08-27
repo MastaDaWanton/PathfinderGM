@@ -19,7 +19,8 @@ import re
 
 from . import goods
 from . import houserules
-from .dice import Modifier
+from .activeeffect import ActiveEffect
+from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
     CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
@@ -29,6 +30,17 @@ from .tables import (
     is_physical, iterative_attacks, material_for, normalise_damage_type,
     power_attack_terms, save_for,
 )
+
+
+def _bonus_type(value) -> str:
+    """One spelling per bonus type, so "armor" and "armour" collide as 1e intends.
+
+    The stacking rule keys on the type's name; two spellings of the same type would
+    quietly stack with each other, which is the exact failure the channel exists to
+    stop.
+    """
+    t = " ".join(str(value or "").split()).strip().lower()
+    return {"armor": "armour", "natural armor": "natural armour"}.get(t, t)
 
 
 class IllegalSheet(ValueError):
@@ -250,13 +262,12 @@ class Actor:
 
     hp_max: int = 1
     hp: int = 1
-    # Temporary hit points sit *on top of* hp_max rather than inside it, are spent before
-    # real hit points, and are not restored by healing.
-    #
-    # A list rather than a number even though 1e keeps only the best, because the pools
-    # expire independently: rage temporary hit points end with the rage while a ward's
-    # last the minute. One number could hold the total or the duration, never both.
-    temp_pools: list["TempPool"] = field(default_factory=list)
+    # The one store for everything that is on this creature and will later stop being:
+    # conditions, buffs, temporary hit point pools, coatings, ability effects. One
+    # applicator (`apply_effect`), one ticker (`tick_effects`). The old per-mechanism
+    # views — `conditions`, `buffs`, `temp_pools`, `coating` — are properties over this
+    # list, so every reader keeps working while there is only one thing to maintain.
+    effects: list[ActiveEffect] = field(default_factory=list)
     # Non-lethal damage, tracked apart from hit points because 1e tracks it apart: it
     # accumulates on its own, it staggers you when it reaches your current hit points and
     # drops you when it passes them, and it heals on a different clock.
@@ -287,19 +298,12 @@ class Actor:
     immunities: list[str] = field(default_factory=list)
     resistances: dict[str, int] = field(default_factory=dict)
     vulnerabilities: list[str] = field(default_factory=list)
-    conditions: list[Condition] = field(default_factory=list)
-    buffs: list[Buff] = field(default_factory=list)
     # Who this creature is being pulled towards, and what defying them costs. Not a
     # condition: a condition is a state the creature is in, while a compulsion is a
     # relationship to a *particular other creature*, and it has to be able to name them.
     compulsions: list["Compulsion"] = field(default_factory=list)
     # Spells this caster can reach: the wizard's book, or nothing for a cleric whose list
     # is their whole class list. Ids, not names — two spells share a name often enough.
-    # A harmful preparation waiting on a blade. One hit and it is gone — a 1e poison is
-    # a dose, not an enchantment. On the actor rather than the weapon entry because
-    # `weapons` is a list of plain strings, and the alternative was giving every torch
-    # and length of rope a coating field.
-    coating: dict = field(default_factory=dict)
     # Minutes since this character last slept, ate and drank. Minutes rather than hours
     # to match `scene.clock_minutes`, so nothing has to convert at the boundary and no
     # half-hour is ever quietly lost to integer division.
@@ -518,21 +522,133 @@ class Actor:
         never-ending buff nothing could clear or a cloak that stopped working after an
         hour. Same four modifier families the effect vocabulary defines, so anything
         an enchantment or a hide can say lands here without a translation table.
+
+        Two sources feed it: crafted records (`worn`), and the magic-item catalogue
+        looked up by the plain string in the slot — the ring of protection the sheet
+        page used to disclaim. A slot past the rules limit contributes nothing: the
+        third ring is worn, not working.
         """
         want = str(target).lower()
         out: list[Modifier] = []
-        for rec in self.worn_items():
-            for spec in rec.get("specs") or []:
-                if not isinstance(spec, dict):
-                    continue
-                if spec.get("type") != kind:
+
+        def read(specs, name: str):
+            for spec in specs or []:
+                if not isinstance(spec, dict) or spec.get("type") != kind:
                     continue
                 if str(spec.get("target", "")).lower() != want:
                     continue
                 amount = int(spec.get("amount", 0) or 0)
                 if amount:
-                    out.append(Modifier(amount, str(rec.get("name") or "worn gear")))
+                    out.append(Modifier(amount, name,
+                                        _bonus_type(spec.get("bonus_type"))))
+
+        crafted = {k for k in self.worn}
+        for rec in self.worn_items():
+            read(rec.get("specs"), str(rec.get("name") or "worn gear"))
+        from . import magicitem
+
+        for slot_key, items in self.slots.items():
+            limit = SLOT_RULES_LIMIT.get(slot_key, 1)
+            for i, item in enumerate(items):
+                if not item or i >= limit:
+                    continue
+                if str(item).strip().lower() in crafted:
+                    continue                    # already read as a crafted record
+                read(magicitem.worn_specs(str(item)), str(item))
         return out
+
+    # --- the effect engine ---------------------------------------------------------
+    #
+    # One applicator and one ticker for everything that lands on a creature and later
+    # stops. The properties below are read-only views: they let two thousand call
+    # sites keep reading `conditions`, `buffs` and `temp_pools` while there is exactly
+    # one list to add to, expire from, and save.
+
+    @property
+    def conditions(self) -> list[Condition]:
+        return [Condition(key=e.key, rounds_left=e.rounds_left, source=e.source)
+                for e in self.effects if e.kind == "condition"]
+
+    @property
+    def buffs(self) -> list[Buff]:
+        out: list[Buff] = []
+        for e in self.effects:
+            if e.kind != "buff":
+                continue
+            for m in e.modifiers:
+                out.append(Buff(kind=str(m.get("kind", "")),
+                                target=str(m.get("target", "")),
+                                amount=int(m.get("amount", 0) or 0),
+                                source=e.source, rounds_left=e.rounds_left,
+                                note=str(m.get("note", ""))))
+        return out
+
+    @property
+    def temp_pools(self) -> list["TempPool"]:
+        return [TempPool(amount=e.amount, source=e.source, rounds_left=e.rounds_left)
+                for e in self.effects if e.kind == "temp_hp"]
+
+    @property
+    def coating(self) -> dict:
+        e = next((x for x in self.effects if x.kind == "coating"), None)
+        return e.payload if e else {}
+
+    @coating.setter
+    def coating(self, value: dict) -> None:
+        """A dose, not an enchantment: at most one, replaced by the next and cleared
+        by the hit that delivers it (`actor.coating = {}`)."""
+        self.effects = [e for e in self.effects if e.kind != "coating"]
+        value = dict(value or {})
+        if value:
+            self.effects.append(ActiveEffect(
+                name=str(value.get("name", "") or "a coating"), kind="coating",
+                source=str(value.get("name", "") or ""), payload=value))
+
+    def apply_effect(self, eff: ActiveEffect) -> ActiveEffect:
+        """The one applicator. Stacking policy: `refresh` finds the copy already here
+        — same kind and identity — and resets its clock and values rather than adding
+        a second; `stack` accumulates. Conditions and pools have their own richer
+        policies and route through `add_condition`/`gain_temp_hp`, which end here."""
+        if eff.stacking == "refresh":
+            for have in self.effects:
+                if (have.kind, have.key or have.name, have.source) == \
+                        (eff.kind, eff.key or eff.name, eff.source):
+                    have.rounds_left = eff.rounds_left
+                    have.duration = eff.duration
+                    have.modifiers = [dict(m) for m in eff.modifiers]
+                    have.tags = tuple(eff.tags)
+                    have.amount = eff.amount
+                    have.payload = dict(eff.payload)
+                    have.periodic = [dict(p) for p in eff.periodic]
+                    return have
+        self.effects.append(eff)
+        return eff
+
+    def remove_effects(self, *, kind: str | None = None, name: str = "",
+                       source: str = "") -> list[ActiveEffect]:
+        """Remove everything matching, returning what went — the contribution of a
+        removed effect evaporates with it, never lingers to be subtracted later."""
+        gone = [e for e in self.effects
+                if (kind is None or e.kind == kind)
+                and (not name or (e.name or e.key).lower() == name.lower())
+                and (not source or e.source.lower() == source.lower())]
+        for e in gone:
+            self.effects.remove(e)
+        return gone
+
+    def tick_effects(self, rounds: int = 1) -> list[str]:
+        """The one ticker. Everything timed expires on the same clock; what ended is
+        returned in the words the old per-mechanism tickers used, because transcripts
+        and tests read them."""
+        ended = []
+        for e in list(self.effects):
+            if e.rounds_left is None:
+                continue
+            e.rounds_left -= rounds
+            if e.rounds_left <= 0:
+                ended.append(e.ended_label)
+                self.effects.remove(e)
+        return ended
 
     # --- basics ------------------------------------------------------------------
 
@@ -716,7 +832,7 @@ class Actor:
         return None
 
     def has_condition(self, key: str) -> bool:
-        return any(c.key == key for c in self.conditions)
+        return any(e.kind == "condition" and e.key == key for e in self.effects)
 
     def has_state(self, query: str) -> bool:
         """Whether any held condition answers a tag query — "state.down",
@@ -729,10 +845,15 @@ class Actor:
         `state.down` whatever its hit points say, and an actor at negative hit points
         with no condition yet recorded still answers through the hp check its callers
         keep — the tag layer widens the old tests, never narrows them.
+
+        Read off the effects' own granted tags rather than re-deriving from condition
+        keys, so *every* effect participates: a stance is `buff.stance.blood-rage`
+        without pretending to be a condition.
         """
         from . import states
 
-        return states.any_match((c.key for c in self.conditions), query)
+        q = (query or "").strip().lower()
+        return any(states.matches(t, q) for e in self.effects for t in e.tags)
 
     # --- condition contributions --------------------------------------------------
 
@@ -803,7 +924,7 @@ class Actor:
 
         mods.extend(self._condition_mods("skills"))
         mods.extend(self._buff_mods("skill_mod", skill))
-        return mods
+        return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
 
@@ -838,7 +959,7 @@ class Actor:
 
         mods.extend(self._condition_mods("saves"))
         mods.extend(self._buff_mods("save_mod", save))
-        return mods
+        return stack(mods)
 
     # --- initiative -------------------------------------------------------------------
 
@@ -855,7 +976,7 @@ class Actor:
                 if bonus:
                     mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
         mods.extend(self._buff_mods("combat_mod", "initiative"))
-        return mods
+        return stack(mods)
 
     # --- attack and damage --------------------------------------------------------------
 
@@ -868,30 +989,43 @@ class Actor:
         """
         from . import weapons as weapons_mod
 
-        wanted = (key or self.equipped or "unarmed").strip().lower()
-        # The armament rides every unarmed strike while it is formed. It used to be a
-        # separately named weapon ("armed punch") the player had to know to pick, and
-        # a live session met the consequence: the panel defaulted to a phantom dagger,
-        # and a Blood Bender with the armament visibly ON was told their swing was
-        # "armed punch" — "it should be unarmed strike and the armament should
-        # automatically know to apply."
-        if wanted in ("unarmed", "unarmed strike", "fist", "fists", "punch") and \
-                self.has_condition("blood armament"):
-            wanted = "armed punch"
-        # The armament's own weapon. Built here rather than in the weapons table
-        # because its damage die is the class table's blood column at this character's
-        # level — a table entry cannot know who is asking. It arms the fist and only
-        # the fist: a held weapon never carries the armament. `armament: True` is the
-        # flag the engine keys on — name comparison broke the moment the display name
-        # started telling the truth.
-        if wanted in ("armed punch", "armed punches", "blood gauntlets"):
-            from . import leveling
+        from . import leveling
 
-            base = dict(weapons_mod.get("unarmed"))
-            base["name"] = "unarmed strike (blood armament)"
-            base["armament"] = True
-            base["damage"] = leveling.table_die(self, "blood") or "1d8"
-            base["type"] = "bludgeoning and piercing"
+        wanted = (key or self.equipped or "unarmed").strip().lower()
+        # A granted weapon rides every unarmed strike while its toggle holds, and
+        # answers to its own aliases whether or not it is formed — the engine's gate
+        # refuses the unformed swing with the forming ability's name, which it cannot
+        # do if the weapon refuses to exist first. This used to be the armament's
+        # hand-written special case (name list, condition, blood column, all in code);
+        # now the class document states the same facts and any class stating them gets
+        # the same weapon. A held weapon never carries a grant: it arms the fist and
+        # only the fist.
+        for g in leveling.granted_weapons(self):
+            w = g["weapon"]
+            aliases = {str(a).lower() for a in (w.get("aliases") or ())}
+            rides_unarmed = (
+                wanted in ("unarmed", "unarmed strike", "fist", "fists", "punch")
+                and w.get("applies_to_unarmed") and g["key"]
+                and self.has_condition(g["key"]))
+            if wanted not in aliases and not rides_unarmed:
+                continue
+            base = dict(weapons_mod.get(str(w.get("base") or "unarmed")))
+            base["name"] = str(w.get("name") or g["ability"])
+            # The die is the class table's own column at this character's level — a
+            # weapons-table entry cannot know who is asking, which is why it is built
+            # here.
+            if w.get("damage_column"):
+                base["damage"] = (leveling.table_die(self, str(w["damage_column"]))
+                                  or str(w.get("fallback_damage") or base["damage"]))
+            if w.get("type"):
+                base["type"] = str(w["type"])
+            for carried in ("rider_column", "damage_label", "proficiency_as"):
+                if w.get(carried):
+                    base[carried] = str(w[carried])
+            # The flags the engine keys on: which toggle must hold, and which ability
+            # forms it — so a refusal can name the fix.
+            base["granted_by"] = g["key"]
+            base["formed_with"] = g["ability"]
             return base
         return weapons_mod.get(wanted)
 
@@ -928,13 +1062,17 @@ class Actor:
         from . import weapons as weapons_mod
 
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
-        # The armament is your own fists with blood over them, so proficiency is the
-        # proficiency you have with your fists. It is not in the weapons table — it is
-        # built on the wearer from the class's blood die — so the table lookup found
-        # nothing, `prof` was None, and a Blood Bender was told they were not proficient
-        # with their own hands: a −4 on every armed punch, visible in the dice popup.
-        if key in ("armed punch", "armed punches", "blood gauntlets"):
-            key = "unarmed"
+        # A granted weapon is your own fists with something over them, so proficiency
+        # is the proficiency the document names (`proficiency_as`, usually unarmed).
+        # It is not in the weapons table — it is built on the wearer from a class
+        # table column — so the table lookup found nothing, `prof` was None, and a
+        # Blood Bender was told they were not proficient with their own hands: a −4
+        # on every armed punch, visible in the dice popup.
+        from . import leveling
+
+        granted = leveling.granted_weapon_named(self, key)
+        if granted:
+            key = str(granted["weapon"].get("proficiency_as") or "unarmed")
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
@@ -1009,7 +1147,7 @@ class Actor:
         if w["category"] == "melee":
             mods.extend(self._condition_mods("melee_attack"))
         mods.extend(self._buff_mods("combat_mod", "attack"))
-        return mods
+        return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
         """How many attacks, at which iteration index. Iteratives are the exact kind of
@@ -1039,7 +1177,11 @@ class Actor:
             _, bonus = self.power_attack_terms(key)
             mods.append(Modifier(bonus, "Power Attack"))
         mods.extend(self._condition_mods("damage"))
-        return mods
+        # The one funnel, which this list alone never read: a `combat_mod` aimed at
+        # damage was accepted, saved, shown on the sheet — and absent from every
+        # damage roll. Found by Blood Rage's +2 damage the day it became a document.
+        mods.extend(self._buff_mods("combat_mod", "damage"))
+        return stack(mods)
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
         if self.flat_damage and weapon_key is None:
@@ -1056,12 +1198,16 @@ class Actor:
         else:
             armour = ARMOUR.get(self.armour, ARMOUR["none"])
             shield = SHIELDS.get(self.shield, SHIELDS["none"])
+            # Typed, so the channels collide as 1e intends: bracers of armour over a
+            # breastplate is the better of the two, not the sum, while a ring's
+            # deflection sits beside either untouched.
             if armour["ac"]:
-                mods.append(Modifier(armour["ac"], armour["name"]))
+                mods.append(Modifier(armour["ac"], armour["name"], "armour"))
             if shield["ac"]:
-                mods.append(Modifier(shield["ac"], shield["name"]))
+                mods.append(Modifier(shield["ac"], shield["name"], "shield"))
             if self.natural_armour:
-                mods.append(Modifier(self.natural_armour, "natural armour"))
+                mods.append(Modifier(self.natural_armour, "natural armour",
+                                     "natural armour"))
 
             loses_dex = flat_footed or any(
                 c.data.get("lose_dex_to_ac") for c in self.conditions
@@ -1083,7 +1229,7 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
-        return mods
+        return stack(mods)
 
     def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed))
@@ -1118,7 +1264,7 @@ class Actor:
                 mods.append(Modifier(2, f"Greater {maneuver.title()}"))
 
         mods.extend(self._condition_mods("attack"))
-        return [m for m in mods if m.value]
+        return stack([m for m in mods if m.value])
 
     def cmd_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
         if self.flat_cmd is not None:
@@ -1140,7 +1286,7 @@ class Actor:
 
         # "Any penalties to a creature's AC also apply to its CMD."
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
-        return [m for m in mods if m.value]
+        return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:
         return sum(m.value for m in self.cmd_modifiers(flat_footed))
@@ -1151,11 +1297,22 @@ class Actor:
 
     @property
     def temp_hp(self) -> int:
-        return sum(p.amount for p in self.temp_pools)
+        return sum(e.amount for e in self.effects if e.kind == "temp_hp")
 
     @property
     def temp_hp_source(self) -> str:
-        return ", ".join(p.source for p in self.temp_pools if p.source)
+        return ", ".join(e.source for e in self.effects
+                         if e.kind == "temp_hp" and e.source)
+
+    def _temp_effects(self) -> list[ActiveEffect]:
+        return [e for e in self.effects if e.kind == "temp_hp"]
+
+    def _new_temp_effect(self, amount: int, source: str,
+                         rounds: int | None) -> ActiveEffect:
+        return ActiveEffect(name=source or "temporary hit points", kind="temp_hp",
+                            source=source, amount=amount,
+                            duration="until-dismissed" if rounds is None else "rounds",
+                            rounds_left=rounds, stacking="stack")
 
     def allows(self, rule: str) -> bool:
         if rule not in ACTOR_RULES:
@@ -1183,14 +1340,14 @@ class Actor:
         `temp_hp.stacks`, where same-source accumulation is the class's whole design.
         """
         amount = max(0, int(amount))
-        existing = next((p for p in self.temp_pools if p.source == source), None)
+        existing = next((e for e in self._temp_effects() if e.source == source), None)
 
         if houserules.magic_stacking() and not self.allows("temp_hp.stacks"):
             if existing:
                 existing.amount, existing.rounds_left = amount, rounds
                 return {"temp_hp": self.temp_hp, "refreshed": True, "source": source,
                         "stacked": True}
-            self.temp_pools.append(TempPool(amount, source, rounds))
+            self.effects.append(self._new_temp_effect(amount, source, rounds))
             return {"temp_hp": self.temp_hp, "added": amount, "source": source,
                     "stacked": True}
 
@@ -1199,18 +1356,20 @@ class Actor:
                 existing.amount += amount
                 existing.rounds_left = rounds
             else:
-                self.temp_pools.append(TempPool(amount, source, rounds))
+                self.effects.append(self._new_temp_effect(amount, source, rounds))
             return {"temp_hp": self.temp_hp, "added": amount, "source": source,
                     "stacked": True}
 
         if existing:
             existing.amount, existing.rounds_left = amount, rounds
-            self.temp_pools = [existing]
+            self.effects = [e for e in self.effects
+                            if e.kind != "temp_hp" or e is existing]
             return {"temp_hp": amount, "refreshed": True, "source": source}
 
         if amount > self.temp_hp:
             was = self.temp_hp
-            self.temp_pools = [TempPool(amount, source, rounds)]
+            self.effects = [e for e in self.effects if e.kind != "temp_hp"]
+            self.effects.append(self._new_temp_effect(amount, source, rounds))
             return {"temp_hp": amount, "replaced": was, "source": source}
         return {"temp_hp": self.temp_hp, "ignored": amount,
                 "source": self.temp_hp_source}
@@ -1223,24 +1382,25 @@ class Actor:
         taken, which is never what a player wants and is invisible when it happens.
         """
         spent = 0
-        order = sorted(self.temp_pools,
-                       key=lambda p: (p.rounds_left is None, p.rounds_left or 0))
+        order = sorted(self._temp_effects(),
+                       key=lambda e: (e.rounds_left is None, e.rounds_left or 0))
         for pool in order:
             if spent >= amount:
                 break
             take = min(pool.amount, amount - spent)
             pool.amount -= take
             spent += take
-        self.temp_pools = [p for p in self.temp_pools if p.amount > 0]
+        self.effects = [e for e in self.effects
+                        if e.kind != "temp_hp" or e.amount > 0]
         return spent
 
     def clear_temp_hp(self, source: str | None = None) -> int:
         """Drop temporary hit points — all of them, or one source's when a buff ends."""
-        if source is None:
-            gone, self.temp_pools = self.temp_hp, []
-            return gone
-        gone = sum(p.amount for p in self.temp_pools if p.source == source)
-        self.temp_pools = [p for p in self.temp_pools if p.source != source]
+        gone = sum(e.amount for e in self._temp_effects()
+                   if source is None or e.source == source)
+        self.effects = [e for e in self.effects
+                        if e.kind != "temp_hp"
+                        or (source is not None and e.source != source)]
         return gone
 
     def heal(self, amount: int) -> int:
@@ -1327,6 +1487,32 @@ class Actor:
             return base + self.temp_hp
         return base
 
+    def _percent_resist(self, amount: int, dtype: str) -> tuple[int, str]:
+        """How much a standing percent-resistance shrugs off, and whose it is.
+
+        Carried in an effect's payload as {"resist": {"against": "physical",
+        "percent": 50}}; "physical" answers for the three weapon types, and a named
+        energy answers for itself. The best single effect applies — percentages do
+        not stack, for the same reason two resist-fire ratings do not.
+        """
+        if amount <= 0:
+            return 0, ""
+        best, why = 0, ""
+        for e in self.effects:
+            r = (e.payload or {}).get("resist")
+            if not isinstance(r, dict):
+                continue
+            pct = int(r.get("percent", 0) or 0)
+            against = str(r.get("against", "")).strip().lower()
+            hits = (against == "physical" and is_physical(dtype)) or (
+                against not in ("", "physical")
+                and normalise_damage_type(against) == normalise_damage_type(dtype))
+            if hits and pct > best:
+                best, why = pct, e.source or e.name
+        # Rounded in the defender's favour: 50% of 7 shrugs off 4, not 3 — half the
+        # blow "resisted" should never leave the bigger half landing.
+        return -(-amount * min(100, best) // 100) if best else 0, why
+
     def take_nonlethal(self, amount: int) -> dict:
         """Non-lethal damage accumulates on its own rather than coming off hit points.
 
@@ -1382,6 +1568,14 @@ class Actor:
         reduced = min(after_type, dr.amount) if dr else 0
         after_dr = after_type - reduced
 
+        # Percent resistance from a standing effect — Blood Bending's "50% resistance
+        # to physical damage while in Blood Rage", promised by the class text and
+        # undeliverable until effects could carry it. The best one applies, same as
+        # every resistance in 1e; it sits after DR because it is a property of the
+        # raging body, not of the armour, and rounds in the defender's favour.
+        factored, factored_by = self._percent_resist(after_dr, dtype)
+        after_dr -= factored
+
         absorbed = self._spend_temp_hp(min(self.temp_hp, after_dr))
         taken = after_dr - absorbed
         # Non-lethal still spends temporary hit points first — they are hit points — but
@@ -1396,6 +1590,7 @@ class Actor:
             # point: "20 fire, half again for vulnerability, 30" has to be readable back.
             "immune": immune, "vulnerable": vulnerable, "resisted": resisted,
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
+            "factored": factored, "factored_by": factored_by if factored else "",
             "absorbed": absorbed, "taken": taken, "lethality": lethality,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
@@ -1608,29 +1803,47 @@ class Actor:
         return took
 
     def add_condition(self, key: str, rounds: int | None = None, source: str = "") -> Condition:
+        """A condition is an effect whose granted tags are its `rules/states.py` entry."""
+        from . import states
+
         key = key.strip().lower()
-        existing = next((c for c in self.conditions if c.key == key), None)
+        existing = next((e for e in self.effects
+                         if e.kind == "condition" and e.key == key), None)
         if existing:
             # Same condition twice does not stack in 1e; the longer duration wins.
             if rounds is not None and (existing.rounds_left is None or rounds > existing.rounds_left):
                 existing.rounds_left = rounds
-            return existing
-        c = Condition(key=key, rounds_left=rounds, source=source)
-        self.conditions.append(c)
-        return c
+            return Condition(key=key, rounds_left=existing.rounds_left,
+                             source=existing.source)
+        self.apply_effect(ActiveEffect(
+            name=CONDITIONS.get(key, {}).get("name", key.title()), kind="condition",
+            key=key, source=source,
+            duration="until-dismissed" if rounds is None else "rounds",
+            rounds_left=rounds, tags=states.tags_for(key)))
+        return Condition(key=key, rounds_left=rounds, source=source)
 
     def add_buff(self, kind: str, target: str, amount: int, source: str = "",
                  rounds: int | None = None, note: str = "") -> "Buff":
         """Grant a timed bonus. Same source on the same roll reapplies, not stacks."""
         kind, target = str(kind).strip(), str(target).strip().lower()
-        for b in self.buffs:
-            if (b.kind, b.target, b.source) == (kind, target, source):
-                b.amount, b.rounds_left, b.note = int(amount), rounds, note
-                return b
-        b = Buff(kind=kind, target=target, amount=int(amount), source=source,
-                 rounds_left=rounds, note=note)
-        self.buffs.append(b)
-        return b
+        for e in self.effects:
+            if e.kind != "buff" or e.source != source or not e.modifiers:
+                continue
+            m = e.modifiers[0]
+            if (m.get("kind"), m.get("target")) == (kind, target):
+                m["amount"], m["note"] = int(amount), note
+                e.rounds_left = rounds
+                e.duration = "until-dismissed" if rounds is None else "rounds"
+                return Buff(kind=kind, target=target, amount=int(amount),
+                            source=source, rounds_left=rounds, note=note)
+        self.effects.append(ActiveEffect(
+            name=source or f"{int(amount):+d} {target}", kind="buff", source=source,
+            duration="until-dismissed" if rounds is None else "rounds",
+            rounds_left=rounds,
+            modifiers=[{"kind": kind, "target": target, "amount": int(amount),
+                        "note": note}]))
+        return Buff(kind=kind, target=target, amount=int(amount), source=source,
+                    rounds_left=rounds, note=note)
 
     def _buff_mods(self, kind: str, target: str) -> list["Modifier"]:
         """Everything timed or worn that moves this number.
@@ -1639,45 +1852,33 @@ class Actor:
         funnel every roll already goes through — saves, skills, attack, AC, initiative.
         Adding it in one place is the difference between an enchanted cloak working
         everywhere and working wherever somebody remembered to ask.
+
+        Read off every effect's modifier list, not only buffs, so an ability's
+        source-tracked bonuses flow through the same funnel and the dice popup keeps
+        naming every number.
         """
-        return [Modifier(b.amount, b.source or "a preparation")
-                for b in self.buffs
-                if b.kind == kind and b.target == str(target).lower() and b.amount] \
-            + self._standing_mods(kind, target)
+        want = str(target).lower()
+        out: list[Modifier] = []
+        for e in self.effects:
+            for m in e.modifiers:
+                amount = int(m.get("amount", 0) or 0)
+                if m.get("kind") == kind and str(m.get("target", "")).lower() == want \
+                        and amount:
+                    out.append(Modifier(amount, e.source or e.name or "a preparation",
+                                        _bonus_type(m.get("bonus_type"))))
+        return out + self._standing_mods(kind, target)
 
     def remove_condition(self, key: str) -> None:
-        self.conditions = [c for c in self.conditions if c.key != key.strip().lower()]
+        key = key.strip().lower()
+        self.effects = [e for e in self.effects
+                        if not (e.kind == "condition" and e.key == key)]
 
     def tick_conditions(self, rounds: int = 1) -> list[str]:
-        """Expire timed conditions and temporary hit points. Returns what ended.
-
-        Temporary hit points tick here too because they expire on the same clock, and a
-        ward that outlives its minute is a character walking around with defences the
-        rules ended several scenes ago.
-        """
-        ended = []
-        for c in list(self.conditions):
-            if c.rounds_left is None:
-                continue
-            c.rounds_left -= rounds
-            if c.rounds_left <= 0:
-                ended.append(c.name)
-                self.conditions.remove(c)
-        for p in list(self.temp_pools):
-            if p.rounds_left is None:
-                continue
-            p.rounds_left -= rounds
-            if p.rounds_left <= 0:
-                ended.append(f"{p.source or 'temporary hit points'} ({p.amount} temp)")
-                self.temp_pools.remove(p)
-        for b in list(self.buffs):
-            if b.rounds_left is None:
-                continue
-            b.rounds_left -= rounds
-            if b.rounds_left <= 0:
-                ended.append(f"{b.source or 'a preparation'} ({b.amount:+d} {b.target})")
-                self.buffs.remove(b)
-        return ended
+        """Expire everything timed. Kept as the name every caller knows; the work is
+        `tick_effects`, the one ticker — conditions, temporary hit points and buffs
+        used to expire in three separate loops here, and a mechanism added without a
+        fourth loop was a mechanism that never wore off."""
+        return self.tick_effects(rounds)
 
     def apply_hp_state(self) -> list[str]:
         """1e's death and unconsciousness thresholds, applied by code so nobody has to
@@ -2403,6 +2604,11 @@ def to_dict(actor: Actor) -> dict:
         "buffs": [{"kind": b.kind, "target": b.target, "amount": b.amount,
                    "source": b.source, "rounds_left": b.rounds_left, "note": b.note}
                   for b in actor.buffs],
+        # The one store, whole. The per-mechanism keys above are kept because older
+        # code and older saves read them, but they are views: an effect that carries
+        # both granted tags and several modifiers — an ability's stance — cannot be
+        # said in them, and this key is where it survives a save.
+        "active_effects": [e.as_dict() for e in actor.effects],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "gender": actor.gender,
@@ -2685,7 +2891,6 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
         compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
-        coating=dict(data.get("coating") or {}),
         awake_minutes=int(data.get("awake_minutes", 0) or 0),
         fed_minutes=int(data.get("fed_minutes", 0) or 0),
         watered_minutes=int(data.get("watered_minutes", 0) or 0),
@@ -2699,7 +2904,6 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         spellbook=list(data.get("spellbook") or []),
         prepared={k: int(v) for k, v in (data.get("prepared") or {}).items()
                   if int(v) > 0},
-        temp_pools=_temp_pools(data),
         ability_damage={k: int(v) for k, v in (data.get("ability_damage") or {}).items()},
         ability_drain={k: int(v) for k, v in (data.get("ability_drain") or {}).items()},
         hit_dice_per_level=int(data.get("hit_dice_per_level", 1) or 1),
@@ -2748,13 +2952,26 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         worn={str(k).strip().lower(): dict(v)
               for k, v in (data.get("worn") or {}).items() if isinstance(v, dict)},
     )
-    for c in data.get("conditions", []):
-        a.add_condition(c if isinstance(c, str) else c["key"],
-                        None if isinstance(c, str) else c.get("rounds_left"))
-    for b in data.get("buffs", []):
-        a.add_buff(b.get("kind", "save_mod"), b.get("target", ""),
-                   b.get("amount", 0), b.get("source", ""),
-                   b.get("rounds_left"), b.get("note", ""))
+    if data.get("active_effects") is not None:
+        # A save this app wrote: the one store carries everything, and the legacy keys
+        # beside it are views of the same facts — loading both would double them.
+        from . import activeeffect
+
+        a.effects = [activeeffect.from_dict(e) for e in data["active_effects"]]
+    else:
+        # An older save, or a hand-written creature: build the store from the
+        # per-mechanism keys it does have.
+        for c in data.get("conditions", []):
+            a.add_condition(c if isinstance(c, str) else c["key"],
+                            None if isinstance(c, str) else c.get("rounds_left"))
+        for b in data.get("buffs", []):
+            a.add_buff(b.get("kind", "save_mod"), b.get("target", ""),
+                       b.get("amount", 0), b.get("source", ""),
+                       b.get("rounds_left"), b.get("note", ""))
+        for p in _temp_pools(data):
+            a.effects.append(a._new_temp_effect(p.amount, p.source, p.rounds_left))
+        if data.get("coating"):
+            a.coating = dict(data["coating"])
     validate(a)
 
     # After validate, so an unknown class is reported as an unknown class rather than as

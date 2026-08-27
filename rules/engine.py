@@ -32,6 +32,7 @@ from . import guards as guards_mod
 from . import reactions
 from . import spells as spells_mod
 from . import weapons as weapons_mod
+from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
@@ -306,6 +307,7 @@ class Scene:
                     a.tick_conditions(1)
                     a.tick_pools(1)
                     compulsion.tick(a, 1)
+                    self._drain_periodic(a)
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
                 ) if r]
@@ -325,6 +327,25 @@ class Scene:
                 self.acted.add(self.initiative[nxt][0])
                 return self.initiative[nxt][0]
         return None                      # nobody left standing
+
+    def _drain_periodic(self, actor: "Actor") -> None:
+        """Run each standing effect's per-round work — today, pool upkeep.
+
+        Blood Rage burns one rage round per round it holds; when the pool runs dry
+        the stance ends and takes its temporary hit points with it, because they were
+        the rage's and not the character's. Declared on the effect (`periodic`), so a
+        homebrew stance with an upkeep gets the same clock without a line here.
+        """
+        for e in list(actor.effects):
+            for p in e.periodic:
+                pool = p.get("spend_pool")
+                if not pool:
+                    continue
+                paid = actor.spend_pool(str(pool), int(p.get("amount", 1) or 1))
+                if not paid.get("ok") and p.get("or_ends") and e in actor.effects:
+                    actor.effects.remove(e)
+                    if e.source:
+                        actor.clear_temp_hp(source=e.source)
 
     # --- things standing in the scene ------------------------------------------------
 
@@ -939,14 +960,18 @@ class Engine:
             )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.equipped or "unarmed"
-            # The armed punch is worn, not carried: it exists while the armament
-            # condition holds and nowhere else, so both the weapons-table check and
-            # the carried-list check would refuse it for the wrong reason.
-            if key in ("armed punch", "armed punches", "blood gauntlets"):
-                if not actor.has_condition("blood armament"):
+            # A granted weapon is worn, not carried: it exists while its toggle holds
+            # and nowhere else, so both the weapons-table check and the carried-list
+            # check would refuse it for the wrong reason. Which grants exist — and
+            # which aliases name them — is the class document's to say.
+            from . import leveling
+
+            granted = leveling.granted_weapon_named(actor, key)
+            if granted is not None:
+                if granted["key"] and not actor.has_condition(granted["key"]):
                     raise IntentError(
-                        "attack: the blood armament is not formed. Use Extracorporeal "
-                        "Blood Armament to form it first.", "legality", index)
+                        f"attack: the {granted['key']} is not formed. Use "
+                        f"{granted['ability']} to form it first.", "legality", index)
             elif not weapons_mod.has(key):
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
@@ -1290,15 +1315,16 @@ class Engine:
         self._ensure_encounter(intent.actor)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
-        # The armament strike exists only while the armament is formed. Refused here
-        # with the toggle's own name, because a swing with a weapon you are not
+        # A granted strike exists only while its toggle is formed. Refused here with
+        # the forming ability's own name, because a swing with a weapon you are not
         # wearing is not a miss — it is a turn that should never have been declared.
         # (A plain unarmed strike never reaches this: `Actor.weapon` only returns the
-        # armament weapon when the ask named it or the condition holds.)
-        if weapon.get("armament") and not actor.has_condition("blood armament"):
+        # granted weapon when the ask named it or the toggle holds.)
+        if weapon.get("granted_by") and not actor.has_condition(weapon["granted_by"]):
             raise IntentError(
-                "attack: the blood armament is not formed. Use Extracorporeal Blood "
-                "Armament to form it first.", "legality")
+                f"attack: the {weapon['granted_by']} is not formed. Use "
+                f"{weapon.get('formed_with', 'its forming ability')} to form it first.",
+                "legality")
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
 
@@ -1428,43 +1454,46 @@ class Engine:
                 mult = weapon["crit_mult"] if state.get("crit") else 1
                 dice_notation = _multiply_dice(weapon["damage"], mult)
                 dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power)
-                if weapon.get("armament"):
+                rider_col = str(weapon.get("rider_column") or "")
+                if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
                     # The fist die used to be an engine-rolled hidden rider — "when
                     # striking with my fist and my armament on i deal fist dmg and
                     # blood dmg but i only roll blood dmg fist gets rolled for me" —
-                    # so it is its own suspended stage now: one popup for the fist,
-                    # one for the blood, each die named. Riders do not multiply on a
-                    # crit, same as 1e treats extra damage dice.
+                    # so it is its own suspended stage now: one popup for the rider,
+                    # one for the main die, each named. Riders do not multiply on a
+                    # crit, same as 1e treats extra damage dice. Which column the
+                    # rider reads is the weapon document's to say, not this file's.
                     from . import leveling as leveling_mod
 
-                    fist = leveling_mod.table_die(actor, "fist") or "1d6"
-                    if "fist_total" not in state:
-                        fist_roll = self._roll_or_suspend_stage(
-                            intent, actor, [], f"Fist die ({fist})", None,
-                            partial, state, fist)
-                        state["fist_total"] = fist_roll.total
-                        state["rolls"].append(fist_roll.as_dict())
+                    rider = leveling_mod.table_die(actor, rider_col) or "1d6"
+                    if "rider_total" not in state:
+                        rider_roll = self._roll_or_suspend_stage(
+                            intent, actor, [], f"{rider_col.title()} die ({rider})",
+                            None, partial, state, rider)
+                        state["rider_total"] = rider_roll.total
+                        state["rolls"].append(rider_roll.as_dict())
                 if mult > 1:
                     dmg_mods = [Modifier(m.value * mult, f"{m.source} x{mult}")
                                 for m in dmg_mods]
-                if weapon.get("armament"):
+                if rider_col:
                     # AFTER the crit scaling, deliberately: a live critical showed
                     # "+12 fist die (1d6) x2" — the rider doubled alongside Str,
                     # while the comment above it promised 1e's rule that extra
                     # damage DICE never multiply. Order is the whole fix.
-                    dmg_mods = dmg_mods + [Modifier(state["fist_total"],
-                                                    f"fist die ({fist})")]
+                    dmg_mods = dmg_mods + [Modifier(state["rider_total"],
+                                                    f"{rider_col} die ({rider})")]
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
-                    # The armament's damage is three named things — Blood DMG + Fist DMG
-                    # + STR — and the label used to say only "armed punch", so a player
-                    # watching 8 damage land could not tell whether the blood die was in
-                    # it. The blood die is this roll; the fist die was the popup before.
-                    (f"Blood die ({weapon['damage']})"
-                     if weapon.get("armament") else f"Damage ({weapon['name']}")
+                    # A granted weapon's damage is several named things — Blood DMG +
+                    # Fist DMG + STR — and the label used to say only "armed punch",
+                    # so a player watching 8 damage land could not tell whether the
+                    # blood die was in it. The document's own label names this roll;
+                    # the rider die was the popup before.
+                    (f"{weapon['damage_label']} ({weapon['damage']})"
+                     if weapon.get("damage_label") else f"Damage ({weapon['name']}")
                     + (" — CRITICAL" if mult > 1 else "")
-                    + ("" if weapon.get("armament") else ")"),
+                    + ("" if weapon.get("damage_label") else ")"),
                     None, partial, state, dice_notation,
                 )
                 state["rolls"].append(dmg.as_dict())
@@ -3132,8 +3161,10 @@ class Engine:
 
         found: list = []
         if who is not None:
-            found += [b for b in who.buffs if matches(b.source)]
-            found += [c for c in who.conditions if matches(c.source)]
+            # The effect records themselves, not the read-only condition/buff views:
+            # a dispel has to move a real clock, and the views are copies.
+            found += [e for e in who.effects
+                      if e.kind in ("buff", "condition") and matches(e.source)]
         found += [m for m in self.scene.manifests if matches(m.source)]
         return found
 
@@ -3151,10 +3182,8 @@ class Engine:
                 self.scene.lift(holder)
             else:
                 for owner in self.scene.actors.values():
-                    if holder in owner.buffs:
-                        owner.buffs.remove(holder)
-                    elif holder in owner.conditions:
-                        owner.conditions.remove(holder)
+                    if holder in owner.effects:
+                        owner.effects.remove(holder)
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
 
     def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
@@ -3737,23 +3766,49 @@ class Engine:
         # off, and the state lives as a clockless condition so every place that shows
         # conditions shows whether it holds — which is the whole point: the armament
         # used to be fire-and-forget with nothing on screen saying if it still held.
+        #
+        # An ability with a document (`paths.<path>.grants`) carries its requirements,
+        # cost, modifiers, granted tags and tells as data; the engine applies them
+        # here without knowing whose class they came from.
         key = leveling.toggle_key(actor, found)
+        doc_path, doc = leveling.ability_doc(actor, found)
         if key:
             if actor.has_condition(key):
-                actor.remove_condition(key)
+                self._drop_stance(actor, key, doc)
                 return Outcome(
                     intent_id=intent.id, op="use_ability",
                     effects=[{"ref": actor.ref, "kind": "toggle", "state": "off",
                               "condition": key}],
-                    tell=f"{actor.name} lets the {key} fall away.",
+                    tell=_doc_tell(doc.get("tell_off"), actor)
+                         or f"{actor.name} lets the {key} fall away.",
                     because=intent.because)
-            actor.add_condition(key, rounds=None, source=found)
+            # Requirements and cost are checked before anything lands, and a failure
+            # is a refusal Outcome with the reason printed — never an IntentError.
+            # The schema may REQUIRE the op the player declared, and a hard refusal
+            # against a required op is the 502 death-spiral this repo has buried four
+            # times (see _op_forage's own post-mortem).
+            refused = self._ability_refusal(actor, found, doc)
+            if refused:
+                return Outcome(intent_id=intent.id, op="use_ability", effects=[],
+                               tell=f"Nothing takes hold. {refused}",
+                               because=intent.because)
+            spent = []
+            cost = doc.get("cost") or {}
+            if cost.get("pool"):
+                paid = actor.spend_pool(str(cost["pool"]),
+                                        int(cost.get("amount", 1) or 1))
+                spent.append({"ref": actor.ref, "kind": "resource",
+                              "pool": str(cost["pool"]),
+                              "spent": paid.get("spent", 0),
+                              "left": paid.get("current", 0)})
+            applied = self._apply_ability_document(actor, found, key, doc_path, doc)
             return Outcome(
                 intent_id=intent.id, op="use_ability",
                 effects=[{"ref": actor.ref, "kind": "toggle", "state": "on",
-                          "condition": key}],
-                tell=(f"{actor.name} forms the {key}. "
-                      f"The armed punch is ready as an attack."),
+                          "condition": key}] + spent + applied["effects"],
+                tell=_doc_tell(doc.get("tell"), actor)
+                     or f"{actor.name} forms the {key}."
+                        + (" " + applied["said"] if applied["said"] else ""),
                 because=intent.because)
         if not effects:
             tier = leveling.tier_needed(actor, wanted)
@@ -3836,6 +3891,111 @@ class Engine:
                       "path": path, "resolved": len(done), "narrated": len(narrated)}],
             tell=" ".join(bits), because=intent.because,
         )
+
+    def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
+        """Why this ability cannot be used right now, as a printable sentence — or "".
+
+        Requirements are tag queries against the one vocabulary, and the answer is a
+        graceful refusal in the untrained-check / busy-forage shape: the reason is
+        something the player could not have known, so it is printed, not raised.
+        """
+        for q in doc.get("requires") or ():
+            if not actor.has_state(str(q)):
+                return (f"{found.title()} needs {q} to hold on {actor.name}, "
+                        f"and it does not.")
+        for q in doc.get("requires_not") or ():
+            if actor.has_state(str(q)):
+                return f"{found.title()} cannot be used while {q} holds on {actor.name}."
+        cost = doc.get("cost") or {}
+        if cost.get("pool"):
+            pool = actor.pool(str(cost["pool"]))
+            need = int(cost.get("amount", 1) or 1)
+            if pool is None or pool.current < need:
+                have = 0 if pool is None else pool.current
+                return (f"{found.title()} costs {need} from the {cost['pool']} pool "
+                        f"and {actor.name} has {have}.")
+            if not pool.ready:
+                return (f"The {cost['pool']} pool recharges in {pool.cooldown_left} "
+                        f"round{'' if pool.cooldown_left == 1 else 's'}.")
+        return ""
+
+    def _apply_ability_document(self, actor: Actor, found: str, key: str,
+                                path: str, doc: dict) -> dict:
+        """Apply a document's standing half: one ActiveEffect through the one
+        applicator, plus any temporary hit points it banks. Returns the effect
+        records and a sentence for the tell."""
+        from . import leveling, states
+
+        effects: list[dict] = []
+        said: list[str] = []
+
+        mods: list[dict] = []
+        for spec in doc.get("modifiers") or ():
+            r = leveling.resolve_effect(dict(spec), actor, path)
+            if r.get("inactive"):
+                continue
+            amount = int(r.get("amount", 0) or 0)
+            if not amount:
+                continue
+            mods.append({"kind": str(r.get("type") or "combat_mod"),
+                         "target": str(r.get("target") or ""),
+                         "amount": amount,
+                         "bonus_type": str(r.get("bonus_type") or "untyped")})
+            said.append(f"{amount:+d} {r.get('target')}")
+
+        tags = tuple(states.tags_for(key)) if key else ()
+        tags += tuple(str(t) for t in (doc.get("tags") or ())
+                      if str(t) not in tags)
+        periodic = []
+        drain = doc.get("drain") or {}
+        if drain.get("pool"):
+            periodic.append({"spend_pool": str(drain["pool"]),
+                             "amount": int(drain.get("amount", 1) or 1),
+                             "or_ends": True})
+        payload = {}
+        if isinstance(doc.get("weapon"), dict):
+            payload["weapon"] = dict(doc["weapon"])
+        if isinstance(doc.get("resist"), dict):
+            # Percent resistance, tier-scaled like everything else — Blood Rage
+            # Armor's 50% arrives at the rung the class file says, not before.
+            r = leveling.resolve_effect(dict(doc["resist"]), actor, path)
+            pct = int(r.get("percent", 0) or 0)
+            if pct > 0 and not r.get("inactive"):
+                against = str(r.get("against", "physical") or "physical")
+                payload["resist"] = {"against": against, "percent": pct}
+                said.append(f"{pct}% resistance to {against} damage")
+
+        actor.apply_effect(ActiveEffect(
+            name=found.title(), kind="condition", key=key, source=found.title(),
+            tags=tags, modifiers=mods, payload=payload, periodic=periodic))
+        if mods:
+            effects.append({"ref": actor.ref, "kind": "stance", "ability": found,
+                            "modifiers": list(mods)})
+
+        temp = doc.get("temp_hp") or {}
+        if temp:
+            r = leveling.resolve_effect(dict(temp), actor, path)
+            per_hd = int(r.get("per_hit_die", 0) or 0)
+            amount = per_hd * actor.hit_dice
+            if amount > 0 and not r.get("inactive"):
+                got = actor.gain_temp_hp(amount, source=found.title())
+                effects.append({"ref": actor.ref, "kind": "temp_hp",
+                                "temp_hp": actor.temp_hp, **got})
+                said.append(f"{amount} temporary hit points "
+                            f"({per_hd} per Hit Die)")
+        return {"effects": effects,
+                "said": ("It carries " + ", ".join(said) + "." if said else "")}
+
+    def _drop_stance(self, actor: Actor, key: str, doc: dict) -> None:
+        """The other half of the applicator: removal evaporates everything the
+        document granted — modifiers, tags, and the temporary hit points that were
+        the stance's and not the character's."""
+        eff = next((e for e in actor.effects
+                    if e.kind == "condition" and e.key == key), None)
+        source = eff.source if eff else ""
+        actor.remove_condition(key)
+        if (doc.get("temp_hp") or {}) and source:
+            actor.clear_temp_hp(source=source)
 
     def _op_blood_pool(self, intent: Intent, partial: dict) -> Outcome:
         """Put blood on the ground.
@@ -4319,6 +4479,22 @@ def survival_note(toll) -> str:
     return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
 
 
+def _doc_tell(template, actor) -> str:
+    """An ability document's own tell, with the actor's name in it.
+
+    The document writes `{name}` and nothing else — a template that names a number
+    would be a mechanic authored into prose, which is exactly what the severed-tells
+    rule exists to stop. A malformed template falls back to its literal text rather
+    than crashing the turn.
+    """
+    if not template:
+        return ""
+    try:
+        return str(template).format(name=actor.name)
+    except (KeyError, IndexError, ValueError):
+        return str(template)
+
+
 def _ward_tell(scene: Scene, e: dict) -> str:
     """One thing a standing effect did, in the voice the rest of the log is written in.
 
@@ -4361,6 +4537,10 @@ def _damage_note(d: dict) -> str:
     bits = []
     if d["reduced"]:
         bits.append(f"less {d['reduced_by']} ({d['reduced']})")
+    if d.get("factored"):
+        # Percent resistance is the third way damage vanishes, and it must say so
+        # for the same reason DR does — the GM narrates the number that landed.
+        bits.append(f"{d['factored']} shrugged off by {d.get('factored_by') or 'resistance'}")
     if d["absorbed"]:
         bits.append(f"{d['absorbed']} off temporary")
     if d.get("lethality") == "nonlethal" and d.get("taken"):

@@ -113,9 +113,11 @@ def test_the_panel_offers_the_fists_only_while_formed_and_only_beside_a_weapon()
     pc.equipped = "unarmed"
     assert _attack_slots(pc)["weapons"] == ["unarmed"]
     # And the single entry really is the armament strike while the toggle holds.
-    assert pc.weapon("unarmed").get("armament") is True
+    # (`granted_by` replaced the old `armament: True` flag when the weapon became a
+    # class-document grant — the flag now says which toggle formed it.)
+    assert pc.weapon("unarmed").get("granted_by") == "blood armament"
     pc.remove_condition("blood armament")
-    assert pc.weapon("unarmed").get("armament") is None
+    assert pc.weapon("unarmed").get("granted_by") is None
 
 
 def test_the_ability_button_reports_its_state():
@@ -314,7 +316,7 @@ def test_the_unarmed_strike_wears_the_armament_automatically():
     pc.equipped = "unarmed"
     pc.add_condition("blood armament", rounds=None, source="test")
     w = pc.weapon(None)
-    assert w.get("armament") is True
+    assert w.get("granted_by") == "blood armament"
     assert w["name"] == "unarmed strike (blood armament)"
     pc.remove_condition("blood armament")
-    assert pc.weapon(None).get("armament") is None
+    assert pc.weapon(None).get("granted_by") is None

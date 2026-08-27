@@ -987,65 +987,6 @@
       "dice": "50"
      }
     ],
-    "Blood Rage": [
-     {
-      "type": "temp_hp",
-      "dice": "2",
-      "source": "Blood Rage"
-     },
-     {
-      "type": "temp_hp",
-      "dice": "3",
-      "source": "Blood Rage"
-     },
-     {
-      "type": "temp_hp",
-      "dice": "4",
-      "source": "Blood Rage"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 2,
-      "target": "attack",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 2,
-      "target": "damage",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 3,
-      "target": "attack",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 3,
-      "target": "damage",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 4,
-      "target": "attack",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": 4,
-      "target": "damage",
-      "bonus_type": "untyped"
-     },
-     {
-      "type": "combat_mod",
-      "amount": -2,
-      "target": "ac",
-      "bonus_type": "untyped"
-     }
-    ],
     "Blood Burst": [
      {
       "type": "save_gate",
@@ -1062,9 +1003,6 @@
     ]
    },
    "needs": {
-    "Blood Rage": [
-     "temporary hit points scaled per Hit Die"
-    ],
     "Blood Burst": [
      "a save DC computed from level and Constitution"
     ],
@@ -1075,10 +1013,54 @@
    "effects_converted": true,
    "passive": [
     "Swift Strikes",
-    "Uncanny Dodge"
+    "Uncanny Dodge",
+    "Extracorporeal Blood Rage Armor"
    ],
    "toggles": {
-    "Extracorporeal Blood Armament": "blood armament"
+    "Extracorporeal Blood Armament": "blood armament",
+    "Blood Rage": "blood rage"
+   },
+   "grants": {
+    "Extracorporeal Blood Armament": {
+     "action": "free",
+     "weapon": {
+      "aliases": ["armed punch", "armed punches", "blood gauntlets"],
+      "applies_to_unarmed": true,
+      "base": "unarmed",
+      "name": "unarmed strike (blood armament)",
+      "damage_column": "blood",
+      "fallback_damage": "1d8",
+      "damage_label": "Blood die",
+      "rider_column": "fist",
+      "type": "bludgeoning and piercing",
+      "proficiency_as": "unarmed"
+     },
+     "tell": "{name} forms the blood armament. The armed punch is ready as an attack."
+    },
+    "Blood Rage": {
+     "action": "free",
+     "cost": {"pool": "rage", "amount": 1},
+     "drain": {"pool": "rage", "amount": 1},
+     "requires_not": ["state.impaired.fatigued", "state.impaired.exhausted"],
+     "_requires_note": "The Core Rulebook's own rage clause — 'A barbarian cannot enter a new rage while fatigued or exhausted' — which is the rule this class's rage is written against.",
+     "modifiers": [
+      {"type": "combat_mod", "target": "attack", "bonus_type": "morale",
+       "scales_by": "control_blood",
+       "by_tier": {"1": {"amount": 2}, "3": {"amount": 3}, "5": {"amount": 4}}},
+      {"type": "combat_mod", "target": "damage", "bonus_type": "morale",
+       "scales_by": "control_blood",
+       "by_tier": {"1": {"amount": 2}, "3": {"amount": 3}, "5": {"amount": 4}}},
+      {"type": "combat_mod", "target": "ac", "amount": -2, "bonus_type": "untyped"}
+     ],
+     "temp_hp": {"scales_by": "control_blood",
+      "by_tier": {"1": {"per_hit_die": 2}, "3": {"per_hit_die": 3},
+                  "5": {"per_hit_die": 4}}},
+     "resist": {"scales_by": "control_blood",
+      "by_tier": {"3": {"against": "physical", "percent": 50}}},
+     "_resist_note": "Extracorporeal Blood Rage Armor, tier 3: 'Gain 50% resistance to physical damage while in Blood Rage.' It is a property of the rage, so it rides the rage's own document and arrives at the tier the armor unlocks.",
+     "tell": "{name} enters Blood Rage: the pulse rises and the blood answers.",
+     "tell_off": "{name} lets the rage drain away, and its borrowed vigour with it."
+    }
    }
   }
  },

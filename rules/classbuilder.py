@@ -289,6 +289,17 @@ PATH_FIELDS = (
                help="A standing state with no clock. The condition name shows wherever "
                     "conditions do, so the player can see whether it still holds.",
                example="Extracorporeal Blood Armament → blood armament"),
+    ClassField("grants", "Ability documents", type="map", key_label="Ability",
+               value_label="Its document", advanced=True,
+               consumer="rules/leveling.py:ability_doc → "
+                        "rules/engine.py:_op_use_ability",
+               help="The full grammar for an ability, keyed by the resolved name: "
+                    "requirements as tag queries (requires / requires_not), a pool "
+                    "cost and per-round drain, granted tags, source-tracked modifiers "
+                    "(scaled by tier if by_tier says so), temporary hit points per "
+                    "Hit Die, a granted weapon, and the tells. An ability with "
+                    "standing parts must also be a toggle, or nothing could ever "
+                    "remove it."),
     ClassField("upgrades", "Upgrades", type="map", key_label="Upgraded name",
                value_label="What the upgrade changes", advanced=True,
                consumer="the Class tab",
@@ -829,6 +840,127 @@ def _validate_paths(d: dict, columns, problems: list[str]) -> None:
             for i, spec in enumerate(specs):
                 problems.extend(
                     validate_effect(spec, f"{at}.effects.{name}[{i}]", columns))
+
+        _validate_grants(d, path, at, resolved_names, abilities, columns, problems)
+
+
+_MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod")
+
+
+def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
+                     abilities: dict, columns, problems: list[str]) -> None:
+    """Stage 3's grammar, checked with the fix named rather than the fault.
+
+    A document that fails here would otherwise fail silently in play — an ability
+    whose cost names a pool the class never declares is an ability that always
+    refuses, with nothing anywhere saying why.
+    """
+    grants = path.get("grants") or {}
+    if not isinstance(grants, dict):
+        problems.append(f"{at}.grants: write grants as a map of resolved ability name "
+                        f"→ document.")
+        return
+    pool_ids = {str(p.get("id", "")).lower() for p in (d.get("pools") or [])
+                if isinstance(p, dict)}
+    toggled = {str(v).lower() for v in (path.get("toggles") or {}).values()}
+    toggle_names = {str(k) for k in (path.get("toggles") or {})}
+
+    for name, doc in grants.items():
+        gat = f"{at}.grants.{name}"
+        if str(name) not in resolved_names and str(name) not in abilities:
+            problems.append(
+                f"{gat}: {str(name)!r} is not an ability of this path, so the document "
+                f"never applies. Grants are keyed by the *resolved* name — the "
+                f"right-hand side of resolves.")
+        if not isinstance(doc, dict):
+            problems.append(f"{gat}: a document is an object.")
+            continue
+        for field_name in ("requires", "requires_not", "tags"):
+            got = doc.get(field_name)
+            if got is not None and (not isinstance(got, (list, tuple)) or
+                                    any(not str(q).strip() for q in got)):
+                problems.append(
+                    f"{gat}.{field_name}: a list of tag queries, like "
+                    f"\"state.impaired.fatigued\" — dot-paths from rules/states.py.")
+        for field_name in ("cost", "drain"):
+            got = doc.get(field_name)
+            if got is None:
+                continue
+            if not isinstance(got, dict) or not str(got.get("pool", "")).strip():
+                problems.append(
+                    f"{gat}.{field_name}: needs a pool — {{\"pool\": \"rage\", "
+                    f"\"amount\": 1}}.")
+                continue
+            if pool_ids and str(got["pool"]).lower() not in pool_ids:
+                problems.append(
+                    f"{gat}.{field_name}: this class declares no pool called "
+                    f"{got['pool']!r}, so the ability would always refuse. Declare the "
+                    f"pool under pools, or name one of: "
+                    f"{', '.join(sorted(pool_ids))}.")
+            if _int(got.get("amount", 1)) is None:
+                problems.append(f"{gat}.{field_name}: amount must be a number.")
+        for i, spec in enumerate(doc.get("modifiers") or []):
+            if not isinstance(spec, dict) or \
+                    str(spec.get("type", "")) not in _MOD_TYPES:
+                problems.append(
+                    f"{gat}.modifiers[{i}]: a document's modifiers are the four "
+                    f"modifier types — {', '.join(_MOD_TYPES)} — because they ride "
+                    f"the sheet's own modifier lists.")
+                continue
+            problems.extend(validate_effect(spec, f"{gat}.modifiers[{i}]", columns))
+        temp = doc.get("temp_hp")
+        if temp is not None:
+            rungs = (temp.get("by_tier") or {}) if isinstance(temp, dict) else {}
+            flat = temp.get("per_hit_die") if isinstance(temp, dict) else None
+            per_hd = list(rungs.values()) + ([{"per_hit_die": flat}]
+                                             if flat is not None else [])
+            if not isinstance(temp, dict) or not per_hd or any(
+                    not isinstance(r, dict) or _int(r.get("per_hit_die")) is None
+                    for r in per_hd):
+                problems.append(
+                    f"{gat}.temp_hp: needs per_hit_die as a number — flat "
+                    f"({{\"per_hit_die\": 2}}) or tiered ({{\"by_tier\": {{\"1\": "
+                    f"{{\"per_hit_die\": 2}}}}}}).")
+        resist = doc.get("resist")
+        if resist is not None:
+            rungs = (resist.get("by_tier") or {}) if isinstance(resist, dict) else {}
+            flat = ([resist] if isinstance(resist, dict)
+                    and resist.get("percent") is not None else [])
+            entries = list(rungs.values()) + flat
+            if not isinstance(resist, dict) or not entries or any(
+                    not isinstance(r, dict)
+                    or _int(r.get("percent")) is None
+                    or not str(r.get("against", "physical")).strip()
+                    for r in entries):
+                problems.append(
+                    f"{gat}.resist: needs a percent and what it is against — "
+                    f"{{\"against\": \"physical\", \"percent\": 50}}, flat or under "
+                    f"by_tier. \"physical\" covers the three weapon types; a named "
+                    f"energy covers itself.")
+        weapon = doc.get("weapon")
+        if weapon is not None:
+            if not isinstance(weapon, dict):
+                problems.append(f"{gat}.weapon: a granted weapon is an object.")
+            else:
+                col = str(weapon.get("damage_column") or "")
+                if col and columns and col not in columns:
+                    problems.append(
+                        f"{gat}.weapon: no column called {col!r} on this class's level "
+                        f"table. Add it to the levels, or pick one of: "
+                        f"{', '.join(sorted(columns)) or 'none are declared'}.")
+                if not str(weapon.get("name", "")).strip():
+                    problems.append(
+                        f"{gat}.weapon: needs a name — what the dice popup and the "
+                        f"attack panel call the strike.")
+        standing = any(doc.get(k) for k in ("modifiers", "temp_hp", "weapon",
+                                            "tags", "drain", "resist"))
+        if standing and str(name) not in toggle_names:
+            problems.append(
+                f"{gat}: this document has standing parts (modifiers, tags, a weapon, "
+                f"temporary hit points or a drain) but {str(name)!r} is not in "
+                f"toggles, so nothing could ever remove what it applies. Add it to "
+                f"toggles with the condition name the sheet should show.")
+        _ = toggled  # the condition names themselves are free text, checked by toggles
 
 
 def validate_class(d: dict) -> list[str]:
