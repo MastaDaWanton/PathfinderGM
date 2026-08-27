@@ -4282,9 +4282,18 @@ class Engine:
         return actor
 
     def _op_spawn(self, intent: Intent, partial: dict) -> Outcome:
+        from .bestiary import split_collective_name
+
+        # "pair of guards" is two guards, not one creature with a plural name —
+        # measured live as a single 11-hp actor the scene panel called a pair.
+        count = int(intent.params.get("count", 1))
+        name = intent.params.get("name")
+        if name:
+            in_name, singular = split_collective_name(str(name))
+            if in_name > 1:
+                count, name = max(count, in_name), singular
         made = self._bring_in(
-            intent.params["template"], count=int(intent.params.get("count", 1)),
-            name=intent.params.get("name"),
+            intent.params["template"], count=count, name=name,
             from_entity_id=intent.params.get("from_entity_id"),
         )
         # How close they arrive. Without this everything spawned defaulted to `near`,

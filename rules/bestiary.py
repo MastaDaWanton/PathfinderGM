@@ -24,6 +24,7 @@ type. `tools/tag_creature_biomes.py` writes them and `biomes_inferred` marks eve
 from __future__ import annotations
 
 import json
+import re
 from difflib import get_close_matches
 from pathlib import Path
 
@@ -120,6 +121,40 @@ KITS: dict[str, dict] = {
     "kit.merchant-guard": {"wealth": "2d6 sp",
                            "pockets": ["ledger scrap", "brass token", "rations"]},
 }
+
+
+_COLLECTIVE_NAME = re.compile(
+    r"^(?:a\s+|the\s+)?(pair|couple|duo|two|trio|three|four|five|six|group|band|"
+    r"gang|mob|pack|squad|patrol|crowd|bunch)\s+of\s+(.+)$", re.I)
+_COLLECTIVE_COUNTS = {"pair": 2, "couple": 2, "duo": 2, "two": 2, "trio": 3,
+                      "three": 3, "four": 4, "five": 5, "six": 6}
+
+
+def split_collective_name(name: str) -> tuple[int, str]:
+    """"pair of guards" is two guards, not one creature with a plural name.
+
+    Measured live: the GM spawned a single 11-hp actor called "pair of guards" and
+    the player fought half as many people as the fiction described — the collective
+    walked through the count=1 path with nobody reading the name. Returns
+    (count, singular) for a collective name, (1, name) untouched otherwise. An
+    unlisted collective (group, gang, mob...) means four, matching the fight
+    injector's own reading of a crowd.
+    """
+    m = _COLLECTIVE_NAME.match(str(name or "").strip())
+    if not m:
+        return 1, str(name or "")
+    count = _COLLECTIVE_COUNTS.get(m.group(1).lower(), 4)
+    plural = m.group(2).strip()
+    singular = {"wolves": "wolf", "thieves": "thief", "knives": "knife"}.get(
+        plural.lower())
+    if singular is None:
+        if plural.lower().endswith("men"):
+            singular = plural[:-3] + "man"
+        elif plural.lower().endswith("s") and not plural.lower().endswith("ss"):
+            singular = plural[:-1]
+        else:
+            singular = plural
+    return count, singular
 
 
 class UnknownTemplate(KeyError):

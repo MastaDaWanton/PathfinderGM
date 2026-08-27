@@ -1085,3 +1085,29 @@ def test_press_the_death_slips_in_before_the_hand_back():
         [{"name": "the thug", "margin": 1, "hp_max": 13}])
     assert out.endswith("What do you do next?")
     assert "drops, dead" in out
+
+
+def test_a_pair_of_guards_is_two_guards():
+    """Measured live: the scene panel showed a single 11-hp actor named "pair of
+    guards" holding a doorway two men wide. A collective name entering the spawn op
+    splits into its count and its singular at the one chokepoint every creature
+    arrives by."""
+    from rules.bestiary import split_collective_name
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    assert split_collective_name("pair of guards") == (2, "guard")
+    assert split_collective_name("a group of clansmen") == (4, "clansman")
+    assert split_collective_name("three wolves") == (1, "three wolves")  # no "of"
+    assert split_collective_name("pack of wolves") == (4, "wolf")
+    assert split_collective_name("the watchman") == (1, "the watchman")
+
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    e = Engine(s, Dice(seed=2))
+    out = e.run(e.validate([{"op": "spawn", "because": "t",
+                             "params": {"template": "watchman",
+                                        "name": "pair of guards"}}])).outcomes[0]
+    made = out.effects[0]["actors"]
+    assert len(made) == 2
+    assert all(m["name"] == "guard" for m in made)
