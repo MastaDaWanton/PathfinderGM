@@ -483,7 +483,8 @@ def inject_fight(raw_intents, player_text: str, scene):
     # at a body while the well-thing existed only in sentences. A dead target means
     # the fight still needs making.
     living = {r for r, a in (getattr(scene, "actors", {}) or {}).items()
-              if not getattr(a, "is_pc", False) and getattr(a, "hp", 0) > 0}
+              if not getattr(a, "is_pc", False) and getattr(a, "hp", 0) > 0
+              and not a.has_state("state.down")}
     for raw in raw_intents:
         if not isinstance(raw, dict):
             continue
@@ -1229,8 +1230,9 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
     if not isinstance(raw_intents, list) or scene is None:
         return None
     dead = {r for r, a in scene.actors.items()
-            if not a.is_pc and a.hp <= 0}
-    living = [r for r, a in scene.actors.items() if not a.is_pc and a.hp > 0]
+            if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))}
+    living = [r for r, a in scene.actors.items()
+              if not a.is_pc and a.hp > 0 and not a.has_state("state.down")]
     targets_dead = [r for r in raw_intents
                     if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
                     and str(r.get("target", "")) in dead]
@@ -1624,7 +1626,7 @@ def inject_loot(raw_intents, player_text: str, scene) -> list:
     if pc is None:
         return raw_intents
     bodies = [ref for ref, a in scene.actors.items()
-              if not a.is_pc and (a.hp <= 0 or a.has_condition("unconscious"))]
+              if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))]
 
     # Repair before append: the schema REQUIRES the loot the player declared, so the
     # model emits one — and on the second turn of a live session it emitted it with no

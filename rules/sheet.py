@@ -718,6 +718,22 @@ class Actor:
     def has_condition(self, key: str) -> bool:
         return any(c.key == key for c in self.conditions)
 
+    def has_state(self, query: str) -> bool:
+        """Whether any held condition answers a tag query — "state.down",
+        "state.unable", "buff.stance" — by exact match or dot-boundary prefix.
+
+        The vocabulary lives in `rules.states`; this is the one question the flat
+        string checks kept answering differently (lootability, the walking-dead cut,
+        can-act all hand-rolled their own tests of hp and key equality). Death is
+        deliberately part of the answer: a corpse with the `dead` condition is
+        `state.down` whatever its hit points say, and an actor at negative hit points
+        with no condition yet recorded still answers through the hp check its callers
+        keep — the tag layer widens the old tests, never narrows them.
+        """
+        from . import states
+
+        return states.any_match((c.key for c in self.conditions), query)
+
     # --- condition contributions --------------------------------------------------
 
     def concealment(self) -> tuple[int, str]:

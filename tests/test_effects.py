@@ -213,3 +213,54 @@ def test_an_effect_says_which_ingredient_it_came_from(shelf):
     r = crafting.preview("herbalist", 1,
                          Chain("herbalist", ["grind"], ["leechwort"]))
     assert all(e.startswith("Leechwort: ") for e in r.effects)
+
+
+
+# --- the state vocabulary (docs/states-effects-tells.md, stage 1) -------------------------
+
+def test_every_shipped_condition_speaks_the_vocabulary():
+    """Flat condition strings made every question its own hand-rolled test, and three
+    of them drifted in live play: lootability, the walking-dead prose cut and can-act
+    each checked hp and string equality their own way — a petrified actor was lootable
+    by one and alive by another. One prefix query now answers each family, and every
+    condition the table ships grants at least one tag."""
+    from rules import states
+    from rules.tables import CONDITIONS
+
+    for key in CONDITIONS:
+        assert states.tags_for(key), key
+        assert not states.tags_for(key)[0].startswith("condition."), (
+            f"{key} is shipped and must be placed in the hierarchy, not self-tagged")
+
+    assert states.any_match(["dead"], "state.down")
+    assert states.any_match(["petrified"], "state.down")
+    assert states.any_match(["stunned"], "state.unable")
+    assert not states.any_match(["stunned"], "state.down")
+    assert not states.any_match(["prone"], "state.down")
+    # Dot-boundary, not substring: state.downhill would be a different place.
+    assert not states.matches("state.downhill", "state.down")
+    # Homebrew self-tags and participates the day it is written.
+    assert states.tags_for("crystallized") == ("condition.crystallized",)
+
+
+def test_the_drifted_questions_now_share_one_answer():
+    """The petrified man: hp positive, utterly beyond objecting. The old loot gate
+    (hp <= 0 or unconscious) refused to strip him; the vocabulary answers
+    state.down and the engine follows it."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    statue = instantiate("thug", scene=scene, name="the petrified thug")
+    scene.add(statue)
+    statue.add_condition("petrified", rounds=None, source="test")
+    assert statue.hp > 0 and statue.has_state("state.down")
+
+    out = Engine(scene, Dice(seed=3)).run(
+        Engine(scene, Dice(seed=3)).validate(
+            [{"op": "loot", "actor": "pc", "params": {"from": statue.ref},
+              "because": "chiselling"}])).outcomes[0]
+    assert out.effects and out.effects[0]["kind"] == "took"

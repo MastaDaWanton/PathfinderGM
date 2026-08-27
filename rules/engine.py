@@ -2212,7 +2212,7 @@ class Engine:
         body = self.scene.actors.get(str(intent.params.get("from_", "")))
         if body is None:
             raise IntentError("loot: no such body here", "refs")
-        if body.hp > 0 and not body.has_condition("unconscious"):
+        if body.hp > 0 and not body.has_state("state.down"):
             return Outcome(
                 intent_id=intent.id, op="loot", effects=[],
                 tell=(f"{body.name} is on their feet and very much attached to their "
