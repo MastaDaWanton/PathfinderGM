@@ -1264,6 +1264,10 @@ class Actor:
                 mods.append(Modifier(2, f"Greater {maneuver.title()}"))
 
         mods.extend(self._condition_mods("attack"))
+        # The one funnel, which this list alone never read — the same gap
+        # damage_modifiers had: a `combat_mod` aimed at cmb was in the authoring
+        # vocabulary, validated, saved, and absent from every manoeuvre roll.
+        mods.extend(self._buff_mods("combat_mod", "cmb"))
         return stack([m for m in mods if m.value])
 
     def cmd_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
@@ -1286,6 +1290,7 @@ class Actor:
 
         # "Any penalties to a creature's AC also apply to its CMD."
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
+        mods.extend(self._buff_mods("combat_mod", "cmd"))
         return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:

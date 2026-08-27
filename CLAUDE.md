@@ -25,6 +25,22 @@ These carry over from World Bible and are not up for renegotiation without askin
 - **Anything available in a browser must also work in the packaged desktop app.** A feature
   that only works under `runserver` is not finished.
 
+## The three laws of state
+
+Everything that changes a number, grants a state, or reaches the narrator obeys these
+(docs/states-effects-tells.md is the design record; `tests/test_three_laws.py` enforces
+what code can enforce; the `states-effects-tells` skill carries the GAS mapping, the
+shipped/promised ledger, and worked examples — load it before working in this territory):
+
+1. **One vocabulary.** Every state is a hierarchical tag; ask prefix questions
+   (`has_state("state.down")`), never match condition strings.
+2. **One applicator.** Every change travels as an `ActiveEffect`; remove it and its
+   contribution evaporates. No parallel stores, no second ticker, no number added
+   outside the modifier funnel.
+3. **Severed tells.** Every effect application emits a tell; the narrator is fed tells
+   and nothing else about mechanics. No model authors a number — validators refuse
+   documents with the fix named.
+
 ## The rules that were learned the hard way
 
 Every one of these cost real debugging time in World Bible. They are not style preferences.
