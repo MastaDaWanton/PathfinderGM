@@ -988,3 +988,29 @@ def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
     # No opposition named: kicking the fallen is a thing a player may mean.
     assert judgement.redirect_attacks_off_corpses(
         raw, "I kick him while he is down", scene) is None
+
+
+
+def test_an_attack_on_a_corpse_does_not_satisfy_the_fight_the_player_wants():
+    """Live: "I attack it" — a well-creature the prose had described for two turns —
+    arrived as an attack on a long-dead ref. inject_fight read "attack", stood aside,
+    and the player swung at a body while the monster existed only in sentences. An
+    attack aimed at the dead means the fight still needs making."""
+    from gm import judgement
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    corpse = instantiate("thug", scene=scene, name="the stranger")
+    scene.add(corpse)
+    corpse.hp = -9
+
+    raw = [{"op": "attack", "actor": "pc", "target": corpse.ref, "params": {},
+            "because": "swinging"}]
+    out = judgement.inject_fight(raw, "I attack it", scene)
+    ops = [r["op"] for r in out]
+    assert "spawn" in ops, ops
+
+    # A living target: the guard holds, no second fight is made.
+    corpse.hp = 9
+    assert judgement.inject_fight(raw, "I attack it", scene) == raw

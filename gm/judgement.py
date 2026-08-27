@@ -476,10 +476,21 @@ def inject_fight(raw_intents, player_text: str, scene):
         return raw_intents
     if not wants_a_fight(player_text):
         return raw_intents
-    # Anything the GM already proposed that makes a fight is left alone.
+    # Anything the GM already proposed that makes a fight is left alone — but an
+    # attack aimed at a corpse is not a fight. Measured live: "I attack it" (a
+    # creature the prose had spent two turns describing) arrived as an attack on a
+    # long-dead ref, this guard read "attack" and stood aside, and the player swung
+    # at a body while the well-thing existed only in sentences. A dead target means
+    # the fight still needs making.
+    living = {r for r, a in (getattr(scene, "actors", {}) or {}).items()
+              if not getattr(a, "is_pc", False) and getattr(a, "hp", 0) > 0}
     for raw in raw_intents:
-        if isinstance(raw, dict) and str(raw.get("op", "")).lower() in (
-                "spawn", "begin_encounter", "attack"):
+        if not isinstance(raw, dict):
+            continue
+        op = str(raw.get("op", "")).lower()
+        if op in ("spawn", "begin_encounter"):
+            return raw_intents
+        if op == "attack" and str(raw.get("target", "")) in living:
             return raw_intents
     # Somebody is already standing there: the player is not starting a fight, they are
     # swinging in one. `fill_obvious_targets` cannot help — it puts a target on an attack
