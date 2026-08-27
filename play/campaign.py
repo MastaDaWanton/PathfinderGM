@@ -47,6 +47,46 @@ def _grid(raw: dict | None):
         obscuring={tuple(p) for p in raw.get("obscuring", [])},
     )
 
+def _portable_world_source(source: str | Path) -> str:
+    """The form of a world path that survives a relaunch.
+
+    A frozen onefile app extracts its bundle to a per-launch temp dir (_MEIxxxxx)
+    that dies with the process. Three live saves carried world_source anchored
+    there, and the home page 500'd on every launch after the one that wrote them —
+    the derived-cache trap, as an absolute path. Anything under the bundle is
+    stored relative to it; everything else (imported worlds in the data dir) keeps
+    its absolute path, which is stable.
+    """
+    from pathfindergm.paths import resource_root
+
+    p = Path(source)
+    try:
+        return p.relative_to(resource_root()).as_posix()
+    except ValueError:
+        return str(p)
+
+
+def _resolve_world_source(source: str | Path) -> Path:
+    """The path to actually open, healed on read like `biome` is.
+
+    Relative means bundled — anchored to this launch's resource root. An absolute
+    path that no longer exists but points through a _MEI dir is a poisoned save
+    from before paths were stored portably: re-anchor its tail onto the current
+    bundle rather than asking anyone to migrate a save by hand.
+    """
+    from pathfindergm.paths import resource_root
+
+    p = Path(source)
+    if not p.is_absolute():
+        return resource_root() / p
+    if not p.exists():
+        parts = p.parts
+        for i, part in enumerate(parts):
+            if part.startswith("_MEI"):
+                return resource_root().joinpath(*parts[i + 1:])
+    return p
+
+
 # The campaign a fresh install starts in, before anyone has been enrolled.
 DEFAULT_CAMPAIGN = "slice"
 
@@ -83,7 +123,7 @@ class Campaign:
 
     @property
     def world(self):
-        return load_cached(self.world_source)
+        return load_cached(_resolve_world_source(self.world_source))
 
     @property
     def location(self):
@@ -119,7 +159,7 @@ class Campaign:
         payload = {
             "save_version": SAVE_VERSION,
             "id": self.id,
-            "world_source": str(self.world_source),
+            "world_source": _portable_world_source(self.world_source),
             "seed": self.seed,
             "scene": {
                 "location_id": self.scene.location_id,

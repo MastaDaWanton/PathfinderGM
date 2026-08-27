@@ -497,3 +497,24 @@ def test_every_campaign_begins_with_a_live_thread():
     notes = [h for h in c.history if "private note" in str(h.get("content", ""))]
     assert len(notes) == 1
     assert "never announce it" in notes[0]["content"]
+
+
+def test_a_save_anchored_in_a_dead_pyinstaller_temp_dir_still_loads():
+    """Measured live 2026-08-27: three saves carried world_source like
+    'C:\...\Temp\_MEI267002\fixtures\pangrella-campaign.json' — the per-launch
+    extraction dir of the run that wrote them — and the home page 500'd on every
+    launch after. The tail past the _MEI dir re-anchors onto the current bundle."""
+    from play.campaign import _resolve_world_source, _portable_world_source
+    from pathfindergm.paths import resource_root
+
+    poisoned = r"C:\Users\nobody\AppData\Local\Temp\_MEI267002\fixtures\pangrella-campaign.json"
+    healed = _resolve_world_source(poisoned)
+    assert healed == resource_root() / "fixtures" / "pangrella-campaign.json"
+    assert healed.exists()
+
+    # And what gets written from now on is relative for anything under the bundle,
+    # absolute (and stable) for an imported world in the user's data directory.
+    assert _portable_world_source(resource_root() / "fixtures" / "x.json") == "fixtures/x.json"
+    assert _portable_world_source(r"C:\Users\nobody\AppData\Local\PathfinderGM\worlds\w.json") \
+        == r"C:\Users\nobody\AppData\Local\PathfinderGM\worlds\w.json"
+    assert _resolve_world_source("fixtures/pangrella-campaign.json").exists()
