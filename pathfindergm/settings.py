@@ -125,3 +125,20 @@ MODELS = {
     "watcher": {"provider": "ollama", "model": "deepseek-r1:8b",
                 "host": "http://localhost:11434"},
 }
+
+# Errors reach the log whether or not DEBUG is on. Django's default logging puts
+# require_debug_true in front of its console handler, so the frozen app — the one
+# place a traceback is the only debuggable artefact — logged "GET / 500" and not
+# one line of why. desktop.py's tee copies stderr to the logfile; this makes sure
+# the traceback is on stderr in the first place.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "stderr": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "django.request": {"handlers": ["stderr"], "level": "ERROR",
+                           "propagate": False},
+    },
+}
