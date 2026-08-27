@@ -1131,6 +1131,42 @@ _LEAKED_OPTIONS = re.compile(
     r"\byour options are\b|\(\s*Combat is now|\(\s*You are still in the midst", re.I)
 
 
+# What a corpse may still do in a sentence. Lying there, being looked at, being
+# stripped — anything else is the resurrection the scene panel contradicts.
+_DEAD_MAY = re.compile(
+    r"\b(?:lies|lay|lying|dead|corpse|body|bod(?:y|ies)|motionless|still|fallen|"
+    r"crumpled|sprawled|remains?|blood|late)\b", re.I)
+
+
+def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
+    """Drop sentences where a dead actor gets up and acts.
+
+    Measured across a live session: the stranger died in the opening turns, the panel
+    said Dead beside his name for the rest of the evening, and the narration kept
+    casting him — "The stranger from earlier bursts out of nowhere, grabbing at your
+    arm", yelling, glaring, stumbling. A sentence naming the dead survives when it
+    treats them as dead (lying, fallen, a body, being stripped); one that has them
+    doing anything else is cut whole.
+    """
+    if not text or not dead_names:
+        return text or "", []
+    names = [n for n in dead_names if n and len(n) >= 3]
+    if not names:
+        return text, []
+    pattern = re.compile("|".join(re.escape(n) for n in names), re.I)
+    kept, cut = [], []
+    for m in _SENTENCE.finditer(text):
+        s = m.group(0)
+        if pattern.search(s) and not _DEAD_MAY.search(s) \
+                and not _OPENS_SPEECH.search(s) and '"' not in s and "“" not in s:
+            cut.append(s.strip())
+            continue
+        kept.append(s.strip())
+    if not cut:
+        return text, []
+    return " ".join(kept), cut
+
+
 def strip_leaked_options(text: str) -> tuple[str, list[str]]:
     """Drop sentences where the option menu leaked into the narration."""
     if not text:

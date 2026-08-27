@@ -1445,3 +1445,20 @@ def test_the_option_menu_never_ships_as_narration():
     assert len(cut) == 2
     assert "*" not in fixed and "already acted" not in fixed
     assert "resounding crack" in fixed and "falls quiet" in fixed
+
+
+
+def test_the_dead_stay_dead_in_the_prose():
+    """Live, a whole evening of it: the stranger died in the opening turns, the panel
+    said Dead beside his name ever after, and the narration kept casting him —
+    "The stranger from earlier bursts out of nowhere, grabbing at your arm." A dead
+    name may lie, be a body, be stripped; it may not burst, grab or yell."""
+    said = ("The crowd surges backward. The stranger from earlier bursts out of "
+            "nowhere, grabbing at your arm. The stranger's body lies crumpled by "
+            "the wall. You catch your breath.")
+    fixed, cut = narration.cut_dead_men_walking(said, ["the stranger from earlier",
+                                                       "the stranger"])
+    assert len(cut) == 1 and "bursts" in cut[0]
+    assert "lies crumpled" in fixed and "catch your breath" in fixed
+    # Nobody dead: nothing to police.
+    assert narration.cut_dead_men_walking(said, []) == (said, [])

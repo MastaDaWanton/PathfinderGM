@@ -600,6 +600,11 @@ class GMAgent:
         # Before the stranger-renamer, which once half-mangled a leaked option list
         # into "the stranger: * the onlooker off your opponent * ..." — cutting the
         # leak first means there is nothing garbled left to rename.
+        dead = [a.name for r, a in self.engine.scene.actors.items()
+                if not a.is_pc and a.hp <= 0]
+        text, risen = narration_mod.cut_dead_men_walking(text, dead)
+        if risen:
+            repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
         text, leaked = narration_mod.strip_leaked_options(text)
         if leaked:
             repairs.append(f"option menu leaked into prose: cut {len(leaked)} "
