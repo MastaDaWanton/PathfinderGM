@@ -804,26 +804,21 @@ def test_swinging_when_everyone_is_down_ends_the_fight():
     assert "spawn" not in ops, "reinforcements nobody called for"
 
 
-def test_a_turn_that_fails_every_attempt_says_so_instead_of_crashing():
-    """The error path unpacked `schedule` — which holds (model, host, provider, key) —
-    as a pair, and raised `ValueError: too many values to unpack` *while reporting that
-    the turn had failed*. The honest "five attempts, here is what each one got wrong"
-    message the player is owed came out as a 500 and a traceback.
-
-    It only runs when every attempt has failed, which is why nobody had reached it until
-    `tools/narrator_audit.py` drove enough turns to find one."""
-    import re as _re
+def test_a_turn_that_fails_every_attempt_degrades_to_narration():
+    """Twice-measured path. First: the error report itself crashed (schedule
+    unpacked as a pair). Then the honest error turned out to be the wrong answer
+    anyway — seven failed attempts put a wall of red where a turn should have
+    been, and the player ruled: "i should get a narrated text like 'you look for
+    a group of guards to fight but none seem to be around'." The exhaustion path
+    now returns a narrate_only TurnPlan with an honest sentence; it never raises."""
     from pathlib import Path
 
     src = (Path(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
         encoding="utf-8")
-    raiser = src[src.index("could not produce a valid turn"):][:400]
-    assert "for m, *_ in schedule" in raiser
-    assert "for m, _ in schedule" not in raiser
-    # And the schedule really is wider than two, which is what made it a bug.
-    built = _re.search(r"schedule = \[\((.*?)\)\]", src)
-    assert built and built.group(1).count(",") >= 2, built and built.group(1)
-
+    tail = src[src.index("Every attempt failed"):][:900]
+    assert "return TurnPlan" in tail
+    assert "narrate_only" in tail
+    assert "raise IntentError" not in tail
 
 
 # --- a trade aimed at nobody --------------------------------------------------------------
