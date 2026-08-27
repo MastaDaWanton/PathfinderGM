@@ -281,3 +281,30 @@ def test_iron_clot_is_never_a_button():
     with pytest.raises(IntentError):
         e.run(e.validate([{"op": "use_ability", "actor": "pc",
                            "params": {"ability": "iron clot"}, "because": "t"}]))
+
+
+def _commander(level=1):
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d["class"] = "blood bending"
+    d["level"] = level
+    d["ranks"] = {}
+    d["paths"] = ["blood commander"]
+    d["armour"] = "none"
+    return from_dict(d, ref="pc")
+
+
+def test_blood_buffer_guards_incoming_nonlethal_by_the_printed_rungs():
+    """'Reduce incoming Non-Lethal Damage by 2 (Lvl 1) or 3 (Lvl 3)' — a dr with
+    against: nonlethal, the first document to use the lethality channel."""
+    for level, want in ((1, 4), (5, 3)):
+        got = _commander(level).take_damage(6, "bludgeoning", lethality="nonlethal")
+        assert got["taken"] == want, (level, got)
+        assert got["reduced_by"].startswith("DR")
+
+
+def test_blood_buffer_never_touches_lethal_hits_or_the_benders_own_costs():
+    """Incoming means incoming: a lethal sword takes full effect, and the class's
+    own ability costs go straight to take_nonlethal and are never discounted —
+    a buffer that cheapened costs would quietly rewrite the class economy."""
+    assert _commander(1).take_damage(6, "slashing")["taken"] == 6
+    assert _commander(1).take_nonlethal(6)["taken"] == 6

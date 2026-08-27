@@ -1459,7 +1459,8 @@ class Actor:
     # --- damage reduction -------------------------------------------------------------
 
     def damage_reduction(self, dtype: str = "untyped",
-                         traits: tuple[str, ...] = ()) -> Reduction | None:
+                         traits: tuple[str, ...] = (),
+                         lethality: str = "lethal") -> Reduction | None:
         """The one DR that applies to this attack, or None.
 
         1e is specific on both counts, and both are easy to get wrong in the generous
@@ -1474,11 +1475,20 @@ class Actor:
         # is permanent and tier-scaled, and an applied copy would go stale the
         # moment the character levels. Best-only still holds across all sources.
         from . import leveling
+
+        def wants(d: dict) -> bool:
+            # A dr may declare `against: nonlethal` — Blood Buffer guards what enemies
+            # deal, never what the bender pays, and costs bypass this method entirely
+            # by going straight to take_nonlethal. Plain DR applies to both, as 1e says.
+            against = str(d.get("against") or "").lower()
+            return not against or against == lethality
+
         for d in leveling.standing_dr(self):
-            pool.append(Reduction(d["amount"], d["bypass"], d["source"]))
+            if wants(d):
+                pool.append(Reduction(d["amount"], d["bypass"], d["source"]))
         for e in self.effects:
             d = e.payload.get("dr") if isinstance(e.payload, dict) else None
-            if isinstance(d, dict) and int(d.get("amount", 0) or 0) > 0:
+            if isinstance(d, dict) and int(d.get("amount", 0) or 0) > 0 and wants(d):
                 pool.append(Reduction(int(d["amount"]), str(d.get("bypass") or ""),
                                       e.source or e.name))
         usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(traits)]
@@ -1576,7 +1586,7 @@ class Actor:
         resisted = min(after_type, self.resistance(dtype)) if not immune else 0
         after_type -= resisted
 
-        dr = self.damage_reduction(dtype, traits)
+        dr = self.damage_reduction(dtype, traits, lethality)
         # DR reduces to zero, never below: it cannot heal you.
         reduced = min(after_type, dr.amount) if dr else 0
         after_dr = after_type - reduced

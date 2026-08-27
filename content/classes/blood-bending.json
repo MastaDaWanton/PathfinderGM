@@ -955,7 +955,27 @@
      "a save DC computed from level and Constitution"
     ]
    },
-   "effects_converted": true
+   "effects_converted": true,
+   "passive": [
+    "Blood Buffer"
+   ],
+   "grants": {
+    "Blood Buffer": {
+     "_note": "'Reduce incoming Non-Lethal Damage by 2 (Lvl 1) or 3 (Lvl 3).' against: nonlethal so it guards what enemies deal and never discounts what the bender pays \u2014 costs go straight to take_nonlethal and bypass DR entirely.",
+     "dr": {
+      "against": "nonlethal",
+      "scales_by": "control_blood",
+      "by_tier": {
+       "1": {
+        "amount": 2
+       },
+       "3": {
+        "amount": 3
+       }
+      }
+     }
+    }
+   }
   },
   "battle blood": {
    "name": "Battle Blood",

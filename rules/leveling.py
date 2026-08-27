@@ -202,6 +202,7 @@ def standing_dr(actor) -> list[dict]:
             if amount > 0:
                 out.append({"amount": amount,
                             "bypass": str(got.get("bypass") or ""),
+                            "against": str(got.get("against") or ""),
                             "source": str(name)})
     return out
 
