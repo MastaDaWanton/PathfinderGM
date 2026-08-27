@@ -412,6 +412,8 @@ def _chain(said, scene, world=None):
             raw = fn(raw, scene) or raw
         elif name == "drop_stray_checks":
             raw = fn(raw, said)
+        elif name == "drop_premature_end":
+            raw = fn(raw)
         else:
             raw = fn(raw, said, scene)
     return raw, names

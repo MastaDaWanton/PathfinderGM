@@ -1201,6 +1201,27 @@ _CHECK_VERBS = (
 _DECLARES = r"\bi\s+(?:try\s+to\s+|attempt\s+to\s+|carefully\s+|quietly\s+|quickly\s+)?"
 
 
+def drop_premature_end(raw_intents) -> list:
+    """The GM does not get to end the fight it is starting.
+
+    Read out of a live save's own turn log: ['attack', 'end_encounter'],
+    ['spawn', 'attack', 'end_encounter'], even ['end_encounter', 'attack'] — the
+    model closes every fight in the same breath it opens one, so the combat bar
+    never once appeared across a whole session of swinging. Ending an encounter is
+    the ENGINE's call (it already ends fights when a side falls, in the NPC loop);
+    an end_encounter travelling with an attack or a spawn is bookkeeping reflex,
+    stripped here. One that travels alone — a surrender, a talk-down — survives.
+    """
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    ops = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "end_encounter" not in ops or not (ops & {"attack", "manoeuvre", "spawn"}):
+        return raw_intents
+    return [r for r in raw_intents
+            if not (isinstance(r, dict)
+                    and str(r.get("op", "")).lower() == "end_encounter")]
+
+
 def drop_stray_checks(raw_intents, player_text: str) -> list:
     """A check the player never implied, riding a turn that already has its action.
 

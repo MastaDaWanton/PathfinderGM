@@ -945,3 +945,18 @@ def test_a_bent_attack_is_straightened_not_refused_seven_times():
     fine = [{"op": "attack", "actor": "pc", "target": thug.ref,
              "params": {"manoeuvre": "trip"}, "because": "x"}]
     assert judgement.normalize_attacks(fine, scene) is None
+
+
+
+def test_the_gm_cannot_end_the_fight_it_is_starting():
+    """Read out of a live save's turn log: ['attack', 'end_encounter'] on turn after
+    turn — the model closed every fight in the same breath it opened one, and the
+    combat bar never appeared across a session of swinging. Travelling with an attack
+    or spawn, end_encounter is stripped; alone (a surrender), it survives."""
+    from gm import judgement
+
+    swung = [{"op": "attack", "actor": "pc", "target": "c1", "params": {}},
+             {"op": "end_encounter", "params": {}}]
+    assert [r["op"] for r in judgement.drop_premature_end(swung)] == ["attack"]
+    talked = [{"op": "end_encounter", "params": {}}]
+    assert judgement.drop_premature_end(talked) == talked
