@@ -1906,3 +1906,38 @@ def inject_cast(raw_intents, player_text: str, scene) -> list:
         "op": "cast", "actor": pc.ref, "params": params,
         "because": "the player said they cast it",
     }]
+
+
+def repair_bare_spawns(raw_intents, player_text: str):
+    """A spawn the model could not shape is this code's to shape.
+
+    Measured live: "I turn to fight the next group of guards" died in seven
+    attempts across two models — six on "spawn: missing required param(s)
+    template", the seventh after the model reached for `type` instead — and the
+    player got a wall of red where a turn should have been. Same law as the loot
+    repair above: the schema REQUIRES the op the model proposed, so the mechanical
+    layer must be able to finish it. `type`/`kind`/`creature` are read as the
+    template the model meant; a spawn still bare after that gets the template the
+    player's own words cue (the fight injector's table), thug when they cue none.
+    """
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn":
+            params = dict(r.get("params") or {})
+            if not params.get("template"):
+                for said in ("type", "kind", "creature", "who"):
+                    if params.get(said):
+                        params["template"] = str(params.pop(said))
+                        break
+            if not params.get("template"):
+                template = "thug"
+                for cue, name in _TEMPLATE_CUES:
+                    if cue.search(player_text or ""):
+                        template = name
+                        break
+                params["template"] = template
+            r = dict(r, params=params)
+        out.append(r)
+    return out

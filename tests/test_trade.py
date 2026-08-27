@@ -414,6 +414,8 @@ def _chain(said, scene, world=None):
             raw = fn(raw, said)
         elif name == "drop_premature_end":
             raw = fn(raw)
+        elif name == "repair_bare_spawns":
+            raw = fn(raw, said)
         elif name == "redirect_attacks_off_corpses":
             raw = fn(raw, said, scene) or raw
         else:

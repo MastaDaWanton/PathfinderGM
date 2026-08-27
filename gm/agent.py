@@ -188,6 +188,7 @@ class GMAgent:
                 # First, because everything downstream reads the shapes this
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.
+                raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
@@ -324,11 +325,23 @@ class GMAgent:
         # message the player was owed came out as a 500 and a traceback instead. It only
         # runs when every attempt has failed, which is why nobody had ever reached it.
         # Found by `tools/narrator_audit.py`.
-        raise IntentError(
-            "the GM could not produce a valid turn in "
-            f"{len(schedule)} attempts across "
-            f"{len({m for m, *_ in schedule})} model(s):\n" + "\n".join(rejections)
-        )
+        # Every attempt failed. The player's own ruling on what happens next: "i
+        # should get a narrated text like 'you look for a group of guards to fight
+        # but none seem to be around' — if that's not the case then this is just an
+        # error." So the turn degrades to a narrated nothing instead of a wall of
+        # red: a narrate_only plan with an honest sentence, and the full rejection
+        # log kept in the plan for the turn ledger, not the transcript.
+        asked = " ".join((player_input or "").split())
+        return TurnPlan(
+            narration=(f"You try — “{asked}” — but the moment does not "
+                       f"answer: whatever you were reaching for is not here to be "
+                       f"found. What do you do instead?"),
+            intents=self.engine.validate([{"op": "narrate_only",
+                                           "because": "the turn could not be shaped"}]),
+            suggestions=[], attempts=attempts,
+            repairs=[f"turn degraded to narration after {len(schedule)} failed "
+                     f"attempts"],
+            rejections=rejections)
 
     # --- An NPC's turn -------------------------------------------------------------------
 

@@ -1111,3 +1111,22 @@ def test_a_pair_of_guards_is_two_guards():
     made = out.effects[0]["actors"]
     assert len(made) == 2
     assert all(m["name"] == "guard" for m in made)
+
+
+def test_a_spawn_the_model_could_not_shape_is_shaped_here():
+    """Measured live: "I turn to fight the next group of guards" died in seven
+    attempts — six on spawn missing template, one on the model reaching for `type`
+    — and the player got a wall of red. The schema requires the op the model
+    proposed, so the mechanical layer finishes it: aliases read, cues filled,
+    thug when nothing cues."""
+    out = judgement.repair_bare_spawns(
+        [{"op": "spawn", "params": {"type": "watchman"}}], "I fight the guards")
+    assert out[0]["params"]["template"] == "watchman"
+
+    out = judgement.repair_bare_spawns(
+        [{"op": "spawn", "params": {}}], "I turn to fight the next group of guards")
+    assert out[0]["params"]["template"]          # cued or thug, never bare
+
+    out = judgement.repair_bare_spawns(
+        [{"op": "spawn", "params": {"template": "thug", "count": 2}}], "whatever")
+    assert out[0]["params"] == {"template": "thug", "count": 2}

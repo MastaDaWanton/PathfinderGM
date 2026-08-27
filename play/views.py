@@ -953,6 +953,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             text, repairs = "", []
         if not text:
             text = " ".join(plain_tell(o.tell) for o in outcomes)
+        if not text and plan is not None and plan.narration:
+            # A degraded turn (every model attempt failed) carries its honest
+            # sentence in the plan; with no tells to dress, this is the one place
+            # it can reach the page.
+            text = plan.narration
         if text:
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})
