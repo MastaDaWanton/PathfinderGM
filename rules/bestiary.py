@@ -45,8 +45,7 @@ TEMPLATES: dict[str, dict] = {
         "flat_cmd": 11,
         "equipped": "club",
         "weapons": ["club"],
-        "wealth": "1d4 sp",
-        "pockets": ["work gloves", "chalk stub"],
+        "kit": "kit.laborer",
         "notes": "Commoner 1. Tired, half-attentive, not paid enough to fight.",
     },
     "watchman": {
@@ -64,8 +63,7 @@ TEMPLATES: dict[str, dict] = {
         "equipped": "shortsword",
         "weapons": ["shortsword", "club"],
         "armour": "chain shirt",
-        "wealth": "1d6 sp",
-        "pockets": ["watch whistle", "rations"],
+        "kit": "kit.militia",
         "notes": "Warrior 1 in a chain shirt. Will shout before drawing.",
     },
     "thug": {
@@ -83,8 +81,7 @@ TEMPLATES: dict[str, dict] = {
         "equipped": "sap",
         "weapons": ["sap", "dagger"],
         "armour": "leather",
-        "wealth": "2d4 sp",
-        "pockets": ["dice of bone", "strip of dried meat"],
+        "kit": "kit.cutpurse",
         "notes": "Warrior 1. Prefers a sap: a body that wakes up cannot testify to a killing.",
     },
     "guard dog": {
@@ -105,6 +102,23 @@ TEMPLATES: dict[str, dict] = {
         "weapons": ["unarmed"],
         "notes": "Scent. Barks first.",
     },
+}
+
+
+# Loadouts by tag, so the same statblock can spawn dressed for different work: a
+# watchman on the wall carries kit.militia; the same warrior working a counting
+# house carries kit.merchant-guard. Kits are TABLES, not model output, same law as
+# the templates' own pockets — and a template's inline wealth/pockets still win
+# over the kit's, so nothing shipped changes shape.
+KITS: dict[str, dict] = {
+    "kit.laborer": {"wealth": "1d4 sp",
+                    "pockets": ["work gloves", "chalk stub"]},
+    "kit.militia": {"wealth": "1d6 sp",
+                    "pockets": ["watch whistle", "rations"]},
+    "kit.cutpurse": {"wealth": "2d4 sp",
+                     "pockets": ["dice of bone", "strip of dried meat"]},
+    "kit.merchant-guard": {"wealth": "2d6 sp",
+                           "pockets": ["ledger scrap", "brass token", "rations"]},
 }
 
 
@@ -142,30 +156,63 @@ def instantiate(
 
 
 def _assemble_kit(actor, data: dict) -> None:
-    """Pockets for the spawned: a purse, worn armour, small carried things.
+    """Pockets for the spawned — as a CLAIM, not yet as contents.
 
     The loot op made empty pockets visible — "I take everything" off a thug who owns a
     sap and nothing else is a hollow sentence. Kits are TABLES, not model output: every
     quality lesson in this repo says a model-authored inventory is unpriceable
-    narrative garbage in the ledger, so a template declares `wealth` (dice, rolled at
-    spawn) and `pockets` (carried ids), and anything undeclared derives from what the
-    stat block already says. Worn armour is loot, not arithmetic: `flat_ac` already
-    includes it, so nothing here touches a number.
-    """
-    from . import creation as creation_mod
-    from .dice import Dice
+    narrative garbage in the ledger. A template declares `kit` (a tag into KITS)
+    and/or inline `wealth`/`pockets`, inline winning; anything undeclared derives
+    from what the stat block already says.
 
+    Nothing is rolled here. Stats resolve at spawn because combat needs them the
+    same round; the pockets stay `kit_pending` until `collapse_kit` at the first
+    observation — loot, steal, trade — so the transcript can never contradict
+    pockets nobody opened, and the watcher has the whole player turn to garnish.
+    """
     if int((data.get("abilities") or {}).get("int", 10) or 10) <= 2:
         return                                  # animals carry teeth, not coin
-    wealth = str(data.get("wealth") or "").strip()
+    kit_key = str(data.get("kit") or "").strip().lower()
+    kit = KITS.get(kit_key, {})
+    wealth = str(data.get("wealth") or kit.get("wealth") or "").strip()
     if not wealth and data.get("kind") == "npc":
         # Derived, roughly: what defeating them is worth maps to what they carry.
         xp = int(data.get("xp_value", 0) or 0)
         wealth = "2d6 sp" if xp >= 100 else "1d4 sp"
+    pockets = [str(p) for p in (data.get("pockets") or kit.get("pockets") or [])]
+    if wealth or pockets:
+        actor.kit_pending = {"kit": kit_key, "wealth": wealth, "pockets": pockets}
+
+
+def collapse_kit(actor) -> list[str]:
+    """First observation: the claim becomes contents, and the claim is gone.
+
+    Idempotent by construction —
+    the pending dict is consumed — so loot-then-loot cannot double the purse.
+    Returns what materialised, for the tell.
+    """
+    from . import creation as creation_mod
+
+    pending = dict(getattr(actor, "kit_pending", None) or {})
+    if not pending:
+        return []
+    actor.kit_pending = {}
+    made = []
+    wealth = str(pending.get("wealth") or "").strip()
     if wealth:
-        actor.purse = creation_mod.starting_purse({"starting_wealth": wealth}) or {}
-    for thing in data.get("pockets") or []:
-        actor.carry(str(thing).strip().lower().replace(" ", "-"), 1)
+        # Merged, never assigned: play may already have put coin on this body (a
+        # bribe taken, a payout pocketed), and the claim collapsing must add the
+        # kit's coin to the facts, not overwrite them.
+        rolled = creation_mod.starting_purse({"starting_wealth": wealth}) or {}
+        for coin, n in rolled.items():
+            actor.purse[coin] = int(actor.purse.get(coin, 0)) + int(n)
+        made.append(f"a purse ({wealth})")
+    for thing in pending.get("pockets") or []:
+        key = str(thing).strip().lower().replace(" ", "-")
+        if key:
+            actor.carry(key, 1)
+            made.append(key)
+    return made
 
 
 def _next_ref(scene) -> str:

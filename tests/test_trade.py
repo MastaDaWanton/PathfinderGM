@@ -1108,3 +1108,37 @@ def test_a_loot_narrated_before_the_engine_opened_the_pockets_is_a_claim():
                  "You pull your cloak against the rain.",
                  "She removes her helmet and sets it down."):
         assert not find_outcome_claims(fine), fine
+
+
+def test_schrodingers_pockets_collapse_at_the_loot():
+    """The pockets are a claim until somebody looks: spawn leaves kit_pending set
+    and the inventory empty, and the loot op is the first observation — the kit
+    rolls there, then moves, so "take everything" still means everything."""
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    thug = instantiate("thug", scene=scene, name="the tough")
+    scene.add(thug)
+    thug.hp = -13
+    assert thug.kit_pending and not thug.inventory
+
+    eng = Engine(scene, Dice(seed=3))
+    eng.run(eng.validate([{"op": "loot", "actor": "pc",
+                           "params": {"from": thug.ref},
+                           "because": "taking everything"}]))
+    assert thug.kit_pending == {}
+    assert pc.inventory.get("dice-of-bone") == 1
+    assert pc.purse.get("sp", 0) >= 2
+
+
+def test_the_unopened_claim_survives_a_save():
+    """A campaign closed mid-scene must reopen with the pockets still unrolled —
+    the claim round-trips through to_dict/from_dict like any other fact."""
+    from rules.bestiary import instantiate
+    from rules.sheet import from_dict, to_dict
+
+    thug = instantiate("thug", scene=Scene(), name="the tough")
+    back = from_dict(to_dict(thug), ref="c9")
+    assert back.kit_pending == thug.kit_pending != {}

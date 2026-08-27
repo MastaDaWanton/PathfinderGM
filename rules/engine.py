@@ -2299,6 +2299,11 @@ class Engine:
                       f"belongings. Taking from the living is a steal, and they get "
                       f"a say in it."), because=intent.because)
 
+        # First observation: Schrödinger's pockets collapse here, rolled and stored
+        # the moment somebody actually looks, immutable after.
+        from .bestiary import collapse_kit
+        collapse_kit(body)
+
         taken: list[str] = []
         effects: list[dict] = []
         for w in list(body.weapons):

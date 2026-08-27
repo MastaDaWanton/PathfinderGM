@@ -454,20 +454,25 @@ def test_the_literal_spell_routes_are_not_read_as_spell_names(client):
 
 def test_the_spawned_arrive_with_pockets_worth_looting():
     """The loot op made empty pockets visible: "take everything" off a thug who owns a
-    sap is a hollow sentence. Kits are tables rolled at spawn — wealth dice, carried
-    things, armour worn and lootable with flat_ac already counting it — and never a
-    model's guess, because a model-authored inventory is unpriceable garbage in the
-    ledger. Animals carry teeth, not coin."""
-    from rules.bestiary import instantiate
+    sap is a hollow sentence. Kits are tables and never a model's guess — but since
+    Schrödinger's pockets, the table is a CLAIM at spawn (kit_pending, tagged with
+    the kit that made it) and contents only at first observation: collapse_kit rolls
+    the wealth and fills the inventory, once, immutably. Armour and weapons still
+    resolve at spawn — combat needs them the same round. Animals carry no claim."""
+    from rules.bestiary import collapse_kit, instantiate
     from rules.engine import Scene
 
     s = Scene()
     thug = instantiate("thug", scene=s, name="the tough")
-    assert thug.purse.get("sp", 0) >= 2            # 2d4 sp, rolled
-    assert thug.inventory                          # the pockets
+    assert thug.purse == {} and thug.inventory == {}     # unobserved
+    assert thug.kit_pending.get("kit") == "kit.cutpurse"
     assert thug.armour == "leather"                # worn, hence lootable
+    made = collapse_kit(thug)
+    assert thug.purse.get("sp", 0) >= 2            # 2d4 sp, rolled at first look
+    assert thug.inventory and made
+    assert collapse_kit(thug) == []                # looked twice, nothing doubles
     dog = instantiate("guard dog", scene=s, name="the dog")
-    assert dog.purse == {} and dog.inventory == {}
+    assert dog.kit_pending == {} and dog.purse == {} and dog.inventory == {}
 
 
 def test_every_campaign_begins_with_a_live_thread():

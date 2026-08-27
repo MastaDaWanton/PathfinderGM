@@ -339,6 +339,14 @@ class Actor:
     # it is recorded per ingredient rather than as a fact about the character because
     # whether you had salt is a question about the moment you picked it up.
     preserved: dict[str, bool] = field(default_factory=dict)
+    # Schrödinger's pockets: the kit this creature spawned with, unrolled. Stats
+    # resolve at spawn because combat needs them instantly; what is IN the pockets
+    # stays a claim ({"kit", "wealth", "pockets"}) until the first time anybody
+    # actually looks — loot, steal, trade — and is rolled and emptied into the
+    # ordinary purse/inventory then, immutable after. Nothing in the transcript can
+    # contradict pockets that were never opened, and the watcher gets the whole
+    # player turn to garnish the claim before it collapses.
+    kit_pending: dict = field(default_factory=dict)
     spellbook: list[str] = field(default_factory=list)
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
@@ -2596,6 +2604,7 @@ def to_dict(actor: Actor) -> dict:
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
         "picked_at": dict(actor.picked_at),
         "preserved": {k: bool(v) for k, v in actor.preserved.items() if v},
+        "kit_pending": dict(actor.kit_pending),
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
         "temp_pools": [{"amount": p.amount, "source": p.source,
@@ -2947,6 +2956,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
                    if int(v) > 0},
         picked_at={str(k): int(v) for k, v in (data.get("picked_at") or {}).items()},
         preserved={str(k): bool(v) for k, v in (data.get("preserved") or {}).items()},
+        kit_pending=dict(data.get("kit_pending") or {}),
         goods={str(k): int(v) for k, v in (data.get("goods") or {}).items()
                if int(v) > 0},
         purse={str(k): int(v) for k, v in (data.get("purse") or {}).items()
