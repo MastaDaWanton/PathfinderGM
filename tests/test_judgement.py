@@ -1020,3 +1020,64 @@ def test_an_attack_on_a_corpse_does_not_satisfy_the_fight_the_player_wants():
     # A living target: the guard holds, no second fight is made.
     corpse.hp = 9
     assert judgement.inject_fight(raw, "I attack it", scene) == raw
+
+
+def test_a_group_in_the_players_sentence_spawns_a_group():
+    """Measured live: "I move towards the group of guards and clansmen and get ready
+    to fight" spawned exactly one watchman, and the player fought the crowd one man
+    at a time, fight after fight, because inject_fight hard-coded count=1."""
+    out = judgement.inject_fight(
+        [{"op": "narrate_only"}],
+        "I move towards the group of guards and clansmen and get ready to fight",
+        _empty_room())
+    spawn = next(i for i in out if i.get("op") == "spawn")
+    enc = next(i for i in out if i.get("op") == "begin_encounter")
+    assert spawn["params"]["count"] == 3
+    assert len(enc["params"]["sides"]["them"]) == 3
+    atk = next(i for i in out if i.get("op") == "attack")
+    assert atk["target"] == enc["params"]["sides"]["them"][0]
+
+
+def test_opponent_count_reads_the_players_own_words():
+    """A stated number wins, collective nouns mean three, a lone man is one, and a
+    dozen is capped at four — a repair must not be a TPB by injector."""
+    cases = (("I attack the two bravos", 2), ("I fight both of them", 2),
+             ("I charge the gang", 3), ("I swing at the man", 1),
+             ("I attack all 10 wolves", 4), ("I punch him", 1))
+    for text, want in cases:
+        assert judgement.opponent_count(text) == want, text
+
+
+def test_press_the_death_writes_the_kill_the_prose_flinched_from():
+    """Measured live: a watchman at -21 of 11 hit points was narrated as "his eyes
+    widen in shock as he struggles to catch his breath". The pass appends an
+    authored death scaled by overkill, and leaves prose alone that already kills."""
+    from gm import narration
+
+    flinched = ("His eyes widen in shock as he struggles to catch his breath, "
+                "clutching at his battered armor.")
+    out, added = narration.press_the_death(
+        flinched, [{"name": "the watchman", "margin": 10, "hp_max": 11,
+                    "subj": "he", "obj": "him", "poss": "his"}])
+    assert added == ["the watchman"]
+    assert "dead" in out
+
+    gore, _ = narration.press_the_death(
+        "", [{"name": "the thug", "margin": 30, "hp_max": 13,
+              "subj": "he", "obj": "him", "poss": "his"}])
+    assert "unmake" in gore
+
+    already = "The watchman drops, dead before he hits the boards."
+    same, added = narration.press_the_death(
+        already, [{"name": "the watchman", "margin": 2, "hp_max": 11}])
+    assert same == already and not added
+
+
+def test_press_the_death_slips_in_before_the_hand_back():
+    from gm import narration
+
+    out, _ = narration.press_the_death(
+        "Your fist lands with a crack. What do you do next?",
+        [{"name": "the thug", "margin": 1, "hp_max": 13}])
+    assert out.endswith("What do you do next?")
+    assert "drops, dead" in out

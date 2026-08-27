@@ -841,7 +841,41 @@ class GMAgent:
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=False)
         attempts.extend(groom_attempts)
+        # After grooming, never before: cut_dead_men_walking would read a fresh
+        # death sentence as a dead man acting.
+        text, pressed = narration_mod.press_the_death(text, self._deaths_from(outcomes))
+        if pressed:
+            repairs.append(f"a kill left off the page: wrote the death of "
+                           f"{', '.join(pressed)}")
         return text, repairs, attempts
+
+    def _deaths_from(self, outcomes: list) -> list[dict]:
+        """Who the engine killed this turn, and by how far — press_the_death's feed.
+
+        Margin is hit points past the death line (-Con), because "just enough" and
+        "triple his life in one blow" deserve different sentences on the page.
+        """
+        deaths = []
+        seen = set()
+        for o in outcomes or []:
+            for e in getattr(o, "effects", None) or []:
+                if not (isinstance(e, dict) and e.get("kind") == "condition"
+                        and e.get("condition") == "dead"):
+                    continue
+                a = self.engine.scene.actors.get(e.get("ref"))
+                if a is None or getattr(a, "is_pc", False) or a.ref in seen:
+                    continue
+                seen.add(a.ref)
+                pron = str(getattr(a, "pronouns", "") or "").lower()
+                subj, _, obj = pron.partition("/")
+                poss = {"he": "his", "she": "her", "they": "their"}.get(subj, "their")
+                deaths.append({
+                    "name": a.name,
+                    "margin": max(0, -int(a.hp) - int(a.ability_score("con"))),
+                    "hp_max": int(a.hp_max),
+                    "subj": subj or "they", "obj": obj or "them", "poss": poss,
+                })
+        return deaths
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
@@ -891,6 +925,10 @@ class GMAgent:
         text, repairs, _more = self._groom(
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=False)
+        text, pressed = narration_mod.press_the_death(text, self._deaths_from(outcomes))
+        if pressed:
+            repairs.append(f"a kill left off the page: wrote the death of "
+                           f"{', '.join(pressed)}")
         attempt = Attempt("consequence", reply.seconds, reply.model, reply.text,
                           note="; ".join(repairs))
         return text, attempt

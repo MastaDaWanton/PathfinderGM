@@ -1469,3 +1469,67 @@ def clean_consequence(text: str, example_answer: str = "", context: str = "") ->
     if not re.search(r"[a-zA-Z]", out):
         return ""
     return out[:MAX_CONSEQUENCE_CHARS].rstrip()
+
+
+# What counts as the prose having actually put a death on the page.
+_DEATH_LANGUAGE = re.compile(
+    r"\b(dead|dies|died|dying|lifeless|corpse|slain|kills?|killed|"
+    r"no longer breath\w*|last breath|life leaves|lifeblood)\b", re.I)
+
+
+def press_the_death(text: str, deaths: list[dict]) -> tuple[str, list[str]]:
+    """A kill the engine resolved must be a death the prose commits to.
+
+    Measured live: a watchman at -21 of 11 hit points — twice his whole life past
+    dead — was narrated as "his eyes widen in shock as he struggles to catch his
+    breath". Nobody struggles for breath at -21; the model writes wounded-man prose
+    because wounded men are what its training saw, and no instruction has moved it.
+    So the fix is the repo's standing one: detect in code, repair with an authored
+    sentence. The sentence is scaled by how far past dead the blow went, because
+    "just enough" and "triple his life in one hit" are different deaths.
+
+    `deaths` entries: {"name", "margin" (hit points past the death line), "hp_max"}.
+    Appended after grooming, never before — `cut_dead_men_walking` would read a
+    fresh death sentence as a dead man acting and cut it.
+    """
+    added = []
+    for d in deaths or []:
+        name = str(d.get("name") or "").strip()
+        if not name:
+            continue
+        first = name.split()[0]
+        said = any(_DEATH_LANGUAGE.search(s) for s in _sentences(text)
+                   if re.search(rf"\b{re.escape(first)}", s, re.I)
+                   or re.search(r"\b(he|she|they)\b", s, re.I))
+        if said:
+            continue
+        margin = int(d.get("margin", 0) or 0)
+        hp_max = max(1, int(d.get("hp_max", 1) or 1))
+        # The actor's own pronouns, defaulting neutral — the same courtesy
+        # `right_body` already enforces everywhere else in the prose.
+        subj = str(d.get("subj") or "they")
+        obj = str(d.get("obj") or "them")
+        poss = str(d.get("poss") or "their")
+        is_ = "is" if subj in ("he", "she", "it") else "are"
+        if margin >= hp_max:
+            line = (f"The blow does not so much fell {name} as unmake {obj} — it "
+                    f"carries through, and what folds to the ground is a ruin, "
+                    f"dead before it lands.")
+        elif margin >= max(3, hp_max // 2):
+            line = (f"{name} is driven from {poss} feet, the wound ruinous, "
+                    f"and {subj} {is_} dead before the dust settles.")
+        else:
+            line = (f"{name} sways, blood at {poss} lips, eyes rolling white — "
+                    f"and drops, dead.")
+        added.append(name)
+        text = _append_before_hand_back(text, line)
+    return text, added
+
+
+def _append_before_hand_back(text: str, line: str) -> str:
+    """Insert before a trailing question, else append — a death narrated after
+    "What do you do?" reads like the GM forgot and doubled back."""
+    parts = _sentences(text)
+    if parts and parts[-1].rstrip().endswith("?"):
+        return " ".join(parts[:-1] + [line, parts[-1]]).strip()
+    return (text.rstrip() + " " + line).strip()

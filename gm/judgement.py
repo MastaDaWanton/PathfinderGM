@@ -567,8 +567,18 @@ def inject_fight(raw_intents, player_text: str, scene):
         if cue.search(player_text or ""):
             template = name
             break
+    # As many as the player's own sentence says. The measured failure: "I move
+    # towards the group of guards and clansmen and get ready to fight" spawned
+    # exactly one watchman, and the player fought a crowd one man at a time,
+    # fight after fight, because this repair hard-coded count=1.
+    count = opponent_count(player_text)
     known = set(getattr(scene, "actors", {}) or {})
-    ref = next(f"c{i}" for i in range(1, len(known) + 3) if f"c{i}" not in known)
+    refs = []
+    i = 1
+    while len(refs) < count:
+        if f"c{i}" not in known:
+            refs.append(f"c{i}")
+        i += 1
     pc = scene.pc() if hasattr(scene, "pc") else None
     pc_ref = getattr(pc, "ref", "pc")
     return list(raw_intents) + [
@@ -577,14 +587,41 @@ def inject_fight(raw_intents, player_text: str, scene):
         # off, out of reach of the punch that started the fight.
         {"op": "spawn", "because": "the player started a fight with somebody",
          "params": dict(
-             {"template": template, "count": 1,
+             {"template": template, "count": count,
               "zone": "near" if _AT_RANGE.search(player_text or "") else "engaged"},
              **({"distance_ft": feet} if (feet := opening_feet(player_text)) else {}))},
         {"op": "begin_encounter", "because": "the player started it",
-         "params": {"sides": {"you": [pc_ref], "them": [ref]}}},
-        {"op": "attack", "actor": pc_ref, "target": ref,
+         "params": {"sides": {"you": [pc_ref], "them": list(refs)}}},
+        {"op": "attack", "actor": pc_ref, "target": refs[0],
          "because": "the player swung first"},
     ]
+
+
+_NUMBER_WORDS = {"two": 2, "both": 2, "pair": 2, "couple": 2, "three": 3,
+                 "few": 3, "several": 3, "four": 4, "five": 5, "six": 6}
+_GROUP_WORDS = re.compile(
+    r"\b(group|gang|mob|pack|band|crowd|squad|patrol|bunch|men|guards|thugs|"
+    r"bandits|wolves|clansmen|soldiers|watchmen|bravos)\b", re.I)
+
+
+def opponent_count(player_text: str) -> int:
+    """How many the player's sentence says they are squaring up against.
+
+    A stated number wins; a collective noun or a bare plural means three; anything
+    else is one. Capped at four — a repair that answers "I fight the crowd" by
+    spawning a dozen thugs at a level-1 character is a TPK by injector, and four is
+    already a fight the dice must be respected in.
+    """
+    text = player_text or ""
+    m = re.search(r"\b(\d{1,2})\b", text)
+    if m and 1 < int(m.group(1)):
+        return min(4, int(m.group(1)))
+    for word, n in _NUMBER_WORDS.items():
+        if re.search(rf"\b{word}\b", text, re.I):
+            return min(4, n)
+    if _GROUP_WORDS.search(text):
+        return 3
+    return 1
 
 
 def repair_unknown_refs(raw_intents, player_text: str, scene):
