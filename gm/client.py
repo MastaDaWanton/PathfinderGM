@@ -100,7 +100,14 @@ def chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature, "num_predict": num_predict},
+        # num_ctx is not decoration: Ollama's default window is 4096, and the
+        # prose call's real prompt measured 4,086 tokens — the model was left TEN
+        # tokens of room, answered '{"narration": "The woman stands by the' and
+        # died done_reason=length on every turn of a live scene, silently, with
+        # num_predict=900 ignored because the window was already spent. 16k costs
+        # roughly 1.5GB of KV cache at 12B and ends the class.
+        "options": {"temperature": temperature, "num_predict": num_predict,
+                    "num_ctx": 16384},
     }
     # A schema, when the caller has one, rather than "some JSON please". Ollama passes
     # `format` to the sampler as a grammar, so a reply that breaks the schema is not
