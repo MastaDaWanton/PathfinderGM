@@ -1128,14 +1128,21 @@ _LEAKED_OPTIONS = re.compile(
     r"\s\*\s|\bNone required\b|\byou'?ve already acted\b|\bchoose one of\b|"
     # "(Combat is now ongoing." and "(You are still in the midst of a fight. )" —
     # the GM whispering stage directions in parentheses, measured twice live.
-    r"\byour options are\b|\(\s*Combat is now|\(\s*You are still in the midst", re.I)
+    r"\byour options are\b|\(\s*Combat is now|\(\s*You are still in the midst|"
+    # "Suggested actions: ..." and "Next, you'll wait for your decision before
+    # proceeding with the scene." — the scaffold reciting itself, measured live
+    # in the Eldrida beat.
+    r"\bSuggested actions?\s*:|\bNext, you'?ll wait for your decision\b|"
+    r"\bwait for your decision before proceeding\b", re.I)
 
 
 # What a corpse may still do in a sentence. Lying there, being looked at, being
 # stripped — anything else is the resurrection the scene panel contradicts.
 _DEAD_MAY = re.compile(
-    r"\b(?:lies|lay|lying|dead|corpse|body|bod(?:y|ies)|motionless|still|fallen|"
-    r"crumpled|sprawled|remains?|blood|late)\b", re.I)
+    # "still" only as posture — bare, it matched "still reeling from your earlier
+    # strike" and a dead merchant walked a whole beat behind that one adverb.
+    r"\b(?:lies|lay|lying|dead|corpse|body|bod(?:y|ies)|motionless|fallen|"
+    r"lies still|lying still|crumpled|sprawled|remains?|blood|late)\b", re.I)
 
 
 def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
@@ -1157,10 +1164,20 @@ def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
     kept, cut = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
-        if pattern.search(s) and not _DEAD_MAY.search(s) \
-                and not _OPENS_SPEECH.search(s) and '"' not in s and "“" not in s:
-            cut.append(s.strip())
-            continue
+        hit = pattern.search(s)
+        if hit and not _DEAD_MAY.search(s):
+            # The quote exemption exists so a living speaker may *mention* the
+            # dead — and it let the dead keep talking, measured live: a merchant
+            # at -19 spat "You'll pay for this!" and nodded through two beats,
+            # protected by his own quotation marks. The exemption now holds only
+            # when the dead name sits INSIDE the quoted span; a dead man as the
+            # speaker outside the quotes is cut, speech and all.
+            # A quote OPENER, not any apostrophe: "it's" must not shield a dead
+            # man named after the contraction.
+            opener = re.search(r"[\"“]|(?<=[\s,:])['‘]", s)
+            if opener is None or hit.start() < opener.start():
+                cut.append(s.strip())
+                continue
         kept.append(s.strip())
     if not cut:
         return text, []

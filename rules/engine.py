@@ -122,6 +122,15 @@ class Scene:
     # to a real actor through the ordinary spawn machinery. Prose invented them;
     # the ledger just refuses to let prose disinvent them.
     cast: list = field(default_factory=list)
+    # How long each fallen non-PC has been lying here, ref -> turns. Bodies get a
+    # short grace for looting and then the scene lets them go on its own — the
+    # live panel carried four corpses and a bleeding man through an entire market
+    # visit because nothing but a biome change ever swept the floor.
+    fallen: dict = field(default_factory=dict)
+    # What bystanders just saw, {"note", "age"}. A public killing the crowd
+    # shrugged off — the player murdered a merchant mid-market and the next
+    # stall-keeper chatted amiably — because nothing carried the event forward.
+    heat: dict = field(default_factory=dict)
     # What each shop has sold, as "place|stall|day|material" -> count. A stall's shelf is
     # drawn rather than stored (see `rules.market`), so this is the only part that has to
     # survive a save: the one legendary on the shelf has to stay sold once it is bought.
@@ -2206,6 +2215,47 @@ class Engine:
             tell=tell, because=intent.because,
         )
 
+    def tidy_the_fallen(self, grace: int = 2) -> list[str]:
+        """Bodies age out of the scene on their own after a short grace.
+
+        Two turns is time to loot and say a word over them; after that they
+        depart quietly, whether or not the player ever walks away. The dying get
+        the same treatment as `leave_behind`: their story resolves rather than
+        printing "bleeding out" beats forever. No-op mid-encounter.
+        """
+        if self.scene.in_encounter:
+            return []
+        tells: list[str] = []
+        for ref in list(self.scene.actors):
+            a = self.scene.actors[ref]
+            if a.is_pc or (a.hp > 0 and not a.has_state("state.down")):
+                self.scene.fallen.pop(ref, None)
+                continue
+            age = self.scene.fallen.get(ref, 0) + 1
+            self.scene.fallen[ref] = age
+            if age > grace:
+                if a.has_condition("dying"):
+                    tells.extend(self._resolve_dying(a))
+                self.scene.depart(ref)
+                self.scene.fallen.pop(ref, None)
+        return tells
+
+    def _resolve_dying(self, a: Actor) -> list[str]:
+        """One dying creature's story ends off-screen: stable, or gone."""
+        floor = -a.ability_score("con")
+        while a.hp > floor and a.has_condition("dying"):
+            if self.dice.roll("1d100", label="stabilise",
+                              visibility="hidden").total <= 10:
+                a.remove_condition("dying")
+                a.add_condition("stable", source="luck")
+                break
+            a.hp -= 1
+        a.apply_hp_state()
+        return [f"{a.name} "
+                + ("stabilises where they lie."
+                   if a.has_condition("stable")
+                   else "has bled out where they fell.")]
+
     def leave_behind(self) -> list[str]:
         """The player walks away inside the same biome: the scene lets go.
 
@@ -2226,20 +2276,7 @@ class Engine:
             if a.is_pc:
                 continue
             if a.has_condition("dying"):
-                floor = -a.ability_score("con")
-                while a.hp > floor and a.has_condition("dying"):
-                    if self.dice.roll("1d100", label="stabilise",
-                                      visibility="hidden").total <= 10:
-                        a.remove_condition("dying")
-                        a.add_condition("stable", source="luck")
-                        break
-                    a.hp -= 1
-                a.apply_hp_state()
-                tells.append(
-                    f"{a.name} "
-                    + ("stabilises where they lie."
-                       if a.has_condition("stable")
-                       else "has bled out where they fell."))
+                tells.extend(self._resolve_dying(a))
             if a.hp <= 0 or a.has_state("state.down"):
                 self.scene.depart(ref)
         return tells

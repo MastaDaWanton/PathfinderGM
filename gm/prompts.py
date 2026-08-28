@@ -655,6 +655,9 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
     ledger = _judgement.cast_brief(scene)
     if ledger:
         lines.append("\n" + ledger)
+    seen = _judgement.heat_brief(scene)
+    if seen:
+        lines.append("\n" + seen)
 
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():

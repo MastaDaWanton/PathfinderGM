@@ -1292,3 +1292,72 @@ def test_a_ledger_merchant_promotes_to_a_civilian_not_a_bruiser():
                                  "I attack the merchant", _empty_room())
     spawn = next(i for i in out if i.get("op") == "spawn")
     assert spawn["params"]["template"] == "guildhand"
+
+
+def test_the_dead_cannot_talk_their_way_past_the_scrubber():
+    """Measured live: a merchant at -19 of 13 spat "You'll pay for this!" and
+    nodded through two more beats — every sentence shielded by its own quotation
+    marks, because the quote exemption was written for living speakers who
+    *mention* the dead. A dead man speaking outside the quotes is cut now; a
+    living speaker naming the dead inside a quote is still spared."""
+    from gm import narration
+
+    talking = ("The merchant, still reeling from your earlier strike, stumbles "
+               "towards you. He spits at your feet, 'You'll pay for this!' "
+               "The merchant you just spoke with nods towards him, saying "
+               "'That one wants silk.'")
+    out, cut = narration.cut_dead_men_walking(talking, ["merchant"])
+    assert len(cut) >= 2 and "merchant" not in out.lower()
+
+    spared = "The guard shakes his head: 'the merchant is dead, and that is that.'"
+    same, cut = narration.cut_dead_men_walking(spared, ["merchant"])
+    assert same == spared and not cut
+
+
+def test_the_person_addressed_becomes_real():
+    """Measured live, overruling an older refusal by the player's word: "i talk
+    to another merchant" produced a vivid stranger who was never added to the
+    scene, could not be traded with, and evaporated. Addressing a civilian role
+    now spawns them peacefully as the commoner they are."""
+    out = judgement.inject_company(
+        [{"op": "narrate_only"}], "i talk to another merchant", _empty_room())
+    spawn = next(i for i in out if i.get("op") == "spawn")
+    assert spawn["params"]["template"] == "guildhand"
+    assert spawn["params"]["name"] == "merchant"
+    assert all(i.get("op") != "begin_encounter" for i in out)
+
+    # Somebody by that role already alive: no double.
+    from rules.bestiary import instantiate
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    m = instantiate("guildhand", scene=s, name="merchant"); s.add(m)
+    out = judgement.inject_company([{"op": "narrate_only"}],
+                                   "I talk to the merchant", s)
+    assert all(i.get("op") != "spawn" for i in out)
+
+
+def test_a_public_killing_heats_the_scene_and_bodies_age_out():
+    """Measured live: a merchant murdered mid-market, and the next stall-keeper
+    chatted amiably about silk while four corpses stood in the scene panel. The
+    kill writes scene.heat while anyone watches, the brief carries it, and the
+    fallen depart on their own after two turns' grace."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Outcome, Scene
+    from rules.sheet import load_pc
+
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    victim = instantiate("guildhand", scene=s, name="merchant"); s.add(victim)
+    s.cast.append({"who": "an old priestess", "turn": 1})
+    fake = Outcome(intent_id="i1", op="attack", effects=[
+        {"ref": victim.ref, "kind": "condition", "condition": "dead"}])
+    victim.hp = -20; victim.apply_hp_state()
+    judgement.note_heat(s, [fake])
+    assert "killed merchant" in s.heat.get("note", "")
+    assert "Nobody chats casually" in judgement.heat_brief(s)
+
+    e = Engine(s, Dice(seed=4))
+    e.tidy_the_fallen(); assert victim.ref in s.actors      # grace turn 1
+    e.tidy_the_fallen(); assert victim.ref in s.actors      # grace turn 2
+    e.tidy_the_fallen(); assert victim.ref not in s.actors  # swept

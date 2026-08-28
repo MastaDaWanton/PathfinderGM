@@ -898,7 +898,13 @@ def _advance(request, c, agent, narration, plan, player_input):
             {"error": f"The engine refused the GM's intents: {exc}"}, status=502
         )
 
-    c.transcript.append({"who": "gm", "text": narration, "kind": "setup"})
+    # Under intents-first the prose is written in _finish, after the dice — a plan
+    # narration appended here too gave the player both beats at once, measured
+    # live as "You try — but the moment does not answer" directly above a beat
+    # that answered perfectly well. The degraded sentence stays in the plan and
+    # lands only through _finish's fallback, when the prose call truly has nothing.
+    if narration and not getattr(agent, "intents_first", False):
+        c.transcript.append({"who": "gm", "text": narration, "kind": "setup"})
     # What the GM offered this turn. Held on the campaign rather than in the
     # transcript because it is a live prompt, not a thing that was said — and it
     # is replaced every turn rather than accumulating.
@@ -941,6 +947,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     # declared — "I follow the guards" must constrain the beat that answers it.
     judgement.update_thread(c.scene, player_input,
                             [o.op for o in resolution.outcomes])
+    judgement.note_heat(c.scene, resolution.outcomes)
+    # Bodies age out on their own: two turns' grace to loot and mourn, then the
+    # scene lets them go whether or not the player ever says the word "leave".
+    swept = agent.engine.tidy_the_fallen()
+    if swept:
+        c.transcript.append({"who": "gm", "text": " ".join(swept),
+                             "kind": "consequence"})
     # Walking away lets the scene go: the dying resolve off-screen and the fallen
     # stay where they fell, whether or not the walk crossed a biome line.
     if judgement.player_departs(player_input):

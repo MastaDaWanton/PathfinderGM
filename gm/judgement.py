@@ -2104,3 +2104,89 @@ def clear_cast(scene) -> None:
     """Walking away leaves the prose-people behind with everything else."""
     if scene is not None:
         scene.cast = []
+
+
+# --- Heat: what the bystanders just saw -----------------------------------------------
+
+def note_heat(scene, outcomes) -> None:
+    """A public killing is a fact the next beat must carry.
+
+    Measured live: the player murdered a merchant in the middle of the market and
+    the very next stall-keeper chatted amiably about silk. Witnesses were
+    everywhere — the cast ledger held them — and nothing carried the event
+    forward. A kill with the ledger non-empty (or any living non-PC watching)
+    writes scene.heat; the brief states it until it cools.
+    """
+    if scene is None:
+        return
+    heat = dict(scene.heat or {})
+    if heat:
+        heat["age"] = int(heat.get("age", 0)) + 1
+        scene.heat = {} if heat["age"] > 8 else heat
+    killed = []
+    for o in outcomes or []:
+        for e in getattr(o, "effects", None) or []:
+            if isinstance(e, dict) and e.get("kind") == "condition" \
+                    and e.get("condition") == "dead":
+                a = scene.actors.get(e.get("ref"))
+                if a is not None and not getattr(a, "is_pc", False):
+                    killed.append(a.name)
+    if not killed:
+        return
+    watchers = bool(scene.cast) or any(
+        not a.is_pc and a.hp > 0 and not a.has_state("state.down")
+        for a in scene.actors.values())
+    if watchers:
+        scene.heat = {"note": f"the player just killed {', '.join(killed)} in "
+                              f"front of onlookers", "age": 0}
+
+
+def heat_brief(scene) -> str:
+    t = getattr(scene, "heat", None) or {}
+    if not t.get("note"):
+        return ""
+    return (f"WHAT THE CROWD JUST SAW (fact): {t['note']}. Bystanders react to "
+            f"it — fear, scattering, someone running for the watch. Nobody "
+            f"chats casually with the killer, and merchants do not approach.")
+
+
+# --- Company: the person the player addresses must exist ------------------------------
+
+_ADDRESSES = re.compile(
+    r"\bI\s+(?:talk to|speak (?:to|with)|approach|walk (?:up )?to|greet|ask|"
+    r"find)\s+(.{3,50}?)\s*[.!?]?$", re.I)
+_CIVILIANS = re.compile(
+    r"\b(merchant|trader|vendor|stall ?keeper|shopkeeper|innkeeper|barkeep|"
+    r"bartender|peddler|farmer|fisherman|smith|scribe|artisan|priest|priestess|"
+    r"beggar|laborer|labourer|porter|clerk|servant|guildhand)\b", re.I)
+
+
+def inject_company(raw_intents, player_text: str, scene):
+    """The person the player turns to becomes a real actor, not a phantom.
+
+    This deliberately reverses an older refusal ("spawning a merchant because the
+    player addressed one is inventing people") — overruled by the player after a
+    live session where "i talk to another merchant" produced a vivid stranger who
+    was never added to the scene, could not be traded with (the panel gates on a
+    living merchant actor), and evaporated on the next beat. The GM's narration
+    already invented these people; making the addressed one real is bookkeeping,
+    not invention. Civilians only, spawned peacefully, no encounter."""
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    m = _ADDRESSES.search(str(player_text or ""))
+    if not m:
+        return raw_intents
+    role = _CIVILIANS.search(m.group(1))
+    if not role:
+        return raw_intents
+    word = role.group(1).lower()
+    for a in scene.actors.values():
+        if not a.is_pc and a.hp > 0 and word in str(a.name).lower():
+            return raw_intents                    # they already exist; talk away
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"
+           for r in raw_intents):
+        return raw_intents
+    return [{"op": "spawn",
+             "because": "the player addressed somebody the scene had not made real",
+             "params": {"template": "guildhand", "count": 1, "name": word,
+                        "zone": "engaged"}}] + list(raw_intents)
