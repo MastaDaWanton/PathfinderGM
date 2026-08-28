@@ -1699,6 +1699,39 @@ _LOOTS = re.compile(
     r"|\btake\s+everything\b", re.I)
 
 
+_BULK_ITEM = re.compile(r"\b(stuff|everything|belongings|wares|inventory|"
+                        r"all (?:of )?(?:it|his|her|their|the)?)\b", re.I)
+
+
+def bulk_give_is_a_loot(raw_intents, scene) -> list:
+    """A give of "his stuff" when he is a corpse is the loot it meant.
+
+    Measured live: the merchant was dead, the model proposed give item
+    "merchants stuff" with nobody as giver, and the old world-branch minted the
+    phrase as an object. Give's bulk handling moves goods and coin, but only
+    loot strips a body properly — weapons, armour, the collapsed kit — so a
+    bulk give that names a downed giver, or names nobody while a lootable body
+    lies here, becomes that loot.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    bodies = [ref for ref, a in scene.actors.items()
+              if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))]
+    out = []
+    for r in raw_intents:
+        if (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
+                and _BULK_ITEM.search(str((r.get("params") or {}).get("item", "")))):
+            frm = (r.get("params") or {}).get("from_") or (r.get("params") or {}).get("from")
+            if frm in bodies or (not frm and bodies):
+                out.append({"op": "loot", "actor": r.get("actor") or "pc",
+                            "because": r.get("because") or "taking everything "
+                                       "from the fallen",
+                            "params": {"from_": frm or bodies[0]}})
+                continue
+        out.append(r)
+    return out
+
+
 def inject_loot(raw_intents, player_text: str, scene) -> list:
     """A declared looting reaches the engine — the corpse's pockets are its business.
 

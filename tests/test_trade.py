@@ -416,6 +416,8 @@ def _chain(said, scene, world=None):
             raw = fn(raw)
         elif name == "repair_bare_spawns":
             raw = fn(raw, said)
+        elif name == "bulk_give_is_a_loot":
+            raw = fn(raw, scene)
         elif name == "redirect_attacks_off_corpses":
             raw = fn(raw, said, scene) or raw
         else:
@@ -1173,3 +1175,29 @@ def test_stuff_is_a_word_not_a_thing():
     assert pc.goods.get("bolt-of-silk", 0) == 2
     assert m.goods == {} and m.kit_pending == {}
     assert pc.inventory        # the collapsed kit's pockets came along
+
+
+def test_a_bulk_give_from_a_corpse_is_the_loot_it_meant():
+    """He was dead. The give of 'merchants stuff' should have been the loot that
+    strips a body properly — weapons, armour, collapsed kit — and now becomes
+    one whether the give names the body or names nobody while a body lies here."""
+    from gm import judgement
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    m = instantiate("guildhand", scene=scene, name="the merchant")
+    scene.add(m)
+    m.hp = -10
+
+    out = judgement.bulk_give_is_a_loot(
+        [{"op": "give", "actor": "pc",
+          "params": {"item": "merchants stuff"}}], scene)
+    assert out[0]["op"] == "loot" and out[0]["params"]["from_"] == m.ref
+
+    # A named living giver stays a give — handing over your pack is legal.
+    m.hp = 4
+    same = judgement.bulk_give_is_a_loot(
+        [{"op": "give", "actor": "pc",
+          "params": {"item": "everything", "from_": m.ref}}], scene)
+    assert same[0]["op"] == "give"
