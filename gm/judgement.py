@@ -2062,9 +2062,11 @@ _CAST_ROLES = ("merchant|trader|vendor|stallkeeper|shopkeeper|guard|guardsman|"
                "artisan|soldier|sailor|innkeeper|barkeep|bartender|thug|urchin|"
                "elder|farmer|fisherman|smith|scribe|porter|drover|peddler|"
                "man|woman|boy|girl")
+# Any-case adjectives, in any order: "an elderly Kelvaxian vendor" has the
+# lowercase one first and the demonym second, and an ordered pattern missed it.
 _CAST_INTRO = re.compile(
-    r"\b(?:a|an|one|the)\s+((?:[A-Z][a-z'-]+\s+){0,2}(?:[a-z-]+\s+){0,2}"
-    r"(?:" + _CAST_ROLES + r"))\b")
+    r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
+    r"(?:" + _CAST_ROLES + r"))\b", re.I)
 _CAST_MAX = 8
 
 
