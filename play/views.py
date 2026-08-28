@@ -973,10 +973,22 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     _recent_events(c.world, c.location))
         earlier = [b["text"] for b in c.transcript[-8:] if b["who"] == "gm"]
         try:
-            text, repairs, _ = agent.narrate_turn(
+            text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier)
         except ModelUnavailable:
-            text, repairs = "", []
+            text, repairs, prose_attempts = "", [], []
+        # Into the ledger, not the void: a live holding-line turn used to leave
+        # no record of why the prose whiffed — the attempts were unpacked into
+        # `_` and dropped, so the one diagnosable artefact never existed.
+        c.turn_log.append({
+            "kind": "prose",
+            "chars": len(text or ""),
+            "repairs": list(repairs or []),
+            "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
+                          "model": a.model, "note": (a.note or "")[:300],
+                          "raw": (a.raw or "")[:300]}
+                         for a in prose_attempts],
+        })
         if not text:
             # Raw tells name the PC — "Initiative: Kesst Vayr..." — and the
             # gemma4 fight audit showed them shipping third-person whenever the
