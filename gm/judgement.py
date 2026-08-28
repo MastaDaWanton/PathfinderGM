@@ -2114,9 +2114,16 @@ def cast_brief(scene) -> str:
 
 
 def clear_cast(scene) -> None:
-    """Walking away leaves the prose-people behind with everything else."""
-    if scene is not None:
-        scene.cast = []
+    """Walking away leaves the prose-people behind with everything else —
+    including the ones the ledger promoted to living actors."""
+    if scene is None:
+        return
+    for e in scene.cast:
+        ref = e.get("ref")
+        if ref and ref in scene.actors and not scene.actors[ref].is_pc \
+                and scene.actors[ref].hp > 0:
+            scene.depart(ref)
+    scene.cast = []
 
 
 # --- Heat: what the bystanders just saw -----------------------------------------------
@@ -2203,3 +2210,47 @@ def inject_company(raw_intents, player_text: str, scene):
              "because": "the player addressed somebody the scene had not made real",
              "params": {"template": "guildhand", "count": 1, "name": word,
                         "zone": "engaged"}}] + list(raw_intents)
+
+
+_PROMOTED_CAP = 4
+
+
+def promote_cast(scene, added) -> list[str]:
+    """A person the ledger notes becomes a person the engine holds.
+
+    The ruling, after the library beat: the place held but "there should have
+    been a stranger" — the ledger knew about him and the scene did not, so he
+    could not be attacked, addressed, traded with or found again. Every newly
+    noted entry now spawns as a living civilian (the fight cues pick watchman-
+    kinds for armed roles, guildhand for the rest), capped at four standing
+    promoted civilians so a crowd scene does not flood the panel. The entry
+    remembers its ref, so clearing the ledger walks its people off with it.
+    """
+    from rules.bestiary import instantiate
+
+    if scene is None or not added or getattr(scene, "in_encounter", False):
+        # Mid-fight, bystanders stay prose: joining a battle takes the spawn op's
+        # initiative bookkeeping, not a quiet walk-on.
+        return []
+    standing = [e for e in scene.cast
+                if e.get("ref") and e["ref"] in scene.actors
+                and scene.actors[e["ref"]].hp > 0]
+    made = []
+    for phrase in added:
+        if len(standing) + len(made) >= _PROMOTED_CAP:
+            break
+        template = "guildhand"
+        for cue, name in _TEMPLATE_CUES:
+            if cue.search(phrase):
+                template = name
+                break
+        actor = instantiate(template, scene=scene, name=phrase)
+        scene.add(actor) if hasattr(scene, "add") else scene.actors.update(
+            {actor.ref: actor})
+        scene.zones[actor.ref] = "near"
+        for e in scene.cast:
+            if e.get("who") == phrase and not e.get("ref"):
+                e["ref"] = actor.ref
+                break
+        made.append(phrase)
+    return made

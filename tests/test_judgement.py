@@ -1386,3 +1386,28 @@ def test_continue_holds_the_thread_and_the_ledger_rots():
     judgement.note_cast(s, "An elderly Kelvaxian vendor waves.", turn=20)
     assert all(e["who"] != "stranger" for e in s.cast)
     assert any("vendor" in e["who"] for e in s.cast)
+
+
+def test_a_noted_person_stands_in_the_scene():
+    """The ruling after the library beat: the place held but 'there should have
+    been a stranger' — the ledger knew about him and the engine did not, so he
+    could not be attacked, addressed, or found again. Newly noted cast promote
+    to living civilians (armed roles get the watchman statline), capped at four,
+    and walking away takes them off the board with the ledger."""
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    added = judgement.note_cast(
+        s, "A stranger watches from the doorway. Nearby, an armed guard "
+           "leans on his spear.", turn=2)
+    made = judgement.promote_cast(s, added)
+    assert len(made) == 2
+    names = {a.name for a in s.actors.values() if not a.is_pc}
+    assert any("stranger" in n for n in names)
+    assert any("guard" in n for n in names)
+    guard = next(a for a in s.actors.values() if "guard" in a.name)
+    assert guard.from_template == "watchman"
+
+    judgement.clear_cast(s)
+    assert all(a.is_pc for a in s.actors.values())

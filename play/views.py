@@ -993,8 +993,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             if rewrit:
                 repairs.append("arrivals at the place they already stand: "
                                f"rewrote {len(rewrit)}")
-            # The beat is final; whoever it introduced is on the books now.
-            judgement.note_cast(c.scene, text, turn=len(c.transcript))
+            # The beat is final; whoever it introduced is on the books now —
+            # and on the board: a noted person the engine does not hold cannot
+            # be attacked, addressed or found again.
+            introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
+            judgement.promote_cast(c.scene, introduced)
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})
     elif outcomes:
