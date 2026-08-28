@@ -3808,6 +3808,45 @@ class Engine:
         taker = self.scene.actors.get(to_ref) if to_ref else None
         giver = self.scene.actors.get(from_ref) if from_ref else None
 
+        # "merchants stuff" is not an item — measured live: the model proposed a
+        # give of exactly that phrase with no giver, and the world-never-runs-out
+        # branch minted it into the pack, labelled "the engine has no rules for
+        # it". A bulk phrase means the whole carry: with a giver, everything they
+        # hold moves; without one, there is nothing to move and the turn says so
+        # instead of inventing an object called stuff.
+        if re.search(r"\b(stuff|everything|belongings|wares|inventory|"
+                     r"all (?:of )?(?:it|his|her|their|the) ?\w*)\b", item, re.I):
+            if giver is None:
+                return Outcome(
+                    intent_id=intent.id, op="give", effects=[],
+                    tell=(f"{item!r} is a word, not a thing. Name the item, or "
+                          f"loot a body, or trade at the stall."),
+                    because=intent.because)
+            from .bestiary import collapse_kit
+            collapse_kit(giver)
+            taken: list[str] = []
+            for store in (giver.goods, giver.inventory):
+                for thing, n in list(store.items()):
+                    if taker is not None:
+                        tgt = (taker.goods if store is giver.goods
+                               else taker.inventory)
+                        tgt[thing] = tgt.get(thing, 0) + n
+                    taken.append(f"{n} × {thing}" if n != 1 else str(thing))
+                store.clear()
+            for coin, n in list(giver.purse.items()):
+                if taker is not None:
+                    taker.purse[coin] = taker.purse.get(coin, 0) + n
+                taken.append(f"{n} {coin}")
+            giver.purse = {}
+            return Outcome(
+                intent_id=intent.id, op="give",
+                effects=[{"ref": getattr(taker, "ref", ""), "kind": "took",
+                          "from": giver.ref, "items": taken}],
+                tell=(f"Everything {giver.name} carries changes hands: "
+                      + (", ".join(taken) if taken else "nothing at all — "
+                         "their hands are empty") + "."),
+                because=intent.because)
+
         coins = goods.coinage(getattr(self, "world", None), None)
         denom = goods.coin_named(item, coins)
 

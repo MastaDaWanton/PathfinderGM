@@ -1144,3 +1144,32 @@ def test_the_unopened_claim_survives_a_save():
     thug = instantiate("thug", scene=Scene(), name="the tough")
     back = from_dict(to_dict(thug), ref="c9")
     assert back.kit_pending == thug.kit_pending != {}
+
+
+def test_stuff_is_a_word_not_a_thing():
+    """Measured live: a give of "merchants stuff" with no giver rode the
+    world-never-runs-out branch and minted an object called merchants stuff,
+    labelled 'the engine has no rules for it'. A bulk phrase with a giver moves
+    everything they hold — kit claim collapsed first — and with nobody named it
+    refuses in words instead of inventing."""
+    from rules.bestiary import instantiate
+
+    scene = Scene(location_id="pangrella")
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    eng = Engine(scene, Dice(seed=5))
+    out = eng.run(eng.validate([{"op": "give", "actor": "pc", "because": "t",
+                                 "params": {"item": "merchants stuff"}}])).outcomes[0]
+    assert "not a thing" in out.tell
+    assert "merchants stuff" not in pc.goods and "merchants-stuff" not in pc.inventory
+
+    m = instantiate("guildhand", scene=scene, name="the merchant")
+    scene.add(m)
+    m.goods["bolt-of-silk"] = 2
+    before = dict(pc.goods)
+    out = eng.run(eng.validate([{"op": "give", "actor": "pc", "because": "t",
+                                 "params": {"item": "everything he has",
+                                            "from_": m.ref, "to": "pc"}}])).outcomes[0]
+    assert pc.goods.get("bolt-of-silk", 0) == 2
+    assert m.goods == {} and m.kit_pending == {}
+    assert pc.inventory        # the collapsed kit's pockets came along
