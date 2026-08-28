@@ -33,7 +33,10 @@ def home(request):
     page is opened rarely and being wrong on it is expensive."""
     active = campaign_mod.current()
     pc = active.scene.pc()
+    from pathfindergm import version
+
     return render(request, "play/home.html", {
+        "build": version.build(),
         "state_json": json.dumps({
             "worlds": [w.as_dict() for w in library.worlds()],
             "recent": library.recent_characters(),

@@ -574,3 +574,14 @@ def test_the_portfile_is_written_after_bind_and_removed_on_shutdown():
     src = inspect.getsource(desktop.main)
     assert src.index("_bind(") < src.index("_write_portfile(")
     assert "portfile.unlink()" in src
+
+
+def test_the_home_page_says_which_build_it_is():
+    """"add a version tracker to the main page and i dont have to wonder" —
+    after a session of findings filed against a build that had already been
+    superseded. Dev reads git live; the packaged build is stamped by
+    tools/stamp_version.py before PyInstaller runs."""
+    from pathfindergm import version
+
+    got = version.build()
+    assert got and got != "unstamped"

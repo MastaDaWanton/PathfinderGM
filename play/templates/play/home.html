@@ -2051,5 +2051,9 @@ async function post(url, body) {
 
 render();
 </script>
+<!-- The build the player is actually running, so a finding is never filed
+     against a version that no longer exists. Stamped at package time. -->
+<div style="position:fixed; right:10px; bottom:6px; font-size:11px; opacity:.45;
+            font-family:monospace; pointer-events:none;">build {{ build }}</div>
 </body>
 </html>
