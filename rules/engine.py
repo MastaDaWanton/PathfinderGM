@@ -115,6 +115,13 @@ class Scene:
     # state the engine owns: {"doing", "subject", "age"} — the prose layer is fed
     # it as fact and scrubbed against it, first slice of the world-state ledger.
     thread: dict = field(default_factory=dict)
+    # The cast ledger, slice 2 of the world state: people the narration has
+    # introduced who are not (yet) engine actors. Each entry {"who": the phrase
+    # the prose used, "turn": when}. The brief feeds them back as fact so the
+    # narrator cannot forget its own cast, and interacting with one promotes it
+    # to a real actor through the ordinary spawn machinery. Prose invented them;
+    # the ledger just refuses to let prose disinvent them.
+    cast: list = field(default_factory=list)
     # What each shop has sold, as "place|stall|day|material" -> count. A stall's shelf is
     # drawn rather than stored (see `rules.market`), so this is the only part that has to
     # survive a save: the one legendary on the shelf has to stay sold once it is bought.

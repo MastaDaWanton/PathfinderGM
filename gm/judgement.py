@@ -249,7 +249,12 @@ _INVENTED_REF = re.compile(r"^[a-z][a-z_]{2,}[ _-]?\d*$", re.I)
 _TEMPLATE_CUES = (
     (re.compile(r"\b(dog|hound|mastiff)\b", re.I), "guard dog"),
     (re.compile(r"\b(watch|watchman|watchmen|guard|guards|soldier)\b", re.I), "watchman"),
-    (re.compile(r"\b(guildhand|clerk|servant|porter)\b", re.I), "guildhand"),
+    # Civilians the cast ledger introduces fight like the commoners they are —
+    # promoting "the Kelvaxian merchant" into a warrior statblock would make
+    # every shopkeeper a bruiser.
+    (re.compile(r"\b(guildhand|clerk|servant|porter|merchant|trader|innkeeper|"
+                r"barkeep|bartender|peddler|farmer|fisherman|beggar|urchin|"
+                r"scribe|artisan)\b", re.I), "guildhand"),
 )
 
 
@@ -2042,3 +2047,60 @@ _WALKS_AWAY = re.compile(
 def player_departs(player_text: str) -> bool:
     """Whether this input is the player walking away from where they stand."""
     return bool(_WALKS_AWAY.search(str(player_text or "")))
+
+
+# --- The cast ledger: people the prose introduced, held as scene state ----------------
+
+_CAST_ROLES = ("merchant|trader|guard|guardsman|watchman|watchwoman|stranger|"
+               "priest|priestess|laborer|labourer|beggar|noble|clansman|clanswoman|"
+               "artisan|soldier|sailor|innkeeper|barkeep|bartender|thug|urchin|"
+               "elder|farmer|fisherman|smith|scribe|porter|drover|peddler|"
+               "man|woman|boy|girl")
+_CAST_INTRO = re.compile(
+    r"\b(?:a|an|one|the)\s+((?:[A-Z][a-z'-]+\s+){0,2}(?:[a-z-]+\s+){0,2}"
+    r"(?:" + _CAST_ROLES + r"))\b")
+_CAST_MAX = 8
+
+
+def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
+    """People the narration introduced become ledger entries, mechanically.
+
+    The haunted-house class of bug in its second form: prose invents a Kelvaxian
+    merchant, the player answers him, and two beats later he has evaporated
+    because he lived nowhere but the model's short memory. Role-phrases in a GM
+    beat are read into `scene.cast`; the brief feeds them back as fact. Capped,
+    deduplicated on the role's head word, and never containing anyone who is
+    already a real actor.
+    """
+    if scene is None or not gm_beat:
+        return []
+    real = " ".join(a.name.lower() for a in scene.actors.values())
+    heads = {str(e.get("who", "")).split()[-1].lower() for e in scene.cast}
+    added = []
+    for m in _CAST_INTRO.finditer(gm_beat):
+        who = " ".join(m.group(1).split())
+        head = who.split()[-1].lower()
+        if head in heads or head in real:
+            continue
+        heads.add(head)
+        scene.cast.append({"who": who, "turn": int(turn)})
+        added.append(who)
+    if len(scene.cast) > _CAST_MAX:
+        scene.cast = scene.cast[-_CAST_MAX:]
+    return added
+
+
+def cast_brief(scene) -> str:
+    """The ledger as a line of fact for the prose call, or ""."""
+    entries = getattr(scene, "cast", None) or []
+    if not entries:
+        return ""
+    names = "; ".join(str(e.get("who")) for e in entries if e.get("who"))
+    return (f"ALSO PRESENT, introduced earlier (fact, keep them consistent, do "
+            f"not re-introduce them): {names}.")
+
+
+def clear_cast(scene) -> None:
+    """Walking away leaves the prose-people behind with everything else."""
+    if scene is not None:
+        scene.cast = []

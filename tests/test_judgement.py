@@ -1250,3 +1250,45 @@ def test_the_thread_knows_where_and_nobody_arrives_there_twice():
     assert "heading through the market" in out
     assert "stand in the market" in out
     assert "towards the market" not in out
+
+
+# --- the cast ledger: prose-people become scene state ---------------------------------
+
+def test_the_prose_cast_is_on_the_books_and_in_the_brief():
+    """The haunted-house class in its second form: a Kelvaxian merchant approached
+    the player and two beats later had evaporated, because he lived nowhere but
+    the model's short memory. Role-phrases in a final beat land in scene.cast,
+    the brief feeds them back as fact, and walking away leaves them behind."""
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    s = Scene()
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    beat = ("One of them, a Kelvaxian merchant, notices your return and "
+            "approaches you. Behind him an old priestess watches from a stall.")
+    added = judgement.note_cast(s, beat, turn=3)
+    assert any("merchant" in a for a in added)
+    assert any("priestess" in a for a in added)
+
+    brief = judgement.cast_brief(s)
+    assert "Kelvaxian merchant" in brief and "priestess" in brief
+
+    # The same beat again introduces nobody twice.
+    assert judgement.note_cast(s, beat, turn=4) == []
+
+    # A real actor's role never doubles into the ledger.
+    from rules.bestiary import instantiate
+    s2 = Scene(); s2.add(instantiate("watchman", scene=s2, name="the watchman"))
+    assert judgement.note_cast(s2, "The watchman frowns at a watchman.", 1) == []
+
+    judgement.clear_cast(s)
+    assert s.cast == [] and judgement.cast_brief(s) == ""
+
+
+def test_a_ledger_merchant_promotes_to_a_civilian_not_a_bruiser():
+    """Attacking the merchant the prose introduced must spawn a commoner
+    statline: promoting shopkeepers to warriors makes every stall a fight club."""
+    out = judgement.inject_fight([{"op": "narrate_only"}],
+                                 "I attack the merchant", _empty_room())
+    spawn = next(i for i in out if i.get("op") == "spawn")
+    assert spawn["params"]["template"] == "guildhand"

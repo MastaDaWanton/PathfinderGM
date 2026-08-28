@@ -945,6 +945,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     # stay where they fell, whether or not the walk crossed a biome line.
     if judgement.player_departs(player_input):
         left = agent.engine.leave_behind()
+        judgement.clear_cast(c.scene)
         if left:
             c.transcript.append({"who": "gm", "text": " ".join(left),
                                  "kind": "consequence"})
@@ -979,6 +980,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             if rewrit:
                 repairs.append("arrivals at the place they already stand: "
                                f"rewrote {len(rewrit)}")
+            # The beat is final; whoever it introduced is on the books now.
+            judgement.note_cast(c.scene, text, turn=len(c.transcript))
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})
     elif outcomes:
