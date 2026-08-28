@@ -1997,3 +1997,16 @@ def thread_brief(scene) -> str:
             f"{t.get('doing', 'engaged with')} {t['subject']}. Keep them and the "
             f"present surroundings in the scene; do not change location, and do "
             f"not drop or replace {t['subject']} unless the player does.")
+
+
+# Distinct from `_DEPARTS` far above, which belongs to inject_travel and carries
+# the capture groups that function reads — reusing the name silently rebound it
+# and broke "Return to Zhilvarnia" the moment this was appended below it.
+_WALKS_AWAY = re.compile(
+    r"\bI\s+(?:leave|walk away|move on|head (?:to|for|out|back)|return to|"
+    r"go (?:to|back)|depart|make my way)\b", re.I)
+
+
+def player_departs(player_text: str) -> bool:
+    """Whether this input is the player walking away from where they stand."""
+    return bool(_WALKS_AWAY.search(str(player_text or "")))

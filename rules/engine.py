@@ -1955,8 +1955,15 @@ class Engine:
     def _op_item_damage(self, intent: Intent, partial: dict) -> Outcome:
         """Damage to gear. Named item, or everything carried when none is named."""
         ref = intent.params.get("to") or intent.target or intent.actor
-        if not ref:
-            raise IntentError("item_damage: needs whose gear", "schema")
+        if not ref or ref not in self.scene.actors:
+            # A refusal, never a raise: validation only requires `amount`, so this
+            # op can arrive aimed at nobody — and did, live, mid-turn, where the
+            # raise threw away the whole resolved turn as a 502. Whose gear wears
+            # is a fact the GM failed to state; nothing is the honest resolution.
+            return Outcome(
+                intent_id=intent.id, op="item_damage", effects=[],
+                tell="Nobody's gear is named, so nothing takes the wear.",
+                because=intent.because)
         target = self.scene.actors[ref]
         amount = intent.params["amount"]
         roll = None
@@ -2191,6 +2198,44 @@ class Engine:
                       **(pool.as_dict() if pool else {"id": pool_id})}],
             tell=tell, because=intent.because,
         )
+
+    def leave_behind(self) -> list[str]:
+        """The player walks away inside the same biome: the scene lets go.
+
+        Travel sheds the fallen, but only on a biome change — measured live, "I
+        leave and return to the market" kept the whole battlefield: four corpses
+        in the scene panel scenes later, and a stranger who had been "bleeding
+        out" since the first fight, printing his tell every turn. Leaving is
+        leaving. The dying run their course off-screen (1e's own odds: stabilise
+        on the way down or bleed out at a point a round), and the dead and the
+        down stay where they fell. No-op mid-encounter — you do not walk out of
+        an initiative order.
+        """
+        if self.scene.in_encounter:
+            return []
+        tells: list[str] = []
+        for ref in list(self.scene.actors):
+            a = self.scene.actors[ref]
+            if a.is_pc:
+                continue
+            if a.has_condition("dying"):
+                floor = -a.ability_score("con")
+                while a.hp > floor and a.has_condition("dying"):
+                    if self.dice.roll("1d100", label="stabilise",
+                                      visibility="hidden").total <= 10:
+                        a.remove_condition("dying")
+                        a.add_condition("stable", source="luck")
+                        break
+                    a.hp -= 1
+                a.apply_hp_state()
+                tells.append(
+                    f"{a.name} "
+                    + ("stabilises where they lie."
+                       if a.has_condition("stable")
+                       else "has bled out where they fell."))
+            if a.hp <= 0 or a.has_state("state.down"):
+                self.scene.depart(ref)
+        return tells
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.

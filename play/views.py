@@ -941,6 +941,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     # declared — "I follow the guards" must constrain the beat that answers it.
     judgement.update_thread(c.scene, player_input,
                             [o.op for o in resolution.outcomes])
+    # Walking away lets the scene go: the dying resolve off-screen and the fallen
+    # stay where they fell, whether or not the walk crossed a biome line.
+    if judgement.player_departs(player_input):
+        left = agent.engine.leave_behind()
+        if left:
+            c.transcript.append({"who": "gm", "text": " ".join(left),
+                                 "kind": "consequence"})
 
     outcomes = [o for o in resolution.outcomes if o.tell]
     if getattr(agent, "intents_first", False):

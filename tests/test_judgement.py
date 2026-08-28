@@ -1175,3 +1175,49 @@ def test_the_thread_brief_and_the_anchor():
     kept = "The guards ahead slow at the market's edge. What do you do?"
     same, anchored = narration.keep_the_thread(kept, s.thread)
     assert same == kept and not anchored
+
+
+def test_walking_away_lets_the_scene_go():
+    """Measured live: "i leave and return to the market" kept the whole
+    battlefield — four corpses in the scene panel scenes later, and a stranger
+    "bleeding out" since the first fight, printing his tell every turn. Travel
+    shed only on a biome change; leaving is leaving. The dying resolve off-screen
+    by 1e's own odds and the fallen depart the scene."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    s = Scene()
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    corpse = instantiate("thug", scene=s, name="the thug")
+    s.add(corpse); corpse.hp = -20; corpse.apply_hp_state()
+    dying = instantiate("watchman", scene=s, name="the stranger")
+    s.add(dying); dying.hp = -8; dying.apply_hp_state()
+    assert dying.has_condition("dying")
+
+    e = Engine(s, Dice(seed=9))
+    assert judgement.player_departs("i leave and return to the market")
+    assert not judgement.player_departs("I attack the merchant")
+    tells = e.leave_behind()
+    assert corpse.ref not in s.actors
+    assert any("stranger" in t for t in tells)
+    # However the dice fell, the stranger's story resolved: stable and left
+    # behind, or dead — never eternally bleeding in the scene panel.
+    assert dying.ref not in s.actors
+    assert not dying.has_condition("dying")
+
+
+def test_an_unaimed_item_damage_is_a_refusal_not_a_dead_turn():
+    """Measured live: the GM proposed item_damage with an amount and nobody's
+    gear; validation only requires the amount, so the raise happened mid-run and
+    the whole resolved turn died as a 502 red wall."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    e = Engine(s, Dice(seed=1))
+    out = e.run(e.validate([{"op": "item_damage", "because": "t",
+                             "params": {"amount": 4}}])).outcomes[0]
+    assert "Nobody's gear" in out.tell
