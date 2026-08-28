@@ -1000,6 +1000,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             if rewrit:
                 repairs.append("arrivals at the place they already stand: "
                                f"rewrote {len(rewrit)}")
+            # The floor of last resort. Measured live on a Continue: the model
+            # echoed the instruction itself, the groomers compressed the echo,
+            # and the beat that shipped was "You take scene on." — four words
+            # against a 600-character scene floor every earlier gate is supposed
+            # to hold. A beat this short with no dice behind it is not a beat.
+            if len(text.strip()) < 60 and not outcomes:
+                text = ("The moment holds — nothing new shows itself just yet. "
+                        "What do you do?")
+                repairs.append("beat too short to stand: replaced with a "
+                               "holding line")
             # The beat is final; whoever it introduced is on the books now —
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.

@@ -1479,3 +1479,18 @@ def test_the_player_is_you_even_when_the_model_names_her():
     assert "you press forward" in out
     assert "'Kesst Vayr!' someone shouts." in out
     assert pc_to_second_person("The thug circles.", "Kesst Vayr") == ("The thug circles.", 0)
+
+
+def test_a_four_word_beat_cannot_stand(client, settings, tmp_path, monkeypatch):
+    """Measured live on a Continue: the model echoed the instruction, the
+    groomers compressed the echo, and 'You take scene on.' shipped against a
+    600-character scene floor. Source-inspected: the finish path holds a floor
+    of last resort — a beat under 60 characters with no dice behind it becomes
+    an honest holding line."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "play" / "views.py").read_text(
+        encoding="utf-8")
+    guard = src[src.index("The floor of last resort"):][:700]
+    assert "< 60" in guard and "not outcomes" in guard
+    assert "The moment holds" in guard
