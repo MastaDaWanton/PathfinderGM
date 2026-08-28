@@ -1361,3 +1361,28 @@ def test_a_public_killing_heats_the_scene_and_bodies_age_out():
     e.tidy_the_fallen(); assert victim.ref in s.actors      # grace turn 1
     e.tidy_the_fallen(); assert victim.ref in s.actors      # grace turn 2
     e.tidy_the_fallen(); assert victim.ref not in s.actors  # swept
+
+
+def test_continue_holds_the_thread_and_the_ledger_rots():
+    """Measured live from the save's own ledger: at the Continue turn the thread
+    was {} — browsing and walking-up were not thread verbs — and the cast held
+    one stale "stranger" from a dozen turns back. Continue arrived with no
+    constraint and a bread stall became a library. The Continue instruction now
+    counts as a continue, browsing somebody is an engagement, and ledger entries
+    older than twelve turns rot out."""
+    from play.views import CARRY_ON
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
+    judgement.update_thread(s, "i browse her bread")
+    assert s.thread.get("doing") == "talking to"
+
+    for _ in range(5):
+        judgement.update_thread(s, CARRY_ON)
+    assert s.thread.get("age") == 0                 # held, not aged out
+
+    s.cast = [{"who": "stranger", "turn": 1}]
+    judgement.note_cast(s, "An elderly Kelvaxian vendor waves.", turn=20)
+    assert all(e["who"] != "stranger" for e in s.cast)
+    assert any("vendor" in e["who"] for e in s.cast)

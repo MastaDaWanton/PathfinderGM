@@ -1952,12 +1952,17 @@ def repair_bare_spawns(raw_intents, player_text: str):
 
 _THREAD_VERBS = re.compile(
     r"\bI\s+(?:(follow|tail|shadow|track|pursue)|"
-    r"(talk to|question|interrogate|speak (?:to|with)|ask)|"
+    r"(talk to|question|interrogate|speak (?:to|with)|ask|approach|"
+    r"walk (?:up )?to|greet|browse|buy from|chat with)|"
     r"(watch|observe|study|keep an eye on)|"
     r"(wait for|look for|search for))\s+(.{3,60}?)\s*[.!?]?$", re.I)
+# The Continue button's own instruction counts as a continue — measured live: the
+# thread was empty, Continue arrived with no constraint at all, and a bread stall
+# became a library between beats.
 _THREAD_CONTINUES = re.compile(
     r"^\s*(?:i\s+)?(?:continue|keep(?:\s+(?:going|following|watching|at it))?|"
-    r"carry on|press on|stay (?:on|with) (?:them|him|her|it))\b", re.I)
+    r"carry on|press on|stay (?:on|with) (?:them|him|her|it)|"
+    r"take no action\b)", re.I)
 _THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
 
 
@@ -2051,7 +2056,8 @@ def player_departs(player_text: str) -> bool:
 
 # --- The cast ledger: people the prose introduced, held as scene state ----------------
 
-_CAST_ROLES = ("merchant|trader|guard|guardsman|watchman|watchwoman|stranger|"
+_CAST_ROLES = ("merchant|trader|vendor|stallkeeper|shopkeeper|guard|guardsman|"
+               "watchman|watchwoman|stranger|"
                "priest|priestess|laborer|labourer|beggar|noble|clansman|clanswoman|"
                "artisan|soldier|sailor|innkeeper|barkeep|bartender|thug|urchin|"
                "elder|farmer|fisherman|smith|scribe|porter|drover|peddler|"
@@ -2085,6 +2091,11 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         heads.add(head)
         scene.cast.append({"who": who, "turn": int(turn)})
         added.append(who)
+    # Old entries rot out: a bare "stranger" noted a dozen turns back fed a whole
+    # invented library scene when a Continue arrived with nothing else to hold —
+    # the ledger is the present cast, not a census of everyone ever mentioned.
+    scene.cast = [e for e in scene.cast
+                  if int(turn) - int(e.get("turn", 0)) <= 12]
     if len(scene.cast) > _CAST_MAX:
         scene.cast = scene.cast[-_CAST_MAX:]
     return added
