@@ -136,7 +136,7 @@ class GMAgent:
             # `narrate_only` is not among the choices, so the failure that cost this
             # project its whole combat loop — narrating a punch and proposing nothing —
             # is not a reply the sampler can produce. See `prompts.turn_schema`.
-            reply = client.chat(messages, model, host, as_json=True,
+            reply = client.chat(messages, model, host, as_json=True, think=False,
                                 temperature=0.8 if n == 0 else 0.5,
                                 provider=provider, api_key=key,
                                 schema=prompts.turn_schema(
@@ -364,7 +364,7 @@ class GMAgent:
         rejections: list[str] = []
 
         for n in range(max_attempts):
-            reply = client.chat(messages, self.model, self.host, as_json=True,
+            reply = client.chat(messages, self.model, self.host, as_json=True, think=False,
                                 provider=self.provider, api_key=self.api_key,
                                 temperature=0.7, num_predict=400,
                                 # The same grammar every other turn call carries. This
@@ -638,6 +638,12 @@ class GMAgent:
             text, fp = narration_mod.second_person_narrator(text)
             if fp:
                 repairs.append(f"narrator in the scene: swapped {', '.join(fp)}")
+        pc = self.engine.scene.pc()
+        if pc is not None:
+            text, named = narration_mod.pc_to_second_person(text, pc.name)
+            if named:
+                repairs.append(f"the player narrated by name: {named} swap(s) "
+                               f"to second person")
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
@@ -711,7 +717,7 @@ class GMAgent:
             reply = client.chat(
                 prompts.narration_repair_messages(
                     text, complaint, player_input, scene_brief),
-                self.model, self.host, as_json=True, provider=self.provider,
+                self.model, self.host, as_json=True, think=False, provider=self.provider,
                 api_key=self.api_key, temperature=0.6, num_predict=900,
                 # Structural insurance, not a truncation cure: `as_json` already puts a
                 # JSON grammar at the sampler, and the live "Unterminated string" failure
@@ -789,7 +795,7 @@ class GMAgent:
             try:
                 reply = client.chat(
                     prompts.repair_messages(claim.sentence, claim.why),
-                    self.model, self.host, as_json=True, temperature=0.3, num_predict=200,
+                    self.model, self.host, as_json=True, think=False, temperature=0.3, num_predict=200,
                     # 200 tokens is roomy for one sentence, and the ceiling means the
                     # string closes before the budget can die mid-word — the failure
                     # the census counted six times on the unconstrained calls.
@@ -842,7 +848,7 @@ class GMAgent:
                 prompts.call_prose_messages(brief, [], player_input, tells,
                                             in_combat=fighting,
                                             enemy=self._current_enemy()),
-                self.prose_model, self.prose_host, as_json=True, temperature=0.8,
+                self.prose_model, self.prose_host, as_json=True, think=False, temperature=0.8,
                 num_predict=900, provider=self.prose_provider, api_key=self.prose_key,
                 schema=prompts.prose_schema(
                     narration_mod.MIN_COMBAT_CHARS if fighting
@@ -918,7 +924,7 @@ class GMAgent:
             # spent the whole 250-token budget on its `<think>` block and returned an
             # empty string once the thinking was stripped. Ollama's `think: false` is
             # accepted by the API and ignored by this tune, so headroom is the fix.
-            self.prose_model, self.prose_host, temperature=0.7, num_predict=700,
+            self.prose_model, self.prose_host, think=False, temperature=0.7, num_predict=700,
             provider=self.prose_provider, api_key=self.prose_key,
         )
         # Mechanical, before anything else sees it: the 4B qwen echoed the whole call-2

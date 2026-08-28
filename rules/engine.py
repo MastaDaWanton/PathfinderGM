@@ -3659,7 +3659,10 @@ class Engine:
             return coin
         pc.xp = int(getattr(pc, "xp", 0) or 0) + total
         nxt = xp_mod.total_for(min(20, pc.level + 1))
-        line = (f" {pc.name} gains {total:,} XP for {', '.join(names)} "
+        # Second person at the source: this line reaches the page raw by design,
+        # and "MastaDaWanton gains 135 XP" was the one third-person survivor of
+        # the gemma4 fight audit's final run.
+        line = (f" You gain {total:,} XP for {', '.join(names)} "
                 f"({pc.xp:,} of {nxt:,} for level {min(20, pc.level + 1)}).")
         if xp_mod.ready_to_level(pc):
             line += " Enough to advance — it will settle with a night's sleep."

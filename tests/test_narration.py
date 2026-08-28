@@ -1462,3 +1462,20 @@ def test_the_dead_stay_dead_in_the_prose():
     assert "lies crumpled" in fixed and "catch your breath" in fixed
     # Nobody dead: nothing to police.
     assert narration.cut_dead_men_walking(said, []) == (said, [])
+
+
+def test_the_player_is_you_even_when_the_model_names_her():
+    """Measured on the gemma4:12b fight audit: six of twelve combat turns
+    narrated 'Kesst Vayr's blade...' — clean prose, wrong person, the single
+    fault class of the run. Whole-set swap with listed verb agreements; speech
+    keeps her name — somebody may shout it."""
+    from gm.narration import pc_to_second_person
+
+    t = ("Kesst Vayr's blade bites home. Kesst swings again as Kesst Vayr "
+         "presses forward. 'Kesst Vayr!' someone shouts.")
+    out, n = pc_to_second_person(t, "Kesst Vayr")
+    assert n == 3
+    assert out.startswith("Your blade bites home. You swing again")
+    assert "you press forward" in out
+    assert "'Kesst Vayr!' someone shouts." in out
+    assert pc_to_second_person("The thug circles.", "Kesst Vayr") == ("The thug circles.", 0)

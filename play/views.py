@@ -978,7 +978,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         except ModelUnavailable:
             text, repairs = "", []
         if not text:
+            # Raw tells name the PC — "Initiative: Kesst Vayr..." — and the
+            # gemma4 fight audit showed them shipping third-person whenever the
+            # prose call whiffed. The fallback gets the same person treatment
+            # the prose does.
+            pc = c.scene.pc()
             text = " ".join(plain_tell(o.tell) for o in outcomes)
+            if pc is not None and text:
+                text, _ = narration_mod.pc_to_second_person(text, pc.name)
         if not text and plan is not None and plan.narration:
             # A degraded turn (every model attempt failed) carries its honest
             # sentence in the plan; with no tells to dress, this is the one place
@@ -1008,7 +1015,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # game that works without it.
             text, attempt = "", None
         if not text:
+            pc = c.scene.pc()
             text = " ".join(plain_tell(o.tell) for o in outcomes)
+            if pc is not None and text:
+                text, _ = narration_mod.pc_to_second_person(text, pc.name)
         c.transcript.append({"who": "gm", "text": text, "kind": "consequence"})
         c.history.append({"role": "assistant", "content": text})
 

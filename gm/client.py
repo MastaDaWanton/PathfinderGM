@@ -120,15 +120,45 @@ def chat(
     if think is not None:
         payload["think"] = think
 
-    req = urllib.request.Request(
-        f"{host.rstrip('/')}/api/chat",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-    )
     started = time.monotonic()
-    try:
+
+    def _post(pl):
+        req = urllib.request.Request(
+            f"{host.rstrip('/')}/api/chat",
+            data=json.dumps(pl).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        try:
+            body = _post(payload)
+        except urllib.error.HTTPError as exc:
+            # Not every runtime compiles every schema keyword. Measured on
+            # gemma4:12b: `maxLength` alone made the grammar compiler refuse the
+            # whole turn schema ("failed to parse grammar", HTTP 400) and every
+            # turn died as a 503 — while llama3.1 accepted the same schema for
+            # months. One retry with the uncompilable keyword stripped: the cap
+            # was always advisory (the groomers cut long prose anyway); the
+            # `minLength` floor, which IS load-bearing, compiles and stays.
+            detail = ""
+            try:
+                detail = exc.read().decode("utf-8", "replace")
+            except Exception:
+                pass
+            if exc.code == 400 and "grammar" in detail and schema:
+                def _strip(node):
+                    if isinstance(node, dict):
+                        return {k: _strip(v) for k, v in node.items()
+                                if k != "maxLength"}
+                    if isinstance(node, list):
+                        return [_strip(v) for v in node]
+                    return node
+                bare = dict(payload, format=_strip(payload["format"]))
+                body = _post(bare)
+            else:
+                raise
     except urllib.error.URLError as exc:
         raise ModelUnavailable(
             f"cannot reach Ollama at {host}: {exc}. Start Ollama, or point "

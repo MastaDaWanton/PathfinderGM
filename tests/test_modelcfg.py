@@ -30,7 +30,7 @@ def test_the_shipped_defaults_stand_until_something_is_set(isolated):
     """A fresh install plays against Ollama with no configuration, which is the
     standing constraint, not a convenience."""
     live = modelcfg.roles()
-    assert live["narrator"]["model"] == "llama3.1:8b"
+    assert live["narrator"]["model"] == "gemma4:12b"
     assert live["narrator"]["provider"] == "ollama"
 
 
@@ -52,7 +52,7 @@ def test_setting_a_role_takes_effect_without_a_restart(isolated):
                                        "model": "qwen3:8b"}}) == []
     assert modelcfg.roles()["narrator"]["model"] == "qwen3:8b"
     # And the untouched roles keep the shipped default.
-    assert modelcfg.roles()["prose"]["model"] == "llama3.1:8b"
+    assert modelcfg.roles()["prose"]["model"] == "gemma4:12b"
 
 
 def test_a_provider_this_build_cannot_reach_is_refused(isolated):

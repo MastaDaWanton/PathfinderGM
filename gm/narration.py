@@ -1613,3 +1613,68 @@ def already_there(text: str, where: str) -> tuple[str, list[str]]:
             done.append(rep)
             text = new
     return text, done
+
+
+# Verbs a combat beat actually uses, base forms the s-form maps to. A list, not a
+# stemmer: "you gauntlets" is a noun and must not be "fixed".
+_YOU_VERBS = {
+    "is": "are", "was": "were", "has": "have", "does": "do",
+    "swings": "swing", "steps": "step", "drives": "drive", "brings": "bring",
+    "takes": "take", "catches": "catch", "moves": "move", "presses": "press",
+    "turns": "turn", "raises": "raise", "lunges": "lunge", "slams": "slam",
+    "throws": "throw", "lands": "land", "feels": "feel", "sees": "see",
+    "hears": "hear", "stands": "stand", "drops": "drop", "pulls": "pull",
+    "pushes": "push", "grips": "grip", "draws": "draw", "breathes": "breathe",
+    "ducks": "duck", "dodges": "dodge", "staggers": "stagger",
+    "strikes": "strike", "watches": "watch", "reaches": "reach",
+    "keeps": "keep", "holds": "hold", "looks": "look", "leans": "lean",
+    "knows": "know", "finds": "find", "twists": "twist", "readies": "ready",
+    "closes": "close", "opens": "open", "charges": "charge", "leaps": "leap",
+    "plants": "plant", "snaps": "snap", "sets": "set",
+    # The engine's own tell verbs, found when the tell fallback started flowing
+    # through this: "You hits the drover" shipped with an s.
+    "hits": "hit", "misses": "miss", "gains": "gain", "attacks": "attack",
+    "deals": "deal", "makes": "make", "rolls": "roll", "wins": "win",
+    "squares": "square", "loots": "loot", "pays": "pay", "spends": "spend",
+}
+
+
+def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
+    """The player's character is 'you', even when the model names her.
+
+    Measured on the gemma4:12b fight audit: six of twelve combat turns narrated
+    "Kesst Vayr's blade..." — clean prose, wrong person, the single fault class
+    of the whole run. Deterministic, whole-set, same doctrine as
+    `second_person_narrator`: name and possessive swap together, the verb that
+    follows is fixed from a list rather than a guess, and speech spans are left
+    alone — somebody may shout her name.
+    """
+    name = str(pc_name or "").strip()
+    if not name or not text or name.lower() not in text.lower():
+        return text or "", 0
+    first = name.split()[0]
+    pattern = re.compile(
+        rf"\b(?:{re.escape(name)}|{re.escape(first)})('s)?\b")
+    protected = [m.span() for m in _QUOTED.finditer(text)]
+    count = 0
+    out = []
+    last = 0
+    for m in pattern.finditer(text):
+        if any(qlo <= m.start() < qhi for qlo, qhi in protected):
+            continue
+        out.append(text[last:m.start()])
+        out.append("your" if m.group(1) else "you")
+        last = m.end()
+        count += 1
+    out.append(text[last:])
+    if not count:
+        return text, 0
+    swapped = "".join(out)
+    swapped = re.sub(
+        r"\byou (\w+)\b",
+        lambda m: "you " + _YOU_VERBS.get(m.group(1), m.group(1)),
+        swapped)
+    # Sentence starts: "you swing" opening a sentence keeps its capital.
+    swapped = re.sub(r"(^|[.!?]\s+)you(r)?\b",
+                     lambda m: m.group(1) + "You" + (m.group(2) or ""), swapped)
+    return swapped, count
