@@ -1564,3 +1564,35 @@ def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
               f"{subject} — you are still {doing or 'on'} them, and they have "
               f"not slipped away.")
     return _append_before_hand_back(text, anchor), subject
+
+
+def already_there(text: str, where: str) -> tuple[str, list[str]]:
+    """You cannot arrive at the place you are standing in.
+
+    Measured live twice in one session: the player and the stranger were both in
+    the market, and the beat had them "heading towards the central market square"
+    and re-entering it. The thread knows where they already are, so arrival
+    language aimed at that place is rewritten in place — the smallest edit that
+    keeps the model's scenery while unbreaking the geography.
+    """
+    where = str(where or "").strip()
+    if not where or not text:
+        return text, []
+    head = re.escape(re.sub(r"^the\s+", "", where, flags=re.I))
+    swaps = [
+        (rf"\b(step|walk|head|move|push|go|going|heading|making (?:your|their) way)"
+         rf"(s|ing|es)?\s+(?:back\s+)?(?:to|towards?|into|for)\s+(the\s+{head})",
+         r"\1\2 through \3"),
+        (rf"\b(enter|re-enter|reenter)(s|ing|ed)?\s+(the\s+{head})",
+         r"cross\2 \3"),
+        (rf"\b(arrive|arriving|arrives?d?)\s+(?:at|in)\s+(the\s+{head})",
+         r"stand in \2"),
+        (rf"\b(reach|reaches|reaching)\s+(the\s+{head})", r"move through \2"),
+    ]
+    done = []
+    for pat, rep in swaps:
+        new = re.sub(pat, rep, text, flags=re.I)
+        if new != text:
+            done.append(rep)
+            text = new
+    return text, done

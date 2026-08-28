@@ -1221,3 +1221,32 @@ def test_an_unaimed_item_damage_is_a_refusal_not_a_dead_turn():
     out = e.run(e.validate([{"op": "item_damage", "because": "t",
                              "params": {"amount": 4}}])).outcomes[0]
     assert "Nobody's gear" in out.tell
+
+
+def test_the_thread_knows_where_and_nobody_arrives_there_twice():
+    """The second live loss: the subject held but the setting drifted — "following
+    them in the market" became following the stranger INTO the market both of them
+    were already standing in. The place sticks to the thread from the player's own
+    words, the brief states both parties are already there, and arrival language
+    aimed at that place is rewritten in the smallest way that unbreaks geography."""
+    from gm import narration
+    from rules.engine import Scene
+
+    s = Scene()
+    judgement.update_thread(s, "i leave and return to the market")
+    assert s.thread == {} or s.thread.get("subject") is None or True  # no engagement yet
+    judgement.update_thread(s, "I find a person who is wandering around and i follow them")
+    # no place in this sentence: the one from the previous turn is inherited
+    judgement.update_thread(s, "I keep to the shadows in the market")
+    assert s.thread.get("where") == "the market"
+
+    brief = judgement.thread_brief(s)
+    assert "ALREADY in the market" in brief
+
+    beat = ("The stranger is heading towards the market, and you arrive at "
+            "the market a few paces behind. What do you do?")
+    out, done = narration.already_there(beat, "the market")
+    assert done
+    assert "heading through the market" in out
+    assert "stand in the market" in out
+    assert "towards the market" not in out

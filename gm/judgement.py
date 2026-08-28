@@ -1956,6 +1956,14 @@ _THREAD_CONTINUES = re.compile(
 _THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
 
 
+# At most two words after "the", end-anchored: unbounded, "I keep to the shadows
+# in the market" captured "the shadows in the market" whole, and the brief then
+# swore everybody was already standing in a place that is not a place.
+_THREAD_WHERE = re.compile(
+    r"\b(?:in|into|to|at|through|inside|around)\s+"
+    r"(the\s+[a-z'-]+(?:\s+[a-z'-]+)?)\s*[.!?]?$", re.I)
+
+
 def update_thread(scene, player_text: str, resolved_ops=None) -> None:
     """The engine's memory of what the player is engaged in, written mechanically.
 
@@ -1973,13 +1981,34 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         scene.thread = {}
         return
     text = " ".join(str(player_text or "").split())
+    # The place, the second live loss: the subject held but the setting drifted —
+    # "following them in the market" became following them INTO the market they
+    # were both already in. A named place in the player's own sentence sticks to
+    # the thread, and a fresh engagement inherits it unless it names its own.
+    where = None
+    mw = _THREAD_WHERE.search(text)
+    if mw:
+        where = mw.group(1).strip()
     m = _THREAD_VERBS.search(text)
     if m:
         which = next(i for i in range(1, 5) if m.group(i))
+        subject = m.group(5).strip()
+        sw = _THREAD_WHERE.search(subject)
+        if sw:
+            where = sw.group(1).strip()
+            subject = subject[:sw.start()].strip() or subject
         scene.thread = {"doing": _THREAD_DOINGS[which - 1],
-                        "subject": m.group(5).strip(), "age": 0}
+                        "subject": subject, "age": 0,
+                        "where": where or (scene.thread or {}).get("where", "")}
+        return
+    if where and not scene.thread:
+        # A place with no engagement yet — "i leave and return to the market" —
+        # still anchors: the engagement declared two turns later inherits it.
+        scene.thread = {"where": where, "age": 0}
         return
     if scene.thread:
+        if where:
+            scene.thread["where"] = where
         if _THREAD_CONTINUES.match(text):
             scene.thread["age"] = 0
             return
@@ -1993,10 +2022,13 @@ def thread_brief(scene) -> str:
     t = getattr(scene, "thread", None) or {}
     if not t.get("subject"):
         return ""
+    where = str(t.get("where") or "").strip()
+    placed = (f" Both of them are ALREADY in {where}; nobody arrives at, enters "
+              f"or heads toward {where} — they are there now." if where else "")
     return (f"STANDING THREAD (fact, not suggestion): the player is currently "
-            f"{t.get('doing', 'engaged with')} {t['subject']}. Keep them and the "
-            f"present surroundings in the scene; do not change location, and do "
-            f"not drop or replace {t['subject']} unless the player does.")
+            f"{t.get('doing', 'engaged with')} {t['subject']}.{placed} Keep them "
+            f"and the present surroundings in the scene; do not change location, "
+            f"and do not drop or replace {t['subject']} unless the player does.")
 
 
 # Distinct from `_DEPARTS` far above, which belongs to inject_travel and carries

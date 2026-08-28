@@ -974,6 +974,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
             if anchored:
                 repairs.append(f"the thread held: re-tethered {anchored!r}")
+            text, rewrit = narration_mod.already_there(
+                text, (c.scene.thread or {}).get("where"))
+            if rewrit:
+                repairs.append("arrivals at the place they already stand: "
+                               f"rewrote {len(rewrit)}")
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})
     elif outcomes:
