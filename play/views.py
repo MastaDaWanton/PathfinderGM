@@ -991,6 +991,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # sentence in the plan; with no tells to dress, this is the one place
             # it can reach the page.
             text = plan.narration
+        if not text:
+            # A turn may NEVER answer with silence. Measured live: "I talk to
+            # the woman" produced no beat at all — the prose call whiffed, there
+            # were no tells, no degraded sentence, and the empty string skipped
+            # every floor below because they all lived inside `if text`.
+            text = ("The moment holds — nothing new shows itself just yet. "
+                    "What do you do?")
+            repairs.append("empty turn: replaced with a holding line")
         if text:
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
             if anchored:

@@ -2178,7 +2178,11 @@ _ADDRESSES = re.compile(
 _CIVILIANS = re.compile(
     r"\b(merchant|trader|vendor|stall ?keeper|shopkeeper|innkeeper|barkeep|"
     r"bartender|peddler|farmer|fisherman|smith|scribe|artisan|priest|priestess|"
-    r"beggar|laborer|labourer|porter|clerk|servant|guildhand)\b", re.I)
+    r"beggar|laborer|labourer|porter|clerk|servant|guildhand|"
+    # "I talk to the woman" — the person the prose put by the fire is a person,
+    # and addressing them by nothing more than woman/man/stranger still means
+    # somebody must be there to answer.
+    r"woman|man|stranger|elder|girl|boy)\b", re.I)
 
 
 def inject_company(raw_intents, player_text: str, scene):
