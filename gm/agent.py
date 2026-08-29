@@ -597,6 +597,9 @@ class GMAgent:
         if not text:
             return text or "", repairs, attempts
 
+        text, bled = narration_mod.cut_schema_bleed(text)
+        if bled:
+            repairs.append(f"schema bled into the prose: cut from {bled[0]!r}")
         text = narration_mod.destutter(text)
         text, cut = narration_mod.drop_repeated_beats(text, earlier)
         if cut:

@@ -1494,3 +1494,21 @@ def test_a_four_word_beat_cannot_stand(client, settings, tmp_path, monkeypatch):
     guard = src[src.index("The floor of last resort"):][:700]
     assert "< 60" in guard and "not outcomes" in guard
     assert "The moment holds" in guard
+
+
+def test_the_schema_is_not_the_story():
+    """Measured live on gemma4:12b: the narration field carried the prose, then
+    '", "suggestions woorden": [...]', a <tool_call|> marker, a fenced json block
+    repeating the whole beat, and the intents key — all of it shipped. The first
+    schema artefact ends the prose."""
+    from gm.narration import cut_schema_bleed
+
+    t = ('The air thickens around your arm. How do you use it? '
+         '", "suggestions woorden": ["Wait for them"], "intents": []}'
+         '<tool_call|>```json { "narration": "The air thickens again" }')
+    out, cut = cut_schema_bleed(t)
+    assert out == "The air thickens around your arm. How do you use it?"
+    assert cut
+
+    clean = "The woman looks up. What do you do?"
+    assert cut_schema_bleed(clean) == (clean, [])

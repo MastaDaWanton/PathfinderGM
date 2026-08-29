@@ -1678,3 +1678,33 @@ def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
     swapped = re.sub(r"(^|[.!?]\s+)you(r)?\b",
                      lambda m: m.group(1) + "You" + (m.group(2) or ""), swapped)
     return swapped, count
+
+
+_SCHEMA_BLEED = re.compile(
+    r'''(?x)(
+        "\s*,\s*"suggestions           # the narration string closing into keys
+      | ,?\s*"suggestions(\s+\w+)?"\s*:  # bare suggestions key (or mangled variant)
+      | ,?\s*"intents"\s*:
+      | <tool_call
+      | ```+\s*json
+      | ```+
+      | \{\s*"narration"\s*:
+    )''')
+
+
+def cut_schema_bleed(text: str) -> tuple[str, list[str]]:
+    """The schema is not the story.
+
+    Measured live on gemma4:12b: the model nested its whole JSON reply inside
+    the narration field — the prose, then '", "suggestions woorden": [...]',
+    a <tool_call|> marker, a fenced ```json block repeating the entire beat,
+    and the intents key — and every character of it shipped to the page. The
+    first schema artefact ends the prose; everything from there is plumbing.
+    """
+    if not text:
+        return text or "", []
+    m = _SCHEMA_BLEED.search(text)
+    if not m:
+        return text, []
+    kept = text[:m.start()].rstrip().rstrip('"').rstrip()
+    return kept, [text[m.start():m.start() + 40]]
