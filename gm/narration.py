@@ -1708,3 +1708,39 @@ def cut_schema_bleed(text: str) -> tuple[str, list[str]]:
         return text, []
     kept = text[:m.start()].rstrip().rstrip('"').rstrip()
     return kept, [text[m.start():m.start() + 40]]
+
+
+# The assistant stepping out from behind the narrator to decline. Not a moral
+# judgement on the tune — a mechanical fact about this reply: it is commentary
+# about the scene rather than the scene, so the turn has no prose yet.
+_DECLINED = re.compile(
+    r"\b(?:i(?:'m| am)?\s*(?:can(?:no|')t|won'?t|will not|unable to|not able to|"
+    r"not comfortable|cannot)\s+(?:write|continue|create|generate|assist|help|"
+    r"produce|narrate|depict|go)"
+    r"|as an ai\b"
+    r"|i (?:must|have to) (?:decline|refuse)"
+    r"|(?:this|that) (?:request|content) (?:is|violates)"
+    r"|i'?m sorry,? but\b)", re.I)
+
+
+def reads_as_a_refusal(text: str) -> bool:
+    """Whether this reply is the assistant declining rather than the GM narrating.
+
+    Detected, not argued with: a tune that will not write a beat is the wrong
+    tune for that beat, and the fallback model exists for exactly that. Only
+    fires on short replies — a long passage that happens to contain "I can't"
+    in dialogue is a character speaking, which is the opposite of a refusal.
+    """
+    t = (text or "").strip()
+    if not t or len(t) >= 600:
+        return False
+    # In the opening sentence and outside quotes. "'I can't help you,' she says"
+    # is a character refusing inside the fiction — the opposite of the model
+    # refusing to write it — and an unanchored search called that a refusal.
+    head = _sentences(t)[:1]
+    if not head:
+        return False
+    first = head[0]
+    if _QUOTED.search(first):
+        return False
+    return bool(_DECLINED.search(first))

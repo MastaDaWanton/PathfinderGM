@@ -847,22 +847,51 @@ class GMAgent:
         """
         fighting = self.engine.scene.in_encounter
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
-        try:
-            reply = client.chat(
-                prompts.call_prose_messages(brief, [], player_input, tells,
-                                            in_combat=fighting,
-                                            enemy=self._current_enemy()),
-                self.prose_model, self.prose_host, as_json=True, think=False, temperature=0.8,
-                num_predict=900, provider=self.prose_provider, api_key=self.prose_key,
-                schema=prompts.prose_schema(
-                    narration_mod.MIN_COMBAT_CHARS if fighting
-                    else narration_mod.MIN_SCENE_CHARS, max_chars=2200))
-            text = str(reply.json().get("narration", "")).strip()
-        except Exception as exc:
-            return "", [f"prose failed: {exc}"], [
-                Attempt("prose", 0.0, self.prose_model, note=str(exc)[:120])]
+        messages = prompts.call_prose_messages(
+            brief, [], player_input, tells, in_combat=fighting,
+            enemy=self._current_enemy())
+        schema = prompts.prose_schema(
+            narration_mod.MIN_COMBAT_CHARS if fighting
+            else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
 
-        attempts = [Attempt("prose", reply.seconds, reply.model, reply.text)]
+        # Prose gets the second model call 1 has always had. It never did, and the
+        # gap was invisible until the beat a model declines to write: one call,
+        # one whiff, and the turn drops to the holding line with the scene
+        # frozen. A tune that will not write a passage is not a broken model —
+        # it is the wrong model for that beat, which is the entire reason the
+        # fallback role exists. Truncation and junk take the same road out.
+        from play import modelcfg
+
+        schedule = [(self.prose_model, self.prose_host, self.prose_provider,
+                     self.prose_key)]
+        spare = modelcfg.for_role("fallback") or {}
+        if spare.get("model") and spare["model"] != self.prose_model:
+            schedule.append((spare["model"], spare.get("host", self.prose_host),
+                             spare.get("provider", "ollama"),
+                             spare.get("api_key", "")))
+
+        attempts: list[Attempt] = []
+        text, reply = "", None
+        for model, host, provider, key in schedule:
+            try:
+                reply = client.chat(
+                    messages, model, host, as_json=True, think=False,
+                    temperature=0.8, num_predict=900, provider=provider,
+                    api_key=key, schema=schema)
+                text = str(reply.json().get("narration", "")).strip()
+            except Exception as exc:
+                attempts.append(Attempt("prose", 0.0, model, note=str(exc)[:120]))
+                continue
+            declined = narration_mod.reads_as_a_refusal(text)
+            attempts.append(Attempt(
+                "prose", reply.seconds, reply.model, reply.text,
+                note="declined — handing to the next model" if declined else ""))
+            if text and not declined:
+                break
+            if declined:
+                text = ""
+        if not text:
+            return "", ["prose failed on every model"], attempts
         # No claim repair here on purpose: the engine has already resolved the turn, so
         # "the blow lands" is a fact being reported, not an outcome being invented.
         text, repairs, groom_attempts = self._groom(

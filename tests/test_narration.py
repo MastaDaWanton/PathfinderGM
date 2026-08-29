@@ -1512,3 +1512,32 @@ def test_the_schema_is_not_the_story():
 
     clean = "The woman looks up. What do you do?"
     assert cut_schema_bleed(clean) == (clean, [])
+
+
+def test_a_declining_reply_is_detected_not_argued_with():
+    """A tune that will not write a beat is the wrong tune for that beat, and
+    the fallback role exists for exactly that. Anchored to the opening sentence
+    and outside quotes: "'I can't help you,' she says" is a character refusing
+    inside the fiction, which an unanchored search called a refusal."""
+    from gm.narration import reads_as_a_refusal
+
+    assert reads_as_a_refusal("I can't write that scene.")
+    assert reads_as_a_refusal("I'm sorry, but I won't continue this.")
+    assert reads_as_a_refusal("As an AI, I must decline.")
+    assert not reads_as_a_refusal("'I can't help you,' she says, turning away.")
+    assert not reads_as_a_refusal("The woman looks up. What do you do?")
+    assert not reads_as_a_refusal("")
+
+
+def test_prose_has_the_second_model_call_one_always_had():
+    """Source-inspected: narrate_turn built one call and one only, so any whiff
+    — a decline, a truncation, junk — dropped the turn to the holding line with
+    the scene frozen. It now walks the same fallback schedule plan_turn does."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
+        encoding="utf-8")
+    body = src[src.index("def narrate_turn"):][:3000]
+    assert 'modelcfg.for_role("fallback")' in body
+    assert "for model, host, provider, key in schedule" in body
+    assert "reads_as_a_refusal" in body
