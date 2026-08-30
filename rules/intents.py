@@ -168,6 +168,27 @@ def _suggest(name: str, candidates) -> str:
         return " Did you mean " + " or ".join(repr(c) for c in close) + "?"
     return ""
 
+
+def _bounded(value, low: int, high: int, index: int, what: str) -> int:
+    """A model-authored count, coerced and clamped, refusing what is not a number.
+
+    "No model authors a number" is half of law 3, and the half the op table kept
+    forgetting: `spawn.count` was bounded and `give.count`, `forage.hours` and
+    `attack.iteration` were not — so one authored value could mint a million gold
+    pieces, drive a foraging loop for a year, or index past the end of an attack
+    sequence and raise inside resolution as a 500.
+
+    Clamping rather than refusing an out-of-range number is deliberate and matches
+    `rules/dc.py`: the model meant "a lot", the engine decides how much, and the turn
+    survives. Only a value that is not a number at all is refused, because there is no
+    honest reading of it — and the refusal names what the field is for, so the retry
+    is a repair rather than a guess.
+    """
+    try:
+        return max(low, min(high, int(value)))
+    except (TypeError, ValueError):
+        raise IntentError(f"{what}. {value!r} is not a number.", "schema", index)
+
 # --- The op table ------------------------------------------------------------------
 
 # op -> (required params, optional params, default visibility)
@@ -694,6 +715,39 @@ def _check_params(intent: Intent, index: int) -> None:
                 )
             else:
                 p["manoeuvre"] = key
+        # Which swing of a full attack this is. Unvalidated, it reached
+        # `whole[min(int(it), len(whole) - 1)]` in the engine, where a non-numeric value
+        # raised inside resolution — a 500 rather than a refusal the model could act on.
+        if p.get("iteration") not in (None, ""):
+            p["iteration"] = _bounded(
+                p["iteration"], 0, 15, index,
+                "attack: iteration is which swing of a full attack this is, counting "
+                "from 0")
+
+    elif op == "give":
+        # The purse is the engine's in both directions, and that has to hold at the
+        # intent layer too: `count` was `max(1, int(...))` in the engine with no ceiling,
+        # so one model-authored number could mint a million gold pieces into a campaign
+        # whose whole economy is hand-priced. Bounded like `spawn.count`, and generously
+        # — a sack of forty arrows is a real thing to hand over.
+        if p.get("count") not in (None, ""):
+            p["count"] = _bounded(
+                p["count"], 1, 500, index,
+                "give: count is how many of the item change hands")
+
+    elif op == "forage":
+        # Bounded on the browser path and bounded in the injector; unbounded on the one
+        # path the model actually uses, where it drives the loop the op runs. A day is
+        # already an enormous forage — `_op_forage` refuses company for a reason.
+        # 48 is the injector's own ceiling (gm/judgement.py), not a new number: two
+        # paths already bounded this and the one the model uses did not, so matching
+        # them is the fix rather than inventing a third answer. It must stay above a
+        # day, because the survival rules are built to be exercised past one — a
+        # thirty-hour forage is how the awake clock's checks get tested at all.
+        if p.get("hours") not in (None, ""):
+            p["hours"] = _bounded(
+                p["hours"], 1, 48, index,
+                "forage: hours is how long is spent on the ground, 1 to 48")
 
     elif op == "move":
         zone = str(p["zone"]).strip().lower()

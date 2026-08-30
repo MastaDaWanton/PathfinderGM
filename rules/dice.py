@@ -155,6 +155,13 @@ class Dice:
             flat = -flat
         if count < 1 or count > 100 or faces < 2 or faces > 1000:
             raise BadDice(f"implausible dice {notation!r}")
+        # The bound belongs on the value, not on the notation. Guarding the dice and
+        # not the constant meant the whole guard was defeated by writing the number
+        # after a plus sign: "1d6+999999" passed as plausible and dealt a million
+        # points. The flat term gets the same ceiling as the dice it rides with —
+        # 100d1000 is the most the notation half allows, so nothing legal is refused.
+        if abs(flat) > 100_000:
+            raise BadDice(f"implausible flat term in {notation!r}")
         return count, faces, flat
 
     def roll(
