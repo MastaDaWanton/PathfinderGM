@@ -200,8 +200,18 @@ def audit(turns: int, script: str, world: str, character: str,
                             content_type="application/json")
             seconds = time.monotonic() - started
             if r.status_code != 200:
+                # WHY it failed, not just that it did. Four instant failures in a
+                # heretic run read as model faults until the status turned out to
+                # be 410 — the PC had died and the campaign was over, which is the
+                # harness outliving its character rather than the narrator failing.
+                why = ""
+                try:
+                    why = json.dumps(r.json())[:200]
+                except Exception:
+                    why = (r.content or b"")[:200].decode("utf-8", "replace")
                 tally["turn-failed"] += 1
                 rows.append({"n": n, "said": said, "faults": ["turn-failed"],
+                             "status": r.status_code, "why": why,
                              "seconds": round(seconds, 1)})
                 continue
 

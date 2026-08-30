@@ -97,9 +97,9 @@ MODELS = {
     # paragraphs verbatim across turns, and answered "I draw my dagger and attack" with a
     # fight it resolved entirely in prose — no intent ever reached the engine. Speed is
     # nothing when the model will not put the game in front of the rules.
-    "narrator": {"provider": "ollama", "model": "gemma4:12b",
+    "narrator": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
                  "host": "http://localhost:11434"},
-    "prose": {"provider": "ollama", "model": "gemma4:12b",
+    "prose": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
               "host": "http://localhost:11434"},
     # Second opinion, not second choice. When the narrator burns every attempt at a
     # turn — llama3.1 will occasionally refuse a schema outright, or circle one wrong
@@ -122,7 +122,7 @@ MODELS = {
     # deepseek-r1:8b by choice: a reasoning model suits a role that reads a log and
     # decides what changed, the same split World Bible used it for (proofreader beside
     # a generator).
-    "watcher": {"provider": "ollama", "model": "gemma4:12b",
+    "watcher": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
                 "host": "http://localhost:11434"},
 }
 
