@@ -1576,6 +1576,13 @@ def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
         return text, ""
     if any(re.search(rf"\b{re.escape(w)}", text, re.I) for w in words):
         return text, ""
+    # Pronouns are presence. Measured live: a whole beat written about her —
+    # 'her eyes close', 'she leans into the contact' — never used the word
+    # 'woman', so the anchor fired and told the player they were still waiting
+    # for somebody who was in their arms. A beat carrying third-person pronouns
+    # and introducing nobody new is continuing with the person already there.
+    if re.search(r"\b(she|her|hers|he|him|his|they|them|their)\b", text, re.I):
+        return text, ""
     doing = str(thread.get("doing") or "").strip()
     anchor = (f"Through it all you keep your attention where you put it: "
               f"{subject} — you are still {doing or 'on'} them, and they have "
@@ -1744,3 +1751,30 @@ def reads_as_a_refusal(text: str) -> bool:
     if _QUOTED.search(first):
         return False
     return bool(_DECLINED.search(first))
+
+
+def reintroduces_the_present(text: str, names) -> list[str]:
+    """Somebody already standing here cannot walk in as a stranger.
+
+    Measured live on an intimate beat the model would not continue: instead of
+    a refusal it wrote a different scene — a door broken down, and 'A woman is
+    there', indefinite, as though meeting her for the first time, though she had
+    been in the player's arms one beat earlier. A deflection reads as prose and
+    passes every check aimed at refusals, but it always leaves this fingerprint:
+    an indefinite article in front of somebody the scene already holds.
+
+    Returns the names re-introduced. The caller decides what to do with a beat
+    that has lost the scene — the honest answer is to ask a different model.
+    """
+    if not text:
+        return []
+    found = []
+    for name in names or ():
+        head = str(name or "").strip().lower().split()[-1:] or [""]
+        head = head[0]
+        if len(head) < 3:
+            continue
+        if re.search(rf"\b(?:a|an|another)\s+(?:\w+\s+){{0,2}}{re.escape(head)}\b",
+                     text, re.I):
+            found.append(str(name))
+    return found

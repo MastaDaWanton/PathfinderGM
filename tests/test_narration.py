@@ -1541,3 +1541,33 @@ def test_prose_has_the_second_model_call_one_always_had():
     assert 'modelcfg.for_role("fallback")' in body
     assert "for model, host, provider, key in schedule" in body
     assert "reads_as_a_refusal" in body
+
+
+def test_pronouns_are_presence():
+    """Measured live: a whole beat written about her — 'her eyes close', 'she
+    leans into the contact' — never used the word 'woman', so the anchor fired
+    and told the player they were still waiting for somebody in their arms."""
+    from gm.narration import keep_the_thread
+
+    thread = {"subject": "the woman", "doing": "waiting for"}
+    beat = "Her eyes close, and she leans into the contact. What do you do?"
+    out, anchored = keep_the_thread(beat, thread)
+    assert out == beat and not anchored
+
+    gone = "The market is loud and the stalls are busy. What do you do?"
+    out, anchored = keep_the_thread(gone, thread)
+    assert anchored == "the woman"
+
+
+def test_a_deflection_leaves_a_fingerprint():
+    """A refusal that reads as prose: instead of continuing an intimate beat the
+    model wrote a different scene — a door broken down and 'A woman is there',
+    indefinite, though she had been in the player's arms one beat earlier. Every
+    check aimed at stated refusals passes it; the indefinite article does not."""
+    from gm.narration import reintroduces_the_present
+
+    lost = ("The heavy door gives way with a groan. Behind it, a woman is "
+            "there, slumped in a high-backed chair.")
+    assert reintroduces_the_present(lost, ["the woman"]) == ["the woman"]
+    assert reintroduces_the_present("She looks up as you enter.", ["the woman"]) == []
+    assert reintroduces_the_present("A watchman shoulders past.", ["the woman"]) == []

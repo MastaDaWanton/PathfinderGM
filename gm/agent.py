@@ -883,12 +883,22 @@ class GMAgent:
                 attempts.append(Attempt("prose", 0.0, model, note=str(exc)[:120]))
                 continue
             declined = narration_mod.reads_as_a_refusal(text)
-            attempts.append(Attempt(
-                "prose", reply.seconds, reply.model, reply.text,
-                note="declined — handing to the next model" if declined else ""))
-            if text and not declined:
+            # A deflection is a refusal that reads as prose: rather than saying
+            # no, the model writes a different scene and re-introduces somebody
+            # already standing here as a stranger. Same answer as a refusal —
+            # ask the next model — because the beat the player declared did not
+            # get written either way.
+            lost = narration_mod.reintroduces_the_present(
+                text, [a.name for a in self.engine.scene.actors.values()
+                       if not a.is_pc])
+            note = ("declined — handing to the next model" if declined
+                    else f"lost the scene, re-introduced {', '.join(lost)}"
+                    if lost else "")
+            attempts.append(Attempt("prose", reply.seconds, reply.model,
+                                    reply.text, note=note))
+            if text and not declined and not lost:
                 break
-            if declined:
+            if declined or lost:
                 text = ""
         if not text:
             return "", ["prose failed on every model"], attempts
