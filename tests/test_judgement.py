@@ -1411,3 +1411,30 @@ def test_a_noted_person_stands_in_the_scene():
 
     judgement.clear_cast(s)
     assert all(a.is_pc for a in s.actors.values())
+
+
+def test_a_crowd_is_people():
+    """Measured live: "a group of six men and women gathered in a circle, their
+    armor heavy with the marks of use" registered NOBODY — the ledger only
+    spoke singular — so the scene held zero actors, and the very next beat
+    invented a merchant in a stall where six armed fighters had been standing.
+    The player's read was right: the world state was doing it."""
+    from rules.engine import Scene
+
+    s = Scene()
+    added = judgement.note_cast(
+        s, "You find them: a group of six men and women gathered in a circle, "
+           "their armor heavy with the marks of use.", turn=1)
+    assert added == ["man"]                      # not "six man", not the phrase
+    assert s.cast[0]["count"] == 4               # six, capped at the promotion cap
+    judgement.promote_cast(s, added)
+    assert len([a for a in s.actors.values() if not a.is_pc]) == 4
+
+    # A group and a singleton in one beat are three people, not four.
+    s2 = Scene()
+    added = judgement.note_cast(
+        s2, "A pair of guards blocks the door, and a merchant watches.", turn=1)
+    assert added == ["guard", "merchant"]
+    judgement.promote_cast(s2, added)
+    assert sorted(a.name for a in s2.actors.values()) == [
+        "guard", "guard", "merchant"]

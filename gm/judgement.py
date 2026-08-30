@@ -2089,12 +2089,21 @@ def player_departs(player_text: str) -> bool:
 
 # --- The cast ledger: people the prose introduced, held as scene state ----------------
 
-_CAST_ROLES = ("merchant|trader|vendor|stallkeeper|shopkeeper|guard|guardsman|"
-               "watchman|watchwoman|stranger|"
-               "priest|priestess|laborer|labourer|beggar|noble|clansman|clanswoman|"
-               "artisan|soldier|sailor|innkeeper|barkeep|bartender|thug|urchin|"
-               "elder|farmer|fisherman|smith|scribe|porter|drover|peddler|"
-               "man|woman|boy|girl")
+_CAST_ROLES = ("merchants?|traders?|vendors?|stall ?keepers?|shopkeepers?|"
+               "guards?|guardsmen|guardsman|watchmen|watchman|watchwoman|"
+               "strangers?|priests?|priestess(?:es)?|labou?rers?|beggars?|"
+               "nobles?|clansmen|clansman|clanswoman|artisans?|soldiers?|"
+               "sailors?|innkeepers?|barkeeps?|bartenders?|thugs?|urchins?|"
+               "elders?|farmers?|fishermen|fisherman|smiths?|scribes?|"
+               "porters?|drovers?|peddlers?|fighters?|warriors?|mercenaries|"
+               "mercenary|brawlers?|toughs?|swordsmen|swordsman|duellists?|"
+               "men|man|women|woman|boys?|girls?|people|folk")
+# A crowd is people. Counted where the prose counts them, capped by the same
+# reading the fight injector uses for an uncounted group.
+_CAST_GROUP = re.compile(
+    r"\b(?:group|band|gang|pack|knot|circle|cluster|party|"
+    r"pair|trio|handful)\s+of\s+(?:\w+\s+){0,2}(?:" + _CAST_ROLES + r")\b",
+    re.I)
 # Any-case adjectives, in any order: "an elderly Kelvaxian vendor" has the
 # lowercase one first and the demonym second, and an ordered pattern missed it.
 _CAST_INTRO = re.compile(
@@ -2118,7 +2127,39 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
     real = " ".join(a.name.lower() for a in scene.actors.values())
     heads = {str(e.get("who", "")).split()[-1].lower() for e in scene.cast}
     added = []
+    # Groups first, and they are why this was widened: "a group of six men and
+    # women gathered in a circle" registered NOBODY — the ledger only spoke
+    # singular — so the scene held zero actors, and the next beat was free to
+    # invent a merchant in a stall where six armed fighters had been standing.
+    spans: list[tuple[int, int]] = []
+    for m in _CAST_GROUP.finditer(gm_beat):
+        from rules.bestiary import split_collective_name
+
+        n, role = split_collective_name(" ".join(m.group(0).split()))
+        # The prose's own number beats the collective's default: "a group of
+        # six men" is six, not the four an uncounted "group" means. Stripped
+        # from the name as well, or the ledger holds a person called "six man".
+        lead = role.split()[0].lower() if role.split() else ""
+        if lead in _NUMBER_WORDS or lead.isdigit():
+            n = int(lead) if lead.isdigit() else _NUMBER_WORDS[lead]
+            role = " ".join(role.split()[1:]) or role
+        head = role.split()[-1].lower() if role.split() else ""
+        if not head or head in heads or head in real:
+            continue
+        heads.add(head)
+        spans.append(m.span())
+        scene.cast.append({"who": role, "turn": int(turn),
+                           "count": max(1, min(n, _PROMOTED_CAP))})
+        added.append(role)
     for m in _CAST_INTRO.finditer(gm_beat):
+        # A phrase already claimed by a group is not a second person: "a group
+        # of six men" registered the group AND "group of six men" as somebody.
+        # Overlap, not containment: the intro match opens on the article — "a
+        # group of six men" — one word before the group match, so a
+        # start-inside test let the whole phrase register a second time as
+        # somebody called "group of six men".
+        if any(m.start() < hi and lo < m.end() for lo, hi in spans):
+            continue
         who = " ".join(m.group(1).split())
         head = who.split()[-1].lower()
         if head in heads or head in real:
@@ -2272,8 +2313,15 @@ def promote_cast(scene, added) -> list[str]:
     standing = [e for e in scene.cast
                 if e.get("ref") and e["ref"] in scene.actors
                 and scene.actors[e["ref"]].hp > 0]
+    counts = {str(e.get("who")): int(e.get("count", 1) or 1) for e in scene.cast}
     made = []
+    # A group is bodies, plural. "a group of six men" that promotes one actor is
+    # the same lie as a pair of guards being one guard: the fiction says six and
+    # the dice know about one.
+    wanted = []
     for phrase in added:
+        wanted.extend([phrase] * max(1, counts.get(phrase, 1)))
+    for phrase in wanted:
         if len(standing) + len(made) >= _PROMOTED_CAP:
             break
         template = "guildhand"
