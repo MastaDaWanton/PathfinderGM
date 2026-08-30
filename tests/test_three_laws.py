@@ -131,18 +131,23 @@ _REACHES = {
     ("save_mod", "fort"): lambda a: sum(m.value for m in a.save_modifiers("fort")),
     ("save_mod", "ref"): lambda a: sum(m.value for m in a.save_modifiers("ref")),
     ("save_mod", "will"): lambda a: sum(m.value for m in a.save_modifiers("will")),
+    ("combat_mod", "touch_ac"): lambda a: a.touch_ac(),
     ("skill_mod", "stealth"):
         lambda a: sum(m.value for m in a.skill_modifiers("stealth")),
+    ("speed", "land"): lambda a: a.speed_feet,
 }
 
 # Authorable and inert. Each names the stage that closes it. The list may only get
 # shorter: a target that starts working fails the second test below until its line is
 # deleted, which is how a ratchet tightens itself rather than asking to be tightened.
 _UNREACHED = {
-    "touch_ac": "stage 2 — touch AC subtracts armour-table numbers instead of "
-                "reading the typed channels",
-    "caster_level": "stage 2 — no reader consults it",
-    "spell_resistance": "stage 2 — no reader consults it",
+    # touch_ac left this list in stage 2: it reads the typed channels now and drops
+    # the three a touch attack ignores, rather than subtracting armour-table numbers
+    # from a finished total.
+    "caster_level": "stage 9 — no reader consults it; casting has no check to spend "
+                    "it on yet",
+    "spell_resistance": "stage 9 — no reader consults it; nothing in the app rolls "
+                        "to overcome SR (docs/spells.md 5.1)",
 }
 
 
@@ -166,10 +171,13 @@ def test_every_authorable_target_reaches_the_number_it_names():
     `_condition_mods("initiative")` is never read. The presence of a call is not the
     delivery of a number, so this authors a real bonus and reads the real total."""
     for (kind, target), read in sorted(_REACHES.items()):
+        # Speed is measured in whole five-foot squares, so a +3 probe would round
+        # away and read as "moves nothing" on a channel that works perfectly.
+        step = 10 if kind == "speed" else 3
         a = _probe()
         before = read(a)
-        a.add_buff(kind, target, 3, source="probe")
-        assert read(a) == before + 3, (
+        a.add_buff(kind, target, step, source="probe")
+        assert read(a) == before + step, (
             f"an authored {kind} aimed at {target!r} moves nothing — it can be "
             f"written in the editor, saved and shown, and no roll will ever feel it")
 
@@ -186,11 +194,11 @@ def test_the_inert_targets_are_only_the_ones_we_know_about():
     forgotten = declared - covered
     assert not forgotten, (
         f"combat targets the editor offers and no test asks about: {sorted(forgotten)}")
-    a = _probe()
-    before = a.ac("melee")
-    a.add_buff("combat_mod", "touch_ac", 3, source="probe")
-    assert a.ac("melee") == before, (
-        "touch_ac reaches a number now — delete its line from _UNREACHED")
+    for target in sorted(_UNREACHED):
+        a = _probe()
+        a.add_buff("combat_mod", target, 3, source="probe")
+        assert not hasattr(a, target), (
+            f"{target} has a reader now — delete its line from _UNREACHED")
 
 
 def test_an_authored_cmb_or_cmd_bonus_actually_moves_the_roll():

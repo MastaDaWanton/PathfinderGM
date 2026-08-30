@@ -1,1813 +1,1813 @@
 {
-  "source": "PF1e potion-able 1st-3rd level spells, converted by hand against content/spells/spells.json.",
-  "note": "A curated conversion, not a bulk one. content/spells/spells.json holds 3,040 spells as PROSE ONLY — no structured effects — so every entry here was read and encoded by hand, and every `spell` id is verified to resolve in that file (tests/test_alchemist.py asserts it). A potion of a spell the app has never heard of is the 'ground every name' failure CLAUDE.md records, so the id is the contract: `Result.output['holds_spell']` carries it, and a potion holding spell X stands in for knowing spell X.\n\nCaster level is 1e's minimum for the spell level — CL 1 for a 1st-level spell, CL 3 for a 2nd, CL 5 for a 3rd — and every duration and die below is that caster level already worked out, because a card that says 'minutes/level' makes the player do arithmetic the bench already knows the answer to.\n\nWhat the effectspec vocabulary cannot hold stays `narrative`, never a guessed spec. Two cases recur: an effect the drinker chooses the target of (lesser restoration mends 'one ability score of your choice' — picking one here would invent a fact the spell never gave), and effects with no counterpart in the engine's vocabulary at all (gaseous form, water breathing). Those are recorded and narrated, which is honest; a spec that looks authored and does nothing is worse.\n\nMaterials are the spell's own printed material component wherever 1e prints one — enlarge person is brewed with the powdered iron the spell itself calls for. The medium sets the tier and therefore the level gate: rectified spirits or font water (uncommon) for 1st-level potions, a rare catalyst for 2nd, azoth (exotic) for 3rd.",
-  "potions": [
+ "source": "PF1e potion-able 1st-3rd level spells, converted by hand against content/spells/spells.json.",
+ "note": "A curated conversion, not a bulk one. content/spells/spells.json holds 3,040 spells as PROSE ONLY — no structured effects — so every entry here was read and encoded by hand, and every `spell` id is verified to resolve in that file (tests/test_alchemist.py asserts it). A potion of a spell the app has never heard of is the 'ground every name' failure CLAUDE.md records, so the id is the contract: `Result.output['holds_spell']` carries it, and a potion holding spell X stands in for knowing spell X.\n\nCaster level is 1e's minimum for the spell level — CL 1 for a 1st-level spell, CL 3 for a 2nd, CL 5 for a 3rd — and every duration and die below is that caster level already worked out, because a card that says 'minutes/level' makes the player do arithmetic the bench already knows the answer to.\n\nWhat the effectspec vocabulary cannot hold stays `narrative`, never a guessed spec. Two cases recur: an effect the drinker chooses the target of (lesser restoration mends 'one ability score of your choice' — picking one here would invent a fact the spell never gave), and effects with no counterpart in the engine's vocabulary at all (gaseous form, water breathing). Those are recorded and narrated, which is honest; a spec that looks authored and does nothing is worse.\n\nMaterials are the spell's own printed material component wherever 1e prints one — enlarge person is brewed with the powdered iron the spell itself calls for. The medium sets the tier and therefore the level gate: rectified spirits or font water (uncommon) for 1st-level potions, a rare catalyst for 2nd, azoth (exotic) for 3rd.",
+ "potions": [
+  {
+   "id": "potion-of-enlarge-person",
+   "name": "Potion of Enlarge Person",
+   "spell": "enlarge-person",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "iron-filings",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "The pinch of powdered iron the spell itself calls for, taken up in spirits and reacted until the solution will not sit still in the vial. It grows the drinker a size category: everything that follows from being bigger, including the parts that are not an improvement.",
+   "effects": [
     {
-      "id": "potion-of-enlarge-person",
-      "name": "Potion of Enlarge Person",
-      "spell": "enlarge-person",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "iron-filings",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "The pinch of powdered iron the spell itself calls for, taken up in spirits and reacted until the solution will not sit still in the vial. It grows the drinker a size category: everything that follows from being bigger, including the parts that are not an improvement.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 2,
-          "bonus_type": "size",
-          "target": "str",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "ability_mod",
-          "amount": -2,
-          "bonus_type": "size",
-          "target": "dex",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "combat_mod",
-          "amount": -1,
-          "bonus_type": "size",
-          "target": "attack",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "combat_mod",
-          "amount": -1,
-          "bonus_type": "size",
-          "target": "ac",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "size category increases by one; space becomes 10 ft and natural reach 10 ft, and equipment grows with the wearer",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        }
-      ]
+     "type": "ability_mod",
+     "amount": 2,
+     "bonus_type": "size",
+     "target": "str",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
     },
     {
-      "id": "potion-of-reduce-person",
-      "name": "Potion of Reduce Person",
-      "spell": "reduce-person",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "talc",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "The same working run backwards, with talc where the iron would be. Smaller, quicker, harder to hit and markedly less use in a doorway.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 2,
-          "bonus_type": "size",
-          "target": "dex",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "ability_mod",
-          "amount": -2,
-          "bonus_type": "size",
-          "target": "str",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "size",
-          "target": "attack",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "size",
-          "target": "ac",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "size category decreases by one; space becomes 2-1/2 ft and natural reach 0 ft, and carried gear shrinks along",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        }
-      ]
+     "type": "ability_mod",
+     "amount": -2,
+     "bonus_type": "size",
+     "target": "dex",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
     },
     {
-      "id": "potion-of-cure-light-wounds",
-      "name": "Potion of Cure Light Wounds",
-      "spell": "cure-light-wounds",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "instantaneous",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "alum",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Font water and a styptic salt, reacted until the vial is faintly warm to hold. The first potion any bench learns and the last one any party stops buying.",
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "1d8+1",
-          "lethality": "lethal"
-        }
-      ]
+     "type": "combat_mod",
+     "amount": -1,
+     "bonus_type": "size",
+     "target": "attack",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
     },
     {
-      "id": "potion-of-mage-armor",
-      "name": "Potion of Mage Armor",
-      "spell": "mage-armor",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 hour",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "cured-leather-scrap",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "A scrap of finished leather dissolved to nothing at all — what the working wants is the idea of armour, not the hide. An hour of protection that weighs nothing and makes no noise.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 4,
-          "bonus_type": "untyped",
-          "target": "ac",
-          "duration": {
-            "amount": 1,
-            "unit": "hour"
-          },
-          "note": "as an armour bonus — it does not stack with worn armour"
-        }
-      ]
+     "type": "combat_mod",
+     "amount": -1,
+     "bonus_type": "size",
+     "target": "ac",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
     },
     {
-      "id": "potion-of-shield-of-faith",
-      "name": "Potion of Shield of Faith",
-      "spell": "shield-of-faith",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "holy-parchment",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "One line of scripture on vellum, dissolved until the ink is a grey thread in the water and then not even that. What is left turns blades a hand's breadth from the skin.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 2,
-          "bonus_type": "deflection",
-          "target": "ac",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-protection-from-evil",
-      "name": "Potion of Protection from Evil",
-      "spell": "protection-from-evil",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "powdered-silver",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Powdered silver in font water — the ward every hedge-priest draws, drunk instead of chalked. It leans against evil specifically and does nothing whatever about a falling rock.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 2,
-          "bonus_type": "deflection",
-          "target": "ac",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "against attacks by evil creatures"
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "resistance",
-          "target": "fort",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "against effects created by evil creatures"
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "resistance",
-          "target": "ref",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "against effects created by evil creatures"
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "resistance",
-          "target": "will",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "against effects created by evil creatures"
-        },
-        {
-          "type": "narrative",
-          "target": "blocks mental control and bars bodily contact by summoned creatures",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-remove-fear",
-      "name": "Potion of Remove Fear",
-      "spell": "remove-fear",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "10 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "camphor",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Camphor's sharpness cutting through font water: it clears the head the way cold air does. Whatever was already frightening the drinker stops working the moment it goes down.",
-      "effects": [
-        {
-          "type": "save_mod",
-          "amount": 4,
-          "bonus_type": "morale",
-          "target": "will",
-          "duration": {
-            "amount": 10,
-            "unit": "minute"
-          },
-          "note": "against fear effects"
-        },
-        {
-          "type": "remove_condition",
-          "target": "shaken"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-jump",
-      "name": "Potion of Jump",
-      "spell": "jump",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "grasshopper-legs",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "The spell's own grasshopper legs, steeped and reacted out. A minute in which gaps stop being arguments.",
-      "effects": [
-        {
-          "type": "skill_mod",
-          "amount": 10,
-          "bonus_type": "enhancement",
-          "target": "acrobatics",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "on jump checks"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-longstrider",
-      "name": "Potion of Longstrider",
-      "spell": "longstrider",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 hour",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "fullers-earth",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "A pinch of road dust, which is the component the spell asks for and a joke the trade never tires of. An hour of covering ground.",
-      "effects": [
-        {
-          "type": "speed",
-          "target": "land",
-          "amount": 10,
-          "duration": {
-            "amount": 1,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-expeditious-retreat",
-      "name": "Potion of Expeditious Retreat",
-      "spell": "expeditious-retreat",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "licorice-root",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Shaved licorice root in spirits, reacted hot and corked while it fizzes. Named honestly: it is for leaving.",
-      "effects": [
-        {
-          "type": "speed",
-          "target": "land",
-          "amount": 30,
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-endure-elements",
-      "name": "Potion of Endure Elements",
-      "spell": "endure-elements",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "24 hours",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "camphor",
-        "natron",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Camphor and embalmer's salt: one keeps the head cool and the other refuses to let the body lose water. A full day of weather being somebody else's problem.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the drinker exists comfortably in conditions between -50 and 140 degrees Fahrenheit without needing to make Fortitude saves",
-          "duration": {
-            "amount": 24,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-comprehend-languages",
-      "name": "Potion of Comprehend Languages",
-      "spell": "comprehend-languages",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "10 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "lamp-black",
-        "rock-salt",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Soot and salt, which is what the spell prints and what the trade has always used. Ten minutes in which every inscription in the room is suddenly addressed to you.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the drinker understands any spoken or written language they hear or touch, though it does not decode ciphers or secret writing",
-          "duration": {
-            "amount": 10,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-pass-without-trace",
-      "name": "Potion of Pass without Trace",
-      "spell": "pass-without-trace",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 hour",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "mistletoe-sprig",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Mistletoe cut with bronze and never allowed to touch ground, dissolved in spirits. A plant that owes the earth no footprint, lending the habit out for an hour.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the drinker leaves no tracks, trail or scent; tracking them by any mundane means is impossible for the duration",
-          "duration": {
-            "amount": 1,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "oil-of-magic-weapon",
-      "name": "Oil of Magic Weapon",
-      "spell": "magic-weapon",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "coat"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "quicklime",
-        "willow-charcoal",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Powdered lime and carbon in spirits — the spell's own components — wiped down a blade rather than swallowed. The steel takes an edge it did not have and keeps it for a minute.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "enhancement",
-          "target": "attack",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "the coated weapon"
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "enhancement",
-          "target": "damage",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "the coated weapon"
-        }
-      ]
-    },
-    {
-      "id": "oil-of-magic-fang",
-      "name": "Oil of Magic Fang",
-      "spell": "magic-fang",
-      "spell_level": 1,
-      "caster_level": 1,
-      "tier": "uncommon",
-      "duration_text": "1 minute",
-      "how": [
-        "coat"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "cat-fur",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "For the companion rather than the sword: rubbed into claw, horn or tooth. Cheap, quick, and the difference between a bite that lands and one that glances.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "enhancement",
-          "target": "attack",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "one natural weapon of the anointed creature"
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "enhancement",
-          "target": "damage",
-          "duration": {
-            "amount": 1,
-            "unit": "minute"
-          },
-          "note": "one natural weapon of the anointed creature"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-cure-moderate-wounds",
-      "name": "Potion of Cure Moderate Wounds",
-      "spell": "cure-moderate-wounds",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "instantaneous",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "unicorn-horn-shaving",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Font water stirred with alicorn until the shaving comes out no lighter than it went in. The horn is a catalyst in the strict sense: it does the work and is not spent.",
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "2d8+3",
-          "lethality": "lethal"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-bull-s-strength",
-      "name": "Potion of Bull's Strength",
-      "spell": "bull-s-strength",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "bull-hairs",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "A few hairs from a bull's shoulder — the spell asks for exactly that and no more — carried by philosopher's wool into something the body will accept.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "str",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-cat-s-grace",
-      "name": "Potion of Cat's Grace",
-      "spell": "cat-s-grace",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "cat-fur",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "A pinch of fur, combed and not pulled. Nothing lands better than the animal it came off, and for three minutes neither does the drinker.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "dex",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-bear-s-endurance",
-      "name": "Potion of Bear's Endurance",
-      "spell": "bear-s-endurance",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "bear-hairs",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Oily guard hairs from a winter coat. The animal sleeps through half a year of hunger; the draught borrows the part of that which is stubbornness.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "con",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-eagle-s-splendor",
-      "name": "Potion of Eagle's Splendor",
-      "spell": "eagle-s-splendor",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "eagle-feathers",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Two clean pinions, reduced to nothing in the flask. What comes out is bearing — the drinker is not better looking, they are harder to dismiss.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "cha",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-fox-s-cunning",
-      "name": "Potion of Fox's Cunning",
-      "spell": "fox-s-cunning",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "fox-hairs",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Red guard hairs from the ruff. The trade has never found a better sympathy for thinking sideways, and has stopped looking.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "int",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-owl-s-wisdom",
-      "name": "Potion of Owl's Wisdom",
-      "spell": "owl-s-wisdom",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "owl-feathers",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Soft-edged feathers that fly silent. Three minutes of knowing better, which is not the same as being told.",
-      "effects": [
-        {
-          "type": "ability_mod",
-          "amount": 4,
-          "bonus_type": "enhancement",
-          "target": "wis",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-barkskin",
-      "name": "Potion of Barkskin",
-      "spell": "barkskin",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "30 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "standing-oak-bark",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Oak bark taken without ringing the tree, reduced until the flask smells like a wet wood in autumn. The skin roughens and does not soften again for half an hour.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 2,
-          "bonus_type": "natural armour",
-          "target": "ac",
-          "duration": {
-            "amount": 30,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-invisibility",
-      "name": "Potion of Invisibility",
-      "spell": "invisibility",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "gum-arabic",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Gum arabic holding the suspension together — the spell's own binder, doing the same job in a bottle that it does in a gesture. The classic, and the one every party buys two of.",
-      "effects": [
-        {
-          "type": "skill_mod",
-          "amount": 20,
-          "bonus_type": "untyped",
-          "target": "stealth",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          },
-          "note": "while invisible and moving; +40 while invisible and holding still"
-        },
-        {
-          "type": "narrative",
-          "target": "the drinker and their carried gear become invisible; attacking or casting an offensive spell ends it immediately",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-blur",
-      "name": "Potion of Blur",
-      "spell": "blur",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "gum-arabic",
-        "mithral-dust",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Mithral dust suspended in gum until the flask itself is hard to focus on. Cheaper than invisibility and harder to argue with, because it does not end when you swing.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the drinker's outline wavers: all attacks against them suffer a 20% miss chance, and it does not end when they attack",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-resist-energy",
-      "name": "Potion of Resist Energy (Fire)",
-      "spell": "resist-energy",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "30 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "salamander-ash",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Salamander ash, which remembers being fireproof, lending the memory out for half an hour. Swap the elemental reagent — winter wolf humour, everfrost salt — and the same chain retunes to cold.",
-      "effects": [
-        {
-          "type": "resistance",
-          "target": "fire",
-          "amount": 10,
-          "duration": {
-            "amount": 30,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-darkvision",
-      "name": "Potion of Darkvision",
-      "spell": "darkvision",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 hours",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "agate-chip",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "An agate polished thin enough to see a candle through, dissolved past seeing. Three hours in which the dark is simply a room with the lamps off.",
-      "effects": [
-        {
-          "type": "sense",
-          "target": "darkvision",
-          "range": 60,
-          "duration": {
-            "amount": 3,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-delay-poison",
-      "name": "Potion of Delay Poison",
-      "spell": "delay-poison",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 hours",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "bitter-aloes",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Aloes bitter enough to teach a lesson, in font water. It does not cure a poisoning — it tells the poison to wait, and poison, for three hours, waits.",
-      "effects": [
-        {
-          "type": "immunity",
-          "target": "poison",
-          "duration": {
-            "amount": 3,
-            "unit": "hour"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "poison already in the body is suspended rather than cured: when the draught expires, the remaining duration resumes where it left off",
-          "duration": {
-            "amount": 3,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-lesser-restoration",
-      "name": "Potion of Lesser Restoration",
-      "spell": "restoration-lesser",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "instantaneous",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "unicorn-horn-shaving",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Alicorn and font water, which is the oldest answer in the book to being diminished. What it mends is whichever score is hurt worst — the drinker chooses as they swallow.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "heals 1d4 points of temporary ability damage to a single ability score, chosen by the drinker as they swallow"
-        },
-        {
-          "type": "remove_condition",
-          "target": "fatigued"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-spider-climb",
-      "name": "Potion of Spider Climb",
-      "spell": "spider-climb",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "30 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "pine-pitch",
-        "cellar-spider",
-        "rectified-spirits",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Bitumen and a live spider, exactly as printed, and the spider is released afterwards by any alchemist worth drinking with. Half an hour of walls being floors.",
-      "effects": [
-        {
-          "type": "speed",
-          "target": "climb",
-          "amount": 20,
-          "duration": {
-            "amount": 30,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "the drinker climbs walls and ceilings with their hands free, and need not make Climb checks to do it",
-          "duration": {
-            "amount": 30,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-see-invisibility",
-      "name": "Potion of See Invisibility",
-      "spell": "see-invisibility",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "30 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "talc",
-        "powdered-silver",
-        "rectified-spirits",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Talc and powdered silver, the two things that have always shown up what is not there. Half an hour of the room being honest with you.",
-      "effects": [
-        {
-          "type": "sense",
-          "target": "see_invisible",
-          "duration": {
-            "amount": 30,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-aid",
-      "name": "Potion of Aid",
-      "spell": "aid",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "The plainest divine draught there is: courage and a cushion. The temporary hit points are the part people remember at the wrong moment.",
-      "effects": [
-        {
-          "type": "temp_hp",
-          "dice": "1d8+3",
-          "source": "aid",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "morale",
-          "target": "attack",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "save_mod",
-          "amount": 1,
-          "bonus_type": "morale",
-          "target": "will",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          },
-          "note": "against fear effects"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-false-life",
-      "name": "Potion of False Life",
-      "spell": "false-life",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 hours",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "rectified-spirits",
-        "ghost-salt",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Salt out of a crypt cistern, which is cold on the tongue and colder afterwards. It lends a margin that was never the drinker's; when it goes, it goes all at once.",
-      "effects": [
-        {
-          "type": "temp_hp",
-          "dice": "1d10+3",
-          "source": "false life",
-          "duration": {
-            "amount": 3,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-remove-paralysis",
-      "name": "Potion of Remove Paralysis",
-      "spell": "remove-paralysis",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "instantaneous",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "font-water",
-        "sal-volatile",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Smelling salts with a benediction behind them. Poured between the teeth of somebody who cannot ask for it, which is the only way it is ever used.",
-      "effects": [
-        {
-          "type": "remove_condition",
-          "target": "paralyzed"
-        },
-        {
-          "type": "narrative",
-          "target": "frees one creature from magical paralysis, hold or slow; a creature that is merely staggered is unaffected"
-        }
-      ]
-    },
-    {
-      "id": "oil-of-align-weapon",
-      "name": "Oil of Align Weapon (Good)",
-      "spell": "align-weapon",
-      "spell_level": 2,
-      "caster_level": 3,
-      "tier": "rare",
-      "duration_text": "3 minutes",
-      "how": [
-        "coat"
-      ],
-      "materials": [
-        "font-water",
-        "powdered-silver",
-        "philosophers-wool",
-        "glass-vial"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "seal"
-      ],
-      "text": "Silver and font water, wiped down the blade with a rag that is burned afterwards. Three minutes in which the sword argues on the right side of a demon's hide.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the coated weapon counts as good-aligned for the purpose of overcoming damage reduction",
-          "duration": {
-            "amount": 3,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-cure-serious-wounds",
-      "name": "Potion of Cure Serious Wounds",
-      "spell": "cure-serious-wounds",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "instantaneous",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "unicorn-horn-shaving",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Azoth is the solvent that is also the medicine, and alicorn is the catalyst that is never spent. Together in a crystal retort they make the best draught the mundane trade can honestly sell.",
-      "effects": [
-        {
-          "type": "heal",
-          "dice": "3d8+5",
-          "lethality": "lethal"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-fly",
-      "name": "Potion of Fly",
-      "spell": "fly",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "5 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "eagle-feathers",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "A wing feather in azoth — the spell's own component, in the only solvent that will take it up whole. Five minutes, which is either plenty or catastrophically few.",
-      "effects": [
-        {
-          "type": "speed",
-          "target": "fly",
-          "amount": 60,
-          "duration": {
-            "amount": 5,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "flight with good manoeuvrability; when the draught expires the drinker falls, so the last round is spent landing",
-          "duration": {
-            "amount": 5,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-haste",
-      "name": "Potion of Haste",
-      "spell": "haste",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "5 rounds",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "licorice-root",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Licorice root driven through azoth until the retort will not stop humming. Five rounds — brief on purpose, because the alternative is a preparation nobody can price.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "untyped",
-          "target": "attack",
-          "duration": {
-            "amount": 5,
-            "unit": "round"
-          },
-          "note": "one extra attack at full bonus when making a full attack"
-        },
-        {
-          "type": "combat_mod",
-          "amount": 1,
-          "bonus_type": "dodge",
-          "target": "ac",
-          "duration": {
-            "amount": 5,
-            "unit": "round"
-          }
-        },
-        {
-          "type": "save_mod",
-          "amount": 1,
-          "bonus_type": "dodge",
-          "target": "ref",
-          "duration": {
-            "amount": 5,
-            "unit": "round"
-          }
-        },
-        {
-          "type": "speed",
-          "target": "land",
-          "amount": 30,
-          "duration": {
-            "amount": 5,
-            "unit": "round"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-heroism",
-      "name": "Potion of Heroism",
-      "spell": "heroism",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "50 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "sunmetal-filings",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Temple-forged sunmetal, warm in the hand at midnight, taken up by azoth. Nearly an hour of being the version of yourself the story needs.",
-      "effects": [
-        {
-          "type": "combat_mod",
-          "amount": 2,
-          "bonus_type": "morale",
-          "target": "attack",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "morale",
-          "target": "fort",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "morale",
-          "target": "ref",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "bonus_type": "morale",
-          "target": "will",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "the same +2 morale bonus applies to every skill check the drinker makes",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-water-breathing",
-      "name": "Potion of Water Breathing",
-      "spell": "water-breathing",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "10 hours",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "river-reed",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "A hollow reed cut below the waterline, which carries air through water as a plain fact before the chain makes a subtler one of it. Ten hours, and it divides among everyone who shares the flask.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "the drinker breathes water freely for ten hours; the duration divides evenly among all creatures who share a single dose",
-          "duration": {
-            "amount": 10,
-            "unit": "hour"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-gaseous-form",
-      "name": "Potion of Gaseous Form",
-      "spell": "gaseous-form",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "10 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "fine-gauze",
-        "smoke-resin",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Gauze and smoke resin, which is what the spell prints, in the one solvent that will hold a thing while it stops being solid. The classic answer to a locked door and a bad plan.",
-      "effects": [
-        {
-          "type": "damage_reduction",
-          "amount": 10,
-          "bypass": "magic",
-          "duration": {
-            "amount": 10,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "the drinker and their gear become insubstantial smoke: fly 10 ft (perfect), pass through small holes and cracks, immune to poison and critical hits, and unable to attack, cast with somatic components or use most items",
-          "duration": {
-            "amount": 10,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "potion-of-neutralize-poison",
-      "name": "Potion of Neutralize Poison",
-      "spell": "neutralize-poison",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "50 minutes",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "bitter-aloes",
-        "willow-charcoal",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Where delay poison tells the venom to wait, this one ends the conversation. Charcoal and aloes doing what they always do, with azoth making them mean it.",
-      "effects": [
-        {
-          "type": "immunity",
-          "target": "poison",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        },
-        {
-          "type": "narrative",
-          "target": "detoxifies any venom in the creature: poison currently affecting them ends, and they cannot be poisoned again for the duration"
-        }
-      ]
-    },
-    {
-      "id": "potion-of-protection-from-energy",
-      "name": "Potion of Protection from Energy",
-      "spell": "protection-from-energy",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "50 minutes, or until spent",
-      "how": [
-        "drink"
-      ],
-      "materials": [
-        "azoth",
-        "everfrost-salt",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "A bank against one element rather than a wall: it absorbs, keeps count, and stops the moment the account is empty. The elemental reagent chosen at brewing decides which element it argues with.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "absorbs up to 60 points of damage of one energy type — acid, cold, electricity, fire or sonic, fixed when the potion is brewed — and ends early once that total is spent",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        }
-      ]
-    },
-    {
-      "id": "oil-of-keen-edge",
-      "name": "Oil of Keen Edge",
-      "spell": "keen-edge",
-      "spell_level": 3,
-      "caster_level": 5,
-      "tier": "exotic",
-      "duration_text": "50 minutes",
-      "how": [
-        "coat"
-      ],
-      "materials": [
-        "azoth",
-        "star-iron-dust",
-        "crystal-retort"
-      ],
-      "methods": [
-        "dissolve",
-        "react",
-        "stabilize",
-        "seal"
-      ],
-      "text": "Star-iron in azoth, wiped down the edge with the grain. The steel does not get sharper so much as more willing, and the difference shows up in the crits.",
-      "effects": [
-        {
-          "type": "narrative",
-          "target": "doubles the threat range of the coated slashing or piercing weapon; it does not stack with any other effect that widens a threat range",
-          "duration": {
-            "amount": 50,
-            "unit": "minute"
-          }
-        }
-      ]
+     "type": "narrative",
+     "target": "size category increases by one; space becomes 10 ft and natural reach 10 ft, and equipment grows with the wearer",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
     }
-  ]
+   ]
+  },
+  {
+   "id": "potion-of-reduce-person",
+   "name": "Potion of Reduce Person",
+   "spell": "reduce-person",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "talc",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "The same working run backwards, with talc where the iron would be. Smaller, quicker, harder to hit and markedly less use in a doorway.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 2,
+     "bonus_type": "size",
+     "target": "dex",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "ability_mod",
+     "amount": -2,
+     "bonus_type": "size",
+     "target": "str",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "size",
+     "target": "attack",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "size",
+     "target": "ac",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "size category decreases by one; space becomes 2-1/2 ft and natural reach 0 ft, and carried gear shrinks along",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-cure-light-wounds",
+   "name": "Potion of Cure Light Wounds",
+   "spell": "cure-light-wounds",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "instantaneous",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "alum",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Font water and a styptic salt, reacted until the vial is faintly warm to hold. The first potion any bench learns and the last one any party stops buying.",
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "1d8+1",
+     "lethality": "lethal"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-mage-armor",
+   "name": "Potion of Mage Armor",
+   "spell": "mage-armor",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 hour",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "cured-leather-scrap",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "A scrap of finished leather dissolved to nothing at all — what the working wants is the idea of armour, not the hide. An hour of protection that weighs nothing and makes no noise.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 4,
+     "bonus_type": "armour",
+     "target": "ac",
+     "duration": {
+      "amount": 1,
+      "unit": "hour"
+     },
+     "note": "as an armour bonus — it does not stack with worn armour"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-shield-of-faith",
+   "name": "Potion of Shield of Faith",
+   "spell": "shield-of-faith",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "holy-parchment",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "One line of scripture on vellum, dissolved until the ink is a grey thread in the water and then not even that. What is left turns blades a hand's breadth from the skin.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "ac",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-protection-from-evil",
+   "name": "Potion of Protection from Evil",
+   "spell": "protection-from-evil",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "powdered-silver",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Powdered silver in font water — the ward every hedge-priest draws, drunk instead of chalked. It leans against evil specifically and does nothing whatever about a falling rock.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "deflection",
+     "target": "ac",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "against attacks by evil creatures"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "fort",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "against effects created by evil creatures"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "ref",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "against effects created by evil creatures"
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "target": "will",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "against effects created by evil creatures"
+    },
+    {
+     "type": "narrative",
+     "target": "blocks mental control and bars bodily contact by summoned creatures",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-remove-fear",
+   "name": "Potion of Remove Fear",
+   "spell": "remove-fear",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "10 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "camphor",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Camphor's sharpness cutting through font water: it clears the head the way cold air does. Whatever was already frightening the drinker stops working the moment it goes down.",
+   "effects": [
+    {
+     "type": "save_mod",
+     "amount": 4,
+     "bonus_type": "morale",
+     "target": "will",
+     "duration": {
+      "amount": 10,
+      "unit": "minute"
+     },
+     "note": "against fear effects"
+    },
+    {
+     "type": "remove_condition",
+     "target": "shaken"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-jump",
+   "name": "Potion of Jump",
+   "spell": "jump",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "grasshopper-legs",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "The spell's own grasshopper legs, steeped and reacted out. A minute in which gaps stop being arguments.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 10,
+     "bonus_type": "enhancement",
+     "target": "acrobatics",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "on jump checks"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-longstrider",
+   "name": "Potion of Longstrider",
+   "spell": "longstrider",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 hour",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "fullers-earth",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "A pinch of road dust, which is the component the spell asks for and a joke the trade never tires of. An hour of covering ground.",
+   "effects": [
+    {
+     "type": "speed",
+     "target": "land",
+     "amount": 10,
+     "duration": {
+      "amount": 1,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-expeditious-retreat",
+   "name": "Potion of Expeditious Retreat",
+   "spell": "expeditious-retreat",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "licorice-root",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Shaved licorice root in spirits, reacted hot and corked while it fizzes. Named honestly: it is for leaving.",
+   "effects": [
+    {
+     "type": "speed",
+     "target": "land",
+     "amount": 30,
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-endure-elements",
+   "name": "Potion of Endure Elements",
+   "spell": "endure-elements",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "24 hours",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "camphor",
+    "natron",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Camphor and embalmer's salt: one keeps the head cool and the other refuses to let the body lose water. A full day of weather being somebody else's problem.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the drinker exists comfortably in conditions between -50 and 140 degrees Fahrenheit without needing to make Fortitude saves",
+     "duration": {
+      "amount": 24,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-comprehend-languages",
+   "name": "Potion of Comprehend Languages",
+   "spell": "comprehend-languages",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "10 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "lamp-black",
+    "rock-salt",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Soot and salt, which is what the spell prints and what the trade has always used. Ten minutes in which every inscription in the room is suddenly addressed to you.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the drinker understands any spoken or written language they hear or touch, though it does not decode ciphers or secret writing",
+     "duration": {
+      "amount": 10,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-pass-without-trace",
+   "name": "Potion of Pass without Trace",
+   "spell": "pass-without-trace",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 hour",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "mistletoe-sprig",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Mistletoe cut with bronze and never allowed to touch ground, dissolved in spirits. A plant that owes the earth no footprint, lending the habit out for an hour.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the drinker leaves no tracks, trail or scent; tracking them by any mundane means is impossible for the duration",
+     "duration": {
+      "amount": 1,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "oil-of-magic-weapon",
+   "name": "Oil of Magic Weapon",
+   "spell": "magic-weapon",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "coat"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "quicklime",
+    "willow-charcoal",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Powdered lime and carbon in spirits — the spell's own components — wiped down a blade rather than swallowed. The steel takes an edge it did not have and keeps it for a minute.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "the coated weapon"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "the coated weapon"
+    }
+   ]
+  },
+  {
+   "id": "oil-of-magic-fang",
+   "name": "Oil of Magic Fang",
+   "spell": "magic-fang",
+   "spell_level": 1,
+   "caster_level": 1,
+   "tier": "uncommon",
+   "duration_text": "1 minute",
+   "how": [
+    "coat"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "cat-fur",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "For the companion rather than the sword: rubbed into claw, horn or tooth. Cheap, quick, and the difference between a bite that lands and one that glances.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "attack",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "one natural weapon of the anointed creature"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "target": "damage",
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "one natural weapon of the anointed creature"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-cure-moderate-wounds",
+   "name": "Potion of Cure Moderate Wounds",
+   "spell": "cure-moderate-wounds",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "instantaneous",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "unicorn-horn-shaving",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Font water stirred with alicorn until the shaving comes out no lighter than it went in. The horn is a catalyst in the strict sense: it does the work and is not spent.",
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "2d8+3",
+     "lethality": "lethal"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-bull-s-strength",
+   "name": "Potion of Bull's Strength",
+   "spell": "bull-s-strength",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "bull-hairs",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "A few hairs from a bull's shoulder — the spell asks for exactly that and no more — carried by philosopher's wool into something the body will accept.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "str",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-cat-s-grace",
+   "name": "Potion of Cat's Grace",
+   "spell": "cat-s-grace",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "cat-fur",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "A pinch of fur, combed and not pulled. Nothing lands better than the animal it came off, and for three minutes neither does the drinker.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "dex",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-bear-s-endurance",
+   "name": "Potion of Bear's Endurance",
+   "spell": "bear-s-endurance",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "bear-hairs",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Oily guard hairs from a winter coat. The animal sleeps through half a year of hunger; the draught borrows the part of that which is stubbornness.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "con",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-eagle-s-splendor",
+   "name": "Potion of Eagle's Splendor",
+   "spell": "eagle-s-splendor",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "eagle-feathers",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Two clean pinions, reduced to nothing in the flask. What comes out is bearing — the drinker is not better looking, they are harder to dismiss.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "cha",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-fox-s-cunning",
+   "name": "Potion of Fox's Cunning",
+   "spell": "fox-s-cunning",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "fox-hairs",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Red guard hairs from the ruff. The trade has never found a better sympathy for thinking sideways, and has stopped looking.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "int",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-owl-s-wisdom",
+   "name": "Potion of Owl's Wisdom",
+   "spell": "owl-s-wisdom",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "owl-feathers",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Soft-edged feathers that fly silent. Three minutes of knowing better, which is not the same as being told.",
+   "effects": [
+    {
+     "type": "ability_mod",
+     "amount": 4,
+     "bonus_type": "enhancement",
+     "target": "wis",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-barkskin",
+   "name": "Potion of Barkskin",
+   "spell": "barkskin",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "30 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "standing-oak-bark",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Oak bark taken without ringing the tree, reduced until the flask smells like a wet wood in autumn. The skin roughens and does not soften again for half an hour.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "natural armour",
+     "target": "ac",
+     "duration": {
+      "amount": 30,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-invisibility",
+   "name": "Potion of Invisibility",
+   "spell": "invisibility",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "gum-arabic",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Gum arabic holding the suspension together — the spell's own binder, doing the same job in a bottle that it does in a gesture. The classic, and the one every party buys two of.",
+   "effects": [
+    {
+     "type": "skill_mod",
+     "amount": 20,
+     "bonus_type": "untyped",
+     "target": "stealth",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     },
+     "note": "while invisible and moving; +40 while invisible and holding still"
+    },
+    {
+     "type": "narrative",
+     "target": "the drinker and their carried gear become invisible; attacking or casting an offensive spell ends it immediately",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-blur",
+   "name": "Potion of Blur",
+   "spell": "blur",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "gum-arabic",
+    "mithral-dust",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Mithral dust suspended in gum until the flask itself is hard to focus on. Cheaper than invisibility and harder to argue with, because it does not end when you swing.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the drinker's outline wavers: all attacks against them suffer a 20% miss chance, and it does not end when they attack",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-resist-energy",
+   "name": "Potion of Resist Energy (Fire)",
+   "spell": "resist-energy",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "30 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "salamander-ash",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Salamander ash, which remembers being fireproof, lending the memory out for half an hour. Swap the elemental reagent — winter wolf humour, everfrost salt — and the same chain retunes to cold.",
+   "effects": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 10,
+     "duration": {
+      "amount": 30,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-darkvision",
+   "name": "Potion of Darkvision",
+   "spell": "darkvision",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 hours",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "agate-chip",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "An agate polished thin enough to see a candle through, dissolved past seeing. Three hours in which the dark is simply a room with the lamps off.",
+   "effects": [
+    {
+     "type": "sense",
+     "target": "darkvision",
+     "range": 60,
+     "duration": {
+      "amount": 3,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-delay-poison",
+   "name": "Potion of Delay Poison",
+   "spell": "delay-poison",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 hours",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "bitter-aloes",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Aloes bitter enough to teach a lesson, in font water. It does not cure a poisoning — it tells the poison to wait, and poison, for three hours, waits.",
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "poison",
+     "duration": {
+      "amount": 3,
+      "unit": "hour"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "poison already in the body is suspended rather than cured: when the draught expires, the remaining duration resumes where it left off",
+     "duration": {
+      "amount": 3,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-lesser-restoration",
+   "name": "Potion of Lesser Restoration",
+   "spell": "restoration-lesser",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "instantaneous",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "unicorn-horn-shaving",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Alicorn and font water, which is the oldest answer in the book to being diminished. What it mends is whichever score is hurt worst — the drinker chooses as they swallow.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "heals 1d4 points of temporary ability damage to a single ability score, chosen by the drinker as they swallow"
+    },
+    {
+     "type": "remove_condition",
+     "target": "fatigued"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-spider-climb",
+   "name": "Potion of Spider Climb",
+   "spell": "spider-climb",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "30 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "pine-pitch",
+    "cellar-spider",
+    "rectified-spirits",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Bitumen and a live spider, exactly as printed, and the spider is released afterwards by any alchemist worth drinking with. Half an hour of walls being floors.",
+   "effects": [
+    {
+     "type": "speed",
+     "target": "climb",
+     "amount": 20,
+     "duration": {
+      "amount": 30,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "the drinker climbs walls and ceilings with their hands free, and need not make Climb checks to do it",
+     "duration": {
+      "amount": 30,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-see-invisibility",
+   "name": "Potion of See Invisibility",
+   "spell": "see-invisibility",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "30 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "talc",
+    "powdered-silver",
+    "rectified-spirits",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Talc and powdered silver, the two things that have always shown up what is not there. Half an hour of the room being honest with you.",
+   "effects": [
+    {
+     "type": "sense",
+     "target": "see_invisible",
+     "duration": {
+      "amount": 30,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-aid",
+   "name": "Potion of Aid",
+   "spell": "aid",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "The plainest divine draught there is: courage and a cushion. The temporary hit points are the part people remember at the wrong moment.",
+   "effects": [
+    {
+     "type": "temp_hp",
+     "dice": "1d8+3",
+     "source": "aid",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "attack",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "will",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     },
+     "note": "against fear effects"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-false-life",
+   "name": "Potion of False Life",
+   "spell": "false-life",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 hours",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "rectified-spirits",
+    "ghost-salt",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Salt out of a crypt cistern, which is cold on the tongue and colder afterwards. It lends a margin that was never the drinker's; when it goes, it goes all at once.",
+   "effects": [
+    {
+     "type": "temp_hp",
+     "dice": "1d10+3",
+     "source": "false life",
+     "duration": {
+      "amount": 3,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-remove-paralysis",
+   "name": "Potion of Remove Paralysis",
+   "spell": "remove-paralysis",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "instantaneous",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "font-water",
+    "sal-volatile",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Smelling salts with a benediction behind them. Poured between the teeth of somebody who cannot ask for it, which is the only way it is ever used.",
+   "effects": [
+    {
+     "type": "remove_condition",
+     "target": "paralyzed"
+    },
+    {
+     "type": "narrative",
+     "target": "frees one creature from magical paralysis, hold or slow; a creature that is merely staggered is unaffected"
+    }
+   ]
+  },
+  {
+   "id": "oil-of-align-weapon",
+   "name": "Oil of Align Weapon (Good)",
+   "spell": "align-weapon",
+   "spell_level": 2,
+   "caster_level": 3,
+   "tier": "rare",
+   "duration_text": "3 minutes",
+   "how": [
+    "coat"
+   ],
+   "materials": [
+    "font-water",
+    "powdered-silver",
+    "philosophers-wool",
+    "glass-vial"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "seal"
+   ],
+   "text": "Silver and font water, wiped down the blade with a rag that is burned afterwards. Three minutes in which the sword argues on the right side of a demon's hide.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the coated weapon counts as good-aligned for the purpose of overcoming damage reduction",
+     "duration": {
+      "amount": 3,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-cure-serious-wounds",
+   "name": "Potion of Cure Serious Wounds",
+   "spell": "cure-serious-wounds",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "instantaneous",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "unicorn-horn-shaving",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Azoth is the solvent that is also the medicine, and alicorn is the catalyst that is never spent. Together in a crystal retort they make the best draught the mundane trade can honestly sell.",
+   "effects": [
+    {
+     "type": "heal",
+     "dice": "3d8+5",
+     "lethality": "lethal"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-fly",
+   "name": "Potion of Fly",
+   "spell": "fly",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "5 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "eagle-feathers",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "A wing feather in azoth — the spell's own component, in the only solvent that will take it up whole. Five minutes, which is either plenty or catastrophically few.",
+   "effects": [
+    {
+     "type": "speed",
+     "target": "fly",
+     "amount": 60,
+     "duration": {
+      "amount": 5,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "flight with good manoeuvrability; when the draught expires the drinker falls, so the last round is spent landing",
+     "duration": {
+      "amount": 5,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-haste",
+   "name": "Potion of Haste",
+   "spell": "haste",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "5 rounds",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "licorice-root",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Licorice root driven through azoth until the retort will not stop humming. Five rounds — brief on purpose, because the alternative is a preparation nobody can price.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "target": "attack",
+     "duration": {
+      "amount": 5,
+      "unit": "round"
+     },
+     "note": "one extra attack at full bonus when making a full attack"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "dodge",
+     "target": "ac",
+     "duration": {
+      "amount": 5,
+      "unit": "round"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "dodge",
+     "target": "ref",
+     "duration": {
+      "amount": 5,
+      "unit": "round"
+     }
+    },
+    {
+     "type": "speed",
+     "target": "land",
+     "amount": 30,
+     "duration": {
+      "amount": 5,
+      "unit": "round"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-heroism",
+   "name": "Potion of Heroism",
+   "spell": "heroism",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "50 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "sunmetal-filings",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Temple-forged sunmetal, warm in the hand at midnight, taken up by azoth. Nearly an hour of being the version of yourself the story needs.",
+   "effects": [
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "attack",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "fort",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "ref",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "will",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "the same +2 morale bonus applies to every skill check the drinker makes",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-water-breathing",
+   "name": "Potion of Water Breathing",
+   "spell": "water-breathing",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "10 hours",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "river-reed",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "A hollow reed cut below the waterline, which carries air through water as a plain fact before the chain makes a subtler one of it. Ten hours, and it divides among everyone who shares the flask.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "the drinker breathes water freely for ten hours; the duration divides evenly among all creatures who share a single dose",
+     "duration": {
+      "amount": 10,
+      "unit": "hour"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-gaseous-form",
+   "name": "Potion of Gaseous Form",
+   "spell": "gaseous-form",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "10 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "fine-gauze",
+    "smoke-resin",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Gauze and smoke resin, which is what the spell prints, in the one solvent that will hold a thing while it stops being solid. The classic answer to a locked door and a bad plan.",
+   "effects": [
+    {
+     "type": "damage_reduction",
+     "amount": 10,
+     "bypass": "magic",
+     "duration": {
+      "amount": 10,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "the drinker and their gear become insubstantial smoke: fly 10 ft (perfect), pass through small holes and cracks, immune to poison and critical hits, and unable to attack, cast with somatic components or use most items",
+     "duration": {
+      "amount": 10,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "potion-of-neutralize-poison",
+   "name": "Potion of Neutralize Poison",
+   "spell": "neutralize-poison",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "50 minutes",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "bitter-aloes",
+    "willow-charcoal",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Where delay poison tells the venom to wait, this one ends the conversation. Charcoal and aloes doing what they always do, with azoth making them mean it.",
+   "effects": [
+    {
+     "type": "immunity",
+     "target": "poison",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    },
+    {
+     "type": "narrative",
+     "target": "detoxifies any venom in the creature: poison currently affecting them ends, and they cannot be poisoned again for the duration"
+    }
+   ]
+  },
+  {
+   "id": "potion-of-protection-from-energy",
+   "name": "Potion of Protection from Energy",
+   "spell": "protection-from-energy",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "50 minutes, or until spent",
+   "how": [
+    "drink"
+   ],
+   "materials": [
+    "azoth",
+    "everfrost-salt",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "A bank against one element rather than a wall: it absorbs, keeps count, and stops the moment the account is empty. The elemental reagent chosen at brewing decides which element it argues with.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "absorbs up to 60 points of damage of one energy type — acid, cold, electricity, fire or sonic, fixed when the potion is brewed — and ends early once that total is spent",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    }
+   ]
+  },
+  {
+   "id": "oil-of-keen-edge",
+   "name": "Oil of Keen Edge",
+   "spell": "keen-edge",
+   "spell_level": 3,
+   "caster_level": 5,
+   "tier": "exotic",
+   "duration_text": "50 minutes",
+   "how": [
+    "coat"
+   ],
+   "materials": [
+    "azoth",
+    "star-iron-dust",
+    "crystal-retort"
+   ],
+   "methods": [
+    "dissolve",
+    "react",
+    "stabilize",
+    "seal"
+   ],
+   "text": "Star-iron in azoth, wiped down the edge with the grain. The steel does not get sharper so much as more willing, and the difference shows up in the crits.",
+   "effects": [
+    {
+     "type": "narrative",
+     "target": "doubles the threat range of the coated slashing or piercing weapon; it does not stack with any other effect that widens a threat range",
+     "duration": {
+      "amount": 50,
+      "unit": "minute"
+     }
+    }
+   ]
+  }
+ ]
 }

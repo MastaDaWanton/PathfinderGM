@@ -904,6 +904,19 @@ class Actor:
         base = max(0, int(self.speed))
         if ARMOUR.get(self.armour, {}).get("weight") in ("medium", "heavy"):
             base = ARMOUR_SPEED.get(base, base)
+        # Between the armour lookup and the halving, which is the order the book
+        # uses: boots do not undo a breastplate's penalty, and being entangled
+        # halves what is left including them.
+        #
+        # All 69 shipped speed specs are written with NO bonus type, and untyped
+        # self-stacks — so routing them in raw would let haste, longstrider,
+        # expeditious retreat and a pair of boots add to +80 where 1e's enhancement
+        # channel gives +30. 1e makes magical speed bonuses enhancement bonuses, so
+        # an untyped one is read as enhancement here rather than left to pile up; a
+        # spec its author typed keeps whatever it says.
+        moved = [Modifier(m.value, m.source, m.type or "enhancement")
+                 for m in self._buff_mods("speed", "land")]
+        base = max(0, base + sum(m.value for m in stack(moved)))
         for slowed in ("entangled", "exhausted"):
             if self.has_condition(slowed):
                 base //= 2
@@ -969,9 +982,15 @@ class Actor:
             got = c.data.get("concealment")
             if isinstance(got, int) and got > best:
                 best, why = got, c.name.lower()
-        for b in self.buffs:
-            if b.kind == "concealment" and b.amount > best:
-                best, why = b.amount, b.source or "concealment"
+        # Every effect and worn gear, not only conditions and the buff VIEW:
+        # `self.buffs` filters to kind == "buff", so a stance or class ability
+        # granting a miss chance was invisible here — the same shape of gap that
+        # kept an ability's ability_mod out of the score — and a cloak that blurs
+        # its wearer had nowhere to reach at all. Still best-only: two 20% miss
+        # chances are not 40% in 1e, and they are not 36% either.
+        for m in self._buff_mods("concealment", "miss_chance"):
+            if m.value > best:
+                best, why = m.value, m.source or "concealment"
         return best, why
 
     def _condition_mods(self, field_name: str) -> list[Modifier]:
@@ -1326,6 +1345,29 @@ class Actor:
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
         return stack(mods)
+
+    # The three channels a touch attack ignores. Named as bonus TYPES rather than as
+    # equipment fields, which is the whole point: a mage armor spell, a bracer, a
+    # crafted hide and a barkskin all grant one of these and none of them is the
+    # `armour` slot, so subtracting the armour table's number left every one of them
+    # inflating touch AC. 1e's rule is about the type, so the code asks about the type.
+    _TOUCH_IGNORES = ("armour", "shield", "natural armour")
+
+    def touch_ac_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
+        """Armour class against a touch attack: everything except what you are wearing.
+
+        This was `ac() - armour[ac] - shield[ac] - natural_armour`, three table lookups
+        subtracted from a finished total — so it saw the armour a character wore and
+        was blind to every other source of the same three bonuses. A `combat_mod`
+        aimed at `touch_ac` reached nothing at all, and the thirteen crafted hides
+        whose own notes read "worked into armour" were typed untyped and counted
+        towards a number they have no business in.
+        """
+        return [m for m in self.ac_modifiers("melee", flat_footed)
+                if (m.type or "") not in self._TOUCH_IGNORES] +             self._buff_mods("combat_mod", "touch_ac")
+
+    def touch_ac(self, flat_footed: bool = False) -> int:
+        return sum(m.value for m in self.touch_ac_modifiers(flat_footed))
 
     def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed))
@@ -2570,11 +2612,7 @@ def full_sheet(actor: Actor) -> dict:
                      for i in actor.gear.values() if i.hp < i.hp_max],
             "ac": _terms(actor.ac_modifiers("melee")),
             "ac_flat_footed": _terms(actor.ac_modifiers("melee", flat_footed=True)),
-            "ac_touch": {"total": actor.ac() - armour["ac"] - shield["ac"]
-                                  - actor.natural_armour,
-                         "terms": [{"value": actor.ac() - armour["ac"] - shield["ac"]
-                                             - actor.natural_armour,
-                                    "source": "touch AC (no armour, shield or natural)"}]},
+            "ac_touch": _terms(actor.touch_ac_modifiers()),
             "saves": [
                 {"key": k, "name": SAVES[k], **_terms(actor.save_modifiers(k))}
                 for k in SAVES

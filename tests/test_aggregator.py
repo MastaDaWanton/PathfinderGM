@@ -257,3 +257,82 @@ def test_the_derived_maximum_round_trips_through_a_save():
     assert a.hit_dice == 6, "two Hit Dice per level"
     assert a.hp_max == 37, "the saved total is the loaded total"
     assert from_dict(to_dict(a), ref="pc").hp_max == 37
+
+
+# --- the last two inert channels ------------------------------------------------------
+
+
+def _plain(armour="none"):
+    return from_dict({"name": "x", "kind": "npc", "hp": 20, "hp_max": 20,
+                      "armour": armour,
+                      "abilities": {k: 12 for k in
+                                    ("str", "dex", "con", "int", "wis", "cha")}})
+
+
+def test_magical_speed_bonuses_do_not_pile_up():
+    """All 69 shipped speed specs are written with no bonus type, and untyped
+    self-stacks — so routing them in raw would let haste, longstrider and expeditious
+    retreat add to +70 over a base 30 where 1e's enhancement channel gives +30. 1e
+    makes magical speed bonuses enhancement bonuses, so an untyped one is read as
+    enhancement rather than left to pile up."""
+    a = _plain()
+    base = a.speed_feet
+    a.add_buff("speed", "land", 30, source="haste")
+    a.add_buff("speed", "land", 10, source="longstrider")
+    a.add_buff("speed", "land", 30, source="expeditious retreat")
+    assert a.speed_feet == base + 30
+
+
+def test_speed_is_still_armoured_and_halved_in_the_book_s_order():
+    """The funnel goes between the armour lookup and the halving: boots do not undo a
+    breastplate, and being entangled halves what is left including them."""
+    a = _plain("full plate")
+    a.add_buff("speed", "land", 10, source="boots")
+    assert a.speed_feet == 30              # 30 -> 20 by armour, +10 boots
+    a.add_condition("entangled")
+    assert a.speed_feet == 15
+
+
+def test_touch_ac_ignores_the_three_channels_a_touch_attack_ignores():
+    """This was `ac() - armour[ac] - shield[ac] - natural_armour`: three table lookups
+    subtracted from a finished total, so it saw the armour a character WORE and was
+    blind to every other source of those same three bonuses. Bracers of armour, mage
+    armor and thirteen crafted hides all inflated touch AC."""
+    a = _plain("leather")
+    before = a.touch_ac()
+    a.slot_list("wrists")[0] = "Bracers of Armor +4"
+    assert a.ac() > 10, "the bracers reach ordinary AC"
+    assert a.touch_ac() == before, "and are ignored by a touch attack"
+
+    b = _plain("leather")
+    was = b.touch_ac()
+    b.slot_list("ring")[0] = "Ring of Protection +1"
+    assert b.touch_ac() == was + 1, "deflection is not ignored"
+
+
+def test_an_authored_touch_ac_bonus_reaches_touch_ac():
+    """It was in the vocabulary, offered by the editor, and read by nothing."""
+    a = _plain("leather")
+    before = a.touch_ac()
+    a.add_buff("combat_mod", "touch_ac", 2, source="a stance")
+    assert a.touch_ac() == before + 2
+
+
+def test_a_crafted_hide_that_says_armour_is_typed_armour():
+    """Thirteen leatherworker specs carried notes reading "worked into armour" and a
+    potion's note read "as an armour bonus — it does not stack with worn armour", and
+    every one of them was typed `untyped`. The note and the type disagreed, and the
+    type is what the stacking rule reads."""
+    import json
+    from pathlib import Path
+
+    raw = Path("content/materials/leatherworker-materials.json").read_text(
+        encoding="utf-8")
+    specs = [spec for entry in json.loads(raw).get("materials", [])
+             for spec in (entry.get("effects") or [])
+             if spec.get("type") == "combat_mod" and spec.get("target") == "ac"
+             and "armour" in str(spec.get("note") or "").lower()]
+    assert specs, "the crafted hides moved; update this test"
+    assert all(s.get("bonus_type") == "armour" for s in specs), (
+        "a hide worked into armour grants an armour bonus, and armour bonuses do not "
+        "stack with the armour it is worked into")

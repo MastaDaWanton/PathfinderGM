@@ -42,7 +42,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 1,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "against slashing weapons, worked into armour"
     },
     {
@@ -227,7 +227,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 1,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "back-plate panels, worked into armour"
     },
     {
@@ -391,7 +391,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 1,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "worked into armour"
     },
     {
@@ -679,7 +679,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 2,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "plates worked over a leather backing"
     },
     {
@@ -909,7 +909,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 1,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "worked into armour"
     },
     {
@@ -972,7 +972,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 2,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "stone-grained scale, worked into armour"
     },
     {
@@ -1003,7 +1003,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 3,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "overlapping plates, worked into armour or barding"
     },
     {
@@ -1117,7 +1117,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 2,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "iron scale, worked into armour"
     },
     {
@@ -1211,7 +1211,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 2,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "body scale, worked into armour"
     },
     {
@@ -1270,7 +1270,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 3,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "ring-segment plate, worked into armour"
     },
     {
@@ -1310,7 +1310,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 2,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "shell-margin plate, worked into armour"
     }
    ],
@@ -1894,7 +1894,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 3,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "carapace plate, worked into armour"
     },
     {
@@ -2985,7 +2985,7 @@
      "type": "combat_mod",
      "target": "ac",
      "amount": 1,
-     "bonus_type": "untyped",
+     "bonus_type": "armour",
      "note": "studding light armour — the studded-leather upgrade"
     }
    ],
