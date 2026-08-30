@@ -55,9 +55,14 @@ def test_constitution_damage_takes_hit_points_with_it(pc):
     nothing — the score drops, the Fortitude save drops, and the hit points sit there
     unchanged as though the poison had never landed."""
     pc.level = 4
+    # Constitution BEFORE the hit points: `hp_max` is derived from the score now, so
+    # "the maximum is 30" only means anything once the score it is derived from is
+    # settled. Written the other way round it used to work by accident, because the
+    # maximum was a stored number that Con changes then edited — the very mutation
+    # that let a buff-damage-expire-heal sequence mint hit points nobody granted.
+    pc.abilities["con"] = 14
     pc.hp_max = 30
-    pc.hp = 30
-    pc.abilities["con"] = 14                     # +2
+    pc.hp = 30                     # +2
     pc.damage_ability("con", 4)                  # -> 10, +0: two modifier points, 4 HD
     assert pc.hp_max == 22
     assert pc.hp == 22
@@ -65,18 +70,28 @@ def test_constitution_damage_takes_hit_points_with_it(pc):
 
 def test_a_wounded_character_keeps_their_wound(pc):
     pc.level = 4
+    # Constitution BEFORE the hit points: `hp_max` is derived from the score now, so
+    # "the maximum is 30" only means anything once the score it is derived from is
+    # settled. Written the other way round it used to work by accident, because the
+    # maximum was a stored number that Con changes then edited — the very mutation
+    # that let a buff-damage-expire-heal sequence mint hit points nobody granted.
+    pc.abilities["con"] = 14
     pc.hp_max = 30
     pc.hp = 12
-    pc.abilities["con"] = 14
     pc.damage_ability("con", 4)
     assert pc.hp_max == 22 and pc.hp == 4
 
 
 def test_healing_constitution_gives_the_hit_points_back(pc):
     pc.level = 4
+    # Constitution BEFORE the hit points: `hp_max` is derived from the score now, so
+    # "the maximum is 30" only means anything once the score it is derived from is
+    # settled. Written the other way round it used to work by accident, because the
+    # maximum was a stored number that Con changes then edited — the very mutation
+    # that let a buff-damage-expire-heal sequence mint hit points nobody granted.
+    pc.abilities["con"] = 14
     pc.hp_max = 30
     pc.hp = 30
-    pc.abilities["con"] = 14
     pc.damage_ability("con", 4)
     pc.heal_ability("con", 4)
     assert pc.hp_max == 30 and pc.ability_score("con") == 14

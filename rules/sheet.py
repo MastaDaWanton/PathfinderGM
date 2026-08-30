@@ -260,7 +260,17 @@ class Actor:
     weapons: list[str] = field(default_factory=list)
     equipped: str | None = None
 
-    hp_max: int = 1
+    # Hit points as ROLLED — every hit die taken, before Constitution says what they
+    # are worth. `hp_max` is derived from this and the current Con modifier, and is a
+    # property rather than a field for the reason law 2 exists: it was mutated in three
+    # places and reconciled in one, so the moment a Constitution BUFF could reach
+    # `ability_score` the arithmetic came apart. Buff up (nothing recomputes), take Con
+    # damage (a delta measured against the buffed modifier), let the buff expire
+    # (nothing recomputes), heal the damage (a delta measured against the unbuffed one)
+    # — and the character keeps hit points nobody granted. That is "added and hopefully
+    # subtracted" exactly, and no amount of care at the call sites removes it. Derived,
+    # the question cannot be asked wrongly.
+    hp_base: int = 1
     hp: int = 1
     # The one store for everything that is on this creature and will later stop being:
     # conditions, buffs, temporary hit point pools, coatings, ability effects. One
@@ -682,26 +692,64 @@ class Actor:
         The floor is 0, not negative: a score at 0 is already the worst thing that
         happens to it (see `ability_zero_effects`), and letting it go to -3 would quietly
         deepen every modifier derived from it.
+
+        The score is also where an `ability_mod` effect lands, and that is 1e's whole
+        rule: a belt of giant strength raises your STRENGTH, and everything derived
+        from it follows — the modifier, the Power Attack prerequisite, Fortitude, hit
+        points. Applied to the modifier instead, as it was, a +4 belt was worth +4 to
+        the modifier where raising a 12 to a 16 gives +2, so the shipped catalogue's
+        belts and headbands were worth double.
         """
         score = self.abilities.get(ab, 10)
         for c in self.conditions:
             score += c.data.get("ability_penalty", {}).get(ab, 0)
         score -= self.ability_damage.get(ab, 0)
         score -= self.ability_drain.get(ab, 0)
+        # Through `stack`, like every other builder's return. Reading the funnel
+        # and forgetting the channel is how two enhancement belts added to +8
+        # instead of taking the better +6 — found by the test written for this
+        # very change, which is what the behavioural table is for.
+        score += sum(m.value for m in stack(self._buff_mods("ability_mod", ab)))
         return max(0, score)
+
+    @property
+    def hp_max(self) -> int:
+        """Rolled hit points plus what Constitution makes of them.
+
+        1e's rule stated once, rather than applied at three call sites and undone at
+        one: every Hit Die you have is worth your Constitution modifier, so the total
+        follows the score wherever it goes — a belt, a poison, a class's permanent
+        growth, a rage. The floor is 1 because a living thing has at least one.
+        """
+        return max(1, self.hp_base + self.ability_mod("con") * max(1, self.hit_dice))
+
+    @hp_max.setter
+    def hp_max(self, total: int) -> None:
+        """Set the finished total, as a stat block states it.
+
+        Writing is allowed and reading still derives, which is the whole point: a
+        printed stat block gives the total and the sheet stores what is left once
+        Constitution's share is taken out, so the number can never afterwards drift
+        away from the score it is supposed to follow.
+        """
+        self.set_hp_max(total)
+
+    def set_hp_max(self, total: int) -> None:
+        """The total, stored as the rolled base that makes it true."""
+        self.hp_base = int(total) - self.ability_mod("con") * max(1, self.hit_dice)
 
     def base_ability_score(self, ab: str) -> int:
         """Before damage and drain — what it heals back towards."""
         return self.abilities.get(ab, 10)
 
     def ability_mod(self, ab: str) -> int:
-        # Ability scores read the buff list directly rather than through `_buff_mods`,
-        # so worn gear has to be added here too — a belt of giant strength that moved
-        # every roll except the Strength modifier would be the worst kind of half-fix.
-        return ability_modifier(self.ability_score(ab)) + sum(
-            b.amount for b in self.buffs
-            if b.kind == "ability_mod" and b.target == ab) + sum(
-            m.value for m in self._standing_mods("ability_mod", ab))
+        """Derived from the score, and from nothing else.
+
+        This used to add buffs and worn gear a SECOND time, on top of a score that did
+        not include them: two funnels for one number, and the second one skipped
+        `stack()`, so two enhancement belts added instead of taking the better.
+        """
+        return ability_modifier(self.ability_score(ab))
 
     # --- ability damage ---------------------------------------------------------------
 
@@ -718,14 +766,14 @@ class Actor:
         if ab not in ABILITIES:
             raise KeyError(f"no such ability {ab!r}")
         amount = max(0, int(amount))
-        before_mod = self.ability_mod("con")
+        before_max = self.hp_max
 
         book = self.ability_drain if drain else self.ability_damage
         book[ab] = book.get(ab, 0) + amount
 
         hp_change = 0
         if ab == "con":
-            hp_change = self._apply_con_change(before_mod)
+            hp_change = self._follow_con(before_max)
         return {
             "ability": ab, "amount": amount, "kind": "drain" if drain else "damage",
             "score": self.ability_score(ab), "hp_change": hp_change,
@@ -739,12 +787,12 @@ class Actor:
         back = min(have, max(0, int(amount)))
         if not back:
             return 0
-        before_mod = self.ability_mod("con")
+        before_max = self.hp_max
         self.ability_damage[ab] = have - back
         if not self.ability_damage[ab]:
             del self.ability_damage[ab]
         if ab == "con":
-            self._apply_con_change(before_mod)
+            self._follow_con(before_max)
         return back
 
     def grow_ability(self, ab: str, amount: int) -> dict:
@@ -761,9 +809,9 @@ class Actor:
         ab = ab.strip().lower()
         if ab not in ABILITIES:
             raise KeyError(f"no such ability {ab!r}")
-        before_mod = self.ability_mod("con")
+        before_max = self.hp_max
         self.abilities[ab] = int(self.abilities.get(ab, 10)) + int(amount)
-        hp_change = self._apply_con_change(before_mod) if ab == "con" else 0
+        hp_change = self._follow_con(before_max) if ab == "con" else 0
         return {"ability": ab, "amount": int(amount),
                 "score": self.ability_score(ab), "hp_change": hp_change}
 
@@ -781,18 +829,24 @@ class Actor:
 
         return list(classes.apply(self).get("pools") or [])
 
-    def _apply_con_change(self, before_mod: int) -> int:
-        """Move hit points to match a changed Constitution modifier.
+    def _follow_con(self, before_max: int) -> int:
+        """Move CURRENT hit points to match a maximum that has already moved.
 
-        1e: hit points change by your Hit Dice times the change in modifier. Current hit
-        points move with the maximum, so a character at full stays at full and a wounded
-        one keeps their wound.
+        `hp_max` is derived, so it needs no help; what still needs saying is 1e's rider
+        that current hit points travel with the maximum, so a character at full stays at
+        full and a wounded one keeps their wound. Measured against the maximum before
+        and after rather than against a modifier delta: the old version computed
+        `(mod_now - mod_then) * hit_dice` and applied it to a stored total, which drifts
+        the moment anything OTHER than that call changes the modifier — which is exactly
+        what an ability_mod effect reaching the score now does.
         """
-        delta = (self.ability_mod("con") - before_mod) * max(1, self.hit_dice)
-        if not delta:
-            return 0
-        self.hp_max = max(1, self.hp_max + delta)
-        self.hp = min(self.hp + delta, self.hp_max)
+        delta = self.hp_max - before_max
+        if delta:
+            # Both directions. Moving current hit points only upwards left a
+            # wounded character holding all of them while their maximum fell — 12
+            # of 22 after a poison that should have left 4 of 22 — and Constitution
+            # damage stopped being able to drop anybody at all.
+            self.hp = min(self.hp + delta, self.hp_max)
         return delta
 
     def ability_zero_effects(self) -> list[str]:
@@ -2970,7 +3024,6 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         natural_armour=data.get("natural_armour", 0),
         weapons=data.get("weapons", []),
         equipped=data.get("equipped"),
-        hp_max=data.get("hp_max", data.get("hp", 1)),
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
@@ -3058,6 +3111,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
             a.effects.append(a._new_temp_effect(p.amount, p.source, p.rounds_left))
         if data.get("coating"):
             a.coating = dict(data["coating"])
+    # After the effects, never before: a save written while a Constitution buff was
+    # standing carries a maximum that already includes it, so the rolled base is the
+    # saved total minus whatever Constitution contributes with everything loaded. Do it
+    # first and the buff would be counted twice on every reload.
     validate(a)
 
     # After validate, so an unknown class is reported as an unknown class rather than as
@@ -3065,6 +3122,14 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     from . import classes
 
     classes.apply(a)
+    # And the hit points last of all, because everything the derivation reads has
+    # to be settled first. `classes.apply` is what sets `hit_dice_per_level`, and
+    # Blood Bending has two — so computing the base before it ran measured
+    # Constitution's share against one die per level and then read it back against
+    # two. Measured on the user's own saves: five of twelve characters gained hit
+    # points on load, Thor 23 -> 37, until this moved below the line that tells the
+    # sheet how many dice it has.
+    a.set_hp_max(int(data.get("hp_max", data.get("hp", 1)) or 1))
     return a
 
 

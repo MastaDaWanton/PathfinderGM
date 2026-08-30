@@ -512,7 +512,14 @@ def level_up(actor, dice=None) -> dict:
     hp = max(1, rolled + con)          # never a level that costs you hit points
 
     actor.level = new_level
-    actor.hp_max += hp
+    # What the level is WORTH is `hp` — the roll plus Constitution, floored at 1,
+    # because 1e never lets a level cost you hit points however wretched your Con.
+    # The store is the rolled base and Constitution's share is derived from the Hit
+    # Dice, so the base takes the difference: a level adds `hp_base` such that the
+    # derived total rises by exactly `hp`. With Con 3 (-4) and a roll of 1 that means
+    # the base gains 5 so the total gains 1 — add `rolled` alone and a bad
+    # Constitution would make levelling up take hit points away.
+    actor.hp_base += hp - con * max(1, int(actor.hit_dice_per_level or 1))
     actor.hp += hp
 
     # Permanent ability growth the class states as data — Blood Bond's +2 Con every

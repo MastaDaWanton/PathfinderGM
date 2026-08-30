@@ -201,7 +201,15 @@ def client(tmp_path):
 
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Seeded, for the same reason the combat panel's fixture is: `begin_with`
+        # leaves seed=None, so every Survival check here rolls real dice. Caught once
+        # in a full-suite run — eight consecutive forages came back empty and
+        # `test_foraging_fills_the_satchel` failed with nothing wrong in the code,
+        # while passing on its own every time. An unseeded fixture is a gate that
+        # lies occasionally, which is worse than one that lies always.
+        c.seed = 20260830
+        c.save()
         yield Client()
         cm._LIVE.clear()
 

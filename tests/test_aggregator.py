@@ -88,9 +88,17 @@ def test_the_belt_and_the_cloak_reach_every_derived_number():
     will_before = sum(m.value for m in pc.save_modifiers("will"))
     pc.slot_list("belt")[0] = "Belt of Giant Strength +2"
     pc.slot_list("shoulders")[0] = "Cloak of Resistance +1"
-    # The catalogue authors ability_mod as a modifier bump (+2), riding the same
-    # convention every buff has used; Kesst's Str 12 base modifier +1 becomes +3.
-    assert pc.ability_mod("str") == 3
+    # 1e: a belt of giant strength raises your STRENGTH. Kesst's Str 12 becomes 14 and
+    # the modifier follows it from +1 to +2.
+    #
+    # This assertion read `== 3` with a comment calling the +2 "a modifier bump, riding
+    # the same convention every buff has used" — which is what the code did and not what
+    # the rules say. Applied to the modifier, a +2 belt was worth +2 where raising 12 to
+    # 14 gives +1, and a +6 belt was worth +6 where it should be +3: every belt and
+    # headband in the shipped catalogue was worth double. The convention was the bug, and
+    # a test written to match it protected the bug.
+    assert pc.ability_score("str") == 14
+    assert pc.ability_mod("str") == 2
     assert sum(m.value for m in pc.save_modifiers("will")) == will_before + 1
     assert sum(m.value for m in pc.attack_modifiers("dagger")) >= atk_before
     assert any(m.source == "Cloak of Resistance +1" for m in pc.save_modifiers("will"))
@@ -172,3 +180,80 @@ def test_the_armor_waits_for_its_tier():
                        "params": {"ability": "Blood Rage"}, "because": "test"}]))
     pc.clear_temp_hp()
     assert pc.take_damage(9, "slashing")["factored"] == 0
+
+
+# --- the score is the funnel point ----------------------------------------------------
+
+
+def _con(level=4, con=14, hp=40):
+    return from_dict({"name": "x", "kind": "npc", "level": level, "hp": hp,
+                      "hp_max": hp,
+                      "abilities": {"str": 10, "dex": 10, "con": con,
+                                    "int": 10, "wis": 10, "cha": 10}})
+
+
+def test_an_ability_bonus_raises_the_score_and_the_modifier_follows():
+    """1e: a belt of giant strength raises your STRENGTH. Applied to the modifier
+    instead — the convention the code used and a test of mine was written to match —
+    a +2 belt was worth +2 where raising 12 to 14 gives +1, and a +6 belt was worth
+    +6 where it should be +3. Every belt and headband in the catalogue was double."""
+    a = _con()
+    a.abilities["str"] = 12
+    a.add_buff("ability_mod", "str", 4, source="belt", bonus_type="enhancement")
+    assert a.ability_score("str") == 16
+    assert a.ability_mod("str") == 3          # not 1 + 4
+
+
+def test_two_enhancement_belts_take_the_better_one():
+    """The second funnel skipped `stack()` entirely, so two enhancement bonuses to one
+    score added. Routing the bonus through the score puts it through the channels."""
+    a = _con()
+    a.abilities["str"] = 12
+    a.add_buff("ability_mod", "str", 2, source="lesser belt", bonus_type="enhancement")
+    a.add_buff("ability_mod", "str", 6, source="greater belt", bonus_type="enhancement")
+    assert a.ability_score("str") == 18       # 12 + 6, not 12 + 8
+
+
+def test_a_constitution_buff_cannot_mint_hit_points():
+    """The sequence the rules review found, and the reason `hp_max` had to become
+    derived in the same change that let ability bonuses reach the score.
+
+    `hp_max` was a stored number mutated in three places and reconciled in one. Buff
+    Constitution (nothing recomputed), take Con damage (a delta measured against the
+    buffed modifier), let the buff expire (nothing recomputed), heal the damage (a
+    delta measured against the unbuffed one) — and the character keeps hit points
+    nobody granted. That is 'added and hopefully subtracted', which law 2 exists to
+    forbid, and it would have been created BY the fix to the ability funnel."""
+    a = _con()
+    start = a.hp_max
+    a.add_buff("ability_mod", "con", 4, source="bear's endurance",
+               bonus_type="enhancement")
+    assert a.hp_max == start + 2 * a.hit_dice, "a +4 Con is +2 per Hit Die"
+    a.damage_ability("con", 4)
+    a.remove_effects(source="bear's endurance")
+    a.heal_ability("con", 4)
+    assert a.hp_max == start, f"hit points were minted: {start} -> {a.hp_max}"
+
+
+def test_a_wounded_character_keeps_the_wound_when_the_maximum_moves():
+    a = _con(hp=40)
+    a.hp = 12
+    a.damage_ability("con", 4)                # -2 modifier over 4 Hit Dice
+    assert a.hp_max == 32 and a.hp == 4
+
+
+def test_the_derived_maximum_round_trips_through_a_save():
+    """The base is stored and the total derived, so the number in the file has to mean
+    the same thing on the way back in — including for a class with two Hit Dice per
+    level, where computing the base before `classes.apply` measured Constitution
+    against one die and read it back against two. Measured on the user's own twelve
+    campaigns: five characters gained hit points on load, Thor 23 -> 37."""
+    from rules.sheet import load_pc
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "blood bending", "level": 3, "ranks": {},
+              "paths": ["battle blood"], "hp_max": 37, "hp": 37})
+    a = from_dict(d, ref="pc")
+    assert a.hit_dice == 6, "two Hit Dice per level"
+    assert a.hp_max == 37, "the saved total is the loaded total"
+    assert from_dict(to_dict(a), ref="pc").hp_max == 37
