@@ -747,6 +747,40 @@ class Actor:
             self._apply_con_change(before_mod)
         return back
 
+    def grow_ability(self, ab: str, amount: int) -> dict:
+        """A permanent increase to a base score — a class's own growth, an inherent bonus.
+
+        The one place a base score goes up, for the same reason `damage_ability` is the
+        one place one goes down: raising Constitution has a second consequence, and
+        `rules/leveling.py` wrote `actor.abilities[ab] += amount` directly and never had
+        it. Measured on the shipped class at 20th level: 100 hit points never granted —
+        210 against 310 owed, one third of the total — because 1e's retroactive rule
+        (every Hit Die already earned gains with the modifier) needs the arithmetic
+        below and a bare `+=` cannot reach it.
+        """
+        ab = ab.strip().lower()
+        if ab not in ABILITIES:
+            raise KeyError(f"no such ability {ab!r}")
+        before_mod = self.ability_mod("con")
+        self.abilities[ab] = int(self.abilities.get(ab, 10)) + int(amount)
+        hp_change = self._apply_con_change(before_mod) if ab == "con" else 0
+        return {"ability": ab, "amount": int(amount),
+                "score": self.ability_score(ab), "hp_change": hp_change}
+
+    def rebuild_pools(self) -> list[str]:
+        """Resize every class pool against the sheet as it stands now.
+
+        A pool's maximum is a formula in the class file precisely so it can follow a
+        level up, and `leveling.level_up` has always called this — guarded by
+        `hasattr`, which is why nobody noticed it had never existed. Measured: nine
+        levels gained in one session left a Blood Bender's rage pool at 5 rounds when
+        its own formula said 25, and a reload silently corrected it, so the bug healed
+        itself every time anybody went looking.
+        """
+        from . import classes
+
+        return list(classes.apply(self).get("pools") or [])
+
     def _apply_con_change(self, before_mod: int) -> int:
         """Move hit points to match a changed Constitution modifier.
 

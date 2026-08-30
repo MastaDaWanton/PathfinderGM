@@ -195,10 +195,14 @@ def test_a_scaffolded_class_levels_up_and_its_pool_formula_follows(mine):
         result = leveling.level_up(actor)
         assert result["ok"], result
     assert actor.level == 5
-    assert actor.pool("squall").maximum == 3 + wis, \
-        "level_up does not resize pools — there is no Actor.rebuild_pools"
-    classes_mod.apply(actor)
+    # This assertion used to read `== 3 + wis`, with the message "level_up does not
+    # resize pools — there is no Actor.rebuild_pools": the test pinned the DEFECT
+    # rather than the rule, so the bug was protected by its own coverage. The method
+    # exists now and `level_up` calls it unguarded, so the pool follows the level
+    # within the session instead of waiting for the reload that used to hide it.
     assert actor.pool("squall").maximum == 3 + wis + 2      # 3 + wis_mod + floor(5/2)
+    classes_mod.apply(actor)
+    assert actor.pool("squall").maximum == 3 + wis + 2, "a recompute must be idempotent"
 
 
 def test_the_path_scaffold_gates_its_abilities_by_tier(mine):

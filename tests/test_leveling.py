@@ -942,3 +942,54 @@ def test_blood_bending_bab_matches_the_supplied_chart():
         d["ranks"] = {}
         pc = from_dict(d, ref="pc")
         assert iterative_attacks(pc.bab) == want, (level, pc.bab)
+
+
+# --- what a level up owes the sheet ---------------------------------------------------
+
+def _levelled(to_level: int):
+    """A Blood Bender levelled the long way — one level_up at a time, as play does."""
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "blood bending", "level": 1, "ranks": {},
+              "paths": ["battle blood"], "xp": 99_999_999})
+    pc = from_dict(d, ref="pc")
+    while pc.level < to_level:
+        got = leveling.level_up(pc, Dice(seed=3))
+        assert got.get("ok"), got.get("why")
+    return pc
+
+
+def test_permanent_constitution_growth_reaches_every_hit_die_already_earned():
+    """1e's retroactive rule: when your Constitution modifier rises, every Hit Die you
+    already have gains with it. `level_up` wrote `actor.abilities[ab] += amount`
+    directly, which raises the score and cannot reach that arithmetic.
+
+    Measured on the shipped class before the fix: 210 maximum hit points at 20th level
+    against 310 owed — 100 never granted, one third of the character's total. The four
+    +2 Constitution steps land at levels 5, 10, 15 and 20, where the character holds 10,
+    20, 30 and 40 Hit Dice: 10 + 20 + 30 + 40 = 100, each step paying every die already
+    earned."""
+    pc = _levelled(20)
+    assert pc.ability_score("con") == 20, "four +2 steps at levels 5, 10, 15, 20"
+    # Take the whole growth back off and the hit points must follow it down, which is
+    # the same arithmetic proving it went on in the first place.
+    before = pc.hp_max
+    pc.damage_ability("con", 8)
+    assert pc.hp_max == before - 4 * pc.hit_dice
+    pc.heal_ability("con", 8)
+    assert pc.hp_max == before
+    assert before >= 300, f"the growth never reached hit points: {before}"
+
+
+def test_a_pool_resizes_on_the_level_that_grows_it():
+    """`level_up` called `actor.rebuild_pools()` behind a `hasattr` guard, and the
+    method had never existed — so it silently returned [] for the life of the feature.
+
+    Measured: nine levels gained in one session left a Blood Bender's rage pool at its
+    1st-level size of 5 rounds when the class's own formula (4 + con_mod + 2*(level-1))
+    said 25. A reload re-ran `classes.apply` and quietly corrected it, which is why the
+    bug healed itself every time anybody went looking for it."""
+    pc = _levelled(10)
+    want = 4 + pc.ability_mod("con") + 2 * (pc.level - 1)
+    assert pc.pool("rage").maximum == want, "the pool did not follow the level"
+    # And the session agrees with the reload, which it did not before.
+    assert from_dict(to_dict(pc), ref="pc").pool("rage").maximum == want

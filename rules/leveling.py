@@ -525,12 +525,25 @@ def level_up(actor, dice=None) -> dict:
         ab = str(g.get("ability", "")).lower()
         if every > 0 and amount and ab in actor.abilities \
                 and new_level % every == 0:
-            actor.abilities[ab] = int(actor.abilities[ab]) + amount
+            # Through the applicator, not `actor.abilities[ab] += amount`: raising
+            # Constitution owes every Hit Die already earned its share, and a bare
+            # increment cannot reach that arithmetic. Measured on the shipped class at
+            # 20th level: 100 hit points never granted — 210 against 310 owed.
+            got = actor.grow_ability(ab, amount)
             grown.append(f"{ab.title()} +{amount} (permanent)")
+            if got["hp_change"]:
+                grown.append(f"{got['hp_change']:+d} hit points "
+                             f"({ab.title()} raised every Hit Die)")
     # Pools are formulas in the class file, so they resize themselves against the new
     # level rather than being recomputed here — the whole reason they were written as
     # formulas in the first place.
-    refreshed = actor.rebuild_pools() if hasattr(actor, "rebuild_pools") else []
+    #
+    # `hasattr` guarded a method that had never existed, so this silently returned []
+    # for the whole life of the feature: nine levels gained in one session left a rage
+    # pool at its 1st-level size of 5 when its own formula said 25, and only a reload —
+    # which re-runs `classes.apply` — put it right, which is why it healed itself
+    # every time anybody went looking for it.
+    refreshed = actor.rebuild_pools()
 
     return {
         "ok": True, "level": new_level, "rolled": rolled, "con": con, "hp": hp,
