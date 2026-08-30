@@ -94,6 +94,54 @@ def j(raw: bytes) -> dict:
         return {"_not_json": raw[:120].decode(errors="replace")}
 
 
+def ac_now(http: Http) -> tuple[int, list[str]]:
+    """The packaged app's own armour class, and what it says makes it up."""
+    s, body = http.get("/api/sheet")
+    ac = ((j(body).get("defense") or {}).get("ac") or {})
+    return int(ac.get("total", 0) or 0), [
+        str(t.get("source", "")) for t in (ac.get("terms") or [])]
+
+
+def check_the_laws_hold(http: Http) -> None:
+    """Apply a real effect through the packaged build and read the number it moved.
+
+    Every other check in this prover exercises a door — a page, a gate, a refusal —
+    and not one applies a condition, applies an effect, advances a clock or reloads a
+    save. So "rebuild the exe and run prove_build" proved the app started and
+    answered, and proved nothing whatever about the three laws it is built on. A worn
+    ring is the smallest thing that exercises all of them at once: a document in the
+    catalogue, an effect granted by a slot, a typed modifier through the one funnel,
+    and a number on the sheet that names where it came from.
+    """
+    before, _ = ac_now(http)
+    s, body = http.post("/api/slots", {"action": "set", "slot": "ring", "index": 0,
+                                       "item": "Ring of Protection +1"})
+    faults = [] if s == 200 else [f"wearing the ring answered {s}: {body[:120]}"]
+    after, terms = ac_now(http)
+    if after != before + 1:
+        faults.append(f"AC {before} -> {after}: a +1 deflection ring moved "
+                      f"{after - before}")
+    if not any("Ring of Protection" in t for t in terms):
+        faults.append(f"the ring is not named among the AC terms: {terms}")
+    note("a worn effect reaches its number and names itself", faults)
+
+
+def check_it_survived_the_restart(http: Http) -> None:
+    """The same ring, after the exe has been stopped and started on the same data.
+
+    Half the defects this programme is fixing are restart-only — six Scene fields the
+    save never writes, two representations of one store — and nothing in this prover
+    ever restarted anything, so it could not have seen one of them.
+    """
+    ac, terms = ac_now(http)
+    faults = []
+    if not any("Ring of Protection" in t for t in terms):
+        faults.append(f"the effect did not survive the restart: {terms}")
+    if ac <= 0:
+        faults.append(f"the sheet came back with AC {ac}")
+    note("an effect survives stopping and restarting the app", faults)
+
+
 def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
@@ -241,8 +289,24 @@ def main() -> None:
     print(f"exe:  {exe}\ndata: {data}\n")
 
     env = dict(os.environ, PATHFINDER_GM_DATA=str(data))
-    proc = subprocess.Popen([str(exe), "--no-browser"], env=env,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def launch():
+        return subprocess.Popen([str(exe), "--no-browser"], env=env,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def stop(p):
+        # The whole tree, not the process: a onefile exe is a bootloader that spawns
+        # the real app as a child, and killing only the parent leaves the child holding
+        # the port — which the packaging suite then failed to bind an hour later, two
+        # tools away from the cause.
+        subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
+                       capture_output=True)
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+    proc = launch()
     try:
         # Discover the server through the same handshake the Electron shell will use —
         # the portfile IS the contract, so the prover dogfoods it instead of assuming
@@ -287,6 +351,31 @@ def main() -> None:
             print("the exe never answered at its own portfile url"); sys.exit(2)
 
         run_checks(http, repo)
+        check_the_laws_hold(http)
+
+        # Stop the app and start it again on the same data directory. Every defect that
+        # only shows itself after a restart was invisible to this prover until now,
+        # which is why it could report ALL CLEAN over a save that had silently dropped
+        # every standing hazard in the scene.
+        stop(proc)
+        proc = launch()
+        portfile.unlink(missing_ok=True)
+        for _ in range(120):
+            if portfile.exists():
+                break
+            time.sleep(1)
+        else:
+            print("the exe never came back after a restart"); sys.exit(2)
+        again = json.loads(portfile.read_text(encoding="utf-8"))
+        http2 = Http(again.get("url", f"http://127.0.0.1:{again.get('port')}/").rstrip("/"))
+        for _ in range(60):
+            try:
+                if http2.get("/")[0] == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(1)
+        check_it_survived_the_restart(http2)
 
         logfile = data / "logs" / "pathfindergm.log"
         faults = []
@@ -306,16 +395,7 @@ def main() -> None:
                               "not reaching the tee")
         note("log file carries the banner and the request lines", faults)
     finally:
-        # The whole tree, not the process. A PyInstaller onefile exe is a bootloader
-        # that spawns the real app as a child; terminate() killed the parent and left
-        # the child holding port 8917 — which the packaging suite then failed to bind
-        # an hour later, two tools away from the cause.
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                       capture_output=True)
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        stop(proc)
 
     print(f"\n{'ALL CLEAN' if not FAULTS else f'{len(FAULTS)} FAULT(S)'}")
     for f in FAULTS:
