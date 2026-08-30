@@ -56,11 +56,20 @@ def test_a_passive_is_not_on_the_usable_list():
 
 
 def test_using_a_passive_is_refused_with_the_reason():
+    """Refused, and as an Outcome rather than a raise.
+
+    This asserted `pytest.raises(IntentError, match="always active")`, which is the
+    502 shape the engine's own comment warns about twenty lines below the site: the
+    schema may REQUIRE the op the player declared, so every regeneration carries it,
+    every one is refused for company, and the turn dies with a 502 instead of the
+    sentence it had ready. Swift Strikes is one of nine ability names in the shipped
+    class file that reach this branch."""
     scene, e = _fight()
-    with pytest.raises(IntentError, match="always active"):
-        e.run(e.validate([{"op": "use_ability", "actor": "pc",
-                           "params": {"ability": "swift strikes"},
-                           "because": "test"}]))
+    out = e.run(e.validate([{"op": "use_ability", "actor": "pc",
+                             "params": {"ability": "swift strikes"},
+                             "because": "test"}])).outcomes[-1]
+    assert "always active" in out.tell
+    assert out.effects == [] and not out.rolls
 
 
 def test_the_first_attack_on_a_target_is_single():

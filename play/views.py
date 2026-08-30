@@ -875,7 +875,23 @@ def roll(request):
         )
 
     engine = c.engine()
-    resolution = engine.resume(face)
+    try:
+        resolution = engine.resume(face)
+    except (IntentError, ValueError, KeyError) as exc:
+        # A raise part-way through resolution used to be a 500 with the scene already
+        # half-mutated and never saved: the damage had landed, the pending roll was
+        # gone, and the player's only way out was to reload into a game that had
+        # forgotten the swing. The scene is left as the engine last saved it and the
+        # player is told, which is the same bargain every other refusal makes.
+        c.scene.awaiting = None
+        c.scene.pending_intents = []
+        c.scene.pending_outcomes = []
+        c.scene.pending_partial = {}
+        c.save()
+        return JsonResponse(
+            {"error": f"That roll could not be finished: {exc}. The turn was let go "
+                      f"rather than half-applied — try the action again."},
+            status=409)
     narration = c.transcript[-1]["text"] if c.transcript else ""
     player_input = next(
         (t["text"] for t in reversed(c.transcript) if t["who"] == "player"), ""
@@ -1170,7 +1186,20 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                                      "text": plain_tell(o.tell)})
             continue
 
-        resolution = engine.run(plan.intents)
+        try:
+            resolution = engine.run(plan.intents)
+        except (IntentError, ValueError, KeyError) as exc:
+            # The fallback path above has been guarded since it was written; the path
+            # the model succeeds on was not. An NPC turn whose intents validated and
+            # then raised at resolution — an empty pool, a ref that left the scene
+            # between the two — took down the PLAYER's request as a 500, on a turn the
+            # player had already finished. A creature the engine cannot resolve holds
+            # back, exactly as one the GM could not speak for does.
+            c.turn_log.append({"kind": "npc-turn", "ref": ref,
+                               "error": f"resolution: {str(exc)[:400]}"})
+            c.transcript.append({"who": "gm", "kind": "consequence",
+                                 "text": f"{actor.name} holds back."})
+            continue
         if plan.narration:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 

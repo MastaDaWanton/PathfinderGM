@@ -3962,9 +3962,20 @@ class Engine:
             # "Using" a passive was worse than a wasted action: Swift Strikes stood in
             # for the attack it exists to modify, and the fight went a round with no
             # to-hit rolled at all.
-            raise IntentError(
-                f"use_ability: {found} is always active — it is never used, it simply "
-                f"happens. Attack, and it does its work on the attack.", "legality")
+            #
+            # A refusal, not a raise. This was an IntentError sitting twenty lines above
+            # the comment that states the rule — "a hard refusal against a required op
+            # is the 502 death-spiral this repo has buried four times" — and it is
+            # reachable from nine ability names the shipped class file lists under its
+            # own tiers. The schema may REQUIRE the op the player declared, so every
+            # regeneration carried it, every one was refused, and the turn died as a
+            # 502 where a sentence would have done.
+            return Outcome(
+                intent_id=intent.id, op="use_ability", effects=[],
+                tell=(f"{found.title()} is always active — it is never used, it "
+                      f"simply happens. {actor.name} attacks, and it does its work "
+                      f"on the attack."),
+                because=intent.because)
 
         # A toggle is a standing state, not a spent action. Using it again turns it
         # off, and the state lives as a clockless condition so every place that shows

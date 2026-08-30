@@ -74,3 +74,58 @@ def test_a_refusal_names_the_field_so_the_retry_is_a_repair():
         with pytest.raises(IntentError) as got:
             _params(op, **params)
         assert phrase in str(got.value), (op, str(got.value))
+
+
+# --- refusals that used to cost the whole turn ----------------------------------------
+
+
+def test_a_passive_refuses_as_an_outcome_and_never_as_a_raise():
+    """The 502 shape, and the one this repo has buried four times: the intent schema
+    may REQUIRE the op the player declared, so a hard refusal is carried by every
+    regeneration, refused every time, and the turn dies with a 502 where a sentence
+    would have done.
+
+    Nine ability names in the shipped class file reach this branch, and the raise sat
+    twenty lines above `_op_use_ability`'s own comment stating the rule."""
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "blood bending", "level": 1, "ranks": {},
+              "paths": ["battle blood"]})
+    pc = from_dict(d, ref="pc")
+    scene = Scene()
+    scene.add(pc)
+    e = Engine(scene, dice=Dice(seed=3))
+    out = e.run(e.validate([{"op": "use_ability", "actor": "pc",
+                             "params": {"ability": "swift strikes"},
+                             "because": "t"}])).outcomes[-1]
+    assert out.op == "use_ability"
+    assert out.effects == [] and not out.rolls
+    assert "always active" in out.tell
+
+
+def test_the_engine_has_no_raise_where_a_refusal_belongs_in_use_ability():
+    """A ratchet, not a boolean. `_op_use_ability` is reachable from every ability the
+    class files list, and every raise inside it is a turn the player loses. One
+    survives — the unknown-ability name, where a DIFFERENT intent genuinely would have
+    worked, which is the test for a legitimate raise."""
+    import ast
+    from pathlib import Path
+
+    source = Path("rules/engine.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "_op_use_ability")
+    raises = [n for n in ast.walk(fn)
+              if isinstance(n, ast.Raise)
+              and "IntentError" in ast.dump(n.exc or ast.Constant(None))]
+    # Two survive, and both pass the test for a legitimate raise — a DIFFERENT intent
+    # would have worked: "nobody here to use it" (name an actor who exists) and "has no
+    # ability called X" (name an ability they have). The third, the passive, did not:
+    # no other intent helps a player who owns an always-active ability, so it refuses
+    # with a sentence instead.
+    assert len(raises) <= 2, (
+        f"{len(raises)} raises in _op_use_ability; a refusal the player could not "
+        f"have predicted is an Outcome with a printable tell, never a raise")

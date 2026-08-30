@@ -272,15 +272,23 @@ def test_iron_clot_never_touches_energy_and_never_stacks():
 
 def test_iron_clot_is_never_a_button():
     """A passive is never used, it simply happens — using it must refuse, not spend
-    the turn Swift Strikes once swallowed."""
-    import pytest
-    from rules.engine import IntentError
+    the turn Swift Strikes once swallowed.
+
+    Refuse, but as an Outcome. This asserted `pytest.raises(IntentError)`, which is the
+    502 shape: the intent schema may REQUIRE the op the player declared, so every
+    regeneration of the turn carries it, every one is refused for company, and the turn
+    dies with a 502 where a sentence would have done. Nine ability names in the shipped
+    class file reach this branch. The raise sat twenty lines above the comment in
+    _op_use_ability that states this exact rule."""
     pc = _coagulator(level=1)
     scene = Scene(); scene.add(pc)
     e = Engine(scene, dice=Dice(seed=11))
-    with pytest.raises(IntentError):
-        e.run(e.validate([{"op": "use_ability", "actor": "pc",
-                           "params": {"ability": "iron clot"}, "because": "t"}]))
+    out = e.run(e.validate([{"op": "use_ability", "actor": "pc",
+                             "params": {"ability": "iron clot"},
+                             "because": "t"}])).outcomes[-1]
+    assert out.effects == [], "a refused passive may not change anything"
+    assert "always active" in out.tell and "never used" in out.tell
+    assert not out.rolls, "and it may not spend a die either"
 
 
 def _commander(level=1):
