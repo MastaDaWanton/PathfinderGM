@@ -206,3 +206,39 @@ def test_every_symbol_the_skill_names_still_resolves():
             problems.append(f"{path}:{symbol} — {exc}")
     assert not problems, "the skill names things that no longer exist:\n" + \
         "\n".join(problems)
+
+
+# --- the gate itself ------------------------------------------------------------------
+
+
+def test_every_content_cache_is_isolated_between_tests():
+    """The suite is the gate every stage of the compliance work is judged by, and a
+    gate that lies teaches you to re-run instead of investigate.
+
+    Sixteen tests assign `settings.CAMPAIGN_DIR` outright rather than through
+    `override_settings` and never restore it, and thirteen modules cache shipped
+    content merged with a homebrew overlay read from under that directory. A cache
+    filled while one test pointed the setting at its own tmp_path was still holding
+    that test's homebrew for every test after it.
+
+    `tests/conftest.py` restores the setting and drops the caches whenever it moves.
+    This keeps its list honest: a cache is declared `_NAME: type | None = None`, so
+    every module holding one of those must be listed, or it silently leaks again.
+    """
+    import re
+
+    from tests.conftest import _CACHED
+
+    declares = re.compile(r"^(_[A-Z][A-Z_]*)\s*:\s*[^=\n]*\|\s*None\s*=\s*None\s*$",
+                          re.M)
+    holders = {
+        f"rules.{path.stem}"
+        for path in Path("rules").glob("*.py")
+        if declares.search(path.read_text(encoding="utf-8"))
+    }
+    missing = holders - set(_CACHED)
+    assert not missing, (
+        f"module(s) cache content under CAMPAIGN_DIR and are not isolated between "
+        f"tests — add them to conftest._CACHED: {sorted(missing)}")
+    stale = set(_CACHED) - holders
+    assert not stale, f"conftest._CACHED names modules that hold no cache: {sorted(stale)}"

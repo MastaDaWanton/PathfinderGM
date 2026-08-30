@@ -22,6 +22,13 @@ def fight(tmp_path):
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Seeded, because the NPC turn this fixture hands the round to rolls real
+        # attacks against a 9-hit-point rogue. Measured over twelve unseeded runs of
+        # the end-turn case: one dropped Kesst to -3, which ends the fight, and
+        # `Scene.end_encounter` clears `acted` — so `assert "pc" in scene.acted` failed
+        # about one run in five at suite level with nothing wrong with the code. A test
+        # gate that lies two runs in five teaches you to re-run instead of investigate.
+        c.seed = 20260830
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
         c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))
