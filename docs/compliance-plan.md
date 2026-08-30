@@ -1,0 +1,148 @@
+# Bringing the app into three-laws compliance
+
+The programme derived from a ten-dimension audit of the whole codebase (162 findings:
+53 silent-failure, 34 drifting-now, 23 blocks-authoring) and hardened by a six-lens
+adversarial review that returned "needs-changes" on every lens. The laws themselves are
+in `CLAUDE.md`; the reasoning is in `docs/design-contract.md` and
+`docs/states-effects-tells.md`.
+
+This file is the plan of record. It exists because the first draft contained three
+changes that would have introduced new bugs while fixing old ones — that is what the
+review was for, and the corrections are recorded here rather than remembered.
+
+## What the review changed about the plan itself
+
+**The green/red contradiction.** The draft said the sharpened law tests "will go red
+immediately, exposing true scope" *and* "suite green at the end of every stage". Three
+reviewers independently found this; both cannot hold, and nine stages of known-red makes
+a new regression indistinguishable from an old one. **Resolution: every law test lands as
+a ratchet, not a boolean** — `assert len(sites) <= N`, where N is the audit's own measured
+count (6 clock decrements, 35 resolution-time raises, 40 literal-key `has_condition`
+branches, 10 class-name sites, 6 unsaved Scene fields). The suite stays green, the number
+is each stage's success criterion, and it only ever goes down. A stage that over-delivers
+tightens N in the same commit.
+
+**Not every channel is additive.** Law 2 says "one modifier funnel", and a test that
+merely asserts a builder mentions `_buff_mods` pushes an executor toward
+`sum(stack(...))` everywhere. In 1e, concealment, energy resistance, damage reduction and
+temporary hit points are **max-not-sum** — blur 20% plus displacement 50% is 50%, not
+70%. **The law test splits in two**: an additive set (attack, damage, AC, saves, skills,
+initiative, CMB, CMD, ability score) that must read the funnel and end in `stack()`, and
+a best-only set that must read the one store and must *not* sum.
+
+**The funnel test's predicate is a false positive.** It asserts the source text of a
+method contains `_buff_mods`. `initiative_modifiers` passes and deafened's −4 still never
+arrives, because `_condition_mods("initiative")` is never read. **Replaced by a
+parametrised behavioural table**: for every (kind, target) pair in the authoring
+vocabulary, author a bonus and assert the number moves.
+
+**The verification instruments are blind.** `tools/prove_build.py` — the packaged-build
+prover CLAUDE.md requires — has zero checks that apply a condition, apply an effect,
+advance a clock and assert expiry, or save and reload. Several defects here are
+restart-only, so "run prove_build at the end" was not a verification claim. **Extending
+prove_build is stage-1 work, not a closing step**, and it runs at the end of every
+save-shape stage.
+
+**Save-shape changes needed a prerequisite nobody had.** Details below; this became
+stage 0 and is done.
+
+## Stage 0 — done
+
+Three commits, each verified, suite green.
+
+- `04b1548` — `level_up` wrote `actor.abilities[ab] += amount` straight into the base
+  score, which cannot reach 1e's retroactive rule. Measured on the shipped class at 20th
+  level: 210 maximum hit points against 310 owed; the four +2 Constitution steps land at
+  levels 5/10/15/20 against 10/20/30/40 Hit Dice, so the debt is 10+20+30+40 = **100 hit
+  points, one third of the character's total**. Growth now goes through
+  `Actor.grow_ability`. `level_up` also called `actor.rebuild_pools()` behind a `hasattr`
+  guard and the method had never existed: nine levels in one session left a rage pool at
+  5 rounds where its formula said 25, and a reload silently corrected it, which is why it
+  was never caught.
+- `a4b6bea` — "no model authors a number" had no enforcement. `spawn.count` was bounded
+  and its neighbours were not: `give.count` could mint 1,000,000 gp, `forage.hours` could
+  drive the loop for a year, `attack.iteration` indexed inside resolution and raised there
+  as a 500. `dice.parse` bounded the dice and not the constant, so `1d6+999999` read as
+  plausible. All now clamp (the `rules/dc.py` choice — the model meant "a lot", the engine
+  decides how much) and refuse only non-numbers, naming the field.
+- `36a0eb2` — **the most dangerous defect found.** `_resume` wrapped `Campaign.load` in a
+  bare `except Exception`, renamed the save, and returned None; `current()` answers None
+  with `_begin`, which saves immediately. Any load error cost the player their campaign
+  and wrote a fresh character over its name, silently. And `save_version != SAVE_VERSION`
+  made every shape change unshippable — bumping it would have handed all twelve real saves
+  to that same path. Both fixed; verified by loading copies of all twelve real campaigns
+  (12 loaded, 0 failed, nothing renamed or created). This is the prerequisite for every
+  later stage that changes what a save holds.
+
+Both defect-pinning tests found here asserted the *broken* behaviour, one with a docstring
+stating the opposite of its own assertion. A test that pins a defect protects it.
+
+## The remaining stages
+
+Each ends with the suite green, a commit naming its measurement, and — for any stage that
+changes a save — a round-trip over copies of the twelve real saves asserting no derived
+number moved except the ones the stage names.
+
+**Stage 1 — sharpen the instruments.** Law tests become ratchets with the audit's counts.
+Funnel test becomes the behavioural table. Additive/best-only split. Add the missing
+applicator test (nothing outside `apply_effect`/`remove_effects`/`tick_effects` may touch
+`.effects`; measured today: 2 applicator call sites against 15 direct mutations). Add the
+refusal-pattern ratchet. Widen the engine-names-no-class-ability sweep (the two-file
+version reads too little; widened it finds 10 sites). Add the dataclass-field-walk
+persistence test — 6 Scene fields went unsaved unnoticed. Extend `prove_build` to apply an
+effect, restart the exe against the same data directory, and assert it survived.
+
+**Stage 2 — one funnel.** `ability_score()` becomes the funnel point for `ability_mod`
+bonuses and `ability_mod()` becomes pure derivation — **one shape, not both**: the draft
+named both and would have applied every belt twice. This stage must also land the derived
+`hp_max` (audit finding 135), because once Con buffs reach `ability_score` the existing
+`_apply_con_change` before/after asymmetry goes live and a buff-damage-expire-heal
+sequence permanently mints hit points — the "added and hopefully subtracted" shape law 2
+forbids, created by the fix. `concealment` and `add_buff`'s missing `bonus_type` join
+here. **Speed and touch AC need their content typed first**: 69 shipped speed specs carry
+no bonus type and would all stack (+80 where 1e gives +30); 36 of 60 non-deflection AC
+specs are untyped crafted armour. Type the content, then move the reader.
+
+**Stage 3 — defence channels become effects, with the save shape changing in the same
+commit.** The draft split the store change (stage 3) from the file change (stage 5),
+which would ship two builds whose memory and disk disagree. One idempotent migration
+converts legacy defence fields to infinite effects *after* the `a.effects` rebind.
+**Immunity gates the ops, never `Actor.add_condition`** — the applicator is also how
+`apply_hp_state` writes dead/dying/unconscious, and gating it would make 749 undead
+creatures unkillable. And 1e attaches immunity to an effect's *descriptor*, not to the
+condition it produces: sleep immunity does not prevent unconsciousness from hit-point
+loss.
+
+**Stage 4 — one clock and one ticker** (split from the draft's single stage, which was
+three). 4a: one `Scene.advance(minutes)` owning the six clock sites. 4b: one ticker plus
+expiry tells — four of five tickers discard their "what ended" lists, so effects expire
+in combat with nothing said. 4c: the store migrations (guards, wards, manifestations,
+compulsions, pool cooldowns), each with its save shape.
+
+**Stage 5 — one vocabulary.** 40 literal-key `has_condition` branches against 12
+`has_state` queries; two disagreeing "can this actor act?" authorities; `play/downed.py`'s
+second down-ness vocabulary; `rest()` clearing fifteen conditions by name.
+
+**Stage 6 — severed tells.** Death, dying, unconsciousness and disabled apply with no tell
+at all; the narrator reaches into `outcome.effects` and does hit-point arithmetic to
+recover what the tell never carried; tells leak hidden roll totals and DCs; the claims
+scrubber does not run on the prose the player actually reads.
+
+**Stage 7 — refusals.** 35 resolution-time raises against 13 refusal Outcomes. Classify
+each: a raise is correct only when a *different* intent would have worked.
+
+**Stage 8 — feats as documents.** 16 of 1,474 computed, eight name-branches, a sixth
+modifier channel. Reuses the class `grants` grammar — a feat is an ability you always
+have.
+
+**Stage 9 — class-name strings out of the engine.** "control blood", Power Attack through
+the intent schema, Swift Strikes in the attack op, starting-kit class tables.
+
+## The destination, and the honest gap
+
+The scalability lens's warning is recorded here because it is the thing most likely to be
+forgotten: after all these stages the engine is lawful and **the corpus is still inert** —
+25,464 shipped effect specs, 3,415 of them `narrative`, 3,015 authored `duration` blocks
+no executor reads, 7,138 `sense` specs with no consumer. Compliance is not the same as
+capacity. A later programme has to make the authored content executable, or the app will
+be beautifully lawful and no more capable than it was.
