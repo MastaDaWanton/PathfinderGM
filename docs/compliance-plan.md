@@ -83,7 +83,21 @@ Each ends with the suite green, a commit naming its measurement, and — for any
 changes a save — a round-trip over copies of the twelve real saves asserting no derived
 number moved except the ones the stage names.
 
-**Stage 1 — sharpen the instruments.** Law tests become ratchets with the audit's counts.
+**Stage 1 — sharpen the instruments. DONE** (`56929d9`, `dda40d7`, `bf1d827`).
+The gate first: the suite failed one run in five, diagnosed by reproduction as unseeded
+dice in a fixture that hands the round to an NPC swinging at a 9-hit-point rogue — not
+the CAMPAIGN_DIR leakage the review assumed, though that is fixed too. Five of five
+green after. Then the four turn-costing refusals pulled forward. Then the law tests:
+the funnel test became behavioural (the substring version passed `initiative_modifiers`
+while deafened's −4 never arrived), the ticker test grew from one clock to all five, the
+applicator gained the test law 2 never had (18 direct mutations against 6 applicator
+calls), the best-only channels are pinned so nobody sums concealment, six unsaved Scene
+fields are named, and `prove_build` now wears a ring through the packaged exe, restarts
+it, and asserts the effect survived. Ratchets are named allowlists, not counts, so they
+tighten themselves.
+
+*Superseded plan text follows, kept for the reasoning:* Law tests become ratchets with
+the audit's counts.
 Funnel test becomes the behavioural table. Additive/best-only split. Add the missing
 applicator test (nothing outside `apply_effect`/`remove_effects`/`tick_effects` may touch
 `.effects`; measured today: 2 applicator call sites against 15 direct mutations). Add the
