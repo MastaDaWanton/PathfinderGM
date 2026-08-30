@@ -1893,15 +1893,28 @@ class Actor:
         return Condition(key=key, rounds_left=rounds, source=source)
 
     def add_buff(self, kind: str, target: str, amount: int, source: str = "",
-                 rounds: int | None = None, note: str = "") -> "Buff":
-        """Grant a timed bonus. Same source on the same roll reapplies, not stacks."""
+                 rounds: int | None = None, note: str = "",
+                 bonus_type: str = "") -> "Buff":
+        """Grant a timed bonus. Same source on the same roll reapplies, not stacks.
+
+        `bonus_type` is 1e's channel — alchemical, morale, enhancement — and it used to
+        be dropped on the floor between the author and the roll. `effectspec` has
+        offered the field since it was written and every shipped consumable spec fills
+        it in; `consumables` did not pass it to the op, the op had no param for it, and
+        this method had no argument to receive it. So every timed bonus in the game
+        entered the funnel untyped, untyped stacks with everything, and two alchemical
+        +2s from two different teas were +4 where 1e gives +2 — with nothing on the
+        sheet to show why.
+        """
         kind, target = str(kind).strip(), str(target).strip().lower()
+        typed = _bonus_type(bonus_type)
         for e in self.effects:
             if e.kind != "buff" or e.source != source or not e.modifiers:
                 continue
             m = e.modifiers[0]
             if (m.get("kind"), m.get("target")) == (kind, target):
                 m["amount"], m["note"] = int(amount), note
+                m["bonus_type"] = typed
                 e.rounds_left = rounds
                 e.duration = "until-dismissed" if rounds is None else "rounds"
                 return Buff(kind=kind, target=target, amount=int(amount),
@@ -1911,7 +1924,7 @@ class Actor:
             duration="until-dismissed" if rounds is None else "rounds",
             rounds_left=rounds,
             modifiers=[{"kind": kind, "target": target, "amount": int(amount),
-                        "note": note}]))
+                        "bonus_type": typed, "note": note}]))
         return Buff(kind=kind, target=target, amount=int(amount), source=source,
                     rounds_left=rounds, note=note)
 
@@ -3039,7 +3052,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         for b in data.get("buffs", []):
             a.add_buff(b.get("kind", "save_mod"), b.get("target", ""),
                        b.get("amount", 0), b.get("source", ""),
-                       b.get("rounds_left"), b.get("note", ""))
+                       b.get("rounds_left"), b.get("note", ""),
+                       b.get("bonus_type", ""))
         for p in _temp_pools(data):
             a.effects.append(a._new_temp_effect(p.amount, p.source, p.rounds_left))
         if data.get("coating"):

@@ -356,6 +356,11 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                 "params": {"type": kind, "target": spec.get("target", ""),
                            "amount": amount, "to": target,
                            "source": spec.get("from") or "the preparation",
+                           # The channel the author already filled in. Dropped here
+                           # for the life of the feature, so every brew stacked with
+                           # every other brew of its own kind.
+                           **({"bonus_type": spec["bonus_type"]}
+                              if spec.get("bonus_type") else {}),
                            **({"duration": spec["duration"]}
                               if isinstance(spec.get("duration"), dict) else
                               {"duration": {"amount": 1, "unit": "hour"}}),

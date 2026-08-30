@@ -205,3 +205,76 @@ def test_healing_real_damage_still_consumes_the_cure(table):
     assert pc.hp == pc.hp_max
     assert pc.nonlethal == 0
     assert sum(p.amount for p in pc.temp_pools) == 10
+
+
+# --- the channel the author filled in and nothing carried -----------------------------
+
+
+def _plain():
+    from rules.sheet import from_dict
+
+    return from_dict({"name": "x", "kind": "npc", "hp": 20, "hp_max": 20,
+                      "abilities": {k: 12 for k in
+                                    ("str", "dex", "con", "int", "wis", "cha")}})
+
+
+def _will(a):
+    return sum(m.value for m in a.save_modifiers("will"))
+
+
+def test_two_bonuses_of_one_named_type_do_not_stack():
+    """1e: two alchemical bonuses are the better one, not the sum.
+
+    `bonus_type` was dropped between the author and the roll. `effectspec` has offered
+    the field since it was written and 772 of the 1,145 modifier specs in shipped
+    content fill it with a type that does NOT stack with itself — and `consumables`
+    never passed it to the buff op, the op had no param for it, and `add_buff` had no
+    argument to receive it. So every timed bonus in the game entered the funnel
+    untyped, untyped stacks with everything, and two teas were worth +4."""
+    a = _plain()
+    base = _will(a)
+    a.add_buff("save_mod", "will", 2, source="acacia tea", bonus_type="alchemical")
+    a.add_buff("save_mod", "will", 2, source="willow tea", bonus_type="alchemical")
+    assert _will(a) == base + 2, "two alchemical bonuses are the better one"
+
+
+def test_two_bonuses_of_different_types_still_stack():
+    """The other half of the rule, and the reason the fix is a channel and not a cap."""
+    a = _plain()
+    base = _will(a)
+    a.add_buff("save_mod", "will", 2, source="a tea", bonus_type="alchemical")
+    a.add_buff("save_mod", "will", 2, source="a prayer", bonus_type="morale")
+    assert _will(a) == base + 4
+
+
+def test_untyped_bonuses_stack_as_1e_says_they_do():
+    a = _plain()
+    base = _will(a)
+    a.add_buff("save_mod", "will", 2, source="one")
+    a.add_buff("save_mod", "will", 2, source="two")
+    assert _will(a) == base + 4
+
+
+def test_the_type_is_named_in_the_terms_and_survives_a_save():
+    """The popup has to be able to say WHY the second tea did nothing."""
+    from rules.sheet import from_dict, to_dict
+
+    a = _plain()
+    a.add_buff("save_mod", "will", 2, source="acacia tea", bonus_type="alchemical")
+    assert any(m.source == "acacia tea" and m.type == "alchemical"
+               for m in a.save_modifiers("will"))
+    back = from_dict(to_dict(a))
+    assert any(m.type == "alchemical" for m in back.save_modifiers("will"))
+
+
+def test_a_misspelled_bonus_type_is_refused_with_the_list():
+    """An unrecognised type would fall through to untyped, which stacks with
+    everything — so a typo would silently double a number instead of being refused."""
+    import pytest
+
+    from rules.intents import IntentError, parse_all
+
+    with pytest.raises(IntentError, match="is not a bonus type"):
+        parse_all([{"op": "buff", "actor": "pc", "because": "t",
+                    "params": {"type": "save_mod", "target": "will", "amount": 2,
+                               "bonus_type": "alchemicel"}}])

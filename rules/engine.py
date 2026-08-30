@@ -1837,7 +1837,8 @@ class Engine:
             per = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
             rounds = int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
         actor.add_buff(kind, target, amount, source=source, rounds=rounds,
-                       note=str(intent.params.get("note", "")))
+                       note=str(intent.params.get("note", "")),
+                       bonus_type=str(intent.params.get("bonus_type", "")))
         span = ""
         if rounds:
             span = f" for {rounds // 600} hour(s)" if rounds >= 600 else \

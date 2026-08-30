@@ -207,7 +207,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),
-    "buff": (("type", "target", "amount"), ("to", "source", "duration", "note"),
+    "buff": (("type", "target", "amount"),
+             ("to", "source", "duration", "note", "bonus_type"),
              "hidden"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
@@ -723,6 +724,25 @@ def _check_params(intent: Intent, index: int) -> None:
                 p["iteration"], 0, 15, index,
                 "attack: iteration is which swing of a full attack this is, counting "
                 "from 0")
+
+    elif op == "buff":
+        # A closed vocabulary the code does not enforce is just a suggestion, and this
+        # one decides whether two bonuses stack: an unrecognised type would fall to
+        # untyped, which stacks with everything, so a typo would silently double a
+        # number rather than being refused.
+        raw = str(p.get("bonus_type", "") or "").strip().lower()
+        if raw:
+            from .effectspec import VOCAB
+
+            allowed = {o["id"] for o in VOCAB["bonus_type"]}
+            fixed = {"armor": "armour", "natural armor": "natural armour"}.get(raw, raw)
+            if fixed not in allowed:
+                raise IntentError(
+                    f"buff: {p['bonus_type']!r} is not a bonus type."
+                    + _suggest(raw, allowed)
+                    + f" The types are: {', '.join(sorted(allowed))}.",
+                    "schema", index)
+            p["bonus_type"] = fixed
 
     elif op == "give":
         # The purse is the engine's in both directions, and that has to hold at the
