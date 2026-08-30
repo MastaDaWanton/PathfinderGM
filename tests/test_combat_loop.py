@@ -148,17 +148,63 @@ def test_starting_a_new_game_archives_the_old_one(tmp_path):
         assert any(b["text"] == "old game" for b in kept["transcript"])
 
 
-def test_an_unreadable_save_is_set_aside_not_clobbered(tmp_path):
-    """A save this build cannot parse is the player's only copy of their game."""
+def test_an_unreadable_save_is_left_alone_and_never_replaced(tmp_path):
+    """A save this build cannot parse is the player's only copy of their game.
+
+    This test used to assert the opposite of its own docstring: `c is not None  # play
+    continues` passed precisely BECAUSE the campaign had been renamed out of the way
+    and a fresh character written in its place. `_resume` swallowed every exception,
+    renamed the file, and returned None; `current()` answered None by calling `_begin`,
+    which saves immediately. So any error on the load path — a new key, a validate()
+    failure, a half-written file — cost the player their campaign, and the screen said
+    nothing at all.
+
+    The file now stays exactly where it is and the failure travels, because a campaign
+    is the least replaceable thing in the user's data directory: the app may refuse to
+    open one, and may never decide on the player's behalf that it is gone."""
+    import pytest as _pytest
     from django.test import override_settings
     from play import campaign as cm
 
     with override_settings(CAMPAIGN_DIR=tmp_path):
         cm._LIVE.clear()
-        (tmp_path / "broken-test.json").write_text("{not json", encoding="utf-8")
-        c = cm.current("broken-test")
-        assert c is not None                       # play continues
-        assert list(tmp_path.glob("broken-test-unreadable-*.json"))
+        save = tmp_path / "broken-test.json"
+        save.write_text("{not json", encoding="utf-8")
+        with _pytest.raises(cm.UnreadableSave, match="left where it is"):
+            cm.current("broken-test")
+        assert save.read_text(encoding="utf-8") == "{not json", "the save was touched"
+        assert not list(tmp_path.glob("broken-test-unreadable-*.json"))
+        assert [p.name for p in tmp_path.glob("*.json")] == ["broken-test.json"]
+
+
+def test_a_save_from_an_older_build_still_opens(tmp_path):
+    """`save_version != SAVE_VERSION` made every shape change unshippable: bumping the
+    number would have declared all twelve of the user's campaigns unreadable at once,
+    and the recovery path answered that by renaming them. Older opens; only a save from
+    a NEWER build is refused, because that is the one this code genuinely cannot read —
+    and it says so with the fix in the message."""
+    import json as _json
+
+    import pytest as _pytest
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        c = cm.current("version-test")
+        c.save()
+        raw = _json.loads((tmp_path / "version-test.json").read_text(encoding="utf-8"))
+
+        raw["save_version"] = cm.SAVE_VERSION - 1
+        (tmp_path / "version-test.json").write_text(_json.dumps(raw), encoding="utf-8")
+        cm._LIVE.clear()
+        assert cm.current("version-test") is not None, "an older save must still open"
+
+        raw["save_version"] = cm.SAVE_VERSION + 1
+        (tmp_path / "version-test.json").write_text(_json.dumps(raw), encoding="utf-8")
+        cm._LIVE.clear()
+        with _pytest.raises(cm.UnreadableSave, match="newer version"):
+            cm.current("version-test")
 
 
 def test_turn_order_survives_the_save(tmp_path):

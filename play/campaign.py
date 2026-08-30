@@ -27,6 +27,17 @@ from world.loader import load_cached
 SAVE_VERSION = 1
 
 
+class UnreadableSave(RuntimeError):
+    """A campaign file exists and this build cannot read it.
+
+    Raised rather than handled, because the only alternative the code had was to rename
+    the save and start a new game over it — which is what it did, silently, for every
+    kind of load failure. A campaign is the most valuable thing in the user's data
+    directory and the least replaceable; the app may refuse to open one, and may never
+    decide on the player's behalf that it is gone.
+    """
+
+
 def _grid(raw: dict | None):
     """Rebuild a map from a save, or None for the scenes that never had one.
 
@@ -226,10 +237,22 @@ class Campaign:
     @classmethod
     def load(cls, path: Path) -> "Campaign":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        if data.get("save_version") != SAVE_VERSION:
+        # Older is read; only NEWER is refused. Written `!=`, this made every save-shape
+        # change unshippable: bumping SAVE_VERSION would have declared all twelve of the
+        # user's existing campaigns unreadable at once, and the recovery path below used
+        # to answer that by renaming them and starting a new game. A save from a future
+        # build is the one case that genuinely cannot be read, because this code does not
+        # know what is in it.
+        found = data.get("save_version")
+        try:
+            found_n = int(found)
+        except (TypeError, ValueError):
+            found_n = 0
+        if found_n > SAVE_VERSION:
             raise ValueError(
-                f"{path.name}: save version {data.get('save_version')}, this build "
-                f"writes {SAVE_VERSION}"
+                f"{path.name}: save version {found}, and this build writes "
+                f"{SAVE_VERSION}. The campaign was saved by a newer version of "
+                f"Pathfinder GM — update the app to open it."
             )
         s = data["scene"]
         scene = Scene(
@@ -453,6 +476,11 @@ def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
             path.rename(path.with_name(f"{campaign_id}-{stamp}.json"))
 
     if campaign_id not in _LIVE:
+        # `_resume` returns None only when there is genuinely no save to read; a save
+        # that exists and cannot be read raises, and that raise travels rather than
+        # falling through to `_begin`. `_begin` saves immediately, so the old
+        # `_resume(...) or _begin(...)` turned every load failure into a new character
+        # written over the campaign that failed to load.
         c = _resume(campaign_id) or _begin(campaign_id)
         _LIVE[campaign_id] = c
     return _LIVE[campaign_id]
@@ -487,13 +515,20 @@ def _resume(campaign_id: str) -> Campaign | None:
     try:
         return Campaign.load(path)
     except Exception as exc:
-        # A save this build cannot read is set aside rather than overwritten. The player
-        # keeps the file; the app keeps working.
-        broken = path.with_name(f"{campaign_id}-unreadable-"
-                                f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-        path.rename(broken)
-        print(f"[campaign] could not read {path.name}: {exc}; moved to {broken.name}")
-        return None
+        # The save is left exactly where it is, and the failure is raised rather than
+        # swallowed. This used to rename the file and return None, and `current()`
+        # answers None by calling `_begin`, which immediately saves — so ANY error on
+        # the load path (a new key, a validate() failure, a half-written file, a typo)
+        # cost the player their campaign and replaced it with a fresh character, with
+        # nothing on screen saying so. The old comment claimed "the player keeps the
+        # file; the app keeps working": the first half was true of a renamed file
+        # nobody could find, and the second was true of a game that was no longer
+        # theirs. A campaign that cannot be read is a thing to be told about, not a
+        # thing to be quietly replaced.
+        raise UnreadableSave(
+            f"{path.name} could not be read: {exc}. The file has been left where it "
+            f"is — nothing was overwritten."
+        ) from exc
 
 
 def _begin(campaign_id: str, character=None) -> Campaign:
