@@ -106,7 +106,23 @@ version reads too little; widened it finds 10 sites). Add the dataclass-field-wa
 persistence test — 6 Scene fields went unsaved unnoticed. Extend `prove_build` to apply an
 effect, restart the exe against the same data directory, and assert it survived.
 
-**Stage 2 — one funnel.** `ability_score()` becomes the funnel point for `ability_mod`
+**Stage 2 — one funnel. DONE** (`6e525fe`, `a51259e`, `3d7df25`).
+`bonus_type` was dropped between the author and the roll — 772 of 1,145 shipped
+modifier specs carry a type that does not self-stack, and every timed bonus entered
+untyped, so two alchemical teas were +4. `ability_mod` effects land on the SCORE now
+(a +2 belt was worth +2 where raising 12 to 14 gives +1: every belt and headband was
+double), and `hp_max` became derived in the same commit, because otherwise a
+buff→damage→expire→heal sequence minted hit points — the shape law 2 forbids, created
+by the fix. Concealment reads the funnel; speed and touch AC joined it once their
+content was typed, which exposed fourteen specs whose note said "armour" and whose
+type said "untyped". Three things the tests caught that the design missed: the level-up
+floor broke under derivation (Con 3 made levelling *cost* hit points), `ability_score`
+read the funnel without `stack()`, and `set_hp_max` ran before `classes.apply` — which
+sets `hit_dice_per_level` — so five of the user's twelve characters gained hit points
+on load (Thor 23→37) until it moved. Verified: twelve saves load, none moved.
+
+*Superseded plan text follows, kept for the reasoning:* `ability_score()` becomes the
+funnel point for `ability_mod`
 bonuses and `ability_mod()` becomes pure derivation — **one shape, not both**: the draft
 named both and would have applied every belt twice. This stage must also land the derived
 `hp_max` (audit finding 135), because once Con buffs reach `ability_score` the existing
