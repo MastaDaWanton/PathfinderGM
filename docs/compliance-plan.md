@@ -164,9 +164,27 @@ expiry tells — four of five tickers discard their "what ended" lists, so effec
 in combat with nothing said. 4c: the store migrations (guards, wards, manifestations,
 compulsions, pool cooldowns), each with its save shape.
 
-**Stage 5 — one vocabulary.** 40 literal-key `has_condition` branches against 12
-`has_state` queries; two disagreeing "can this actor act?" authorities; `play/downed.py`'s
-second down-ness vocabulary; `rest()` clearing fifteen conditions by name.
+**Stage 5 — one vocabulary. DONE** (`51f7199`, `b80b239`, `bf9b2b4`, `96d67cc`;
+`docs/stage-5-plan.md` is the record). The estimate held exactly — the AST census found
+40 literal-key `has_condition` branches against 12 `has_state` queries, and ten of the
+twelve asked the same single query, so nine of the eleven tag families had no readers.
+
+It was three questions answered by five authorities, not one question answered twice:
+"may I act now" (`can_act`, per op, since 1e's incapacities are not all total), "am I out
+of the fight" (`is_down`) and "can I resist at all" (`is_helpless` — 1e's maneuver
+clause, whose flag sat on five condition rows with **no reader anywhere**). Two live
+player-facing bugs fell out of the disagreement: a petrified character was handed a turn
+the engine then refused as a legality error, which regenerates rather than repairs and
+reached the player as a 502; and `state.down` meaning both "lootable" and "a body on the
+floor" meant a petrified enemy at full hit points was deleted from the scene as a corpse.
+
+What the tempting implementation would have cost, all measured: `can_act ->
+not has_state("state.unable")` alone auto-grapples a fascinated target, makes it
+unattackable and ends the encounter around it; a family-query `rest()` raises the dead,
+cures paralysis and deletes blindness. Recorded in the tests rather than in prose.
+
+`cast` belongs in the intent guard by the rules and was deliberately left out: the turn
+schema forces the op the guard would refuse, which is the buried-502 shape. Stage 7.
 
 **Stage 6 — severed tells.** Death, dying, unconsciousness and disabled apply with no tell
 at all; the narrator reaches into `outcome.effects` and does hit-point arithmetic to

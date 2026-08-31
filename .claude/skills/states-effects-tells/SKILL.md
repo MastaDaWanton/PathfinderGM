@@ -51,7 +51,9 @@ ability documents for the battle blood path (requirements, cost, drain, tiered
 modifiers, temp HP per HD, granted weapon, tells); typed stacking channels; worn
 magic items from slots via `rules/magicitem.py:worn_specs`; percent resistance
 in `take_damage`; the battle gate (first violence opens the fight, never
-resolves it); finishing-blow detection.
+resolves it); finishing-blow detection; the three state questions with one owner
+each — `Actor.can_act` (per op, via `states.BLOCKS`), `Actor.is_down`,
+`Actor.is_helpless` — and the `recovery.*` families with `Actor.clear_states`.
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
@@ -76,7 +78,19 @@ mechanics.
   and expiry each emit a tell.
 - *"Add a new fear condition"* → a `TAGS` entry under `state.fear.*` in
   `rules/states.py` plus a `CONDITIONS` row; never a boolean, and no consumer
-  may match the new key as a string — they ask `has_state("state.fear")`.
+  may match the new key as a string — they ask `has_state("state.fear")`. If it
+  ends on a night's sleep say so with `recovery.rest`, and if it stops actions
+  say *which* in `states.BLOCKS`: a boolean answers with one bit and 1e's
+  incapacities are not all total.
+- *"Can this creature act?"* → three different questions, and conflating any two
+  has cost a bug each. `can_act(op)` is may-I-act-now; `is_down` is
+  out-of-the-fight (a stunned enemy is not, and reading it off can-act ended
+  encounters around them); `is_helpless` is 1e's "immobilized, unconscious, or
+  otherwise incapacitated", the maneuver clause, and is narrower than both.
+- *"Everything X cures should be one sweep"* → a `recovery.*` tag, never a
+  `state.*` family. `state.unable` contains `dead`, so a night's sleep sweeping
+  it raises corpses; `state.held` contains `paralyzed`; `state.senses` contains
+  `blinded`. Removal by family is the single most dangerous edit in this file.
 - *"The narrator should mention the DR that soaked the hit"* → no: the *tell*
   carries what landed (`_damage_note` names the soak), and the narrator dresses
   the tell. If the narrator needs a fact, the fact becomes part of a tell.
@@ -93,6 +107,12 @@ tests/test_ability_documents.py
 tests/test_aggregator.py
 rules/states.py:tags_for
 rules/states.py:matches
+rules/states.py:stops
+rules/states.py:BLOCKS
+rules/sheet.py:Actor.can_act
+rules/sheet.py:Actor.is_down
+rules/sheet.py:Actor.is_helpless
+rules/sheet.py:Actor.clear_states
 rules/activeeffect.py:ActiveEffect
 rules/sheet.py:Actor.apply_effect
 rules/sheet.py:Actor.tick_effects
