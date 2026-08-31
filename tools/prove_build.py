@@ -142,6 +142,61 @@ def check_it_survived_the_restart(http: Http) -> None:
     note("an effect survives stopping and restarting the app", faults)
 
 
+def petrify_in_the_save(data: Path) -> None:
+    """Write a state that stops actions straight into the save, while the app is down.
+
+    Seeded rather than applied through an endpoint because the point is the LOAD path:
+    a condition arrives from disk carrying whatever the build that wrote it believed,
+    and the vocabulary of the build that reads it is the one that must win.
+    """
+    for path in sorted((data / "campaigns").glob("*.json")):
+        save = json.loads(path.read_text(encoding="utf-8"))
+        actors = (save.get("scene") or {}).get("actors") or {}
+        for actor in actors.values():
+            if actor.get("kind") != "pc":
+                continue
+            # Whichever store this save actually uses: a campaign written by this build
+            # carries `active_effects`, and the legacy `conditions` list is only read
+            # when that key is absent — so writing to the wrong one seeds nothing and
+            # the check passes for the wrong reason.
+            if isinstance(actor.get("active_effects"), list):
+                actor["active_effects"].append(
+                    {"kind": "condition", "key": "petrified", "name": "Petrified",
+                     "source": "the prover", "duration": "until-dismissed",
+                     "rounds_left": None})
+            else:
+                actor.setdefault("conditions", []).append(
+                    {"key": "petrified", "rounds_left": None})
+            path.write_text(json.dumps(save), encoding="utf-8")
+            return
+    raise SystemExit("prover found no player character to petrify")
+
+
+def check_a_turn_nobody_can_take_is_refused_in_prose(http: Http) -> None:
+    """The 502 stage 5 closed, proven on the packaged build.
+
+    A character who cannot act was reported fit for a turn, so the GM planned one and
+    the engine then refused every op in it as a `legality` error — which regenerates
+    rather than repairs. Every model attempt burned and the player got a blank page.
+
+    No Ollama is needed to see it, and that is the assertion: the refusal happens
+    before any model is reached, so a build that has regressed hangs on a model call
+    here instead of answering. The reply must also leave the character where it found
+    them — the tempting fix routed them into the wake-up path, which floors hit points
+    at 1 and announces they have come round.
+    """
+    s, body = http.post("/api/say", {"text": "I draw my sword and look for a fight."})
+    said = " ".join(t.get("text", "") for t in (j(body).get("transcript") or []))
+    faults = []
+    if s != 200:
+        faults.append(f"the turn answered {s}: {body[:160]}")
+    if "petrified" not in said.lower():
+        faults.append(f"the refusal never said what stopped them: {said[-200:]!r}")
+    if "come round" in said.lower():
+        faults.append("a petrified character was told they had woken up")
+    note("a turn nobody can take is refused in prose, before any model", faults)
+
+
 def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
@@ -358,6 +413,9 @@ def main() -> None:
         # which is why it could report ALL CLEAN over a save that had silently dropped
         # every standing hazard in the scene.
         stop(proc)
+        # Seeded while the app is down, so the state arrives from disk on the way back
+        # up and the load path is what gets proved.
+        petrify_in_the_save(data)
         proc = launch()
         portfile.unlink(missing_ok=True)
         for _ in range(120):
@@ -376,6 +434,7 @@ def main() -> None:
                 pass
             time.sleep(1)
         check_it_survived_the_restart(http2)
+        check_a_turn_nobody_can_take_is_refused_in_prose(http2)
 
         logfile = data / "logs" / "pathfindergm.log"
         faults = []
