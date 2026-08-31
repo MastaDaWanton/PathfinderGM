@@ -2150,8 +2150,7 @@ class Engine:
         # `dead` is deliberately outside this family — resurrection is the only caller
         # entitled to remove it, and one shared list either breaks that or lets cure
         # light wounds raise a corpse.
-        if target.hp > 0:
-            target.clear_states("recovery.hit-points")
+        lifted = target.clear_states("recovery.hit-points") if target.hp > 0 else []
 
         # The tell owns everything the cure did. "Already unhurt" used to be the whole
         # sentence for a Blood Bender at full hit points, while the same drink was
@@ -2169,12 +2168,26 @@ class Engine:
             parts.append(f"banks {temp_banked} as temporary vitality")
         tell = (f"{target.name} " + ", ".join(parts) + "."
                 if parts else f"{target.name} is already unhurt.")
+        # Coming back is the half a cure is FOR, and it was silent in both channels: the
+        # effects list said `heal` and nothing else, and the tell counted hit points
+        # while saying nothing about the dying stopping. Law 3 asks a removal to emit
+        # its tell exactly as an application does.
+        if lifted:
+            # Ordered and joined the way the application tell says them, so "is
+            # unconscious and dying" is undone by "is no longer unconscious and dying"
+            # rather than by a semicolon-separated list of game words.
+            order = ("unconscious", "dying", "stable", "disabled")
+            back = sorted(lifted, key=lambda k: (order.index(k) if k in order else 9, k))
+            tell += (f" {target.name} is no longer "
+                     f"{' and '.join(back)}.")
 
         return Outcome(
             intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
             effects=[{"ref": target.ref, "kind": "heal", "amount": healed,
                       "nonlethal_healed": nl_healed, "temp_banked": temp_banked,
-                      "hp_after": target.hp, "hp_max": target.hp_max}],
+                      "hp_after": target.hp, "hp_max": target.hp_max}]
+                    + [{"ref": target.ref, "kind": "condition", "condition": k,
+                        "ends": True} for k in lifted],
             tell=tell,
             because=intent.because,
         )
