@@ -29,7 +29,42 @@ Thirty-five is exactly the audit's "35 resolution-time raises": it is the count 
 `legality`. Only `refs` has code repairs; everything else costs a model call and asks
 again, to a ceiling of **five attempts** for a player turn and three for an NPC.
 
-Exhaustion has two ends, and only one of them is graceful:
+### The split that matters: 24 are retried, 10 are a 502 on the spot
+
+AST-verified, the file holds **34** legality raises (the audit's 35 was a string count
+that caught one occurrence which is not a raise). They divide by *where they fire*, and
+the two halves behave nothing alike:
+
+| where | count | what the player gets |
+|---|---|---|
+| validation — `_check_legality` 10, `_check_cast` 7, `_check_move` 6, `_check_craft` 1 | **24** | up to five model attempts, then a graceful degrade |
+| resolution — inside the `_op_*` handlers | **10** | **HTTP 502 immediately, no retry** |
+
+The resolution ten are `_op_use_item` (×3), `_op_attack`, `_op_forage`, `_op_sell`,
+`_op_buy`, `_op_use_ability`, `_op_resource`, `_op_cast`. `play/views.py:_advance` catches
+them and returns *"The engine refused the GM's intents: …"* with **`c.transcript.pop()`** —
+so the player types a sentence, is told the GM failed, and their own words are deleted
+from the record. Its comment says reaching there "means validation and resolution have
+drifted apart", which is true and is the point: these are not drift, they are ten ordinary
+things a player can try. An empty ki pool is not a bug.
+
+That is the buried 502, precisely located, and it is ten sites rather than thirty-five.
+
+Reproduced with the plainest actions in the game, against a real engine:
+
+    use an item they do not have    LEGALITY -> use_item: Kesst is not carrying '…'
+    sell something not carried      LEGALITY -> sell: Kesst is not carrying '…'
+
+A player writes "I drink my healing potion" without one and the app answers 502 and
+erases what they wrote. Both fire during `run()` *after* `validate()` has passed, so the
+five-attempt retry loop never sees them — there is no degrade, no second try, nothing.
+
+Note what is already right: the messages name the fix. *"Kesst is not carrying 'X'. They
+have: …"* is exactly the contract's style. **It is the shape that is wrong, not the
+wording** — which is why stage 7 is a mechanical change to ten call sites and not a
+rewriting exercise.
+
+Exhaustion in the *validation* half has two ends, and only one of them is graceful:
 
 - the normal path degrades to a `narrate_only` plan with an honest sentence — *"You try —
   '…' — but the moment does not answer"*;
