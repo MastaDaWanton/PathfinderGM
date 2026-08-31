@@ -355,8 +355,10 @@ def test_every_content_cache_is_isolated_between_tests():
 # Everything else edits the store behind the engine's back.
 _STORE_EDITORS = {
     "rules/sheet.py": "the applicator's own implementation",
-    "rules/engine.py": "stage 4c: _drain_periodic and the dispel path remove records "
-                       "directly instead of going through remove_effects",
+    # _drain_periodic left this list in stage 4b — it goes through remove_effects now
+    # and says which pool ran dry. One edit remains, and it is the dispel.
+    "rules/engine.py": "stage 5: the dispel path removes a record directly instead of "
+                       "going through remove_effects",
 }
 
 

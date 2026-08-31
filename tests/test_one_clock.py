@@ -118,3 +118,36 @@ def test_a_scene_with_no_dice_can_still_advance():
     assert s._dice is None
     s.advance(9 * 24 * 60)
     assert s.clock_minutes == 9 * 24 * 60
+
+
+def test_a_round_is_finer_than_a_minute_and_the_conversion_floors():
+    """Found by an adversarial review of stage 4a, in a throwaway probe it wrote to
+    dump the numbers — the suite was green through the whole regression.
+
+    `advance_time` may be asked for five rounds. Deriving the tick from minutes alone
+    floors 5 // 10 to zero, so "five rounds pass" expired NOTHING, and fifteen rounds
+    ticked ten and quietly lost five. The clock still moves in whole minutes; the tick
+    is stated in rounds."""
+    from rules.engine import Engine
+
+    for amount, unit, duration, survives in ((5, "round", 5, False),
+                                             (15, "round", 15, False),
+                                             (9, "round", 9, False),
+                                             (9, "round", 20, True)):
+        s = _scene()
+        pc = s.actors["pc"]
+        pc.add_buff("save_mod", "will", 2, source="bless", rounds=duration)
+        Engine(s).run(Engine(s).validate(
+            [{"op": "advance_time", "because": "t",
+              "params": {"amount": amount, "unit": unit}}]))
+        assert bool(pc.effects) is survives, (
+            f"{amount} {unit} against a {duration}-round buff")
+
+
+def test_rounds_that_do_not_fill_a_minute_still_leave_the_clock_alone():
+    """The other half: five rounds is half a minute, and the world clock counts whole
+    minutes. The tick must happen without the clock moving."""
+    s = _scene()
+    got = s.advance(0, rounds=5)
+    assert got["rounds"] == 5 and got["minutes"] == 0
+    assert s.clock_minutes == 0

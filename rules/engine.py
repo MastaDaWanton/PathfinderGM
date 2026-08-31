@@ -330,10 +330,22 @@ class Scene:
                 # turn: the allowance is what you may do while other people act.
                 self.reacted = {}
                 for a in self.actors.values():
-                    a.tick_conditions(1)
-                    a.tick_pools(1)
-                    compulsion.tick(a, 1)
-                    self._drain_periodic(a)
+                    # Every one of these returned a list of what it ended, and every
+                    # one of those lists was dropped on the floor — so in a fight, a
+                    # buff running out, a cooldown coming back and a compulsion
+                    # releasing all happened in total silence. Law 3 says the narrator
+                    # may only dress what the engine recorded, so an expiry nobody
+                    # records is an expiry the player can never be told about.
+                    self.hazards.extend(
+                        {"kind": "effect_ended", "ref": a.ref, "what": name}
+                        for name in a.tick_effects(1))
+                    self.hazards.extend(
+                        {"kind": "pool_ready", "ref": a.ref, "pool": pid}
+                        for pid in a.tick_pools(1))
+                    self.hazards.extend(
+                        {"kind": "compulsion_ended", "ref": a.ref, "what": name}
+                        for name in compulsion.tick(a, 1))
+                    self.hazards.extend(self._drain_periodic(a))
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
                 ) if r]
@@ -354,7 +366,7 @@ class Scene:
                 return self.initiative[nxt][0]
         return None                      # nobody left standing
 
-    def _drain_periodic(self, actor: "Actor") -> None:
+    def _drain_periodic(self, actor: "Actor") -> list[dict]:
         """Run each standing effect's per-round work — today, pool upkeep.
 
         Blood Rage burns one rage round per round it holds; when the pool runs dry
@@ -362,6 +374,7 @@ class Scene:
         the rage's and not the character's. Declared on the effect (`periodic`), so a
         homebrew stance with an upkeep gets the same clock without a line here.
         """
+        out: list[dict] = []
         for e in list(actor.effects):
             for p in e.periodic:
                 pool = p.get("spend_pool")
@@ -369,9 +382,16 @@ class Scene:
                     continue
                 paid = actor.spend_pool(str(pool), int(p.get("amount", 1) or 1))
                 if not paid.get("ok") and p.get("or_ends") and e in actor.effects:
-                    actor.effects.remove(e)
+                    # Through the applicator, and out loud. This removed the record
+                    # directly and cleared the pool beside it, so a stance ending
+                    # because its upkeep ran dry was two silent mutations — the exact
+                    # shape law 2 forbids, in the function that enforces upkeep.
+                    actor.remove_effects(name=e.name or e.key, source=e.source)
                     if e.source:
                         actor.clear_temp_hp(source=e.source)
+                    out.append({"kind": "upkeep_failed", "ref": actor.ref,
+                                "what": e.name or e.key, "pool": str(pool)})
+        return out
 
     # --- things standing in the scene ------------------------------------------------
 
@@ -419,7 +439,7 @@ class Scene:
     # — and four of them then ticked nothing at all.
     ROUNDS_PER_MINUTE = 10
 
-    def advance(self, minutes: int) -> dict:
+    def advance(self, minutes: int = 0, rounds: int | None = None) -> dict:
         """Move the world clock, and expire what that much time expires.
 
         The one door. Six places moved `clock_minutes` and two of them expired anything:
@@ -436,9 +456,16 @@ class Scene:
         Returns what ended, so the caller can say so — four of the six threw that away.
         """
         minutes = max(0, int(minutes))
-        if not minutes:
+        # Rounds may be stated directly, because a round is finer than a minute and
+        # the conversion floors. `advance_time` may be asked for five rounds, and
+        # deriving rounds from `minutes` alone made that five-round advance tick
+        # nothing at all (5 // 10 == 0) while fifteen rounds ticked ten. Found by an
+        # adversarial review of this very change, in a probe it wrote to dump the
+        # numbers — the suite was green through all of it.
+        rounds = (max(0, int(rounds)) if rounds is not None
+                  else minutes * self.ROUNDS_PER_MINUTE)
+        if not minutes and not rounds:
             return {"minutes": 0, "rounds": 0, "ended": []}
-        rounds = minutes * self.ROUNDS_PER_MINUTE
         self.clock_minutes += minutes
         ended: list[str] = []
         for a in self.actors.values():
@@ -485,6 +512,11 @@ class Scene:
             ward.rounds_left -= rounds
             if ward.rounds_left <= 0:
                 self.wards.remove(ward)
+                # A manifestation ending emitted `manifest_ended` three lines below and
+                # a ward ending emitted nothing, so the two halves of one function
+                # disagreed about whether an expiry is worth mentioning.
+                out.append({"kind": "ward_ended", "ref": ward.owner or "",
+                            "source": ward.source, "what": ward.source})
         for made in list(self.manifests):
             if made.rounds_left is None:
                 continue
@@ -3713,7 +3745,10 @@ class Engine:
         # Through the one door. This op already collected its ended list and told it —
         # it was the only one of the six that did — but it ticked conditions and buffs
         # while pool cooldowns, compulsions, wards and fog clouds stood still.
-        passed = self.scene.advance(minutes)
+        # Both, because they are not interchangeable here: the clock moves in whole
+        # minutes and the tick is in rounds, and "five rounds pass" must expire a
+        # five-round buff even though it moves the clock by nothing.
+        passed = self.scene.advance(minutes, rounds=rounds)
         ended: list[str] = list(passed["ended"])
         tell = f"{amount} {unit}{'s' if amount != 1 else ''} pass."
         if ended:
@@ -4862,6 +4897,17 @@ def _ward_tell(scene: Scene, e: dict) -> str:
                 f"from {source}.")
     if kind == "manifest_ended":
         return f"{e.get('what', 'It')} thins out and is gone."
+    if kind == "effect_ended":
+        return f"{e.get('what', 'Something')} wears off {name}."
+    if kind == "ward_ended":
+        return f"{e.get('what') or source} fades."
+    if kind == "pool_ready":
+        return f"{name} can use {e.get('pool', 'it')} again."
+    if kind == "compulsion_ended":
+        return f"{name} is free of {e.get('what', 'it')}."
+    if kind == "upkeep_failed":
+        return (f"{e.get('what', 'It')} runs dry and lets go of {name} — "
+                f"no {e.get('pool', 'fuel')} left to hold it.")
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
     return ""
