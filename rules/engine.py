@@ -514,30 +514,56 @@ class Scene:
         for ward in list(self.wards) if fire else ():
             if ward.trigger == "each_round":
                 out.extend(self._fire(ward))
-        for ward in list(self.wards):
-            if ward.stops_with and ward.owner:
-                holder = self.actors.get(ward.owner)
-                if holder is None or not holder.has_condition(ward.stops_with):
-                    self.wards.remove(ward)
-                    continue
-            if ward.rounds_left is None:
-                continue
-            ward.rounds_left -= rounds
-            if ward.rounds_left <= 0:
-                self.wards.remove(ward)
-                # A manifestation ending emitted `manifest_ended` three lines below and
-                # a ward ending emitted nothing, so the two halves of one function
-                # disagreed about whether an expiry is worth mentioning.
-                out.append({"kind": "ward_ended", "ref": ward.owner or "",
-                            "source": ward.source, "what": ward.source})
-        for made in list(self.manifests):
-            if made.rounds_left is None:
-                continue
-            made.rounds_left -= rounds
-            if made.rounds_left <= 0:
-                self.lift(made)
-                out.append({"kind": "manifest_ended", "what": made.what, "id": made.id})
+        out.extend(self.tick_effects(rounds))
         return out
+
+    def tick_effects(self, rounds: int = 1) -> list[dict]:
+        """The scene's one ticker, and the one door out for anything standing in it.
+
+        Wards and manifestations had an expiry loop each, three lines apart, and the two
+        disagreed about everything: a ward was removed in silence while a manifestation
+        emitted `manifest_ended`, and only the manifestation gave its squares back. That
+        is the shape law 2 forbids — the Actor learned it in stage 2, when conditions,
+        buffs and temporary hit points each had their own loop and a fourth mechanism
+        added without a fourth loop simply never wore off.
+
+        One loop, and one `_end_standing` that every removal goes through, so a thing
+        cannot leave the scene without both its teardown and its tell.
+        """
+        out: list[dict] = []
+        for holder in list(self.wards) + list(self.manifests):
+            # A ward tied to a condition goes when the condition does, whatever its
+            # clock says — "cure the bleeding and the bleed ward evaporates".
+            stops = getattr(holder, "stops_with", "")
+            if stops and getattr(holder, "owner", ""):
+                who = self.actors.get(holder.owner)
+                if who is None or not who.has_condition(stops):
+                    out.append(self._end_standing(holder))
+                    continue
+            if holder.rounds_left is None:
+                continue
+            holder.rounds_left -= rounds
+            if holder.rounds_left <= 0:
+                out.append(self._end_standing(holder))
+        return out
+
+    def _end_standing(self, holder) -> dict:
+        """Take one standing thing out of the scene, with its teardown and its tell.
+
+        The teardown is why this is a door rather than two `remove` calls. A
+        manifestation's squares are a MUTATION of the grid that only `lift` undoes, and
+        `ActiveEffect` has no teardown hook — so an expiry routed through a generic
+        ticker would drop the record and leave a fog cloud's squares in
+        `grid.obscuring` for the rest of the session, with no fog in the room to
+        explain why it was blind.
+        """
+        if isinstance(holder, Manifestation):
+            self.lift(holder)
+            return {"kind": "manifest_ended", "what": holder.what, "id": holder.id}
+        if holder in self.wards:
+            self.wards.remove(holder)
+        return {"kind": "ward_ended", "ref": holder.owner or "",
+                "source": holder.source, "what": holder.source}
 
     def _fire(self, ward: "Ward", struck_by: str = "") -> list[dict]:
         """Resolve one ward against whoever it aims at, and say what it did."""

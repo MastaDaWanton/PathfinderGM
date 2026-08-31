@@ -42,7 +42,12 @@ def test_every_condition_is_in_the_tag_vocabulary():
 # somebody had to write, and deleting one is that stage's own proof.
 _CLOCK_SITES = {
     "rules/sheet.py": "tick_effects — the one actor ticker, and the destination",
-    "rules/engine.py": "stage 4c: wards and manifestations become scene effects",
+    # The scene's own ticker, and its destination — the same standing rules/sheet.py
+    # has for the actor's. Wards and manifestations had an expiry loop each, three
+    # lines apart, disagreeing about teardown and about whether an ending was worth
+    # mentioning; `Scene.tick_effects` is now the one, with `_end_standing` as the one
+    # door out.
+    "rules/engine.py": "Scene.tick_effects — the one scene ticker, and the destination",
     "rules/guards.py": "stage 4c: a guard's uses_left is a charge, not a clock",
 }
 
@@ -76,7 +81,7 @@ def test_every_clock_that_counts_down_is_accounted_for():
         f"a clock counts down outside the one ticker and outside the allowlist: "
         f"{unlisted}. Model it as an ActiveEffect, or add it to _CLOCK_SITES naming "
         f"the stage that will fold it in.")
-    gone = set(_CLOCK_SITES) - set(found) - {"rules/sheet.py"}
+    gone = set(_CLOCK_SITES) - set(found) - {"rules/sheet.py", "rules/engine.py"}
     assert not gone, (
         f"these clocks are folded in — delete them from _CLOCK_SITES: {sorted(gone)}")
 

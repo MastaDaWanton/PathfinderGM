@@ -105,3 +105,58 @@ def test_a_stance_that_runs_dry_says_which_pool_ran_out():
     said = _roll_a_round(scene)
     assert any("Blood Rage" in s and "runs dry" in s for s in said), said
     assert not pc.has_condition("blood rage")
+
+
+# --- the scene has one ticker too ------------------------------------------------------
+
+
+def test_a_ward_tied_to_a_condition_goes_when_the_condition_does_and_says_so():
+    """"Cure the bleeding and the bleed ward evaporates" was already true and already
+    silent: the `stops_with` branch removed the ward with no record at all, three lines
+    above the branch that emitted one. One loop and one door out means a thing cannot
+    leave the scene without both its teardown and its tell."""
+    from rules.engine import Ward
+
+    scene, pc, _ = _fight()
+    pc.add_condition("bleed")
+    scene.wards.append(Ward(owner="pc", trigger="each_round", stops_with="bleed",
+                            source="a bleed ward", spec={}))
+    pc.remove_condition("bleed")
+    said = [_ward_tell(scene, r) for r in scene.tick_effects(1)]
+    assert any("bleed ward" in s for s in said), said
+    assert not scene.wards
+
+
+def test_a_manifestation_always_gives_its_squares_back():
+    """The teardown is why removal is a door rather than two `remove` calls. A
+    manifestation's squares are a MUTATION of the grid that only `lift` undoes, and
+    `ActiveEffect` has no teardown hook — an expiry routed through a generic ticker
+    would drop the record and leave the fog's squares in `grid.obscuring` for the rest
+    of the session, with no fog in the room to explain why it was blind."""
+    from rules.engine import Manifestation
+    from rules.grid import Grid
+
+    scene, _, _ = _fight()
+    scene.grid = Grid(width=20, height=20)
+    scene.place(Manifestation(what="a bank of fog", terrain="obscuring",
+                              squares=[(5, 5), (5, 6)], rounds_left=2,
+                              source="fog cloud"))
+    assert sorted(scene.grid.obscuring) == [(5, 5), (5, 6)]
+    said = [_ward_tell(scene, r) for r in scene.tick_effects(5)]
+    assert any("fog" in s for s in said), said
+    assert not scene.grid.obscuring, "the room stayed blind"
+
+
+def test_the_scene_expires_everything_in_one_loop():
+    """Two loops three lines apart is how the two halves came to disagree."""
+    import ast
+    from pathlib import Path
+
+    source = Path("rules/engine.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    scene = next(n for n in ast.walk(tree)
+                 if isinstance(n, ast.ClassDef) and n.name == "Scene")
+    fn = next(m for m in scene.body
+              if isinstance(m, ast.FunctionDef) and m.name == "tick_effects")
+    body = ast.get_source_segment(source, fn)
+    assert body.count("rounds_left -=") == 1, "the scene grew a second expiry loop"
