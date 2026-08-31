@@ -32,6 +32,65 @@ def travel(engine, biome="forest", **params):
          "params": {"biome": biome, **params}}]))
 
 
+# --- who counts as fallen ---------------------------------------------------------------
+
+def test_a_petrified_enemy_is_not_swept_up_as_a_corpse(yard):
+    """`state.down` means two things at once — "beyond objecting, therefore lootable"
+    (six conditions) and "a body on the floor whose story resolves" (four) — and the
+    three sites that DELETE a creature asked the wide one.
+
+    So a petrified enemy at full hit points, and a Strength-drained helpless one, aged
+    out of the scene over a grace of two turns and were handed to `Scene.depart`, which
+    strips an actor from actors, initiative, sides, zones, guards and the reaction
+    ledger. The statue and whatever it was carrying simply stopped existing. Walking out
+    of a room does not delete a statue either, so `leave_behind` asked wrongly too.
+
+    `state.down.fallen` is the narrow half; the loot gate keeps asking the family.
+    """
+    s, engine = yard
+    statue = s.actors["c1"]
+    statue.add_condition("petrified", source="a basilisk")
+    assert statue.hp > 0
+
+    for _ in range(4):
+        engine.tidy_the_fallen()
+    assert "c1" in s.actors, "a petrified enemy was tidied away as a body"
+
+    engine.leave_behind()
+    assert "c1" in s.actors, "and left behind by walking out of the room"
+
+    # Still lootable, which is the whole reason the family stays wide.
+    assert statue.has_state("state.down")
+
+
+def test_a_real_body_still_ages_out(yard):
+    """The other side of the same line: narrowing it must not leave corpses standing
+    around forever, which is the ghost this module exists to prevent."""
+    s, engine = yard
+    body = s.actors["c1"]
+    body.hp = -9
+    body.apply_hp_state()
+    assert body.has_state("state.down.fallen")
+
+    for _ in range(4):
+        engine.tidy_the_fallen()
+    assert "c1" not in s.actors, "a corpse stayed in the scene"
+
+
+def test_a_stabilised_body_does_not_walk_to_the_next_biome(yard):
+    """Travel named four literal keys — dead, dying, unconscious — and forgot `stable`,
+    so a body that had stopped bleeding came along to the forest."""
+    s, engine = yard
+    body = s.actors["c1"]
+    body.hp = -2
+    body.apply_hp_state()
+    body.remove_condition("dying")
+    body.add_condition("stable", source="a stabilisation check")
+
+    travel(engine)
+    assert "c1" not in s.actors, "a stabilised body travelled with the party"
+
+
 # --- departing --------------------------------------------------------------------------
 
 def test_depart_removes_every_trace(yard):

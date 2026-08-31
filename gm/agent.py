@@ -625,8 +625,14 @@ class GMAgent:
         # Before the stranger-renamer, which once half-mangled a leaked option list
         # into "the stranger: * the onlooker off your opponent * ..." — cutting the
         # leak first means there is nothing garbled left to rename.
+        # `state.down.dead`, the leaf and not the family: this cuts any sentence in
+        # which a named actor does something a corpse could not, so widening it to
+        # `state.down` would stop an unconscious NPC stirring or groaning and stop a
+        # petrified one being carried. What was missing is the other direction — a
+        # Constitution-drained corpse at full hit points, which `hp <= 0` cannot see,
+        # and which went on acting in every paragraph for the rest of the session.
         dead = [a.name for r, a in self.engine.scene.actors.items()
-                if not a.is_pc and a.hp <= 0]
+                if not a.is_pc and (a.hp <= 0 or a.has_state("state.down.dead"))]
         text, risen = narration_mod.cut_dead_men_walking(text, dead)
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")

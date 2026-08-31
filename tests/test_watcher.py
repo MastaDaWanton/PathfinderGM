@@ -77,6 +77,37 @@ def _turns(c, n):
         c.turn_log.append({"kind": "turn", "outcomes": []})
 
 
+def test_the_watcher_and_the_loot_op_mean_the_same_thing_by_down():
+    """`_down`'s docstring called itself "the loot op's own test" and was not: the loot
+    op asks `hp <= 0 or state.down`, and this asked `hp <= 0 or has_condition
+    ("unconscious")` — one literal key against a family of six.
+
+    Measured at positive hit points, they disagreed on five of the six: dead, dying,
+    helpless, petrified and stable. A creature killed by Constitution damage is written
+    `dead` with its hit points untouched, so the watcher never offered it for looting
+    while the loot op would have stripped it happily.
+    """
+    from rules.sheet import from_dict
+
+    def body(**kw):
+        a = from_dict({"name": "the watchman", "kind": "npc", "hp": 20, "hp_max": 20,
+                       "abilities": {k: 12 for k in ("str", "dex", "con",
+                                                     "int", "wis", "cha")}}, ref="c1")
+        for key in kw.get("conditions", ()):
+            a.add_condition(key, source="probe")
+        a.hp = kw.get("hp", 20)
+        return a
+
+    for key in ("dead", "dying", "unconscious", "stable", "petrified", "helpless"):
+        a = body(conditions=[key])
+        assert watcher._down(a), f"{key} at full hit points was not down to the watcher"
+        # The loot op's actual test, quoted rather than trusted.
+        assert a.hp <= 0 or a.has_state("state.down")
+
+    assert not watcher._down(body()), "an unhurt creature must not be lootable"
+    assert watcher._down(body(hp=-2)), "hit points alone still answer"
+
+
 # --- the wiring: the role is actually called now --------------------------------------
 
 def test_the_watcher_role_finally_has_call_sites():

@@ -59,6 +59,62 @@ def test_the_states_are_told_apart(scene):
     assert downed.state_of(pc) == "dead"
 
 
+def test_a_character_who_cannot_act_is_not_reported_fine(scene):
+    """The fifth answer, and the 502 underneath it.
+
+    `state_of` knew four conditions. Measured across the 31 shipped ones, SEVEN that
+    cannot act fell through to "fine" — cowering, dazed, fascinated, helpless,
+    paralyzed, petrified and stunned. `play/views.py` gates the turn on
+    `state_of(pc) not in ("fine", "disabled")`, so a petrified character was handed a
+    turn, the GM planned it, and `Engine.validate` then refused every op in it as a
+    `legality` IntentError — which regenerates rather than repairs. The turn burned the
+    retry loop and reached the player as a blank 502 page.
+    """
+    pc = scene.pc()
+    for key in ("petrified", "paralyzed", "stunned", "helpless", "dazed",
+                "cowering", "fascinated"):
+        pc.add_condition(key, source="probe")
+        assert downed.state_of(pc) == "held", f"{key} was reported fit for a turn"
+        assert not pc.can_act()
+        pc.remove_condition(key)
+    assert downed.state_of(pc) == "fine"
+
+
+def test_an_endless_hold_is_said_plainly_and_costs_no_world_clock(scene):
+    """The tempting fix was to widen the "stable" rung to `state.down`, which routes a
+    petrified character into the wake-up path: `scene.advance(60)` burns an hour, the
+    removal loop leaves the petrification in place, hit points are floored at 1, and the
+    player is told "You come round about an hour later" — to a statue that is still a
+    statue, on hit points it never lost.
+    """
+    pc = scene.pc()
+    pc.hp = 9
+    pc.add_condition("petrified", source="a basilisk")
+    before = scene.clock_minutes
+
+    got = downed.resolve(FakeCampaign(scene))
+
+    assert got.state == "held" and not got.playable and not got.died
+    assert scene.clock_minutes == before, "an hour was burned on a statue"
+    assert pc.hp == 9, "hit points were floored by a recovery that never happened"
+    assert pc.has_condition("petrified"), "the petrification was quietly cured"
+    assert not any("come round" in line for line in got.lines)
+    assert got.lines and "petrified" in got.lines[0]
+
+
+def test_a_hold_with_a_clock_is_waited_out(scene):
+    """The other half: paralysis from a ghoul does end, and a character who cannot act
+    still has to get to the far side of it. The one ticker moves the rounds."""
+    pc = scene.pc()
+    pc.add_condition("paralyzed", source="a ghoul", rounds=3)
+
+    got = downed.resolve(FakeCampaign(scene))
+
+    assert got.playable, "the hold ran out and the character never got their turn back"
+    assert pc.can_act() and not pc.has_condition("paralyzed")
+    assert any("3 rounds pass" in line for line in got.lines)
+
+
 def test_a_character_at_exactly_zero_may_still_act(scene):
     """Disabled is conscious. Refusing their turn would be as wrong as letting a dying
     character take one."""

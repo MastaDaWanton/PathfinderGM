@@ -22,11 +22,18 @@ from __future__ import annotations
 #   state.unable.*  — cannot take actions right now (may still be very much alive).
 # They overlap where 1e overlaps them: the dying are both down and unable; the
 # stunned are unable and emphatically not down.
+#
+# `state.down.fallen` is the narrower half of `state.down`: a body on the floor whose
+# story resolves on its own — it bleeds out, it stabilises, it is already dead. The
+# other two members of the family are living creatures held in place, and the difference
+# decides who gets quietly removed from the scene. Without it `tidy_the_fallen` aged a
+# petrified enemy out as a corpse two turns after the fight, statue and all, and
+# `downed.resolve` offered a paralyzed character a nap they would never wake from.
 TAGS: dict[str, tuple[str, ...]] = {
-    "dead":        ("state.down.dead", "state.unable"),
-    "dying":       ("state.down.dying", "state.unable"),
-    "unconscious": ("state.down.unconscious", "state.unable"),
-    "stable":      ("state.down.stable", "state.unable"),
+    "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
+    "dying":       ("state.down.dying", "state.down.fallen", "state.unable"),
+    "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable"),
+    "stable":      ("state.down.stable", "state.down.fallen", "state.unable"),
     "petrified":   ("state.down.petrified", "state.unable"),
     # Helpless has always carried `can_act: False` in the condition row and no
     # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag

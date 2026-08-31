@@ -2425,7 +2425,10 @@ class Engine:
         tells: list[str] = []
         for ref in list(self.scene.actors):
             a = self.scene.actors[ref]
-            if a.is_pc or (a.hp > 0 and not a.has_state("state.down")):
+            # `state.down.fallen`, not the whole family: petrified and helpless are
+            # down and alive, and asking the family aged a petrified enemy out of the
+            # scene as a corpse two turns after the fight — statue, treasure and all.
+            if a.is_pc or (a.hp > 0 and not a.has_state("state.down.fallen")):
                 self.scene.fallen.pop(ref, None)
                 continue
             age = self.scene.fallen.get(ref, 0) + 1
@@ -2474,7 +2477,9 @@ class Engine:
                 continue
             if a.has_condition("dying"):
                 tells.extend(self._resolve_dying(a))
-            if a.hp <= 0 or a.has_state("state.down"):
+            # The fallen are left behind; the petrified are not "left behind", they are
+            # still standing there. Walking out of a room does not delete a statue.
+            if a.hp <= 0 or a.has_state("state.down.fallen"):
                 self.scene.depart(ref)
         return tells
 
@@ -2512,10 +2517,10 @@ class Engine:
                 if actor.is_pc:
                     continue
                 stays = ref not in kept and str(actor.name) not in kept
-                cannot_come = (actor.hp <= 0
-                               or actor.has_condition("dead")
-                               or actor.has_condition("dying")
-                               or actor.has_condition("unconscious"))
+                # The four literal keys this used to name are exactly the fallen, minus
+                # `stable` — which it forgot, so a stabilised body walked to the next
+                # biome with the party.
+                cannot_come = actor.hp <= 0 or actor.has_state("state.down.fallen")
                 if stays or cannot_come:
                     self.scene.depart(ref)
                     left.append(actor.name)

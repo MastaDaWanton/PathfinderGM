@@ -13,6 +13,9 @@ rules' business, not the GM's:
   dying   (below 0)     a hit point a round until they stabilise or die
   stable                unconscious, no longer bleeding, and will come round in time
   dead                  the campaign is over for that character
+  held                  cannot act, and not on the hit-point track at all: paralysed,
+                        stunned, petrified, bound. Waited out if it has a clock, and
+                        said plainly if it has not.
 """
 from __future__ import annotations
 
@@ -26,7 +29,7 @@ HOURS_UNTIL_CONSCIOUS = 1
 
 @dataclass
 class Outcome:
-    state: str                       # fine | disabled | dying | stable | dead
+    state: str                       # fine | disabled | dying | stable | dead | held
     lines: list[str] = field(default_factory=list)
     playable: bool = True
 
@@ -36,6 +39,23 @@ class Outcome:
 
 
 def state_of(pc) -> str:
+    """Which of the resolutions above this character is owed.
+
+    The first four rungs name the conditions the hit-point ladder writes, and they are
+    literal on purpose: `apply_hp_state` writes exactly these keys and this is the
+    reading of them. The fifth rung is the one that was missing.
+
+    Measured before it existed: seven conditions that cannot act — cowering, dazed,
+    fascinated, helpless, paralyzed, petrified and stunned — fell through to "fine". The
+    character was handed a turn, the GM planned it, and the engine's guard then refused
+    every op in it as a legality error. A legality error regenerates rather than
+    repairs, so the turn burned the retry loop and reached the player as a 502.
+
+    Widening the "stable" rung to `state.down` instead is worse, and was the tempting
+    fix: it routes a petrified character into the wake-up path, which burns an hour of
+    world clock, floors their hit points at 1 and prints "You come round about an hour
+    later" to a statue that is still a statue.
+    """
     if pc is None:
         return "fine"
     if pc.has_condition("dead"):
@@ -46,6 +66,8 @@ def state_of(pc) -> str:
         return "stable"
     if pc.has_condition("disabled"):
         return "disabled"
+    if pc.has_state("state.unable") or pc.has_state("state.down"):
+        return "held"
     return "fine"
 
 
@@ -64,6 +86,9 @@ def resolve(campaign) -> Outcome:
 
     if state == "dead":
         return Outcome(state="dead", playable=False, lines=[death_notice(pc)])
+
+    if state == "held":
+        return _wait_it_out(campaign, pc)
 
     engine = campaign.engine()
     lines: list[str] = []
@@ -104,6 +129,46 @@ def resolve(campaign) -> Outcome:
         f"has gone."
     )
     return Outcome(state="stable", playable=True, lines=lines)
+
+
+def _wait_it_out(campaign, pc) -> Outcome:
+    """Cannot act, and not on the hit-point track: paralysed, stunned, bound, petrified.
+
+    There is no turn to take and no bleeding to resolve either, and until this branch
+    existed there was no third answer — the character came back "fine", was handed a
+    turn, and every op in it was refused by the engine as a legality error. A legality
+    error regenerates rather than repairs, so the turn burned the retry loop and reached
+    the player as a 502.
+
+    A hold with a clock is waited out, which is what a table does: everyone else acts and
+    the clock comes round again. A hold without one is said plainly. The tempting
+    alternative — routing these into the stable branch below — burns an hour of world
+    clock, floors hit points at 1 and tells a petrified character they have come round.
+    """
+    scene = campaign.scene
+    key = pc.blocking_key()
+    held = next((e for e in pc.effects if e.key == key), None)
+    what = ((held.name if held else "") or key or "unable to move").lower()
+    rounds = int(getattr(held, "rounds_left", 0) or 0) if held else 0
+
+    if rounds <= 0:
+        return Outcome(state="held", playable=False, lines=[
+            f"You are {what}, and it is not wearing off on its own. Nothing you decide "
+            f"changes that — this one needs somebody else, or magic. Time can pass, but "
+            f"you cannot spend it."])
+
+    ended = scene.advance(0, rounds=rounds)
+    lines = [f"You are {what} and can do nothing but wait. "
+             f"{rounds} round{'s' if rounds != 1 else ''} pass."]
+    # Everything else that ran out while they stood there — law 3 says an expiry the
+    # engine records is one the player may be told about. The hold's own expiry tell is
+    # dropped because the last line says it in words the player is already reading.
+    lines.extend(line for line in (ended.get("ended") or [])
+                 if what not in line.lower())
+    still = pc.blocking_condition()
+    lines.append("You have yourself back." if not still
+                 else f"You are still {still.lower()}.")
+    return Outcome(state="held", playable=not still, lines=lines)
 
 
 def death_notice(pc) -> str:

@@ -149,8 +149,15 @@ def _jobs_for(c) -> list[dict]:
 
 
 def _down(a) -> bool:
-    """The loot op's own test: only the down and the dead."""
-    return a.hp <= 0 or a.has_condition("unconscious")
+    """The loot op's own test: only the down and the dead.
+
+    It said so and was not: the loot op asks `hp <= 0 or state.down`, and this asked one
+    literal key. Measured at positive hit points, the two disagreed on five of the six
+    members of the family — dead, dying, helpless, petrified and stable — so a creature
+    killed by Constitution damage at full health was never offered for looting by the
+    watcher, though the loot op would have stripped it happily.
+    """
+    return a.hp <= 0 or a.has_state("state.down")
 
 
 def _belongings(a) -> dict:

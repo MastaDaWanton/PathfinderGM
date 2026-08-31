@@ -266,11 +266,14 @@ def _can_be_fought(actor) -> bool:
     from three scenes back — and every attack on the people the narration described was
     filled onto him. A man bleeding out on the ground is not the obvious reading of "I
     attack"; being the only body in the room must not make him one.
+
+    The four literal keys this used to name were `state.down` minus the two it forgot,
+    so a petrified thug at full hit points was a plausible target and "I attack" filled
+    onto a statue — the same shape as the gatekeeper, by a different route.
     """
     if int(getattr(actor, "hp", 1)) <= 0:
         return False
-    return not any(actor.has_condition(c)
-                   for c in ("dead", "dying", "unconscious", "stable"))
+    return not actor.has_state("state.down")
 
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is
