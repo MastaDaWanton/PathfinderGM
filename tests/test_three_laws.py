@@ -485,3 +485,36 @@ def test_every_scene_field_is_saved_or_named_as_lost():
     fixed = set(_UNSAVED_SCENE_FIELDS) - set(unsaved)
     assert not fixed, (
         f"these are saved now — delete them from _UNSAVED_SCENE_FIELDS: {sorted(fixed)}")
+
+
+# The only two places the world clock may be written: the one door, and the loader that
+# restores a saved value. Six sites moved it before stage 4a and four of them expired
+# nothing at all.
+_CLOCK_WRITERS = {
+    "rules/engine.py": "Scene.advance — the one door",
+    "play/campaign.py": "the load constructor, restoring a saved value",
+}
+
+
+def test_only_one_function_moves_the_world_clock():
+    """Stage 4a's headline property, which nothing measured.
+
+    Six places wrote `scene.clock_minutes` and two of them expired anything: a
+    forty-eight-hour forage, a twelve-hour crafting session, an hour spent waking up
+    and a resurrection costing up to twenty-seven days all left every timed effect
+    where it was. `Scene.advance` is the single door now — and a seventh site could be
+    added tomorrow with the whole suite still green, which is exactly the shape of
+    rule this project has measured as failing when it lives only in prose."""
+    pattern = re.compile(r"\bclock_minutes\s*[+\-]?=")
+    found: dict[str, list[int]] = {}
+    for path in sorted(Path(".").glob("*/*.py")):
+        if path.parts[0] not in ("rules", "play", "gm", "world"):
+            continue
+        source = re.sub(r'"""(?:.|\n)*?"""', "", path.read_text(encoding="utf-8"))
+        for n, line in enumerate(source.splitlines(), 1):
+            if pattern.search(re.sub(r"#.*$", "", line)):
+                found.setdefault(path.as_posix(), []).append(n)
+    unlisted = {k: found[k] for k in sorted(set(found) - set(_CLOCK_WRITERS))}
+    assert not unlisted, (
+        f"the world clock is moved outside Scene.advance: {unlisted}. Call "
+        f"scene.advance(minutes) so the effects, the pools and the body move with it.")

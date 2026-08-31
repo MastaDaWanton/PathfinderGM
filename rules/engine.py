@@ -439,7 +439,8 @@ class Scene:
     # — and four of them then ticked nothing at all.
     ROUNDS_PER_MINUTE = 10
 
-    def advance(self, minutes: int = 0, rounds: int | None = None) -> dict:
+    def advance(self, minutes: int = 0, rounds: int | None = None,
+                charge_body: bool = True) -> dict:
         """Move the world clock, and expire what that much time expires.
 
         The one door. Six places moved `clock_minutes` and two of them expired anything:
@@ -469,6 +470,22 @@ class Scene:
         self.clock_minutes += minutes
         ended: list[str] = []
         for a in self.actors.values():
+            # The body keeps its own clock, and the door has to open that one too.
+            # `survival.pass_hours` is reached from exactly one place in the app, so
+            # four of the six routed sites moved the world and left hunger, thirst and
+            # wakefulness where they were: three days of `advance_time` and the needs
+            # panel still reported full grace. That is the failure survival.py is named
+            # after, arriving by a different route.
+            #
+            # The COUNTERS move here and the CHECKS do not. pass_hours rolls dice, can
+            # knock a character unconscious and returns fewer hours than it was asked
+            # for, none of which can live inside a function whose caller has already
+            # decided how far the clock goes. Counters that are right beat counters
+            # that are wrong, and the panel shows the danger either way.
+            if charge_body and minutes:
+                a.awake_minutes += minutes
+                a.fed_minutes += minutes
+                a.watered_minutes += minutes
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
@@ -2643,7 +2660,9 @@ class Engine:
         # reads when they are picked, so advancing first would hand the player up to
         # forty-eight hours of free freshness. And `worked` is what the body actually
         # managed — pass_hours can stop early — so the number is only known here.
-        self.scene.advance(worked * survival.MINUTES_PER_HOUR)
+        # `charge_body=False`: `survival.pass_hours` above has already charged the body
+        # for exactly these hours, and rolled the checks that go with them.
+        self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
 
         span = f"{worked} hour{'s' if worked != 1 else ''}"
         if result["empty"]:
@@ -4511,7 +4530,9 @@ class Engine:
         # NPC standing in the same scene kept every timed buff through an eight-hour
         # night. `advance` also leaves the body alone: `Actor.rest` has already called
         # survival.sleep, and a night deliberately costs no food or water.
-        ended = self.scene.advance(hours * 60)["ended"]
+        # `charge_body=False`: `Actor.rest` has already called survival.sleep, and a
+        # night deliberately costs no food or water — pinned by tests/test_survival.py.
+        ended = self.scene.advance(hours * 60, charge_body=False)["ended"]
 
         bits = [f"{actor.name} rests for {hours} hours."]
         if result["healed"]:

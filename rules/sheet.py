@@ -730,7 +730,17 @@ class Actor:
     def tick_effects(self, rounds: int = 1) -> list[str]:
         """The one ticker. Everything timed expires on the same clock; what ended is
         returned in the words the old per-mechanism tickers used, because transcripts
-        and tests read them."""
+        and tests read them.
+
+        Hit points follow the maximum down when an effect that was holding it up ends.
+        `hp_max` is derived from the Constitution modifier, so a bear's endurance
+        expiring lowers it — and nothing here used to notice, leaving the character
+        standing at 38 of 30. `_follow_con` was written for exactly this and applies in
+        both directions; the clamp belongs where the expiry happens rather than at the
+        one call site somebody remembered, because 25 shipped spells carry a timed
+        Constitution bonus and every one of them ends somewhere.
+        """
+        before_max = self.hp_max
         ended = []
         for e in list(self.effects):
             if e.rounds_left is None:
@@ -739,6 +749,8 @@ class Actor:
             if e.rounds_left <= 0:
                 ended.append(e.ended_label)
                 self.effects.remove(e)
+        if ended:
+            self._follow_con(before_max)
         return ended
 
     # --- basics ------------------------------------------------------------------

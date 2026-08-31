@@ -151,3 +151,54 @@ def test_rounds_that_do_not_fill_a_minute_still_leave_the_clock_alone():
     got = s.advance(0, rounds=5)
     assert got["rounds"] == 5 and got["minutes"] == 0
     assert s.clock_minutes == 0
+
+
+def test_the_body_clock_moves_with_the_world_clock():
+    """Found by the adversarial review of 4a, and it is the lesson this stage quoted as
+    its own justification arriving by a different route.
+
+    `survival.pass_hours` is reached from exactly one place in the app, so four of the
+    six routed sites moved the world and left the body untouched: three days of
+    `advance_time` and the needs panel still reported full grace, while a twelve-hour
+    crafting excursion cost no food, water or wakefulness at all.
+
+    The COUNTERS move; the CHECKS do not. `pass_hours` rolls dice, can knock a
+    character unconscious and returns fewer hours than asked, none of which can live
+    inside a function whose caller has already decided how far the clock goes."""
+    s = _scene()
+    pc = s.actors["pc"]
+    assert (pc.awake_minutes, pc.fed_minutes, pc.watered_minutes) == (0, 0, 0)
+    s.advance(3 * 24 * 60)
+    assert pc.awake_minutes == 3 * 24 * 60
+    assert pc.fed_minutes == 3 * 24 * 60
+    assert pc.watered_minutes == 3 * 24 * 60
+
+
+def test_a_night_still_costs_no_food_or_water():
+    """The exemption `_op_rest` has always had, now stated at the call rather than
+    inherited by silence: `Actor.rest` has already called survival.sleep, and a night
+    deliberately does not make you hungry."""
+    s = _scene()
+    pc = s.actors["pc"]
+    pc.fed_minutes = 1200
+    s.advance(8 * 60, charge_body=False)
+    assert pc.fed_minutes == 1200
+
+
+def test_hit_points_follow_the_maximum_down_when_a_buff_expires():
+    """`hp_max` is derived from the Constitution modifier, so bear's endurance ending
+    lowers it — and the ticker did not notice, leaving a character standing at 38 of
+    30. Twenty-five shipped spells carry a timed Constitution bonus, and every one of
+    them ends somewhere; the clamp belongs where the expiry happens rather than at the
+    one call site somebody remembered."""
+    s = _scene()
+    pc = s.actors["pc"]
+    pc.abilities["con"] = 14
+    base = pc.hp_max
+    pc.add_buff("ability_mod", "con", 4, source="bear's endurance",
+                bonus_type="enhancement", rounds=10)
+    assert pc.hp_max > base
+    pc.hp = pc.hp_max
+    s.advance(0, rounds=20)
+    assert pc.hp_max == base
+    assert pc.hp == base, f"left above the maximum: {pc.hp}/{pc.hp_max}"
