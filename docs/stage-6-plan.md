@@ -161,6 +161,51 @@ And the blind spot that makes 6c worth doing at all: **18 death and unconsciousn
 assertions in shipped prose, 0 flagged.** Not one of the 44 patterns names a condition or
 a state change.
 
+## What the probes changed
+
+Seven probes re-ran the readers' claims against live code. Several measurements did not
+reproduce and are corrected here rather than carried: the "18 death assertions, 0
+flagged" is 11 on a tight regex and 23 on a loose one, of which 3 are flagged; "20 claim
+repairs across 261 turns" is 23 across 353; "85 application call sites" is 80; and
+`_resolve_maneuver` is not "every ordinary route to death" — no shipped manoeuvre deals
+hit-point damage at all.
+
+Two probe findings landed as fixes in this stage rather than as notes, because both were
+live: the ability path that could not kill, and the kill sentence being deleted.
+
+Still open, measured, and belonging to later substages:
+
+- **`_op_use_ability` emits no damage effect**, only `{"kind": "use_ability"}` — so the
+  door is invisible to `_hurt_refs`, `_deaths_from`, the battle-joined check and the turn
+  log. 6a gave it the ladder and the tell; the effect record is 6b's.
+- **`_op_heal` is silent in both channels** — a cure that lifts `dying` and `unconscious`
+  reports only `[('heal', None, None)]`, so nothing says the character came back.
+- **`found.title()` mangles every ability name in its tell** — "Iron Clot (Dr 2/-)".
+- **37 of 49 blood-bending abilities fall through to a database row**: "Blood Spike
+  Projectile is a Control Blood 1 ability of the blood spike path; Masta has reached 0."
+- **594 spells put the raw `SAVE_DC_FORMULA` placeholder into the cast tell**, and the
+  suite cannot see it.
+- **A sixth raw transcript door**: `play/craft_views.py` writes a full dice breakdown
+  ("made (d20 12+8 = 20 vs DC 10)") straight to the page with no stripping.
+- **The dice popup leaks the enemy's already-rolled hidden total** as the target number,
+  before the player rolls — and the payload has no provenance to key a fix on.
+- **`press_the_death`'s guard is defeated by somebody else's death**, and `leave_behind`
+  departs a corpse saying nothing.
+- **`apply_hp_state`'s `changed` list is appends-only.** The removals — `dying`/`stable`/
+  `unconscious` cleared on death, `staggered` cleared, and both lifting when non-lethal
+  heals back below the line — are never in it, so somebody who wakes up does so in
+  silence. The trap is sharp and named: appending the removals **inverts the mechanic**,
+  because the effect record carries no add/remove direction, so a lifted unconsciousness
+  would be narrated as a fresh knockout. A direction field comes first, or not at all.
+- **The tell canary reads as 100% coverage and is 54%.** Measured: 63 `Outcome(`
+  constructions in `rules/engine.py`, 34 matched, 29 invisible — and all the hit-point
+  sites are among the 29, because they pass `effects=effects`. It should count effect
+  dicts reaching an Outcome, not literal syntax.
+- **`_deaths_from` looks the actor up after the scene has swept it.** A turn that kills
+  and leaves in one input — "I finish him and go" — departs the body before the death can
+  be read off it, and the kill is never written. Narrowed by probe: `tidy_the_fallen` and
+  `leave_behind` both no-op mid-encounter, so it cannot fire inside initiative.
+
 ## Known already, to be folded in
 
 Two defects surfaced while measuring and are not law-3 debt of their own:
