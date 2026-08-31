@@ -399,21 +399,23 @@ CATEGORIES: list[Category] = [
             EffectType("resistance", "Energy resistance", "Resist fire 10", [
                 Field("target", "Against", "choice", vocab="damage_type"),
                 Field("amount", "Points", "int"),
-            ], blocked="Applied when a creature has it. A consumable that grants it is "
-                       "recorded and narrated — nothing wears off yet, so nothing is "
-                       "granted temporarily."),
+            ], blocked="Granted with a clock or without one, and applied in 1e's own "
+                       "order by `take_damage`. Two resistances against one energy do "
+                       "not stack — the better applies."),
             EffectType("damage_reduction", "Damage reduction", "DR 3/— for 8 hours", [
                 Field("amount", "Points", "int"),
                 Field("bypass", "Bypassed by", "text", required=False,
                       hint="silver, cold iron. Empty for DR/—, which nothing bypasses."),
-            ], blocked="Applied when a creature has it. A consumable that grants it is "
-                       "recorded and narrated."),
+            ], blocked="Granted with a clock or without one. Several kinds of damage "
+                       "reduction do not add up: only the best applicable one applies, "
+                       "and none of them touches energy damage."),
             EffectType("immunity", "Immunity", "Immune to fire for 2 hours", [
                 Field("target", "To what", "text",
                       hint="fire damage, poison, gaze attacks."),
-            ], blocked="Damage immunity is applied when a creature has it. An immunity to "
-                       "something that is not a damage type — paralysis, a gaze — is "
-                       "recorded for the GM; the save path does not consult it yet."),
+            ], blocked="Damage immunity is granted and applied, with a clock or "
+                       "without. An immunity to something that is not a damage type — "
+                       "paralysis, a gaze — is recorded and read by the condition ops, "
+                       "which refuse a condition the creature cannot suffer."),
             # The other half of resistance, and it had no way to be said. 236 of the 782
             # printed stat blocks carry one — "vulnerable to fire" on 88, "vulnerable to
             # cold" on 68 — and without this they could only be written as narrative,
@@ -421,9 +423,8 @@ CATEGORIES: list[Category] = [
             # explaining that it should not sits beside it doing nothing.
             EffectType("vulnerability", "Vulnerability", "Vulnerable to cold", [
                 Field("target", "To what", "choice", vocab="damage_type"),
-            ], blocked="Applied when a creature has it — half again as much damage of "
-                       "that type. A consumable that inflicts it is recorded and "
-                       "narrated."),
+            ], blocked="Granted with a clock or without one — half again as much "
+                       "damage of that type, applied before resistance, as 1e says."),
             # Displacement, blur, entropic shield and blurred movement are *entirely*
             # this, and every one of them was inert: with no way to say "miss chance"
             # they had to be written as narrative, and the alternative — writing 50% as

@@ -101,7 +101,12 @@ def test_the_condition_views_are_never_assigned():
     place anything edited a condition behind the engine's back — and it silently
     did nothing once conditions became a property. Nothing in the app may assign
     to the view names; the store is edited through apply_effect and the shims."""
-    pattern = re.compile(r"\.(conditions|buffs|temp_pools)\s*=[^=]")
+    # Assignment AND the mutating methods, across every view: `.append` on a view
+    # builds a list, mutates it and throws it away, which is how a DR granted in a
+    # test silently did nothing until the suite caught it.
+    views = "conditions|buffs|temp_pools|immunities|resistances|vulnerabilities|reductions"
+    pattern = re.compile(
+        rf"\.({views})\s*(?:=[^=]|\.append|\.remove|\.extend|\.pop|\.clear)")
     offenders = []
     for path in Path(".").glob("*/*.py"):
         if path.parts[0] not in ("rules", "gm", "play", "tools", "world"):
@@ -109,6 +114,9 @@ def test_the_condition_views_are_never_assigned():
         # survival.Toll carries its own `conditions` — a list of condition NAMES a
         # hardship inflicts, not the Actor view — and is allowed to assign it.
         if path.name == "survival.py":
+            continue
+        # sheet.py implements the views; an implementation may touch what it implements.
+        if path.name == "sheet.py":
             continue
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if pattern.search(line) and "self.effects" not in line:

@@ -367,6 +367,38 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                            **({"note": spec["note"]} if spec.get("note") else {})}}]
         return out
 
+    if kind == "speed":
+        # The channel went live in stage 2 (speed_feet reads the funnel) and nothing
+        # could fill it: a potion of longstrider still produced no intents. `speed` is
+        # a modifier like any other once there is a reader for it.
+        return [{"op": "buff", "actor": target, "because": because,
+                 "params": {"type": "speed",
+                            "target": str(spec.get("target", "") or "land"),
+                            "amount": int(spec.get("amount", 0) or 0), "to": target,
+                            "source": spec.get("from") or "the preparation",
+                            **({"bonus_type": spec["bonus_type"]}
+                               if spec.get("bonus_type") else {}),
+                            **({"duration": spec["duration"]}
+                               if isinstance(spec.get("duration"), dict) else
+                               {"duration": {"amount": 1, "unit": "hour"}})}}]
+
+    if kind in ("resistance", "damage_reduction", "immunity", "vulnerability"):
+        # The branch these four never had. Each was marked executable-ish in the
+        # catalogue with a `blocked` note saying a consumable granting one is "recorded
+        # and narrated — nothing wears off yet", and the honest consequence was that
+        # drinking one produced no intents at all: the dose spent, nothing applied, no
+        # error. They wear off now, so they can be granted.
+        return [{"op": "defence", "actor": target, "because": because,
+                 "params": {"kind": kind,
+                            "against": str(spec.get("target", "") or ""),
+                            "amount": int(spec.get("amount", 0) or 0),
+                            "bypass": str(spec.get("bypass", "") or ""),
+                            "to": target,
+                            "source": spec.get("from") or "the preparation",
+                            **({"duration": spec["duration"]}
+                               if isinstance(spec.get("duration"), dict) else
+                               {"duration": {"amount": 1, "unit": "hour"}})}}]
+
     if kind == "remove_condition":
         return [{"op": "condition", "because": because,
                  "params": {"condition": spec.get("target") or "", "to": target,

@@ -226,15 +226,22 @@ def test_an_effect_type_that_a_potion_cannot_run_says_so():
     where the line is. Two were never run anywhere and now say that instead."""
     from rules import consumables
 
-    for tid in ("immunity", "resistance", "damage_reduction", "vulnerability",
-                "sense", "speed"):
-        _, etype = effectspec.find(tid)
-        assert etype.blocked, f"{tid} runs nowhere and explains nothing"
+    # Five of the six run now. This test used to assert `== []` for all of them —
+    # naming the silent failure in its own docstring and then pinning it in place,
+    # which is how a defect gets protected by its own coverage. The four defences
+    # became effect kinds with a clock in stage 3, and speed joined the funnel in
+    # stage 2, so each produces an intent that does something.
+    for tid in ("immunity", "resistance", "damage_reduction", "vulnerability", "speed"):
         spec = {"type": tid, "target": "fire", "amount": 10}
-        assert consumables._spec_to_intents(spec, "c1", 1.0, "a potion") == []
+        got = consumables._spec_to_intents(spec, "c1", "a potion", 1.0)
+        assert got, f"{tid} still produces no intents — the dose would vanish"
 
-    assert effectspec.find("sense")[1].engine is False
-    assert effectspec.find("speed")[1].engine is False
+    # Sense is the one that genuinely runs nowhere: nothing in the engine asks what a
+    # creature can see, so light and concealment are still narrated.
+    _, sense = effectspec.find("sense")
+    assert sense.blocked and sense.engine is False
+    assert consumables._spec_to_intents(
+        {"type": "sense", "target": "darkvision"}, "c1", "a potion", 1.0) == []
 
 
 def test_the_builder_shows_the_note_even_when_the_engine_flag_is_true():

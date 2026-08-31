@@ -265,8 +265,10 @@ def test_iron_clot_never_touches_energy_and_never_stacks():
     DRs give the best one only — a statblock DR 3/— beside Iron Clot's 2 is 3."""
     pc = _coagulator(level=1)
     assert pc.damage_reduction("fire") is None
-    from rules.sheet import Reduction
-    pc.reductions.append(Reduction(3, "", "thick hide"))
+    # Through the applicator: `reductions` is a view over the effect store now, and
+    # `.append` on it builds a list, mutates that, and throws it away — the same
+    # silent no-op that `pc.conditions = [...]` was in stage 2.
+    pc.grant_defence("damage_reduction", "", amount=3, source="thick hide")
     assert pc.damage_reduction("bludgeoning").amount == 3
 
 

@@ -1814,6 +1814,39 @@ class Engine:
         parts = [one(head)] + [one(e) for e in head.get("also", [])]
         return "; ".join(parts) + "."
 
+    def _op_defence(self, intent: Intent, partial: dict) -> Outcome:
+        """Grant damage reduction, immunity, energy resistance or vulnerability.
+
+        The op the four types never had. `effectspec` has offered them since it was
+        written and its own `blocked` text admitted the consequence — "nothing wears off
+        yet, so nothing is granted temporarily" — so a potion of fire resistance was
+        drunk, the dose was spent, and `_spec_to_intents` returned an empty list.
+        """
+        target = self.scene.actors.get(intent.params.get("to") or intent.actor or "")             or self.scene.pc()
+        if target is None:
+            raise IntentError("defence: nobody here to protect", "refs")
+        kind = str(intent.params["kind"])
+        against = str(intent.params.get("against", ""))
+        amount = int(intent.params.get("amount", 0) or 0)
+        bypass = str(intent.params.get("bypass", "") or "")
+        source = str(intent.params.get("source") or "a preparation")
+        rounds = _rounds_from(intent.params.get("duration"))
+        target.grant_defence(kind, against, amount=amount, bypass=bypass,
+                             source=source, rounds=rounds)
+        said = {
+            "damage_reduction": f"damage reduction {amount}/{bypass or '—'}",
+            "immunity": f"immunity to {against}",
+            "resistance": f"resistance {amount} to {against}",
+            "vulnerability": f"vulnerability to {against}",
+        }[kind]
+        return Outcome(
+            intent_id=intent.id, op="defence",
+            effects=[{"ref": target.ref, "kind": "defence", "defence": kind,
+                      "against": against, "amount": amount, "rounds": rounds}],
+            tell=f"{target.name} has {said}" + (
+                f" for {rounds} round(s)." if rounds else " while it lasts."),
+            because=intent.because)
+
     def _op_buff(self, intent: Intent, partial: dict) -> Outcome:
         """A timed numeric bonus lands on an actor.
 
@@ -4702,6 +4735,17 @@ def survival_note(toll) -> str:
     if failed and not bits:
         bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")
     return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
+
+
+def _rounds_from(duration) -> int | None:
+    """A duration block as a number of rounds, or None for one that never ends."""
+    if not isinstance(duration, dict) or not duration.get("amount"):
+        return None
+    per = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
+    try:
+        return int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
+    except (TypeError, ValueError):
+        return None
 
 
 def _doc_tell(template, actor) -> str:

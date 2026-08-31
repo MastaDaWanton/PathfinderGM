@@ -207,6 +207,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),
+    # Damage reduction, immunity, energy resistance and vulnerability, granted with a
+    # clock. Before this there was no op for any of them: `effectspec` offered all four
+    # types, 123 spells and 13 magic items authored one, and `consumables` had no branch
+    # — so the dose was spent and nothing happened, with no error anywhere.
+    "defence": (("kind",),
+                ("against", "amount", "bypass", "to", "duration", "source"), "hidden"),
     "buff": (("type", "target", "amount"),
              ("to", "source", "duration", "note", "bonus_type"),
              "hidden"),
@@ -561,8 +567,14 @@ def parse(raw: dict, index: int = 0) -> Intent:
     if not isinstance(params, dict):
         raise IntentError(f"{op}: params must be an object", "schema", index)
 
+    # Scoped to the op, not global. The table is a courtesy — the GM writes "against"
+    # and means `opposed_by` on a check — but applied to every op it silently renames a
+    # param another op legitimately declares: `defence` declares `against`, and the
+    # alias took it away and then refused the intent for missing it. An alias fires
+    # only when the op actually wants the target and does not itself declare the word.
+    declared = set(required) | set(optional)
     for said, means in PARAM_ALIASES.items():
-        if said in params and means not in params:
+        if said in params and means not in params                 and means in declared and said not in declared:
             params[means] = params.pop(said)
 
     missing = [p for p in required if params.get(p) in (None, "")]
@@ -724,6 +736,33 @@ def _check_params(intent: Intent, index: int) -> None:
                 p["iteration"], 0, 15, index,
                 "attack: iteration is which swing of a full attack this is, counting "
                 "from 0")
+
+    elif op == "defence":
+        kinds = ("damage_reduction", "immunity", "resistance", "vulnerability")
+        raw = str(p.get("kind", "")).strip().lower().replace(" ", "_")
+        if raw not in kinds:
+            raise IntentError(
+                f"defence: {p.get('kind')!r} is not a kind of defence."
+                + _suggest(raw, kinds)
+                + f" The kinds are: {', '.join(kinds)}.",
+                "schema", index)
+        p["kind"] = raw
+        # Three of the four are AGAINST something and one is not: damage reduction is
+        # an amount and what bypasses it, with no damage type attached, so requiring
+        # `against` for every kind refused the only one that cannot have it.
+        if raw != "damage_reduction" and not str(p.get("against", "") or "").strip():
+            raise IntentError(
+                f"defence: {raw} needs `against` — what it protects from, like "
+                f"\"fire\" or \"poison\". Only damage_reduction has none.",
+                "schema", index)
+        if raw == "damage_reduction" and not p.get("amount"):
+            raise IntentError(
+                "defence: damage_reduction needs an amount — how many points it stops.",
+                "schema", index)
+        if p.get("amount") not in (None, ""):
+            p["amount"] = _bounded(
+                p["amount"], 0, 1000, index,
+                "defence: amount is how many points it stops")
 
     elif op == "buff":
         # A closed vocabulary the code does not enforce is just a suggestion, and this

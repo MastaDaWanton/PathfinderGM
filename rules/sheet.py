@@ -290,24 +290,20 @@ class Actor:
     # have 20. Nothing needed this until the grid arrived — zones have no distance — so a
     # sheet written before this defaults rather than failing to load.
     speed: int = 30
-    reductions: list[Reduction] = field(default_factory=list)
-    # The other three defences a stat block prints, which until now had nowhere to live.
-    # `reductions` above has been read since the beginning; `Immune cold` and `Resist
-    # fire 10` were dropped when a bestiary row became an Actor, so a frost giant took
-    # full damage from cold and a devil took full damage from fire.
+    # Damage reduction, immunity, energy resistance and vulnerability were four more
+    # parallel stores — the fifth, sixth, seventh and eighth mechanisms law 2 forbids
+    # — and they survived stage 2 because they arrive from a stat block and never
+    # expire. Never expiring is exactly what made them wrong: `effectspec` offers all
+    # four types, and the catalogue's own `blocked` text admitted the consequence —
+    # "nothing wears off yet, so nothing is granted temporarily" — so 123 spells and
+    # 13 magic items authored a defence that could only ever land on a creature born
+    # with it. A potion of fire resistance was drunk, the dose spent, and nothing
+    # happened, with no error anywhere.
     #
-    # Kept as plain data next to `reductions` rather than as effect specs, for the same
-    # reason `reductions` is: `take_damage` should not be interpreting a schema in the
-    # middle of resolving a hit. `rules/creature_effects.py` does the interpreting once,
-    # at load.
-    #
-    # Immunity is by name rather than by damage type, because most immunities are not
-    # damage types — "undead traits", "paralysis", "mind-affecting effects". `immune_to`
-    # answers the damage question and the rest are there for the save and condition paths
-    # to consult when they learn to.
-    immunities: list[str] = field(default_factory=list)
-    resistances: dict[str, int] = field(default_factory=dict)
-    vulnerabilities: list[str] = field(default_factory=list)
+    # They are effect kinds now, and the four names are read-only views over the one
+    # store, the arrangement `conditions`, `buffs` and `temp_pools` have had since
+    # stage 2. An innate defence is an effect with no clock; a granted one has one and
+    # wears off through the one ticker.
     # Who this creature is being pulled towards, and what defying them costs. Not a
     # condition: a condition is a state the creature is in, while a compulsion is a
     # relationship to a *particular other creature*, and it has to be able to name them.
@@ -605,6 +601,83 @@ class Actor:
     def temp_pools(self) -> list["TempPool"]:
         return [TempPool(amount=e.amount, source=e.source, rounds_left=e.rounds_left)
                 for e in self.effects if e.kind == "temp_hp"]
+
+    # --- the four defences, as views over the one store --------------------------------
+
+    def _defence(self, kind: str) -> list[ActiveEffect]:
+        return [e for e in self.effects if e.kind == kind]
+
+    def grant_defence(self, kind: str, against: str, amount: int = 0,
+                      bypass: str = "", source: str = "",
+                      rounds: int | None = None) -> ActiveEffect:
+        """Put a defence on this creature — innate when `rounds` is None, timed when not.
+
+        The one door for all four. A stat block's `Immune cold` and a potion of fire
+        resistance arrive the same way and differ only in whether they carry a clock,
+        which is what makes the potion possible at all: before this there was no shape
+        for a defence that ENDS, so `consumables` had no branch for any of the four and
+        drinking one produced no intents whatsoever.
+        """
+        return self.apply_effect(ActiveEffect(
+            name=source or f"{kind} {against}".strip(), kind=kind,
+            # What it is against AND what defeats it: `apply_effect` treats
+            # (kind, key, source) as one record, so keying on `against` alone made
+            # DR 10/silver and DR 3/— the same record — the second refreshed the first
+            # and a creature with two kinds of damage reduction silently had one.
+            key=f"{against}|{bypass}", source=source or "", amount=int(amount),
+            duration="until-dismissed" if rounds is None else "rounds",
+            rounds_left=rounds,
+            payload={"against": str(against), "amount": int(amount),
+                     "bypass": str(bypass or "")}))
+
+    @property
+    def immunities(self) -> list[str]:
+        """By NAME, not by damage type: most immunities are not damage types — "undead
+        traits", "paralysis", "mind-affecting effects" — and `immune_to` answers only
+        the damage question, leaving the rest for the save and condition paths."""
+        return [str(e.payload.get("against", "")) for e in self._defence("immunity")]
+
+    @immunities.setter
+    def immunities(self, values) -> None:
+        self.effects = [e for e in self.effects if e.kind != "immunity"]
+        for v in values or ():
+            self.grant_defence("immunity", str(v), source="innate")
+
+    @property
+    def resistances(self) -> dict[str, int]:
+        return {str(e.payload.get("against", "")): int(e.payload.get("amount", 0) or 0)
+                for e in self._defence("resistance")}
+
+    @resistances.setter
+    def resistances(self, values) -> None:
+        self.effects = [e for e in self.effects if e.kind != "resistance"]
+        for k, v in (values or {}).items():
+            self.grant_defence("resistance", str(k), amount=int(v), source="innate")
+
+    @property
+    def vulnerabilities(self) -> list[str]:
+        return [str(e.payload.get("against", ""))
+                for e in self._defence("vulnerability")]
+
+    @vulnerabilities.setter
+    def vulnerabilities(self, values) -> None:
+        self.effects = [e for e in self.effects if e.kind != "vulnerability"]
+        for v in values or ():
+            self.grant_defence("vulnerability", str(v), source="innate")
+
+    @property
+    def reductions(self) -> list["Reduction"]:
+        return [Reduction(int(e.payload.get("amount", 0) or 0),
+                          str(e.payload.get("bypass") or ""),
+                          e.source or e.name)
+                for e in self._defence("damage_reduction")]
+
+    @reductions.setter
+    def reductions(self, values) -> None:
+        self.effects = [e for e in self.effects if e.kind != "damage_reduction"]
+        for r in values or ():
+            self.grant_defence("damage_reduction", "", amount=r.amount,
+                               bypass=r.bypass, source=r.source or "innate")
 
     @property
     def coating(self) -> dict:
@@ -1612,7 +1685,12 @@ class Actor:
         """
         if not is_physical(dtype):
             return None
-        pool = list(self.reductions)
+        # One read path. `reductions` is a VIEW over the damage_reduction effects, so
+        # seeding the pool from it and then walking the effects again would count every
+        # innate DR twice — and best-only would hide it, right up until two sources
+        # differed. The loop below sees the standalone effects and the `dr` riders that
+        # ability documents carry, which is all of them.
+        pool: list[Reduction] = []
         # Class documents join the statblock's own DR here rather than by writing
         # into `reductions`, for the same reason worn gear is live-read: Iron Clot
         # is permanent and tier-scaled, and an applied copy would go stale the
@@ -1630,6 +1708,13 @@ class Actor:
             if wants(d):
                 pool.append(Reduction(d["amount"], d["bypass"], d["source"]))
         for e in self.effects:
+            if e.kind == "damage_reduction":
+                d = dict(e.payload or {})
+                if int(d.get("amount", 0) or 0) > 0 and wants(d):
+                    pool.append(Reduction(int(d["amount"]),
+                                          str(d.get("bypass") or ""),
+                                          e.source or e.name))
+                continue
             d = e.payload.get("dr") if isinstance(e.payload, dict) else None
             if isinstance(d, dict) and int(d.get("amount", 0) or 0) > 0 and wants(d):
                 pool.append(Reduction(int(d["amount"]), str(d.get("bypass") or ""),
@@ -2996,6 +3081,11 @@ def _overrides(raw: dict) -> dict[str, bool]:
     return {k: bool(v) for k, v in raw.items()}
 
 
+# The four effect kinds that are defences. Named once so the migration, the save and
+# the law tests all mean the same four things by it.
+_DEFENCE_KINDS = ("immunity", "resistance", "vulnerability", "damage_reduction")
+
+
 def _defences(data: dict) -> tuple[list[str], dict[str, int], list[str]]:
     """Immunity, resistance and vulnerability, from wherever the save put them.
 
@@ -3100,10 +3190,6 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         purse={str(k): int(v) for k, v in (data.get("purse") or {}).items()
                if int(v) > 0},
         pools=_pools(data.get("pools") or {}),
-        reductions=[_reduction(r) for r in (data.get("reductions") or [])],
-        immunities=immunities,
-        resistances=resistances,
-        vulnerabilities=vulnerabilities,
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
         heritage=data.get("heritage", ""),
@@ -3149,6 +3235,19 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
             a.effects.append(a._new_temp_effect(p.amount, p.source, p.rounds_left))
         if data.get("coating"):
             a.coating = dict(data["coating"])
+    # The defences, migrated — and AFTER the effects above, never before. `from_dict`
+    # rebinds `a.effects` wholesale when the save carries `active_effects`, so anything
+    # minted during construction is discarded by that line; the blast-radius review
+    # named this as the way the two plausible implementations fail in opposite
+    # directions, one losing every legacy save's defences and the other doubling them
+    # on every round trip. Idempotent by asking the store first: a save written since
+    # this landed already carries them as effects and is left alone; every older one is
+    # built from the flat keys, and a bestiary row from its printed spec list.
+    if not any(e.kind in _DEFENCE_KINDS for e in a.effects):
+        a.immunities = immunities
+        a.resistances = resistances
+        a.vulnerabilities = vulnerabilities
+        a.reductions = [_reduction(r) for r in (data.get("reductions") or [])]
     # After the effects, never before: a save written while a Constitution buff was
     # standing carries a maximum that already includes it, so the rolled base is the
     # saved total minus whatever Constitution contributes with everything loaded. Do it
