@@ -134,6 +134,39 @@ leave them opaque forever; and `Ward.from_dict` has no defaults, so a truncated 
 inside `Campaign.load` and the campaign refuses to open. `Ward.from_dict` and
 `Manifestation.from_dict` have zero call sites in the repo and have never been exercised.
 
+## Where stage 4 actually got to
+
+**4a and 4b are complete.** One door for the world clock, one ticker, and nothing that
+wears off wears off in silence. Both were hardened by an adversarial review that found
+four defects the suite could not see, including a body clock the door did not open and
+hit points left above a maximum that had fallen.
+
+**4c is two thirds done, and the third is deliberately left.**
+
+*Compulsions — done* (`9adec63`). A fifth timed store with its own ticker, which only ran
+on the combat rollover, so a taunt applied out of a fight lasted until the next fight
+began. Now an effect kind expiring on every clock; `rules/compulsion.py` is gone from the
+clock allowlist.
+
+*Wards and manifestations — persisted* (`6c39422`). The real bug: a restart silently
+deleted every fog cloud, wall of stone, thorn body and bleed ward, and both `from_dict`
+constructors had zero call sites in the repo. They are saved now, restored without
+`place()` so the grid is not double-counted, with ids preserved because `Ward.manifest_id`
+is a foreign key. `wards` and `manifests` are gone from the unsaved-field allowlist.
+
+*Wards, manifestations and blood pools as scene-side EFFECT KINDS — not done.* This is
+the structural half, and its whole remaining benefit is deleting one more line from
+`_CLOCK_SITES`. It is left because it is genuinely expensive and the cost is concentrated
+in places where a hasty change is silent: `ActiveEffect` has no teardown hook, so expiry
+through a generic ticker would never call `Scene.lift` and a fog cloud's squares would
+stay in the grid forever, leaving a room permanently blind; and the blood-pool UI contract
+reads `b.at` as a bare square while a manifestation carries `squares`, so changing the
+payload without the JavaScript stops blood being drawn on the map with no error anywhere.
+Neither is hard to do carefully; both are easy to do wrongly and green.
+
+What that leaves in the allowlists is honest: `rules/engine.py` and `rules/guards.py`
+still keep their own clocks, and `spawn_feet` is still unsaved.
+
 ## Done means
 
 - One function moves the world clock and one function ticks it; the law test's
