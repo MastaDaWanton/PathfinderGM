@@ -546,6 +546,49 @@ def test_crossing_a_hit_point_threshold_is_said_out_loud():
             f"{amount} damage wrote {written} and the narrator was told only: {tell!r}")
 
 
+def test_an_ability_that_deals_damage_can_kill():
+    """Found by the stage-6 reconnaissance, and it is not a tell defect at all — it is
+    the one underneath.
+
+    `_op_use_ability` rolled the damage, took it off hit points and never ran the
+    hit-point ladder. Measured: a level-12 blood bender's Blood Spike Projectile took a
+    thug to −22 of 13 against Constitution 13 — nine hit points past its death line —
+    and wrote NO condition. Not dead, not dying, not unconscious. The creature was not
+    killed quietly; it was not killed at all, and would have taken its next turn.
+
+    The same gap swallowed the ability's own cost: a non-lethal price past the threshold
+    could not knock its user out either.
+    """
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import from_dict
+
+    pc = from_dict({"name": "Kesst", "kind": "pc", "hp": 60, "hp_max": 60,
+                    "class": "blood bending", "level": 12,
+                    "paths": {"blood spike": 12},
+                    "abilities": {k: 14 for k in ("str", "dex", "con",
+                                                  "int", "wis", "cha")}}, ref="pc")
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(pc)
+    thug = instantiate("thug", scene=scene, name="the thug")
+    scene.add(thug)
+    engine = Engine(scene, Dice(seed=3))
+
+    got = engine.run(engine.validate(
+        [{"op": "use_ability", "actor": "pc", "because": "she strikes",
+          "params": {"ability": "blood spike projectile", "to": "c1"}}]))
+
+    assert thug.hp < 0, "the ability did no damage; this proves nothing"
+    written = sorted(c.key for c in thug.conditions)
+    assert written, (
+        f"the thug is at {thug.hp} of {thug.hp_max} and carries no condition — an "
+        f"ability that deals damage cannot take anybody out of the fight")
+    assert any(k in written for k in ("dead", "dying", "unconscious"))
+    assert "unconscious" in got.outcomes[0].tell, (
+        "and the narrator was not told either")
+
+
 def test_the_narrator_is_fed_tells_and_never_effects():
     """The severing itself: the two functions that build the narrator's view of the
     turn read `.tell` (and `.because`) off outcomes and must never reach for

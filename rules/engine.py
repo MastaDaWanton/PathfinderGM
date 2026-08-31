@@ -4347,6 +4347,13 @@ class Engine:
 
         target = self.scene.actors.get(intent.params.get("to") or "") or actor
         done, narrated, rolls = [], [], []
+        # Everyone this ability actually hurt, so the hit-point ladder runs on them at
+        # the end. It never did: measured, a level-12 blood bender's Blood Spike
+        # Projectile took a thug to -22 of 13 against Constitution 13 — nine hit points
+        # past the death line — and wrote no condition at all. Not dead, not dying, not
+        # unconscious. An ability that deals damage could not kill anybody, and the
+        # non-lethal cost could not knock its own user out either.
+        hurt: list[str] = []
         for spec in effects:
             if spec.get("inactive"):
                 continue
@@ -4356,6 +4363,7 @@ class Engine:
                                       visibility="player")
                 rolls.append(roll)
                 actor.take_nonlethal(roll.total)
+                hurt.append(actor.ref)
                 done.append(f"{actor.name} pays {roll.total} non-lethal")
             elif kind == "damage":
                 # Never at the user by default. Half these abilities are areas —
@@ -4369,6 +4377,7 @@ class Engine:
                                       visibility="player")
                 rolls.append(roll)
                 target.take_damage(roll.total, spec.get("damage_type", "untyped"))
+                hurt.append(target.ref)
                 done.append(f"{roll.total} damage to {target.name}")
             elif kind == "heal":
                 roll = self.dice.roll(str(spec["dice"]), label=found,
@@ -4406,6 +4415,10 @@ class Engine:
             else:
                 narrated.append(kind)
 
+        crossed = []
+        for ref in dict.fromkeys(hurt):
+            crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
+
         bits = [f"{actor.name} uses {found.title()}."]
         if done:
             bits.append("The engine resolves: " + "; ".join(done) + ".")
@@ -4414,8 +4427,10 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="use_ability", rolls=rolls,
             effects=[{"ref": actor.ref, "kind": "use_ability", "ability": found,
-                      "path": path, "resolved": len(done), "narrated": len(narrated)}],
-            tell=" ".join(bits), because=intent.because,
+                      "path": path, "resolved": len(done), "narrated": len(narrated)}]
+                    + crossed,
+            tell=" ".join(bits) + self._hp_state_tell(crossed),
+            because=intent.because,
         )
 
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
@@ -4977,22 +4992,6 @@ class Engine:
     # which the narrator may not read, so it was never told anybody died. It wrote
     # wounded-man prose about a corpse and a repair pressed the death on afterwards.
     #
-    # The voice is `_op_ability_damage`'s, which has said `f"{target.name} is {c}."` for
-    # these same conditions all along — the second copy of this rule, and the one that
-    # was not silent. Terse on purpose: a tell constrains the narrator, it does not
-    # decorate, and florid tells are the presentation layer leading the mechanic.
-    #
-    # `disabled` earns its clause because the bare game word is opaque — a narrator
-    # handed "the thug is disabled" writes nothing a player can picture, and the
-    # contract's own rule is that a fact the narrator needs becomes part of the tell.
-    _HP_STATE_SAID = {
-        "dead": "{name} is dead.",
-        "dying": "{name} is dying.",
-        "unconscious": "{name} is unconscious.",
-        "disabled": "{name} is disabled: still standing, but any real effort now costs "
-                    "blood.",
-    }
-
     def _hp_state_tell(self, effects: list[dict]) -> str:
         """The sentence that goes with what `_hp_state_effects` just wrote.
 
@@ -5012,9 +5011,10 @@ class Engine:
             # reading, so the pair is said once rather than as two flat sentences.
             if key == "dying" and "unconscious" in keys:
                 continue
-            line = self._HP_STATE_SAID.get(key)
+            line = _STATE_SAID.get(key)
             if not line:
                 continue
+            line += "."
             if key == "unconscious" and "dying" in keys:
                 line = "{name} is unconscious and dying."
             who = self.scene.actors.get(e.get("ref"))
@@ -5096,6 +5096,23 @@ def _doc_tell(template, actor) -> str:
         return str(template)
 
 
+# How a hit-point state reads, in the voice `_op_ability_damage` has used for these same
+# conditions all along — one rule that had two copies, and only one of them was silent.
+# Terse on purpose: a tell constrains the narrator, it does not decorate, and florid
+# tells are the presentation layer leading the mechanic.
+#
+# `disabled` earns its clause because the bare game word is opaque — a narrator handed
+# "the thug is disabled" writes nothing a player can picture, and the contract's own rule
+# is that a fact the narrator needs becomes part of the tell. Shared with `_ward_tell` so
+# a cloud that disables somebody is no more cryptic than a sword that does.
+_STATE_SAID = {
+    "dead": "{name} is dead",
+    "dying": "{name} is dying",
+    "unconscious": "{name} is unconscious",
+    "disabled": "{name} is disabled: still standing, but any real effort now costs blood",
+}
+
+
 def _ward_tell(scene: Scene, e: dict) -> str:
     """One thing a standing effect did, in the voice the rest of the log is written in.
 
@@ -5116,7 +5133,9 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "ward_saved":
         return f"{name} rides out {source} ({e.get('roll')} against DC {e.get('dc')})."
     if kind == "condition":
-        return f"{name} is {e.get('condition')} ({e.get('from', source)})."
+        key = str(e.get("condition") or "")
+        said = _STATE_SAID.get(key, "{name} is " + key)
+        return f"{said.format(name=name)} ({e.get('from', source)})."
     if kind == "ability_damage":
         return (f"{name} takes {e.get('amount')} "
                 f"{ABILITY_FULL.get(str(e.get('ability', '')), 'ability')} damage "
