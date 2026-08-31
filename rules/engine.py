@@ -414,7 +414,48 @@ class Scene:
         here = footprint(anchor, actor.size)
         return [m for m in self.manifests if m.covers(here)]
 
-    def tick_standing(self, rounds: int = 1) -> list[dict]:
+    # Ten rounds to the minute, written once. Six sites multiplied their own way to get
+    # here — `hours * 600`, `worked * MINUTES_PER_HOUR`, `days * 24 * 60`, `rounds // 10`
+    # — and four of them then ticked nothing at all.
+    ROUNDS_PER_MINUTE = 10
+
+    def advance(self, minutes: int) -> dict:
+        """Move the world clock, and expire what that much time expires.
+
+        The one door. Six places moved `clock_minutes` and two of them expired anything:
+        a forty-eight-hour forage, a twelve-hour crafting session, an hour spent waking
+        up and a resurrection costing up to twenty-seven days all left every timed effect
+        in the scene exactly where it was. This is the survival module's own lesson —
+        "the clock moved and the body did not know" — with effects in place of hunger.
+
+        EXPIRY ONLY. `advance_turn` keeps the per-round *firing*: an eight-hour rest is
+        4,800 rounds, and calling the ward hazards or the pool upkeep that many times
+        would empty every pool and roll thousands of saves, while calling them once would
+        under-resolve. Time passing ends things; it does not make them happen again.
+
+        Returns what ended, so the caller can say so — four of the six threw that away.
+        """
+        minutes = max(0, int(minutes))
+        if not minutes:
+            return {"minutes": 0, "rounds": 0, "ended": []}
+        rounds = minutes * self.ROUNDS_PER_MINUTE
+        self.clock_minutes += minutes
+        ended: list[str] = []
+        for a in self.actors.values():
+            ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
+            ended.extend(f"{a.name}: {pid} is ready"
+                         for pid in a.tick_pools(rounds))
+            ended.extend(f"{a.name}: {name}" for name in compulsion.tick(a, rounds))
+        # The scene's own standing things expire on the same clock. `tick_standing` fires
+        # `each_round` wards as well, which is exactly the work this must not repeat — so
+        # it is called once, for expiry, and the firing stays where the rounds are real.
+        for record in self.tick_standing(rounds, fire=False):
+            what = record.get("what") or record.get("kind")
+            if what:
+                ended.append(str(what))
+        return {"minutes": minutes, "rounds": rounds, "ended": ended}
+
+    def tick_standing(self, rounds: int = 1, fire: bool = True) -> list[dict]:
         """One round of everything the scene is holding: hazards fire, then clocks run.
 
         On the Scene rather than on the Engine, and that is the same call `bleed_out`
@@ -426,7 +467,11 @@ class Scene:
         aimed at somebody, not in front of the ground they are both standing on.
         """
         out: list[dict] = []
-        for ward in list(self.wards):
+        # `fire` is False when time is being SKIPPED rather than played: an eight-hour
+        # rest is 4,800 rounds and firing every each_round ward that many times would
+        # roll thousands of saves, while firing once would understate a cloud stood in
+        # for a minute. Expiry still runs — a fog cloud does not outlive the night.
+        for ward in list(self.wards) if fire else ():
             if ward.trigger == "each_round":
                 out.extend(self._fire(ward))
         for ward in list(self.wards):
@@ -2562,7 +2607,11 @@ class Engine:
             actor.carry(iid, n, pristine=result["pristine"].get(iid, 0),
                         at_minute=self.scene.clock_minutes)
 
-        self.scene.clock_minutes += worked * survival.MINUTES_PER_HOUR
+        # After `carry` above, deliberately: herbs are stamped with the clock as it
+        # reads when they are picked, so advancing first would hand the player up to
+        # forty-eight hours of free freshness. And `worked` is what the body actually
+        # managed — pass_hours can stop early — so the number is only known here.
+        self.scene.advance(worked * survival.MINUTES_PER_HOUR)
 
         span = f"{worked} hour{'s' if worked != 1 else ''}"
         if result["empty"]:
@@ -3661,10 +3710,11 @@ class Engine:
         amount, unit = intent.params["amount"], intent.params["unit"]
         rounds = _to_rounds(amount, unit)
         minutes = rounds // 10 if unit == "round" else _to_minutes(amount, unit)
-        self.scene.clock_minutes += minutes
-        ended: list[str] = []
-        for a in self.scene.actors.values():
-            ended.extend(f"{a.name}: {name}" for name in a.tick_conditions(rounds))
+        # Through the one door. This op already collected its ended list and told it —
+        # it was the only one of the six that did — but it ticked conditions and buffs
+        # while pool cooldowns, compulsions, wards and fog clouds stood still.
+        passed = self.scene.advance(minutes)
+        ended: list[str] = list(passed["ended"])
         tell = f"{amount} {unit}{'s' if amount != 1 else ''} pass."
         if ended:
             tell += " Ended: " + ", ".join(ended) + "."
@@ -4422,8 +4472,11 @@ class Engine:
         result = actor.rest(kind)
         refilled = actor.refresh_pools("rest.night", self.dice)
         hours = result["hours"]
-        self.scene.clock_minutes += hours * 60
-        ended = actor.tick_conditions(hours * 600)      # ten rounds to the minute
+        # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
+        # NPC standing in the same scene kept every timed buff through an eight-hour
+        # night. `advance` also leaves the body alone: `Actor.rest` has already called
+        # survival.sleep, and a night deliberately costs no food or water.
+        ended = self.scene.advance(hours * 60)["ended"]
 
         bits = [f"{actor.name} rests for {hours} hours."]
         if result["healed"]:

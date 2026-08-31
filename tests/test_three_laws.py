@@ -57,13 +57,20 @@ def test_every_clock_that_counts_down_is_accounted_for():
     see one of the five, which is worse than not testing it at all: three of the four
     it could not see tick only inside an encounter, so a compulsion applied out of a
     fight lasts until the next fight starts."""
-    pattern = re.compile(r"\b\w+_left\s*-=")
+    # Both shapes. `x_left -= n` is the obvious one; `x_left = max(0, x_left - n)` is
+    # how `tick_pools` writes a cooldown, so the first version of this test could not
+    # see the fifth clock at all — it measured four of five and reported the law upheld.
+    pattern = re.compile(r"\b\w+_left\s*-=|\b(\w+_left)\s*=.*\1\s*-")
     found: dict[str, list[int]] = {}
     for path in sorted(Path(".").glob("*/*.py")):
         if path.parts[0] not in ("rules", "play", "gm", "world"):
             continue
-        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if pattern.search(line):
+        # Code, not prose: a comment quoting `rounds_left -= rounds` to explain why a
+        # bound exists is documentation, and counting it as a clock made this test fail
+        # on its own explanation.
+        source = re.sub(r'"""(?:.|\n)*?"""', "", path.read_text(encoding="utf-8"))
+        for n, line in enumerate(source.splitlines(), 1):
+            if pattern.search(re.sub(r"#.*$", "", line)):
                 found.setdefault(path.as_posix(), []).append(n)
     unlisted = {k: found[k] for k in sorted(set(found) - set(_CLOCK_SITES))}
     assert not unlisted, (

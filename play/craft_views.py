@@ -1083,7 +1083,9 @@ def craft_excursion(request):
         haul = [{"id": mid, "name": names.get(mid, mid), "count": n}
                 for mid, n in sorted(counted.items())]
 
-    c.scene.clock_minutes += hours * 60
+    # Through the one door, and after `market.day_of` was read at the top of this view:
+    # advancing first would roll the shelf over inside a twelve-hour buying run.
+    c.scene.advance(hours * 60)
     tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing."
     verb = spec.get("verb") or spec.get("label", "working")
     # What it cost and what was left on the counter, said in the same line as the haul.

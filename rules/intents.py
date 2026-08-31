@@ -840,10 +840,16 @@ def _check_params(intent: Intent, index: int) -> None:
                 "schema", index,
             )
         p["unit"] = unit
-        try:
-            p["amount"] = int(p["amount"])
-        except (TypeError, ValueError):
-            raise IntentError("advance_time: amount must be a number", "schema", index)
+        # Bounded, and never negative. `amount` was a bare `int()` with no floor and no
+        # ceiling, and the engine hands it to `tick_effects`, whose body is
+        # `e.rounds_left -= rounds` — so a negative advance rewound the world clock past
+        # market days already sold AND *extended* every timed effect on every actor in
+        # the scene. The ceiling is a year in the unit asked for, which is far past any
+        # honest turn and short of the numbers that make the tick loop meaningless.
+        ceiling = {"round": 100_000, "minute": 10_000, "hour": 8_760, "day": 365}[unit]
+        p["amount"] = _bounded(
+            p["amount"], 0, ceiling, index,
+            f"advance_time: amount is how much time passes, 0 to {ceiling} {unit}s")
 
     elif op == "rest":
         kind = str(p.get("kind", "night")).strip().lower()

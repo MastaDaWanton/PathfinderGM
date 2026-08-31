@@ -92,7 +92,9 @@ def resolve(campaign) -> Outcome:
     # Stable, one way or the other: the fight is long over and the character wakes.
     if scene.in_encounter:
         scene.end_encounter()
-    scene.clock_minutes += HOURS_UNTIL_CONSCIOUS * 60
+    # An hour used to pass with nothing ticking at all — not conditions, not buffs,
+    # not pools, not compulsions.
+    scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
     for gone in ("stable", "unconscious", "dying", "disabled"):
         pc.remove_condition(gone)
     pc.hp = max(pc.hp, 1)

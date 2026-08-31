@@ -283,7 +283,6 @@ def resurrect(request):
     # The mechanics, all through the ordinary applicators.
     for gone in ("dead", "dying", "stable", "unconscious", "disabled"):
         pc.remove_condition(gone)
-    pc.hp = pc.hp_max
     pc.nonlethal = 0
 
     factions = [f.get("name") for f in (c.world.factions or [])
@@ -292,7 +291,13 @@ def resurrect(request):
     patron = (factions[dice.roll("1d%d" % len(factions), visibility="hidden").total - 1]
               if factions else "a stranger whose face you never see")
     days = 7 + dice.roll("2d10", label="days lost", visibility="hidden").total
-    c.scene.clock_minutes += days * 24 * 60
+    # Between nine and twenty-seven days pass, the largest jump in the app, and nothing
+    # used to expire in them. Through the one door now — which is also why the hit
+    # points are restored AFTER it rather than before: an effect holding up the
+    # maximum can expire inside those weeks, and setting hp first left a character
+    # above a maximum that had since fallen.
+    c.scene.advance(days * 24 * 60)
+    pc.hp = pc.hp_max
     pc.add_condition("life debt", source=patron)
 
     c.scene.end_encounter()
