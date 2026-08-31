@@ -117,6 +117,50 @@ Both law-3 tests widen: every function that builds the narrator's prompt, `getat
 as well as attribute access, and every `Outcome` with effects however they are built —
 not just literals in one file.
 
+## What the reconnaissance added
+
+Seven readers and seven probes, run against the real code and the twelve real campaigns.
+The headline reproduced independently three times over: **20 of 20 live turns** in which
+`_hp_state_effects` wrote a condition carried a tell that never mentioned it — 100%.
+
+Findings that change the plan:
+
+- **There was already a correct copy.** `_ward_tell` renders `'the guildhand is dead
+  (hit points).'` — the only path in the app that got this right, so a ward kill told and
+  a sword kill did not. 6a matched `_op_ability_damage`'s voice; consolidating the two
+  renderers is 6b's, not a third one.
+- **An ability that damages does not run the ladder at all.** Probed: a level-12 blood
+  bender's Blood Spike Projectile took a thug to −22 of 13 against Con 13 — nine hit
+  points past death — and wrote **no condition at all**. Not dead, not dying, not
+  unconscious. That is a sixth site, and it is a creature that cannot be killed by that
+  ability rather than merely a silent one.
+- **`press_the_death`'s "already said it" guard is defeated by somebody else's death.**
+  It accepts death language anywhere near a pronoun as evidence *this* actor's death was
+  stated, so one enemy dying covers for another's.
+- **`leave_behind` departs a corpse with nothing said** — it returns text for the dying
+  and none for the dead.
+- **`Outcome.player_visible()` has zero production callers**, while `gm/agent.py:959`'s
+  docstring asserts the narrator is fed its output. A claim in prose that no code backs,
+  which is the same failure this stage is about, one layer up.
+- **81% of recorded tells (146 of 180) already name the player in the third person.** So
+  the death tell naming them is the house convention, not a new hazard; the
+  second-person conversion downstream is what handles it, and making death the one
+  exception would be the drift.
+
+Measured costs of the naive fixes, all three of which are now ruled out:
+
+- flipping `claims=True` on the live path cuts **25 of 43** real consequence beats below
+  forty characters — the beat is destroyed — and deletes **14 of 18** engine-authored
+  lines;
+- running `plain_tell` over the narrator's feed alters 38% of real tells, leaves 70 of
+  212 still carrying digits, and destroys the player's own hit points and purse;
+- the scrubber's worst pattern, the "escape" family, was wrong in **8 of the 9** times it
+  fired in real play ("a soft sigh escaping her lips").
+
+And the blind spot that makes 6c worth doing at all: **18 death and unconsciousness
+assertions in shipped prose, 0 flagged.** Not one of the 44 patterns names a condition or
+a state change.
+
 ## Known already, to be folded in
 
 Two defects surfaced while measuring and are not law-3 debt of their own:
