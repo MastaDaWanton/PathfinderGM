@@ -1562,11 +1562,18 @@ def test_prose_has_the_second_model_call_one_always_had():
     """Source-inspected: narrate_turn built one call and one only, so any whiff
     — a decline, a truncation, junk — dropped the turn to the holding line with
     the scene frozen. It now walks the same fallback schedule plan_turn does."""
+    import ast
     from pathlib import Path
 
     src = (Path(__file__).resolve().parents[1] / "gm" / "agent.py").read_text(
         encoding="utf-8")
-    body = src[src.index("def narrate_turn"):][:3000]
+    # The whole function, not a fixed 3,000-character slice from its `def`. The slice
+    # measured distance from the start rather than the function's own extent, so adding
+    # a paragraph of docstring pushed the last assertion out of the window and failed a
+    # test about the fallback schedule for a reason with nothing to do with it.
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "narrate_turn")
+    body = ast.get_source_segment(src, fn) or ""
     assert 'modelcfg.for_role("fallback")' in body
     assert "for model, host, provider, key in schedule" in body
     assert "reads_as_a_refusal" in body

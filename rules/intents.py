@@ -1119,15 +1119,110 @@ class OutcomeClaim:
         return self.text
 
 
-def find_outcome_claims(narration: str) -> list[OutcomeClaim]:
-    """Every place the narration asserts a mechanical result.
+# What the engine must already have decided before prose is allowed to say it. The
+# contract's rule is that an outcome-claim is prose stating a mechanic **no tell backs**,
+# and until this existed the detector had never been shown the engine's answer — it could
+# ask "does this sentence assert a mechanic" and never "was that mechanic true".
+#
+# Which is why the two doors the player actually reads run with `claims=False`: written
+# AFTER the dice, "your blade finds the gap" is reporting rather than invention. Measured
+# on the twelve real campaigns, scrubbing them blind cuts 25 of 43 consequence beats below
+# forty characters — the beat is destroyed.
+#
+# Keyed on what the OUTCOMES structurally establish, never on the text of the tells.
+# Searching a tell's prose for a word to answer a mechanical question is exactly the
+# string-matching stage 5 spent itself removing.
+_BACKED_BY = {
+    "hit": ("states an attack landing", "states an attack having landed",
+            "states being hit", "states a wound already dealt"),
+    "miss": ("states an attack missing",),
+    "damage": ("states a damage number", "states damage taken", "states hit points",
+               "states a wound already dealt"),
+    "verdict": ("states success or failure", "states an action succeeding"),
+    "save": ("states a save succeeding",),
+    "perception": ("states a perception result",),
+    "stealth": ("states a stealth result", "states an escape"),
+    "roll": ("states a die result", "states a roll's result"),
+    "purse": ("states a sum of money", "states money gained; the purse is the engine's",
+              "states a price", "states the player paying"),
+    "items": ("states items gained; the pockets are the engine's to fill",
+              "states items gained; the satchel is the engine's to fill"),
+    "xp": ("states advancement; levels and experience are the engine's",),
+}
+
+
+def claims_the_engine_backs(outcomes) -> frozenset[str]:
+    """Which mechanical assertions prose may make, because the dice already made them.
+
+    Deliberately NOT derived from the tells' text. A tell is a sentence, and asking
+    whether it "mentions a hit" is a regex over English — a second vocabulary living in
+    the presentation layer. The outcome record says what happened in fields.
+
+    Nothing here is licence to invent a NUMBER. The patterns that catch a stated DC, a
+    skill deciding an outcome, or the assistant speaking in its own voice are backed by
+    nothing and never can be.
+    """
+    backed: set[str] = set()
+
+    def allow(key: str) -> None:
+        backed.update(_BACKED_BY.get(key, ()))
+
+    for o in outcomes or []:
+        # Outcomes arrive as objects live and as dicts out of the turn log, and the
+        # measurement that justifies this function replays the log.
+        get = o.get if isinstance(o, dict) else (lambda k, d=None, _o=o: getattr(_o, k, d))
+        op = str(get("op", "") or "")
+        verdict = str(get("verdict", "") or "")
+        effects = list(get("effects", None) or [])
+        rolls = list(get("rolls", None) or [])
+
+        if verdict:
+            allow("verdict")
+        if verdict == "hit":
+            allow("hit")
+        if verdict == "miss":
+            allow("miss")
+        if op == "save" and verdict == "success":
+            allow("save")
+        if any(isinstance(e, dict) and e.get("kind") == "damage"
+               and int(e.get("amount") or 0) > 0 for e in effects):
+            allow("damage")
+        if any(str((r.get("visibility") if isinstance(r, dict)
+                    else getattr(r, "visibility", ""))) == "player" for r in rolls):
+            allow("roll")
+        if op == "check":
+            skill = str((get("params", None) or {}).get("skill", "")).lower()
+            if "perception" in skill:
+                allow("perception")
+            if "stealth" in skill:
+                allow("stealth")
+        if op in ("loot", "trade", "buy", "sell", "give", "pay"):
+            allow("purse")
+            allow("items")
+        if op in ("forage", "craft", "take"):
+            allow("items")
+        if op == "xp":
+            allow("xp")
+    return frozenset(backed)
+
+
+def find_outcome_claims(narration: str, backed=()) -> list[OutcomeClaim]:
+    """Every place the narration asserts a mechanical result the engine never reached.
 
     This is what makes the architecture's central promise true. "A persuasive model
     narrating a hit that actually missed" is not prevented by asking the model not to; it
     is prevented by looking, in code, every single turn.
+
+    `backed` is what the dice already decided — see `claims_the_engine_backs`. Prose
+    written after resolution is reporting, and reporting is the narrator's whole job;
+    without this the detector cut the true sentence beside the invented one, which is why
+    the doors the player reads had it switched off altogether.
     """
+    allowed = frozenset(backed or ())
     claims: list[OutcomeClaim] = []
     for rx, why in OUTCOME_RE:
+        if why in allowed:
+            continue
         for m in rx.finditer(narration or ""):
             claims.append(
                 OutcomeClaim(

@@ -546,6 +546,61 @@ def test_crossing_a_hit_point_threshold_is_said_out_loud():
             f"{amount} damage wrote {written} and the narrator was told only: {tell!r}")
 
 
+def test_the_scrubber_knows_what_the_dice_already_decided():
+    """Law 3's third clause, verbatim: prose stating a mechanic **no tell backs** is an
+    outcome-claim. The detector had never been shown the engine's answer — it could ask
+    "does this sentence assert a mechanic" and never "was that mechanic true" — so the
+    two doors the player actually reads ran with it switched off entirely.
+
+    That was a defensible local decision and the comment said so: written after the dice,
+    "your blade finds the gap" is reporting rather than invention. Measured on the twelve
+    real campaigns, scrubbing those beats blind cuts 25 of 43 below forty characters, and
+    deletes 14 of the 18 engine-authored lines. The fix is to tell the detector what
+    happened, not to turn it off.
+
+    Backed from the outcome RECORD — op, verdict, effects — and never from the text of
+    the tells. Searching a tell's prose for the word "hit" to answer a mechanical
+    question is the string-matching stage 5 spent itself removing.
+    """
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.intents import claims_the_engine_backs, find_outcome_claims
+    from rules.sheet import load_pc
+
+    def swing(seed):
+        scene = Scene(location_id="5bbd0c40345f")
+        scene.add(load_pc("fixtures/pc-kesst.json"))
+        scene.add(instantiate("guildhand", scene=scene, name="the guildhand"))
+        engine = Engine(scene, Dice(seed=seed))
+        intent = [{"op": "attack", "actor": "pc", "target": "c1",
+                   "visibility": "hidden", "because": "she swings", "params": {}}]
+        engine.run(engine.validate(intent))        # the battle gate opens the fight
+        return engine.run(engine.validate(intent))
+
+    found = {}
+    for seed in range(1, 60):
+        got = swing(seed)
+        if got.outcomes and got.outcomes[0].verdict in ("hit", "miss"):
+            found.setdefault(got.outcomes[0].verdict, got.outcomes)
+        if len(found) == 2:
+            break
+    assert set(found) == {"hit", "miss"}, "needed one of each to prove both directions"
+
+    invented = "You slip free of the crowd and the purse is in your pocket."
+    for verdict, outcomes in found.items():
+        backed = claims_the_engine_backs(outcomes)
+        true_line = ("Your blade finds the gap under his arm." if verdict == "hit"
+                     else "Your point goes wide of him.")
+
+        assert find_outcome_claims(true_line), (
+            "this sentence must look like a claim, or the test proves nothing")
+        assert not find_outcome_claims(true_line, backed=backed), (
+            f"the engine said {verdict} and the scrubber cut the prose reporting it")
+        assert find_outcome_claims(invented, backed=backed), (
+            "an invented theft survived because an attack happened to land")
+
+
 def test_a_creature_at_exactly_zero_is_not_a_corpse_to_anybody():
     """Stage 5 claimed no two modules disagreed about "out of the fight" any more, and on
     this case they still did. Exactly 0 hit points is *disabled* in 1e — conscious, on

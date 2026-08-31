@@ -14,7 +14,8 @@ from dataclasses import dataclass, field
 
 from django.conf import settings
 
-from rules.intents import Intent, IntentError, cut_outcome_claims, find_outcome_claims
+from rules.intents import (Intent, IntentError, claims_the_engine_backs,
+                          cut_outcome_claims, find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
 
@@ -573,7 +574,8 @@ class GMAgent:
     def _groom(self, text: str, *, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
-               rewrite: bool = True) -> tuple[str, list[str], list[Attempt]]:
+               rewrite: bool = True,
+               backed=()) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -608,7 +610,7 @@ class GMAgent:
         cast = " ".join(a.name for a in self.engine.scene.actors.values())
         text = narration_mod.strip_example_cast(text, f"{player_input} {cast}")
         if claims:
-            text, claim_repairs, claim_attempts = self._repair_outcome_claims(text)
+            text, claim_repairs, claim_attempts = self._repair_outcome_claims(text, backed)
             repairs += claim_repairs
             attempts += claim_attempts
 
@@ -787,8 +789,9 @@ class GMAgent:
 
     # --- Check 4's repair ---------------------------------------------------------------
 
-    def _repair_outcome_claims(self, narration: str) -> tuple[str, list[str], list[Attempt]]:
-        claims = find_outcome_claims(narration)
+    def _repair_outcome_claims(self, narration: str,
+                               backed=()) -> tuple[str, list[str], list[Attempt]]:
+        claims = find_outcome_claims(narration, backed=backed)
         if not claims:
             return narration, [], []
 
@@ -821,7 +824,7 @@ class GMAgent:
                 attempts.append(Attempt("repair", 0.0, self.model, note=f"failed: {exc}"))
                 fixed = ""
 
-            if fixed and not find_outcome_claims(fixed):
+            if fixed and not find_outcome_claims(fixed, backed=backed):
                 narration = narration.replace(claim.sentence, fixed)
                 repairs.append(f"{claim.why}: {claim.sentence!r} -> {fixed!r}")
             else:
@@ -849,7 +852,14 @@ class GMAgent:
         so every check that used to run over call 1's narration runs over this instead —
         the prose is still reviewed, still polished, still has the body and hand-back
         backstops under it. What is gone is `_repair_outcome_claims`, and it is gone
-        because it cannot happen: the model is being shown what the dice did.
+        The claim repair runs here too, and did not until stage 6: it was left out
+        because "it cannot happen — the model is being shown what the dice did", which
+        is the prompt-rule reasoning this repo's first law says fails. Being shown the
+        outcome does not stop a model adding a mechanic the outcome never contained;
+        measured across the twelve real campaigns, 2.2% of the beats the player read
+        carry one. What it DOES mean is that a claim the dice already made is reporting
+        rather than invention, so the detector is handed what the engine backed instead
+        of being switched off — `rules.intents.claims_the_engine_backs`.
         """
         fighting = self.engine.scene.in_encounter
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
@@ -915,7 +925,8 @@ class GMAgent:
             min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
                        else narration_mod.MIN_SCENE_CHARS),
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
-            player_input=player_input, brief=brief, hand_back=True, claims=False)
+            player_input=player_input, brief=brief, hand_back=True, claims=True,
+            backed=claims_the_engine_backs(outcomes))
         attempts.extend(groom_attempts)
         # After grooming, never before: cut_dead_men_walking would read a fresh
         # death sentence as a dead man acting.
@@ -995,12 +1006,17 @@ class GMAgent:
         # `name_refs` and the hand-back fix and nothing else. Roughly half of what the
         # player reads comes through here.
         #
-        # `claims=False`: the engine has already resolved the turn, so "the blow lands"
-        # is reporting, not invention. `hand_back=False`: two or three sentences about
-        # what the dice did hand nothing back. `min_chars` stays 0 for the same reason.
+        # The claim repair, shown what the dice decided. The comment here used to read
+        # "`claims=False`: the engine has already resolved the turn, so 'the blow lands'
+        # is reporting, not invention" — true, and the reason a blind detector could not
+        # run on this door: measured, scrubbing these beats without the outcomes cuts 25
+        # of 43 of them below forty characters. The answer was to tell the detector, not
+        # to turn it off. `hand_back=False`: two or three sentences about what the dice
+        # did hand nothing back. `min_chars` stays 0 for the same reason.
         text, repairs, _more = self._groom(
             cleaned, earlier=None, min_chars=0, max_chars=0,
-            player_input=player_input, brief="", hand_back=False, claims=False)
+            player_input=player_input, brief="", hand_back=False, claims=True,
+            backed=claims_the_engine_backs(outcomes))
         text, pressed = narration_mod.press_the_death(text, self._deaths_from(outcomes))
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
