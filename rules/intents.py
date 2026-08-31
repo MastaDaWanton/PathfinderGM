@@ -249,7 +249,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # them in the inventory — the same gap the trade op closed for shops. `from` is
     # the body; the engine owns what is actually on it.
     "loot": (("from_",), (), "hidden"),
-    "condition": (("condition",), ("duration", "to"), "hidden"),
+    # `descriptors` is what the effect declares itself to BE — a fear effect, a
+    # poison, a mind-affecting compulsion — which is what 1e attaches immunity to.
+    # Without it the only question that can be asked is "are you immune to being
+    # shaken", and the answer to that is not the rule.
+    "condition": (("condition",), ("duration", "to", "descriptors"), "hidden"),
     # The engine owns the slot, the caster level and the save DC. It does *not* own what
     # the spell does — that lives in three thousand paragraphs of English, and a parser
     # guessing at it would produce confident wrong numbers. Anything mechanical the GM

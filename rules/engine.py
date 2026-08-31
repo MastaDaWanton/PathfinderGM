@@ -25,6 +25,7 @@ from . import effectspec
 from . import foraging
 from . import ingredients as ing_mod
 from . import resources
+from . import states
 from . import survival
 from . import worldclass
 from . import grid as gridmod
@@ -39,6 +40,7 @@ from .grid import Grid
 from .intents import Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import (
+    CONDITIONS,
     ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, normalise_damage_type,
 )
 
@@ -2601,6 +2603,22 @@ class Engine:
             rounds = _to_rounds(duration.get("amount", 0), duration.get("unit", "round"))
         elif isinstance(duration, int):
             rounds = duration
+        # Immunity is consulted HERE, and never inside `add_condition`. That applicator
+        # is also how `apply_hp_state` writes dead, dying and unconscious and how
+        # `ability_zero_effects` writes helpless — gate it and the 759 shipped creatures
+        # with undead traits become unkillable, immune to the very condition that
+        # records their death. The op is where an outside effect asks to impose
+        # something; the applicator is the engine's own hand.
+        blocked = states.immunity_blocks(
+            target.immunities, key,
+            intent.params.get("descriptors") or ())
+        if blocked:
+            # A refusal, not a raise: the schema may require the op the GM declared.
+            return Outcome(
+                intent_id=intent.id, op="condition", effects=[],
+                tell=f"{target.name} is immune to {blocked} and is not "
+                     f"{CONDITIONS.get(key, {}).get('name', key).lower()}.",
+                because=intent.because)
         cond = target.add_condition(key, rounds, source=intent.because)
         return Outcome(
             intent_id=intent.id, op="condition",

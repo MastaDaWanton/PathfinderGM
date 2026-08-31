@@ -84,3 +84,83 @@ def any_match(keys, query: str) -> bool:
     """Whether any condition key in `keys` grants a tag answering `query`."""
     q = (query or "").strip().lower()
     return any(matches(t, q) for k in keys for t in tags_for(k))
+
+
+# What an immunity, written as a stat block writes it, actually protects against.
+#
+# 1e attaches immunity to what an effect IS — a sleep effect, a fear effect, a poison —
+# and not to the condition it happens to produce, and the difference is the whole reason
+# this is a table rather than a string comparison. 469 shipped creatures are immune to
+# sleep, and sleep immunity does NOT stop a creature falling unconscious from hit-point
+# loss, non-lethal damage or a coup de grâce; 759 carry "undead traits", which is a
+# bundle the Bestiary defines once and every entry then refers to.
+#
+# Keys are the words stat blocks use. Values are the condition keys and the descriptors
+# they cover; a descriptor is matched against what an EFFECT declares itself to be, so
+# "immune to fear" stops a fear effect that would shake you and leaves the shaken you get
+# from something else alone.
+IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
+    "sleep": ("sleep",),
+    "paralysis": ("paralyzed", "paralysis"),
+    "stun": ("stunned", "stun"),
+    "fear": ("shaken", "frightened", "panicked", "cowering", "fear"),
+    "mind-affecting": ("confused", "fascinated", "charm", "compulsion",
+                       "mind-affecting"),
+    "mind affecting": ("confused", "fascinated", "charm", "compulsion",
+                       "mind-affecting"),
+    "poison": ("poison", "nauseated", "sickened"),
+    "disease": ("disease",),
+    "bleed": ("bleed",),
+    "fatigue": ("fatigued",),
+    "exhaustion": ("exhausted", "fatigued"),
+    "nausea": ("nauseated",),
+    "blindness": ("blinded",),
+    "deafness": ("deafened",),
+    "death effects": ("death",),
+    "energy drain": ("energy drain",),
+    # The Bestiary's own bundle, expanded once here rather than in every consumer.
+    "undead traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+                      "disease", "poison", "fatigued", "exhausted",
+                      "confused", "fascinated", "charm", "compulsion",
+                      "mind-affecting", "bleed", "death", "nauseated", "sickened"),
+    "construct traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+                         "disease", "poison", "fatigued", "exhausted",
+                         "confused", "fascinated", "charm", "compulsion",
+                         "mind-affecting", "bleed", "death", "nauseated",
+                         "sickened"),
+    "elemental traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+                         "poison", "bleed"),
+}
+
+
+def immunity_blocks(immunities, condition_key: str = "",
+                    descriptors=()) -> str:
+    """Which immunity stops this condition, or "" if none does.
+
+    Answers with the immunity's own words so a refusal can print them. Both halves are
+    consulted: the condition a creature cannot suffer, and the descriptors the effect
+    declares itself to carry — an effect that says it is a fear effect is stopped by
+    immunity to fear whatever condition it was going to apply.
+    """
+    key = (condition_key or "").strip().lower()
+    said = {str(d).strip().lower() for d in (descriptors or ()) if str(d).strip()}
+    for raw in immunities or ():
+        name = " ".join(str(raw).split()).strip().lower()
+        covers = IMMUNITY_COVERS.get(name)
+        if covers is None:
+            # An unlisted immunity still protects against its own name, so a homebrew
+            # "immune to petrification" works the day it is written — the same
+            # self-tagging courtesy `tags_for` extends to an unregistered condition.
+            covers = (name,)
+        if key and key in covers:
+            return str(raw)
+        if said & set(covers):
+            return str(raw)
+        # A stat block writes the noun and the condition table holds the adjective:
+        # "immune to petrification" against the `petrified` condition. Matched on a
+        # five-character stem, which is long enough that `sleep` does not answer for
+        # `slept-in` and short enough that every inflection in the corpus lands.
+        if key and len(name) >= 5 and (key.startswith(name[:5])
+                                       or name.startswith(key[:5])):
+            return str(raw)
+    return ""

@@ -179,3 +179,73 @@ def test_an_op_that_declares_a_param_keeps_it():
                                      "against": {"ref": "c1",
                                                  "skill": "perception"}}}])[0]
     assert opposed.params["opposed_by"]["skill"] == "perception"
+
+
+# --- immunity gates the ops, never the applicator --------------------------------------
+
+
+def _skeleton():
+    from rules.bestiary import instantiate
+
+    pc = _pc()
+    s = Scene()
+    s.add(pc)
+    z = instantiate("skeleton", scene=s)
+    s.add(z)
+    return z, Engine(s, Dice(seed=1))
+
+
+def test_a_creature_refuses_a_condition_it_is_immune_to():
+    """2,192 shipped creatures declare an immunity a condition op should consult —
+    759 with undead traits, 469 immune to sleep, 243 to paralysis — and nothing asked.
+    A skeleton could be paralysed, put to sleep and sickened."""
+    z, engine = _skeleton()
+    out = engine.run(engine.validate([
+        {"op": "condition", "actor": "pc", "because": "a spell",
+         "params": {"condition": "paralyzed", "to": z.ref}}])).outcomes[-1]
+    assert not z.has_condition("paralyzed")
+    assert out.effects == [], "a refused condition may change nothing"
+    assert "immune to undead traits" in out.tell
+
+
+def test_the_applicator_is_never_gated_so_the_immune_can_still_die():
+    """The rules review's blocker. `Actor.add_condition` is also how `apply_hp_state`
+    writes dead, dying and unconscious and how `ability_zero_effects` writes helpless
+    — gate it and the 759 creatures with undead traits become UNKILLABLE, immune to
+    the very condition that records their death. The op is where an outside effect
+    asks to impose something; the applicator is the engine's own hand."""
+    z, _ = _skeleton()
+    z.hp = -50
+    assert "dead" in z.apply_hp_state()
+    assert z.has_condition("dead")
+
+
+def test_sleep_immunity_does_not_stop_being_knocked_out():
+    """1e attaches immunity to what an effect IS, not to the condition it produces.
+    469 creatures are immune to sleep, and sleep immunity does not prevent
+    unconsciousness from hit-point loss, non-lethal damage or a coup de grâce —
+    gating on the produced condition would have over-blocked in the largest bucket."""
+    from rules.states import immunity_blocks
+
+    assert not immunity_blocks(["sleep"], "unconscious")
+    assert immunity_blocks(["sleep"], "sleep")
+
+
+def test_an_effect_that_declares_what_it_is_meets_the_right_immunity():
+    """The descriptor half: an effect that says it is a fear effect is stopped by
+    immunity to fear whatever condition it was going to apply."""
+    from rules.states import immunity_blocks
+
+    assert immunity_blocks(["fear"], "shaken") == "fear"
+    assert immunity_blocks(["mind-affecting"], "", ["compulsion"]) == "mind-affecting"
+    assert not immunity_blocks(["cold"], "shaken")
+
+
+def test_a_homebrew_immunity_protects_against_its_own_name():
+    """The same self-tagging courtesy `tags_for` extends to an unregistered condition,
+    and it copes with the stat block writing the noun where the table holds the
+    adjective — "immune to petrification" against the `petrified` condition."""
+    from rules.states import immunity_blocks
+
+    assert immunity_blocks(["petrification"], "petrified") == "petrification"
+    assert immunity_blocks(["gaze attacks"], "gaze attacks") == "gaze attacks"
