@@ -1998,7 +1998,11 @@ function showPopup(p) {
   const die = p.die || "1d20";
   const terms = p.breakdown.map(m => ({ label: m.source, value: sign(m.value) }));
   terms.push({ label: "your modifier", value: sign(p.modifier), total: true });
-  if (p.dc != null) terms.push({ label: "beat", value: p.dc });
+  // `dc_shown` is the engine saying whether this number is a difficulty the
+  // player may know or the result of a die already rolled in secret. Absent on
+  // a payload from an older save mid-flight, which reads as shown — the same
+  // answer it had before the flag existed.
+  if (p.dc != null && p.dc_shown !== false) terms.push({ label: "beat", value: p.dc });
 
   Dice3D.ask({
     title: p.label,
@@ -2104,7 +2108,11 @@ document.addEventListener("click", async e => {
       const p = d.roll;
       const terms = p.breakdown.map(m => ({ label: m.source, value: sign(m.value) }));
       terms.push({ label: "your modifier", value: sign(p.modifier), total: true });
-      if (p.dc != null) terms.push({ label: "beat", value: p.dc });
+      // `dc_shown` is the engine saying whether this number is a difficulty the
+  // player may know or the result of a die already rolled in secret. Absent on
+  // a payload from an older save mid-flight, which reads as shown — the same
+  // answer it had before the flag existed.
+  if (p.dc != null && p.dc_shown !== false) terms.push({ label: "beat", value: p.dc });
       const face = await Dice3D.ask({
         title: p.label, why: p.because || "", sides: 20, lo: 1, hi: 20, die: "1d20",
         terms,

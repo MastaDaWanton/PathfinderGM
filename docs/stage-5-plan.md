@@ -236,6 +236,13 @@ both `recovery.*` families still reproduce the replaced literal lists verbatim.
 
 ## Known and deliberately deferred
 
+**Closed after the fact** (`51ce02a`, `da18ef3`). Four of the five below were fixed once
+stage 6 was under way, and the fifth is genuinely stage 7's subject. What the list got
+wrong is worth keeping: the clockless hold was filed as a refusal problem and was an
+**applicator** one — the `condition` op could only ever add, so nothing in the app could
+lift anything. And "`hp <= 0` at five sites" was nineteen, seven of them hiding in the
+inverted spelling `hp > 0`.
+
 **Open, measured, not fixed here** — carried into the stages that own them rather than
 patched at the end of this one:
 

@@ -1444,6 +1444,12 @@ class Engine:
             dc=resolved_dc.final,
             partial=partial,
             extra_partial={"opposed_roll": opposing_roll.as_dict()} if opposing_roll else {},
+            # On an opposed check the number to beat IS the opponent's roll, made in
+            # secret a few lines above. Showing it hands the player the guard's
+            # Perception result before they roll their Stealth — the one case with no
+            # play argument at all, because it is not a difficulty they could know, it
+            # is the outcome of somebody else's hidden die.
+            dc_shown=not opposed,
         )
 
         margin = roll.total - resolved_dc.final
@@ -4926,6 +4932,7 @@ class Engine:
     def _roll_or_suspend(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int, partial: dict, extra_partial: dict | None = None,
+        dc_shown: bool = True,
     ) -> Roll:
         """Roll it, or hand it to the player and stop.
 
@@ -4944,6 +4951,11 @@ class Engine:
                 "modifier": sum(m.value for m in mods),
                 "breakdown": [m.as_dict() for m in mods],
                 "dc": dc,
+                # Whether the number may be shown. The popup carried it as a bare int
+                # with no provenance, so the browser could not tell a difficulty the
+                # player is entitled to know from the result of a die already rolled in
+                # secret — and printed both as "beat: N".
+                "dc_shown": bool(dc_shown),
                 "because": intent.because,
                 "intent_id": intent.id,
             }

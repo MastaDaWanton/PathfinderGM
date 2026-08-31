@@ -109,6 +109,38 @@ def test_the_opposed_roll_is_made_before_suspending_and_is_not_rerolled(engine):
     assert first.outcomes[0].rolls[1].as_dict()["faces"] == carried["faces"]
 
 
+def test_the_popup_never_shows_a_number_rolled_in_secret(engine):
+    """The dice popup carried its target as a bare int with no provenance, so the
+    browser could not tell a difficulty the player is entitled to know from the result of
+    a die already rolled behind the screen — and printed both as "beat: N".
+
+    On an opposed check the number to beat IS the opponent's roll, made in secret a few
+    lines earlier. Measured: sneaking past the guildhand opened the popup showing
+    "beat: 8" — the guard's Perception result — before the player rolled their Stealth.
+
+    Blanking the field outright was the wrong fix and is the trap recorded in
+    docs/stage-6-plan.md: it also carries stated skill DCs, and removing those makes
+    every roll a blind ask, which is worse play than the leak. The engine says which it
+    is instead.
+    """
+    got = run(engine, [{
+        "op": "check", "actor": "pc", "visibility": "player", "because": "sneaking",
+        "params": {"skill": "stealth", "opposed_by": {"ref": "c1", "skill": "perception"}},
+    }])
+    assert got.awaiting["dc_shown"] is False, (
+        f"the popup would print the opponent's secret roll of "
+        f"{got.awaiting['dc']} as the number to beat")
+
+    # A difficulty the GM stated is still shown: this is provenance, not censorship.
+    engine.scene.awaiting = None
+    engine.scene.pending_intents = []
+    stated = run(engine, [{
+        "op": "check", "actor": "pc", "visibility": "player", "because": "sneaking",
+        "params": {"skill": "stealth", "dc": {"band": "tough"}},
+    }])
+    assert stated.awaiting["dc_shown"] is True
+
+
 def test_an_npc_roll_can_never_be_player_visible(engine):
     """Measured on the first fully successful live turn: the GM marked the guildhand's
     Perception check `visibility: "player"`.
