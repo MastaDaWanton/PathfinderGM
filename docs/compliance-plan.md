@@ -133,8 +133,23 @@ here. **Speed and touch AC need their content typed first**: 69 shipped speed sp
 no bonus type and would all stack (+80 where 1e gives +30); 36 of 60 non-deflection AC
 specs are untyped crafted armour. Type the content, then move the reader.
 
-**Stage 3 — defence channels become effects, with the save shape changing in the same
-commit.** The draft split the store change (stage 3) from the file change (stage 5),
+**Stage 3 — defence channels become effects. DONE** (`db660da`, `a5f6e18`).
+The four became effect kinds with the field names as views, and the store shape and save
+shape changed in one commit with an idempotent migration that runs *after* the effects
+rebind. A potion of fire resistance works: 123 spells and 13 magic items authored a
+defence that `_spec_to_intents` had no branch for, so the dose was spent and nothing
+happened. Speed gained the consumable branch its stage-2 reader was waiting for. The
+immunity gate went on the OPS and never on `add_condition` — that applicator writes
+hit-point death, so gating it would have made 759 undead unkillable — and immunity
+attaches to an effect's descriptor, because 469 creatures are immune to sleep and sleep
+immunity does not stop unconsciousness from hit-point loss. Three bugs found on the way:
+the defence identity collapsed DR 10/silver and DR 3/— into one record, the DR reader
+double-counted once `reductions` became a view, and `PARAM_ALIASES` renamed `against` to
+`opposed_by` for *every* op — a landmine for any op declaring that word, now scoped.
+Verified: twelve saves, no drift, no duplication.
+
+*Superseded plan text follows, kept for the reasoning:* defence channels become effects,
+with the save shape changing in the same commit. The draft split the store change (stage 3) from the file change (stage 5),
 which would ship two builds whose memory and disk disagree. One idempotent migration
 converts legacy defence fields to infinite effects *after* the `a.effects` rebind.
 **Immunity gates the ops, never `Actor.add_condition`** — the applicator is also how
