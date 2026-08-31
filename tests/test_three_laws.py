@@ -589,19 +589,70 @@ def test_an_ability_that_deals_damage_can_kill():
         "and the narrator was not told either")
 
 
-def test_the_narrator_is_fed_tells_and_never_effects():
-    """The severing itself: the two functions that build the narrator's view of the
-    turn read `.tell` (and `.because`) off outcomes and must never reach for
-    `.effects` — prose that knows a mechanic no tell backs is an outcome-claim."""
-    source = Path("gm/agent.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for name in ("narrate_outcome",):
-        fn = next((n for n in ast.walk(tree)
-                   if isinstance(n, ast.FunctionDef) and n.name == name), None)
-        assert fn is not None, f"gm/agent.py lost {name}; update this test"
-        body = ast.get_source_segment(source, fn)
-        assert ".effects" not in body, (
-            f"{name} reads outcome.effects — the narrator may only be fed tells")
+# Who in the GM layer may read an outcome's mechanics instead of its tell, and why.
+#
+# The seam is not "nothing may read effects" — that would be false to the design, which
+# hands `cut_dead_men_walking` the dead on purpose. The line is: **what builds the
+# narrator's prompt sees tells; an engine-side repair, applied to the model's output
+# afterwards, may know engine facts.** A repair is the engine correcting the model, not
+# the model being taught a mechanic.
+_READS_MECHANICS = {
+    "gm/agent.py:_deaths_from":
+        "feeds press_the_death, a repair that runs AFTER the prose — it needs how far "
+        "past dead the blow went, and a tell is a sentence, not a number. Making the "
+        "narrator parse that back out of English would be a second vocabulary built in "
+        "the presentation layer.",
+    "gm/judgement.py:note_heat":
+        "sets scene.heat, which is world state and not prose — nothing the narrator "
+        "reads passes through here.",
+}
+
+
+def test_only_the_named_repairs_read_mechanics_instead_of_tells():
+    """The severing itself, and the version of this test that can actually see it.
+
+    The old one inspected a single function and matched the literal text `.effects`.
+    Measured: `.effects` appears ZERO times in the whole of `gm/` — both real sites
+    spell it `getattr(o, "effects", None)` — so the test was vacuously true and always
+    had been. It is why the debt survived five stages: the narrator was reaching past
+    the tell in two places and law 3's ratchet could not see either.
+
+    Now every function in `gm/` is checked, both spellings are caught, and the two that
+    may is an allowlist with a reason each — the shape `_CLOCK_SITES` uses, because a
+    count cannot tell a site being removed from one being moved.
+    """
+    found: dict[str, int] = {}
+    for path in sorted(Path("gm").glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        owner: dict[int, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for inner in ast.walk(node):
+                    if hasattr(inner, "lineno"):
+                        owner.setdefault(inner.lineno, node.name)
+        for node in ast.walk(tree):
+            # `o.effects`, and `getattr(o, "effects")` which is how both real sites
+            # are written and how they slipped past the old test.
+            hit = (isinstance(node, ast.Attribute) and node.attr == "effects") or (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value == "effects")
+            if hit:
+                where = f"{path.as_posix()}:{owner.get(node.lineno, '<module>')}"
+                found[where] = found.get(where, 0) + 1
+
+    unlisted = sorted(set(found) - set(_READS_MECHANICS))
+    assert not unlisted, (
+        f"the narrator reaches past the tell in {unlisted}. If prose needs a fact, the "
+        f"fact becomes part of a tell; if an engine-side repair needs one, add it to "
+        f"_READS_MECHANICS with the reason.")
+
+    gone = sorted(set(_READS_MECHANICS) - set(found))
+    assert not gone, (
+        f"{gone} no longer reads effects — delete the exemption, that is the win")
 
 
 # --- the skill cannot rot -------------------------------------------------------------
