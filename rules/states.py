@@ -96,13 +96,6 @@ TAGS: dict[str, tuple[str, ...]] = {
 }
 
 
-# The tag namespaces this file is the authority for. A condition's tags in these are
-# rebuilt from `tags_for` every time it is read off a save, so retiring an answer here
-# actually reaches campaigns already on disk; anything outside them belongs to whichever
-# document added it and is left alone. See `activeeffect._tags_on_load`.
-OWNED_PREFIXES: tuple[str, ...] = ("state.", "recovery.", "condition.")
-
-
 def tags_for(key: str) -> tuple[str, ...]:
     """The tags a condition key grants. Unknown keys self-tag, so homebrew plays."""
     key = (key or "").strip().lower()

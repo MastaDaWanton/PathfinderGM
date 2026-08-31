@@ -121,31 +121,47 @@ def test_a_state_that_only_a_document_declares_still_stops_actions():
     assert a.blocking_condition() == "hexed", "and the refusal has to name something"
 
 
-def test_retiring_a_tag_reaches_campaigns_already_on_disk():
+def test_a_vocabulary_addition_reaches_campaigns_already_on_disk():
     """Tags are written into the save, so the vocabulary and a saved condition are two
     copies of one fact — the shape law 1 exists to prevent, hiding in the persistence
-    layer. Every test builds its actors fresh, so nothing would ever notice.
+    layer. Every test builds its actors fresh, so nothing would ever notice: a `helpless`
+    prisoner saved before the vocabulary called them `state.unable` would keep the old
+    answer for the life of the campaign.
 
-    Adding was the easy half. A union alone is a one-way ratchet: a tag the vocabulary
-    RETIRES never reaches an old save, and the stale one is written straight back on the
-    next save, so a condition keeps a retired answer for the life of the campaign. The
-    namespaces this file owns are therefore rebuilt outright, and only tags outside them
-    — which is what an ability document appends — survive from the record.
+    Adding is the half that is safe to do. Rebuilding the owned namespaces outright —
+    which is the only way to RETIRE an answer — was tried and reverted: an ability
+    document appends its own tags in any namespace, so the rebuild deleted them.
+    Measured, a grant of `state.unable.trance` blocked actions in session and stopped
+    blocking after a restart, and a homebrew condition declaring `recovery.rest` was
+    cleared by a night's sleep until the campaign was reloaded. Carrying a stale tag is
+    the lesser failure; the greater one is a document whose declaration evaporates on
+    the next load, which is precisely what stage 3 and stage 5c promised documents.
+
+    The cost, stated rather than hidden: nothing can withdraw a tag from a condition
+    already on disk. Doing that safely needs a document's own tags recorded separately
+    from the vocabulary's, which is a save-shape change and not this stage's.
     """
     from rules.activeeffect import from_dict as effect_from_dict
     from rules.states import tags_for
 
     got = effect_from_dict({
         "kind": "condition", "key": "fascinated", "name": "Fascinated",
-        "tags": ["state.unable.fascinated",       # still granted today
-                 "state.gone.retired",            # a vocabulary answer since withdrawn
+        "tags": ["state.unable.fascinated",       # what the save happened to carry
                  "document.own.flourish"]})       # an ability document's own
 
-    assert "state.gone.retired" not in got.tags, (
-        "a retired vocabulary answer survived the save and will be written back")
+    assert set(got.tags) >= set(tags_for("fascinated")), (
+        "a vocabulary entry added since the save was written did not reach it")
     assert "document.own.flourish" in got.tags, (
-        "a document's own tag was destroyed by rebuilding from the key")
-    assert set(got.tags) >= set(tags_for("fascinated"))
+        "a document's own tag was destroyed on load")
+
+    # And the same for a tag a document declares INSIDE a namespace the vocabulary
+    # uses — the case that made the rebuild untenable.
+    doc = effect_from_dict({
+        "kind": "condition", "key": "blood rage", "name": "Blood Rage",
+        "tags": ["buff.stance.blood-rage", "state.unable.trance",
+                 "recovery.rest"]})
+    assert "state.unable.trance" in doc.tags and "recovery.rest" in doc.tags, (
+        "a document's declared state survived in session and vanished on reload")
 
 
 # The condition names the four ending-sites each carried before `recovery.*` existed,

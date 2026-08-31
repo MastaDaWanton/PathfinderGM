@@ -64,10 +64,16 @@ def state_of(pc) -> str:
         return "dying"
     if pc.has_condition("stable") or pc.has_condition("unconscious"):
         return "stable"
-    if pc.has_condition("disabled"):
-        return "disabled"
+    # Before `disabled`, not after. Disabled means "conscious, and may act carefully" —
+    # it is a rung that HANDS OUT a turn, so a character who is disabled *and* paralyzed
+    # was reported fit for one. Measured: all seven of the conditions above reached the
+    # turn gate as playable whenever the character sat at exactly 0 hit points, and the
+    # engine then refused every op in the plan as a legality error. The 502 this rung
+    # exists to close was still open for the whole hp == 0 case.
     if pc.has_state("state.unable") or pc.has_state("state.down"):
         return "held"
+    if pc.has_condition("disabled"):
+        return "disabled"
     return "fine"
 
 
@@ -144,11 +150,29 @@ def _wait_it_out(campaign, pc) -> Outcome:
     alternative — routing these into the stable branch below — burns an hour of world
     clock, floors hit points at 1 and tells a petrified character they have come round.
     """
+    from rules import states
+
     scene = campaign.scene
-    key = pc.blocking_key()
-    held = next((e for e in pc.effects if e.key == key), None)
-    what = ((held.name if held else "") or key or "unable to move").lower()
+    # Found by the same predicate that chose it, not by key. `blocking_key` falls back
+    # to the effect's NAME when a document-declared state carries no key, and looking
+    # that up as a key matched nothing — so a three-round hold read as permanent.
+    held = next((e for e in pc.effects if states.stops(e.tags)), None)
+    what = ((held.name if held else "") or pc.blocking_key()
+            or "unable to move").lower()
     rounds = int(getattr(held, "rounds_left", 0) or 0) if held else 0
+
+    if scene.in_encounter:
+        # No skipping time inside a fight. `Scene.advance` is EXPIRY ONLY by contract:
+        # it runs no turns, fires no wards, drains no upkeep and never rolls the dying.
+        # Using it here put the player inside a safety bubble — measured, a paralyzed
+        # character stood among three thugs for four rounds and took not one attack,
+        # while the burning cloud they were lying in lost four rounds of its clock for
+        # free. Every stun and daze the player suffered cost them nothing.
+        #
+        # The turn is simply not theirs. The caller runs the world's turns instead, and
+        # the rounds tick through `advance_turn`, which is the door that fires things.
+        return Outcome(state="held", playable=False, lines=[
+            f"You are {what} and can only watch."])
 
     if rounds <= 0:
         return Outcome(state="held", playable=False, lines=[
@@ -156,6 +180,7 @@ def _wait_it_out(campaign, pc) -> Outcome:
             f"changes that — this one needs somebody else, or magic. Time can pass, but "
             f"you cannot spend it."])
 
+    # Out of a fight nobody is swinging, so skipping to the far side is honest.
     ended = scene.advance(0, rounds=rounds)
     lines = [f"You are {what} and can do nothing but wait. "
              f"{rounds} round{'s' if rounds != 1 else ''} pass."]

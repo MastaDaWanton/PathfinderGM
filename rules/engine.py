@@ -323,9 +323,10 @@ class Scene:
         """
         if not self.initiative:
             return None
-        # Cleared once per call rather than per rollover, so the two lines below can
+        # Cleared once per call rather than per rollover, so the lines below can
         # accumulate across however many rounds this one call has to skip through.
         self.hazards = []
+        self.bleeding = []
         for _ in range(self.MAX_SKIPPED_ROUNDS):
             ref = self._next_able()
             if ref is not None:
@@ -379,9 +380,15 @@ class Scene:
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
                     self.hazards.extend(self._drain_periodic(a))
-                self.bleeding = [r for r in (
+                # Appended, for the reason the next comment gives about `hazards`, and
+                # it was left as an assignment when that one was fixed. One call now
+                # skips up to twenty rounds looking for somebody able to act, so only
+                # the last round's dying survived: measured, a thug bled to death during
+                # a skipped round and `scene.bleeding` came back empty, so the player
+                # was never told he had stopped moving.
+                self.bleeding.extend(r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
-                ) if r]
+                ) if r)
                 # After the dying, because a hazard that finishes somebody should find
                 # them where the round left them rather than where it started.
                 #
@@ -784,6 +791,13 @@ class Scene:
         self.zones.pop(ref, None)
         self.positions.pop(ref, None)
         self.acted.discard(ref)
+        # Refs are recycled — `bestiary._next_ref` hands out the lowest free `cN` — so a
+        # stated spawn distance left behind here is inherited by whoever takes the name
+        # next. Measured: an archer who arrived at 120 feet departed, and the next spawn
+        # to reuse `c1` was laid out 120 feet away despite asking for `engaged`. This
+        # was harmless only while the field was dropped at every save; it is persisted
+        # now, so the poisoning would have lasted the campaign.
+        self.spawn_feet.pop(ref, None)
         self.reacted = {k: v for k, v in self.reacted.items()
                         if not k.startswith(f"{ref}:")}
         self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]

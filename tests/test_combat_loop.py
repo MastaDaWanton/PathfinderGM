@@ -237,6 +237,50 @@ def test_a_fight_where_nobody_can_act_waits_rather_than_vanishing(scene):
     assert s.sides_standing() == 2, "and both sides are still in it"
 
 
+def test_a_death_during_a_skipped_round_is_still_reported(engine, scene):
+    """`scene.bleeding` was an assignment inside the per-round loop, six lines above a
+    comment explaining why `hazards` beside it must be appended. Once one call could
+    skip up to twenty rounds looking for somebody able to act, only the last round's
+    dying survived — measured, a thug bled to death during a skipped round and
+    `scene.bleeding` came back empty, so "he stops moving" was never said.
+
+    Law 3 in reverse: the engine recorded it and the player could never be told.
+    """
+    s = scene
+    dying = next(a for r, a in s.actors.items() if r != "pc")
+    dying.hp = -9
+    dying.apply_hp_state()
+    others = [a for a in s.actors.values() if a is not dying]
+    for a in others:
+        a.add_condition("stunned", source="a thunderclap", rounds=6)
+    s.initiative = [(r, 20 - i * 3) for i, r in enumerate(s.actors)]
+    s.turn = 0
+
+    s.advance_turn()
+
+    assert s.round >= 5, "the rounds were not skipped, so this proves nothing"
+    assert s.bleeding, "a creature bled out during a skipped round and nothing was said"
+
+
+def test_a_departed_creature_takes_its_spawn_distance_with_it(scene):
+    """Refs are recycled — the bestiary hands out the lowest free `cN` — so a stated
+    spawn distance left behind is inherited by whoever takes the name next. Measured: an
+    archer who arrived at 120 feet departed, and the next spawn to reuse `c1` was laid
+    out 120 feet away despite asking for `engaged`.
+
+    Harmless only while the field was dropped at every save; it is persisted now, so the
+    poisoning would have lasted the campaign. This is the lesson CLAUDE.md records about
+    derived state in the user's data directory, arriving through the scene save.
+    """
+    s = scene
+    ref = next(r for r in s.actors if r != "pc")
+    s.spawn_feet[ref] = 120
+
+    s.depart(ref)
+
+    assert ref not in s.spawn_feet, "the next creature to take this ref inherits 120 feet"
+
+
 def test_how_far_away_a_spawn_arrived_survives_the_save(tmp_path):
     """`spawn` writes `spawn_feet` and `begin_encounter` reads it, and those are two
     different turns — so the one scene field whose entire life spans a turn boundary was

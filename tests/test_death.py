@@ -71,13 +71,65 @@ def test_a_character_who_cannot_act_is_not_reported_fine(scene):
     retry loop and reached the player as a blank 502 page.
     """
     pc = scene.pc()
-    for key in ("petrified", "paralyzed", "stunned", "helpless", "dazed",
-                "cowering", "fascinated"):
+    held = ("petrified", "paralyzed", "stunned", "helpless", "dazed",
+            "cowering", "fascinated")
+    for key in held:
         pc.add_condition(key, source="probe")
         assert downed.state_of(pc) == "held", f"{key} was reported fit for a turn"
         assert not pc.can_act()
         pc.remove_condition(key)
     assert downed.state_of(pc) == "fine"
+
+    # And at exactly 0 hit points, where `disabled` — a rung that HANDS OUT a turn —
+    # was tested first and shadowed every one of them. Found by review: the 502 this
+    # rung exists to close was still open for the whole hp == 0 case.
+    for key in held:
+        pc.hp = 0
+        pc.apply_hp_state()
+        pc.add_condition(key, source="probe")
+        assert pc.has_condition("disabled")
+        assert downed.state_of(pc) == "held", (
+            f"disabled shadowed {key}: the turn was handed out and every op in it "
+            f"would be refused as a legality error")
+        pc.remove_condition(key)
+        pc.remove_condition("disabled")
+
+
+def test_a_hold_inside_a_fight_skips_no_time_at_all(scene):
+    """Found by an adversarial review, under a green suite, and the worst thing this
+    stage shipped before it was caught.
+
+    `Scene.advance` is EXPIRY ONLY by contract — it runs no turns, fires no wards,
+    drains no upkeep and never rolls the dying. Waiting a hold out with it put the
+    player inside a safety bubble: measured, a paralyzed character stood among three
+    thugs for four rounds and was not touched once, while the burning cloud they were
+    lying in lost four rounds of its clock for free. Every stun, daze and cower the
+    player suffered cost them nothing, and ghoul paralysis — whose whole danger in 1e is
+    that the ghouls eat you while you are down — became a free rest.
+
+    The turn is simply not theirs. The world takes its own, through `advance_turn`,
+    which is the door that fires things.
+    """
+    from rules.engine import Ward
+
+    s = scene
+    pc = s.pc()
+    s.initiative = [(r, 20 - i * 3) for i, r in enumerate(s.actors)]
+    s.turn = 0
+    s.sides = {"party": ["pc"], "them": [r for r in s.actors if r != "pc"]}
+    s.wards.append(Ward(owner="pc", trigger="each_round", rounds_left=10,
+                        source="a burning cloud", spec={}))
+    pc.add_condition("paralyzed", source="a ghoul", rounds=4)
+    before = (s.round, s.clock_minutes, s.wards[0].rounds_left)
+
+    got = downed.resolve(FakeCampaign(s))
+
+    assert got.state == "held" and not got.playable
+    assert (s.round, s.clock_minutes, s.wards[0].rounds_left) == before, (
+        "the hold skipped time inside a fight, so nobody swung and the ward's clock "
+        "was spent for free")
+    assert pc.has_condition("paralyzed"), (
+        "the hold expired without a single round of the fight being played")
 
 
 def test_an_endless_hold_is_said_plainly_and_costs_no_world_clock(scene):

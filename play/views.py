@@ -716,6 +716,13 @@ def say(request):
             _end_campaign(c, pc)
             c.save()
             return JsonResponse({**_state(c), **_ended_payload(c)}, status=200)
+        # A turn the player cannot take is still a turn that passes. Inside a fight the
+        # world takes its own, which is what ticks the hold down, fires the ward they
+        # are lying in and lets the enemies standing over them act. `downed.resolve`
+        # deliberately skips no time in an encounter: it used to, and a paralyzed
+        # character stood among three thugs for four rounds without being touched.
+        if outcome.state == "held" and c.scene.in_encounter:
+            _run_npc_turns(c, GMAgent(c.world, c.engine()))
         c.save()
         return JsonResponse(_state(c))
 

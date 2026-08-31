@@ -190,7 +190,74 @@ One test was found pinning around a defect rather than pinning a rule:
 measured the base, because a stunned target used to succeed automatically and there was
 no roll for the bonus to land on. It tests the +4 it is named for now.
 
+## What the second adversarial review caught
+
+A second pass over 5b–5d found eleven more, six of them mine and two of those worse than
+what stage 5 set out to fix. Recorded in full because the pattern is the finding: this
+stage was reviewed twice and the second pass was not redundant.
+
+1. **`_wait_it_out` froze the fight around the player.** `Scene.advance` is EXPIRY ONLY
+   by its own docstring — it runs no turns, fires no wards, drains no upkeep and never
+   rolls the dying. Waiting a hold out with it put the player in a safety bubble:
+   measured, a paralyzed character stood among three thugs for four rounds untouched
+   while the burning cloud they were lying in lost four rounds of its clock for free.
+   Every stun the player suffered became free. **This was worse than the 502 it
+   replaced.** The turn is simply not theirs now: inside a fight nothing is skipped and
+   the world takes its own turns through `advance_turn`, which is the door that fires.
+2. **A clockless hold was a permanent campaign lock** — and clockless is `_op_condition`'s
+   default when the GM omits a duration. Nothing ticked, no NPC could act, no removal
+   path existed. Partly closed by (1), since the world now acts; **still open out of
+   combat**, and recorded below.
+3. **A document-declared hold was unwaitable.** `blocking_key` falls back to the effect's
+   *name* when there is no key, and `downed` then looked the effect up *by key* — so a
+   three-round hold read as permanent. The half of the first review's fix that made the
+   case visible shipped without the half that lets it resolve.
+4. **The 502 was still open at exactly 0 hit points.** `disabled` — a rung that hands out
+   a turn — was tested before `held`, so all seven conditions reached the turn gate as
+   playable whenever the character sat at 0 hp.
+5. **Rebuilding owned tag namespaces destroyed document tags.** `_apply_ability_document`
+   appends a document's tags in *any* namespace, so the first review's fix deleted them:
+   a grant of `state.unable.trance` blocked actions in session and stopped after a
+   restart. Reverted to the union; the cost — a withdrawn tag never reaches a save
+   already on disk — is now stated in the code rather than hidden.
+6. **A death during a skipped round was never reported.** `scene.bleeding` was an
+   assignment six lines above the comment explaining why `hazards` beside it must be
+   appended, so only the last of up to twenty skipped rounds survived.
+7. **`spawn_feet` was persisted but never pruned**, and refs are recycled — so a departed
+   archer's 120 feet was inherited by the next creature to take `c1`, which asked for
+   `engaged` and was laid out 120 feet away. Harmless only while the field was dropped
+   at every save; persisting it would have made the poisoning permanent.
+
+Confirmed clean by the same review, exhaustively: the round-rollover rewrite agrees with
+the old predicate on the first rollover for **every reachable (turn, length) pair**,
+including `turn == -1` and a single-entry initiative order (2,646 cases, identical refs);
+parking the turn pointer corrupts no order, re-grants no turn and loses no `acted`; and
+both `recovery.*` families still reproduce the replaced literal lists verbatim.
+
 ## Known and deliberately deferred
+
+**Open, measured, not fixed here** — carried into the stages that own them rather than
+patched at the end of this one:
+
+- **A clockless hold out of combat is still a lock.** In a fight the world now acts, but
+  outside one nothing ticks and `_op_condition` mints `rounds=None` whenever the GM omits
+  a duration. The real fix is a removal path and a refusal that offers one — stage 7.
+- **`nauseated` is the `cast` problem already live.** It is `state.impaired`, so the turn
+  is planned and `validate` then refuses `attack` and `check` as legality errors. Same
+  buried-502 shape this stage declined to widen `cast` into. Stage 7.
+- **`hp <= 0` still sits beside the tag query** at five of the sites 5b re-pointed, so a
+  creature at exactly 0 hit points is standing and taking turns while `tidy_the_fallen`,
+  `leave_behind` and the walking-dead prose cut all treat it as a corpse. Inherited, and
+  the reason `Scene.conscious`'s docstring exists — but this stage claimed no two modules
+  disagreed any more, and on this case they still do.
+- **`petrified` and `helpless` are permanent scene ghosts.** They are `state.down` but not
+  `state.down.fallen`, so after 5b narrowed the departure sites *nothing* removes them,
+  and `rules/xp.py` still asks `hp > 0` — so petrifying the last enemy ends the fight
+  with 135 XP unpaid and nothing said. That is the same bullet 5d claimed, still open for
+  the down-but-alive half of the family.
+- **`_retime`'s identity match is delivered by an equality-based `list.remove`.** Not
+  reachable today because the dispel mutates `rounds_left` first, but the comment asserts
+  a guarantee the one door does not provide.
 
 `rules/tables.py` is a hard-coded dict with no content overlay, unlike classes, feats and
 spells, so a homebrew condition gets `condition.<key>` and nothing else: no recovery tag,
