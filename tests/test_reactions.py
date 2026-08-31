@@ -105,6 +105,25 @@ def test_a_creature_that_cannot_act_takes_no_swing():
     assert [o.op for o in res.outcomes] == ["move"]
 
 
+def test_a_creature_that_cannot_swing_takes_no_swing_even_though_it_can_move():
+    """Found by an adversarial review, under a green suite.
+
+    A spliced reaction goes straight to resolution and never passes `validate`, so this
+    is the only gate it meets — and it asked the general question, `can_act()`. The
+    moment the vocabulary correctly gave a nauseated creature its move action back, that
+    same answer handed it the attack of opportunity as well, and it swung.
+
+    1e is explicit: a nauseated creature may take "a single move action" and nothing
+    else. The question a reaction asks is about attacking, not about acting.
+    """
+    s, e = board()
+    s.actors["c1"].add_condition("nauseated", source="bad meat")
+    assert s.actors["c1"].can_act(), "it may still move — that is the whole point"
+
+    res = run_move(e, "pc", (5, 9))
+    assert [o.op for o in res.outcomes] == ["move"], "a nauseated creature swung"
+
+
 def test_allies_do_not_provoke_each_other():
     s, e = board()
     s.sides = {"us": ["pc", "c1"]}

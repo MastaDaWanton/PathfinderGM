@@ -74,7 +74,11 @@ def reactions_for(actor) -> list[Reaction]:
     layer on here; Blood Bending's paths are built on them, which is why the shape is a
     list rather than a single hard-coded case.
     """
-    if not actor.can_act():
+    # The attack question, not the general one. A nauseated creature may take its
+    # single move action and may not swing, and asking `can_act` gave it the attack
+    # of opportunity back the moment the vocabulary let it move again. A spliced
+    # reaction never passes `validate`, so this is the only gate it meets.
+    if actor.blocking_key("attack"):
         return []
     return [attack_of_opportunity(actor)]
 
@@ -105,7 +109,8 @@ def threatens(scene, watcher_ref: str, square) -> bool:
         return False
     anchor = scene.positions.get(watcher_ref)
     watcher = scene.actors.get(watcher_ref)
-    if anchor is None or watcher is None or not watcher.can_act():
+    # Threatening a square is about being able to swing into it.
+    if anchor is None or watcher is None or watcher.blocking_key("attack"):
         return False
     reach = _reach_of(watcher)
     if reach <= 0:

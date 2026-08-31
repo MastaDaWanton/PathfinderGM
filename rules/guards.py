@@ -132,7 +132,9 @@ def eligible(scene, target_ref: str) -> list[Guard]:
         if g.uses_left is not None and g.uses_left <= 0:
             continue
         guardian = scene.actors.get(g.guardian)
-        if guardian is None or not guardian.can_act():
+        # Interposing is a swing, so ask about attacking rather than about acting
+        # at all — the same distinction reactions draw.
+        if guardian is None or guardian.blocking_key("attack"):
             continue
         if not in_range(scene, g.guardian, g.protects, g.range_ft):
             continue

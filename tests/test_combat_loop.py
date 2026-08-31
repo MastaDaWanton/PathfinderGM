@@ -207,6 +207,59 @@ def test_a_save_from_an_older_build_still_opens(tmp_path):
             cm.current("version-test")
 
 
+def test_a_fight_where_nobody_can_act_waits_rather_than_vanishing(scene):
+    """Found by an adversarial review of the vocabulary split, under a green suite.
+
+    Once `conscious` meant "still in the fight" rather than "can act now", a round in
+    which EVERY combatant was stunned left `sides_standing()` at 2 — so the loop's own
+    "the fight is over" branch was skipped — while `advance_turn` returned None, which
+    `play/views.py` reads as the fight being over. The encounter ended with two live
+    enemies upright, paid no XP and printed nothing at all.
+
+    Holds are timed, so the answer is to keep looking across rounds. The first attempt
+    at this fix returned None just as silently: the scan only ticks when it wraps past
+    the top of the order, and a fight starting from `turn == -1` never wraps on its
+    first pass, so the retry re-walked one round for ever and expired nothing.
+    """
+    s = scene
+    s.initiative = [(r, 18 - i) for i, r in enumerate(s.actors)]
+    s.turn = -1
+    s.sides = {"party": ["pc"], "them": [r for r in s.actors if r != "pc"]}
+    for a in s.actors.values():
+        a.add_condition("stunned", source="a thunderclap", rounds=3)
+    assert s.advance_turn.__self__ is s
+
+    ref = s.advance_turn()
+
+    assert ref is not None, "the fight ended with everyone still standing in it"
+    assert s.round >= 3, "the holds were never ticked down"
+    assert not s.actors[ref].has_condition("stunned")
+    assert s.sides_standing() == 2, "and both sides are still in it"
+
+
+def test_how_far_away_a_spawn_arrived_survives_the_save(tmp_path):
+    """`spawn` writes `spawn_feet` and `begin_encounter` reads it, and those are two
+    different turns — so the one scene field whose entire life spans a turn boundary was
+    the one the save dropped. A restart between setting an ambush up and the fight
+    starting put every archer back at the `far` default of forty feet, however far the
+    spawn had said they were.
+    """
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path):
+        cm._LIVE.clear()
+        c = cm.current("spawn-distance")
+        c.scene.spawn_feet["c9"] = 120
+        c.save()
+
+        cm._LIVE.clear()
+        back = cm.current("spawn-distance")
+
+    assert back.scene.spawn_feet.get("c9") == 120, (
+        "the archer's stated distance was lost across the restart")
+
+
 def test_turn_order_survives_the_save(tmp_path):
     from django.test import override_settings
     from play import campaign as cm

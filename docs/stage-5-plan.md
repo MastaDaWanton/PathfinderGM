@@ -143,6 +143,44 @@ the shape of `_CLOCK_SITES`, so a count cannot confuse a site being removed with
 moved. Plus the two already marked stage 5: the dispel path's direct store edit in
 `_STORE_EDITORS`, and unsaved `spawn_feet` in `_UNSAVED_SCENE_FIELDS`.
 
+## What the adversarial review caught
+
+Six defects, every one under a green suite, every one found by a probe rather than by
+reading. Recorded because the pattern is now consistent enough to plan around: the suite
+proves the change did what it said, and only a probe finds what it did *as well*.
+
+1. **A maneuver against a corpse rolled a d20.** The automatic clause moved from
+   `not can_act()` — eleven condition rows — to the `helpless` flag, which sits on five.
+   `dead` and `stable` fell in the gap, so the player was handed a die to roll against a
+   body on the floor and could fail. Now `is_helpless or is_down`.
+2. **A fight where everyone was stunned vanished.** `sides_standing()` stayed at 2, so
+   the "fight is over" branch was skipped, while `advance_turn` returned None, which the
+   caller reads as the fight being over — the encounter ended with two live enemies
+   upright, no XP and nothing printed. `advance_turn` now looks across rounds so the
+   holds tick down. The *first* fix for this returned None just as silently, because the
+   scan only ticks when it wraps and a fight starting from `turn == -1` never wraps on
+   its first pass; the second probe caught it.
+3. **`cast` in the guard was new 502 exposure.** The rule is right — a stunned wizard
+   cannot cast — but `turn_schema` builds a `contains` the sampler cannot violate, so "I
+   cast magic missile" forces the op that is about to be refused as a legality error and
+   burns every attempt. Reverted to the three ops the guard always had. The vocabulary
+   still says `cast` is stopped; making these refusals printable is stage 7.
+4. **Nauseated creatures took attacks of opportunity.** Reactions and guards asked the
+   general `can_act()`, so restoring the move action restored the swing with it. A
+   spliced reaction never passes `validate`, so that gate was the only one. They ask
+   `blocking_key("attack")` now.
+5. **The tag union was a one-way ratchet.** Additions reached saved campaigns and
+   removals never did, and the stale tag was written back on the next save. The
+   namespaces the vocabulary owns are rebuilt outright; a document's own tags survive.
+6. **A keyless blocking effect was invisible to `can_act`.** The predicate returned the
+   effect's key, and a document-declared state need not have one, so the empty string
+   read as "nothing stops you" — contradicting the promise `states.stops` makes.
+
+One test was found pinning around a defect rather than pinning a rule:
+`test_a_stunned_target_gives_a_four_bonus` added `stunned`, removed it again and
+measured the base, because a stunned target used to succeed automatically and there was
+no roll for the bonus to land on. It tests the +4 it is named for now.
+
 ## Known and deliberately deferred
 
 `rules/tables.py` is a hard-coded dict with no content overlay, unlike classes, feats and

@@ -326,9 +326,41 @@ class Scene:
         # Cleared once per call rather than per rollover, so the two lines below can
         # accumulate across however many rounds this one call has to skip through.
         self.hazards = []
+        for _ in range(self.MAX_SKIPPED_ROUNDS):
+            ref = self._next_able()
+            if ref is not None:
+                return ref
+            # Nobody could act this round. If anybody is still in the fight the holds
+            # are timed and the next round will find them; if the order is empty of
+            # the living there is nothing to wait for.
+            if not any(self.conscious(r) for r, _ in self.initiative):
+                break
+            # Park on the last slot so the next pass wraps at its first step, which is
+            # what rolls the round over and ticks the holds down. Without this the
+            # retry re-walks the same round for ever and expires nothing — the first
+            # fix for this returned None just as silently, and only a probe caught it.
+            self.turn = len(self.initiative) - 1
+        return None                      # nobody left standing
+
+    # How many rounds one call may skip looking for somebody able to act. A single
+    # pass returned None the moment every combatant was stunned at once — and the
+    # caller reads None as "the fight is over", so a mutual stun ended the encounter
+    # with two live enemies upright, paid no XP and printed nothing at all. Holds are
+    # timed; ticking through them finds the turn again. Twenty rounds is longer than
+    # any hold the game ships.
+    MAX_SKIPPED_ROUNDS = 20
+
+    def _next_able(self) -> str | None:
+        """One pass down the initiative order from wherever the turn is."""
         for step in range(1, len(self.initiative) + 1):
-            nxt = (self.turn + step) % len(self.initiative)
-            if nxt <= self.turn:
+            reached = self.turn + step
+            nxt = reached % len(self.initiative)
+            # Passing the top of the order is the top of a new round — but not the
+            # first turn of the fight, which starts from `turn == -1` and is round one
+            # already. This used to read `nxt <= self.turn`, which happens to fire once
+            # per cycle only because the scan returned early; with nobody able to act
+            # it charged the round several times over in a single pass.
+            if reached > 0 and nxt == 0:
                 self.round += 1
                 # Attacks of opportunity refill at the top of the round, not on your own
                 # turn: the allowance is what you may do while other people act.
@@ -370,7 +402,7 @@ class Scene:
                 self.turn = nxt
                 self.acted.add(ref)
                 return ref
-        return None                      # nobody left standing
+        return None                      # nobody able this pass
 
     def _drain_periodic(self, actor: "Actor") -> list[dict]:
         """Run each standing effect's per-round work — today, pool upkeep.
@@ -1134,7 +1166,16 @@ class Engine:
             self._check_move(intent, index)
 
         actor = self.scene.get(intent.actor) if intent.actor else None
-        if actor and intent.op in states.ACTIONS:
+        # The three ops this guard has always refused, and deliberately not `cast`,
+        # which `states.BLOCKS` does say a stunned character cannot do. A refusal here
+        # is an `IntentError` of check "legality", and a legality error regenerates
+        # rather than repairs — while `turn_schema` builds a `contains` the sampler
+        # cannot violate, so "I cast magic missile" forces the op that is about to be
+        # refused and burns every attempt. Required-op meeting hard-refusal is the
+        # buried-502 class, and turning these three into printable Outcomes is stage
+        # 7's subject; adding a fourth op to the pile first would be shipping a new
+        # blank page to fix a rules nicety.
+        if actor and intent.op in ("attack", "move", "check"):
             # Asked per op, because the states are not all total. A nauseated character
             # gets their single move action, which the old `can_act()` boolean refused
             # along with everything else — it was the one action 1e explicitly allows.
@@ -1797,12 +1838,18 @@ class Engine:
         cmd = sum(x.value for x in cmd_mods)
         cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
 
-        automatic = defender.is_helpless
+        automatic = defender.is_helpless or defender.is_down
         if automatic:
             # "If your target is immobilized, unconscious, or otherwise incapacitated,
             # your maneuver automatically succeeds." That is the `helpless` question,
             # not the can-act one: reading it off `can_act` handed a free grapple
             # against a merely dazed, stunned, cowering or fascinated target.
+            #
+            # `is_down` is here too, and the omission was caught by review rather than
+            # by the suite. The `helpless` flag sits on five condition rows where the
+            # old can-act test covered eleven, and `dead` and `stable` are in the gap —
+            # so the player was handed a d20 to roll against a corpse, which is the
+            # same insult the swing path had already been fixed for.
             roll = None
             margin = 0
             verdict = "success"
@@ -3560,9 +3607,15 @@ class Engine:
             if isinstance(holder, Manifestation):
                 self.scene.lift(holder)
             else:
+                # Through the applicator, not `effects.remove`: this was the last edit
+                # of the store outside the one door, and a dispel is exactly the case
+                # law 2 is about — the effect's contribution has to evaporate with it.
+                # Matched on identity, because two records can share a source and only
+                # the one the dispel found is going.
                 for owner in self.scene.actors.values():
                     if holder in owner.effects:
-                        owner.effects.remove(holder)
+                        owner.remove_effects(match=lambda e, h=holder: e is h)
+                        break
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
 
     def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:

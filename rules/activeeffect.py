@@ -102,9 +102,21 @@ def _tags_on_load(d: dict) -> tuple[str, ...]:
     key = str(d.get("key", "") or "")
     if str(d.get("kind", "") or "") != "condition" or not key:
         return stored
-    from .states import tags_for
+    from .states import OWNED_PREFIXES, tags_for
 
-    return stored + tuple(t for t in tags_for(key) if t not in stored)
+    # Rebuilt, not merely added to. A union alone is a one-way ratchet: a tag the
+    # vocabulary GAINS reaches old saves, a tag it RETIRES never does, and the stale one
+    # is written straight back on the next save — so a condition saved under an old
+    # answer keeps it for the life of the campaign, silently and for ever.
+    #
+    # The namespaces the vocabulary owns are rebuilt outright, which is the only way to
+    # retire an answer; anything outside them was added by `_apply_ability_document` on
+    # top of `tags_for` and is the document's to keep. Deciding by namespace rather than
+    # by "is this tag still in TAGS somewhere" is deliberate: a retired tag is by
+    # definition no longer in TAGS, so that test keeps exactly the tags it should drop.
+    kept = tuple(t for t in stored
+                 if not t.startswith(OWNED_PREFIXES) and t not in tags_for(key))
+    return tags_for(key) + kept
 
 
 def from_dict(d: dict) -> ActiveEffect:

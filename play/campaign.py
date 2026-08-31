@@ -210,6 +210,12 @@ class Campaign:
                 "fallen": dict(self.scene.fallen),
                 "heat": dict(self.scene.heat),
                 "market_taken": self.scene.market_taken,
+                # Written by `spawn` and read by `begin_encounter`, which is the next
+                # turn — so the one field whose entire life spans a turn boundary was
+                # the one the save dropped. A restart between the ambush being set up
+                # and the fight starting put every archer back at the forty-foot
+                # default, however far the spawn said they were.
+                "spawn_feet": self.scene.spawn_feet,
                 "biome": self.scene.biome,
                 "pending_intents": self.scene.pending_intents,
                 "pending_outcomes": self.scene.pending_outcomes,
@@ -295,6 +301,8 @@ class Campaign:
             # nothing has been bought today, which is the right answer for them.
             market_taken={str(k): int(v)
                           for k, v in (s.get("market_taken") or {}).items()},
+            spawn_feet={str(k): int(v)
+                        for k, v in (s.get("spawn_feet") or {}).items()},
             biome=s.get("biome", ""),
             pending_intents=s.get("pending_intents", []),
             pending_outcomes=s.get("pending_outcomes", []),

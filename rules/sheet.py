@@ -1070,7 +1070,12 @@ class Actor:
         """
         from . import states
 
-        return next((e.key for e in self.effects
+        # Falls back to the name, then to a word, because the answer doubles as the
+        # "" that means "nothing stops you". An effect carrying `state.unable.*` with no
+        # key would otherwise block according to `has_state` and not according to
+        # `can_act` — which is exactly the document-declared case `states.stops` promises
+        # to serve.
+        return next((e.key or e.name or "unable to act" for e in self.effects
                      if states.stops(e.tags, action)), "")
 
     def blocking_condition(self, action: str = "any") -> str | None:

@@ -178,17 +178,48 @@ def test_an_incapacitated_target_is_manoeuvred_automatically(engine, scene):
 
 def test_a_stunned_target_gives_a_four_bonus(engine, scene):
     """"If your target is stunned, you receive a +4 bonus on your attack roll to perform
-    a combat maneuver against it." (CRB p.199)"""
-    scene.get("c1").add_condition("stunned")
-    # Stunned blocks acting, so the target is also incapacitated — check the modifier is
-    # assembled on a target that can still act.
-    scene.get("c1").remove_condition("stunned")
+    a combat maneuver against it." (CRB p.199)
+
+    This could not be tested until the vocabulary split: `automatic` was read off
+    `can_act()`, so a stunned target succeeded with no roll and there was no attack roll
+    for the +4 to appear on. The test added `stunned`, removed it again and measured the
+    base — the bonus it is named for went unchecked. 1e gives the bonus precisely
+    because a stunned creature CAN still resist; the clause that skips the roll is
+    "immobilized, unconscious, or otherwise incapacitated", which is a different set.
+    """
     kesst = scene.pc()
     base = sum(m.value for m in kesst.cmb_modifiers("trip"))
-    scene.get("c1").add_condition("shaken")   # something that does not stop it acting
+    scene.get("c1").add_condition("stunned")
+
     res, prompts = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                                   "params": {"manoeuvre": "trip"}}], faces=[10])
-    assert sum(b["value"] for b in prompts[0]["breakdown"]) == base
+
+    assert prompts, "a stunned target still resists, so the roll must be asked for"
+    assert sum(b["value"] for b in prompts[0]["breakdown"]) == base + 4
+
+
+def test_a_body_on_the_floor_is_never_handed_a_die_to_roll(engine, scene):
+    """Found by an adversarial review, under a green suite.
+
+    The automatic clause moved from `not can_act()` — true for eleven condition rows —
+    to the `helpless` flag, which sits on five. `dead` and `stable` are in the gap, so
+    the player was offered a d20 against a corpse, and could fail it. That is the same
+    insult the swing path records at `_resolve_attack`: "the player was asked to roll a
+    d20 at a body on the floor".
+    """
+    for key, hp in (("dead", -20), ("stable", -3), ("dying", -3)):
+        s = Scene(location_id="5bbd0c40345f")
+        s.add(load_pc("fixtures/pc-kesst.json"))
+        s.add(instantiate("thug", scene=s, name="the thug"))
+        body = s.get("c1")
+        body.hp = hp
+        body.add_condition(key, source="probe")
+
+        res, prompts = play(Engine(s, Dice(seed=4)),
+                            [{"op": "attack", "actor": "pc", "target": "c1",
+                              "params": {"manoeuvre": "grapple"}}])
+        assert prompts == [], f"a d20 was asked for against a {key} body"
+        assert res.outcomes[0].verdict == "success"
 
 
 def test_grappling_grapples_both_of_you(engine, scene):

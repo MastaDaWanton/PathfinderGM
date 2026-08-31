@@ -100,6 +100,54 @@ def test_being_unable_to_act_is_not_the_same_as_being_out_of_the_fight():
     assert nauseated.blocking_key("move") == ""
 
 
+def test_a_state_that_only_a_document_declares_still_stops_actions():
+    """`states.stops` promises a document may declare `state.unable.*` and be obeyed
+    without a row in the condition table. It was half true: `has_state` saw such an
+    effect and `can_act` did not, because the predicate returned the effect's KEY and a
+    document-declared state need not have one — so an empty string read as "nothing
+    stops you". Found by review, under a green suite, because nothing the app builds
+    today lacks a key.
+    """
+    from rules.activeeffect import ActiveEffect
+    from rules.sheet import from_dict
+
+    a = from_dict({"name": "Probe", "kind": "npc", "hp": 20, "hp_max": 20,
+                   "abilities": {k: 12 for k in ("str", "dex", "con",
+                                                 "int", "wis", "cha")}}, ref="c1")
+    a.effects.append(ActiveEffect(name="hexed", kind="condition", key="",
+                                  tags=("state.unable.hexed",)))
+    assert a.has_state("state.unable")
+    assert not a.can_act(), "the vocabulary said no and can_act said yes"
+    assert a.blocking_condition() == "hexed", "and the refusal has to name something"
+
+
+def test_retiring_a_tag_reaches_campaigns_already_on_disk():
+    """Tags are written into the save, so the vocabulary and a saved condition are two
+    copies of one fact — the shape law 1 exists to prevent, hiding in the persistence
+    layer. Every test builds its actors fresh, so nothing would ever notice.
+
+    Adding was the easy half. A union alone is a one-way ratchet: a tag the vocabulary
+    RETIRES never reaches an old save, and the stale one is written straight back on the
+    next save, so a condition keeps a retired answer for the life of the campaign. The
+    namespaces this file owns are therefore rebuilt outright, and only tags outside them
+    — which is what an ability document appends — survive from the record.
+    """
+    from rules.activeeffect import from_dict as effect_from_dict
+    from rules.states import tags_for
+
+    got = effect_from_dict({
+        "kind": "condition", "key": "fascinated", "name": "Fascinated",
+        "tags": ["state.unable.fascinated",       # still granted today
+                 "state.gone.retired",            # a vocabulary answer since withdrawn
+                 "document.own.flourish"]})       # an ability document's own
+
+    assert "state.gone.retired" not in got.tags, (
+        "a retired vocabulary answer survived the save and will be written back")
+    assert "document.own.flourish" in got.tags, (
+        "a document's own tag was destroyed by rebuilding from the key")
+    assert set(got.tags) >= set(tags_for("fascinated"))
+
+
 # The condition names the four ending-sites each carried before `recovery.*` existed,
 # quoted verbatim so the tags can be checked against what they replaced rather than
 # against themselves. Copies drift: travel forgot `stable`, and only resurrection was
@@ -134,6 +182,80 @@ def test_the_recovery_families_hold_exactly_the_lists_they_replaced():
     assert "dead" not in {k for k, t in TAGS.items() if "recovery.hit-points" in t}, (
         "cure light wounds would raise the dead: resurrection is the only caller "
         "entitled to remove `dead`, which is why it names the key itself")
+
+
+# Literal condition keys still named in app code, with why each file is entitled to
+# them. A ceiling per file rather than a total, because a total cannot tell a site being
+# REMOVED from one being MOVED — the same reason `_CLOCK_SITES` is a list of exemptions
+# somebody had to write rather than a number.
+#
+# What is left is almost entirely category (a): the engine's own mechanical writers. 1e
+# says a character below 0 hit points is unconscious and dying, and the code that writes
+# that has to name those conditions — widening any of these guards to a family is how a
+# creature becomes unkillable, because a dying actor would never cross into dead.
+_LITERAL_KEY_SITES = {
+    "rules/sheet.py": (34, "apply_hp_state, apply_nonlethal_state, bleed_out, the "
+                           "ability-zero states and rest's exhausted-to-fatigued "
+                           "downgrade — the writers of the 1e ladders themselves"),
+    "rules/engine.py": (11, "the dying/stable resolution, flat-footed and stunned as "
+                            "combat rules, grappled as a maneuver result, and dead as "
+                            "'this square holds a corpse'"),
+    "play/downed.py": (6, "the four rungs of the hit-point ladder, read where "
+                          "apply_hp_state wrote them; the fifth rung asks the "
+                          "vocabulary"),
+    "rules/survival.py": (4, "the fatigue ladder: thirst escalates fatigued to "
+                             "exhausted, and asks for the key it is about to write"),
+    "play/views.py": (3, "resurrection naming `dead` (the only caller entitled to "
+                         "remove it), the life-debt it charges for, and the stance "
+                         "toggle whose key comes from a class document"),
+}
+
+
+def test_no_new_site_matches_a_condition_by_name():
+    """Law 1 in the form that can be checked: systems ask the vocabulary, they do not
+    match strings. Measured before this stage, by AST census over the app: 107 literal
+    condition-key mentions against 12 tag queries — and ten of those twelve asked the
+    same single query, so nine of the eleven tag families rules/states.py ships had no
+    readers at all.
+
+    The drift that bought: `play/downed.py` reported seven conditions that cannot act as
+    fit for a turn, `gm/watcher.py` missed five of the six `state.down` members, and
+    four sites carried the same four condition names between them and had already
+    disagreed about which four.
+
+    A ceiling per file, and it may only fall. The remainder is the engine writing the
+    conditions 1e names — those must stay literal, because widening a death guard to a
+    family means a dying actor never crosses into dead.
+    """
+    calls = {"has_condition", "add_condition", "remove_condition"}
+    found: dict[str, int] = {}
+    for folder in ("rules", "play", "gm", "world", "tools"):
+        for path in sorted(Path(folder).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            hits = sum(
+                1 for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and node.args
+                and (node.func.attr if isinstance(node.func, ast.Attribute)
+                     else getattr(node.func, "id", "")) in calls
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str))
+            if hits:
+                found[path.as_posix()] = hits
+
+    unlisted = {k: v for k, v in found.items() if k not in _LITERAL_KEY_SITES}
+    assert not unlisted, (
+        f"a new system is matching conditions by name: {unlisted}. Ask the vocabulary "
+        f"— has_state('state.down'), clear_states('recovery.rest') — so the next state "
+        f"anyone adds participates without editing this file.")
+
+    for path, (ceiling, why) in _LITERAL_KEY_SITES.items():
+        hits = found.get(path, 0)
+        assert hits <= ceiling, (
+            f"{path} names {hits} literal condition keys against a ceiling of "
+            f"{ceiling} ({why}).")
+        assert hits >= ceiling - 1, (
+            f"{path} is down to {hits} — lower the ceiling in _LITERAL_KEY_SITES to "
+            f"{hits} so the ratchet keeps its grip.")
 
 
 # --- law 2: one applicator, one ticker ------------------------------------------------
@@ -463,10 +585,8 @@ def test_every_content_cache_is_isolated_between_tests():
 # Everything else edits the store behind the engine's back.
 _STORE_EDITORS = {
     "rules/sheet.py": "the applicator's own implementation",
-    # _drain_periodic left this list in stage 4b — it goes through remove_effects now
-    # and says which pool ran dry. One edit remains, and it is the dispel.
-    "rules/engine.py": "stage 5: the dispel path removes a record directly instead of "
-                       "going through remove_effects",
+    # _drain_periodic left this list in stage 4b and the dispel path in stage 5, which
+    # was the last one: `rules/engine.py` no longer touches the store at all.
 }
 
 
@@ -562,7 +682,6 @@ _UNSAVED_SCENE_FIELDS = {
     "log": "transient — rebuilt each turn",
     "bleeding": "transient — read and cleared within the turn that fills it",
     "hazards": "transient — read and cleared within the turn that fills it",
-    "spawn_feet": "stage 5: lost across exactly the turn boundary it is needed on",
 }
 
 
