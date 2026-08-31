@@ -154,7 +154,29 @@ constructors had zero call sites in the repo. They are saved now, restored witho
 `place()` so the grid is not double-counted, with ids preserved because `Ward.manifest_id`
 is a foreign key. `wards` and `manifests` are gone from the unsaved-field allowlist.
 
-*Wards, manifestations and blood pools as scene-side EFFECT KINDS — not done.* This is
+*The scene's one ticker — done* (`193c0cd`). Wards and manifestations had an expiry
+loop each, three lines apart, disagreeing about teardown and about whether an ending was
+worth mentioning. `Scene.tick_effects` is the one loop and `_end_standing` the one door
+out, so nothing leaves the scene without both its teardown and its tell — a ward tied to
+a cured condition now says so, and a manifestation always gives its squares back.
+`rules/engine.py` is relabelled in the clock allowlist from debt to destination, the same
+standing `rules/sheet.py` has: the law is one ticker per OWNER, and the Actor and the
+Scene now each have exactly one.
+
+They were deliberately not rewritten into generic `ActiveEffect` records. A
+manifestation's squares are a mutation of the grid that only `lift` undoes, and
+`ActiveEffect` has no teardown hook — a generic ticker would drop the record and leave a
+fog cloud's squares in `grid.obscuring` for the session, with no fog in the room to
+explain why it was blind. One ticker per owner is the law; one dataclass for every kind
+of thing is not.
+
+*Blood pools stay as they are*, and the measurement is the reason: they carry no
+`rounds_left` at all, so they are not a clock and not law 2's business. Folding them into
+`Manifestation` is de-duplication with a live UI contract attached — `table.html` reads
+`b.at` as a bare square while a manifestation carries `squares` — and belongs in its own
+change.
+
+*Superseded:* This is
 the structural half, and its whole remaining benefit is deleting one more line from
 `_CLOCK_SITES`. It is left because it is genuinely expensive and the cost is concentrated
 in places where a hasty change is silent: `ActiveEffect` has no teardown hook, so expiry
