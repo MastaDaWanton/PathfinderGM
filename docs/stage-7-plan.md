@@ -1,7 +1,8 @@
 # Stage 7 — refusals
 
-The plan of record for stage 7 of `docs/compliance-plan.md`. Every number below was
-measured against the code and the twelve real campaigns.
+The plan of record for stage 7 of `docs/compliance-plan.md`. Written after a five-agent
+reconnaissance with a probe stage, and every number below was measured against the code
+and the twelve real campaigns rather than estimated.
 
 ## The rule
 
@@ -15,155 +16,192 @@ From `docs/design-contract.md`:
 > **Validators name the fix, not the fault.** "No pool called 'fury'. Declare it under
 > pools, or name one of: ki, rage" — every message tells the author what to type next.
 
-## The mechanism, read out of the source
+## The census, classified
 
-An `IntentError` carries a `check` kind, and the kind decides what the turn costs:
+37 explicit non-suspend raises are reachable from `run()`; 35 more sit inside `validate()`'s
+five checkers. Against them stand **18 printable refusals** (15 in `rules/engine.py` with
+`effects=[]` and a refusal tell, plus 3 added by stage 5 in `play/downed.py`) — the
+audit's 13, plus what later stages added.
 
-| kind | count in `rules/engine.py` | what the agent does |
-|---|---|---|
-| `legality` | **35** | appends the rejection and **regenerates** |
-| `refs` | 26 (+2 `reference`) | **repaired in code** — spawns the people the GM described, drops a trade aimed at nobody |
-| `schema` | 10 | appends the rejection and regenerates |
+Classifying the 37 by the plan's own test — *a raise is correct only when a different
+intent would have worked*:
 
-Thirty-five is exactly the audit's "35 resolution-time raises": it is the count of
-`legality`. Only `refs` has code repairs; everything else costs a model call and asks
-again, to a ceiling of **five attempts** for a player turn and three for an NPC.
+| verdict | count |
+|---|---|
+| **correct to raise** — the model can name another item, target, biome, seller | **22** |
+| **must become printable** | **4** |
+| **unreachable in the app** | **11** |
 
-### The split that matters: 24 are retried, 10 are a 502 on the spot
+The eleven are dead code of one shape: every `"nobody here to X"` fallback that fires when
+`scene.pc()` returns None. `Scene.depart` refuses to remove the PC, so none of them can
+happen.
 
-AST-verified, the file holds **34** legality raises (the audit's 35 was a string count
-that caught one occurrence which is not a raise). They divide by *where they fire*, and
-the two halves behave nothing alike:
+**The four:**
 
-| where | count | what the player gets |
-|---|---|---|
-| validation — `_check_legality` 10, `_check_cast` 7, `_check_move` 6, `_check_craft` 1 | **24** | up to five model attempts, then a graceful degrade |
-| resolution — inside the `_op_*` handlers | **10** | **HTTP 502 immediately, no retry** |
+| site | what |
+|---|---|
+| `_op_resource:2485` | an empty or non-existent pool |
+| `_op_cast:3251` | out of slots, failing **mid-list** after earlier slots were spent |
+| `_op_buy:3168` | the item is not on this merchant's counter today |
+| `_op_loot:2693` | the body departed between validate and run |
 
-The resolution ten are `_op_use_item` (×3), `_op_attack`, `_op_forage`, `_op_sell`,
-`_op_buy`, `_op_use_ability`, `_op_resource`, `_op_cast`. `play/views.py:_advance` catches
-them and returns *"The engine refused the GM's intents: …"* with **`c.transcript.pop()`** —
-so the player types a sentence, is told the GM failed, and their own words are deleted
-from the record. Its comment says reaching there "means validation and resolution have
-drifted apart", which is true and is the point: these are not drift, they are ten ordinary
-things a player can try. An empty ki pool is not a bug.
+An earlier pass of this plan said "ten sites". That was the raw count of `legality` raises
+inside `_op_*` handlers, before classification; most of them are correct to raise, because
+"you are not carrying that dagger" is a refusal a different intent answers. Four is the
+number.
 
-That is the buried 502, precisely located, and it is ten sites rather than thirty-five.
+## Why a resolution-time raise is strictly worse than a validate-time one
 
-Reproduced with the plainest actions in the game, against a real engine:
+`play/views.py:_advance` catches it **once**, returns HTTP 502 — *"The engine refused the
+GM's intents: …"*, with the raw engine string — and calls **`c.transcript.pop()`**. The
+player types a sentence, is told the GM failed, and their own words are deleted from the
+record. There is no retry: these fire during `run()`, after `validate()` has passed, so
+the five-attempt schedule never sees them.
 
-    use an item they do not have    LEGALITY -> use_item: Kesst is not carrying '…'
-    sell something not carried      LEGALITY -> sell: Kesst is not carrying '…'
+A validate-time raise at least gets the schedule and the graceful degrade at
+`gm/agent.py:339`.
 
-A player writes "I drink my healing potion" without one and the app answers 502 and
-erases what they wrote. Both fire during `run()` *after* `validate()` has passed, so the
-five-attempt retry loop never sees them — there is no degrade, no second try, nothing.
+Measured cost of the retry path, from the real campaigns: **261 turn records, 557 model
+calls, median 8.7s each**. Five burned planner attempts is about 44 seconds and then a
+sentence that answers nothing; the degraded line appears 4 times in the real transcripts.
 
-Note what is already right: the messages name the fix. *"Kesst is not carrying 'X'. They
-have: …"* is exactly the contract's style. **It is the shape that is wrong, not the
-wording** — which is why stage 7 is a mechanical change to ten call sites and not a
-rewriting exercise.
+### And one class that is worse than a 502
 
-Exhaustion in the *validation* half has two ends, and only one of them is graceful:
+`_advance` catches `(IntentError, ValueError)` and **not `KeyError`** — while the NPC path
+at `views.py:1207` catches all three. There are 31 `self.scene.actors[…]` subscripts inside
+`_op_*` handlers, and four are reachable from a list that already passed validation:
+travel-then-damage, travel-then-heal, travel-then-check, travel-then-use_item. Verified
+directly:
 
-- the normal path degrades to a `narrate_only` plan with an honest sentence — *"You try —
-  '…' — but the moment does not answer"*;
-- `gm/agent.py`'s corrections branch ends in a **bare `raise` on the last attempt**,
-  which escapes `plan_turn` and reaches `play/views.py` as an HTTP 502. That is the
-  buried 502 the contract names, and it is a single line.
+    travel to the forest, then damage c1  ->  KeyError('c1')
 
-## What play actually costs — and how it corrects the premise
+Django has no custom exception middleware, so that is a **500 with a traceback**, not a
+502. Only `_op_attack` carries the defensive re-check that converts it to an `IntentError`.
 
-Across **353 logged turns** in the twelve real campaigns:
+### The mid-list case, measured
 
-- **73 turns (21%) hit at least one rejection**, burning **186 model attempts** — about
-  half a wasted call per turn, and on a local model a wasted call is most of a minute.
-- 2 turns degraded to *"the moment does not answer"*.
+Six `cast` intents in one list **pass** validate against two prepared slots, because
+`_check_cast` reads the pre-run count and checks the whole list before running any of it.
+The third raises at `engine.py:3251` — by which time two slots are gone and two fireballs
+have landed. The 502 throws all of it away.
 
-By kind, and this is the finding that reframes the stage:
+Do **not** fix this by making validate simulate the list. That is a second resolver.
 
-| kind | rejections in real play |
+## What play actually pays for
+
+Across **353 logged turns**: 73 (21%) carried at least one rejection, burning **186 model
+attempts**. By kind:
+
+| kind | rejections |
 |---|---|
 | `schema` | **111** |
 | `judgement` | 30 |
 | `legality` | **4** |
-| `refs` | 5 |
+| `refs` | 3 |
 
-**The 35 legality raises are not what play is paying for.** Legality fired four times in
-353 turns. The cost is overwhelmingly `schema` — the model omitting a required param:
-`move: missing required param(s) zone` ×17, `spawn: … template` ×13, `travel: … biome`
-×13.
+The legality four were: two can-act refusals (both about an **NPC**, both retried fine),
+`rest: there is a fight going on`, and `attack: a trip needs a target`.
 
-That does not make the legality class unimportant: when it hits, it is severe (a petrified
-character's turn burned every attempt and reached the player as a blank page, which is
-what stage 5 fixed at the gate rather than at the refusal). It is severe **and rare**.
-Schema is mild **and constant**. Stage 7 should say so and address both, rather than
-classifying 35 raises that almost never fire and calling the stage done.
+So the buried-502 class is **severe and rare**; the schema class is **mild and constant**.
+Stage 7 must address both, and must not be justified as fixing the thing that fires four
+times in 353 turns.
 
-### The worst single message
+### The `nauseated` hole is real, and has never fired
 
-`move: missing required param(s) zone` — 17 occurrences, and the next attempt fixed it
-only **12%** of the time. The model is not learning from it. Compare
-`give: missing required param(s) item`, which resolved next-attempt 80% of the time. The
-difference is not obviously the message: it is worth finding out what it is, because
-seventeen occurrences at 12% is roughly forty wasted model calls in twelve campaigns.
+Sweeping all 31 shipped conditions through `downed.state_of` and `validate`, `nauseated`
+is the **only** condition where the turn gate calls the PC playable and the guard then
+refuses their ops. Every other blocking condition already returns `held` / `dying` /
+`stable` / `dead` and never reaches the model — which is what stage 5 fixed.
 
-### What actually predicts a schema rejection
+Over 261 real turns the guard fired exactly **twice**, both times about an NPC, both
+retried successfully on the next attempt. **Zero PC firings.**
 
-Missing-param rejections against how often each op was attempted, over the same 353
-turns. Every op with a **0%** rate has no required params at all — an op that requires
-nothing cannot fail this way — so the comparison that matters is within the rest:
+And the reason those two fired at all is worth more than the hole: `gm/prompts.py`'s
+`scene_brief` names hit points, gender, heritage, class, level and class abilities — and
+**never names a single condition**, on the PC or on anyone else in the scene. Probed with
+a nauseated PC and a shaken NPC, the words "nauseated", "shaken" and "condition" are all
+absent. The NPC-turn prompt *does* say "their conditions are: shaken". So on the player-turn
+path the model is **structurally unable to know** that c1 is dead, and is then corrected
+for not knowing.
+
+## The contract's own example sentence is unimplemented
+
+The design contract's worked example of a good message is verbatim:
+
+> "No pool called 'fury'. Declare it under pools, or name one of: ki, rage"
+
+What the app prints, from `engine.py:2485` via `sheet.py:2018`, is `resource: no fury to
+spend.` — **the identical sentence whether the pool is empty or has never existed.**
+
+And the same mechanic already has a correct answer twelve hundred lines away:
+`_ability_refusal` refuses an unaffordable ability *printably* — "Blood Spike costs 2 from
+the blood pool and Kesst Vayr has 0." — with a docstring naming "the untrained-check /
+busy-forage shape". One mechanic, two answers, and the good one is the one nobody reused.
+
+Two more name the fault rather than the fix: `ability_damage: "no such ability 'zzz'"`
+does not list the six abilities, and `use_ability: … has no ability called 'x'. Their paths
+are none.` names the paths instead of the ability names — while `gm/prompts.py` already
+computes exactly the list it should print.
+
+### A hypothesis the data did not support
+
+Do messages that name the fix cost fewer retries than messages that name the fault?
+Measured: **32% resolved next attempt for fix-naming messages against 42% for
+fault-naming** — the opposite direction. Small samples and a crude classifier, so this is
+not evidence the rule is wrong; it is evidence stage 7 must not be *justified* on a claim
+its own data contradicts.
+
+### What does predict a schema rejection
+
+Missing-param rejections against attempts, same 353 turns. Every op with a **0%** rate has
+no required params — so the comparison is within the rest:
 
 | op | required param | attempts | rejections | rate |
 |---|---|---|---|---|
 | `move` | `zone` | 2 | 17 | **89%** |
 | `sell` / `loot` | `item` / `from_` | 2 / 4 | 2 / 4 | 50% |
 | `spawn` / `travel` | `template` / `biome` | 14 / 15 | 13 / 13 | ~47% |
-| `begin_encounter` | `sides` | 8 | 4 | 33% |
 | `give` | `item` | 14 | 5 | 26% |
 | `check` | `skill` | 20 | 6 | 23% |
-| `use_ability` | `ability` | 6 | 1 | 14% |
 | `attack` | *(none)* | 53 | 0 | 0% |
 
-The pattern is not which ops are demonstrated in the prompt — `attack` is undemonstrated
-and never fails, `travel` is demonstrated and fails half the time. It is **what the
-required param is made of**. `ability`, `item` and `skill` are things the player's own
-sentence names — "I use blood rage", "I give him the dagger". `zone` is engine
-vocabulary: the player writes "I back toward the door" and nothing in that maps to
-engaged / near / far. `template`, `sides` and `from_` are the same kind of thing.
+It is not which ops the prompt demonstrates — `attack` is undemonstrated and never fails;
+`travel` is demonstrated and fails half the time. It is **what the required param is made
+of**. `ability`, `item` and `skill` are things the player's own sentence names. `zone` is
+engine vocabulary: the player writes "I back toward the door" and nothing in that maps to
+engaged / near / far. `template`, `sides` and `from_` are the same.
 
-So the expensive schema failures are the ones where the model is being asked to supply a
-value the fiction never contains — which is a job for code, in the shape `refs` repairs
-already have, not for another attempt at the same question. (`move`'s denominator is
-small — two successes against seventeen rejections — so 89% is directional, not precise.)
+The expensive failures are where the model is asked for a value the fiction never
+contains — work for code, in the shape the `refs` repairs already have. (`move`'s
+denominator is two; 89% is directional, not precise.)
 
-### A hypothesis the data did NOT support
+## Substages
 
-The contract's rule invites the obvious test — do messages that name the fix cost fewer
-retries than messages that name the fault? Measured: **32% resolved next attempt for
-fix-naming messages against 42% for fault-naming ones**, i.e. the opposite direction.
-Small samples and a crude classifier, so this is not evidence the rule is wrong; it is
-evidence that "name the fix" has not been shown to reduce retry cost, and stage 7 must not
-be justified on a claim its own data contradicts.
+### 7a — the 500 and the 502 stop being reachable
+`_advance` catches `KeyError` like the NPC path already does, and the four
+travel-then-anything cases get the defensive re-check `_op_attack` already carries. One
+handler, one helper.
 
-## Substages (draft, pending the reconnaissance)
+### 7b — the four refusals become printable Outcomes
+`_op_resource`, `_op_cast`, `_op_buy`, `_op_loot`. `_ability_refusal` is the worked
+example to copy, not to reinvent. The mid-list cast keeps what it already spent and says
+so; validate must not be taught to simulate.
 
-### 7a — the buried 502 stops being reachable
-The bare `raise` on the last attempt of the corrections branch. One line, and it is the
-only path from a refusal to a blank page.
+### 7c — the messages that name the fault
+The contract's own `fury` sentence, implemented, with the empty-pool and no-such-pool
+cases separated. Then `ability_damage` and `use_ability` printing the lists they already
+have to hand.
 
-### 7b — the legality raises that no rewrite can satisfy
-Classify all 35 by the plan's own test — **a raise is correct only when a different
-intent would have worked**. "attack: no such weapon" is repairable and should raise;
-"you are nauseated and cannot attack" is not, and must be a printable Outcome. The parked
-items land here: `nauseated`, and the `cast` op stage 6 declined to widen the guard into
-precisely because it would have added a fourth op to this pile.
+### 7d — the brief names conditions
+The player-turn brief says what state everyone is in, so the model stops being corrected
+for not knowing. This is the root cause of both real legality firings, and it is a prompt
+change with a mechanical check behind it, not a prompt rule.
 
-### 7c — the schema class, which is where the turns actually go
-111 of 150 real rejections. Whether the answer is better messages, code repair in the
-shape `refs` already has, or schema defaults, is an open question this plan should answer
-with a measurement rather than a preference.
+### 7e — the schema class
+111 of 150 real rejections. Params made of engine vocabulary get inferred or defaulted in
+code; params the fiction supplies stay the model's to write.
 
-### 7d — the ratchet
-A refusal-shape test in the `_CLOCK_SITES` mould: every `legality` raise is either on the
-allowlist with a reason, or is a printable Outcome.
+### 7f — the ratchet
+Every `legality` raise reachable from `run()` is on an allowlist with a reason, or is a
+printable Outcome — the `_CLOCK_SITES` shape. Plus a test that `_advance` catches
+everything the NPC path catches.
