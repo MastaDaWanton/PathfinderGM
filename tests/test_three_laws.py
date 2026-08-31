@@ -100,6 +100,42 @@ def test_being_unable_to_act_is_not_the_same_as_being_out_of_the_fight():
     assert nauseated.blocking_key("move") == ""
 
 
+# The condition names the four ending-sites each carried before `recovery.*` existed,
+# quoted verbatim so the tags can be checked against what they replaced rather than
+# against themselves. Copies drift: travel forgot `stable`, and only resurrection was
+# ever entitled to remove `dead`.
+_WAS_HAND_WRITTEN = {
+    "recovery.hit-points": ("dying", "stable", "unconscious", "disabled"),
+    "recovery.rest": ("prone", "flat-footed", "shaken", "frightened", "panicked",
+                      "dazzled", "entangled", "grappled", "pinned", "staggered",
+                      "sickened", "nauseated", "dazed", "cowering", "fascinated"),
+}
+
+
+def test_the_recovery_families_hold_exactly_the_lists_they_replaced():
+    """Four sites named the same four conditions between them — `_op_heal`,
+    `Actor.rest`, `downed.resolve` and `views.resurrect` — and `Actor.rest` named
+    fifteen more. Nineteen literals in one function, and nothing tied any copy to any
+    other.
+
+    The families are checked against the lists rather than against themselves, because a
+    tag that silently gains or loses a member is the same defect in a new place. And a
+    family that grows is how the dangerous version of this arrives: `state.unable`
+    contains `dead`, so a `rest()` that swept a `state.*` family would raise a corpse.
+    """
+    from rules.states import TAGS
+
+    for family, was in _WAS_HAND_WRITTEN.items():
+        now = {k for k, tags in TAGS.items() if family in tags}
+        assert now == set(was), (
+            f"{family} no longer holds the list it replaced. "
+            f"gained {sorted(now - set(was))}, lost {sorted(set(was) - now)}")
+
+    assert "dead" not in {k for k, t in TAGS.items() if "recovery.hit-points" in t}, (
+        "cure light wounds would raise the dead: resurrection is the only caller "
+        "entitled to remove `dead`, which is why it names the key itself")
+
+
 # --- law 2: one applicator, one ticker ------------------------------------------------
 
 

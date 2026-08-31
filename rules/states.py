@@ -29,45 +29,63 @@ from __future__ import annotations
 # decides who gets quietly removed from the scene. Without it `tidy_the_fallen` aged a
 # petrified enemy out as a corpse two turns after the fight, statue and all, and
 # `downed.resolve` offered a paralyzed character a nap they would never wake from.
+#
+# The `recovery.*` family says what ENDS a state, which is a fact about the condition and
+# so belongs here rather than in a list at each site that ends things. Four sites carried
+# the same four names — heal, rest, the downed resolution and resurrection — and the
+# copies had already drifted: travel forgot `stable`, and only resurrection is entitled
+# to remove `dead`.
+#
+#   recovery.hit-points  being back above 0 hit points undoes it
+#   recovery.rest        a night's sleep ends it: the stale states that otherwise
+#                        quietly poison every roll for the rest of the campaign
+#
+# Sweeping an existing `state.*` family instead is the trap, and it is one keystroke
+# from the obvious implementation: `state.unable` contains `dead`, so a night's sleep
+# would raise a corpse; `state.held` contains `paralyzed`, so it would cure paralysis;
+# `state.senses` contains `blinded` and `deafened`, which in 1e end only with a spell.
 TAGS: dict[str, tuple[str, ...]] = {
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
-    "dying":       ("state.down.dying", "state.down.fallen", "state.unable"),
-    "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable"),
-    "stable":      ("state.down.stable", "state.down.fallen", "state.unable"),
+    "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
+                    "recovery.hit-points"),
+    "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable",
+                    "recovery.hit-points"),
+    "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
+                    "recovery.hit-points"),
     "petrified":   ("state.down.petrified", "state.unable"),
     # Helpless has always carried `can_act: False` in the condition row and no
     # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag
     # layer said a bound prisoner could act and the row said they could not.
     "helpless":    ("state.down.helpless", "state.unable"),
     "paralyzed":   ("state.unable.paralyzed", "state.held"),
-    "pinned":      ("state.held.pinned",),
-    "grappled":    ("state.held.grappled",),
+    "pinned":      ("state.held.pinned", "recovery.rest"),
+    "grappled":    ("state.held.grappled", "recovery.rest"),
     "stunned":     ("state.unable.stunned",),
-    "dazed":       ("state.unable.dazed",),
-    "cowering":    ("state.unable.cowering",),
+    "dazed":       ("state.unable.dazed", "recovery.rest"),
+    "cowering":    ("state.unable.cowering", "recovery.rest"),
     # Nauseated is impaired, not unable: 1e allows it "a single move action per turn"
     # and stops the rest. The condition row carried `can_act: False`, which the engine's
     # guard read as a block on attack, move AND check — denying the one action the rules
     # allow. What it stops is stated in BLOCKS rather than by a boolean that cannot say.
-    "nauseated":   ("state.impaired.nauseated",),
-    "staggered":   ("state.impaired.staggered",),
-    "disabled":    ("state.impaired.disabled",),
+    "nauseated":   ("state.impaired.nauseated", "recovery.rest"),
+    "staggered":   ("state.impaired.staggered", "recovery.rest"),
+    "disabled":    ("state.impaired.disabled", "recovery.hit-points"),
     "fatigued":    ("state.impaired.fatigued",),
     "exhausted":   ("state.impaired.exhausted",),
-    "sickened":    ("state.impaired.sickened",),
-    "shaken":      ("state.fear.shaken",),
-    "frightened":  ("state.fear.frightened",),
-    "panicked":    ("state.fear.panicked",),
-    "fascinated":  ("state.unable.fascinated",),
+    "sickened":    ("state.impaired.sickened", "recovery.rest"),
+    "shaken":      ("state.fear.shaken", "recovery.rest"),
+    "frightened":  ("state.fear.frightened", "recovery.rest"),
+    "panicked":    ("state.fear.panicked", "recovery.rest"),
+    "fascinated":  ("state.unable.fascinated", "recovery.rest"),
     "confused":    ("state.impaired.confused",),
     "blinded":     ("state.senses.blinded",),
     "deafened":    ("state.senses.deafened",),
-    "dazzled":     ("state.senses.dazzled",),
+    "dazzled":     ("state.senses.dazzled", "recovery.rest"),
     "invisible":   ("state.hidden.invisible",),
-    "prone":       ("state.position.prone",),
-    "flat-footed": ("state.position.flat-footed",),
+    "prone":       ("state.position.prone", "recovery.rest"),
+    "flat-footed": ("state.position.flat-footed", "recovery.rest"),
     "bleed":       ("state.wound.bleeding",),
-    "entangled":   ("state.held.entangled",),
+    "entangled":   ("state.held.entangled", "recovery.rest"),
     # The stances play has already minted. Buffs, not states: they are worn by choice.
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),

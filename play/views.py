@@ -280,9 +280,13 @@ def resurrect(request):
     if pc is None:
         return JsonResponse({"error": "the body is not in the scene"}, status=409)
 
-    # The mechanics, all through the ordinary applicators.
-    for gone in ("dead", "dying", "stable", "unconscious", "disabled"):
-        pc.remove_condition(gone)
+    # The mechanics, all through the ordinary applicators. `dead` is named here and
+    # nowhere else: this is the only caller entitled to remove it, which is why it is
+    # not in the `recovery.hit-points` family that heal, rest and the downed resolution
+    # share — one list covering all four would either break resurrection or let cure
+    # light wounds raise a corpse.
+    pc.remove_condition("dead")
+    pc.clear_states("recovery.hit-points")
     pc.nonlethal = 0
 
     factions = [f.get("name") for f in (c.world.factions or [])

@@ -2228,8 +2228,30 @@ class Actor:
 
     def remove_condition(self, key: str) -> None:
         key = key.strip().lower()
-        self.effects = [e for e in self.effects
-                        if not (e.kind == "condition" and e.key == key)]
+        self.remove_effects(kind="condition", match=lambda e: e.key == key)
+
+    def clear_states(self, query: str) -> list[str]:
+        """End every condition whose tags answer `query`, and say which went.
+
+        The one door for "everything that X ends". Four sites carried the same four
+        condition names between them — heal, rest, the downed resolution and
+        resurrection — and the copies had already drifted apart; the `recovery.*`
+        families in `rules.states` say it once instead.
+
+        Deliberately narrow: this takes a query and removes what answers it, so a caller
+        cannot reach past the vocabulary and hand-roll a list again. What each family
+        contains, and why sweeping a `state.*` family here would raise the dead, is
+        written where the families are.
+        """
+        from . import states
+
+        q = (query or "").strip().lower()
+        if not q:
+            return []
+        gone = self.remove_effects(
+            kind="condition",
+            match=lambda e: any(states.matches(str(t), q) for t in e.tags))
+        return [e.key for e in gone]
 
     def tick_conditions(self, rounds: int = 1) -> list[str]:
         """Expire everything timed. Kept as the name every caller knows; the work is
@@ -2325,18 +2347,11 @@ class Actor:
         floor = max(self.hp, 0)
         self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
 
-        woke = False
-        for gone in ("unconscious", "stable", "disabled", "dying"):
-            if self.has_condition(gone) and self.hp > 0:
-                self.remove_condition(gone)
-                woke = True
+        woke = bool(self.hp > 0 and self.clear_states("recovery.hit-points"))
         # You stand up in the morning. Waking still prone, shaken and entangled from a
         # fight the night before is the sort of stale state that quietly poisons every
         # roll for the rest of the campaign.
-        for over in ("prone", "flat-footed", "shaken", "frightened", "panicked",
-                     "dazzled", "entangled", "grappled", "pinned", "staggered",
-                     "sickened", "nauseated", "dazed", "cowering", "fascinated"):
-            self.remove_condition(over)
+        self.clear_states("recovery.rest")
         # A night's sleep is what fatigue is for. Exhaustion becomes fatigue instead.
         if self.has_condition("exhausted"):
             self.remove_condition("exhausted")

@@ -120,9 +120,8 @@ def resolve(campaign) -> Outcome:
     # An hour used to pass with nothing ticking at all — not conditions, not buffs,
     # not pools, not compulsions.
     scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
-    for gone in ("stable", "unconscious", "dying", "disabled"):
-        pc.remove_condition(gone)
     pc.hp = max(pc.hp, 1)
+    pc.clear_states("recovery.hit-points")
     lines.append(
         f"You come round about an hour later, face down where you fell, on "
         f"{pc.hp} hit point{'s' if pc.hp != 1 else ''}. Whoever was standing over you "

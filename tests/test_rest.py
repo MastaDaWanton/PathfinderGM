@@ -126,11 +126,33 @@ def test_you_are_on_your_feet_in_the_morning():
         assert not pc.has_condition(c), c
 
 
+def test_a_night_does_not_cure_what_a_night_does_not_cure():
+    """The trap in expressing rest's nineteen names as a tag query, and it is one
+    keystroke from the obvious implementation.
+
+    Sweeping an existing `state.*` family instead of the `recovery.*` one catches far
+    more than the list did: `state.unable` contains `dead`, so a night's sleep raises a
+    corpse; `state.held` contains `paralyzed`, so it cures a ghoul's paralysis;
+    `state.senses` contains `blinded` and `deafened`, which in 1e end only with remove
+    blindness or heal — an entire class of lasting consequence deleted by a nap. It
+    would also pre-empt the exhausted-to-fatigued downgrade three lines further on.
+    """
+    lasting = ("blinded", "deafened", "paralyzed", "confused", "petrified",
+               "bleed", "life debt")
+    pc = load_pc("fixtures/pc-kesst.json")
+    for key in lasting:
+        pc.add_condition(key, source="something lasting")
+    pc.rest("night")
+    for key in lasting:
+        assert pc.has_condition(key), f"a night's sleep cured {key}"
+
+
 def test_the_dead_do_not_rest():
     pc = load_pc("fixtures/pc-kesst.json")
     pc.hp = -50
     pc.apply_hp_state()
     assert pc.rest("night")["healed"] == 0
+    assert pc.has_condition("dead"), "a night's sleep raised the dead"
 
 
 # --- As an intent ------------------------------------------------------------------------

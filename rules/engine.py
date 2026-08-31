@@ -2071,9 +2071,11 @@ class Engine:
         nl_healed = nl_before - target.nonlethal
         temp_banked = sum(p.amount for p in target.temp_pools) - temp_before
         # The dying stop dying when they are back above zero; nothing else clears it.
-        for gone in ("dying", "stable", "unconscious", "disabled"):
-            if target.hp > 0 and target.has_condition(gone):
-                target.remove_condition(gone)
+        # `dead` is deliberately outside this family — resurrection is the only caller
+        # entitled to remove it, and one shared list either breaks that or lets cure
+        # light wounds raise a corpse.
+        if target.hp > 0:
+            target.clear_states("recovery.hit-points")
 
         # The tell owns everything the cure did. "Already unhurt" used to be the whole
         # sentence for a Blood Bender at full hit points, while the same drink was
