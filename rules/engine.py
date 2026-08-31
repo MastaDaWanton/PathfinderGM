@@ -1525,12 +1525,14 @@ class Engine:
             effects.append({"ref": actor.ref, "kind": "condition", "condition": cond})
             tell_bits.append(f"{actor.name} is {cond}.")
 
-        effects.extend(self._hp_state_effects(actor))
+        crossed = self._hp_state_effects(actor)
+        effects.extend(crossed)
 
         return Outcome(
             intent_id=intent.id, op="save", rolls=[roll], dc=resolved_dc.as_dict(),
             verdict=verdict, margin=margin, effects=effects,
-            tell=" ".join(tell_bits), because=intent.because,
+            tell=" ".join(tell_bits) + self._hp_state_tell(crossed),
+            because=intent.because,
         )
 
     # attack -------------------------------------------------------------------------------
@@ -1809,7 +1811,8 @@ class Engine:
                 state["stage"] = "attack"
 
         rolls = [_roll_from_dict(r) for r in state["rolls"]]
-        effects = list(state["effects"]) + self._hp_state_effects(defender)
+        crossed = self._hp_state_effects(defender)
+        effects = list(state["effects"]) + crossed
         any_hit = any(e.get("kind") == "damage" for e in effects)
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
@@ -1818,7 +1821,9 @@ class Engine:
             intent_id=intent.id, op="attack", rolls=rolls,
             dc={"value": target_ac, "explain": ac_note, "flat_footed": flat_footed},
             verdict="hit" if any_hit else "miss",
-            effects=effects, tell=" ".join(state["tells"]), because=intent.because,
+            effects=effects,
+            tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
+            because=intent.because,
         )
 
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
@@ -1924,13 +1929,15 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "condition",
                                     "condition": back, "from": f"failed {m['name']}"})
 
-        effects.extend(self._hp_state_effects(defender))
+        crossed = self._hp_state_effects(defender)
+        effects.extend(crossed)
         return Outcome(
             intent_id=intent.id, op="attack", rolls=[roll] if roll else [],
             dc={"value": cmd, "explain": cmd_note, "flat_footed": flat_footed,
                 "breakdown": [x.as_dict() for x in cmd_mods]},
             verdict=verdict, margin=margin, effects=effects,
-            tell=" ".join(bits), because=intent.because,
+            tell=" ".join(bits) + self._hp_state_tell(crossed),
+            because=intent.because,
         )
 
     def _ensure_encounter(self, initiator: str) -> bool:
@@ -2002,12 +2009,14 @@ class Engine:
         # Every creature the blow actually reached, which after interception is not always
         # the one it was aimed at. Keyed off the effects rather than off `target`, because
         # a redirected blow that drops the guardian has to knock *them* out.
+        crossed = []
         for ref in self._hurt_refs(hit):
-            effects.extend(self._hp_state_effects(self.scene.actors[ref]))
+            crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
+        effects.extend(crossed)
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=self._damage_tell(hit),
+            tell=self._damage_tell(hit) + self._hp_state_tell(crossed),
             because=intent.because,
         )
 
@@ -3302,13 +3311,18 @@ class Engine:
             state["i"] += 1
 
         effects = [cast_effect] + list(state["effects"])
+        crossed = []
         for ref in {e["ref"] for e in state["effects"] if e.get("kind") == "damage"}:
-            effects.extend(self._hp_state_effects(self.scene.actors[ref]))
+            crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
+        effects.extend(crossed)
 
         tells = [f"{actor.name} casts {spell.name} ({'; '.join(bits)})."]
         if dice:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
         tells.extend(state["tells"])
+        crossed_said = self._hp_state_tell(crossed).strip()
+        if crossed_said:
+            tells.append(crossed_said)
 
         # The riders, in two piles. The ones the engine can run — a manifestation, a
         # summon, an operation on another spell, anything waiting on a trigger — are run;
@@ -4956,6 +4970,56 @@ class Engine:
             {"ref": target.ref, "kind": "condition", "condition": c, "from": "hit points"}
             for c in target.apply_hp_state()
         ]
+
+    # What each hit-point state sounds like, said once. The narrator is fed tells and
+    # nothing else about mechanics, and until this existed the tell for a killing blow
+    # was "the thug takes 30 slashing damage." — the death was in `outcome.effects`,
+    # which the narrator may not read, so it was never told anybody died. It wrote
+    # wounded-man prose about a corpse and a repair pressed the death on afterwards.
+    #
+    # The voice is `_op_ability_damage`'s, which has said `f"{target.name} is {c}."` for
+    # these same conditions all along — the second copy of this rule, and the one that
+    # was not silent. Terse on purpose: a tell constrains the narrator, it does not
+    # decorate, and florid tells are the presentation layer leading the mechanic.
+    #
+    # `disabled` earns its clause because the bare game word is opaque — a narrator
+    # handed "the thug is disabled" writes nothing a player can picture, and the
+    # contract's own rule is that a fact the narrator needs becomes part of the tell.
+    _HP_STATE_SAID = {
+        "dead": "{name} is dead.",
+        "dying": "{name} is dying.",
+        "unconscious": "{name} is unconscious.",
+        "disabled": "{name} is disabled: still standing, but any real effort now costs "
+                    "blood.",
+    }
+
+    def _hp_state_tell(self, effects: list[dict]) -> str:
+        """The sentence that goes with what `_hp_state_effects` just wrote.
+
+        Returned rather than appended in place, because the five sites that cross a
+        hit-point threshold each build their tell differently — an attack's tell reads
+        nothing like a falling rock's — and the state has to arrive in the same sentence
+        the player is already reading.
+        """
+        keys = {str(e.get("condition") or "") for e in effects or []
+                if e.get("kind") == "condition"}
+        said = []
+        for e in effects or []:
+            if e.get("kind") != "condition":
+                continue
+            key = str(e.get("condition") or "")
+            # 1e writes both on the one blow and they are a single event to anybody
+            # reading, so the pair is said once rather than as two flat sentences.
+            if key == "dying" and "unconscious" in keys:
+                continue
+            line = self._HP_STATE_SAID.get(key)
+            if not line:
+                continue
+            if key == "unconscious" and "dying" in keys:
+                line = "{name} is unconscious and dying."
+            who = self.scene.actors.get(e.get("ref"))
+            said.append(line.format(name=who.name if who else "they"))
+        return (" " + " ".join(said)) if said else ""
 
 
 # --- (de)serialisation for the suspend/resume round trip --------------------------------

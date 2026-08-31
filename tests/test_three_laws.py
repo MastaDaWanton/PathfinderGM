@@ -504,6 +504,48 @@ def test_an_outcome_with_literal_effects_carries_a_tell():
         "tell:\n" + "\n".join(offenders))
 
 
+def test_crossing_a_hit_point_threshold_is_said_out_loud():
+    """The tell for a killing blow was `'the thug takes 30 slashing damage.'`
+
+    Measured at all three of 1e's thresholds: the condition was written into
+    `outcome.effects` and never into `outcome.tell`. The narrator is fed tells and
+    nothing else about mechanics, so it was never told anybody died — it wrote
+    wounded-man prose about a corpse, and `press_the_death` pressed the death on
+    afterwards. A repair that fires because the engine withheld the fact is the
+    severing failing in the direction nobody looks: the tell was not wrong, it was
+    silent.
+
+    Driven through the engine rather than grepped, because the tell is composed from
+    several pieces at five different sites and only the finished sentence matters.
+    """
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import from_dict
+
+    def fight(hp):
+        s = Scene(location_id="5bbd0c40345f")
+        for ref, kind, name, h in (("pc", "pc", "Kesst", 20),
+                                   ("c1", "npc", "the thug", hp)):
+            s.add(from_dict(
+                {"name": name, "kind": kind, "hp": h, "hp_max": 20, "level": 1,
+                 "class": "rogue" if kind == "pc" else None,
+                 "abilities": {k: 12 for k in ("str", "dex", "con",
+                                               "int", "wis", "cha")}}, ref=ref))
+        return s, Engine(s, Dice(seed=5))
+
+    for amount, expect in ((6, "is disabled"), (9, "is unconscious and dying"),
+                           (30, "is dead")):
+        scene, engine = fight(6)
+        got = engine.run(engine.validate(
+            [{"op": "damage", "actor": "pc", "target": "c1", "because": "she hits",
+              "params": {"amount": amount, "type": "slashing"}}]))
+        tell = got.outcomes[0].tell
+        written = sorted(c.key for c in scene.get("c1").conditions)
+        assert written, f"{amount} damage crossed no threshold; this proves nothing"
+        assert expect in tell, (
+            f"{amount} damage wrote {written} and the narrator was told only: {tell!r}")
+
+
 def test_the_narrator_is_fed_tells_and_never_effects():
     """The severing itself: the two functions that build the narrator's view of the
     turn read `.tell` (and `.because`) off outcomes and must never reach for
