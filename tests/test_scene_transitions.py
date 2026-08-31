@@ -168,9 +168,14 @@ def test_an_escort_named_in_with_comes_along(yard):
 
 
 def test_the_dying_stay_where_they_fell_even_when_named(yard):
-    """A dying escort is not an escort. They stay, whatever the intent says."""
+    """A dying escort is not an escort. They stay, whatever the intent says.
+
+    Set to a real dying state rather than to exactly 0 hit points, which is
+    *disabled* — conscious and walking, and a perfectly good escort.
+    """
     s, engine = yard
-    s.actors["c2"].hp = 0
+    s.actors["c2"].hp = -3
+    s.actors["c2"].apply_hp_state()
     travel(engine, **{"with": ["c2"]})
     assert set(s.actors) == {"pc"}
 

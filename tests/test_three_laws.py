@@ -546,6 +546,48 @@ def test_crossing_a_hit_point_threshold_is_said_out_loud():
             f"{amount} damage wrote {written} and the narrator was told only: {tell!r}")
 
 
+def test_a_creature_at_exactly_zero_is_not_a_corpse_to_anybody():
+    """Stage 5 claimed no two modules disagreed about "out of the fight" any more, and on
+    this case they still did. Exactly 0 hit points is *disabled* in 1e — conscious, on
+    its feet, taking initiative turns — and eleven sites spelled the question
+    `hp <= 0` instead of asking the vocabulary.
+
+    So a disabled creature was simultaneously: aged out of the scene as a body, left
+    behind when the party walked out, named in the walking-dead prose cut so its every
+    sentence was deleted, offered to the watcher for looting, stripped by the loot op,
+    hidden from the merchant panel, and skinnable — while it was standing there able to
+    act. The craft door said "The dead only" in its own docstring.
+
+    One question, `Actor.is_down`, which is `hp < 0 or state.down`.
+    """
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+    from gm import watcher
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    foe = instantiate("thug", scene=scene, name="the thug")
+    scene.add(foe)
+    engine = Engine(scene, Dice(seed=2))
+
+    foe.hp = 0
+    foe.apply_hp_state()
+    assert foe.has_condition("disabled") and foe.can_act(), "not the disabled case"
+
+    assert not foe.is_down, "disabled is not down; it is standing and acting"
+    assert scene.conscious("c1"), "and it is still in the fight"
+    assert not watcher._down(foe), "offered for looting while on its feet"
+
+    for _ in range(4):
+        engine.tidy_the_fallen()
+    assert "c1" in scene.actors, "a conscious creature was tidied away as a body"
+
+    engine.leave_behind()
+    assert "c1" in scene.actors, "and left behind, though it could have walked"
+
+
 def test_an_ability_that_deals_damage_can_kill():
     """Found by the stage-6 reconnaissance, and it is not a tell defect at all — it is
     the one underneath.

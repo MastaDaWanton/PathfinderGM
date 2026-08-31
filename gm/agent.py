@@ -567,7 +567,7 @@ class GMAgent:
         exactly the scene it was measured in, a tavern with one thug at -5 hp.
         """
         others = [a for r, a in self.engine.scene.actors.items()
-                  if not a.is_pc and a.hp > 0]
+                  if not a.is_pc and not a.is_down]
         return not others
 
     def _groom(self, text: str, *, earlier: list[str] | None = None,
@@ -632,7 +632,7 @@ class GMAgent:
         # Constitution-drained corpse at full hit points, which `hp <= 0` cannot see,
         # and which went on acting in every paragraph for the rest of the session.
         dead = [a.name for r, a in self.engine.scene.actors.items()
-                if not a.is_pc and (a.hp <= 0 or a.has_state("state.down.dead"))]
+                if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead"))]
         text, risen = narration_mod.cut_dead_men_walking(text, dead)
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
@@ -671,7 +671,7 @@ class GMAgent:
         # cut runs only when the scene is genuinely empty of living opposition, so a
         # real second wave (spawned, existing) is never touched.
         alone = not [a for r, a in self.engine.scene.actors.items()
-                     if not a.is_pc and a.hp > 0]
+                     if not a.is_pc and not a.is_down]
         if alone:
             text, ghosts = narration_mod.cut_phantom_opposition(text)
             if ghosts:

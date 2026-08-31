@@ -214,7 +214,11 @@ def test_skinning_a_carcass_puts_the_hide_in_the_satchel(client):
         c.scene.depart(ref)
     wolf = instantiate("guard dog", scene=c.scene, name="a dire wolf")
     c.scene.add(wolf)
-    wolf.hp = 0
+    # A carcass, not a creature at exactly 0 hit points — which in 1e is *disabled*:
+    # conscious, upright and able to act. `hp = 0` was shorthand for "dead" that the
+    # state machine never agreed with, and it let the player skin a living animal.
+    wolf.hp = -20
+    wolf.apply_hp_state()
     c.save()
 
     before = dict(c.scene.pc().inventory)

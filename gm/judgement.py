@@ -853,7 +853,7 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
     as anything else. Nothing here bypasses a check.
     """
     actor = scene.actors.get(ref)
-    if actor is None or not actor.can_act() or actor.hp <= 0:
+    if actor is None or not actor.can_act() or actor.is_down:
         return None
 
     mine = next((side for side, refs in (scene.sides or {}).items() if ref in refs), None)
@@ -1323,9 +1323,9 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
     if is_finishing_blow(player_text, scene):
         return None
     dead = {r for r, a in scene.actors.items()
-            if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))}
+            if not a.is_pc and a.is_down}
     living = [r for r, a in scene.actors.items()
-              if not a.is_pc and a.hp > 0 and not a.has_state("state.down")]
+              if not a.is_pc and not a.is_down]
     targets_dead = [r for r in raw_intents
                     if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
                     and str(r.get("target", "")) in dead]
@@ -1719,7 +1719,7 @@ def bulk_give_is_a_loot(raw_intents, scene) -> list:
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
     bodies = [ref for ref, a in scene.actors.items()
-              if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))]
+              if not a.is_pc and a.is_down]
     out = []
     for r in raw_intents:
         if (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
@@ -1752,7 +1752,7 @@ def inject_loot(raw_intents, player_text: str, scene) -> list:
     if pc is None:
         return raw_intents
     bodies = [ref for ref, a in scene.actors.items()
-              if not a.is_pc and (a.hp <= 0 or a.has_state("state.down"))]
+              if not a.is_pc and a.is_down]
 
     # Repair before append: the schema REQUIRES the loot the player declared, so the
     # model emits one — and on the second turn of a live session it emitted it with no
@@ -2231,7 +2231,7 @@ def note_heat(scene, outcomes) -> None:
     if not killed:
         return
     watchers = bool(scene.cast) or any(
-        not a.is_pc and a.hp > 0 and not a.has_state("state.down")
+        not a.is_pc and not a.is_down
         for a in scene.actors.values())
     if watchers:
         scene.heat = {"note": f"the player just killed {', '.join(killed)} in "

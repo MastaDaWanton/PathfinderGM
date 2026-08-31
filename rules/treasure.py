@@ -133,7 +133,9 @@ def take_from_fallen(scene, pc, rng=None) -> tuple[int, list[str]]:
             continue
         for ref in refs:
             foe = scene.actors.get(ref)
-            if foe is None or foe.hp > 0:
+            # The same reading as `xp.award_for_fallen`: half of "beaten" has full
+            # hit points, and a petrified foe dropped its purse nowhere.
+            if foe is None or (foe.hp > 0 and not foe.is_down):
                 continue
             got = worth(foe, rng)
             if got:

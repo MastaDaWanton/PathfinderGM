@@ -775,7 +775,7 @@ def _fallen(c) -> list[dict]:
     """Creatures in the scene that can be skinned or salvaged. The dead only."""
     return [{"ref": r, "name": a.name}
             for r, a in c.scene.actors.items()
-            if not a.is_pc and a.hp <= 0]
+            if not a.is_pc and a.is_down]
 
 
 def _at_market(c) -> bool:

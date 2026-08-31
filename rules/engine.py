@@ -1587,7 +1587,7 @@ class Engine:
                         self.scene.acted.add(intent.actor)
                         break
                 foes = [a.name for r, a in self.scene.actors.items()
-                        if r != intent.actor and not a.is_pc and a.hp > 0]
+                        if r != intent.actor and not a.is_pc and not a.is_down]
                 return Outcome(
                     intent_id=intent.id, op="attack",
                     effects=[{"ref": actor.ref, "kind": "battle_joined",
@@ -1956,7 +1956,7 @@ class Engine:
         """
         if self.scene.in_encounter:
             return False
-        combatants = [r for r, a in self.scene.actors.items() if a.hp > 0]
+        combatants = [r for r, a in self.scene.actors.items() if not a.is_down]
         if len(combatants) < 2:
             return False
 
@@ -2500,7 +2500,10 @@ class Engine:
             # `state.down.fallen`, not the whole family: petrified and helpless are
             # down and alive, and asking the family aged a petrified enemy out of the
             # scene as a corpse two turns after the fight — statue, treasure and all.
-            if a.is_pc or (a.hp > 0 and not a.has_state("state.down.fallen")):
+            # A body on the floor, which exactly 0 hit points is not — that is
+            # *disabled*: conscious, upright and taking turns, and it was being aged
+            # out of the scene as a corpse.
+            if a.is_pc or not (a.hp < 0 or a.has_state("state.down.fallen")):
                 self.scene.fallen.pop(ref, None)
                 continue
             age = self.scene.fallen.get(ref, 0) + 1
@@ -2556,7 +2559,7 @@ class Engine:
             # with the party and stood in the scene panel there for the rest of the
             # campaign. Bodies ageing out of a room the party is still in is one rule;
             # the party walking out is another, and it sheds the whole family.
-            if a.hp <= 0 or a.has_state("state.down"):
+            if a.is_down:
                 self.scene.depart(ref)
         return tells
 
@@ -2598,7 +2601,7 @@ class Engine:
                 # `stable` — which it forgot, so a stabilised body walked to the next
                 # biome with the party. The wider family for the same reason
                 # `leave_behind` uses it: a statue does not come along either.
-                cannot_come = actor.hp <= 0 or actor.has_state("state.down")
+                cannot_come = actor.is_down
                 if stays or cannot_come:
                     self.scene.depart(ref)
                     left.append(actor.name)
@@ -2669,7 +2672,11 @@ class Engine:
         body = self.scene.actors.get(str(intent.params.get("from_", "")))
         if body is None:
             raise IntentError("loot: no such body here", "refs")
-        if body.hp > 0 and not body.has_state("state.down"):
+        # The same question the watcher asks, spelled the same way. Both said
+        # `hp <= 0 or state.down`, which differs from `is_down` at exactly 0 hit
+        # points — and there the creature is *disabled*: conscious, upright, and
+        # being stripped of its belongings where it stood.
+        if not body.is_down:
             return Outcome(
                 intent_id=intent.id, op="loot", effects=[],
                 tell=(f"{body.name} is on their feet and very much attached to their "
@@ -3972,7 +3979,7 @@ class Engine:
         from . import xp as xp_mod
 
         pc = self.scene.pc()
-        if pc is None or pc.hp <= 0:
+        if pc is None or pc.is_down:
             return ""
         # Settled first and appended to every path out of here. Written as
         # `return line + self._settle_treasure()` on the paying branch only, a creature
@@ -3990,7 +3997,7 @@ class Engine:
             fallen = [a.name for side, refs in self.scene.sides.items()
                       if pc.ref not in refs
                       for a in (self.scene.actors.get(r) for r in refs)
-                      if a is not None and a.hp <= 0]
+                      if a is not None and (a.hp <= 0 or a.is_down)]
             if fallen:
                 return (f" No experience: {', '.join(sorted(set(fallen)))} "
                         f"{'carries' if len(set(fallen)) == 1 else 'carry'} no price in "
@@ -4019,7 +4026,7 @@ class Engine:
         from . import goods as goods_mod, treasure as treasure_mod
 
         pc = self.scene.pc()
-        if pc is None or pc.hp <= 0:
+        if pc is None or pc.is_down:
             return ""
         gold, names = treasure_mod.take_from_fallen(self.scene, pc, self.dice)
         if not gold:

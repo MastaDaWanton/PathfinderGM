@@ -1447,7 +1447,7 @@ def _merchant_here(scene):
     injectors) deliberately keeps working anywhere; this gates only the panel.
     """
     for ref, a in scene.actors.items():
-        if a.is_pc or a.hp <= 0:
+        if a.is_pc or a.is_down:
             continue
         if _MERCHANT.search(str(a.name or "")) or _MERCHANT.search(str(a.kind or "")):
             return a
