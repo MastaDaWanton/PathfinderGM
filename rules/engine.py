@@ -899,8 +899,35 @@ class Ward:
                 "stops_with": self.stops_with, "manifest_id": self.manifest_id}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Ward":
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+    def from_dict(cls, d: dict) -> "Ward | None":
+        """A saved ward, or None for a record too damaged to be one.
+
+        Defensive on purpose, in the shape `rules/guards.py` already uses. `owner` and
+        `trigger` have no defaults, so the obvious `cls(**{...})` raises TypeError on a
+        truncated record — inside `Campaign.load`, which `_resume` turns into
+        UnreadableSave, which means the whole campaign refuses to open because one fog
+        cloud was written badly. A hazard that cannot be read is a hazard to drop.
+        """
+        if not isinstance(d, dict) or not str(d.get("trigger", "")).strip():
+            return None
+        try:
+            return cls(
+                owner=str(d.get("owner", "") or ""),
+                trigger=str(d["trigger"]),
+                spec=dict(d.get("spec") or {}),
+                recipient=str(d.get("recipient", "target") or "target"),
+                caster=str(d.get("caster", "") or ""),
+                rounds_left=(None if d.get("rounds_left") is None
+                             else int(d["rounds_left"])),
+                source=str(d.get("source", "") or ""),
+                save=str(d.get("save", "") or ""),
+                dc=int(d.get("dc", 0) or 0),
+                save_effect=str(d.get("save_effect", "") or ""),
+                stops_with=str(d.get("stops_with", "") or ""),
+                manifest_id=str(d.get("manifest_id", "") or ""),
+            )
+        except (TypeError, ValueError):
+            return None
 
 
 @dataclass

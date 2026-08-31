@@ -453,8 +453,6 @@ _UNSAVED_SCENE_FIELDS = {
     "log": "transient — rebuilt each turn",
     "bleeding": "transient — read and cleared within the turn that fills it",
     "hazards": "transient — read and cleared within the turn that fills it",
-    "wards": "stage 4c/5: a restart deletes every thorn body and bleed ward",
-    "manifests": "stage 4c/5: a restart deletes the fog and leaves its squares",
     "spawn_feet": "stage 5: lost across exactly the turn boundary it is needed on",
 }
 

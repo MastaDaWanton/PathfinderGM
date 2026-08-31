@@ -19,7 +19,7 @@ from django.conf import settings
 from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
-from rules.engine import BloodPool, Engine, Scene
+from rules.engine import BloodPool, Engine, Manifestation, Scene, Ward
 from rules.guards import from_dict as guard_from_dict
 from rules.sheet import from_dict, load_pc, to_dict
 from world.loader import load_cached
@@ -192,6 +192,12 @@ class Campaign:
                 "reacted": self.scene.reacted,
                 "guards": [g.as_dict() for g in self.scene.guards],
                 "pools": [b.as_dict() for b in self.scene.pools],
+                # The standing hazards. Both of these had as_dict and from_dict written
+                # and NEITHER was ever called by anything: a save/reload mid-fight
+                # silently deleted every fog cloud, wall of stone, thorn body and bleed
+                # ward in the scene, while the grid kept the squares they had claimed.
+                "wards": [w.as_dict() for w in self.scene.wards],
+                "manifests": [m.as_dict() for m in self.scene.manifests],
                 "initiative": self.scene.initiative,
                 "acted": sorted(self.scene.acted),
                 "attacked": sorted(self.scene.attacked),
@@ -263,6 +269,17 @@ class Campaign:
             reacted={k: int(v) for k, v in (s.get("reacted") or {}).items()},
             guards=[guard_from_dict(g) for g in (s.get("guards") or [])],
             pools=[BloodPool.from_dict(b) for b in (s.get("pools") or [])],
+            # Constructed directly and appended, never through `Scene.place`. The grid
+            # is saved with the fog's squares ALREADY in `grid.obscuring`, so place()
+            # would recompute `added` as empty and `lift()` would then leave the room
+            # permanently opaque with no fog in it to explain why. The ids are kept for
+            # the same class of reason: `Ward.manifest_id` points at them, and re-minting
+            # would silently detach every area ward — `_aimed_at` would return nobody
+            # and the hazard would fire on no one, with nothing reported.
+            wards=[w for w in (Ward.from_dict(x) for x in (s.get("wards") or []))
+                   if w is not None],
+            manifests=[Manifestation.from_dict(x)
+                       for x in (s.get("manifests") or [])],
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             attacked=set(s.get("attacked", [])),
