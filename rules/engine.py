@@ -2549,9 +2549,14 @@ class Engine:
                 continue
             if a.has_condition("dying"):
                 tells.extend(self._resolve_dying(a))
-            # The fallen are left behind; the petrified are not "left behind", they are
-            # still standing there. Walking out of a room does not delete a statue.
-            if a.hp <= 0 or a.has_state("state.down.fallen"):
+            # Leaving is leaving: anybody who cannot follow stays where they are, and
+            # that includes the ones still upright. Stage 5b narrowed this to the fallen
+            # alongside `tidy_the_fallen` — but the two doors want different questions,
+            # and narrowing this one meant a petrified enemy travelled to the next biome
+            # with the party and stood in the scene panel there for the rest of the
+            # campaign. Bodies ageing out of a room the party is still in is one rule;
+            # the party walking out is another, and it sheds the whole family.
+            if a.hp <= 0 or a.has_state("state.down"):
                 self.scene.depart(ref)
         return tells
 
@@ -2591,8 +2596,9 @@ class Engine:
                 stays = ref not in kept and str(actor.name) not in kept
                 # The four literal keys this used to name are exactly the fallen, minus
                 # `stable` — which it forgot, so a stabilised body walked to the next
-                # biome with the party.
-                cannot_come = actor.hp <= 0 or actor.has_state("state.down.fallen")
+                # biome with the party. The wider family for the same reason
+                # `leave_behind` uses it: a statue does not come along either.
+                cannot_come = actor.hp <= 0 or actor.has_state("state.down")
                 if stays or cannot_come:
                     self.scene.depart(ref)
                     left.append(actor.name)
@@ -2841,6 +2847,28 @@ class Engine:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
         target = self.scene.actors[ref]
         key = str(intent.params["condition"]).strip().lower()
+
+        # Lifting one, and it is checked BEFORE the immunity gate below. Immunity says
+        # what may not be inflicted; gating a removal on it means a creature immune to
+        # fear can never be cured of being shaken — the same inversion that made 759
+        # undead unkillable when the gate was put on the applicator.
+        #
+        # The op could only ever add. Measured: `_op_condition` mints `rounds=None`
+        # whenever the GM omits a duration, so an unbounded paralysis was a campaign the
+        # character never played again — nothing ticked it, no turn could be taken, and
+        # there was no route out of it in the whole app.
+        if intent.params.get("ends"):
+            gone = target.remove_effects(kind="condition",
+                                         match=lambda e: e.key == key)
+            named = CONDITIONS.get(key, {}).get("name", key).lower()
+            return Outcome(
+                intent_id=intent.id, op="condition",
+                effects=[{"ref": target.ref, "kind": "condition", "condition": key,
+                          "ends": True} for _ in gone],
+                tell=(f"{target.name} is no longer {named}." if gone
+                      else f"{target.name} was not {named}."),
+                because=intent.because)
+
         duration = intent.params.get("duration")
         rounds = None
         if isinstance(duration, dict):

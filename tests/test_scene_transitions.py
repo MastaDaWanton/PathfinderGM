@@ -56,11 +56,17 @@ def test_a_petrified_enemy_is_not_swept_up_as_a_corpse(yard):
         engine.tidy_the_fallen()
     assert "c1" in s.actors, "a petrified enemy was tidied away as a body"
 
-    engine.leave_behind()
-    assert "c1" in s.actors, "and left behind by walking out of the room"
-
     # Still lootable, which is the whole reason the family stays wide.
     assert statue.has_state("state.down")
+
+    # But walking out leaves it: the two doors ask different questions, and the first
+    # version of this test asserted the wrong half. `tidy_the_fallen` is bodies ageing
+    # out of a room the party is STILL IN, so a statue standing there is not a body to
+    # clear away. `leave_behind` is the party walking out, and a petrified enemy cannot
+    # follow — measured before this was split, the statue travelled to the next biome
+    # with the party and stood in the scene panel there for the rest of the campaign.
+    engine.leave_behind()
+    assert "c1" not in s.actors, "the statue followed the party out of the room"
 
 
 def test_a_real_body_still_ages_out(yard):

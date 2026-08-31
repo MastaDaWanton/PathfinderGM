@@ -87,7 +87,13 @@ def award_for_fallen(scene, pc) -> tuple[int, list[str]]:
             continue
         for ref in refs:
             foe = scene.actors.get(ref)
-            if foe is None or foe.hp > 0:
+            # Hit points alone missed the half of "beaten" that has none. Measured:
+            # petrifying the last enemy ends the fight — `sides_standing` drops to one
+            # and the views print "The fight is over." — with 135 XP unpaid and nothing
+            # said about it, because a statue is at full health. Widened rather than
+            # replaced: `is_down` is `hp < 0 or state.down`, so asking it alone would
+            # stop paying for a foe beaten to exactly 0.
+            if foe is None or (foe.hp > 0 and not foe.is_down):
                 continue
             got = worth(foe)
             if got:

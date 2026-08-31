@@ -253,7 +253,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # poison, a mind-affecting compulsion — which is what 1e attaches immunity to.
     # Without it the only question that can be asked is "are you immune to being
     # shaken", and the answer to that is not the rule.
-    "condition": (("condition",), ("duration", "to", "descriptors"), "hidden"),
+    "condition": (("condition",), ("duration", "to", "descriptors", "ends"), "hidden"),
     # The engine owns the slot, the caster level and the save DC. It does *not* own what
     # the spell does — that lives in three thousand paragraphs of English, and a parser
     # guessing at it would produce confident wrong numbers. Anything mechanical the GM

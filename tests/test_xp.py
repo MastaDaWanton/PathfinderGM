@@ -57,6 +57,27 @@ def test_a_won_fight_pays_the_pc(fight):
     assert f"{foe.xp_value:,} XP" in line or f"{foe.xp_value} XP" in line
 
 
+def test_beating_the_last_enemy_without_hurting_it_still_pays(fight):
+    """Half of "beaten" has full hit points. `award_for_fallen` skipped anyone at
+    `hp > 0`, so petrifying or binding the last enemy ended the fight — `sides_standing`
+    drops to one and the views print "The fight is over." — with the XP unpaid and
+    nothing said about it. Measured at 135 XP for a thug.
+
+    Widened rather than swapped: asking `is_down` alone (`hp < 0 or state.down`) would
+    stop paying for a foe beaten to exactly 0, who is disabled and very much beaten.
+    """
+    c, e = fight
+    foe = c.scene.actors["c1"]
+    assert foe.hp > 0
+    foe.add_condition("petrified", source="a basilisk")
+    assert foe.is_down and not c.scene.conscious("c1")
+
+    line = e._settle_xp()
+
+    assert c.scene.pc().xp == foe.xp_value, "the fight ended and paid nothing"
+    assert "XP" in line, "and said nothing about it either"
+
+
 def test_a_fled_enemy_pays_nothing(fight):
     """Mercy is the GM's `xp` op to reward, not a tax collected by the tally."""
     c, e = fight

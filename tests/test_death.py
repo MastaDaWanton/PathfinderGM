@@ -95,6 +95,47 @@ def test_a_character_who_cannot_act_is_not_reported_fine(scene):
         pc.remove_condition("disabled")
 
 
+def test_a_hold_with_no_clock_can_be_lifted(scene):
+    """The campaign brick stage 5 left open, and it was an applicator gap rather than a
+    refusal one: the `condition` op could only ever ADD. `_op_condition` mints
+    `rounds=None` whenever the GM omits a duration, so an unbounded paralysis was a
+    character who never played again — nothing ticked it, no turn could be taken, and
+    there was no route out of it anywhere in the app.
+
+    The removal is checked BEFORE the immunity gate. Immunity says what may not be
+    inflicted on you; gating a cure on it means a creature immune to fear can never be
+    cured of being shaken — the same inversion that made 759 undead unkillable when the
+    gate was put on the applicator instead of the op.
+    """
+    from rules.dice import Dice
+    from rules.engine import Engine
+
+    pc = scene.pc()
+    engine = Engine(scene, Dice(seed=1))
+
+    def condition(**params):
+        return engine.run(engine.validate(
+            [{"op": "condition", "actor": "pc", "because": "a touch",
+              "params": {"to": "pc", **params}}]))
+
+    condition(condition="paralyzed")
+    held = next(e for e in pc.effects if e.key == "paralyzed")
+    assert held.rounds_left is None, "this test needs the clockless case"
+    assert downed.state_of(pc) == "held" and not pc.can_act()
+
+    got = condition(condition="paralyzed", ends=True)
+    assert pc.can_act() and downed.state_of(pc) == "fine"
+    assert "no longer paralyzed" in got.outcomes[0].tell
+
+    # Removing what was never there says so rather than claiming a cure.
+    assert "was not" in condition(condition="blinded", ends=True).outcomes[0].tell
+
+    pc.immunities = ["fear"]
+    pc.add_condition("shaken", source="something that was not fear")
+    condition(condition="shaken", ends=True)
+    assert not pc.has_condition("shaken"), "immunity blocked a cure"
+
+
 def test_a_hold_inside_a_fight_skips_no_time_at_all(scene):
     """Found by an adversarial review, under a green suite, and the worst thing this
     stage shipped before it was caught.

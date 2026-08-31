@@ -759,8 +759,15 @@ class Actor:
                 and (not name or (e.name or e.key).lower() == name.lower())
                 and (not source or e.source.lower() == source.lower())
                 and (match is None or match(e))]
-        for e in gone:
-            self.effects.remove(e)
+        # By identity, not by value. `ActiveEffect` is a plain dataclass, so `list.remove`
+        # matches on `__eq__` and deletes the FIRST equal record rather than the one the
+        # predicate picked — two doses of the same poison are equal in every field. The
+        # dispel passes `match=lambda e: e is holder` and the comment there promises the
+        # record it found is the record that goes; `.remove` could not deliver that.
+        # Sliced in place so the list object itself survives, which callers holding a
+        # reference to `effects` rely on.
+        doomed = {id(e) for e in gone}
+        self.effects[:] = [e for e in self.effects if id(e) not in doomed]
         return gone
 
     def tick_effects(self, rounds: int = 1) -> list[str]:
