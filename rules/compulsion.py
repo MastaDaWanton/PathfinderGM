@@ -59,43 +59,39 @@ def add(actor, by: str, penalty: int = 4, rounds: int | None = None,
         source: str = "", why: str = "") -> Compulsion:
     """Compel this creature towards `by`.
 
-    Re-compelling from the same source refreshes rather than stacking. Two taunts from the
-    same enemy are one taunt shouted twice; letting them add would make the mechanic scale
-    with how many times the GM happened to mention it.
+    Through the one applicator, which gives the refresh rule for free: re-compelling
+    from the same source resets the clock rather than stacking, because two taunts from
+    the same enemy are one taunt shouted twice and letting them add would make the
+    mechanic scale with how often the GM happened to mention it.
+
+    The effect carries NO modifiers. The penalty lives in the payload and is read by
+    `penalty_against`, which is the only reader that knows who is being attacked —
+    routing it through the modifier funnel would charge the creature for obeying.
     """
-    existing = next((c for c in actor.compulsions if c.by == by and c.source == source),
-                    None)
-    if existing is not None:
-        existing.penalty = max(existing.penalty, int(penalty))
-        existing.rounds_left = rounds
-        existing.why = why or existing.why
-        return existing
-    made = Compulsion(by=by, penalty=int(penalty), rounds_left=rounds, source=source,
-                      why=why)
-    actor.compulsions.append(made)
-    return made
+    from .activeeffect import ActiveEffect
+
+    # The stronger pull wins a refresh. `apply_effect` replaces the payload wholesale,
+    # so re-shouting a weaker taunt over a stronger one would quietly lower the price of
+    # defying it — the rule is that two taunts from one enemy are one taunt shouted
+    # twice, not a way to talk somebody down.
+    for held in actor.compulsions:
+        if held.by == by and held.source == source:
+            penalty = max(int(penalty), held.penalty)
+            why = why or held.why
+            break
+    actor.apply_effect(ActiveEffect(
+        name=source or f"compulsion towards {by}", kind="compulsion",
+        key=f"{by}|{source}", source=source,
+        duration="until-dismissed" if rounds is None else "rounds",
+        rounds_left=rounds,
+        payload={"by": by, "penalty": int(penalty), "why": why}))
+    return next(c for c in actor.compulsions if c.by == by and c.source == source)
 
 
 def remove(actor, by: str = "", source: str = "") -> int:
-    before = len(actor.compulsions)
-    actor.compulsions = [
-        c for c in actor.compulsions
-        if not ((not by or c.by == by) and (not source or c.source == source))
-    ]
-    return before - len(actor.compulsions)
-
-
-def tick(actor, rounds: int = 1) -> list[str]:
-    """Count compulsions down, returning the ones that ended."""
-    ended: list[str] = []
-    for c in list(actor.compulsions):
-        if c.rounds_left is None:
-            continue
-        c.rounds_left -= rounds
-        if c.rounds_left <= 0:
-            actor.compulsions.remove(c)
-            ended.append(c.source or f"compulsion towards {c.by}")
-    return ended
+    return len(actor.remove_effects(
+        kind="compulsion", source=source,
+        match=lambda e: not by or str(e.payload.get("by", "")) == by))
 
 
 def penalty_against(actor, target_ref: str) -> list[Modifier]:
@@ -121,5 +117,8 @@ def pulled_towards(actor) -> list[str]:
     return [c.by for c in actor.compulsions]
 
 
+# `tick` is gone. Compulsions expire on `Actor.tick_effects` with everything else, so
+# they count down on every clock rather than only on the combat rollover — which is why
+# a compulsion applied out of a fight used to last until the next fight began.
 __all__ = ["Compulsion", "add", "from_dict", "penalty_against", "pulled_towards",
-           "remove", "tick"]
+           "remove"]

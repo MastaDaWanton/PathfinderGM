@@ -377,8 +377,12 @@ def test_a_compulsion_counts_down_and_ends():
     s, e = board()
     raider = s.actors["c2"]
     compulsion.add(raider, by="pc", penalty=4, rounds=2, source="a taunt")
-    assert compulsion.tick(raider, 1) == []
-    assert compulsion.tick(raider, 1) == ["a taunt"]
+    # Through the one ticker. `compulsion.tick` is gone: a compulsion expires with
+    # everything else now, so it counts down on every clock rather than only on the
+    # combat rollover — which is why one applied out of a fight used to last until the
+    # next fight began.
+    assert raider.tick_effects(1) == []
+    assert raider.tick_effects(1) == ["a taunt"]
     assert raider.compulsions == []
 
 
@@ -386,7 +390,7 @@ def test_one_with_no_duration_does_not_expire():
     s, e = board()
     raider = s.actors["c2"]
     compulsion.add(raider, by="pc", penalty=4, source="a bloodlink")
-    compulsion.tick(raider, 50)
+    raider.tick_effects(50)
     assert len(raider.compulsions) == 1
 
 
@@ -481,3 +485,44 @@ def test_the_guard_tell_is_written_for_a_player():
     tell = guard(e, "absorb", amount=8).outcomes[0].tell
     assert "steps in front of the companion" in tell
     assert "`" not in tell and "amount" not in tell
+
+
+def test_a_compulsion_expires_out_of_combat():
+    """Its only ticker was the combat rollover, so a compulsion applied outside a fight
+    lasted until the next fight started — however many hours or days passed. It is an
+    effect now and expires on every clock."""
+    s, e = board()
+    raider = s.actors["c2"]
+    compulsion.add(raider, by="pc", penalty=4, rounds=10, source="a taunt")
+    was_round = s.round
+    s.advance(1)                       # one minute of world time, no turn taken
+    assert s.round == was_round, "no round was played; only the clock moved"
+    assert raider.compulsions == []
+
+
+def test_the_penalty_is_not_a_modifier_and_must_not_become_one():
+    """The trap in the obvious implementation. Authoring the -4 as a `combat_mod` so it
+    flows through the one funnel INVERTS the mechanic: `_buff_mods` has no notion of
+    whom you are attacking, so the penalty would apply to every swing including the one
+    that obeys — and "obeying is free" is the whole design of this module."""
+    s, e = board()
+    raider = s.actors["c2"]
+    compulsion.add(raider, by="pc", penalty=4, source="a taunt")
+    held = [x for x in raider.effects if x.kind == "compulsion"]
+    assert held and all(not x.modifiers for x in held)
+    assert not any(m.source == "a taunt" for m in raider.attack_modifiers())
+    assert compulsion.penalty_against(raider, "pc") == []
+    assert [m.value for m in compulsion.penalty_against(raider, "c1")] == [-4]
+
+
+def test_a_compulsion_survives_a_save():
+    from rules.sheet import from_dict, to_dict
+
+    s, e = board()
+    raider = s.actors["c2"]
+    compulsion.add(raider, by="pc", penalty=6, rounds=5, source="a bloodlink")
+    back = from_dict(to_dict(raider), ref="c2")
+    assert [(c.by, c.penalty, c.rounds_left) for c in back.compulsions] == [("pc", 6, 5)]
+    # and a reload does not double them
+    twice = from_dict(to_dict(back), ref="c2")
+    assert len(twice.compulsions) == 1

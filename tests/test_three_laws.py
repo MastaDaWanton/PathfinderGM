@@ -42,7 +42,6 @@ def test_every_condition_is_in_the_tag_vocabulary():
 # somebody had to write, and deleting one is that stage's own proof.
 _CLOCK_SITES = {
     "rules/sheet.py": "tick_effects — the one actor ticker, and the destination",
-    "rules/compulsion.py": "stage 4c: compulsions become effects",
     "rules/engine.py": "stage 4c: wards and manifestations become scene effects",
     "rules/guards.py": "stage 4c: a guard's uses_left is a charge, not a clock",
 }

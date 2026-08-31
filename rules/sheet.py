@@ -307,7 +307,10 @@ class Actor:
     # Who this creature is being pulled towards, and what defying them costs. Not a
     # condition: a condition is a state the creature is in, while a compulsion is a
     # relationship to a *particular other creature*, and it has to be able to name them.
-    compulsions: list["Compulsion"] = field(default_factory=list)
+    # Compulsions were a fifth timed store with their own add, their own list and
+    # their own ticker — law 2's exact prohibition, and the reason a compulsion
+    # applied out of a fight lasted until the next fight started: its ticker only
+    # ran on the combat rollover. An effect kind now; the view is below.
     # Spells this caster can reach: the wizard's book, or nothing for a cleric whose list
     # is their whole class list. Ids, not names — two spells share a name often enough.
     # Minutes since this character last slept, ate and drank. Minutes rather than hours
@@ -680,6 +683,33 @@ class Actor:
                                bypass=r.bypass, source=r.source or "innate")
 
     @property
+    def compulsions(self) -> list["Compulsion"]:
+        """Who is pulling at this creature, built from the one store.
+
+        The modifiers list on these effects is deliberately EMPTY. Authoring the -4 as
+        a `combat_mod` so it flows through the one funnel inverts the mechanic:
+        `_buff_mods` has no notion of *whom* you are attacking, so the penalty would
+        apply to every swing including the one that obeys — and "obeying is free" is
+        the whole design. `compulsion.penalty_against` is the reader, because it is the
+        only one that knows the target.
+        """
+        from .compulsion import Compulsion
+
+        return [Compulsion(by=str(e.payload.get("by", "")),
+                           penalty=int(e.payload.get("penalty", 0) or 0),
+                           rounds_left=e.rounds_left, source=e.source,
+                           why=str(e.payload.get("why", "")))
+                for e in self.effects if e.kind == "compulsion"]
+
+    @compulsions.setter
+    def compulsions(self, values) -> None:
+        from . import compulsion as compulsion_mod
+
+        self.effects = [e for e in self.effects if e.kind != "compulsion"]
+        for c in values or ():
+            compulsion_mod.add(self, c.by, c.penalty, c.rounds_left, c.source, c.why)
+
+    @property
     def coating(self) -> dict:
         e = next((x for x in self.effects if x.kind == "coating"), None)
         return e.payload if e else {}
@@ -716,13 +746,19 @@ class Actor:
         return eff
 
     def remove_effects(self, *, kind: str | None = None, name: str = "",
-                       source: str = "") -> list[ActiveEffect]:
+                       source: str = "", match=None) -> list[ActiveEffect]:
         """Remove everything matching, returning what went — the contribution of a
         removed effect evaporates with it, never lingers to be subtracted later."""
+        # `match` is a predicate for the removals the three named filters cannot
+        # express — a compulsion is identified by whom it pulls towards, which lives in
+        # its payload. Given rather than letting callers filter and delete themselves,
+        # because the moment a caller edits the store directly the removal stops
+        # emitting and law 2 is back to being a suggestion.
         gone = [e for e in self.effects
                 if (kind is None or e.kind == kind)
                 and (not name or (e.name or e.key).lower() == name.lower())
-                and (not source or e.source.lower() == source.lower())]
+                and (not source or e.source.lower() == source.lower())
+                and (match is None or match(e))]
         for e in gone:
             self.effects.remove(e)
         return gone
@@ -3167,7 +3203,6 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
-        compulsions=[_compulsion(c) for c in (data.get("compulsions") or [])],
         awake_minutes=int(data.get("awake_minutes", 0) or 0),
         fed_minutes=int(data.get("fed_minutes", 0) or 0),
         watered_minutes=int(data.get("watered_minutes", 0) or 0),
@@ -3255,6 +3290,16 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # on every round trip. Idempotent by asking the store first: a save written since
     # this landed already carries them as effects and is left alone; every older one is
     # built from the flat keys, and a bestiary row from its printed spec list.
+    # Compulsions, migrated on the same rule and for the same reason: `from_dict`
+    # rebinds `a.effects` wholesale, so anything minted during construction is
+    # discarded, and asking the store first keeps a reload from doubling them.
+    if not any(e.kind == "compulsion" for e in a.effects):
+        for raw in (data.get("compulsions") or []):
+            got = _compulsion(raw)
+            from . import compulsion as compulsion_mod
+
+            compulsion_mod.add(a, got.by, got.penalty, got.rounds_left,
+                               got.source, got.why)
     if not any(e.kind in _DEFENCE_KINDS for e in a.effects):
         a.immunities = immunities
         a.resistances = resistances

@@ -342,9 +342,6 @@ class Scene:
                     self.hazards.extend(
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
-                    self.hazards.extend(
-                        {"kind": "compulsion_ended", "ref": a.ref, "what": name}
-                        for name in compulsion.tick(a, 1))
                     self.hazards.extend(self._drain_periodic(a))
                 self.bleeding = [r for r in (
                     a.bleed_out(self._dice) for a in self.actors.values()
@@ -489,7 +486,6 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
-            ended.extend(f"{a.name}: {name}" for name in compulsion.tick(a, rounds))
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
