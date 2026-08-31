@@ -258,15 +258,14 @@ CONDITIONS: dict[str, dict] = {
     "staggered": {"name": "Staggered", "note": "one action per round"},
     "stunned": {
         "name": "Stunned",
-        "lose_dex_to_ac": True, "ac": -2, "can_act": False,
-        "note": "cannot act, loses Dex to AC, -2 AC",
+        "lose_dex_to_ac": True, "ac": -2, "note": "cannot act, loses Dex to AC, -2 AC",
     },
     "unconscious": {
         "name": "Unconscious",
-        "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "lose_dex_to_ac": True, "helpless": True,
         "note": "helpless and unaware",
     },
-    "dead": {"name": "Dead", "can_act": False, "note": "dead"},
+    "dead": {"name": "Dead", "note": "dead"},
     "dazzled": {"name": "Dazzled", "attack": -1, "note": "-1 on attack rolls"},
     "blinded": {
         "name": "Blinded",
@@ -282,19 +281,17 @@ CONDITIONS: dict[str, dict] = {
     # was written from memory and covered barely half the conditions in the game; a
     # condition the engine does not know is one it silently ignores when a GM applies it.
     "dazed": {
-        "name": "Dazed", "can_act": False,
-        "note": "can take no actions, but has no penalty to AC",
+        "name": "Dazed", "note": "can take no actions, but has no penalty to AC",
     },
     "deafened": {
         "name": "Deafened", "initiative": -4,
         "note": "-4 on initiative, and a 20% chance to miscast spells with verbal components",
     },
     "cowering": {
-        "name": "Cowering", "ac": -2, "lose_dex_to_ac": True, "can_act": False,
-        "note": "-2 AC, loses Dex to AC, and takes no actions",
+        "name": "Cowering", "ac": -2, "lose_dex_to_ac": True, "note": "-2 AC, loses Dex to AC, and takes no actions",
     },
     "helpless": {
-        "name": "Helpless", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "name": "Helpless", "lose_dex_to_ac": True, "helpless": True,
         "note": "treated as Dex 0; melee attackers gain +4 to hit",
     },
     "pinned": {
@@ -302,12 +299,11 @@ CONDITIONS: dict[str, dict] = {
         "note": "-4 AC, loses Dex to AC, tightly bound and barely able to act",
     },
     "paralyzed": {
-        "name": "Paralyzed", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "name": "Paralyzed", "lose_dex_to_ac": True, "helpless": True,
         "note": "Str and Dex reduced to 0, helpless, cannot move or act",
     },
     "nauseated": {
-        "name": "Nauseated", "can_act": False,
-        "note": "can take only a single move action; cannot attack or cast",
+        "name": "Nauseated", "note": "can take only a single move action; cannot attack or cast",
     },
     "panicked": {
         "name": "Panicked",
@@ -323,15 +319,14 @@ CONDITIONS: dict[str, dict] = {
         "note": "at 0 hp; a standard action costs 1 hp and may start it dying",
     },
     "dying": {
-        "name": "Dying", "lose_dex_to_ac": True, "can_act": False, "helpless": True,
+        "name": "Dying", "lose_dex_to_ac": True, "helpless": True,
         "note": "unconscious and losing 1 hp a round until stabilised or dead",
     },
     "stable": {
-        "name": "Stable", "can_act": False,
-        "note": "below 0 hp but no longer losing hit points",
+        "name": "Stable", "note": "below 0 hp but no longer losing hit points",
     },
     "petrified": {
-        "name": "Petrified", "can_act": False, "helpless": True,
+        "name": "Petrified", "helpless": True,
         "note": "turned to stone: unconscious and unaware",
     },
     "confused": {

@@ -28,13 +28,20 @@ TAGS: dict[str, tuple[str, ...]] = {
     "unconscious": ("state.down.unconscious", "state.unable"),
     "stable":      ("state.down.stable", "state.unable"),
     "petrified":   ("state.down.petrified", "state.unable"),
-    "helpless":    ("state.down.helpless",),
+    # Helpless has always carried `can_act: False` in the condition row and no
+    # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag
+    # layer said a bound prisoner could act and the row said they could not.
+    "helpless":    ("state.down.helpless", "state.unable"),
     "paralyzed":   ("state.unable.paralyzed", "state.held"),
     "pinned":      ("state.held.pinned",),
     "grappled":    ("state.held.grappled",),
     "stunned":     ("state.unable.stunned",),
     "dazed":       ("state.unable.dazed",),
     "cowering":    ("state.unable.cowering",),
+    # Nauseated is impaired, not unable: 1e allows it "a single move action per turn"
+    # and stops the rest. The condition row carried `can_act: False`, which the engine's
+    # guard read as a block on attack, move AND check — denying the one action the rules
+    # allow. What it stops is stated in BLOCKS rather than by a boolean that cannot say.
     "nauseated":   ("state.impaired.nauseated",),
     "staggered":   ("state.impaired.staggered",),
     "disabled":    ("state.impaired.disabled",),
@@ -84,6 +91,67 @@ def any_match(keys, query: str) -> bool:
     """Whether any condition key in `keys` grants a tag answering `query`."""
     q = (query or "").strip().lower()
     return any(matches(t, q) for k in keys for t in tags_for(k))
+
+
+# What a state stops an actor DOING, as opposed to what it makes them.
+#
+# This replaces the `can_act` boolean that sat on the condition rows. A boolean has to
+# answer "can this creature act?" with one bit, and 1e's incapacities are not all total:
+# a nauseated character may take a single move action and nothing else, so the flag
+# blocked all three of the ops the engine guards and denied them the one the rules
+# allow. Naming the ops lets the vocabulary say what each state actually stops.
+#
+# The flag and the tag tree also drifted, because both were hand-written and nothing
+# compared them: measured across the 31 shipped conditions they disagreed on three —
+# `fascinated` (tagged unable, flagged able), `helpless` (flagged unable, untagged) and
+# `nauseated` (flagged unable, and wrongly). There is now one list, and
+# `test_the_vocabulary_is_the_only_authority_on_acting` keeps it the only one.
+#
+# Keys are tag prefixes, so an unregistered homebrew state under `state.unable.*`
+# stops actions the day it is written without being added here.
+ACTIONS: tuple[str, ...] = ("attack", "move", "check", "cast")
+
+BLOCKS: dict[str, frozenset[str]] = {
+    # Unable is total, and always has been: this is the family the ten conditions that
+    # take no turn at all belong to.
+    "state.unable": frozenset(ACTIONS + ("any",)),
+    # "The only action such a character can take is a single move action per turn."
+    "state.impaired.nauseated": frozenset(("attack", "check", "cast")),
+}
+
+
+def stops(tags, action: str = "any") -> bool:
+    """Whether a state carrying `tags` stops `action`.
+
+    `action` is one of ACTIONS, or "any" for the general question — may this creature
+    take *any* action at all. "any" is answered only by a state that stops everything,
+    which is why a nauseated character is not "unable" while still being refused an
+    attack.
+
+    Takes the tags an effect actually carries rather than re-deriving them from its
+    key, because the two are not the same thing: an ability document may append its own
+    tags on top of `tags_for` (`rules/engine.py`, `_apply_ability_document`), and
+    `Actor.has_state` reads the carried tags. A second derivation here would be a
+    second vocabulary — the exact fault this stage exists to remove.
+
+    One question with one answer, asked by the turn gate (`play/views.py`), the intent
+    guard (`rules/engine.py`) and the sheet alike. They used to answer it separately:
+    a petrified character was handed a turn by the first, planned by the GM, and then
+    refused by the second as a legality error — which regenerates rather than repairs,
+    so the turn burned the retry loop and died as a 502 the player saw as a blank page.
+    """
+    want = (action or "any").strip().lower()
+    return any(want in stopped and matches(str(tag), prefix)
+               for tag in tags or ()
+               for prefix, stopped in BLOCKS.items())
+
+
+def blocking(keys, action: str = "any") -> str:
+    """The condition key that stops `action`, or "" — for a caller holding only keys.
+
+    Prefer `stops` with the effect's own tags where they are to hand.
+    """
+    return next((k for k in keys or () if stops(tags_for(k), action)), "")
 
 
 # What an immunity, written as a stat block writes it, actually protects against.

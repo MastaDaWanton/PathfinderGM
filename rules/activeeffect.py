@@ -85,6 +85,28 @@ class ActiveEffect:
         return self.name or self.source or "an effect"
 
 
+def _tags_on_load(d: dict) -> tuple[str, ...]:
+    """The stored tags, plus whatever the vocabulary says the key grants today.
+
+    A save is a record of what happened, not a second copy of the vocabulary. Tags were
+    frozen at write time, so a condition saved before its entry gained a family kept the
+    old answer for the life of the campaign — a `helpless` prisoner saved yesterday
+    would still not be `state.unable` after the vocabulary said it was, and no test
+    anywhere would notice, because every test builds its actors fresh.
+
+    Unioned rather than replaced: `_apply_ability_document` appends a document's own
+    declared tags on top of `tags_for`, and rebuilding from the key alone would delete
+    them on the next load.
+    """
+    stored = tuple(str(t) for t in (d.get("tags") or ()))
+    key = str(d.get("key", "") or "")
+    if str(d.get("kind", "") or "") != "condition" or not key:
+        return stored
+    from .states import tags_for
+
+    return stored + tuple(t for t in tags_for(key) if t not in stored)
+
+
 def from_dict(d: dict) -> ActiveEffect:
     return ActiveEffect(
         name=str(d.get("name", "") or ""),
@@ -93,7 +115,7 @@ def from_dict(d: dict) -> ActiveEffect:
         source=str(d.get("source", "") or ""),
         duration=str(d.get("duration", "until-dismissed") or "until-dismissed"),
         rounds_left=d.get("rounds_left"),
-        tags=tuple(d.get("tags") or ()),
+        tags=_tags_on_load(d),
         modifiers=[dict(m) for m in (d.get("modifiers") or [])],
         amount=int(d.get("amount", 0) or 0),
         payload=dict(d.get("payload") or {}),

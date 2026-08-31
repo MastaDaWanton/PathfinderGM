@@ -1053,13 +1053,59 @@ class Actor:
                 + SHIELDS.get(self.shield, SHIELDS["none"])["acp"])
 
     def can_act(self) -> bool:
-        return all(c.data.get("can_act", True) for c in self.conditions)
+        """Whether this creature can take any action at all.
 
-    def blocking_condition(self) -> str | None:
-        for c in self.conditions:
-            if not c.data.get("can_act", True):
-                return c.name
-        return None
+        The vocabulary answers it, not a flag on the condition row. The two used to
+        disagree on three of the thirty-one shipped conditions, and consumers picked
+        whichever they knew about — see `rules.states.blocking`.
+        """
+        return not self.blocking_key()
+
+    def blocking_key(self, action: str = "any") -> str:
+        """The condition key stopping `action`, or "" — the vocabulary's own answer.
+
+        Asked of the tags each effect carries, the same ones `has_state` reads, so a
+        document that declares its own `state.unable.*` tag stops actions without
+        needing a row in the condition table.
+        """
+        from . import states
+
+        return next((e.key for e in self.effects
+                     if states.stops(e.tags, action)), "")
+
+    def blocking_condition(self, action: str = "any") -> str | None:
+        """The same answer as a display name, for a refusal the player reads."""
+        key = self.blocking_key(action)
+        if not key:
+            return None
+        return next((c.name for c in self.conditions if c.key == key), key)
+
+    @property
+    def is_down(self) -> bool:
+        """Out of the fight — not merely unable to act this instant.
+
+        The distinction the app kept losing. "Can this creature act?" and "is this
+        creature out of the fight?" are different questions, and five authorities
+        answered them with three predicates between them: a stunned or fascinated enemy
+        takes no turn and is emphatically still in the fight, while a Constitution-drained
+        corpse at full hit points takes no turn and is emphatically not.
+
+        Hit points are part of the answer because a body can be down before anything has
+        written a condition on it — the tag layer widens the old tests, never narrows
+        them.
+        """
+        return self.hp < 0 or self.has_state("state.down")
+
+    @property
+    def is_helpless(self) -> bool:
+        """"Immobilized, unconscious, or otherwise incapacitated" — 1e's own phrase for
+        the creature a combat maneuver succeeds against without a roll.
+
+        A narrower question than `can_act`, and the distinction is load-bearing: a
+        fascinated creature takes no actions and is emphatically NOT helpless, so
+        reading this off `can_act` would let anyone grapple a distracted one for free.
+        """
+        return any(c.data.get("helpless") for c in self.conditions)
 
     def has_condition(self, key: str) -> bool:
         return any(e.kind == "condition" and e.key == key for e in self.effects)

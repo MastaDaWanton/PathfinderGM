@@ -297,9 +297,36 @@ def test_the_rejection_lists_the_refs_that_do_exist(engine):
 
 def test_an_unconscious_actor_cannot_act(engine, scene):
     scene.get("c1").add_condition("unconscious")
-    with pytest.raises(IntentError, match="cannot act") as e:
+    with pytest.raises(IntentError, match="cannot attack") as e:
         engine.validate([{"op": "attack", "actor": "c1", "target": "pc"}])
     assert e.value.check == "legality"
+
+
+def test_the_guard_refuses_the_op_that_is_actually_stopped(engine, scene):
+    """The guard asked one boolean — `can_act()` — and applied its answer to attack,
+    move and check together. 1e's incapacities are not all total, and the condition
+    table's `can_act` flag had no way to say so: nauseated carried `can_act: False`,
+    which refused the character's move, and "the only action such a character can take
+    is a single move action per turn" is the entire rule for being nauseated.
+
+    Measured across the 31 shipped conditions, the flag and the `state.unable` tag
+    disagreed on three — fascinated, helpless and nauseated — and consumers read
+    whichever of the two they knew about.
+    """
+    c1 = scene.get("c1")
+    c1.add_condition("nauseated")
+
+    moved = engine.validate([{"op": "move", "actor": "c1", "because": "away", "params": {"zone": "far"}}])
+    assert moved, "a nauseated character may still take their single move action"
+
+    with pytest.raises(IntentError, match="nauseated and cannot attack"):
+        engine.validate([{"op": "attack", "actor": "c1", "target": "pc"}])
+
+    # And the total states stay total: stunned stops the move as well.
+    c1.remove_condition("nauseated")
+    c1.add_condition("stunned")
+    with pytest.raises(IntentError, match="stunned and cannot move"):
+        engine.validate([{"op": "move", "actor": "c1", "because": "away", "params": {"zone": "far"}}])
 
 
 def test_attacking_with_a_weapon_the_actor_is_not_carrying_is_rejected(engine):

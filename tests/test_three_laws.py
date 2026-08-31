@@ -32,6 +32,74 @@ def test_every_condition_is_in_the_tag_vocabulary():
         f"state.* family question): {sorted(missing)}")
 
 
+def test_the_vocabulary_is_the_only_authority_on_acting():
+    """The condition rows carried a `can_act` boolean and the tag tree carried
+    `state.unable`, both hand-written, and nothing compared them. Measured across the 31
+    shipped conditions they disagreed on three — `fascinated` (tagged unable, flagged
+    able), `helpless` (flagged unable, untagged) and `nauseated` (flagged unable, and
+    wrongly: 1e allows it "a single move action per turn" and the flag refused the move).
+
+    Consumers then read whichever of the two they had heard of, which is how a maneuver
+    came to succeed without a roll against a target that was merely distracted.
+
+    A flag is also the wrong shape for the question: it answers "can this creature act?"
+    with one bit, and 1e's incapacities are not all total. What a state stops is stated
+    in `states.BLOCKS`, per op.
+    """
+    from rules.tables import CONDITIONS
+
+    flagged = sorted(k for k, v in CONDITIONS.items() if "can_act" in v)
+    assert not flagged, (
+        f"condition rows carrying a second answer to 'can this creature act': "
+        f"{flagged}. What a state stops belongs in rules/states.py BLOCKS, where one "
+        f"function answers for the turn gate, the intent guard and the sheet alike.")
+
+
+def test_being_unable_to_act_is_not_the_same_as_being_out_of_the_fight():
+    """Three questions, and the app answered them with two predicates. `Scene.conscious`
+    opened with `not a.can_act()` while all five of its callers wanted "still in the
+    fight" — so a stunned enemy, who takes no turn and is very much still fighting,
+    counted as a side no longer standing: the encounter ended and the XP settled with
+    them upright in front of the player.
+
+    The third question — 1e's "immobilized, unconscious, or otherwise incapacitated",
+    which makes a combat maneuver succeed with no roll — had no owner at all. The
+    condition rows carried `helpless: True` on five rows and NOTHING read it, so
+    `_resolve_maneuver` borrowed can-act and auto-grappled the dazed and the cowering.
+    """
+    from rules.sheet import from_dict
+    from rules.tables import CONDITIONS
+
+    def actor():
+        return from_dict({"name": "Probe", "kind": "npc", "hp": 20, "hp_max": 20,
+                          "abilities": {k: 12 for k in ("str", "dex", "con",
+                                                        "int", "wis", "cha")}},
+                         ref="c1")
+
+    for key in sorted(CONDITIONS):
+        a = actor()
+        a.add_condition(key, source="probe")
+        if a.is_helpless:
+            assert not a.can_act(), f"{key} is helpless but may act"
+        if a.is_down:
+            assert not a.can_act(), f"{key} is out of the fight but may act"
+
+    # The three that separate the questions, named rather than derived.
+    stunned, fascinated = actor(), actor()
+    stunned.add_condition("stunned", source="probe")
+    fascinated.add_condition("fascinated", source="probe")
+    for a, key in ((stunned, "stunned"), (fascinated, "fascinated")):
+        assert not a.can_act(), f"{key} should take no turn"
+        assert not a.is_down, f"{key} is not out of the fight"
+        assert not a.is_helpless, f"{key} must not be auto-grappled without a roll"
+
+    nauseated = actor()
+    nauseated.add_condition("nauseated", source="probe")
+    assert nauseated.can_act(), "1e gives the nauseated a single move action"
+    assert nauseated.blocking_key("attack") == "nauseated"
+    assert nauseated.blocking_key("move") == ""
+
+
 # --- law 2: one applicator, one ticker ------------------------------------------------
 
 

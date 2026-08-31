@@ -297,17 +297,21 @@ class Scene:
         return self.initiative[self.turn % len(self.initiative)][0]
 
     def conscious(self, ref: str) -> bool:
-        """Still up, and still in the fight.
+        """Still up, and still in the fight — which is not the same as able to act now.
 
         Exactly 0 hit points is *disabled*, not unconscious: you are on your feet and
         may take a single action, at the cost of a hit point. Requiring `hp > 0` here
         dropped a disabled character out of the initiative order and ended the fight
         around them while they were still standing.
+
+        It used to open with `not a.can_act()`, which is the other question, and all
+        five of its callers wanted this one: how many sides are still standing, who is
+        left to target, who is company, who is marked "out" on the panel. Answering
+        them with can-act meant a stunned enemy — no turn, very much still fighting —
+        ended the encounter and settled the XP while standing in front of the player.
         """
         a = self.actors.get(ref)
-        if not a or not a.can_act():
-            return False
-        return a.hp > 0 or (a.hp == 0 and not a.has_condition("unconscious"))
+        return a is not None and not a.is_down
 
     def advance_turn(self) -> str | None:
         """Move to the next combatant who can still act, and return their ref.
@@ -357,10 +361,15 @@ class Scene:
                 # points to -6 and `scene.hazards` came back empty, so nothing was
                 # narrated and the fight simply ended with no reason given.
                 self.hazards.extend(self.tick_standing(1))
-            if self.conscious(self.initiative[nxt][0]):
+            ref = self.initiative[nxt][0]
+            # The one caller that wants "can act now" rather than "still in the fight":
+            # a stunned combatant stays in the initiative order and on the panel, and
+            # loses this turn. Asked separately since `conscious` stopped conflating
+            # the two.
+            if self.conscious(ref) and self.actors[ref].can_act():
                 self.turn = nxt
-                self.acted.add(self.initiative[nxt][0])
-                return self.initiative[nxt][0]
+                self.acted.add(ref)
+                return ref
         return None                      # nobody left standing
 
     def _drain_periodic(self, actor: "Actor") -> list[dict]:
@@ -1125,12 +1134,17 @@ class Engine:
             self._check_move(intent, index)
 
         actor = self.scene.get(intent.actor) if intent.actor else None
-        if actor and intent.op in ("attack", "move", "check") and not actor.can_act():
-            raise IntentError(
-                f"{intent.op}: {actor.name} is {actor.blocking_condition().lower()} and "
-                f"cannot act",
-                "legality", index,
-            )
+        if actor and intent.op in states.ACTIONS:
+            # Asked per op, because the states are not all total. A nauseated character
+            # gets their single move action, which the old `can_act()` boolean refused
+            # along with everything else — it was the one action 1e explicitly allows.
+            stopped = actor.blocking_condition(intent.op)
+            if stopped:
+                raise IntentError(
+                    f"{intent.op}: {actor.name} is {stopped.lower()} and cannot "
+                    f"{intent.op}",
+                    "legality", index,
+                )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.equipped or "unarmed"
             # A granted weapon is worn, not carried: it exists while its toggle holds
@@ -1595,7 +1609,9 @@ class Engine:
             # returned early every time and never reached the "one side left standing"
             # check. The fight could not end, so the XP and the treasure never settled.
             # The reported "0 XP from the bear" has this shape underneath it too.
-            if defender.hp <= 0 or not defender.can_act():
+            # "Already down", not "cannot act": a stunned or fascinated defender is
+            # still a target, and reading this off can-act made them unattackable.
+            if defender.is_down:
                 if state["i"]:
                     state["tells"].append(
                         f"{defender.name} is already down; {actor.name} holds the blow.")
@@ -1781,10 +1797,12 @@ class Engine:
         cmd = sum(x.value for x in cmd_mods)
         cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
 
-        automatic = not defender.can_act()
+        automatic = defender.is_helpless
         if automatic:
             # "If your target is immobilized, unconscious, or otherwise incapacitated,
-            # your maneuver automatically succeeds."
+            # your maneuver automatically succeeds." That is the `helpless` question,
+            # not the can-act one: reading it off `can_act` handed a free grapple
+            # against a merely dazed, stunned, cowering or fascinated target.
             roll = None
             margin = 0
             verdict = "success"
