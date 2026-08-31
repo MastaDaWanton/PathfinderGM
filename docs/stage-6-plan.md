@@ -161,6 +161,34 @@ And the blind spot that makes 6c worth doing at all: **18 death and unconsciousn
 assertions in shipped prose, 0 flagged.** Not one of the 44 patterns names a condition or
 a state change.
 
+## What landed
+
+`cfa1d40` 6a — the hit-point ladder speaks, at all six sites (recon found a sixth).
+`f5b454f` 6b — an ability that deals damage could not kill anybody; one phrasing table.
+`7c312a1` 6e — the narrator ratchet, which was vacuously true and always had been.
+`84151ef` — the player's own kill was being deleted off the page, and 6a made it worse.
+`812b231` 6d — the dice popup stops handing over a roll made behind the screen.
+`0a84462` 6c — the scrubber runs on the prose the player reads, because it knows the dice.
+`0a84462`+ — a cure says the character came back.
+
+Verified on the packaged build: `dist/PathfinderGM.exe` rebuilt, `prove_build` ALL CLEAN
+over 21 checks, and the live path driven through `/api/say` against a copy of a real
+campaign.
+
+**Still open**, and honestly so — none of it is load-bearing for the laws, all of it is
+measured:
+
+- the tell canary still reads as full coverage and is 54% (34 of 63 `Outcome(`
+  constructions), because it matches literal syntax rather than counting effect dicts;
+- `apply_hp_state`'s `changed` list is appends-only, so waking up is silent — and the
+  fix inverts the mechanic unless a direction field lands first;
+- `found.title()` renders "Iron Clot (Dr 2/—)", and 37 of 49 blood-bending abilities
+  fall through to a database row rather than prose;
+- 594 spells put the raw `SAVE_DC_FORMULA` placeholder into the cast tell;
+- `play/craft_views.py` writes a full dice breakdown to the transcript unstripped;
+- `press_the_death`'s "already said it" guard is satisfied by somebody else's death, and
+  `leave_behind` departs a corpse saying nothing.
+
 ## What the probes changed
 
 Seven probes re-ran the readers' claims against live code. Several measurements did not

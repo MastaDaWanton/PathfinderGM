@@ -186,10 +186,27 @@ cures paralysis and deletes blindness. Recorded in the tests rather than in pros
 `cast` belongs in the intent guard by the rules and was deliberately left out: the turn
 schema forces the op the guard would refuse, which is the buried-502 shape. Stage 7.
 
-**Stage 6 — severed tells.** Death, dying, unconsciousness and disabled apply with no tell
-at all; the narrator reaches into `outcome.effects` and does hit-point arithmetic to
-recover what the tell never carried; tells leak hidden roll totals and DCs; the claims
-scrubber does not run on the prose the player actually reads.
+**Stage 6 — severed tells. MOSTLY DONE** (`cfa1d40`, `f5b454f`, `7c312a1`, `84151ef`,
+`812b231`, `0a84462`; record `docs/stage-6-plan.md`, which lists what is left).
+
+All four symptoms were one thing. The tell for a killing blow was "the thug takes 30
+slashing damage." — the condition went into `effects` and never into `tell`, so across
+the twelve real campaigns 27 hit-point states were applied and ZERO named. The narrator
+was never told anybody died, which is exactly why a repair reached past the tell to do
+hit-point arithmetic and press the kill onto the page afterwards.
+
+Two live bugs underneath: an ability that dealt damage never ran the ladder at all (a
+blood bender took a thug nine hit points past its death line and wrote no condition), and
+`cut_dead_men_walking` was deleting the player's own kill sentence — which 6a made worse
+before the fix went in beside it.
+
+Law 3's ratchet was vacuously true and always had been: `.effects` appears zero times in
+`gm/`, because both reach-pasts spell it `getattr(o, "effects", …)`.
+
+The scrubber now runs on the prose the player reads. Flipping the flag was the wrong fix
+and the measurements say why — blind, it cuts 25 of 43 real consequence beats below forty
+characters and deletes 14 of 18 engine-authored lines. `find_outcome_claims` is shown what
+the outcomes structurally establish instead, so reporting survives and invention does not.
 
 **Stage 7 — refusals.** 35 resolution-time raises against 13 refusal Outcomes. Classify
 each: a raise is correct only when a *different* intent would have worked.
