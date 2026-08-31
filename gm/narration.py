@@ -1145,6 +1145,23 @@ _DEAD_MAY = re.compile(
     r"lies still|lying still|crumpled|sprawled|remains?|blood|late)\b", re.I)
 
 
+# The player is the subject, so whoever is named after them is not the one acting — and
+# this is usually the killing blow itself. "You cut the thug down where he stands" names
+# a man who is dead by the end of the sentence, which is the one sentence about him that
+# MUST survive.
+#
+# Measured, and it was deleting them: "You kill the thug.", "You drive your blade through
+# the thug and he drops." and "Your fist connects with a meaty thud and the thug crashes
+# to the deck." were all cut whole, because the dead list is built from live `hp <= 0`
+# and is already true the instant the blow resolves. Stage 6a made it bite harder by
+# telling the narrator about the death, so the model writes these sentences more often —
+# a live prose loss that the tell fix made worse until this went in beside it.
+#
+# The cost, stated rather than hidden: "You watch the thug get up and run" now survives.
+# That is far rarer than a kill, and the engine's own tell states the death regardless.
+_PLAYER_ACTS = re.compile(r"[\"“'‘]?\s*Your?\b", re.I)
+
+
 def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
     """Drop sentences where a dead actor gets up and acts.
 
@@ -1165,7 +1182,7 @@ def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
         hit = pattern.search(s)
-        if hit and not _DEAD_MAY.search(s):
+        if hit and not _DEAD_MAY.search(s) and not _PLAYER_ACTS.match(s.strip()):
             # The quote exemption exists so a living speaker may *mention* the
             # dead — and it let the dead keep talking, measured live: a merchant
             # at -19 spat "You'll pay for this!" and nodded through two beats,

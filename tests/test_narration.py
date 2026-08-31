@@ -1464,6 +1464,35 @@ def test_the_dead_stay_dead_in_the_prose():
     assert narration.cut_dead_men_walking(said, []) == (said, [])
 
 
+def test_the_players_own_kill_is_not_cut_as_a_dead_man_walking():
+    """The dead list is built from live `hp <= 0`, so it is already true the instant the
+    blow resolves — and the sentence describing that blow names the man it just killed.
+    Measured, all of these were deleted whole: "You kill the thug.", "You drive your
+    blade through the thug and he drops.", "Your fist connects with a meaty thud and the
+    thug crashes to the deck." The one sentence about him that must survive was the one
+    reliably cut, and the player watched their own kill vanish off the page.
+
+    Found by an adversarial probe of stage 6a, which made it bite harder: once the
+    engine's tell says the thug is dead, the narrator writes these sentences far more
+    often. A fix that made a live prose loss worse until this went in beside it.
+
+    The rule is this function's own docstring — a sentence goes when the DEAD ACTOR gets
+    up and acts — and in every one of these the player is the subject.
+    """
+    dead = ["the thug"]
+    for said in ("You kill the thug.",
+                 "You drive your blade through the thug and he drops.",
+                 "Your fist connects with a meaty thud and the thug crashes to the deck.",
+                 "You cut the thug down where he stands."):
+        fixed, cut = narration.cut_dead_men_walking(said, dead)
+        assert fixed.strip() == said and not cut, f"the kill was cut: {said!r}"
+
+    # And a corpse still may not act, which is the whole point of the function.
+    for said in ("The thug swings at you again.", "The thug yells for the watch."):
+        fixed, cut = narration.cut_dead_men_walking(said, dead)
+        assert not fixed.strip() and cut, f"a dead man kept acting: {said!r}"
+
+
 def test_the_player_is_you_even_when_the_model_names_her():
     """Measured on the gemma4:12b fight audit: six of twelve combat turns
     narrated 'Kesst Vayr's blade...' — clean prose, wrong person, the single
