@@ -176,6 +176,15 @@ proves the change did what it said, and only a probe finds what it did *as well*
    effect's key, and a document-declared state need not have one, so the empty string
    read as "nothing stops you" — contradicting the promise `states.stops` makes.
 
+A seventh finding was about the record rather than the code, and is worth keeping
+straight: **three conditions is the count of the flag/tag *disagreement*, not the count
+of conditions whose behaviour moved.** Sweeping 832 condition × hit-point pairs, old
+formula against new, eight changed somewhere: `fascinated`, `nauseated` and `helpless`
+from the disagreement, plus `dead`, `stable`, `paralyzed`, `cowering`, `dazed` and
+`stunned` through `conscious` and `is_down` no longer being read off can-act. All are
+correct by 1e — a paralyzed creature is still in the fight and is a coup-de-grâce target
+— but "three changed" was the wrong sentence to have written.
+
 One test was found pinning around a defect rather than pinning a rule:
 `test_a_stunned_target_gives_a_four_bonus` added `stunned`, removed it again and
 measured the base, because a stunned target used to succeed automatically and there was
