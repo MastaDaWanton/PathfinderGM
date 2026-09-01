@@ -1965,6 +1965,90 @@ def inject_cast(raw_intents, player_text: str, scene) -> list:
     }]
 
 
+_A_NUMBER = re.compile(r"\b(\d[\d,]*)\b")
+
+
+def keep_the_authors_numbers(intents, wish: str):
+    """The number in the wish is the number. Nobody else gets to round it.
+
+    Measured live against gemma-4-12B: `/cheat I have 1000 gold` came back as
+    `{"op": "give", "params": {"item": "gold", "count": 500}}` — half of what was
+    asked for, resolved cleanly, tell and prose both confident about it.
+
+    Runs on VALIDATED intents, after `parse_all`, and that is the load-bearing part.
+    `_bounded` clamps `give.count` to 500 because "no model authors a number" — one
+    authored value could otherwise mint a million gold into a hand-priced economy. So
+    the model was not even the culprit here: a repair applied *before* validation was
+    clamped straight back to 500 and the live probe read identically before and after
+    the fix, which is how the real cause was found. The clamp is a rule about the
+    MODEL, and on this one path the number is the author's own — they typed it.
+
+    Deliberately narrow. It fires only when the wish names exactly ONE number, and it
+    only ever rewrites `count` and `amount` — a wish with two numbers in it ("2 potions
+    of 3 doses") cannot be resolved this way without guessing which belongs where, and
+    guessing is what this exists to stop.
+    """
+    if not isinstance(intents, list):
+        return intents
+    found = _A_NUMBER.findall(str(wish or ""))
+    if len(found) != 1:
+        return intents
+    wanted = int(found[0].replace(",", ""))
+    for one in intents:
+        params = getattr(one, "params", None)
+        if not isinstance(params, dict):
+            continue
+        for key in ("count", "amount"):
+            got = params.get(key)
+            if isinstance(got, (int, float)) and not isinstance(got, bool) \
+                    and int(got) != wanted:
+                params[key] = wanted
+    return intents
+
+
+def split_plural_targets(raw_intents):
+    """One ref per intent. A model that means several says so with several.
+
+    Measured live on the first `/cheat I defeat all the enemies`, against
+    gemma-4-12B: it answered the plural honestly with a single intent carrying
+    `"to": ["c2", "c3"]`. Every op in the table takes ONE ref, `_known` did
+    `ref in self.scene.actors` on the list, and `unhashable type: 'list'` reached
+    Django as a 500 with a traceback.
+
+    The engine now refuses that shape rather than dying on it, but refusing is the
+    wrong answer to a request that was perfectly clear: the fan-out is what the model
+    meant, it is mechanical, and it costs no second call. Detect in code, repair
+    exactly what was found — the same shape as every fix in this file that held.
+    """
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for raw in raw_intents:
+        if not isinstance(raw, dict):
+            out.append(raw)
+            continue
+        params = raw.get("params")
+        many = params.get("to") if isinstance(params, dict) else None
+        # `targets()` reads `target` too, and the same plural arrives there.
+        if not isinstance(many, list):
+            many = raw.get("target") if isinstance(raw.get("target"), list) else None
+            key = "target"
+        else:
+            key = "to"
+        refs = [r for r in (many or []) if isinstance(r, str) and r]
+        if not refs:
+            out.append(raw)
+            continue
+        for ref in refs:
+            one = dict(raw)
+            if key == "to":
+                one["params"] = dict(params, to=ref)
+            else:
+                one["target"] = ref
+            out.append(one)
+    return out
+
+
 def repair_bare_spawns(raw_intents, player_text: str):
     """A spawn the model could not shape is this code's to shape.
 

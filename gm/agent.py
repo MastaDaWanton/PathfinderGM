@@ -189,6 +189,7 @@ class GMAgent:
                 # First, because everything downstream reads the shapes this
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.
+                raw = judgement.split_plural_targets(raw)
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 raw = judgement.repair_misaimed_attack(
@@ -348,6 +349,74 @@ class GMAgent:
             rejections=rejections)
 
     # --- An NPC's turn -------------------------------------------------------------------
+
+    def plan_cheat(self, wish: str, location=None, recent_events=None,
+                   max_attempts: int = 3) -> TurnPlan:
+        """The author's wish, turned into intents the engine will actually run.
+
+        Prior art settled the shape before any of it was written. Inform's PURLOIN moves
+        a *real object* into your hands wherever it is; NetHack's #wizwish goes through
+        the same object-naming parser an ordinary game uses, and an unparseable wish
+        gives you a random real object rather than an invented one; DikuMUD's immortal
+        commands are `load obj <vnum>` and `set <player> gold 1000` — typed, targeted,
+        and resolved by the same code that runs normal play. Not one tradition lets a
+        sentence become fiction directly, and the reason is the one this app already
+        knows: a wish the engine did not execute is a fact only the narrator remembers,
+        and the narrator forgets.
+
+        So a cheat is an intent list like any other. What it skips is the *fiction's*
+        permission — no check, no cost, no refusal for being impossible — and what it
+        does NOT skip is a single line of the engine's bookkeeping. It also skips the
+        injector chain `plan_turn` runs, deliberately: those read the player's words as a
+        declaration of what THEIR CHARACTER does, and `/cheat I defeat all the enemies`
+        run through `inject_fight` would spawn somebody to fight.
+        """
+        brief = prompts.scene_brief(self.world, self.engine.scene, location,
+                                    recent_events)
+        base = prompts.cheat_messages(brief, wish)
+        messages = base
+        attempts: list[Attempt] = []
+        rejections: list[str] = []
+
+        for n in range(max_attempts):
+            reply = client.chat(
+                messages, self.model, self.host, as_json=True, think=False,
+                temperature=0.3, provider=self.provider, api_key=self.api_key,
+                schema=prompts.turn_schema(
+                    fighting=False, refs=tuple(self.engine.scene.actors),
+                    min_chars=0, ops=prompts.CHEAT_OPS))
+            attempts.append(Attempt(kind="cheat", seconds=reply.seconds,
+                                    model=self.model, raw=(reply.text or "")[:300]))
+            try:
+                data = reply.json()
+            except ValueError as exc:
+                rejections.append(f"attempt {n + 1}: {exc}")
+                messages = _with_correction(base, reply.text, str(exc))
+                continue
+            try:
+                raw = judgement.split_plural_targets(data.get("intents") or [])
+                data = dict(data, intents=raw)
+                # After validation on purpose: the count clamp exists to stop a
+                # MODEL minting a million gold, and on this one path the number
+                # is the author's own. Applied before, it was clamped straight
+                # back and the live probe read identically either way.
+                intents = judgement.keep_the_authors_numbers(
+                    self.engine.validate(raw), wish)
+            except IntentError as exc:
+                rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
+                messages = _with_correction(base, reply.text, str(exc))
+                continue
+            return TurnPlan(narration="", intents=intents, attempts=attempts,
+                            rejections=rejections)
+
+        # Every attempt refused. A cheat that cannot be mechanised is still a thing the
+        # author said, so it becomes a beat rather than an error: the wish reaches the
+        # narrator and nothing pretends a number changed.
+        return TurnPlan(
+            narration="", intents=self.engine.validate(
+                [{"op": "narrate_only",
+                  "because": f"the author wrote: {wish}"}]),
+            attempts=attempts, rejections=rejections)
 
     def npc_turn(self, ref: str, location=None, recent_events=None,
                  max_attempts: int = 3) -> TurnPlan:

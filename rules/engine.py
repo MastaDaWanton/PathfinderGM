@@ -1165,13 +1165,32 @@ class Engine:
             intent.visibility = "hidden"
 
     def _known(self, ref: str | None, extra: set[str] | None = None) -> bool:
-        return bool(ref) and (ref in self.scene.actors or ref in (extra or set()))
+        # A ref that is not a string is not a ref — and `ref in dict` on a list raises
+        # `TypeError: unhashable type` rather than answering False. Found live on the
+        # first `/cheat I defeat all the enemies`: gemma answered the plural honestly
+        # with `"to": ["c2", "c3"]`, the validator died on the membership test, and
+        # Django turned it into a 500 with a traceback. Every op here takes ONE ref;
+        # a model that means several says so with several intents. Answering False
+        # sends it to the `refs` branch, which is the one branch that repairs.
+        return isinstance(ref, str) and bool(ref) and (
+            ref in self.scene.actors or ref in (extra or set()))
 
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
         if intent.op in ("narrate_only", "advance_time", "spawn", "begin_encounter"):
             if intent.op == "begin_encounter":
-                for side, refs in intent.params["sides"].items():
+                sides = intent.params["sides"]
+                # Same family as the `_known` guard above: a container where a mapping
+                # was expected is an AttributeError and a 500, not a rejection. The
+                # model writes `sides` as a list of refs often enough to matter.
+                if not isinstance(sides, dict):
+                    raise IntentError(
+                        "begin_encounter: sides is a map of side name to a list of "
+                        f"refs, like {{\"you\": [\"pc\"], \"them\": [\"c1\"]}} — got "
+                        f"{sides!r}", "schema", index)
+                for side, refs in sides.items():
+                    if isinstance(refs, str):
+                        refs = [refs]
                     for r in refs:
                         if not self._known(r, extra):
                             raise IntentError(
@@ -1197,6 +1216,11 @@ class Engine:
                     "refs", index,
                 )
         opposed = intent.params.get("opposed_by")
+        if opposed and not isinstance(opposed, dict):
+            raise IntentError(
+                "check: opposed_by is an object naming a ref and a skill, like "
+                f"{{\"ref\": \"c1\", \"skill\": \"perception\"}} — got {opposed!r}",
+                "schema", index)
         if opposed and not self._known(opposed.get("ref"), extra):
             raise IntentError(
                 f"check: opposed_by names unknown ref {opposed.get('ref')!r}",
@@ -3046,6 +3070,13 @@ class Engine:
                 tell=f"{target.name} is immune to {blocked} and is not "
                      f"{CONDITIONS.get(key, {}).get('name', key).lower()}.",
                 because=intent.because)
+        # One step on the attitude track at a time. Nobody is hostile and helpful at
+        # once, and without this a charm laid over an old grudge left both standing
+        # and `attitude_of` answered with whichever the reversed walk hit first.
+        # Here rather than in `add_condition`, for the reason argued directly above:
+        # the applicator is the engine's own hand and this is a rule about the op.
+        if key in states.ATTITUDES:
+            target.clear_states("attitude")
         cond = target.add_condition(key, rounds, source=intent.because)
         return Outcome(
             intent_id=intent.id, op="condition",

@@ -93,7 +93,41 @@ TAGS: dict[str, tuple[str, ...]] = {
     # The price of coming back: somebody paid the priests, and now the debt sits
     # on the character. Clockless — the world decides when it is called in.
     "life debt": ("state.obligation.life-debt",),
+    # 1e's attitude track, in the book's own order. `rules/effectspec.py` has offered
+    # an `attitude` effect type since the spell import — thirty-three spells set one,
+    # charm person among them — and it shipped `engine=False` with the note "no check
+    # in the app consults an attitude yet", because there was nowhere for the answer
+    # to live. Here is the somewhere.
+    #
+    # Not under `state.*`: an attitude stops no action and impairs no roll. It is a
+    # fact about how somebody feels towards you, and its whole job is to be READ — by
+    # the brief, so the narrator writes the merchant as a merchant who likes you, and
+    # by whatever later asks whether this creature would fight. And no `recovery.*`:
+    # what ends a charm is the effect's own clock, not a night's sleep, and putting
+    # one here would have every sweep in the app cure infatuation.
+    "hostile":     ("attitude.hostile",),
+    "unfriendly":  ("attitude.unfriendly",),
+    "indifferent": ("attitude.indifferent",),
+    "friendly":    ("attitude.friendly",),
+    "helpful":     ("attitude.helpful",),
 }
+
+# The track in the book's order, worst to best. Ordered because the question asked of
+# it is nearly always a comparison — "friendly or better" — and a set cannot answer it.
+ATTITUDES: tuple[str, ...] = (
+    "hostile", "unfriendly", "indifferent", "friendly", "helpful")
+
+
+def attitude_of(actor, default: str = "") -> str:
+    """Where this creature sits on the track, or `default` if nobody has said.
+
+    One reader for one question, so no site ever matches `"friendly"` as a string —
+    the same rule every other family here lives under.
+    """
+    for step in reversed(ATTITUDES):
+        if actor is not None and actor.has_state(f"attitude.{step}"):
+            return step
+    return default
 
 
 def tags_for(key: str) -> tuple[str, ...]:

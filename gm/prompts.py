@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 
+from rules import states
 from rules.intents import OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
 
@@ -720,7 +721,15 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
             )
         else:
             note = actor.notes.split(".")[0] if actor.notes else ""
-            lines.append(f"  {ref} — {actor.name}. {note}.")
+            # How they feel about the player, when anything has said. The attitude
+            # effect type has existed since the spell import — thirty-three spells
+            # set one — and shipped with nowhere to be read; a charmed guard was
+            # charmed in the effect list and hostile in every sentence about him.
+            # Stated as fact, in the vocabulary's own word, so the narrator writes
+            # the creature the engine is holding.
+            mood = states.attitude_of(actor)
+            feels = f" {actor.name} is {mood} towards the player." if mood else ""
+            lines.append(f"  {ref} — {actor.name}. {note}.{feels}")
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,
@@ -1158,7 +1167,8 @@ _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools"
 
 
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
-                min_chars: int = 0, must_contain: tuple[str, ...] = ()) -> dict:
+                min_chars: int = 0, must_contain: tuple[str, ...] = (),
+                ops: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
 
     `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
@@ -1175,7 +1185,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         "type": "object",
         "properties": {
             "op": {"type": "string",
-                   "enum": list(_FIGHT_OPS) if fighting else sorted(_OPS)},
+                   "enum": (sorted(ops) if ops else
+                            list(_FIGHT_OPS) if fighting else sorted(_OPS))},
             "actor": ({"type": "string", "enum": list(refs)} if refs
                       else {"type": "string"}),
             "target": ({"type": "string", "enum": list(refs)} if refs
@@ -1220,3 +1231,118 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         },
         "required": ["narration", "intents"],
     }
+
+
+# --- The author's own hand -------------------------------------------------------------
+
+# The ops a cheat may use: everything that does NOT put dice in somebody's hands.
+# Derived from the op table's own visibility column rather than hand-listed, so an op
+# added tomorrow lands on the right side of the line without this being edited.
+#
+# Measured live, and this is why it exists at all. Probing `/cheat I have 1000 gold`
+# against gemma-4-12B in a scene that happened to be mid-fight came back with
+# `{"op": "attack", "actor": "pc"}` — the merchant swung at the player and knocked her
+# unconscious, on a wish about money. A model in a fight does what it does in a fight,
+# and no amount of instruction outweighs the brief describing one. An enum at the
+# sampler is not an instruction: `attack` is a token the model cannot emit here.
+#
+# The rule it encodes is also just true. A cheat never rolls — the whole point is that
+# the author has decided the outcome — so every `player`-visibility op (attack, check,
+# save, forage, use_item, sell, buy, use_ability) is exactly the wrong shape for one.
+CHEAT_OPS: tuple[str, ...] = tuple(
+    op for op, (_need, _may, vis) in _OPS.items() if vis != "player")
+
+
+def _op_reference() -> str:
+    """Every op and its params, generated from the op table.
+
+    The ordinary turn prompt does not carry this: it teaches by example and the schema's
+    enum pins the op name at the sampler. A cheat is bookkeeping rather than a scene, and
+    the model is being asked for ops it has seen no example of — `advance_time`, `defence`,
+    `temp_hp` — so it needs the params by name. Generated rather than written out, because
+    a hand-copied list of forty ops is a copy that drifts, and CLAUDE.md's rule about
+    grepping for every copy of a rule exists for exactly this.
+    """
+    lines = ["THE OPS you may use, and the params each takes "
+             "(required first, then optional):"]
+    for op, (need, may, _vis) in sorted(_OPS.items()):
+        if op not in CHEAT_OPS:
+            continue
+        parts = ", ".join(need) or "—"
+        if may:
+            parts += "  [" + ", ".join(may) + "]"
+        lines.append(f"  {op}: {parts}")
+    return "\n".join(lines)
+
+
+CHEAT_SYSTEM = """You are the rules engine's clerk, not its referee.
+
+The person playing this game is also its author, and they have just written down
+something that is now true. Your only job is to turn that sentence into the intents
+that MAKE it true, using the ops below and the refs that exist. The rules do not get a
+vote: nothing is too expensive, nobody rolls to resist, no check is made, and no reason
+is needed.
+
+What you may NOT do is invent. Every ref you name must be one of the refs listed in the
+scene. Every place must be one of the places listed. If the wish names somebody who is
+not here, spawn them; if it names a thing, give it. If nothing in the op list can do what
+the wish asks, emit one narrate_only and let the prose carry it — a wish you cannot
+mechanise honestly is better than an op that pretends.
+
+Worked examples of the shape:
+
+  "I have 1000 gold"
+    [{"op": "give", "because": "the author says so",
+      "params": {"item": "gold", "count": 1000, "to": "pc"}}]
+
+  "I defeat all the enemies"
+    [{"op": "condition", "because": "the author says so",
+      "params": {"condition": "dead", "to": "<each enemy ref>"}},
+     {"op": "end_encounter", "because": "the author says so", "params": {}}]
+
+  "the merchant falls deeply in love with me"
+    [{"op": "condition", "because": "the author says so",
+      "params": {"condition": "helpful", "to": "<the merchant's ref>"}}]
+
+  "I am wearing a suit of full plate"
+    [{"op": "give", "because": "the author says so",
+      "params": {"item": "full plate", "count": 1, "to": "pc"}},
+     {"op": "wear", "because": "the author says so",
+      "params": {"item": "full plate", "actor": "pc"}}]
+
+  "it is suddenly midnight"
+    [{"op": "advance_time", "because": "the author says so",
+      "params": {"amount": 8, "unit": "hours"}}]
+
+You cannot wear or use what you are not carrying: hand it over first, then put it
+on. Two intents, in that order.
+
+Numbers in the wish are the author's numbers. 1000 gold is 1000, not 500.
+
+Attitudes are a real state and the track is hostile, unfriendly, indifferent, friendly,
+helpful — "falls in love", "trusts me", "is my friend" are all `helpful` or `friendly`,
+not a narrate_only.
+
+Write no narration. The intents are the whole answer."""
+
+
+def cheat_messages(briefing_scene: str, wish: str) -> list[dict]:
+    """The author's wish, as a request for intents and nothing else.
+
+    Deliberately NOT the ordinary turn prompt with a different instruction bolted on.
+    That prompt is built to make a model refuse impossible things, keep the fiction
+    honest and hand the turn back with a question — every one of which is exactly what a
+    cheat is for overriding, and CLAUDE.md's own rule is that instruction volume loses to
+    demonstration volume. A prompt whose examples all show a careful GM cannot be argued
+    into being a clerk.
+
+    The scene brief still goes in whole, because the one thing a cheat must not do is
+    invent: the refs, the names and the places are the same grounding every other call
+    gets, and the schema pins the refs at the sampler on top of it.
+    """
+    return [
+        {"role": "system", "content": CHEAT_SYSTEM + "\n\n" + _op_reference()},
+        {"role": "user", "content": briefing_scene},
+        {"role": "user",
+         "content": f"The author writes: {wish}\n\nMake it true."},
+    ]

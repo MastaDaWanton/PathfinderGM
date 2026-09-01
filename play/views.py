@@ -689,6 +689,18 @@ def say(request):
     # their mouth on the one turn whose entire point is that they said nothing.
     shown = "…" if carry_on else text
 
+    # The author's own hand, and it goes BEFORE the reaching-across-the-table check
+    # below — which exists to refuse exactly the sentences a cheat is made of. "The
+    # merchant falls in love with me" is a declaration about the world, and saying so
+    # on purpose is the whole feature.
+    #
+    # Detected here in code and never by the model, for the reason every other
+    # declaration-detection in this app is in code: a model asked to notice a marker
+    # sometimes does not, and a cheat quietly narrated instead of executed is the worst
+    # of both — the fiction says you have the gold and the purse does not.
+    if not carry_on and _CHEAT.match(text):
+        return _cheat(c, _CHEAT.sub("", text, count=1).strip(), shown)
+
     # The player controls one character; the GM controls the world. A turn that declares
     # what the world does is handed back rather than resolved — gently, and without
     # consuming the turn, because the player has not done anything wrong so much as
@@ -757,7 +769,7 @@ def say(request):
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
-    return _advance(request, c, agent, plan.narration, plan, text)
+    return _advance(c, agent, plan.narration, plan, text)
 
 
 # The combat panel's whitelist: what a button may emit, and nothing else. The free-text
@@ -936,7 +948,48 @@ def roll(request):
     return _finish(c, agent, resolution, narration, player_input, plan=None)
 
 
-def _advance(request, c, agent, narration, plan, player_input):
+# `/cheat <wish>`. A slash so it can never be a sentence somebody meant: no ordinary
+# turn starts with one, and the player who types it has decided to be the author for a
+# line. Trailing space or colon both allowed, because both are what people type.
+_CHEAT = re.compile(r"^\s*/cheat\b[:\s]*", re.I)
+
+
+def _cheat(c, wish: str, shown: str):
+    """Make the author's sentence true, through the engine like everything else.
+
+    The design question the player asked out loud — "the hard part is perhaps making it
+    actually give me the items and/or narrating correctly" — has one answer for both
+    halves, and it is the answer this whole app is built on: the model proposes, the
+    engine disposes. A cheat that reaches `engine.run` gives real items because `give`
+    is the same op a shopkeeper uses, and it narrates correctly because the prose call
+    is fed the resulting TELLS and the claims scrubber deletes any sentence stating a
+    mechanic no tell backs. A cheat that granted nothing therefore cannot be narrated
+    as though it had — for free, from machinery that already existed.
+    """
+    if not wish:
+        return JsonResponse(
+            {"error": "Say what is true. For example: /cheat I have 1000 gold"},
+            status=400)
+    c.transcript.append({"who": "player", "text": shown})
+    agent = GMAgent(c.world, c.engine())
+    try:
+        plan = agent.plan_cheat(wish, location=c.location,
+                                recent_events=_recent_events(c.world, c.location))
+    except ModelUnavailable as exc:
+        c.transcript.pop()
+        return JsonResponse({"error": str(exc)}, status=503)
+    except IntentError as exc:
+        c.transcript.pop()
+        return JsonResponse(
+            {"error": f"That could not be turned into anything the engine can do. "
+                      f"{exc}"}, status=502)
+    # Straight into the ordinary turn from here: same resolution, same rollback on a
+    # refusal, same prose call, same scrubber. The only thing a cheat skips is the
+    # fiction's permission, and that was spent in the prompt.
+    return _advance(c, agent, "", plan, f"(the author writes: {wish})")
+
+
+def _advance(c, agent, narration, plan, player_input):
     engine = agent.engine
     # The turn either happens or it does not. Resolution applies each intent
     # before it reaches the next, so a list that raises half-way leaves the

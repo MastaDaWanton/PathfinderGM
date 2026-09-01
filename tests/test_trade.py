@@ -412,7 +412,7 @@ def _chain(said, scene, world=None):
             raw = fn(raw, scene) or raw
         elif name == "drop_stray_checks":
             raw = fn(raw, said)
-        elif name == "drop_premature_end":
+        elif name in ("drop_premature_end", "split_plural_targets"):
             raw = fn(raw)
         elif name == "repair_bare_spawns":
             raw = fn(raw, said)
