@@ -642,13 +642,25 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
 
     if location:
         lines.append(f"\nHERE: {location.name}, a {location.scale or 'place'}.")
-        # Which room of it. The world models a city and not the taproom inside it, so
-        # without this the model reconstructs the spot from earlier beats — and put a
-        # player back inside a building they had walked out of two turns before.
-        spot = str(getattr(scene, "spot", "") or "").strip()
-        if spot:
-            lines.append(f"  The party is in {spot}. Not anywhere else in "
+        # Which part of it, and what leads out — stated the same way the cast is, because
+        # it is the same rule. "WHO IS HERE (these refs are the only ones that exist)"
+        # has grounded people since it was written; this file's own docstring has asked
+        # for the same courtesy for PLACES since it was written too ("a model invents
+        # places and people, then treats them as settled fact") and never got it. Without
+        # it the model reconstructs the room from earlier beats, and put a player back
+        # inside a building they had walked out of two turns before.
+        from rules import places as _places
+
+        known = _places.spots_for(location, terrain=getattr(scene, "biome", ""))
+        here = _places.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
+        if here is not None and len(known) > 1:
+            others = [p.name for p in known if p.id != here.id]
+            lines.append(f"  The party is at {here.name}. Not anywhere else in "
                          f"{location.name}; they are there now.")
+            lines.append(f"  THE PLACES HERE (the only ones that exist): "
+                         f"{', '.join(p.name for p in known)}. To move between them use "
+                         f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
+                         f"Anything else is refused.")
         for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
                     "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
             if location.fact(key):

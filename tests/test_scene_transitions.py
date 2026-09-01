@@ -112,31 +112,34 @@ def test_leaving_a_room_is_a_scene_change_even_on_the_same_ground(yard):
     a change of biome always did.
     """
     s, engine = yard
-    s.spot = "the merchant's stall"
+    start = engine.here()
+    other = next(p for p in engine.places() if p.id != start.id)
     got = engine.run(engine.validate([
         {"op": "travel", "because": "she walks out",
-         "params": {"place": "the market square"}}]))
+         "params": {"place": other.name}}]))
 
-    assert s.spot == "the market square"
+    assert engine.here().id == other.id
     assert s.biome == "urban", "changing room must not change the ground underfoot"
     assert list(s.actors) == ["pc"], "the people of the old room followed her out"
-    assert "the market square" in got.outcomes[0].tell
+    assert other.name in got.outcomes[0].tell
 
 
 def test_an_escort_still_comes_along_between_rooms(yard):
     s, engine = yard
     engine.run(engine.validate([
         {"op": "travel", "because": "they walk out together",
-         "params": {"place": "the street", "with": ["c1"]}}]))
+         "params": {"place": next(p.name for p in engine.places()
+                                   if p.id != engine.here().id),
+                    "with": ["c1"]}}]))
     assert set(s.actors) == {"pc", "c1"}
 
 
 def test_new_ground_forgets_the_old_room(yard):
     """A stale room name would anchor the prose to a building a day's walk behind."""
     s, engine = yard
-    s.spot = "the taproom"
+    s.at = engine.here().id
     travel(engine)
-    assert s.biome == "forest" and s.spot == ""
+    assert s.biome == "forest" and s.at == ""
 
 
 def test_travel_with_neither_ground_nor_room_says_what_to_type(yard):

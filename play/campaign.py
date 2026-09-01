@@ -217,9 +217,11 @@ class Campaign:
                 # default, however far the spawn said they were.
                 "spawn_feet": self.scene.spawn_feet,
                 "biome": self.scene.biome,
-                # Where inside the location they are standing. Unsaved, a restart
-                # put the party back in a room the brief no longer described.
-                "spot": self.scene.spot,
+                # WHICH place they are standing in, by id. The list of places is
+                # derived (rules.places.spots_for is deterministic and seeded off the
+                # location's own id), so there is nothing else here to save and no way
+                # for a stored list to drift from the generator that made it.
+                "at": self.scene.at,
                 "pending_intents": self.scene.pending_intents,
                 "pending_outcomes": self.scene.pending_outcomes,
                 "pending_partial": self.scene.pending_partial,
@@ -307,7 +309,7 @@ class Campaign:
             spawn_feet={str(k): int(v)
                         for k, v in (s.get("spawn_feet") or {}).items()},
             biome=s.get("biome", ""),
-            spot=str(s.get("spot") or ""),
+            at=str(s.get("at") or ""),
             pending_intents=s.get("pending_intents", []),
             pending_outcomes=s.get("pending_outcomes", []),
             pending_partial=s.get("pending_partial", {}),

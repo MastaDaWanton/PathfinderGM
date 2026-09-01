@@ -76,10 +76,15 @@ class Scene:
     # out of a building, the GM narrated the square, and the next beat was back inside
     # by the fire, because nothing had told the engine the room was over.
     #
-    # `spot` rather than `place`, which is already a METHOD on this class — the one
-    # that puts a manifestation on the grid. A field of that name shadows it and every
-    # standing spell in the game stops being placeable.
-    spot: str = ""
+    # `at` holds the place's ID and nothing else. The list of places a location has is
+    # DERIVED — `rules.places.spots_for` is deterministic and seeded off the location's
+    # own durable id — so there is no collection to save, nothing to migrate, and no way
+    # for a stored list to drift from the generator that made it.
+    #
+    # It replaced a free-text `spot` written straight from a model param, which was the
+    # narrator establishing a fact rather than proposing one, and which gave "where the
+    # party is" a second writer beside `thread["where"]`.
+    at: str = ""
     actors: dict[str, Actor] = field(default_factory=dict)
     zones: dict[str, str] = field(default_factory=dict)
     # The map, and where everybody is standing on it. Both optional: a scene with no grid
@@ -2593,6 +2598,28 @@ class Engine:
                 self.scene.depart(ref)
         return tells
 
+    def places(self) -> tuple:
+        """Every place this location is made of — derived, never stored.
+
+        Healed on read rather than migrated, the same courtesy `Campaign.biome` extends
+        to a save written before biomes existed: a save that needs a migration step to be
+        playable is a save that breaks the moment somebody opens an old one.
+        """
+        from . import places as places_mod
+
+        found = (self.world.get(self.scene.location_id) if self.world else None)
+        # The bare id when the world is not to hand: it is what seeds the layout, so a
+        # scene still has its places without one, and the ground chooses the table.
+        return places_mod.spots_for(found or self.scene.location_id,
+                                    terrain=self.scene.biome)
+
+    def here(self):
+        """The place the party is standing in. Never None — they are always somewhere."""
+        from . import places as places_mod
+
+        known = self.places()
+        return places_mod.find(known, self.scene.at) or known[0]
+
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
 
@@ -2622,6 +2649,28 @@ class Engine:
                 f"{', '.join(sorted(biomes.BIOMES))}.",
                 "schema")
 
+        # A destination that does not exist is refused with the ones that do, exactly as
+        # an unknown biome already is. This is the courtesy the ref registry has always
+        # extended to people and never to places — and it is what makes the difference
+        # between the model CHOOSING a place and the model INVENTING one. A rewrite
+        # naming a real place works, so this raises rather than printing: the model can
+        # repair it, which is the test stage 7 sets for a correct raise.
+        from . import places as places_mod
+
+        known = self.places()
+        going_to = None
+        if place:
+            going_to = places_mod.find(known, place)
+            if going_to is None:
+                raise IntentError(
+                    f"travel: there is no {place!r} here. The places are: "
+                    f"{', '.join(p.name for p in known)}.",
+                    "schema")
+            if going_to.described_only:
+                raise IntentError(
+                    f"travel: {going_to.name} can be seen from here but not reached.",
+                    "legality")
+
         kept = {str(r) for r in (intent.params.get("with") or [])}
         left: list[str] = []
         # A change of ground OR a change of room. Both are scene transitions and both
@@ -2629,7 +2678,7 @@ class Engine:
         # the square, exactly as the gatekeeper stays in the city when they walk to the
         # forest. Only the biome half existed, so a move inside one place changed
         # nothing the engine could see and the brief went on describing the old room.
-        moved = biome != self.scene.biome or (place and place != self.scene.spot)
+        moved = biome != self.scene.biome or (going_to and going_to.id != self.scene.at)
         if moved:
             fight_ended = self.scene.in_encounter
             if fight_ended:
@@ -2651,18 +2700,21 @@ class Engine:
             fight_ended = False
 
         was, self.scene.biome = self.scene.biome, biome
-        was_place, self.scene.spot = self.scene.spot, (place or self.scene.spot)
-        # New ground is a new room by definition: the taproom does not come with you to
-        # the forest, and a stale place name would anchor the prose to a building that
-        # is a day's walk behind.
-        if biome != was and not place:
-            self.scene.spot = ""
+        was_place = self.scene.at
+        if going_to is not None:
+            self.scene.at = going_to.id
+        # New ground is a new set of places by definition: the taproom does not come with
+        # you to the forest, and a stale id would point at a room a day's walk behind.
+        # `places()` is keyed on the location, so the id simply stops resolving — clearing
+        # it says so rather than leaving the party pointing at nowhere.
+        if biome != was and going_to is None:
+            self.scene.at = ""
         note = str(intent.params.get("note") or "").strip()
         bits = []
         if biome != was:
             bits.append(f"The ground changes: {biomes.describe(biome).lower()}.")
-        if place and place != was_place:
-            bits.append(f"You are in {place} now.")
+        if going_to is not None and going_to.id != was_place:
+            bits.append(f"You are at {going_to.name} now.")
         if fight_ended:
             bits.append("The fight is left behind.")
         if left:
@@ -2672,7 +2724,7 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="travel",
             effects=[{"kind": "biome", "biome": biome, "was": was, "left": left,
-                      "place": self.scene.spot, "was_place": was_place,
+                      "place": self.scene.at, "was_place": was_place,
                       "fight_ended": fight_ended}],
             tell=" ".join(bits),
             because=intent.because,
