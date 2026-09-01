@@ -130,15 +130,30 @@ def test_end_turn_handss_the_round_onward(fight):
     assert "pc" in scene.acted                    # passing is still acting
 
 
-def test_not_your_turn_is_refused(fight):
+def test_not_your_turn_runs_the_turns_it_is_waiting_on(fight):
+    """A refusal the player cannot act on is a locked door, not a refusal.
+
+    This used to assert a flat 409. Overturned by a live session on 2026-09-01: a
+    market fight held twelve creatures, `_run_npc_turns` had a fixed budget of
+    twelve, and it returned with a thug still holding the turn. The panel said
+    "It is not your turn" to every button, the free-text box goes through the same
+    gate, and nothing in the app advances the order except the loop that had just
+    given up — the save was unplayable.
+
+    The only reason somebody else holds the turn when the player posts is that
+    the loop did not finish, so the panel finishes it. What must never happen is
+    a request ending with the turn parked on an NPC.
+    """
     client, cm = fight
     scene = cm.current().scene
     while scene.current_ref() == "pc":
         scene.advance_turn()
     cm.current().save()
     r = _act(client, [{"op": "attack", "target": "c1"}])
-    assert r.status_code == 409
-    assert "not your turn" in r.json()["error"].lower()
+    assert r.status_code < 400, r.json()
+    after = cm.current().scene
+    assert not after.in_encounter or after.awaiting \
+        or after.current_ref() == "pc", "the request ended on somebody else's turn"
 
 
 def test_a_fight_lays_the_ground_it_promised(fight):

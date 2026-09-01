@@ -330,3 +330,73 @@ def test_every_door_that_resolves_also_knows_how_to_undo():
     assert not guilty, (
         f"{guilty} resolve intents without taking a snapshot to restore on "
         f"refusal — a raise half-way through leaves the earlier half standing")
+
+
+def test_a_fight_never_ends_a_request_on_somebody_elses_turn():
+    """"It is not your turn" with nothing that can make it your turn is a dead game.
+
+    Measured live on 2026-09-01: a market fight held twelve creatures in
+    initiative — ten thugs, a woman and a collective. `_run_npc_turns` had a
+    fixed budget of twelve, so all twelve iterations went on NPCs and it
+    returned with a thug still holding the turn. The combat panel answered "It
+    is not your turn", the free-text box goes through the same gate, and nothing
+    in the app advances the order except the loop that had just given up. There
+    was no way forward at all.
+
+    Two halves, and both are needed: the budget is now a round rather than a
+    constant, and if it ever runs out anyway the turn is parked on the player.
+    """
+    import ast
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    loop = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "_run_npc_turns")
+    body = ast.get_source_segment(src, loop) or ""
+    assert "len(scene.initiative)" in body, (
+        "the NPC budget is a constant again; a fight bigger than it can never come "
+        "back round to the player")
+    assert "_hand_the_turn_back" in body, (
+        "_run_npc_turns can fall out of its loop with an NPC holding the turn and "
+        "say nothing about it")
+
+    panel = next(n for n in ast.walk(tree)
+                 if isinstance(n, ast.FunctionDef) and n.name == "combat_act")
+    text = ast.get_source_segment(src, panel) or ""
+    assert "It is not your turn." not in text or "_run_npc_turns" in text, (
+        "the panel refuses a turn it holds without running the turns it is "
+        "waiting on")
+
+
+def test_the_turn_comes_back_to_the_player_from_any_slot():
+    """The recovery itself, on a scene parked exactly as the live save was."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    engine = Engine(scene, Dice(seed=5))
+    engine.run(engine.validate([
+        {"op": "spawn", "because": "the crowd",
+         "params": {"template": "thug", "count": 10, "zone": "engaged"}},
+        {"op": "begin_encounter", "because": "the ambush",
+         "params": {"sides": {"you": ["pc"],
+                              "them": [f"c{i}" for i in range(1, 11)]}}}]))
+
+    class _Campaign:
+        def __init__(self, scene):
+            self.scene = scene
+            self.transcript = []
+
+    c = _Campaign(scene)
+    parked = next(i for i, (r, _) in enumerate(scene.initiative) if r != "pc")
+    scene.turn = parked
+    assert scene.current_ref() != "pc"
+
+    from play.views import _hand_the_turn_back
+
+    _hand_the_turn_back(c, "back to you")
+    assert scene.current_ref() == "pc", "the player still cannot act"
+    assert c.transcript, "the skipped round happened silently"

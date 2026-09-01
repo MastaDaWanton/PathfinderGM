@@ -807,7 +807,19 @@ def combat_act(request):
                            for a in actions if isinstance(a, dict)) or not actions:
             return JsonResponse({"error": "No fight is on."}, status=409)
     elif scene.current_ref() != pc.ref:
-        return JsonResponse({"error": "It is not your turn."}, status=409)
+        # The only reason somebody else holds the turn when the player posts is that
+        # the NPC loop did not finish — so finish it, rather than refusing. Measured
+        # live: a twelve-creature fight left a thug holding the turn and this branch
+        # answered "It is not your turn" to every button, for ever. A refusal the
+        # player cannot act on is not a refusal, it is a locked door.
+        _run_npc_turns(c, GMAgent(c.world, c.engine()))
+        if scene.in_encounter and scene.current_ref() != pc.ref:
+            _hand_the_turn_back(c, "The moment comes back to you.")
+        # A fight that ended while they waited, or a die they now owe, is an answer
+        # in itself — the declared action belongs to a turn that no longer exists.
+        if scene.awaiting or not scene.in_encounter:
+            c.save()
+            return JsonResponse(_state(c))
 
     raw = []
     for a in actions:
@@ -1137,7 +1149,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     turn, and stops when it comes back round to the player.
 
     `limit` is a guard against a fight that cannot end — a stalled loop here would hang
-    the player's request rather than merely playing badly.
+    the player's request rather than merely playing badly. It is a FLOOR, not the
+    budget: a round is one turn per combatant, so a fixed twelve stopped being a
+    round the moment a fight had twelve creatures in it. Measured live on
+    2026-09-01 in a market holding ten thugs, a woman and a collective: all twelve
+    iterations went on NPCs, the loop returned with a thug still holding the turn,
+    the panel read "It is not your turn", and every button refused. The game had no
+    way forward at all.
     """
     scene = c.scene
     if not scene.in_encounter or scene.awaiting:
@@ -1147,7 +1165,9 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     location = c.location
     events = _recent_events(world, location)
 
-    for _ in range(limit):
+    # Twice the order: one full round, plus room for the arrivals a spawn mid-fight
+    # inserts into it.
+    for _ in range(max(limit, len(scene.initiative) * 2)):
         # A side with nobody standing means the fight is over.
         if scene.sides and scene.sides_standing() <= 1:
             # Settled while the sides are still declared — the same payout the
@@ -1257,6 +1277,33 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 "text": text or " ".join(plain_tell(o.tell) for o in tells),
             })
         _log_turn(c, plan, resolution)
+
+    # The budget ran out with somebody else holding the turn. Whatever went wrong,
+    # the player is not left staring at a panel where every button refuses: the
+    # turn comes back to them and what was cut is said out loud. Parked directly
+    # rather than advanced, because advancing ticks rounds and expires holds — the
+    # skipped creatures lose their turn, which is a mercy to the player, not a
+    # round of free time for anyone.
+    _hand_the_turn_back(c, "The scuffle blurs; the moment comes back to you.")
+
+
+def _hand_the_turn_back(c, why: str) -> None:
+    """Park the initiative on the player. The one invariant a fight must not break.
+
+    An encounter whose turn sits on an NPC when a request ends is a dead game:
+    `combat_act` answers "It is not your turn", the free-text box goes through the
+    same gate, and nothing in the app advances the order except the loop that just
+    gave up.
+    """
+    scene = c.scene
+    pc = scene.pc()
+    if pc is None or not scene.in_encounter or scene.current_ref() == pc.ref:
+        return
+    at = next((i for i, (r, _) in enumerate(scene.initiative) if r == pc.ref), None)
+    if at is None:
+        return
+    scene.turn = at
+    c.transcript.append({"who": "gm", "text": why, "kind": "consequence"})
 
 
 def _log_turn(c, plan, resolution, replace: bool = False):
