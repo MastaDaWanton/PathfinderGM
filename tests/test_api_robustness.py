@@ -214,3 +214,119 @@ def test_every_resolution_door_catches_the_same_failures():
         assert kind in door, (
             f"_advance does not catch {kind}, so a resolution-time {kind} reaches "
             f"Django as a 500 with a traceback")
+
+
+def test_a_refused_turn_leaves_no_creatures_standing():
+    """A 502 must undo the half of the turn that already resolved.
+
+    Read out of a live save on 2026-09-01. The server log shows
+    `POST /api/say ... 502` at 11:08:44 and a successful one at 11:09:20. The
+    campaign's own turn log records exactly two creatures created all game — the
+    foreman (killed) and one thug (killed) — and the saved scene held TEN
+    pristine thugs, all `hp 13/13`, all zoned `engaged`, none of them the one
+    that fought and none carrying the loot the watcher had garnished onto it.
+
+    The mechanism is that `_drive` applies each intent before it reaches the
+    next, so the spawn landed and a later intent raised. The 502 branch popped
+    the player's line from the transcript and did not save — but not-saving is
+    not not-happening: the campaign lives in `_LIVE`, so the next successful
+    turn wrote the ghosts to disk.
+    """
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.intents import IntentError
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    engine = Engine(scene, Dice(seed=3))
+    before = scene.snapshot()
+
+    # A list that PASSES validation and raises at RESOLUTION — the only kind that
+    # can half-apply. The second op is one of the live 502s: a potion the sheet
+    # does not carry is a refusal validation cannot see, because whether the
+    # player has one is not a fact about the shape of the intent.
+    raw = [{"op": "spawn", "because": "the ambush",
+            "params": {"template": "thug", "count": 10, "zone": "engaged"}},
+           {"op": "use_item", "actor": "pc", "because": "the wound",
+            "params": {"item": "potion of cure light wounds"}}]
+    with pytest.raises((IntentError, ValueError, KeyError)):
+        engine.run(engine.validate(raw))
+    assert len(scene.actors) == 11, (
+        "the probe no longer reproduces a half-applied list; find one that does")
+
+    scene.restore(before)
+    assert sorted(scene.actors) == ["pc"], (
+        f"the refused turn left {len(scene.actors) - 1} creatures on the board: "
+        f"{sorted(scene.actors)}")
+    assert sorted(scene.zones) == ["pc"], \
+        "the creatures are gone and their zones are not"
+
+
+def test_the_snapshot_covers_the_whole_scene_not_a_field_list():
+    """The rollback must not be a second, hand-written copy of the save format.
+
+    The save format is a hand-written field list and it has already proved
+    incomplete twice — `Ward.as_dict` and `Manifestation.as_dict` existed and
+    were called by nothing, so a reload deleted every fog cloud and wall of
+    stone in the scene. A snapshot that forgets a field is worse than no
+    snapshot, because it silently reverts *some* of the turn. Every dataclass
+    field is checked, so a field added tomorrow is covered without this test
+    being edited.
+    """
+    import dataclasses
+
+    from rules.engine import Scene
+
+    scene = Scene(location_id="5bbd0c40345f")
+    snap = scene.snapshot()
+    fields = {f.name for f in dataclasses.fields(Scene)} - {"_dice"}
+    missing = sorted(fields - set(snap))
+    assert not missing, f"snapshot does not carry {missing}"
+
+
+def test_a_turn_is_written_to_the_log_once():
+    """Eight `turn` entries for four turns made the ghost-thug hunt twice as long.
+
+    `_log_turn(replace=True)` replaced only when the LAST entry was a turn, and
+    under intents-first the prose entry is appended between the two writes — so
+    every turn was logged, then logged again. The live save read as though the
+    spawn had resolved twice, which is a whole wrong theory to rule out.
+    """
+    import ast
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "_log_turn")
+    text = ast.get_source_segment(src, fn) or ""
+    assert "turn_log[-1]" not in text, (
+        "_log_turn looks at the last entry again; the prose entry sits between "
+        "the two writes, so the replace misses and the turn is logged twice")
+
+
+def test_every_door_that_resolves_also_knows_how_to_undo():
+    """A ratchet, because the fix is only as good as the door that forgot it.
+
+    Four functions in `play/views.py` drive resolution — the spoken turn, the
+    combat panel, the dice popup and the NPC loop — and each has its own refusal
+    branch. `_advance` was the one the live 502 came through; nothing stops the
+    next door from being written without a rollback, and the symptom (ghost
+    creatures appearing in a later save) points nowhere near the code.
+    """
+    import ast
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    guilty = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef):
+            continue
+        body = ast.get_source_segment(src, fn) or ""
+        if ".run(" not in body and ".resume(" not in body:
+            continue
+        if ".snapshot()" not in body or ".restore(" not in body:
+            guilty.append(fn.name)
+    assert not guilty, (
+        f"{guilty} resolve intents without taking a snapshot to restore on "
+        f"refusal — a raise half-way through leaves the earlier half standing")

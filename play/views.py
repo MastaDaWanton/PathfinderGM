@@ -838,10 +838,13 @@ def combat_act(request):
         return JsonResponse(_state(c))
 
     c.transcript.append({"who": "player", "text": label or "(the combat panel)"})
+    undo = scene.snapshot()
     try:
         intents = engine.validate(raw)
         resolution = engine.run(intents)
-    except (IntentError, ValueError) as exc:
+    except (IntentError, ValueError, KeyError) as exc:
+        # Same bargain as the spoken turn: the refused action leaves no trace.
+        scene.restore(undo)
         c.transcript.pop()
         return JsonResponse({"error": str(exc)}, status=400)
 
@@ -891,14 +894,19 @@ def roll(request):
         )
 
     engine = c.engine()
+    undo = c.scene.snapshot()
     try:
         resolution = engine.resume(face)
     except (IntentError, ValueError, KeyError) as exc:
         # A raise part-way through resolution used to be a 500 with the scene already
         # half-mutated and never saved: the damage had landed, the pending roll was
         # gone, and the player's only way out was to reload into a game that had
-        # forgotten the swing. The scene is left as the engine last saved it and the
-        # player is told, which is the same bargain every other refusal makes.
+        # forgotten the swing. Not-saving was never the same thing as not-happening —
+        # the campaign is held in memory, so the half-applied board survived to be
+        # written by the next turn that succeeded. The snapshot is the rollback the
+        # old comment claimed; the pending roll is then dropped on purpose, so the
+        # restored scene is not waiting on a die nobody is going to be asked for.
+        c.scene.restore(undo)
         c.scene.awaiting = None
         c.scene.pending_intents = []
         c.scene.pending_outcomes = []
@@ -918,9 +926,15 @@ def roll(request):
 
 def _advance(request, c, agent, narration, plan, player_input):
     engine = agent.engine
+    # The turn either happens or it does not. Resolution applies each intent
+    # before it reaches the next, so a list that raises half-way leaves the
+    # earlier half standing — and this branch's careful `transcript.pop()` then
+    # produced a game whose PROSE was consistent and whose BOARD was not.
+    undo = c.scene.snapshot()
     try:
         resolution = engine.run(plan.intents)
     except (IntentError, ValueError, KeyError) as exc:
+        c.scene.restore(undo)
         # Validation is meant to cover everything resolution accepts, so reaching here
         # means the two have drifted apart — which has happened once already (a bare
         # string DC). Report it as a rejected turn rather than a 500, and keep the
@@ -1196,10 +1210,12 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 c.transcript.append({"who": "gm", "kind": "consequence",
                                      "text": f"{actor.name} holds back."})
                 continue
+            undo = scene.snapshot()
             try:
                 intents = engine.validate(fallback)
                 resolution = engine.run(intents)
-            except (IntentError, ValueError):
+            except (IntentError, ValueError, KeyError):
+                scene.restore(undo)
                 c.transcript.append({"who": "gm", "kind": "consequence",
                                      "text": f"{actor.name} holds back."})
                 continue
@@ -1209,9 +1225,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                                      "text": plain_tell(o.tell)})
             continue
 
+        undo = scene.snapshot()
         try:
             resolution = engine.run(plan.intents)
         except (IntentError, ValueError, KeyError) as exc:
+            # "Holds back" has to mean it: an NPC whose list raised after spawning
+            # its friends left the friends on the board and said nothing about them.
+            scene.restore(undo)
             # The fallback path above has been guarded since it was written; the path
             # the model succeeds on was not. An NPC turn whose intents validated and
             # then raised at resolution — an empty pool, a ref that left the scene
@@ -1256,10 +1276,18 @@ def _log_turn(c, plan, resolution, replace: bool = False):
         "intents": [i.as_dict() for i in plan.intents],
         "outcomes": [o.as_dict() for o in resolution.outcomes],
     }
-    if replace and c.turn_log and c.turn_log[-1].get("kind") == "turn":
-        c.turn_log[-1] = entry
-    else:
-        c.turn_log.append(entry)
+    # The turn entry `_advance` wrote before the prose call, wherever it now sits.
+    # `replace` used to look only at the LAST entry, and under intents-first the
+    # prose entry is appended between the two — so every single turn was logged
+    # twice. Read out of a live save: eight "turn" entries for four turns, four
+    # exact duplicate pairs, and the log that is supposed to answer "what did the
+    # engine do" claimed the spawn happened twice.
+    if replace:
+        for i in range(len(c.turn_log) - 1, -1, -1):
+            if c.turn_log[i].get("kind") == "turn":
+                c.turn_log[i] = entry
+                return
+    c.turn_log.append(entry)
 
 
 @require_POST
@@ -1335,6 +1363,10 @@ def use_item(request):
     if refusal:
         return refusal
     target = str(body.get("to", "") or "pc").strip()
+    # One intent in, but a jar's authored effects fan out into several inside the
+    # op, so a raise part-way can still leave the drink half-drunk: consumed off
+    # the sheet, and no healing.
+    undo = c.scene.snapshot()
     try:
         engine = c.engine()
         resolution = engine.run(engine.validate([{
@@ -1343,8 +1375,10 @@ def use_item(request):
             "params": {"item": item, "how": how, "to": target},
         }]))
     except IntentError as exc:
+        c.scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:
+        c.scene.restore(undo)
         # A jar with authored effects the engine chokes on must be a sentence in the
         # sheet, not a 500 with an invisible error — "clicking the drink button does
         # nothing" was exactly this, twice over.
@@ -1565,13 +1599,18 @@ def trade_do(request):
     if op == "sell" and body.get("accept") is not None:
         params["accept"] = body["accept"]
 
+    # A trade moves goods one way and coin the other. A raise between the two is
+    # the worst half-application in the app: paid for, not delivered.
+    undo = c.scene.snapshot()
     try:
         engine = c.engine()
         resolution = engine.run(engine.validate(
             [{"op": op, "actor": "pc", "because": "at the counter", "params": params}]))
     except IntentError as exc:
+        c.scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:
+        c.scene.restore(undo)
         # The same rule the drink button learned: a trade that cannot happen is a
         # sentence on the screen, never a 500 with an invisible error.
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)

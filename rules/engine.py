@@ -191,6 +191,51 @@ class Scene:
     # everything else and a scene stays reproducible.
     _dice: Any = None
 
+    def snapshot(self) -> dict:
+        """Everything the scene is, deep-copied, so a refused turn can be undone.
+
+        Resolution mutates as it goes — `_drive` applies each intent before it
+        reaches the next — so an intent list that raises half-way leaves the
+        earlier half standing. Measured live on 2026-09-01: a `/api/say` at
+        11:08:44 returned 502, and the intents that had already resolved left
+        TEN pristine thugs standing engaged in the market. Nothing wrote them to
+        disk on that request, but the campaign is held in memory, so the next
+        successful turn saved them. The player had killed one thug all game.
+
+        Whole state rather than an inverse per op — the Z-machine's `@save_undo`
+        answer, and for its reason: undoing by inversion needs every op to know
+        how to unhappen (spawn, damage, effect application, initiative
+        bookkeeping, the grid) and each one is a place the pair can drift apart.
+        `deepcopy` needs none. Deliberately NOT the save format: that is a
+        hand-written field list which has already proved incomplete twice — a
+        reload silently deleted every ward and manifestation in the scene for
+        months — and a snapshot that forgets a field is worse than none.
+        """
+        import copy
+
+        # The engine lends the scene its dice for the round tick. It is shared,
+        # seeded state that belongs to the engine, not the scene; copying it
+        # would restore a rewound random stream along with the board.
+        dice, self._dice = self._dice, None
+        try:
+            return copy.deepcopy(self.__dict__)
+        finally:
+            self._dice = dice
+
+    def restore(self, snap: dict) -> None:
+        """Put the scene back as `snapshot` found it, in place.
+
+        In place, not by rebinding `campaign.scene`: an Engine, a GMAgent and the
+        view all hold this same object, and swapping the campaign's reference
+        would leave three live readers looking at the half-applied one.
+        """
+        import copy
+
+        dice = self._dice
+        self.__dict__.clear()
+        self.__dict__.update(copy.deepcopy(snap))
+        self._dice = dice
+
     def add(self, actor: Actor, zone: str = "near", at: tuple[int, int] | None = None) -> Actor:
         self.actors[actor.ref] = actor
         self.zones[actor.ref] = zone
