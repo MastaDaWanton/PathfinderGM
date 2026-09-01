@@ -920,11 +920,18 @@ def _advance(request, c, agent, narration, plan, player_input):
     engine = agent.engine
     try:
         resolution = engine.run(plan.intents)
-    except (IntentError, ValueError) as exc:
+    except (IntentError, ValueError, KeyError) as exc:
         # Validation is meant to cover everything resolution accepts, so reaching here
         # means the two have drifted apart — which has happened once already (a bare
         # string DC). Report it as a rejected turn rather than a 500, and keep the
         # transcript consistent by dropping the player line that never resolved.
+        #
+        # `KeyError` was missing while the NPC path three hundred lines down caught all
+        # three, and it is reachable from a list that PASSED validation: travel departs
+        # an actor, and a later intent in the same list still names them —
+        # `self.scene.actors[ref]` raises a bare KeyError('c1'). Django has no exception
+        # middleware here, so "I strike him and head for the treeline" was a 500 with a
+        # traceback rather than the 502 the rest of this branch is careful to produce.
         c.transcript.pop()
         return JsonResponse(
             {"error": f"The engine refused the GM's intents: {exc}"}, status=502

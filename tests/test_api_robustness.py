@@ -175,3 +175,42 @@ def test_a_face_that_is_not_a_number_is_refused_not_crashed(client):
         assert cm.current().scene.awaiting, "the garbage face consumed the roll"
     finally:
         client.post("/api/roll", data="{}", content_type="application/json")
+
+
+def test_every_resolution_door_catches_the_same_failures():
+    """A resolution-time raise must never reach Django as a 500.
+
+    `_advance` caught (IntentError, ValueError) while the NPC turn path three hundred
+    lines below it caught KeyError too — and KeyError is reachable from an intent list
+    that PASSED validation: `travel` departs an actor and a later intent in the same list
+    still names them, so `self.scene.actors[ref]` raises a bare KeyError('c1'). Verified
+    by driving travel-then-damage through a real Engine. Django has no exception
+    middleware here, so "I strike him and head for the treeline" was a traceback rather
+    than the 502 that branch is careful to produce.
+
+    Compared between the doors rather than asserted at one, because the defect was the
+    two disagreeing.
+    """
+    import ast
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    def caught(fn_name):
+        fn = next((n for n in ast.walk(tree)
+                   if isinstance(n, ast.FunctionDef) and n.name == fn_name), None)
+        assert fn is not None, f"play/views.py lost {fn_name}; update this test"
+        names = set()
+        for node in ast.walk(fn):
+            if isinstance(node, ast.ExceptHandler) and node.type is not None:
+                parts = (node.type.elts if isinstance(node.type, ast.Tuple)
+                         else [node.type])
+                names.update(getattr(p, "id", "") for p in parts)
+        return names
+
+    door = caught("_advance")
+    for kind in ("IntentError", "ValueError", "KeyError"):
+        assert kind in door, (
+            f"_advance does not catch {kind}, so a resolution-time {kind} reaches "
+            f"Django as a 500 with a traceback")
