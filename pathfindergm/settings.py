@@ -134,11 +134,25 @@ MODELS = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        # `/api/alive` is four lines a minute forever — 5,760 a day against a log
+        # desktop.py truncates at 2 MB. Left in, the heartbeat would push the run a bug
+        # report needs off the end of the file within a week.
+        "quiet_heartbeat": {"()": "pathfindergm.liveness.QuietHeartbeat"},
+    },
     "handlers": {
         "stderr": {"class": "logging.StreamHandler"},
+        "requests": {"class": "logging.StreamHandler",
+                     "filters": ["quiet_heartbeat"]},
     },
     "loggers": {
         "django.request": {"handlers": ["stderr"], "level": "ERROR",
                            "propagate": False},
+        # Django's own `django.server` handler is replaced rather than filtered in place:
+        # a filter added to a handler defined in DEFAULT_LOGGING is a filter on an object
+        # this dict does not own, and the merge order is not something to bet the request
+        # log on.
+        "django.server": {"handlers": ["requests"], "level": "INFO",
+                          "propagate": False},
     },
 }

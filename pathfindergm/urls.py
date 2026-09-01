@@ -8,6 +8,10 @@ urlpatterns = [
     path("", home_views.home, name="home"),
     path("play/", views.table, name="table"),
     path("api/state", views.state, name="state"),
+    # The heartbeat every page sends so the process can tell an open window from a
+    # closed one. See `pathfindergm/liveness.py` for the four hours of orphaned server
+    # that made it necessary.
+    path("api/alive", views.alive, name="alive"),
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),

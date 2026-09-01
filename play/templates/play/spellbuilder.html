@@ -257,3 +257,6 @@ $("#save").addEventListener("click", async () => {
 drawForm();
 fillPicker();
 </script>
+<!-- The heartbeat that lets the packaged exe tell an open window from a closed
+     one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% static 'js/keepalive.js' %}"></script>

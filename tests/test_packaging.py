@@ -398,6 +398,211 @@ def test_the_launcher_never_shells_out_to_runserver():
     assert "ThreadedWSGIServer" in code
 
 
+# --- the game stops when its last window does --------------------------------------------
+#
+# Measured 2026-09-01. `dist\PathfinderGM.exe` was double-clicked at 10:35:08 and played
+# until 12:01:35, where the log records `Broken pipe from ('127.0.0.1', 49967)` — the
+# browser going away. It was still serving at 16:20: two processes, PID 27840 and PID
+# 30176, started nine seconds apart, holding 127.0.0.1:8917 and an exclusive handle on the
+# .exe they were running from.
+#
+# Neither symptom named the cause. The handle made `python -m PyInstaller
+# pathfindergm.spec --noconfirm` fail with `PermissionError: [WinError 5] Access is
+# denied`; the port made `test_the_launcher_falls_back_to_a_free_port` (above) fail,
+# because it binds 8917 and asserts the first bind gets the preferred port. Both went away
+# the moment the processes were killed, which is how the shape of it was finally seen.
+#
+# The nine-second gap looked like the "bound 8917 twice" defect that same test documents,
+# and it was not. Reproduced against the identical exe on 2026-09-01: parent 31548 spawns
+# child 30748 nineteen seconds later with the same command line, and `server.json` carries
+# the *child's* pid. A one-file PyInstaller build is a bootloader that unpacks 38 MB and
+# then runs the app as a child; two processes is what one running copy looks like.
+
+
+def _fresh_liveness():
+    """The module with no window having ever checked in — its state is process-global."""
+    import importlib
+
+    from pathfindergm import liveness
+
+    return importlib.reload(liveness)
+
+
+@pytest.mark.parametrize(
+    "template", sorted(p.name for p in (ROOT / "play" / "templates" / "play").glob("*.html")))
+def test_every_page_carries_the_heartbeat(template):
+    """A page without it is a way to leave the server running for four hours.
+
+    Enumerated off disk rather than listed, because the failure is a *new* template: the
+    five that exist today were wired by hand, and the sixth is the one this test is for.
+    That is CLAUDE.md's "when you fix a rule, grep for every copy of it" written down so
+    it does not have to be remembered.
+    """
+    text = (ROOT / "play" / "templates" / "play" / template).read_text(encoding="utf-8")
+    assert "js/keepalive.js" in text, (
+        f"play/templates/play/{template} does not load js/keepalive.js — a window opened "
+        f"on it cannot tell the exe it exists, and closing it leaves the server holding "
+        f"port 8917 and a handle on its own file")
+
+
+def test_the_served_pages_really_ship_the_heartbeat_file():
+    """The tag in the template is not the same claim as a file the build can serve.
+
+    `js/dice3d.js` is bundled because `play/static` is in the spec; a new file under that
+    directory ships for free, and this is what proves it rather than assuming it.
+    """
+    from django.contrib.staticfiles import finders
+    from django.test import Client
+
+    assert finders.find("js/keepalive.js"), "js/keepalive.js is not findable by staticfiles"
+
+    client = Client()
+    for path in ("/", "/play/", "/craft/"):
+        html = client.get(path).content.decode("utf-8")
+        assert "js/keepalive.js" in html, f"{path} served no heartbeat"
+    assert client.get("/static/js/keepalive.js").status_code == 200
+
+
+def test_the_heartbeat_arms_the_reaper_and_the_page_is_told_its_own_interval():
+    """`/api/alive` is the whole signal, and it must answer the interval rather than
+    have the page hard-code it — two copies of one number is the drift CLAUDE.md warns
+    about, and here the drift would be a game that closes itself mid-session."""
+    import json as _json
+
+    from django.test import Client
+
+    from pathfindergm import liveness
+
+    live = _fresh_liveness()
+    assert not live.armed(), "the reaper is armed before any window has spoken"
+
+    response = Client().get("/api/alive")
+    assert response.status_code == 200
+    body = _json.loads(response.content)
+    assert body["ok"] is True
+    assert body["every"] == liveness.PING_SECONDS
+    # A cached heartbeat stops reaching the server while the page is still on screen.
+    assert "no-store" in response["Cache-Control"]
+
+    assert live.armed()
+    assert not live.the_last_window_is_gone(), "a window that just spoke is not gone"
+
+
+def test_an_exe_nobody_opened_a_window_on_is_never_reaped():
+    """`tools/prove_build.py` drives the packaged exe over HTTP for minutes and never
+    runs a line of JavaScript, so it never sends a heartbeat.
+
+    Jupyter's version of this feature shuts down after the timeout with `--no-browser`
+    and no page attached, which here would make the packaging prover a race against its
+    own subject. The reaper is armed by the *first* heartbeat instead: silence before a
+    window has ever existed means nothing.
+    """
+    live = _fresh_liveness()
+    assert live.idle_seconds() == 0.0
+    assert not live.armed()
+    assert not live.the_last_window_is_gone()
+
+
+def test_the_grace_outlasts_a_throttled_background_tab():
+    """Chrome throttles timers in a tab hidden for five minutes to **once per minute**.
+
+    A grace under 60 seconds would therefore end the session of a player who minimised
+    the window — a far worse bug than the one being fixed, and the reason the design is a
+    positive heartbeat with a long grace rather than an exit beacon. 180 against a
+    15-second ping tolerates two missed minutes and still frees the port and the .exe
+    handle long before anybody rebuilds.
+    """
+    live = _fresh_liveness()
+    assert live.grace_seconds() >= 120, live.grace_seconds()
+    assert live.grace_seconds() > 4 * live.PING_SECONDS
+
+
+def test_the_grace_is_overridable_so_the_packaged_build_can_be_proved(monkeypatch):
+    """Same justification as `PATHFINDER_GM_DATA`: a fix that has not been run against
+    the built artifact is not a fact, and a proof that costs three minutes of wall clock
+    is a proof that gets commented out. `tools/prove_build.py` turns it down and watches
+    the real exe exit on its own."""
+    live = _fresh_liveness()
+    monkeypatch.setenv("PATHFINDER_GM_IDLE_GRACE", "20")
+    assert live.grace_seconds() == 20.0
+    # Nonsense must not disable the reaper — that would restore the four-hour orphan.
+    monkeypatch.setenv("PATHFINDER_GM_IDLE_GRACE", "not a number")
+    assert live.grace_seconds() == 180.0
+
+
+def test_the_reaper_runs_on_every_launch_not_only_under_the_shell():
+    """The orphaned run was the *bare* exe — the log line reads
+    `installed H:\\coding\\PathfinderGM\\dist`, not the shell's `resources\\backend`.
+
+    So the reaper cannot live inside the `--watch-stdin` branch, which is the tempting
+    place for it: that branch only exists when Electron is the launcher, and Electron
+    already has a better signal. Pinned as source because starting a real server in the
+    suite to watch it not-shut-down would take the grace period to prove.
+    """
+    import inspect
+
+    import desktop
+
+    src = inspect.getsource(desktop.main)
+    assert "_reap_when_the_last_window_closes" in src
+    watch = src.index('if "--watch-stdin" in argv:')
+    reaper = src.index("target=_reap_when_the_last_window_closes")
+    assert reaper > watch, "the reaper is inside the --watch-stdin branch"
+    # Outdented back to the function body, not nested under the branch.
+    line = src[src.rindex("\n", 0, reaper) + 1:reaper]
+    assert len(line) - len(line.lstrip()) == 4, (
+        f"the reaper is started at indent {len(line) - len(line.lstrip())} — it only "
+        f"runs when a shell passed --watch-stdin, and the four-hour orphan was the "
+        f"bare exe")
+
+
+def test_the_heartbeat_stays_out_of_the_request_log():
+    """Four beats a minute is 5,760 lines a day, ~90 bytes each — half a megabyte
+    against a log `desktop.py` truncates at 2 MB on launch.
+
+    The log is the only debuggable artefact a frozen app has, and it has already been
+    blind once (a live 500 whose traceback reached nothing). A fix that fills it with
+    heartbeats trades one silent failure for another, so `django.server` gets a filter
+    and the other request lines — which `tools/prove_build.py` asserts are present —
+    keep coming through.
+    """
+    import logging
+
+    from pathfindergm.liveness import QuietHeartbeat
+
+    def record(msg_args):
+        return logging.LogRecord("django.server", logging.INFO, __file__, 1,
+                                 '"%s" %s %s', msg_args, None)
+
+    quiet = QuietHeartbeat()
+    assert not quiet.filter(record(('GET /api/alive HTTP/1.1', '200', '31')))
+    assert quiet.filter(record(('GET / HTTP/1.1', '200', '103770')))
+    assert quiet.filter(record(('POST /api/say HTTP/1.1', '200', '6982')))
+    # A record with no args at all (Django logs a few) must not be swallowed.
+    assert quiet.filter(logging.LogRecord("django.server", logging.INFO, __file__, 1,
+                                          "Broken pipe from ('127.0.0.1', 49967)",
+                                          None, None))
+
+
+def test_an_abandoned_server_still_exits_cleanly():
+    """The reaper uses `server.shutdown()`, not `os._exit`.
+
+    A game that closes itself must leave the same state a game the player closed does:
+    the request in flight finished, `serve_forever` returned, and `main`'s `finally`
+    removed `server.json`. The orphan left its portfile behind — `%LOCALAPPDATA%\\
+    PathfinderGM\\server.json` was still there, stamped 10:35:08 with pid 27840 — and a
+    stale handshake is how a launcher is told a dead server is live.
+    """
+    import inspect
+
+    import desktop
+
+    src = inspect.getsource(desktop._reap_when_the_last_window_closes)
+    assert "server.shutdown()" in src
+    for banned in ("os._exit", "sys.exit", "taskkill", "os.kill"):
+        assert banned not in src, f"the reaper reaches for {banned}"
+
+
 # --- the stale-cache rule ---------------------------------------------------------------
 
 def test_nothing_derived_is_written_into_the_user_data_directory():

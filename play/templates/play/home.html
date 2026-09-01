@@ -2055,5 +2055,8 @@ render();
      against a version that no longer exists. Stamped at package time. -->
 <div style="position:fixed; right:10px; bottom:6px; font-size:11px; opacity:.45;
             font-family:monospace; pointer-events:none;">build {{ build }}</div>
+<!-- The heartbeat that lets the packaged exe tell an open window from a closed
+     one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% static 'js/keepalive.js' %}"></script>
 </body>
 </html>

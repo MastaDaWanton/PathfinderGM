@@ -18,6 +18,15 @@ Choices worth writing down, because each of them was the alternative to somethin
   the app can therefore run at once, which is also what makes the packaging checks able to
   drive a build while a dev server is up.
 
+  **The game ends when its last window does, not when its console does.** Closing the
+  console has always been the documented stop and still works, but the window a player
+  closes is the browser's, and a WSGI server is never told its last client left. Measured
+  2026-09-01: the exe was double-clicked at 10:35, the browser closed at 12:01, and it was
+  still holding port 8917 and a handle on its own `.exe` four hours later — which broke
+  the next build with `WinError 5`. Every page now sends a heartbeat and
+  `_reap_when_the_last_window_closes` shuts the server down when they stop.
+  `pathfindergm/liveness.py` carries the measurement and the designs that were refused.
+
   **Browser opened after the socket is listening, not before.** `webbrowser.open` returns
   immediately and the browser races the server; opening after `bind()` means the first
   request cannot arrive at a closed port. It is opened from the main thread and the server
@@ -163,6 +172,45 @@ def _write_portfile(data_root: Path, port: int, url: str) -> Path | None:
         return None
 
 
+def _reap_when_the_last_window_closes(server) -> None:
+    """Stop serving once no page has checked in for the grace period.
+
+    The defect, measured 2026-09-01: the exe was double-clicked at 10:35:08, the browser
+    was closed at 12:01:35 (`Broken pipe from ('127.0.0.1', 49967)` in the log), and the
+    server was still up four hours later — two processes, 27840 and 30176, holding
+    127.0.0.1:8917 and an exclusive handle on `dist\\PathfinderGM.exe`. The port made
+    `test_the_launcher_falls_back_to_a_free_port` fail; the handle made the rebuild fail
+    with `PermissionError: [WinError 5] Access is denied`. Neither symptom named the
+    cause, which was simply that closing a browser window tells the server nothing.
+
+    The console window has always been the documented way to stop the bare exe, and it
+    stays. This is for the far more likely thing a player does — close the game and walk
+    away — and it is a backstop under the Electron shell too, whose stdin handshake is a
+    better signal but only exists when the shell is the launcher. The bad run was the
+    bare exe: the log line reads `installed H:\\coding\\PathfinderGM\\dist`.
+
+    Polls rather than waits on a condition because the arming is one-way and the grace is
+    minutes: a five-second tick costs nothing and cannot deadlock with the request
+    threads that call `liveness.touch()`. Daemon, so it can never be the thing holding
+    the exit open — which is the failure mode this whole function is about.
+
+    `server.shutdown()` is the same graceful stop `--watch-stdin` uses: the request in
+    flight finishes, `serve_forever` returns, and `main`'s `finally` removes the
+    portfile, so an abandoned game still exits *cleanly* and leaves no stale handshake.
+    """
+    from pathfindergm import liveness
+
+    while True:
+        time.sleep(5)
+        if liveness.the_last_window_is_gone():
+            # Said out loud, because a game that stops on its own must not look like a
+            # crash to the next person reading the log.
+            print(f"No window has checked in for {liveness.grace_seconds():.0f}s — "
+                  f"closing the game.", flush=True)
+            server.shutdown()
+            return
+
+
 def _open_browser_when_up(url: str, port: int) -> None:
     """Poll the port, then open. Belt and braces over "bind happened before serve".
 
@@ -249,6 +297,12 @@ def main(argv: list[str] | None = None) -> int:
             server.shutdown()
         threading.Thread(target=_watch, daemon=True).start()
 
+    # Always, shell or no shell. Inert until a page checks in, so nothing that drives the
+    # exe without a browser — `tools/prove_build.py`, `--check`, a curl — can be reaped
+    # out from under itself.
+    threading.Thread(target=_reap_when_the_last_window_closes, args=(server,),
+                     daemon=True).start()
+
     # `flush=True` on every line, and it is not decoration. Frozen, stdout is a pipe
     # rather than a console whenever anything captures it, so Python block-buffers it and
     # nothing appears until 8 KB have accumulated — which for six lines is never. The
@@ -261,7 +315,8 @@ def main(argv: list[str] | None = None) -> int:
     say(f"  installed {install_root()}")
     say(f"  your data {user_data_root()}")
     say(f"  serving   {url}")
-    say("Close this window to stop the game.")
+    say("Close this window to stop the game — or just close the game's window; it "
+        "shuts down a few minutes later.")
 
     if "--no-browser" not in argv:
         threading.Thread(target=_open_browser_when_up, args=(url, port),

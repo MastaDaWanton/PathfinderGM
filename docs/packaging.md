@@ -26,7 +26,9 @@ spec is the only record of which content directories ship.
 Double-click. That is the whole procedure, which is the standing constraint. The exe
 starts a server on `127.0.0.1:8917` and opens the default browser at it. A console window
 stays open behind the browser showing the request log and where the user's saves live;
-closing that window stops the game.
+closing that window stops the game. Closing the *browser* window also stops it, about
+three minutes later — see "The server outlived the browser by four hours" below for why
+that sentence had to be added.
 
 Two flags exist, and neither is for the player:
 
@@ -38,6 +40,9 @@ Two flags exist, and neither is for the player:
 `PATHFINDER_GM_DATA` overrides the user data directory. That is the mechanism CLAUDE.md's
 "run the built executable against a throwaway data directory" rule depends on, so it is not
 a debug convenience — without it a packaging fix cannot be proved at all.
+`PATHFINDER_GM_IDLE_GRACE` overrides the idle shutdown below, for the same reason and with
+the same justification: the check that proves it watches the real exe exit, and at the
+shipped 180 seconds that check costs three minutes of wall clock and gets commented out.
 
 ---
 
@@ -275,6 +280,68 @@ backend survives**. Green in both dev mode (`electron .` over this machine's Pyt
 and against the electron-builder output. `npm run dist` in `electron/` builds
 `release/Pathfinder GM Setup 0.1.0.exe` (119 MB NSIS installer, backend exe bundled as
 an extraResource).
+
+## The server outlived the browser by four hours (2026-09-01)
+
+The one that cost the most so far, because neither symptom named the cause.
+
+`dist\PathfinderGM.exe` was double-clicked at **10:35:08** and played until **12:01:35**,
+where the log records `Broken pipe from ('127.0.0.1', 49967)` — the browser going away. It
+was still serving at **16:20**. Two processes, **27840** and **30176**, held
+`127.0.0.1:8917` and an exclusive handle on the `.exe` they were running from. What that
+looked like from two tools away:
+
+- `python -m PyInstaller pathfindergm.spec --noconfirm` failed with
+  `PermissionError: [WinError 5] Access is denied` — the held handle on its own output.
+- `tests/test_packaging.py::test_the_launcher_falls_back_to_a_free_port` failed — it binds
+  8917 and asserts the first bind gets the preferred port.
+
+Both went away the moment the processes were killed.
+
+**The two processes were not the bug.** Nine seconds apart looked exactly like the
+"bound 8917 twice" defect that same test documents. Reproduced against the identical exe:
+parent **31548** spawns child **30748** nineteen seconds later, same command line, and
+`server.json` carries the *child's* pid. A one-file build is a bootloader that unpacks
+38 MB and then runs the app as a child. Two processes is what one running copy looks like,
+and the gap is the unpack.
+
+**The bug was that closing a browser window tells a server nothing.** A WSGI server learns
+that no request arrived; it never learns that its last client left, and a player who is
+reading looks identical. The console window has always been the documented stop, and the
+window a player closes is the browser's. The Electron shell has a real answer to this
+(stdin closes, the backend shuts down cleanly) and the shell was not in the picture — the
+log line for that launch reads `installed H:\coding\PathfinderGM\dist`, the bare exe.
+`tools/prove_shell.py` was re-run against this change and is still **ALL CLEAN**, including
+"no backend outlives the shell", so nothing in `electron/main.js` was touched.
+
+**The fix.** Every page loads `js/keepalive.js`, which `GET`s `/api/alive` every 15
+seconds; `desktop.py` runs a reaper thread that calls `server.shutdown()` once no page has
+checked in for 180 seconds. `pathfindergm/liveness.py` holds the state, the reasoning and
+the three designs that were refused:
+
+- **An exit beacon on `pagehide`/`beforeunload`** would be instant instead of costing a
+  grace period, and it is wrong twice. MDN calls those events unreliable and steers to
+  `visibilitychange` — which fires when a player merely alt-tabs, so a beacon on it ends
+  the session of somebody who looked at something else. A positive heartbeat cannot make
+  that mistake: only silence ends a game, and a backgrounded window is not silent.
+- **A short grace.** Chrome throttles timers in a tab hidden for five minutes to *once per
+  minute*, so anything under 60 seconds kills live games belonging to players who
+  minimised the window — a worse bug than the one being fixed.
+- **Reaping on a timer from the start**, which is what Jupyter's
+  `shutdown_no_activity_timeout` does under `--no-browser`. That would make
+  `tools/prove_build.py` a race against its own subject: it drives the packaged exe over
+  HTTP for minutes and never runs a line of JavaScript. The reaper is **armed by the first
+  heartbeat** instead, so an exe nobody has opened a window on runs forever, exactly as it
+  does today.
+
+The heartbeat is also filtered out of the request log — four beats a minute is 5,760 lines
+a day against a log truncated at 2 MB, and burying the run a bug report needs is the same
+failure as having no log.
+
+Proved on the packaged build by `tools/prove_build.py`, which now takes a launch of its
+own: send three heartbeats, stop, and watch the real exe exit by itself — child first,
+then the bootloader that holds the file handle, with `server.json` removed, which is what
+marks the exit as the clean one rather than an axe.
 
 ## What remains unproven
 
