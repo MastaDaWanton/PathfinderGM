@@ -2047,6 +2047,23 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
                         "subject": subject, "age": 0,
                         "where": where or (scene.thread or {}).get("where", "")}
         return
+    # Walking away ends the engagement, and until this it did not. Found in a live
+    # session: the player spent a turn talking to a merchant, then wrote "I leave the
+    # building and search the city for the largest group of powerful fighters I can
+    # find" — and the thread was still telling the prose call, as fact, "the player is
+    # currently talking to them… Keep them and the present surroundings in the scene;
+    # DO NOT CHANGE LOCATION". The model obeyed it, and the next beat put the player
+    # back in the room they had walked out of two turns earlier.
+    #
+    # Checked after `_THREAD_VERBS` on purpose: a sentence that both leaves and declares
+    # a new engagement — "I walk over to them and ask their name" — sets the new thread
+    # rather than clearing to nothing. Ageing was never going to catch this; the thread
+    # rots after six turns of not continuing, and the scene had already been dragged
+    # back twice by then.
+    if scene.thread and _DEPARTS.search(text):
+        scene.thread = {}
+        return
+
     if where and not scene.thread:
         # A place with no engagement yet — "i leave and return to the market" —
         # still anchors: the engagement declared two turns later inherits it.
@@ -2164,6 +2181,19 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         if any(m.start() < hi and lo < m.end() for lo, hi in spans):
             continue
         who = " ".join(m.group(1).split())
+        # A role noun reached through "of" is not somebody arriving. The filler
+        # between the article and the role is three arbitrary words, which is what
+        # lets "a tall hooded stranger" through — and also let a figure of speech
+        # through as a person. Found in a live session: "the memory of the woman's
+        # end still hangs heavy in the air" put **the memory of the woman** in the
+        # ledger, `cast_brief` fed her back as present, and the next beat re-staged
+        # her in a room the player had already left.
+        #
+        # It drops the back-references too, which were never introductions either:
+        # "one of the men", "the last of the guards". A real group keeps its own
+        # path — `_CAST_GROUP` claims "a group of four men" before this loop runs.
+        if " of " in f" {who} ":
+            continue
         head = who.split()[-1].lower()
         if head in heads or head in real:
             continue

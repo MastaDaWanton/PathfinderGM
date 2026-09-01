@@ -1155,6 +1155,43 @@ def test_the_thread_survives_a_continue():
     assert s.thread == {}                            # the fight IS the engagement
 
 
+def test_walking_away_ends_the_engagement():
+    """Found in a live session, and it dragged the scene backwards two turns running.
+
+    The player spent a turn talking to a merchant, then wrote "I leave the building and
+    search the city for the largest group of powerful fighters I can find". The GM
+    narrated the square, four men in chainmail, the lot. Then "I walk over to them" — and
+    the next beat was back inside the building, by the fire, with a woman who had been
+    dead for several turns.
+
+    The thread was still on the books at age 2, and `thread_brief` states it to the prose
+    call as FACT: "the player is currently talking to them… Keep them and the present
+    surroundings in the scene; do not change location". The model obeyed. Ageing was
+    never going to catch it — the thread rots after six quiet turns and the scene had
+    already been pulled back twice by then.
+
+    Leaving is not a quiet turn. It ends the engagement.
+    """
+    from rules.engine import Scene
+
+    s = Scene()
+    judgement.update_thread(s, "I ask the merchant what he sells")
+    assert s.thread.get("subject"), "no thread to lose; this proves nothing"
+    assert "do not change location" in judgement.thread_brief(s)
+
+    judgement.update_thread(
+        s, "I leave the building and search the city for the largest group of "
+           "powerful fighters I can find")
+    assert s.thread == {}, f"the merchant conversation followed them out: {s.thread}"
+    assert judgement.thread_brief(s) == ""
+
+    # An ordinary turn still holds the engagement — this must not clear on everything.
+    s2 = Scene()
+    judgement.update_thread(s2, "I ask the merchant what he sells")
+    judgement.update_thread(s2, "I ask him where he got it")
+    assert s2.thread.get("subject"), "a follow-up question dropped the thread"
+
+
 def test_the_thread_brief_and_the_anchor():
     """The two halves of the constraint: the brief states the engagement as fact,
     and a beat that drops the subject gets it re-tethered before the hand-back."""
@@ -1283,6 +1320,42 @@ def test_the_prose_cast_is_on_the_books_and_in_the_brief():
 
     judgement.clear_cast(s)
     assert s.cast == [] and judgement.cast_brief(s) == ""
+
+
+def test_a_figure_of_speech_is_not_a_person_in_the_scene():
+    """Found in a live session, and it put a woman back in a room the player had left.
+
+    The beat opened "The blood on your hands has not yet dried, and the memory of the
+    woman's end still hangs heavy in the air…" — and **the memory of the woman** went
+    into `scene.cast` as somebody present. `cast_brief` feeds the ledger back as fact,
+    so the next beat re-staged her by the fire, in a building the player had walked out
+    of two turns earlier. One of the three cast entries recorded across the twelve real
+    campaigns was this abstraction.
+
+    The filler between the article and the role noun is three arbitrary words, which is
+    what lets "a tall hooded stranger" through. A role reached across "of" is not
+    somebody arriving — it is a possessive, a back-reference or a figure of speech.
+    """
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    def cast_from(beat):
+        s = Scene()
+        s.add(load_pc("fixtures/pc-kesst.json"))
+        judgement.note_cast(s, beat, turn=1)
+        return [e["who"] for e in s.cast]
+
+    live = ("The blood on your hands has not yet dried, and the memory of the woman's "
+            "end still hangs heavy in the air. As you step out into the square, a group "
+            "of four men in chainmail stand near the corner.")
+    got = cast_from(live)
+    assert not any("memory" in w for w in got), f"a figure of speech joined the cast: {got}"
+    assert any("man" in w for w in got), "the four men who are actually there were lost"
+
+    # Real introductions still land; back-references still do not.
+    assert cast_from("A tall hooded stranger steps out of the doorway.") == \
+        ["tall hooded stranger"]
+    assert cast_from("One of the men turns to look at you.") == []
 
 
 def test_a_ledger_merchant_promotes_to_a_civilian_not_a_bruiser():
