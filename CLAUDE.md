@@ -98,6 +98,31 @@ Every one of these cost real debugging time in World Bible. They are not style p
 
 ## How work is expected to be done
 
+- **Search the internet for how this has already been solved, BEFORE designing it — every
+  time, not only when it feels hard.** A standing instruction, not a suggestion. Almost
+  nothing here is a new problem: movement, state tracking, effect stacking, refusals,
+  scene transitions and grounding a narrator all have decades of prior art in interactive
+  fiction, MUDs, tabletop systems, game engines and the research literature. Designing
+  from first principles produces something plausible that then has to be retrofitted, and
+  the retrofit always costs more than the search would have.
+
+  Measured 2026-09-01, which is why this is written down rather than remembered: the room
+  model was designed here from scratch and shipped as a free-text `Scene.spot`. A
+  six-tradition sweep run immediately afterwards identified that exact shape as **the one
+  thing no tradition sanctions** — Inform's Recipe Book calls for "a small number of named
+  positions" as a kind of value, Fate caps a scene at two to four zones, Diku enumerates
+  its exits — and the field was gone within the day. The sweep also supplied the framing
+  the design had missed completely (four spatial authorities, none derived from the
+  others) and a list of ideas worth *refusing* with reasons, two of which the code was
+  actively tempted by.
+
+  Search for how the traditions model it, what they measured, and above all what they
+  **tried and abandoned**: Fate shipped weighted zone borders and then deleted them, which
+  settles the question faster than any argument for adding them. Prefer primary
+  documentation to summaries, cite what is used, and say plainly when a claim could not be
+  sourced — a confident wrong answer about how Inform models rooms is worse than "I could
+  not confirm this". Have a second pass check the first: in that same sweep a critic pass
+  caught two overclaims in the researchers' own findings.
 - **Tests document the defect they prevent.** Name the measurement in the docstring — "ten
   of ten paragraphs ended the same way", "674px of content in a 617px box". A test that
   only asserts behaviour gets deleted by the next person; one that records what went wrong

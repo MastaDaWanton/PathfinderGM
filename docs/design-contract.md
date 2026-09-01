@@ -65,6 +65,18 @@ name; GAS is where the working gets checked, not where it came from. Translate:
 
 ## How code is written here
 
+- **Search for the prior art before designing, every time.** Movement, state
+  tracking, stacking, refusals, scene transitions and grounding a narrator are all
+  decades-solved in interactive fiction, MUDs, tabletop systems, engines and the
+  research literature. First principles produce something plausible that then has
+  to be retrofitted, and the retrofit costs more than the search would have.
+  Measured: a room model designed here from scratch shipped as a free-text field,
+  and a six-tradition sweep the next day named that exact shape as the one thing
+  no tradition sanctions. Look hardest for what a tradition **tried and
+  abandoned** — Fate shipped weighted zone borders and then deleted them, which
+  settles a question faster than any argument for adding them. Cite primary
+  sources, say when a claim could not be sourced, and have a second pass check the
+  first.
 - **Detect mechanically, repair with a targeted call.** Find defects with code (a
   regex, a set comparison, a count); ask a model to fix only what was found.
   Instructing a model to behave differently fails and keeps failing — this

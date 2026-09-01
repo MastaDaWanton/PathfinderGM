@@ -71,6 +71,22 @@ items above; models authoring numbers anywhere (validators refuse documents with
 the fix named, in the classbuilder's message style); presentation leading
 mechanics.
 
+## Before designing anything: search for how it was already solved
+
+Standing instruction, every time, not only when a problem feels hard. Movement,
+state tracking, stacking, refusals, scene transitions and narrator grounding are
+decades-solved in interactive fiction, MUDs, tabletop systems, game engines and
+the research literature. First principles produce something plausible that has to
+be retrofitted later, and the retrofit costs more than the search.
+
+Measured 2026-09-01: a room model designed here shipped as a free-text
+`Scene.spot`, and a six-tradition sweep the next day named that exact shape as
+the one thing no tradition sanctions — it also supplied the framing the design had
+missed (four spatial authorities, none derived) and four ideas worth refusing with
+reasons. Look hardest for what a tradition **tried and abandoned**; cite primary
+sources; have a second pass check the first, which in that sweep caught two
+overclaims in the researchers' own findings.
+
 ## Worked judgment
 
 - *"Add an ongoing poison"* → an `ActiveEffect` with `periodic` (build the
