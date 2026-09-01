@@ -217,6 +217,9 @@ class Campaign:
                 # default, however far the spawn said they were.
                 "spawn_feet": self.scene.spawn_feet,
                 "biome": self.scene.biome,
+                # Where inside the location they are standing. Unsaved, a restart
+                # put the party back in a room the brief no longer described.
+                "spot": self.scene.spot,
                 "pending_intents": self.scene.pending_intents,
                 "pending_outcomes": self.scene.pending_outcomes,
                 "pending_partial": self.scene.pending_partial,
@@ -304,6 +307,7 @@ class Campaign:
             spawn_feet={str(k): int(v)
                         for k, v in (s.get("spawn_feet") or {}).items()},
             biome=s.get("biome", ""),
+            spot=str(s.get("spot") or ""),
             pending_intents=s.get("pending_intents", []),
             pending_outcomes=s.get("pending_outcomes", []),
             pending_partial=s.get("pending_partial", {}),

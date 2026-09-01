@@ -592,6 +592,11 @@ When the party moves onto different ground, say so: {"op": "travel", "params":
 {"biome": "forest"}}. The biomes are urban, grassland, farmland, forest, jungle, swamp,
 hills, mountain, desert, tundra, coast, underground, ruins, planar. What can be found by
 searching depends entirely on it, so it has to be right before anyone looks.
+A move WITHIN one place is the same op with a spot instead of a biome: leaving a stall for
+the square, a taproom for the street, one wing of a ruin for another is {"op": "travel",
+"params": {"place": "the market square"}}. Use it whenever the scene changes room, even
+though the ground has not changed — it is what leaves the people of the old room behind,
+and without it they follow the party around.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
@@ -637,6 +642,13 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
 
     if location:
         lines.append(f"\nHERE: {location.name}, a {location.scale or 'place'}.")
+        # Which room of it. The world models a city and not the taproom inside it, so
+        # without this the model reconstructs the spot from earlier beats — and put a
+        # player back inside a building they had walked out of two turns before.
+        spot = str(getattr(scene, "spot", "") or "").strip()
+        if spot:
+            lines.append(f"  The party is in {spot}. Not anywhere else in "
+                         f"{location.name}; they are there now.")
         for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
                     "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
             if location.fact(key):

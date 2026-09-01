@@ -69,6 +69,17 @@ class Scene:
     """Everything the engine owns. The world agent may read this and writes none of it —
     see docs/intent-protocol.md §8."""
     location_id: str | None = None
+    # Where inside that location the party is standing: "the taproom", "the market
+    # square". The world models a city; it does not model the rooms in it, so a move
+    # from a stall to the square changed nothing the engine could see — `travel` is a
+    # BIOME transition and both are urban. Found in a live session: the player walked
+    # out of a building, the GM narrated the square, and the next beat was back inside
+    # by the fire, because nothing had told the engine the room was over.
+    #
+    # `spot` rather than `place`, which is already a METHOD on this class — the one
+    # that puts a manifestation on the grid. A field of that name shadows it and every
+    # standing spell in the game stops being placeable.
+    spot: str = ""
     actors: dict[str, Actor] = field(default_factory=dict)
     zones: dict[str, str] = field(default_factory=dict)
     # The map, and where everybody is standing on it. Both optional: a scene with no grid
@@ -2597,8 +2608,14 @@ class Engine:
         how the GM says an escort comes along. The dead and the dying are not eligible
         even there: they stay where they fell.
         """
-        want = str(intent.params["biome"]).strip().lower()
-        biome = biomes.canonical(want)
+        want = str(intent.params.get("biome") or "").strip().lower()
+        place = " ".join(str(intent.params.get("place") or "").split())
+        if not want and not place:
+            raise IntentError(
+                'travel: say where. Either new ground — "biome": "forest" — or a new '
+                'spot on the same ground — "place": "the market square".',
+                "schema")
+        biome = biomes.canonical(want) if want else self.scene.biome
         if biome is None:
             raise IntentError(
                 f"travel: {want!r} is not a biome. The biomes are: "
@@ -2607,7 +2624,13 @@ class Engine:
 
         kept = {str(r) for r in (intent.params.get("with") or [])}
         left: list[str] = []
-        if biome != self.scene.biome:
+        # A change of ground OR a change of room. Both are scene transitions and both
+        # shed the cast: the merchant stays in his stall when the player walks out into
+        # the square, exactly as the gatekeeper stays in the city when they walk to the
+        # forest. Only the biome half existed, so a move inside one place changed
+        # nothing the engine could see and the brief went on describing the old room.
+        moved = biome != self.scene.biome or (place and place != self.scene.spot)
+        if moved:
             fight_ended = self.scene.in_encounter
             if fight_ended:
                 self.scene.end_encounter()
@@ -2628,10 +2651,18 @@ class Engine:
             fight_ended = False
 
         was, self.scene.biome = self.scene.biome, biome
+        was_place, self.scene.spot = self.scene.spot, (place or self.scene.spot)
+        # New ground is a new room by definition: the taproom does not come with you to
+        # the forest, and a stale place name would anchor the prose to a building that
+        # is a day's walk behind.
+        if biome != was and not place:
+            self.scene.spot = ""
         note = str(intent.params.get("note") or "").strip()
         bits = []
         if biome != was:
             bits.append(f"The ground changes: {biomes.describe(biome).lower()}.")
+        if place and place != was_place:
+            bits.append(f"You are in {place} now.")
         if fight_ended:
             bits.append("The fight is left behind.")
         if left:
@@ -2641,6 +2672,7 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="travel",
             effects=[{"kind": "biome", "biome": biome, "was": was, "left": left,
+                      "place": self.scene.spot, "was_place": was_place,
                       "fight_ended": fight_ended}],
             tell=" ".join(bits),
             because=intent.because,

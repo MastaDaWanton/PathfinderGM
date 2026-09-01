@@ -13,6 +13,7 @@ import pytest
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
+from rules.intents import IntentError
 from rules.sheet import load_pc
 
 
@@ -95,6 +96,59 @@ def test_a_stabilised_body_does_not_walk_to_the_next_biome(yard):
 
     travel(engine)
     assert "c1" not in s.actors, "a stabilised body travelled with the party"
+
+
+# --- changing room without changing ground ------------------------------------------------
+
+def test_leaving_a_room_is_a_scene_change_even_on_the_same_ground(yard):
+    """Found by playing. The player left a merchant's building for the square, the GM
+    narrated the square and four men in it, and the next beat was back inside by the
+    fire with somebody several turns dead.
+
+    `travel` modelled the GROUND, and a stall and the square outside it are both urban —
+    so the move reached the engine as nothing at all. The merchant stayed in the scene,
+    the brief went on describing his stall, and the world had no way to be told the room
+    was over. The op takes a `place` now, and a change of room sheds its cast exactly as
+    a change of biome always did.
+    """
+    s, engine = yard
+    s.spot = "the merchant's stall"
+    got = engine.run(engine.validate([
+        {"op": "travel", "because": "she walks out",
+         "params": {"place": "the market square"}}]))
+
+    assert s.spot == "the market square"
+    assert s.biome == "urban", "changing room must not change the ground underfoot"
+    assert list(s.actors) == ["pc"], "the people of the old room followed her out"
+    assert "the market square" in got.outcomes[0].tell
+
+
+def test_an_escort_still_comes_along_between_rooms(yard):
+    s, engine = yard
+    engine.run(engine.validate([
+        {"op": "travel", "because": "they walk out together",
+         "params": {"place": "the street", "with": ["c1"]}}]))
+    assert set(s.actors) == {"pc", "c1"}
+
+
+def test_new_ground_forgets_the_old_room(yard):
+    """A stale room name would anchor the prose to a building a day's walk behind."""
+    s, engine = yard
+    s.spot = "the taproom"
+    travel(engine)
+    assert s.biome == "forest" and s.spot == ""
+
+
+def test_travel_with_neither_ground_nor_room_says_what_to_type(yard):
+    """The contract's rule: a validator names the fix. Measured across the twelve real
+    campaigns, `travel: missing required param(s) biome` fired 13 times and the next
+    attempt resolved it 38% of the time — the model wanted a place and the op only
+    offered ground."""
+    s, engine = yard
+    with pytest.raises(IntentError) as e:
+        engine.run(engine.validate(
+            [{"op": "travel", "because": "she goes", "params": {}}]))
+    assert '"biome"' in str(e.value) and '"place"' in str(e.value)
 
 
 # --- departing --------------------------------------------------------------------------

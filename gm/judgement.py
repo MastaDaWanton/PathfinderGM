@@ -1656,6 +1656,22 @@ def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
         return list(raw_intents) + [{
             "op": "travel", "because": f"the player said they go to {named}",
             "params": {"biome": "urban", "note": f"Back within {named}."}}]
+
+    # A move that changes ROOM without changing ground — a stall for the square, a
+    # taproom for the street — is `travel` with a `place` now, and this injector
+    # deliberately does not guess one.
+    #
+    # It was written and then removed: an extractor good enough to read "I go into the
+    # tavern" also reads "I walk across the yard to the gate", which is movement inside
+    # one scene rather than a new one, and the distinction is semantic. This file's own
+    # doctrine, two hundred lines down, is that an injector guessing a value is strictly
+    # worse than the model choosing it with the scene in front of it — and a guessed
+    # place is worse than a guessed target, because it reaches the next brief as a
+    # stated fact about where the party is standing.
+    #
+    # So the room change is documented in the briefing and accepted by the op, and the
+    # model names it. What stops the old room being narrated back when the model stays
+    # silent is `update_thread`, which now clears the engagement on a departure.
     return raw_intents
 
 
