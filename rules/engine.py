@@ -11,6 +11,7 @@ same list from exactly where it stopped.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,6 +65,46 @@ def zone_for_feet(feet: int) -> str:
     return "far"
 
 
+class _Here(Mapping):
+    """Who is in the party's place: a read-only view over `Scene.people`.
+
+    Computed on every call and cached nowhere, on purpose. Bevy shipped a hierarchy
+    with both `Parent` and `Children` as real components kept level by commands, and
+    replaced it in 0.16 with a single source of truth whose other side is derived,
+    because writing either side by hand "may result in hierarchy invalidation" — they
+    shipped a polling diagnostic to catch the corruption before giving up on the
+    design. Inform computes "location of" by walking the tree on every call. At a dozen
+    actors the walk costs nothing, and there is nothing for `restore` to invalidate.
+
+    A `Mapping`, not a dict: `.items()`, `.values()`, `.get`, `[ref]`, `in`, `len` and
+    iteration are the whole read surface 171 production sites use, and assignment,
+    `pop`, `update` and `del` raise — so the five sites that wrote the roster directly
+    cannot keep working by accident.
+    """
+
+    __slots__ = ("_scene",)
+
+    def __init__(self, scene: "Scene"):
+        self._scene = scene
+
+    def __getitem__(self, ref: str) -> "Actor":
+        actor = self._scene.people[ref]
+        if actor.at != self._scene.at:
+            raise KeyError(ref)
+        return actor
+
+    def __iter__(self):
+        here = self._scene.at
+        return (r for r, a in self._scene.people.items() if a.at == here)
+
+    def __len__(self) -> int:
+        here = self._scene.at
+        return sum(1 for a in self._scene.people.values() if a.at == here)
+
+    def __repr__(self) -> str:
+        return f"_Here({dict(self)!r})"
+
+
 @dataclass
 class Scene:
     """Everything the engine owns. The world agent may read this and writes none of it —
@@ -85,7 +126,19 @@ class Scene:
     # narrator establishing a fact rather than proposing one, and which gave "where the
     # party is" a second writer beside `thread["where"]`.
     at: str = ""
-    actors: dict[str, Actor] = field(default_factory=dict)
+    # Everyone the campaign holds, wherever they are. THE STORE. `actors` below is the
+    # derived view of who is in the party's place, and it is the only thing most of the
+    # engine reads; the store is for the world clock (time passes for the merchant in
+    # the next room), the ageing loop (a body the party walked away from still leaves),
+    # ref minting (a ref worn by somebody elsewhere is not free) and persistence.
+    people: dict[str, Actor] = field(default_factory=dict)
+    # The high-water mark for `cN` refs. Refs are minted once and never reused — the
+    # lowest-free scan that used to hand them out recycled a departed archer's 120-foot
+    # spawn distance onto the next `c1`, and under containment it would mint a living
+    # creature's ref a second time. Only `Scene.add` advances it; a refused turn's
+    # snapshot restores it, so a ref minted by a turn that did not happen is legitimately
+    # reissued by the next one.
+    minted: int = 0
     zones: dict[str, str] = field(default_factory=dict)
     # The map, and where everybody is standing on it. Both optional: a scene with no grid
     # behaves exactly as it did before there was one, which is what let the grid arrive
@@ -161,10 +214,6 @@ class Scene:
     # opened at the `far` default of forty feet however far they said they were.
     spawn_feet: dict[str, int] = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
-    # The ground underfoot, which decides what can be foraged here. Defaults from the
-    # world's own Biomes/Terrain facts when a campaign starts, and the GM moves it as the
-    # party travels.
-    biome: str = ""
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
     turn: int = -1
@@ -236,11 +285,47 @@ class Scene:
         self.__dict__.update(copy.deepcopy(snap))
         self._dice = dice
 
+    @property
+    def actors(self) -> Mapping[str, Actor]:
+        """Who is in the party's place. Derived; see `_Here`."""
+        return _Here(self)
+
+    @property
+    def biome(self) -> str:
+        """The ground underfoot: a parse of the one coordinate, never a stored field.
+
+        `scene.biome` was a sibling of `scene.at`, written by travel and healed by the
+        campaign, and "both are urban" is exactly what let walking out of a stall change
+        nothing. The place id carries its ground (`{location}~forest:the-approach`), so
+        the question has one answer with one writer. Empty for a scene that has not been
+        placed, which the forage and market doors already refuse out loud.
+        """
+        from . import places as places_mod
+
+        return places_mod.terrain_of(self.at)
+
     def add(self, actor: Actor, zone: str = "near", at: tuple[int, int] | None = None) -> Actor:
-        self.actors[actor.ref] = actor
+        """Put a creature into the scene, HERE. One of the writers of `Actor.at`.
+
+        Stamped unconditionally: a roster sheet carries the place the character last
+        stood in, in a campaign that may be in another world, and `if not actor.at`
+        would let that id walk in.
+
+        The keyword `at` is a GRID SQUARE and predates the place field of the same
+        name on the actor; forty test sites pass it. The two are never confused in
+        code because one is a tuple and the other a string, and the name stays.
+        """
+        actor.at = self.at
+        self.people[actor.ref] = actor
         self.zones[actor.ref] = zone
         if at is not None:
             self.positions[actor.ref] = (int(at[0]), int(at[1]))
+        # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
+        # come through here, so a save from before the mark existed heals itself to the
+        # highest ref it holds on the first load.
+        m = re.fullmatch(r"c(\d+)", str(actor.ref))
+        if m:
+            self.minted = max(self.minted, int(m.group(1)))
         return actor
 
     # --- the map, when there is one ------------------------------------------------------
@@ -344,7 +429,10 @@ class Scene:
         return self.actors.get(ref)
 
     def pc(self) -> Actor | None:
-        return next((a for a in self.actors.values() if a.is_pc), None)
+        # The STORE, not the view. "Here" is the PC's place and the view is everyone in
+        # the PC's place, so finding the PC through the view is circular — and sixty
+        # callers dereference this without a guard.
+        return next((a for a in self.people.values() if a.is_pc), None)
 
     # --- turn order -------------------------------------------------------------------
 
@@ -427,7 +515,13 @@ class Scene:
                 # Attacks of opportunity refill at the top of the round, not on your own
                 # turn: the allowance is what you may do while other people act.
                 self.reacted = {}
-                for a in self.actors.values():
+                # The store: a round is a unit of time, and time passes for the merchant
+                # in the next room too. Nothing in any tradition freezes an object because
+                # the player is not looking at it, and the survival module has already
+                # paid for the version of this that did ("the clock moved and the body
+                # did not know"). The hazards below stay scene-local — a cloud in this
+                # room does not burn a man in that one.
+                for a in self.people.values():
                     # Every one of these returned a list of what it ended, and every
                     # one of those lists was dropped on the floor — so in a fight, a
                     # buff running out, a cooldown coming back and a compulsion
@@ -448,7 +542,7 @@ class Scene:
                 # a skipped round and `scene.bleeding` came back empty, so the player
                 # was never told he had stopped moving.
                 self.bleeding.extend(r for r in (
-                    a.bleed_out(self._dice) for a in self.actors.values()
+                    a.bleed_out(self._dice) for a in self.people.values()
                 ) if r)
                 # After the dying, because a hazard that finishes somebody should find
                 # them where the round left them rather than where it started.
@@ -575,7 +669,9 @@ class Scene:
             return {"minutes": 0, "rounds": 0, "ended": []}
         self.clock_minutes += minutes
         ended: list[str] = []
-        for a in self.actors.values():
+        # Everyone the campaign holds: an eight-hour rest expires the buff on the
+        # merchant in the next room and advances his hunger, exactly as it does here.
+        for a in self.people.values():
             # The body keeps its own clock, and the door has to open that one too.
             # `survival.pass_hours` is reached from exactly one place in the app, so
             # four of the six routed sites moved the world and left hunger, thirst and
@@ -645,7 +741,9 @@ class Scene:
             # clock says — "cure the bleeding and the bleed ward evaporates".
             stops = getattr(holder, "stops_with", "")
             if stops and getattr(holder, "owner", ""):
-                who = self.actors.get(holder.owner)
+                # The store: a ward on somebody who has walked into the next room is
+                # not a ward on somebody who has been cured.
+                who = self.people.get(holder.owner)
                 if who is None or not who.has_condition(stops):
                     out.append(self._end_standing(holder))
                     continue
@@ -821,23 +919,22 @@ class Scene:
         self.wards = []
         self.hazards = []
 
-    def depart(self, ref: str) -> Actor | None:
-        """Take one creature out of the scene, and out of every structure that names it.
+    def _unseat(self, ref: str) -> None:
+        """Take one creature out of every TACTICAL structure that names it.
 
-        The structures are the point. A first version that only deleted from `actors`
-        would leave the ref in the initiative order, the sides, the zones, the guard
-        arrangements and the reaction ledger — five places for a ghost to keep acting
-        from. The 2026-08-22 playtest produced exactly that ghost by never removing
-        anybody at all: a gatekeeper wounded in the city travelled inside the scene to
-        the forest and took an NPC turn after every player turn for the rest of the
-        session.
+        The structures are the point. A first version that only deleted from the roster
+        left the ref in the initiative order, the sides, the zones and the reaction
+        ledger — places for a ghost to keep acting from. The 2026-08-22 playtest
+        produced exactly that ghost by never removing anybody at all: a gatekeeper
+        wounded in the city travelled inside the scene to the forest and took an NPC
+        turn after every player turn for the rest of the session.
 
-        The PC is refused: a scene without its player is not a scene, it is a bug.
+        Tactical only: a zone, a square, an initiative slot, a side, a spent reaction, a
+        stated spawn distance, a turn spent lying on this floor, an attack made in this
+        fight. Every one of those is meaningless in another room. Guards, wards, pools
+        and manifests are NOT here — see `move` and `remove` for which of them each
+        door touches, and why.
         """
-        actor = self.actors.get(ref)
-        if actor is None or actor.is_pc:
-            return None
-
         # The initiative order shrinks, and `turn` must go on pointing at the same
         # creature — an index into a list that just changed length is how a removal
         # hands somebody else's turn to the wrong side of the fight.
@@ -848,27 +945,113 @@ class Scene:
         else:
             self.turn = next(i for i, (r, _) in enumerate(self.initiative) if r == current)
 
-        del self.actors[ref]
         self.zones.pop(ref, None)
         self.positions.pop(ref, None)
         self.acted.discard(ref)
-        # Refs are recycled — `bestiary._next_ref` hands out the lowest free `cN` — so a
-        # stated spawn distance left behind here is inherited by whoever takes the name
-        # next. Measured: an archer who arrived at 120 feet departed, and the next spawn
-        # to reuse `c1` was laid out 120 feet away despite asking for `engaged`. This
-        # was harmless only while the field was dropped at every save; it is persisted
-        # now, so the poisoning would have lasted the campaign.
         self.spawn_feet.pop(ref, None)
+        # Leaked by three of the four old depart doors and persisted, so a stale age was
+        # waiting for whoever wore the ref next; with refs never reused it is merely
+        # untidy, and it is cleaned anyway.
+        self.fallen.pop(ref, None)
         self.reacted = {k: v for k, v in self.reacted.items()
                         if not k.startswith(f"{ref}:")}
-        self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]
-        # And the wards, for the reason this method's docstring gives about every other
-        # structure: a ward naming a creature who has left the scene is one more place
-        # for a ghost to keep acting from, and this one would fire every round.
-        self.wards = [w for w in self.wards if ref not in (w.owner, w.caster)]
+        self.attacked = {k for k in self.attacked
+                         if ref not in k.split(">", 1)}
         self.sides = {side: [r for r in refs if r != ref]
                       for side, refs in self.sides.items()}
+
+    def move(self, ref: str, place_id: str) -> Actor | None:
+        """Put one creature in a place. The OTHER writer of `Actor.at`, and the only
+        one that changes it.
+
+        Inform's `PlayerTo` is the model: "the player object can only be moved by this
+        routine: this allows us to maintain the invariant" (WorldModelKit §13). Moving
+        the PC moves the party — `scene.at` follows, and the cast ledger of prose-people
+        the narrator introduced *here* is emptied, because that is what walking out of
+        a room does to the people in it.
+
+        Tactical state is dropped (`_unseat`). Guards are not: a guard is a relationship
+        between two creatures, and whether it survives depends on where BOTH of them
+        end up, which only the caller knows once every move of a travel is done — see
+        `settle_relations`. Wards with an owner are the teeth of something on that
+        body and travel with it; area wards, pools and manifests are things on the
+        floor of a room and stay on it.
+
+        Mid-encounter the PC is refused: travel ends the fight first (`_op_travel`
+        settles the XP, then `end_encounter`, then moves), and every other caller has
+        no business moving the party out of an initiative order.
+        """
+        actor = self.people.get(ref)
+        if actor is None:
+            return None
+        place_id = str(place_id or "").strip()
+        if not place_id:
+            raise ValueError("move: a place id, never nothing — the party is always somewhere")
+        if actor.is_pc and self.in_encounter:
+            raise ValueError("move: the player does not leave an initiative order; "
+                             "end the encounter first")
+        self._unseat(ref)
+        actor.at = place_id
+        self.zones[ref] = "near"
+        if actor.is_pc:
+            self.at = place_id
+            self.cast = []
         return actor
+
+    def settle_relations(self) -> list[str]:
+        """Drop every guard whose two ends are no longer in one place.
+
+        After ALL the moves of a travel, not inside each one: the PC moves first and the
+        escort second, and a guard between them would be cut in the gap. Returns the
+        guardians' refs, so a caller can say the arrangement lapsed.
+        """
+        lapsed: list[str] = []
+        kept = []
+        for g in self.guards:
+            a, b = self.people.get(g.guardian), self.people.get(g.protects)
+            if a is None or b is None or a.at != b.at:
+                lapsed.append(g.guardian)
+            else:
+                kept.append(g)
+        self.guards = kept
+        return lapsed
+
+    def remove(self, ref: str) -> Actor | None:
+        """Take one creature out of the campaign for good. The ONE destroyer.
+
+        Inform keeps `remove` (out of the tree, still in existence) apart from
+        destruction; this app has no use for a creature that exists nowhere, so this is
+        the destroyer and `move` is the only other spatial write. Everything relational
+        goes with them: guards at either end, wards they own or cast, and — outside every
+        scene table — the compulsions they were pulling on other people, which live on
+        the *targets'* effect lists and would otherwise charge a −4 forever against
+        somebody who no longer exists.
+
+        The PC is refused: a scene without its player is not a scene, it is a bug.
+        """
+        actor = self.people.get(ref)
+        if actor is None or actor.is_pc:
+            return None
+        self._unseat(ref)
+        self.guards = [g for g in self.guards if ref not in (g.guardian, g.protects)]
+        # A ward naming a creature who no longer exists is one more place for a ghost
+        # to keep acting from, and this one would fire every round.
+        self.wards = [w for w in self.wards if ref not in (w.owner, w.caster)]
+        from . import compulsion as compulsion_mod
+
+        for other in self.people.values():
+            if other.ref != ref:
+                compulsion_mod.remove(other, by=ref)
+        for e in self.cast:
+            if e.get("ref") == ref:
+                e.pop("ref", None)
+        del self.people[ref]
+        return actor
+
+    # The name every earlier stage knew the destroyer by. Kept so the four callers and
+    # the tests that pin its contract (every trace gone, the turn stays on the same
+    # creature, the PC refused) go on reading as written.
+    depart = remove
 
 
 # --- Results -----------------------------------------------------------------------
@@ -1084,10 +1267,17 @@ class BloodPool:
     at: tuple[int, int] | None = None
     amount: int = 1
     source: str = ""
+    # WHICH floor it is on: the place id of the scene it was spilled in. Blood is a
+    # fact about the room, not the bender — the review's ruling, against a first draft
+    # that cleaned pools by owner on every move and so cost the one class whose
+    # resource this is its bank for walking through a door. A pool is reachable when
+    # its owner is back on this floor and not before; an old save's pools carry no
+    # place and are read as here.
+    place: str = ""
 
     def as_dict(self) -> dict:
         return {"owner": self.owner, "at": list(self.at) if self.at else None,
-                "amount": self.amount, "source": self.source}
+                "amount": self.amount, "source": self.source, "place": self.place}
 
     @classmethod
     def from_dict(cls, d: dict) -> "BloodPool":
@@ -1095,7 +1285,11 @@ class BloodPool:
         return cls(owner=d.get("owner", ""),
                    at=tuple(at) if at else None,
                    amount=int(d.get("amount", 1) or 1),
-                   source=d.get("source", ""))
+                   source=d.get("source", ""),
+                   place=str(d.get("place") or ""))
+
+    def here(self, scene) -> bool:
+        return not self.place or self.place == scene.at
 
 
 # --- The engine ---------------------------------------------------------------------
@@ -1133,19 +1327,22 @@ class Engine:
         return intents
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
-        """The refs `spawn` intents in this list are going to mint."""
-        from .bestiary import _next_ref
+        """The refs `spawn` intents in this list are going to mint.
 
-        taken = set(self.scene.actors)
+        Through the one minter, with the refs projected so far passed as `taken`, so
+        validation and minting cannot disagree — this used to be a hand-copied second
+        version of the allocation loop, and CLAUDE.md's rule about copies of a rule
+        exists because they drift. Validation consumes nothing: the mark advances only
+        when a creature is actually added.
+        """
+        from .bestiary import next_ref
+
         projected: set[str] = set()
         for intent in intents:
             if intent.op != "spawn":
                 continue
             for _ in range(int(intent.params.get("count", 1) or 1)):
-                n = 1
-                while f"c{n}" in taken or f"c{n}" in projected:
-                    n += 1
-                projected.add(f"c{n}")
+                projected.add(next_ref(self.scene, taken=projected))
         return projected
 
     def _force_visibility(self, intent: Intent) -> None:
@@ -1175,6 +1372,42 @@ class Engine:
         return isinstance(ref, str) and bool(ref) and (
             ref in self.scene.actors or ref in (extra or set()))
 
+    def _elsewhere(self, ref) -> str:
+        """Where a ref the campaign holds but the party cannot reach is standing, or "".
+
+        Under containment "unknown ref" splits in two, and the old refusal — "create
+        them first with spawn" — would invite the model to spawn a duplicate of the
+        merchant standing in the next room. This is the other branch. It does NOT say
+        "travel there": a travel and an action on them in one list fails the action's
+        own ref check, because validation runs against the view before anything moves.
+        """
+        if not isinstance(ref, str) or not ref:
+            return ""
+        actor = self.scene.people.get(ref)
+        if actor is None or actor.at == self.scene.at:
+            return ""
+        from . import places as places_mod
+
+        known = self.places()
+        there = places_mod.find(known, actor.at)
+        where = there.name if there is not None else "somewhere else"
+        return (f"{ref} ({actor.name}) is at {where}, not here. Leave them out "
+                f"of it this turn.")
+
+    def _refuse_ref(self, intent: Intent, index: int, ref, role: str,
+                    extra: set[str] | None) -> None:
+        """One shape for every unknown-ref refusal, with the right branch chosen."""
+        away = self._elsewhere(ref)
+        if away:
+            raise IntentError(f"{intent.op}: {away}", "refs", index)
+        raise IntentError(
+            f"{intent.op}: unknown {role} {ref!r}; known refs are "
+            f"{sorted(set(self.scene.actors) | (extra or set()))}."
+            + (" Refer to people by ref, never by name." if role == "actor" else "")
+            + _SPAWN_HINT,
+            "refs", index,
+        )
+
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
         if intent.op in ("narrate_only", "advance_time", "spawn", "begin_encounter"):
@@ -1202,19 +1435,19 @@ class Engine:
 
         needs_actor = intent.op in ("check", "save", "attack", "move")
         if needs_actor and not self._known(intent.actor, extra):
-            raise IntentError(
-                f"{intent.op}: unknown actor {intent.actor!r}; known refs are "
-                f"{sorted(set(self.scene.actors) | (extra or set()))}. Refer to people by ref, never by name."
-                + _SPAWN_HINT,
-                "refs", index,
-            )
+            self._refuse_ref(intent, index, intent.actor, "actor", extra)
         for t in intent.targets():
             if not self._known(t, extra):
-                raise IntentError(
-                    f"{intent.op}: unknown target {t!r}; known refs are "
-                    f"{sorted(set(self.scene.actors) | (extra or set()))}." + _SPAWN_HINT,
-                    "refs", index,
-                )
+                self._refuse_ref(intent, index, t, "target", extra)
+        # `with` was read at one production line and validated by none: the model could
+        # name a ref the store holds in another room, and travel would have moved a
+        # creature it could not see. Names are allowed (resolved by `_op_travel`) and
+        # simply ignored when unknown, as before; a REF must be here.
+        if intent.op == "travel":
+            for w in (intent.params.get("with") or []):
+                if isinstance(w, str) and re.fullmatch(r"c\d+|pc", w) \
+                        and not self._known(w, extra):
+                    self._refuse_ref(intent, index, w, "escort", extra)
         opposed = intent.params.get("opposed_by")
         if opposed and not isinstance(opposed, dict):
             raise IntentError(
@@ -2599,8 +2832,13 @@ class Engine:
         if self.scene.in_encounter:
             return []
         tells: list[str] = []
-        for ref in list(self.scene.actors):
-            a = self.scene.actors[ref]
+        # The STORE: a body the party walked away from still leaves after its grace,
+        # rather than lying in a room nobody will re-enter for the rest of the campaign.
+        # The two-turn grace is why a fresh corpse is still in the VIEW meanwhile —
+        # loot, heat, the finishing-blow check and the dead-men-walking cut all read it
+        # there — and death does not move anybody, so it is.
+        for ref in list(self.scene.people):
+            a = self.scene.people[ref]
             # `state.down.fallen`, not the whole family: petrified and helpless are
             # down and alive, and asking the family aged a petrified enemy out of the
             # scene as a corpse two turns after the fight — statue, treasure and all.
@@ -2636,51 +2874,58 @@ class Engine:
                    else "has bled out where they fell.")]
 
     def leave_behind(self) -> list[str]:
-        """The player walks away inside the same biome: the scene lets go.
+        """The player says they are leaving: the dying here run their course.
 
-        Travel sheds the fallen, but only on a biome change — measured live, "I
-        leave and return to the market" kept the whole battlefield: four corpses
-        in the scene panel scenes later, and a stranger who had been "bleeding
-        out" since the first fight, printing his tell every turn. Leaving is
-        leaving. The dying run their course off-screen (1e's own odds: stabilise
-        on the way down or bleed out at a point a round), and the dead and the
-        down stay where they fell. No-op mid-encounter — you do not walk out of
-        an initiative order.
+        This used to shed the down family as well — and `clear_cast` after it shed the
+        promoted civilians — because a room had no way to keep its people. It has one
+        now: walking out is a `travel`, the room keeps everyone in it, and the party's
+        view simply stops containing them. What is left of this door is the story
+        beat: the dying resolve (1e's own odds — stabilise on the way down or bleed out
+        at a point a round) before the party is out of earshot, so nobody bleeds out in
+        silence two rooms away. Departs nobody. No-op mid-encounter — you do not walk
+        out of an initiative order.
         """
         if self.scene.in_encounter:
             return []
         tells: list[str] = []
-        for ref in list(self.scene.actors):
-            a = self.scene.actors[ref]
+        for a in list(self.scene.actors.values()):
             if a.is_pc:
                 continue
             if a.has_condition("dying"):
                 tells.extend(self._resolve_dying(a))
-            # Leaving is leaving: anybody who cannot follow stays where they are, and
-            # that includes the ones still upright. Stage 5b narrowed this to the fallen
-            # alongside `tidy_the_fallen` — but the two doors want different questions,
-            # and narrowing this one meant a petrified enemy travelled to the next biome
-            # with the party and stood in the scene panel there for the rest of the
-            # campaign. Bodies ageing out of a room the party is still in is one rule;
-            # the party walking out is another, and it sheds the whole family.
-            if a.is_down:
-                self.scene.depart(ref)
         return tells
 
-    def places(self) -> tuple:
-        """Every place this location is made of — derived, never stored.
+    def _terrain_hint(self, found) -> str:
+        """The ground a location that is not a settlement stands on, when a bare id
+        cannot say: the world's own facts if there is a world, else what the party is
+        already standing on, else grassland."""
+        from . import places as places_mod
 
-        Healed on read rather than migrated, the same courtesy `Campaign.biome` extends
-        to a save written before biomes existed: a save that needs a migration step to be
-        playable is a save that breaks the moment somebody opens an old one.
+        # Never the ground the party is currently on: that is what made a world-less
+        # engine forget it had a town the moment the party walked into the forest —
+        # "home" became the forest, and "back to urban" minted an urban region
+        # outside the town. With no world the hint is empty and a bare id reads as
+        # a settlement (`places._settled`); a caller that knows better says so.
+        if self.world is not None and found is not None:
+            found_biomes = biomes.from_world(self.world, found)
+            return next((b for b in found_biomes if b != places_mod.URBAN), "grassland")
+        return ""
+
+    def places(self) -> tuple:
+        """Every place the party can name from where they stand — derived, never stored.
+
+        The location's own set, plus the ground they are on when it is not the
+        location's own ground: from the forest outside the town, "the market" still
+        resolves. One derivation, `places.for_scene`, shared with the brief; there used
+        to be two, and two copies of a rule is the trap CLAUDE.md names.
         """
         from . import places as places_mod
 
         found = (self.world.get(self.scene.location_id) if self.world else None)
         # The bare id when the world is not to hand: it is what seeds the layout, so a
-        # scene still has its places without one, and the ground chooses the table.
-        return places_mod.spots_for(found or self.scene.location_id,
-                                    terrain=self.scene.biome)
+        # scene still has its places without one.
+        return places_mod.for_scene(found or self.scene.location_id, self.scene.at,
+                                    terrain_hint=self._terrain_hint(found))
 
     def here(self):
         """The place the party is standing in. Never None — they are always somewhere."""
@@ -2688,6 +2933,46 @@ class Engine:
 
         known = self.places()
         return places_mod.find(known, self.scene.at) or known[0]
+
+    def place_party(self, place_id: str = "") -> None:
+        """Stand the party somewhere real: the named place, or the location's first.
+
+        The Engine's door onto `Scene.move` for the PC, and the one that validates:
+        `Scene` cannot know what places exist (it has no world), so a place id that did
+        not come from `places()` is refused HERE — that is the free-text `spot` coming
+        back through a side door. Everyone unplaced (a save from before actors had a
+        place) is stood with the party.
+        """
+        from . import places as places_mod
+
+        if place_id:
+            # Validated against the set the TARGET's own ground implies, not the set
+            # the party currently sees: a scene that has not been placed yet sees
+            # nothing, and a save being healed onto the forest has to be allowed to
+            # name the forest. The question is "is this a real place of this
+            # location", and the id carries enough to ask it.
+            found = (self.world.get(self.scene.location_id) if self.world else None)
+            known = places_mod.for_scene(
+                found or self.scene.location_id, place_id,
+                terrain_hint=places_mod.terrain_of(place_id))
+            target = places_mod.find(known, place_id)
+            if target is None:
+                raise ValueError(f"place_party: no place {place_id!r} here; the places "
+                                 f"are {[p.id for p in known]}")
+        else:
+            target = self.places()[0]
+        # Placement is not movement. `move` unseats — drops the zone, the initiative
+        # slot, the side — and refuses the PC mid-encounter; a save loaded mid-fight
+        # from before places existed has all of those and must keep them. Nothing is
+        # walked out of, so the cast ledger stays too. The third and last writer of
+        # `Actor.at`, and it only ever writes the party's own place.
+        pc = self.scene.pc()
+        self.scene.at = target.id
+        if pc is not None:
+            pc.at = target.id
+        for a in self.scene.people.values():
+            if not a.at:
+                a.at = target.id
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
@@ -2711,8 +2996,8 @@ class Engine:
                 'travel: say where. Either new ground — "biome": "forest" — or a new '
                 'spot on the same ground — "place": "the market square".',
                 "schema")
-        biome = biomes.canonical(want) if want else self.scene.biome
-        if biome is None:
+        biome = biomes.canonical(want) if want else None
+        if want and biome is None:
             raise IntentError(
                 f"travel: {want!r} is not a biome. The biomes are: "
                 f"{', '.join(sorted(biomes.BIOMES))}.",
@@ -2727,7 +3012,7 @@ class Engine:
         from . import places as places_mod
 
         known = self.places()
-        going_to = None
+        here = self.here()
         if place:
             going_to = places_mod.find(known, place)
             if going_to is None:
@@ -2739,61 +3024,105 @@ class Engine:
                 raise IntentError(
                     f"travel: {going_to.name} can be seen from here but not reached.",
                     "legality")
-
-        kept = {str(r) for r in (intent.params.get("with") or [])}
-        left: list[str] = []
-        # A change of ground OR a change of room. Both are scene transitions and both
-        # shed the cast: the merchant stays in his stall when the player walks out into
-        # the square, exactly as the gatekeeper stays in the city when they walk to the
-        # forest. Only the biome half existed, so a move inside one place changed
-        # nothing the engine could see and the brief went on describing the old room.
-        moved = biome != self.scene.biome or (going_to and going_to.id != self.scene.at)
-        if moved:
-            fight_ended = self.scene.in_encounter
-            if fight_ended:
-                self.scene.end_encounter()
-            for ref in list(self.scene.actors):
-                actor = self.scene.actors[ref]
-                if actor.is_pc:
-                    continue
-                stays = ref not in kept and str(actor.name) not in kept
-                # The four literal keys this used to name are exactly the fallen, minus
-                # `stable` — which it forgot, so a stabilised body walked to the next
-                # biome with the party. The wider family for the same reason
-                # `leave_behind` uses it: a statue does not come along either.
-                cannot_come = actor.is_down
-                if stays or cannot_come:
-                    self.scene.depart(ref)
-                    left.append(actor.name)
+        elif biome == here.terrain:
+            # The ground already underfoot. This used to compare the stored biome and
+            # do nothing; without the field the same answer has to be said, or a party
+            # standing at the heart of the forest would be walked back to its approach
+            # with the escort shed, on a wish to go deeper in.
+            going_to = here
+        elif biome == known[0].terrain:
+            # Back to town. Three production paths send `urban` home — both injectors
+            # and the bench picker — and every one of them would otherwise have minted
+            # a region called urban outside the town it was trying to enter.
+            going_to = known[0]
         else:
-            fight_ended = False
+            # Open ground of a kind the party is not on: the region's first place.
+            going_to = places_mod.region_set(
+                places_mod.location_of(known[0].id) or self.scene.location_id, biome)[0]
 
-        was, self.scene.biome = self.scene.biome, biome
+        # Escorts: refs are validated against the view already; names are resolved here,
+        # against the view, and an ambiguous name refuses rather than guessing which of
+        # two guards comes along. Unknown names are ignored, as they always were.
+        escorts: list[str] = []
+        for w in (intent.params.get("with") or []):
+            w = str(w).strip()
+            if not w:
+                continue
+            if w in self.scene.actors:
+                escorts.append(w)
+                continue
+            matches = [r for r, a in self.scene.actors.items()
+                       if not a.is_pc and str(a.name).lower() == w.lower()]
+            if len(matches) > 1:
+                raise IntentError(
+                    f"travel: {w!r} names {len(matches)} people here; say which by "
+                    f"ref: {', '.join(matches)}.", "refs")
+            escorts.extend(matches)
+
+        pc = self.scene.pc()
         was_place = self.scene.at
-        if going_to is not None:
-            self.scene.at = going_to.id
-        # New ground is a new set of places by definition: the taproom does not come with
-        # you to the forest, and a stale id would point at a room a day's walk behind.
-        # `places()` is keyed on the location, so the id simply stops resolving — clearing
-        # it says so rather than leaving the party pointing at nowhere.
-        if biome != was and going_to is None:
-            self.scene.at = ""
+        was_ground = here.terrain
+        moved = going_to.id != was_place
+        left: list[str] = []
+        stayed_down: list[str] = []
+        fight_ended = False
+        xp_line = ""
+        dying_tells: list[str] = []
+        if moved:
+            # In this order: pay, then end, then walk. `_settle_xp` needs the sides and
+            # the bodies, `end_encounter` clears the sides, and a fight walked out of
+            # used to pay nothing without a word — the tell below carries the line.
+            if self.scene.in_encounter:
+                xp_line = self._settle_xp()
+                self.scene.end_encounter()
+                fight_ended = True
+            for a in list(self.scene.actors.values()):
+                if a.is_pc:
+                    continue
+                if a.ref in escorts and a.is_down:
+                    # The dead and the dying are not eligible even when named: they
+                    # stay where they fell. Said, rather than silently dropped.
+                    stayed_down.append(a.name)
+                    escorts.remove(a.ref)
+                if a.ref not in escorts:
+                    # Three doors used to shed people and only two resolved the dying
+                    # first; travel left them bleeding with no tell. Nobody bleeds out
+                    # in silence because the party changed rooms.
+                    if a.has_state("state.down.dying"):
+                        dying_tells.extend(self._resolve_dying(a))
+                    left.append(a.name)
+            if pc is not None:
+                self.scene.move(pc.ref, going_to.id)
+            else:
+                # A scene with no player (some tests) is placed rather than moved: the
+                # party record has three writers and this door is not a fourth.
+                self.place_party(going_to.id)
+            for ref in escorts:
+                self.scene.move(ref, going_to.id)
+            # After every move, for the reason `settle_relations` gives.
+            self.scene.settle_relations()
+
         note = str(intent.params.get("note") or "").strip()
         bits = []
-        if biome != was:
-            bits.append(f"The ground changes: {biomes.describe(biome).lower()}.")
-        if going_to is not None and going_to.id != was_place:
+        if not moved:
+            bits.append(f"You are already at {going_to.name}.")
+        if going_to.terrain != was_ground:
+            bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
+        if moved:
             bits.append(f"You are at {going_to.name} now.")
         if fight_ended:
-            bits.append("The fight is left behind.")
+            bits.append("The fight is left behind." + xp_line)
+        if stayed_down:
+            bits.append(f"{', '.join(stayed_down)} cannot come: they stay where they fell.")
+        bits.extend(dying_tells)
         if left:
             bits.append(f"Left behind: {', '.join(left)}.")
         if note:
             bits.append(note)
         return Outcome(
             intent_id=intent.id, op="travel",
-            effects=[{"kind": "biome", "biome": biome, "was": was, "left": left,
-                      "place": self.scene.at, "was_place": was_place,
+            effects=[{"kind": "biome", "biome": going_to.terrain, "was": was_ground,
+                      "left": left, "place": self.scene.at, "was_place": was_place,
                       "fight_ended": fight_ended}],
             tell=" ".join(bits),
             because=intent.because,
@@ -4617,11 +4946,11 @@ class Engine:
                 done.append(f"{target.name} may become {spec.get('target')}")
             elif spec.get("op") == "blood_pool":
                 where = self.scene.positions.get(actor.ref)
-                self.scene.pools.append(BloodPool(owner=actor.ref, at=where,
+                self.scene.pools.append(BloodPool(owner=actor.ref, at=where, place=self.scene.at,
                                                   source=found))
                 done.append("blood on the ground")
             elif spec.get("op") == "spend_pools":
-                mine = [b for b in self.scene.pools if b.owner == actor.ref]
+                mine = [b for b in self.scene.pools if b.owner == actor.ref and b.here(self.scene)]
                 take = len(mine) if str(spec.get("count")) == "all"                     else min(len(mine), int(spec.get("count", 1) or 1))
                 for pool in mine[:take]:
                     self.scene.pools.remove(pool)
@@ -4771,7 +5100,7 @@ class Engine:
             landed_on = onto if onto in self.scene.positions else actor.ref
             where = self.scene.positions.get(landed_on)
         amount = max(1, int(intent.params.get("amount", 1) or 1))
-        made = BloodPool(owner=actor.ref, at=tuple(where) if where else None,
+        made = BloodPool(owner=actor.ref, place=self.scene.at, at=tuple(where) if where else None,
                          amount=amount, source=str(intent.params.get("source") or
                                                    intent.because or ""))
         self.scene.pools.append(made)
@@ -4796,7 +5125,7 @@ class Engine:
         ref = intent.params.get("actor") or intent.actor
         actor = self.scene.actors.get(ref) if ref else self.scene.pc()
         mine = [b for b in self.scene.pools
-                if actor is None or b.owner == actor.ref]
+                if (actor is None or b.owner == actor.ref) and b.here(self.scene)]
         want = intent.params.get("count", 1)
         take = len(mine) if str(want).lower() == "all" else max(1, int(want or 1))
         spent = mine[:take]

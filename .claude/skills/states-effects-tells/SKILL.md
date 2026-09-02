@@ -53,7 +53,14 @@ magic items from slots via `rules/magicitem.py:worn_specs`; percent resistance
 in `take_damage`; the battle gate (first violence opens the fight, never
 resolves it); finishing-blow detection; the three state questions with one owner
 each — `Actor.can_act` (per op, via `states.BLOCKS`), `Actor.is_down`,
-`Actor.is_helpless` — and the `recovery.*` families with `Actor.clear_states`.
+`Actor.is_helpless` — and the `recovery.*` families with `Actor.clear_states`;
+the `attitude.*` track (hostile → helpful) read by `states.attitude_of` and stated
+in the brief; **one spatial coordinate** — `Actor.at` is a place id from
+`rules/places.py`, `Scene.people` is the store, `Scene.actors` the derived
+read-only view of who is here, `Scene.move`/`Scene.remove` the only doors,
+`scene.biome` a parse of the id, refs minted once via `bestiary.next_ref` and
+never reused (docs/places-8b-plan.md; ratchet in
+`tests/test_one_spatial_authority.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —

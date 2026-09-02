@@ -393,6 +393,14 @@ class Actor:
     # these live on the Actor rather than on whoever created them.
     pools: dict[str, "Pool"] = field(default_factory=dict)
 
+    # WHERE this creature is: a place id from `rules.places`, and the one spatial fact
+    # the engine holds about anybody. Every tradition that solved presence — Inform's
+    # `parent`, Diku's `IN_ROOM`, LambdaMOO's `.location`, Bevy's `ChildOf` — keeps the
+    # relation on the contained thing and derives "who is here" from it; storing a
+    # roster on the room is the design Bevy shipped and then replaced, because two
+    # copies of one fact desynchronise. Written by exactly two doors, `Scene.add` and
+    # `Scene.move`; `Scene.actors` is the view of everyone whose `at` is the party's.
+    at: str = ""
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
     # the other.
@@ -2992,6 +3000,7 @@ def to_dict(actor: Actor) -> dict:
         # said in them, and this key is where it survives a save.
         "active_effects": [e.as_dict() for e in actor.effects],
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
+        "at": actor.at,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "gender": actor.gender,
         "paths": list(actor.paths),
@@ -3312,6 +3321,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         pools=_pools(data.get("pools") or {}),
         world_entity_id=data.get("world_entity_id"),
         world_people_id=data.get("world_people_id"),
+        # Read, not merely written: `from_dict` ignores keys it does not know, so a
+        # save that carried `at` would have loaded every actor into no place and the
+        # heal for saves that predate the field would have fired on all of them.
+        at=str(data.get("at") or ""),
         heritage=data.get("heritage", ""),
         race=data.get("race", "human"),
         paths=[str(p) for p in (data.get("paths") or [])],

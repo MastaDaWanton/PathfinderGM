@@ -194,7 +194,7 @@ def test_a_garnish_is_dropped_when_the_scene_shed_the_corpse(campaign, monkeypat
     body = _fresh_kill(c)
     _answer(monkeypatch, {"item": "an iron key", "band": "worthless"})
     watcher._work(watcher._jobs_for(c))
-    del c.scene.actors[body.ref]
+    c.scene.remove(body.ref)
     assert watcher.drain(c) is False
 
 

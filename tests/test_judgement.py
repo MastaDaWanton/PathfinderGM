@@ -14,6 +14,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import parse_all
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 @pytest.fixture
@@ -456,7 +457,7 @@ def test_a_declared_journey_moves_the_engines_ground(scene):
     the gates for the treeline" was narrated as a whole journey and arrived as
     narrate_only — the biome stayed urban, the forage tables were wrong, and the city
     gatekeeper was still in the scene because travel is the transition and never fired."""
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     out = judgement.inject_travel(
         [{"op": "narrate_only"}],
         "I head out the gates for the treeline before this city causes me more trouble.",
@@ -466,7 +467,7 @@ def test_a_declared_journey_moves_the_engines_ground(scene):
 
 
 def test_mentioning_ground_without_going_there_travels_nowhere(scene):
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     for text in ("I like these woods.", "Should we head into the woods?",
                  "I walk across the yard to the gate."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
@@ -474,7 +475,7 @@ def test_mentioning_ground_without_going_there_travels_nowhere(scene):
 
 
 def test_travelling_to_the_ground_underfoot_is_not_a_transition(scene):
-    scene.biome = "forest"
+    stand_on(scene, "forest")
     out = judgement.inject_travel(
         [{"op": "narrate_only"}], "I head deeper into the forest.", scene)
     assert all(r.get("op") != "travel" for r in out)
@@ -490,7 +491,7 @@ def test_ground_the_narrator_names_but_the_list_did_not(scene):
     every biome-gated excursion stayed locked on ground nobody was standing on any more.
     The same law as the outcome-claim verbs: each session reaches for a noun the list
     does not have, and the list is what has to grow."""
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     said = ("I leave the step and walk out past the edge of Zhilvarnia into the open "
             "scrub, looking for something dangerous to fight.")
     out = judgement.inject_travel([{"op": "narrate_only"}], said, scene)
@@ -512,7 +513,7 @@ def test_a_word_that_is_only_sometimes_ground_does_not_move_anybody(scene):
     mid-sentence and sheds whoever was talking to them. So bare "brush", "wood" and
     "mine" stay out of the list: brushing past a guard, a wooden door and a sword that
     is mine are all commoner than the terrain reading."""
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     for text in ("I brush past the guard and keep going.",
                  "I pull the wooden door to and bar it.",
                  "The sword is mine, and I take it to the table."):
@@ -524,7 +525,7 @@ def test_going_home_is_a_journey_too(scene):
     """"Return to Zhilvarnia" is one of the app's own suggestion chips, and none of the
     ways of saying it were in `_DEPARTS`: return, turn back, double back, retrace. Going
     home is as common a move as setting out, and the safety net had no word for it."""
-    scene.biome = "grassland"
+    stand_on(scene, "grassland")
     for text, biome in (("I return to the city.", "urban"),
                         ("I turn back towards the city walls.", "urban"),
                         ("I double back to the forest.", "forest"),
@@ -537,7 +538,7 @@ def test_going_home_is_a_journey_too(scene):
 def test_returning_something_to_somebody_is_not_a_journey(scene):
     """The ground noun is what keeps the new verbs honest: handing a sword back names
     no terrain, so nobody travels."""
-    scene.biome = "grassland"
+    stand_on(scene, "grassland")
     for text in ("I return the sword to him.", "I turn back to face him.",
                  "I give the coin to the boy."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene)
@@ -559,7 +560,7 @@ def test_a_place_with_a_name_is_a_destination(scene):
     town, come back by naming the town, and without this the biome stays out in the
     grass and every stall in the city is shut."""
     world = _pangrella()
-    scene.biome = "grassland"
+    stand_on(scene, "grassland")
     for text in ("Return to Zhilvarnia.", "I head back to Zhilvarnia.",
                  "I walk to Mirabalos.", "I set out for Torvathys."):
         out = judgement.inject_travel([{"op": "narrate_only"}], text, scene, world)
@@ -568,7 +569,7 @@ def test_a_place_with_a_name_is_a_destination(scene):
 
 
 def test_already_in_the_town_you_named_is_not_a_journey(scene):
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     out = judgement.inject_travel(
         [{"op": "narrate_only"}], "Return to Zhilvarnia.", scene, _pangrella())
     assert all(r.get("op") != "travel" for r in out)
@@ -579,7 +580,7 @@ def test_talking_about_a_journey_is_not_taking_one(scene):
     a real city in it, and the party must not be somewhere else by the end of the
     sentence. The hole was there for terrain too — this closes both."""
     world = _pangrella()
-    scene.biome = "grassland"
+    stand_on(scene, "grassland")
     for text in ("I think about going to Zhilvarnia one day.",
                  "I wonder whether to head for the woods.",
                  "I ask the guard about going to Torvathys.",
@@ -853,9 +854,9 @@ def test_a_sale_to_a_merchant_who_is_not_there_is_dropped_not_fatal():
 
     # A sale to somebody actually present is not this function's business.
     from rules.sheet import from_dict
-    scene.actors["c1"] = from_dict({"name": "the stallholder", "kind": "npc",
-                                    "hp": 4, "hp_max": 4, "level": 1,
-                                    "class": ""}, ref="c1")
+    scene.add(from_dict({"name": "the stallholder", "kind": "npc",
+                         "hp": 4, "hp_max": 4, "level": 1,
+                         "class": ""}, ref="c1"))
     fine = [{"op": "sell", "actor": "pc", "params": {"item": "x", "to": "c1"},
              "because": "x"}]
     assert judgement.drop_unfulfillable_trades(fine, scene) is None
@@ -1214,12 +1215,18 @@ def test_the_thread_brief_and_the_anchor():
     assert same == kept and not anchored
 
 
-def test_walking_away_lets_the_scene_go():
-    """Measured live: "i leave and return to the market" kept the whole
-    battlefield — four corpses in the scene panel scenes later, and a stranger
-    "bleeding out" since the first fight, printing his tell every turn. Travel
-    shed only on a biome change; leaving is leaving. The dying resolve off-screen
-    by 1e's own odds and the fallen depart the scene."""
+def test_walking_away_resolves_the_dying_and_departs_nobody():
+    """Measured live: "i leave and return to the market" kept the whole battlefield —
+    four corpses in the scene panel scenes later, and a stranger "bleeding out" since
+    the first fight, printing his tell every turn.
+
+    This door used to answer that by departing the fallen, because a room had no way
+    to keep its people. It has one now: the room keeps them and the party's `travel`
+    is what stops the view holding them (stage 8b). What this door still owns is the
+    story beat — the dying resolve by 1e's own odds before the party is out of
+    earshot, never eternally bleeding — and the bodies stay where they fell for the
+    ageing loop to sweep wherever the party has gone.
+    """
     from rules.bestiary import instantiate
     from rules.dice import Dice
     from rules.engine import Engine, Scene
@@ -1237,12 +1244,10 @@ def test_walking_away_lets_the_scene_go():
     assert judgement.player_departs("i leave and return to the market")
     assert not judgement.player_departs("I attack the merchant")
     tells = e.leave_behind()
-    assert corpse.ref not in s.actors
     assert any("stranger" in t for t in tells)
-    # However the dice fell, the stranger's story resolved: stable and left
-    # behind, or dead — never eternally bleeding in the scene panel.
-    assert dying.ref not in s.actors
     assert not dying.has_condition("dying")
+    assert corpse.ref in s.people and dying.ref in s.people, \
+        "leave_behind destroyed people; the room keeps them"
 
 
 def test_an_unaimed_item_damage_is_a_refusal_not_a_dead_turn():
@@ -1271,14 +1276,17 @@ def test_the_thread_knows_where_and_nobody_arrives_there_twice():
 
     s = Scene()
     judgement.update_thread(s, "i leave and return to the market")
-    assert s.thread == {} or s.thread.get("subject") is None or True  # no engagement yet
     judgement.update_thread(s, "I find a person who is wandering around and i follow them")
-    # no place in this sentence: the one from the previous turn is inherited
     judgement.update_thread(s, "I keep to the shadows in the market")
-    assert s.thread.get("where") == "the market"
+    # The thread no longer carries a place: that was a second writer of "where the
+    # party is" beside the engine's own, read out of the player's sentence, and one
+    # brief could assert two rooms. The place is the engine's and is handed in.
+    assert "where" not in s.thread
+    assert s.thread.get("subject") == "them"
 
-    brief = judgement.thread_brief(s)
-    assert "ALREADY in the market" in brief
+    brief = judgement.thread_brief(s, where="the market")
+    assert "ALREADY at the market" in brief
+    assert "ALREADY" not in judgement.thread_brief(s)
 
     beat = ("The stranger is heading towards the market, and you arrive at "
             "the market a few paces behind. What do you do?")
@@ -1482,8 +1490,16 @@ def test_a_noted_person_stands_in_the_scene():
     guard = next(a for a in s.actors.values() if "guard" in a.name)
     assert guard.from_template == "watchman"
 
+    # The ledger empties; the people stay. `clear_cast` used to depart the promoted
+    # civilians because a room had no way to keep them — it does now, and it is the
+    # party WALKING OUT that stops the view holding them, not the regex.
     judgement.clear_cast(s)
+    assert s.cast == []
+    assert not all(a.is_pc for a in s.actors.values()), \
+        "clear_cast still departs people; the room should keep them"
+    s.move("pc", "somewhere~urban:else")
     assert all(a.is_pc for a in s.actors.values())
+    assert len(s.people) == 3, "moving the party destroyed the people it left"
 
 
 def test_a_crowd_is_people():

@@ -23,19 +23,31 @@ every reload. The model chooses one that exists and is refused if it does not, w
 the courtesy the ref registry has always extended to people and never to places, though
 `gm/prompts.py`'s own docstring has asked for it since it was written.
 
+**The ground is inside the id.** `{location}~urban:the-market`,
+`{location}~forest:the-approach`. Stage 8c wanted the biome read off the place and the
+place seeded off the biome — a loop — and the review found the other way out: a
+`Scene` holds no world by design, so `scene.biome` cannot look anything up, but it can
+parse. `terrain_of(scene.at)` is the whole derivation, and the eleven readers that want
+the canonical enum string get it from the one coordinate that has one writer.
+
 When World Bible ships towns and the places in them, an authored list replaces a generated
-one at `spots_for` and nothing else changes.
+one at `home_set` and nothing else changes.
 """
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # How many spots a location gets. Fate caps a conflict at "two to four zones"; Inform's
 # Recipe Book calls for "a small number of named positions". The ceiling is the point —
 # an open-ended list is free text wearing a tuple, and every extra spot is somewhere the
 # narrator can strand the player with nothing to do.
 MOST_SPOTS = 6
+
+# The character between a location and its ground inside a place id. Never a `:` — that
+# already separates the ground from the spot — and never something a World Bible id can
+# contain (twelve hex characters, measured against the fixture).
+SEP = "~"
 
 # What a settlement is made of, in the order a generated town gets them. Deliberately
 # generic: these are read against the location's own facts below, and a name the world
@@ -58,6 +70,13 @@ _WILD = (
     ("the high ground", "somewhere to see from"),
 )
 
+# The ground a settlement stands on, by construction. Four predicates used to answer
+# "is this a town" — `biomes.from_world`'s `kind == "CITY"`, `_settled` here,
+# `_at_market`'s `== "urban"` and the injector's `_SETTLEMENT_KINDS` — and the review
+# measured them disagreeing: a village is settled to three of them and grassland to the
+# fourth. The settlement set says `urban` and asks nobody.
+URBAN = "urban"
+
 
 @dataclass
 class Place:
@@ -78,7 +97,7 @@ class Place:
     id: str = ""
     name: str = ""
     about: str = ""
-    # Read off the place, never stored beside it. `biome` as a sibling field on the scene
+    # Read off the id, never stored beside it. `biome` as a sibling field on the scene
     # is precisely what let "both are urban" defeat the transition.
     terrain: str = ""
     exits: tuple[str, ...] = ()
@@ -103,6 +122,33 @@ def from_dict(d: dict) -> Place:
     )
 
 
+# --- the id, and what it says ------------------------------------------------------------
+
+def region_key(location_id: str, terrain: str) -> str:
+    """`{location}~{terrain}`: the prefix every place on that ground shares."""
+    return f"{str(location_id or '').strip()}{SEP}{str(terrain or '').strip().lower()}"
+
+
+def terrain_of(place_id: str) -> str:
+    """The ground a place id stands on, or "" when the id does not say.
+
+    The parse IS `scene.biome`. No lookup, no world, no table — which is what lets a
+    deep-copied Scene answer the question and a save written by an older build
+    (`at == ""`) answer honestly with nothing.
+    """
+    head = str(place_id or "").split(":", 1)[0]
+    if SEP not in head:
+        return ""
+    return head.rsplit(SEP, 1)[1].strip().lower()
+
+
+def location_of(place_id: str) -> str:
+    head = str(place_id or "").split(":", 1)[0]
+    return head.rsplit(SEP, 1)[0] if SEP in head else head
+
+
+# --- the sets ----------------------------------------------------------------------------
+
 def _seed(location_id: str) -> int:
     """A number that is the same for this location for ever.
 
@@ -119,36 +165,31 @@ def _settled(location, terrain: str = "") -> bool:
     Falls back to the ground underfoot when the world entity is not to hand, which is
     derivation rather than a guess: `urban` means streets and yards, and the app's own
     biome table says so. An engine built without a world still has `scene.location_id`
-    and `scene.biome`, and between them that is enough.
+    and the ground its place id carries, and between them that is enough.
     """
     kind = str(getattr(location, "kind", "") or "").upper()
     scale = str(getattr(location, "scale", "") or "").lower()
     if kind or scale:
         return ("CITY" in kind or "SETTLEMENT" in kind or "TOWN" in kind
                 or scale in ("city", "town", "village", "hamlet", "settlement"))
-    return str(terrain or "").lower() == "urban"
+    # A bare id with nothing said about its ground is a settlement. Every location a
+    # campaign starts in is one (twelve of twelve in the fixture, all CITY), and the
+    # alternative — reading the ground the party is CURRENTLY on — is what made a
+    # world-less engine forget it had a town to go back to the moment the party
+    # walked into the forest. Only an explicit non-urban hint makes a wild site.
+    return str(terrain or "").lower() in ("", URBAN)
 
 
-def spots_for(location, terrain: str = "") -> tuple[Place, ...]:
-    """The places this location is made of — closed, seeded and the same every time.
+def _slug(label: str) -> str:
+    return "-".join(str(label).lower().split())
 
-    `location` may be a world entity or a bare id. Only the id is load-bearing: it seeds
-    the layout so a town has the same rooms in every session, and the rest sharpens the
-    naming when it is available. With no id at all the party still has to be somewhere,
-    so there is exactly one place with no exits — which refuses every move rather than
-    inventing a destination, the fail-closed direction.
-    """
-    here = str(getattr(location, "id", None) or location or "").strip()
-    name = str(getattr(location, "name", "") or "").strip()
-    if not here:
-        return (Place(id="here", name=name or "here",
-                      about="", terrain=terrain, exits=()),)
 
-    table = _SETTLEMENT if _settled(location, terrain) else _WILD
-    n = 3 + _seed(here) % (min(MOST_SPOTS, len(table)) - 2)
+def _build(location_id: str, terrain: str, table) -> tuple[Place, ...]:
+    n = 3 + _seed(location_id) % (min(MOST_SPOTS, len(table)) - 2)
     chosen = list(table[:n])
-    ids = [f"{here}:{_slug(label)}" for label, _ in chosen]
-    # Everywhere connects to everywhere else in one location. A settlement is not a maze,
+    prefix = region_key(location_id, terrain)
+    ids = [f"{prefix}:{_slug(label)}" for label, _ in chosen]
+    # Everywhere connects to everywhere else on one ground. A settlement is not a maze,
     # and a graph the player has to solve is a different game from the one this is.
     return tuple(
         Place(id=pid, name=label, about=about, terrain=terrain,
@@ -157,8 +198,65 @@ def spots_for(location, terrain: str = "") -> tuple[Place, ...]:
     )
 
 
-def _slug(label: str) -> str:
-    return "-".join(str(label).lower().split())
+def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
+    """The location's own places — a settlement's rooms, or a wild site's reaches.
+
+    `location` may be a world entity or a bare id. Only the id is load-bearing: it seeds
+    the layout so a town has the same rooms in every session, and the rest sharpens the
+    naming when it is available. A settlement is `urban` whatever the continent's facts
+    say; a site that is not one stands on `terrain_hint`, which the engine reads off the
+    world when it has one and off the party's current place when it does not. With no id
+    at all the party still has to be somewhere, so there is exactly one place with no
+    exits and no ground — which refuses every move rather than inventing a destination,
+    the fail-closed direction.
+    """
+    here = str(getattr(location, "id", None) or location or "").strip()
+    name = str(getattr(location, "name", "") or "").strip()
+    if not here:
+        return (Place(id="here", name=name or "here", about="", terrain="", exits=()),)
+    hint = str(terrain_hint or "").strip().lower()
+    if _settled(location, hint):
+        return _build(here, URBAN, _SETTLEMENT)
+    return _build(here, hint or "grassland", _WILD)
+
+
+def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
+    """Open ground of one kind around a location: the forest outside the town.
+
+    Derivable with nothing but the location id and a biome word, so a world-less test
+    engine can stand in the forest and a save that predates places can be healed onto
+    the ground it recorded.
+    """
+    # "nowhere" rather than the exitless fallback: a scene with no location can still
+    # be stood on real ground for the foraging tables, and the id has to say which.
+    here = str(getattr(location_id, "id", None) or location_id or "").strip() or "nowhere"
+    return _build(here, str(terrain or "").strip().lower() or "grassland", _WILD)
+
+
+def for_scene(location, at: str, terrain_hint: str = "") -> tuple[Place, ...]:
+    """Every place the party can name from where they stand: home, plus the ground
+    they are on if it is not home.
+
+    The ONE derivation. `Engine.places()` and the scene brief both used to compute this
+    separately — two copies of a rule, the trap CLAUDE.md names — and now both call here.
+    Region places share the `_WILD` names, and only one region is ever current, so a
+    name resolves to one place.
+    """
+    home = home_set(location, terrain_hint)
+    ground = terrain_of(at)
+    if not ground or ground == home[0].terrain:
+        return home
+    if home[0].id == "here":
+        # No location at all, but the party has been stood on named ground: that
+        # ground is all there is.
+        return region_set(location_of(at), ground)
+    return home + region_set(location_of(at), ground)
+
+
+def spots_for(location, terrain: str = "") -> tuple[Place, ...]:
+    """The location's own places. Kept as the name stage 8a shipped under; `home_set`
+    is the same function and the docstring lives there."""
+    return home_set(location, terrain)
 
 
 def find(places, wanted: str) -> Place | None:

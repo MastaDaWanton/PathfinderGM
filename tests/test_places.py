@@ -21,6 +21,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 class _Loc:
@@ -32,7 +33,7 @@ class _Loc:
 
 def _scene(biome="urban", location_id="loc-1"):
     s = Scene(location_id=location_id)
-    s.biome = biome
+    stand_on(s, biome)
     s.add(load_pc("fixtures/pc-kesst.json"))
     s.add(instantiate("guildhand", scene=s, name="the merchant"))
     return s, Engine(s, Dice(seed=7))
@@ -120,12 +121,20 @@ def test_a_name_is_matched_leniently_and_refused_hard():
     assert places.find(known, "") is None
 
 
-def test_new_ground_forgets_which_room_you_were_in():
-    """`places()` is keyed on the location, so a stale id simply stops resolving.
-    Clearing it says so rather than leaving the party pointing at nowhere."""
+def test_new_ground_is_a_real_place_and_the_town_is_still_there():
+    """Open ground is a REGION of the location — `{location}~forest:the-approach` — not
+    a blank. Stage 8a blanked `at` on a biome change, which left the party pointing at
+    nowhere and the ground in a sibling field; the ground lives inside the id now, and
+    "the market" still resolves from the forest so the party can walk back."""
     s, engine = _scene()
-    s.at = engine.here().id
+    was = engine.here().id
     engine.run(engine.validate(
         [{"op": "travel", "because": "she makes for the treeline",
           "params": {"biome": "forest"}}]))
-    assert s.biome == "forest" and s.at == ""
+    assert s.biome == "forest"
+    assert places.terrain_of(s.at) == "forest" and s.at != was
+    assert engine.here().id == s.at, "the party is standing somewhere places() knows"
+    assert places.find(engine.places(), "the market") is not None, \
+        "the town vanished the moment she stepped outside it"
+    assert list(s.actors) == ["pc"], "the merchant followed her into the forest"
+    assert s.people["c1"].at == was, "the merchant is not where she left him"

@@ -31,7 +31,12 @@ def fight(tmp_path):
         c.seed = 20260830
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
-        c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))
+        # Every test below names the thug `c1`. Refs are never reused, so the
+        # departed companion's ref is not free — the thug is given it outright,
+        # which a fresh store with no `c1` in it allows a test to do.
+        thug = instantiate("thug", scene=c.scene, name="the thug")
+        thug.ref = "c1"
+        c.scene.add(thug)
         e = c.engine()
         e.run(e.validate([{
             "op": "begin_encounter",

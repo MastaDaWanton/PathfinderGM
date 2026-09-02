@@ -26,7 +26,11 @@ def fight(tmp_path):
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
-        c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))
+        # The tests name the thug `c1`; refs are never reused, so it is given the ref
+        # outright rather than minted into it.
+        thug = instantiate("thug", scene=c.scene, name="the thug")
+        thug.ref = "c1"
+        c.scene.add(thug)
         e = c.engine()
         e.run(e.validate([{
             "op": "begin_encounter",

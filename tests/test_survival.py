@@ -25,6 +25,7 @@ from rules import foraging, survival
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._places import stand_on
 
 
 @pytest.fixture
@@ -42,7 +43,7 @@ def forager():
 @pytest.fixture
 def wood(forager):
     s = Scene(location_id="5bbd0c40345f")
-    s.biome = "forest"
+    stand_on(s, "forest")
     s.add(forager)
     return s, Engine(s, Dice(seed=5))
 

@@ -195,7 +195,10 @@ def campaigns_in(world_id: str) -> list[dict]:
             continue
         if Path(str(data.get("world_source", ""))).stem != world_id:
             continue
-        pc = (data.get("scene") or {}).get("actors", {}).get("pc", {})
+        # `people` from a version-2 save, `actors` from a version-1 one — the same two
+        # keys `Campaign.load` reads, for the same reason.
+        scene = data.get("scene") or {}
+        pc = (scene.get("people") or scene.get("actors") or {}).get("pc", {})
         entry = roster.load(data.get("character_id", "")) if data.get("character_id") else None
         out.append({
             "id": data.get("id", path.stem),

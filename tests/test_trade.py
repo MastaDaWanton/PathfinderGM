@@ -910,13 +910,13 @@ def test_the_trade_panel_needs_a_merchant_and_the_state_says_so():
         from rules.sheet import from_dict
         added = from_dict({"name": "the stallholder", "kind": "npc", "hp": 4,
                            "hp_max": 4, "class": "", "level": 1}, ref="m1")
-        c.scene.actors["m1"] = added
+        c.scene.add(added)
         assert _merchant_here(c.scene) is not None
         r = Client().post("/api/trade", data="{}", content_type="application/json")
         assert r.status_code == 200
         assert r.json()["stall"] == "the-stallholder"
     finally:
-        c.scene.actors.pop("m1", None)
+        c.scene.remove("m1")
 
 
 def test_free_actions_go_straight_to_the_engine_out_of_combat():

@@ -263,15 +263,19 @@ def test_a_death_during_a_skipped_round_is_still_reported(engine, scene):
 
 
 def test_a_departed_creature_takes_its_spawn_distance_with_it(scene):
-    """Refs are recycled — the bestiary hands out the lowest free `cN` — so a stated
-    spawn distance left behind is inherited by whoever takes the name next. Measured: an
-    archer who arrived at 120 feet departed, and the next spawn to reuse `c1` was laid
-    out 120 feet away despite asking for `engaged`.
+    """Refs used to be recycled — the bestiary handed out the lowest free `cN` — so a
+    stated spawn distance left behind was inherited by whoever took the name next.
+    Measured: an archer who arrived at 120 feet departed, and the next spawn to reuse
+    `c1` was laid out 120 feet away despite asking for `engaged`.
 
-    Harmless only while the field was dropped at every save; it is persisted now, so the
-    poisoning would have lasted the campaign. This is the lesson CLAUDE.md records about
-    derived state in the user's data directory, arriving through the scene save.
+    Two answers now, and this pins both. The table is still cleaned on the way out.
+    And the ref is NEVER handed out again: five copies of the lowest-free scan were
+    found poisoning five per-ref tables (`spawn_feet`, `fallen`, `pools`, `attacked`,
+    the market's stall key), and under containment every copy would have minted a
+    living creature's ref a second time for somebody in the next room.
     """
+    from rules.bestiary import next_ref
+
     s = scene
     ref = next(r for r in s.actors if r != "pc")
     s.spawn_feet[ref] = 120
@@ -279,6 +283,8 @@ def test_a_departed_creature_takes_its_spawn_distance_with_it(scene):
     s.depart(ref)
 
     assert ref not in s.spawn_feet, "the next creature to take this ref inherits 120 feet"
+    assert next_ref(s) != ref, "the departed creature's ref was handed out again"
+    assert int(next_ref(s)[1:]) > int(ref[1:]), "refs are not monotonic"
 
 
 def test_how_far_away_a_spawn_arrived_survives_the_save(tmp_path):

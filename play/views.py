@@ -172,7 +172,7 @@ def _state(c) -> dict:
             # Blood on the ground. Sent whether or not there is a grid: without one
             # they are still a count the player needs, because half the class spends
             # them.
-            "pools": [b.as_dict() for b in c.scene.pools],
+            "pools": [b.as_dict() for b in c.scene.pools if b.here(c.scene)],
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -306,8 +306,11 @@ def resurrect(request):
 
     c.scene.end_encounter()
     # The fight that killed them is long over and far away; the bodies stay there.
-    for ref in [r for r, a in list(c.scene.actors.items()) if not a.is_pc]:
-        c.scene.remove(ref) if hasattr(c.scene, "remove") else c.scene.actors.pop(ref)
+    # The STORE, and through the destroyer: this walked the view with a raw `pop`
+    # that bypassed every side table, and under containment the view is not everyone.
+    # A clean slate is what the old dict meant when the dict was everyone.
+    for ref in [r for r, a in list(c.scene.people.items()) if not a.is_pc]:
+        c.scene.remove(ref)
 
     c.ended = ""
     if c.character_id:
@@ -870,7 +873,13 @@ def combat_act(request):
         # Same bargain as the spoken turn: the refused action leaves no trace.
         scene.restore(undo)
         c.transcript.pop()
-        return JsonResponse({"error": str(exc)}, status=400)
+        # A stale panel can name somebody who has since left the room, and the
+        # validator's sentence for that is written for the model — a ref and an op.
+        # The person reads a sentence written for a person.
+        said = str(exc)
+        if getattr(exc, "check", "") == "refs" and "not here" in said:
+            said = "That person is no longer here."
+        return JsonResponse({"error": said}, status=400)
 
     # A free action is remembered for the next spoken turn, so the narrator hears about
     # it without a turn ever having been spent on it. In-memory on purpose: it is a note
@@ -1088,7 +1097,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         # there are tells, because a `narrate_only` turn with no prose is a blank page
         # and most town turns are `narrate_only`.
         brief = prompts.scene_brief(c.world, c.scene, c.location,
-                                    _recent_events(c.world, c.location))
+                                    _recent_events(c.world, c.location),
+                                    here=agent.engine.here(),
+                                    known=agent.engine.places())
         earlier = [b["text"] for b in c.transcript[-8:] if b["who"] == "gm"]
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
@@ -1133,8 +1144,18 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
             if anchored:
                 repairs.append(f"the thread held: re-tethered {anchored!r}")
+            # The engine's place, not the thread's: `thread["where"]` was a second
+            # writer of where the party is and is gone. Skipped on the turn the party
+            # ARRIVES — `here()` is already the destination when the prose runs, and
+            # the rewrite would turn "you walk into the tavern" into "walk through
+            # the tavern" on the one beat that is genuinely an arrival.
+            arrived = any(
+                o.op == "travel" and any(
+                    e.get("kind") == "biome" and e.get("place") != e.get("was_place")
+                    for e in (o.effects or []))
+                for o in resolution.outcomes)
             text, rewrit = narration_mod.already_there(
-                text, (c.scene.thread or {}).get("where"))
+                text, "" if arrived else agent.engine.here().name)
             if rewrit:
                 repairs.append("arrivals at the place they already stand: "
                                f"rewrote {len(rewrit)}")

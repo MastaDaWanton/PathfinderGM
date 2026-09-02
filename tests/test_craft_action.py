@@ -16,6 +16,7 @@ from django.test import Client, override_settings
 from gm import judgement
 from rules.engine import Scene
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def client(tmp_path, monkeypatch):
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
-        c.scene.biome = "forest"
+        stand_on(c.scene, "forest")
         c.save()
         yield Client()
         cm._LIVE.clear()

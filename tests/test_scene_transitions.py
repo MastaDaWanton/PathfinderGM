@@ -15,12 +15,13 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 @pytest.fixture
 def yard():
     s = Scene(location_id="5bbd0c40345f")
-    s.biome = "urban"
+    stand_on(s, "urban")
     s.add(load_pc("fixtures/pc-kesst.json"))
     s.add(instantiate("guildhand", scene=s, name="the gatekeeper"))
     s.add(instantiate("thug", scene=s, name="the bravo"))
@@ -63,11 +64,14 @@ def test_a_petrified_enemy_is_not_swept_up_as_a_corpse(yard):
     # But walking out leaves it: the two doors ask different questions, and the first
     # version of this test asserted the wrong half. `tidy_the_fallen` is bodies ageing
     # out of a room the party is STILL IN, so a statue standing there is not a body to
-    # clear away. `leave_behind` is the party walking out, and a petrified enemy cannot
-    # follow — measured before this was split, the statue travelled to the next biome
-    # with the party and stood in the scene panel there for the rest of the campaign.
-    engine.leave_behind()
+    # clear away. Walking out is a `travel`, and a petrified enemy cannot follow —
+    # measured before this was split, the statue travelled to the next biome with the
+    # party and stood in the scene panel there for the rest of the campaign. Under
+    # containment it does not have to be shed at all: it stays where it stands.
+    stall = s.at
+    travel(engine)
     assert "c1" not in s.actors, "the statue followed the party out of the room"
+    assert s.people["c1"].at == stall, "the statue stopped existing instead of staying"
 
 
 def test_a_real_body_still_ages_out(yard):
@@ -134,12 +138,19 @@ def test_an_escort_still_comes_along_between_rooms(yard):
     assert set(s.actors) == {"pc", "c1"}
 
 
-def test_new_ground_forgets_the_old_room(yard):
-    """A stale room name would anchor the prose to a building a day's walk behind."""
+def test_new_ground_is_a_place_of_its_own(yard):
+    """A stale room name would anchor the prose to a building a day's walk behind — and
+    a blank one left the party nowhere. New ground is that region's first place, with
+    the ground inside the id, and the room they left keeps its people."""
+    from rules import places
+
     s, engine = yard
-    s.at = engine.here().id
+    was = engine.here().id
     travel(engine)
-    assert s.biome == "forest" and s.at == ""
+    assert s.biome == "forest"
+    assert places.terrain_of(s.at) == "forest" and s.at != was
+    assert engine.here().id == s.at
+    assert {a.at for a in s.people.values() if not a.is_pc} == {was}
 
 
 def test_travel_with_neither_ground_nor_room_says_what_to_type(yard):

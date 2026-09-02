@@ -10,6 +10,7 @@ frozen app.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +25,11 @@ from rules.guards import from_dict as guard_from_dict
 from rules.sheet import from_dict, load_pc, to_dict
 from world.loader import load_cached
 
-SAVE_VERSION = 1
+# 2: actors are saved as `people`, each with the place it stands in, and `minted` (the
+# ref high-water mark) rides along. Bumped rather than left at 1 because an older build
+# opening a `people` save would read `actors` as empty and hand the player a dead game
+# with no sentence naming the cause; with the version refused, the sentence is there.
+SAVE_VERSION = 2
 
 
 class UnreadableSave(RuntimeError):
@@ -142,15 +147,13 @@ class Campaign:
 
     @property
     def biome(self) -> str:
-        """The ground underfoot, filled in from the world if the save predates it.
+        """The ground underfoot: a parse of the party's place, never a stored field.
 
-        Healed on read rather than migrated: every campaign written before biomes existed
-        has an empty one, and a save that needs a migration step to be playable is a save
-        that breaks the moment somebody opens an old one.
+        This was a read that WROTE — it healed a stored `scene.biome` from the world —
+        and the home page reached it, so rendering a list of campaigns could rewrite
+        one. The place id carries its ground now and `load` stands an old save
+        somewhere real; there is nothing left here to heal.
         """
-        if not self.scene.biome:
-            found = biomes.from_world(self.world, self.location)
-            self.scene.biome = found[0] if found else "grassland"
         return self.scene.biome
 
     def engine(self) -> Engine:
@@ -174,7 +177,10 @@ class Campaign:
             "seed": self.seed,
             "scene": {
                 "location_id": self.scene.location_id,
-                "actors": {r: to_dict(a) for r, a in self.scene.actors.items()},
+                # THE STORE, not the view: an actor in the next room is still an actor
+                # in the campaign. Each carries `at`.
+                "people": {r: to_dict(a) for r, a in self.scene.people.items()},
+                "minted": self.scene.minted,
                 "zones": self.scene.zones,
                 # Terrain is stored as lists of squares rather than a dense array: a
                 # battlefield is mostly ordinary floor, and a 40x40 map of the word
@@ -216,7 +222,6 @@ class Campaign:
                 # and the fight starting put every archer back at the forty-foot
                 # default, however far the spawn said they were.
                 "spawn_feet": self.scene.spawn_feet,
-                "biome": self.scene.biome,
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -308,16 +313,34 @@ class Campaign:
                           for k, v in (s.get("market_taken") or {}).items()},
             spawn_feet={str(k): int(v)
                         for k, v in (s.get("spawn_feet") or {}).items()},
-            biome=s.get("biome", ""),
             at=str(s.get("at") or ""),
+            minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),
             pending_outcomes=s.get("pending_outcomes", []),
             pending_partial=s.get("pending_partial", {}),
             awaiting=s.get("awaiting"),
         )
-        for ref, a in s.get("actors", {}).items():
-            scene.actors[ref] = from_dict(a, ref=ref)
-        return cls(
+        # `people` from a version-2 save, `actors` from a version-1 one. Straight into
+        # the store rather than through `add`, because `add` stamps the party's place
+        # and the zone, and both were saved. An actor whose dict has NO `at` key was
+        # saved before places existed and is healed below; empty is not absent.
+        unplaced: list[str] = []
+        for ref, a in (s.get("people") or s.get("actors") or {}).items():
+            scene.people[ref] = from_dict(a, ref=ref)
+            if "at" not in a:
+                unplaced.append(ref)
+        # The mark heals to the highest ref the save holds ANYWHERE a ref is keyed —
+        # a stale `fallen` age or a cast entry can name a ref the store no longer
+        # does, and minting it again is the poisoning this exists to end.
+        seen = set(scene.people) | set(scene.fallen) | set(scene.spawn_feet) | {
+            str(e.get("ref")) for e in scene.cast if e.get("ref")}
+        highest = 0
+        for r in seen:
+            m = re.fullmatch(r"c(\d+)", str(r))
+            if m:
+                highest = max(highest, int(m.group(1)))
+        scene.minted = max(scene.minted, highest)
+        campaign = cls(
             id=data["id"], world_source=data["world_source"], scene=scene,
             history=data.get("history", []), transcript=data.get("transcript", []),
             turn_log=data.get("turn_log", []), seed=data.get("seed"),
@@ -328,6 +351,42 @@ class Campaign:
             suggestions=list(data.get("suggestions") or []),
             ended=data.get("ended", ""),
         )
+        campaign._heal_places(str(s.get("biome") or ""), unplaced)
+        return campaign
+
+    def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
+        """A save from before actors had a place, stood somewhere real.
+
+        Healed on read rather than migrated, the same courtesy `biome` extended to
+        saves written before biomes existed. Needs the world, which is why it runs
+        here and not inside `load`. The rule: an unplaced scene whose stored biome was
+        the settlement's own ground (or nothing) is at the settlement's first place;
+        one that had walked onto other ground is at that region's first place. Then
+        everyone the save did not place is stood with the party.
+        """
+        from rules import places as places_mod
+
+        try:
+            engine = self.engine()
+            if not self.scene.at:
+                known = engine.places()
+                home_ground = known[0].terrain
+                if stored_biome and stored_biome != home_ground and known[0].id != "here":
+                    where = places_mod.region_set(
+                        places_mod.location_of(known[0].id), stored_biome)[0].id
+                else:
+                    where = known[0].id
+                engine.place_party(where)
+            else:
+                engine.place_party(self.scene.at)
+        except Exception:
+            # A world that will not load is reported by whoever asked for it; the
+            # party is not left nowhere on the way to that sentence. Everyone the save
+            # did not place is stood with the party by `place_party`, which is the
+            # one door outside `Scene` that writes an actor's place.
+            if not self.scene.at:
+                self.scene.at = "here"
+        del unplaced
 
 
 # --- The slice's starting situation -------------------------------------------------------
@@ -355,12 +414,12 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     world = load_cached(world_source)
     town = opening.starting_place(world)
     scene = Scene(location_id=town.id if town else None)
-    # The ground underfoot, read from the world's own facts rather than assumed. The
-    # export carries `Biomes`, `Terrain` and `Climate` — Kaelinora's reads "Pangrellan
-    # grasslands, Kyropticus deserts" — and they live on the continent, not the town.
-    found = biomes.from_world(world, town)
-    scene.biome = found[0] if found else "grassland"
+    # Placed, not biomed: the ground is inside the place id and a new campaign stands
+    # at its town's first place. The PC first, then the party is placed, THEN the
+    # company — `Scene.add` stamps whoever arrives with the party's place, and the
+    # review found the other order left the opening companion standing nowhere.
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
+    Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
     scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
     c = Campaign(

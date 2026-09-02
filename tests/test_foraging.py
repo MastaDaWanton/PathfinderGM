@@ -19,6 +19,7 @@ from django.test import Client, override_settings
 from rules import biomes, foraging, ingredients
 from rules.dice import Dice
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._places import stand_on
 
 
 # --- the vocabulary -----------------------------------------------------------------------
@@ -220,15 +221,38 @@ def test_the_campaign_starts_in_the_worlds_own_biome(client):
     assert d["scene"]["biome_describe"]
 
 
-def test_a_save_written_before_biomes_heals_on_read(client):
-    """Healed on read rather than migrated: every campaign written before biomes existed
-    has an empty one, and a save that needs a migration step to be playable is a save that
-    breaks the moment somebody opens an old one."""
+def test_a_save_written_before_places_heals_on_load(client):
+    """Healed on read rather than migrated: every campaign written before places existed
+    has no `at` on the scene and no `at` on any actor, and a save that needs a migration
+    step to be playable is a save that breaks the moment somebody opens an old one.
+
+    A version-1 save: `actors` instead of `people`, a stored `biome`, nothing placed.
+    It loads standing at the settlement's first place with everyone beside the party —
+    and `biome` is read off that place, not off the field the save carried.
+    """
+    import json
+
     from play import campaign as cm
 
     c = cm.current()
-    c.scene.biome = ""
-    assert c.biome == "urban"
+    path = c.save()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["save_version"] = 1
+    scene = data["scene"]
+    scene["actors"] = scene.pop("people")
+    for a in scene["actors"].values():
+        a.pop("at", None)
+    scene["at"] = ""
+    scene["biome"] = "urban"
+    scene.pop("minted", None)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    old = cm.Campaign.load(path)
+    assert old.biome == "urban"
+    assert old.scene.at and old.scene.at == old.engine().places()[0].id
+    assert all(a.at == old.scene.at for a in old.scene.people.values()), \
+        "somebody the old save held was left standing nowhere"
+    assert set(old.scene.actors) == set(old.scene.people)
 
 
 def test_travelling_changes_what_grows(client):
@@ -303,7 +327,7 @@ def treeline():
     d["level"] = 6
     d["ranks"] = {"survival": 6}
     s = Scene(location_id="5bbd0c40345f")
-    s.biome = "forest"
+    stand_on(s, "forest")
     s.add(from_dict(d, ref="pc"))
     return s, Engine(s, _Dice(seed=5)), instantiate
 
@@ -386,7 +410,7 @@ def test_foraging_searches_the_ground_underfoot_whatever_it_is_asked_for(treelin
     won and the parameter lost.
     """
     scene, engine, _ = treeline
-    scene.biome = "urban"
+    stand_on(scene, "urban")
     # Face 18: under this seed the urban table's hidden d100s land on the leaves. A
     # middling face clears the DC but every pick misses — an honest empty hour, useless
     # to this test.
@@ -476,7 +500,7 @@ def test_an_npc_forage_never_opens_the_popup(treeline):
     as a fact. An NPC forage suspending would hang the world tick on a popup nobody is
     looking at."""
     scene, engine, instantiate = treeline
-    del scene.actors["pc"]
+    scene.people.pop("pc")
     thug = instantiate("thug", scene=scene, name="the gatherer")
     scene.add(thug)
     resolution = engine.run(engine.validate([

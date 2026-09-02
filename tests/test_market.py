@@ -20,6 +20,7 @@ from django.test import Client, override_settings
 from play import campaign as cm
 from rules import benches, market
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 @pytest.fixture
@@ -183,7 +184,7 @@ def test_there_is_no_stall_in_an_empty_field(client):
     sold Iron to a character with nothing around them but grass."""
     c = cm.current()
     c.scene.pc().purse = {"gp": 500}
-    c.scene.biome = "urban"
+    stand_on(c.scene, "urban")
     c.save()
     d = client.get("/api/craft/actions").json()
     markets = [a for a in d["actions"] if a["requires"] == "market"]
@@ -191,7 +192,7 @@ def test_there_is_no_stall_in_an_empty_field(client):
     assert all(a["available"] for a in markets), "cannot buy in town"
 
     c = cm.current()
-    c.scene.biome = "grassland"                 # walked out past the walls
+    stand_on(c.scene, "grassland")                 # walked out past the walls
     c.save()
     d = client.get("/api/craft/actions").json()
     markets = [a for a in d["actions"] if a["requires"] == "market"]

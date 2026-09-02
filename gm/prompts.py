@@ -597,7 +597,9 @@ A move WITHIN one place is the same op with a spot instead of a biome: leaving a
 the square, a taproom for the street, one wing of a ruin for another is {"op": "travel",
 "params": {"place": "the market square"}}. Use it whenever the scene changes room, even
 though the ground has not changed — it is what leaves the people of the old room behind,
-and without it they follow the party around.
+and without it they follow the party around. Somebody who comes along is named in
+"with", by ref: {"op": "travel", "params": {"place": "the gate", "with": ["c2"]}}.
+Everyone not named stays where they are.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
@@ -631,7 +633,8 @@ _BODY_BRIEF = {
 }
 
 
-def scene_brief(world, scene, location, recent_events=None) -> str:
+def scene_brief(world, scene, location, recent_events=None, *, here=None,
+                known=()) -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -650,10 +653,16 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
         # places and people, then treats them as settled fact") and never got it. Without
         # it the model reconstructs the room from earlier beats, and put a player back
         # inside a building they had walked out of two turns before.
-        from rules import places as _places
+        # Handed down by the caller that has an engine, never derived here: this used
+        # to be a second copy of `Engine.places()`, keyed on the `location` argument
+        # where the engine keys on `scene.location_id`, and two derivations of one
+        # fact is the trap CLAUDE.md names. The fallback is the same one function the
+        # engine calls, for the callers (tests, mostly) that have no engine.
+        if not known:
+            from rules import places as _places
 
-        known = _places.spots_for(location, terrain=getattr(scene, "biome", ""))
-        here = _places.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
+            known = _places.for_scene(location, getattr(scene, "at", ""))
+            here = _places.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
         if here is not None and len(known) > 1:
             others = [p.name for p in known if p.id != here.id]
             lines.append(f"  The party is at {here.name}. Not anywhere else in "
@@ -674,7 +683,10 @@ def scene_brief(world, scene, location, recent_events=None) -> str:
     # single fact the prose most needs, and the one it lost live (two followed
     # guards became a haunted house between beats).
     from . import judgement as _judgement
-    held = _judgement.thread_brief(scene)
+    # The place name the thread sentence asserts is the engine's, and only when the
+    # place is real: the exitless no-location fallback would read "ALREADY at here".
+    held = _judgement.thread_brief(
+        scene, where=(here.name if here is not None and here.exits else ""))
     if held:
         lines.append("\n" + held)
     ledger = _judgement.cast_brief(scene)

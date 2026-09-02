@@ -103,7 +103,8 @@ class GMAgent:
         reason to have one — and it inherits the final rejection, so it starts warned
         rather than fresh.
         """
-        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
+        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
+                                    here=self.engine.here(), known=self.engine.places())
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
@@ -371,8 +372,8 @@ class GMAgent:
         declaration of what THEIR CHARACTER does, and `/cheat I defeat all the enemies`
         run through `inject_fight` would spawn somebody to fight.
         """
-        brief = prompts.scene_brief(self.world, self.engine.scene, location,
-                                    recent_events)
+        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
+                                    here=self.engine.here(), known=self.engine.places())
         base = prompts.cheat_messages(brief, wish)
         messages = base
         attempts: list[Attempt] = []
@@ -428,7 +429,8 @@ class GMAgent:
         creature simply holding its ground.
         """
         actor = self.engine.scene.actors[ref]
-        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events)
+        brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
+                                    here=self.engine.here(), known=self.engine.places())
         base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round)
         messages = base
         attempts: list[Attempt] = []

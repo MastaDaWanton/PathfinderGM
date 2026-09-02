@@ -580,13 +580,14 @@ def inject_fight(raw_intents, player_text: str, scene):
     # exactly one watchman, and the player fought a crowd one man at a time,
     # fight after fight, because this repair hard-coded count=1.
     count = opponent_count(player_text)
-    known = set(getattr(scene, "actors", {}) or {})
-    refs = []
-    i = 1
+    from rules.bestiary import next_ref
+
+    # Through the one minter, with the refs projected so far as `taken`. This was one
+    # of four hand-copied lowest-free scans, and under containment every copy would
+    # have re-minted a ref a living creature in the next room still wears.
+    refs: list[str] = []
     while len(refs) < count:
-        if f"c{i}" not in known:
-            refs.append(f"c{i}")
-        i += 1
+        refs.append(next_ref(scene, taken=refs))
     pc = scene.pc() if hasattr(scene, "pc") else None
     pc_ref = getattr(pc, "ref", "pc")
     return list(raw_intents) + [
@@ -684,10 +685,11 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
     # How many, from how many the GM itself named. Not from the player's sentence: the
     # player does not decide how many enemies are round the corner.
     count = len(invented)
-    minted = [f"c{i}" for i in range(1, count + len(known) + 2)
-              if f"c{i}" not in known][:count]
-    if len(minted) < count:
-        return None
+    from rules.bestiary import next_ref
+
+    minted: list[str] = []
+    while len(minted) < count:
+        minted.append(next_ref(scene, taken=minted))
 
     swap = dict(zip(invented, minted))
     params = {"template": template, "count": count}
@@ -963,10 +965,9 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
             template = name
             break
 
-    n = 1
-    while f"c{n}" in actors:
-        n += 1
-    minted = f"c{n}"
+    from rules.bestiary import next_ref
+
+    minted = next_ref(scene)
 
     out = [{"op": "spawn", "because": f"the {victim_phrase} the player is attacking "
                                       f"was described but never created",
@@ -1342,8 +1343,9 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
             break
     if template is None:
         return None                       # kicking the fallen: let it stand
-    known = set(scene.actors)
-    ref = next(f"c{i}" for i in range(1, len(known) + 3) if f"c{i}" not in known)
+    from rules.bestiary import next_ref
+
+    ref = next_ref(scene)
     out: list = [{"op": "spawn",
                   "because": "the fight the fiction has been describing",
                   "params": {"template": template, "count": 1}}]
@@ -1840,8 +1842,49 @@ def inject_forage(raw_intents, player_text: str, scene) -> list:
 # CLAUDE.md records what a duplicated rule costs — a consequence rule was fixed in one
 # prompt and left stale in the other, and the bug went on shipping from the copy nobody
 # looked at.
+def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
+    """The player is walking out: the turn must carry a `travel`, and the model must
+    say to where.
+
+    A DECLARER, not an injector — it never joins the live chain and never guesses a
+    place. `inject_travel` refuses to invent a destination for a room change, and it is
+    right to: a guessed place lands in the next brief as fact. But the review found
+    that once a room keeps its people, nothing moved the PC for the commonest leaving
+    sentence at all ("I leave the tavern" carries no ground word), and the merchant
+    stayed in view. So the schema insists: `turn_schema(must_contain=("travel",))`
+    makes the reply unsamplable without one, and the brief's place list makes a real
+    destination the only thing it can choose. The model chooses; nothing guesses. A
+    location with a single place has nowhere to go, and is left alone.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if any(str((r or {}).get("op", "")).lower() == "travel" for r in raw_intents
+           if isinstance(r, dict)):
+        return raw_intents
+    if not _WALKS_AWAY.search(str(player_text or "")):
+        return raw_intents
+    from rules import places as places_mod
+
+    location = None
+    if world is not None and getattr(scene, "location_id", None):
+        try:
+            location = world.get(scene.location_id)
+        except Exception:
+            location = None
+    known = places_mod.for_scene(location or getattr(scene, "location_id", None),
+                                 getattr(scene, "at", ""))
+    if len(known) < 2:
+        return raw_intents
+    return list(raw_intents) + [{"op": "travel",
+                                 "because": "the player is leaving; say to where"}]
+
+
 _DECLARERS = (
     ("survival", lambda raw, text, scene, world: inject_survival(raw, text, scene)),
+    # Before travel, and only here: `inject_travel` bows out when a travel is already
+    # present, so a leaving sentence that also names new ground still gets its one
+    # travel from whichever declarer spoke first.
+    ("leaving", lambda raw, text, scene, world: declare_leaving(raw, text, scene, world)),
     # Sale before goods, the same order the live chain runs them in — and asking them in
     # the wrong order here is what surfaced the bug: "I sell the Yarow Elixir" came back
     # as both `give` and `sell`, which is one item leaving twice.
@@ -2127,25 +2170,23 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         scene.thread = {}
         return
     text = " ".join(str(player_text or "").split())
-    # The place, the second live loss: the subject held but the setting drifted —
-    # "following them in the market" became following them INTO the market they
-    # were both already in. A named place in the player's own sentence sticks to
-    # the thread, and a fresh engagement inherits it unless it names its own.
-    where = None
-    mw = _THREAD_WHERE.search(text)
-    if mw:
-        where = mw.group(1).strip()
+    # The place used to be read out of the player's own sentence here and written to
+    # `thread["where"]` — a second writer of "where the party is" beside the engine's
+    # place, and `scene_brief` printed both into one prompt, so a single brief could
+    # assert two rooms (docs/intent-protocol.md §8: no field has two writers). The
+    # writes are gone; the engine's `here()` is the one source and the brief is handed
+    # it. `_THREAD_WHERE` survives for its other job: trimming the trailing place
+    # phrase off the subject, so "I follow them into the market" engages with "them"
+    # and not with "them into the market".
     m = _THREAD_VERBS.search(text)
     if m:
         which = next(i for i in range(1, 5) if m.group(i))
         subject = m.group(5).strip()
         sw = _THREAD_WHERE.search(subject)
         if sw:
-            where = sw.group(1).strip()
             subject = subject[:sw.start()].strip() or subject
         scene.thread = {"doing": _THREAD_DOINGS[which - 1],
-                        "subject": subject, "age": 0,
-                        "where": where or (scene.thread or {}).get("where", "")}
+                        "subject": subject, "age": 0}
         return
     # Walking away ends the engagement, and until this it did not. Found in a live
     # session: the player spent a turn talking to a merchant, then wrote "I leave the
@@ -2164,14 +2205,7 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         scene.thread = {}
         return
 
-    if where and not scene.thread:
-        # A place with no engagement yet — "i leave and return to the market" —
-        # still anchors: the engagement declared two turns later inherits it.
-        scene.thread = {"where": where, "age": 0}
-        return
     if scene.thread:
-        if where:
-            scene.thread["where"] = where
         if _THREAD_CONTINUES.match(text):
             scene.thread["age"] = 0
             return
@@ -2180,14 +2214,20 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
             scene.thread = {}
 
 
-def thread_brief(scene) -> str:
-    """The thread as a sentence of fact for the prose call, or ""."""
+def thread_brief(scene, where: str = "") -> str:
+    """The thread as a sentence of fact for the prose call, or "".
+
+    `where` is the engine's own place name, handed down by the caller that has an
+    engine — the brief cannot derive it, and it must never again be read out of the
+    thread. Asserted only as what the engine knows ("you are ALREADY at"), never as
+    where the subject is, because the subject is a free-text phrase and not a ref.
+    """
     t = getattr(scene, "thread", None) or {}
     if not t.get("subject"):
         return ""
-    where = str(t.get("where") or "").strip()
-    placed = (f" Both of them are ALREADY in {where}; nobody arrives at, enters "
-              f"or heads toward {where} — they are there now." if where else "")
+    where = str(where or "").strip()
+    placed = (f" You are ALREADY at {where}; nobody arrives at, enters or heads "
+              f"toward {where} — they are there now." if where else "")
     return (f"STANDING THREAD (fact, not suggestion): the player is currently "
             f"{t.get('doing', 'engaged with')} {t['subject']}.{placed} Keep them "
             f"and the present surroundings in the scene; do not change location, "
@@ -2321,15 +2361,18 @@ def cast_brief(scene) -> str:
 
 
 def clear_cast(scene) -> None:
-    """Walking away leaves the prose-people behind with everything else —
-    including the ones the ledger promoted to living actors."""
+    """The ledger of prose-people the narrator introduced HERE is emptied.
+
+    This used to depart the promoted ones too, because a room had no way to keep its
+    people: walking away was the only door out of the scene. A room keeps them now —
+    they are contained by the place, the party's view stops holding them, and the
+    engine's own mover empties this ledger when the PC changes place. What is left of
+    this door is the regex path's residual: the player said they were leaving and the
+    model proposed no travel, so at least the ledger does not go on asserting "ALSO
+    PRESENT" about people the player has walked away from in prose. Departs nobody.
+    """
     if scene is None:
         return
-    for e in scene.cast:
-        ref = e.get("ref")
-        if ref and ref in scene.actors and not scene.actors[ref].is_pc \
-                and scene.actors[ref].hp > 0:
-            scene.depart(ref)
     scene.cast = []
 
 
@@ -2463,9 +2506,9 @@ def promote_cast(scene, added) -> list[str]:
                 template = name
                 break
         actor = instantiate(template, scene=scene, name=phrase)
-        scene.add(actor) if hasattr(scene, "add") else scene.actors.update(
-            {actor.ref: actor})
-        scene.zones[actor.ref] = "near"
+        # Through the door. The fallback that wrote `scene.actors` directly would now
+        # write into a derived view and vanish; `add` stamps the place and the zone.
+        scene.add(actor)
         for e in scene.cast:
             if e.get("who") == phrase and not e.get("ref"):
                 e["ref"] = actor.ref

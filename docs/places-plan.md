@@ -108,3 +108,18 @@ writes a place name that did not come from the registry.
 
 Campaigns may be flushed rather than migrated — the user's explicit call, so the model is
 built right rather than around the twelve existing saves.
+
+## Status
+
+**8a** shipped 2026-09-01. **8b–8e** shipped 2026-09-02; the working plan with the
+review's amendments is `docs/places-8b-plan.md`. What changed from the stages above, in
+the review's hands: terrain lives *inside* every place id (`{location}~forest:the-
+approach`) so `scene.biome` is a parse and needs no world; refs are minted once against
+a high-water mark and never reused; the world clock and the ageing loop run over the
+full store; guards are relational and pools are place-bound; a place-less "I leave"
+makes the schema demand a `travel`. The ratchet lives in
+`tests/test_one_spatial_authority.py` beside the law file rather than inside it, and the
+containment tests in `tests/test_containment.py`. Saves written before 8b load — an
+unplaced scene is stood at its settlement's first place, or the region its stored biome
+named — and `SAVE_VERSION` is 2 so an older build refuses them out loud instead of
+opening a dead game.

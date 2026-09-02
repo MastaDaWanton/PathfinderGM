@@ -250,15 +250,40 @@ def collapse_kit(actor) -> list[str]:
     return made
 
 
-def _next_ref(scene) -> str:
-    """Encounter-local refs: c1, c2, ... Short because the GM has to type them, and
-    distinct from World Bible's 12-char ids so the two can never be confused."""
+def next_ref(scene, taken=()) -> str:
+    """The next ref, minted once and never reused. The ONE minter.
+
+    Refs are `c1, c2, ...` — short because the GM has to type them, and distinct from
+    World Bible's twelve-character ids so the two can never be confused.
+
+    They used to be recycled: the lowest `cN` not in `scene.actors`, and that rule was
+    copied by hand into four other places (the validator's projection and three
+    judgement repairs). Recycling poisoned every per-ref table that outlived a creature
+    — `spawn_feet` (an archer's 120 feet inherited by the next `c1`, engine.py's own
+    comment), `fallen`, `pools`, `attacked`, the market's stall key, the watcher's
+    garnish ledger — and under containment it would have been worse than poison: an
+    actor in the next room is not in the view, so his ref would have been minted a
+    second time for a living creature.
+
+    So the mark, not the dict. `scene.minted` is a high-water mark that only `Scene.add`
+    advances; a save from before it existed heals to the highest `cN` it holds. `taken`
+    is for callers projecting several refs before anybody is added — the validator
+    checking a list that spawns three — and it advances nothing: validation must not
+    consume a ref.
+    """
     if scene is None:
         return "c1"
-    n = 1
-    while f"c{n}" in scene.actors:
+    held = set(getattr(scene, "people", None) or getattr(scene, "actors", {}) or ())
+    n = int(getattr(scene, "minted", 0) or 0)
+    while True:
         n += 1
-    return f"c{n}"
+        ref = f"c{n}"
+        if ref not in held and ref not in taken:
+            return ref
+
+
+# The name stage 8a and every older test knew it by.
+_next_ref = next_ref
 
 
 # --- the imported bestiary ------------------------------------------------------------------

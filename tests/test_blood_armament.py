@@ -183,10 +183,12 @@ def test_a_free_action_does_not_hand_the_round_to_the_enemy(tmp_path):
         c = cm.begin_with(_bender())
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
-        c.scene.add(instantiate("black-bear", scene=c.scene, name="a bear"))
+        # Refs are minted once and never reused, so the bear is not `c1` — the
+        # companion the campaign opened with was, and departing him frees nothing.
+        bear = c.scene.add(instantiate("black-bear", scene=c.scene, name="a bear")).ref
         e = c.engine()
         e.run(e.validate([{"op": "begin_encounter",
-                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+                           "params": {"sides": {"pc": ["pc"], "them": [bear]}}}]))
         while c.scene.current_ref() != "pc":
             c.scene.advance_turn()
         c.save()
@@ -195,7 +197,7 @@ def test_a_free_action_does_not_hand_the_round_to_the_enemy(tmp_path):
         r = Client().post("/api/combat/act", data=_json.dumps({
             "actions": [{"op": "use_ability",
                          "params": {"ability": "Extracorporeal Blood Armament"},
-                         "target": "c1"}],
+                         "target": bear}],
             "label": "free: armament", "end_turn": False}),
             content_type="application/json")
         after = cm.current()
@@ -254,14 +256,15 @@ def test_swift_strikes_does_not_swing_at_a_body_on_the_floor():
         thug.hp = 1                                   # one hit puts it down
         c.scene.add(thug)
         e = c.engine()
+        # Not `c1`: refs are never reused, and the opening companion wore that one.
         e.run(e.validate([{"op": "begin_encounter",
-                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+                           "params": {"sides": {"pc": ["pc"], "them": [thug.ref]}}}]))
         while c.scene.current_ref() != "pc":
             c.scene.advance_turn()
         c.save()
 
         r = Client().post("/api/combat/act", data=_json.dumps({
-            "actions": [{"op": "attack", "target": "c1",
+            "actions": [{"op": "attack", "target": thug.ref,
                          "params": {"full_attack": True}}],
             "label": "strike", "end_turn": True}), content_type="application/json")
         assert r.status_code == 200, r.content[:200]
@@ -269,7 +272,7 @@ def test_swift_strikes_does_not_swing_at_a_body_on_the_floor():
         after = cm.current()
         # Whatever else happened, nobody is being asked to roll at a body.
         if after.scene.awaiting:
-            assert after.scene.actors["c1"].hp > 0, (
+            assert after.scene.actors[thug.ref].hp > 0, (
                 "a roll is pending against a defender who is already down")
         cm._LIVE.clear()
 

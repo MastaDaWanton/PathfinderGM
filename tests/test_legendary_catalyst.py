@@ -42,6 +42,7 @@ from rules.crafting import Chain
 from rules.dice import Dice
 from rules.intents import IntentError
 from rules.sheet import load_pc
+from tests._places import stand_on
 
 
 @pytest.fixture
@@ -359,7 +360,7 @@ def test_a_gm_can_hand_over_a_legendary_monster_part(client):
     from rules.sheet import load_pc
 
     scene = Scene(location_id="5bbd0c40345f")
-    scene.biome = "forest"
+    stand_on(scene, "forest")
     scene.add(load_pc("fixtures/pc-kesst.json"))
     scene.add(instantiate("thug", scene=scene, name="a wandering trader"))
     engine = Engine(scene, Dice(seed=3))
