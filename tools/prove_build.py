@@ -151,7 +151,12 @@ def petrify_in_the_save(data: Path) -> None:
     """
     for path in sorted((data / "campaigns").glob("*.json")):
         save = json.loads(path.read_text(encoding="utf-8"))
-        actors = (save.get("scene") or {}).get("actors") or {}
+        # `people` from a version-2 save, `actors` from a version-1 one — the same two
+        # keys `Campaign.load` reads. The prover found "no player character to
+        # petrify" the first time it met a version-2 save, which is this line's
+        # measurement.
+        scene = save.get("scene") or {}
+        actors = scene.get("people") or scene.get("actors") or {}
         for actor in actors.values():
             if actor.get("kind") != "pc":
                 continue
