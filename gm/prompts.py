@@ -633,6 +633,30 @@ _BODY_BRIEF = {
 }
 
 
+def _states_of(actor) -> str:
+    """What state a creature is in, as a clause for the brief, or "".
+
+    Stage 7 measured the hole: the player-turn brief named hit points, gender,
+    heritage, class, level and class abilities and never a single condition, on the PC
+    or on anyone else — probed with a nauseated PC and a shaken NPC, the words
+    "nauseated", "shaken" and "condition" were all absent. The NPC-turn prompt said
+    "their conditions are: shaken" all along. So on the player-turn path the model was
+    structurally unable to know that c1 was dead, and was then corrected for not
+    knowing: both real legality firings in 261 turns were exactly that.
+
+    Stated in the vocabulary's own words — a condition's name is a state the engine
+    holds, not a number — so this is a fact the tells already back.
+    """
+    names = []
+    for c in getattr(actor, "conditions", None) or []:
+        n = str(getattr(c, "name", "") or getattr(c, "key", "")).strip().lower()
+        if n and n not in names:
+            names.append(n)
+    if not names:
+        return ""
+    return f" Conditions: {', '.join(names)}."
+
+
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=()) -> str:
     """The world facts the GM may draw on this turn.
@@ -729,7 +753,7 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
-                f"{actor.hp}/{actor.hp_max} hp."
+                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}"
             )
         else:
             note = actor.notes.split(".")[0] if actor.notes else ""
@@ -741,7 +765,7 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # the creature the engine is holding.
             mood = states.attitude_of(actor)
             feels = f" {actor.name} is {mood} towards the player." if mood else ""
-            lines.append(f"  {ref} — {actor.name}. {note}.{feels}")
+            lines.append(f"  {ref} — {actor.name}. {note}.{feels}{_states_of(actor)}")
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,
@@ -750,13 +774,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     if pc is not None and getattr(pc, "paths", None):
         from rules import leveling
 
-        usable = []
-        for path in pc.paths:
-            det = leveling.path_detail(pc.char_class or "", path)
-            reached = leveling.control_blood_for(pc, path)
-            for tier, names in sorted((det.get("tiers") or {}).items()):
-                if int(tier) <= reached:
-                    usable += names
+        # The one list, shared with the engine's own refusal for an unknown ability.
+        usable = leveling.usable_names(pc)
         if usable:
             lines.append(
                 f"\nWHAT {pc.name.upper()} CAN DO (their own class abilities — when they "

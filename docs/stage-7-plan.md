@@ -205,3 +205,34 @@ code; params the fiction supplies stay the model's to write.
 Every `legality` raise reachable from `run()` is on an allowlist with a reason, or is a
 printable Outcome — the `_CLOCK_SITES` shape. Plus a test that `_advance` catches
 everything the NPC path catches.
+
+## Status
+
+Shipped 2026-09-02, with one correction to the classification above.
+
+**The four went printable** through one door, `Engine._refuse`: the fury sentence is
+now two sentences (no such pool, with the pools listed; empty, with what was asked
+against what is left); a cast that runs out of slots mid-list keeps what it already
+cast and says so; a thing not on the counter today prints the counter; a body that
+left between validate and run says where it went, because under containment (8b) it
+usually just changed rooms.
+
+**"Correct to raise" was true at validate time and false at resolution.** The census
+classified twenty-two resolution raises as correct because "the model can name another
+item" — but no retry exists at resolution: `_advance` catches once, answers 502, pops
+the player's line. So every remaining resolution-time refusal now prints — the seven
+"needs a target" schema raises, the three "unknown target/buyer/seller" refs raises
+(which under containment say *where* the person is), the armament-not-formed, the
+nameless ground, the described-only place, the unknown craft — and the cheap checks
+(is the item in the satchel, is that an ability they have) are ALSO made in
+`_check_legality`, where the model does get its retry with the list in hand. The
+ratchet in `tests/test_stage7_refusals.py` lists every raise left inside a resolver
+with its reason: nine that cannot fire (the PC cannot be removed) and the travel floors
+under a validate-time refusal that already named the fix. No `legality` raise survives
+in a resolver.
+
+**7c**: `use_ability` names the abilities, from the one helper `leveling.usable_names`
+the brief now shares; `ability_damage` names the six scores. **7d**: the brief carries
+`Conditions: …` on every line, PC included, in the vocabulary's own words. **7e**:
+`move.zone` is optional — the 89% rejection — and a bare move keeps the zone it had;
+the other high-rate params (`template`, `from_`, `biome`) already had code repairs.

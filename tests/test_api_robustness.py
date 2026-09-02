@@ -242,22 +242,25 @@ def test_a_refused_turn_leaves_no_creatures_standing():
     before = scene.snapshot()
 
     # A list that PASSES validation and raises at RESOLUTION — the only kind that
-    # can half-apply. The second op is one of the live 502s: a potion the sheet
-    # does not carry is a refusal validation cannot see, because whether the
-    # player has one is not a fact about the shape of the intent.
+    # can half-apply. Stage 7 made every refusal validate can foresee a validate-time
+    # one and every other a printed sentence, so the list has to change under itself
+    # to reach a raise at all: the spawn projects ten refs the attack may name, the
+    # travel then walks the party out of their room, and the attack finds its target
+    # "not on the board at resolution time" — the one floor validate cannot see past.
+    other = next(p for p in engine.places() if p.id != engine.here().id)
     raw = [{"op": "spawn", "because": "the ambush",
             "params": {"template": "thug", "count": 10, "zone": "engaged"}},
-           {"op": "use_item", "actor": "pc", "because": "the wound",
-            "params": {"item": "potion of cure light wounds"}}]
+           {"op": "travel", "because": "away", "params": {"place": other.name}},
+           {"op": "attack", "actor": "pc", "target": "c1", "because": "the swing"}]
     with pytest.raises((IntentError, ValueError, KeyError)):
         engine.run(engine.validate(raw))
-    assert len(scene.actors) == 11, (
+    assert len(scene.people) == 11, (
         "the probe no longer reproduces a half-applied list; find one that does")
 
     scene.restore(before)
-    assert sorted(scene.actors) == ["pc"], (
-        f"the refused turn left {len(scene.actors) - 1} creatures on the board: "
-        f"{sorted(scene.actors)}")
+    assert sorted(scene.people) == ["pc"], (
+        f"the refused turn left {len(scene.people) - 1} creatures in the campaign: "
+        f"{sorted(scene.people)}")
     assert sorted(scene.zones) == ["pc"], \
         "the creatures are gone and their zones are not"
 

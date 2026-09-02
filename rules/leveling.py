@@ -559,3 +559,22 @@ def level_up(actor, dice=None) -> dict:
         "saves": gains["saves"], "skill_ranks": gains["skill_ranks"],
         "pools": refreshed,
     }
+
+
+def usable_names(actor) -> list[str]:
+    """Every class ability this character can use right now, by name.
+
+    One list, two readers. The scene brief computed this inline to tell the model what
+    the player can do, and the engine's refusal for an unknown ability printed the
+    PATHS instead — "Their paths are blood spike" — when the names were the whole point
+    of the message. CLAUDE.md: when you fix a rule, grep for every copy of it; this is
+    the copy.
+    """
+    usable: list[str] = []
+    for path in getattr(actor, "paths", None) or []:
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        reached = control_blood_for(actor, path)
+        for tier, names in sorted((det.get("tiers") or {}).items()):
+            if int(tier) <= reached:
+                usable += [str(n) for n in names]
+    return usable

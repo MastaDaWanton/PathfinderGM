@@ -304,7 +304,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # parses. `to` is the square, and on a scene with a map it is the one that decides
     # where somebody ends up — the zone is then re-derived from the real distance rather
     # than believed.
-    "move": (("zone",), ("who", "square"), "hidden"),
+    # `zone` is no longer required. Stage 7 measured why it was the single worst
+    # schema rejection in play — 17 rejections against 2 attempts, 89% — and the reason
+    # was what the param is MADE OF: `engaged`/`near`/`far` is engine vocabulary, and
+    # the player writes "I back toward the door", which contains none of it. A square
+    # says where; a bare move keeps the zone it had. Only `attack`, which has no
+    # required params at all, never failed.
+    "move": ((), ("zone", "who", "square"), "hidden"),
     "spawn": (("template",),
               ("from_entity_id", "count", "name", "zone", "distance_ft"),
               "hidden"),
@@ -813,12 +819,17 @@ def _check_params(intent: Intent, index: int) -> None:
                 "forage: hours is how long is spent on the ground, 1 to 48")
 
     elif op == "move":
-        zone = str(p["zone"]).strip().lower()
-        if zone not in ZONES:
+        # Optional now (see the op table): a zone word the fiction never contains is
+        # not worth a rejected turn. Given, it must still be one of the three.
+        zone = str(p.get("zone") or "").strip().lower()
+        if zone and zone not in ZONES:
             raise IntentError(
                 f"move: zone must be one of {ZONES}, got {zone!r}", "schema", index
             )
-        p["zone"] = zone
+        if zone:
+            p["zone"] = zone
+        else:
+            p.pop("zone", None)
         if p.get("square") not in (None, ""):
             p["square"] = _square(p["square"], "move", index)
 

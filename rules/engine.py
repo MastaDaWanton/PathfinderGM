@@ -1471,6 +1471,103 @@ class Engine:
             )
 
     def _check_legality(self, intent: Intent, index: int) -> None:
+        # The cheap facts, asked HERE so the model gets its retry with the list in
+        # hand. Stage 7 measured that a refusal raised at resolution reaches nobody who
+        # can act on it — `_advance` catches it once, answers 502, and pops the
+        # player's line — while a refusal raised here goes back through the
+        # five-attempt schedule with the fix named. "Is the item in the satchel" and
+        # "is that an ability they have" are single lookups against the actor as it
+        # stands, not a simulation of the list; the resolution-time floor below each
+        # op still prints when the list has changed under itself.
+        if intent.op in ("use_item", "sell") and intent.actor:
+            actor = self.scene.get(intent.actor)
+            item_id = str(intent.params.get("item", "")).strip().lower()
+            if actor is not None and item_id:
+                held = actor.stock.get(item_id)
+                if held is None or held.count < 1:
+                    raise IntentError(
+                        f"{intent.op}: {actor.name} is not carrying {item_id!r}. They "
+                        f"have: {', '.join(sorted(actor.stock)) or 'nothing crafted'}",
+                        "legality", index)
+                if intent.op == "use_item":
+                    # Whether a jar can be thrown, drunk or painted on is a fact about
+                    # the jar, and the weapon to coat is a fact about the sheet: both
+                    # are single lookups, and both used to be found out at
+                    # resolution.
+                    how = str(intent.params.get("how", "drink")).strip().lower()
+                    use = consumables.plan(held, how=how,
+                                           target=intent.params.get("to") or intent.actor,
+                                           because=intent.because)
+                    if not use.ok:
+                        raise IntentError(f"use_item: {'; '.join(use.problems)}",
+                                          "legality", index)
+                    if how == "coat":
+                        weapon = str(intent.params.get("weapon") or actor.equipped
+                                     or "").lower()
+                        if not weapons_mod.has(weapon):
+                            raise IntentError(
+                                f"use_item: {actor.name} has no weapon {weapon!r} to coat",
+                                "legality", index)
+        if intent.op == "resource" and intent.params.get("spend"):
+            # The pool as it stands. A list that spends the same pool twice reaches the
+            # printed floor in the resolver for the second one; this is the first.
+            ref = intent.params.get("to") or intent.actor \
+                or (self.scene.pc().ref if self.scene.pc() else None)
+            target = self.scene.get(ref) if ref else None
+            pool_id = str(intent.params.get("pool", "")).strip().lower()
+            if target is not None and pool_id:
+                pool = target.pool(pool_id)
+                if pool is None:
+                    raise IntentError(
+                        f"resource: no pool called {pool_id!r} on {target.name}. Their "
+                        f"pools are: {', '.join(sorted(target.pools)) or 'none'}.",
+                        "legality", index)
+                amount = intent.params.get("amount", 1)
+                if not pool.ready:
+                    raise IntentError(
+                        f"resource: {pool_id} recharges in {pool.cooldown_left} "
+                        f"round{'' if pool.cooldown_left == 1 else 's'}",
+                        "legality", index)
+                if isinstance(amount, int) and pool.current < amount:
+                    raise IntentError(
+                        f"resource: {pool_id}: {pool.current} left, {amount} needed",
+                        "legality", index)
+        if intent.op == "buy" and intent.params.get("item"):
+            from . import market as market_mod
+            # The counter is drawn from a seeded table keyed on the day, so what is on
+            # it is known here as well as at resolution; asked here, the model can
+            # name something that IS on it.
+            item_id = str(intent.params["item"]).strip().lower()
+            seller = intent.params.get("from_")
+            place = str(self.scene.location_id or "nowhere")
+            stall = str(intent.params.get("stall") or seller or "market")
+            day = market_mod.day_of(self.scene.clock_minutes)
+            counter = market_mod.on_sale(place, stall, day, self.scene.market_taken)
+            if not any(str(getattr(m, "id", "")).lower() == item_id for m in counter):
+                near = ", ".join(sorted(str(getattr(m, "id", "")) for m in counter)[:12])
+                raise IntentError(
+                    f"buy: no {item_id!r} on the counter today. They have: "
+                    f"{near or 'nothing'}", "legality", index)
+        if intent.op == "ability_damage":
+            ab = str(intent.params.get("ability", "")).strip().lower()
+            if ab and ab not in ABILITY_FULL:
+                raise IntentError(
+                    f"ability_damage: no ability score called {ab!r}. The six are: "
+                    f"{', '.join(ABILITY_FULL)}.", "schema", index)
+        if intent.op == "use_ability":
+            from . import leveling
+
+            ref = intent.params.get("actor") or intent.actor
+            actor = self.scene.get(ref) if ref else self.scene.pc()
+            wanted = str(intent.params.get("ability", "")).strip()
+            if actor is not None and wanted:
+                _path, found, _fx = leveling.find_ability(actor, wanted)
+                if not found:
+                    names = leveling.usable_names(actor)
+                    raise IntentError(
+                        f"use_ability: {actor.name} has no ability called {wanted!r}. "
+                        f"They can use: {', '.join(names) or 'nothing yet'}.",
+                        "legality", index)
         if intent.op == "rest" and self.scene.in_encounter:
             # "Any significant interruption during your rest prevents you from healing
             # that night." Being in a fight is the significant interruption.
@@ -1874,7 +1971,7 @@ class Engine:
         actor = self.scene.actors[intent.actor]
         targets = intent.targets()
         if not targets:
-            raise IntentError("attack: needs a target", "schema")
+            return self._refuse(intent, "The attack names nobody to hit, so nothing is rolled.")
         if targets[0] not in self.scene.actors:
             # Defensive: resolution should never meet a ref that validation passed, but a
             # correction applied after validation once made that untrue and the engine
@@ -1929,10 +2026,10 @@ class Engine:
         # (A plain unarmed strike never reaches this: `Actor.weapon` only returns the
         # granted weapon when the ask named it or the toggle holds.)
         if weapon.get("granted_by") and not actor.has_condition(weapon["granted_by"]):
-            raise IntentError(
-                f"attack: the {weapon['granted_by']} is not formed. Use "
-                f"{weapon.get('formed_with', 'its forming ability')} to form it first.",
-                "legality")
+            return self._refuse(
+                intent, f"The {weapon['granted_by']} is not formed, so there is nothing "
+                        f"to swing. {weapon.get('formed_with', 'Its forming ability')} "
+                        f"forms it, as a free action.")
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
 
@@ -2318,7 +2415,7 @@ class Engine:
     def _op_damage(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or (intent.targets() or [None])[0]
         if not ref:
-            raise IntentError("damage: needs a target", "schema")
+            return self._refuse(intent, "The damage names nobody to land on, so none lands.")
         target = self.scene.actors[ref]
         amount = intent.params["amount"]
         roll = None
@@ -2414,12 +2511,12 @@ class Engine:
         who = intent.params.get("to") or intent.actor
         actor = self.scene.actors.get(who)
         if actor is None:
-            raise IntentError(f"buff: unknown target {who!r}", "refs")
+            return self._refuse(intent, self._elsewhere(who) or f"There is no {who} here to affect.")
         kind = str(intent.params.get("type", "save_mod"))
         target = str(intent.params.get("target", ""))
         amount = int(intent.params.get("amount", 0) or 0)
         if not target or not amount:
-            raise IntentError("buff: needs a target and a non-zero amount", "schema")
+            return self._refuse(intent, "The bonus names nobody, or nothing, so nothing changes.")
         source = str(intent.params.get("source") or "a preparation")
         duration = intent.params.get("duration") or {}
         rounds = None
@@ -2451,7 +2548,7 @@ class Engine:
         """
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
         if not ref:
-            raise IntentError("heal: needs somebody to heal", "schema")
+            return self._refuse(intent, "The healing names nobody, so nobody is healed.")
         target = self.scene.actors[ref]
         amount = intent.params["amount"]
         roll = None
@@ -2514,7 +2611,7 @@ class Engine:
         """Grant temporary hit points, which do not stack — the best source wins."""
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
         if not ref:
-            raise IntentError("temp_hp: needs somebody to grant them to", "schema")
+            return self._refuse(intent, "The temporary hit points name nobody, so nobody gets them.")
         target = self.scene.actors[ref]
         amount = intent.params["amount"]
         roll = None
@@ -2544,7 +2641,7 @@ class Engine:
         """
         ref = intent.params.get("to") or intent.target or intent.actor
         if not ref:
-            raise IntentError("ability_damage: needs a target", "schema")
+            return self._refuse(intent, "The ability damage names nobody, so none lands.")
         target = self.scene.actors[ref]
         ab = str(intent.params["ability"]).strip().lower()[:3]
         amount = intent.params["amount"]
@@ -2556,8 +2653,12 @@ class Engine:
         drain = bool(intent.params.get("drain"))
         try:
             res = target.damage_ability(ab, amount, drain=drain)
-        except KeyError as exc:
-            raise IntentError(f"ability_damage: {exc}", "schema") from exc
+        except KeyError:
+            # The six are always the six; the message used to name the fault and not
+            # them.
+            return self._refuse(
+                intent, f"No ability score called {ab}. The six are: "
+                        f"{', '.join(ABILITY_FULL)}.")
 
         effects = [{"ref": target.ref, "kind": "ability_damage", **res}]
         bits = [f"{target.name} takes {res['amount']} {ABILITY_FULL[ab]} "
@@ -2798,9 +2899,21 @@ class Engine:
         if intent.params.get("spend"):
             result = target.spend_pool(pool_id, amount)
             if not result["ok"]:
-                # Refused, not silently ignored: an ability that fires with an empty pool
-                # is one the player thinks they still have.
-                raise IntentError(f"resource: {result['why']}.", "legality")
+                # Refused out loud, not silently ignored: an ability that fires with an
+                # empty pool is one the player thinks they still have. And printed, not
+                # raised: this was `resource: no fury to spend.` as a 502 — the identical
+                # sentence whether the pool was empty or had never existed, which is
+                # the contract's own worked example of the message it forbids. Two
+                # refusals now, because "not any more" and "no such thing" lead to
+                # different next moves.
+                if target.pool(pool_id) is None:
+                    have = ", ".join(sorted(target.pools)) or "none"
+                    return self._refuse(
+                        intent, f"No pool called {pool_id!r} on {target.name}. Their "
+                                f"pools are: {have}.")
+                return self._refuse(
+                    intent, f"{target.name} cannot spend {amount} {pool_id}: "
+                            f"{result['why']}.")
             cooldown = intent.params.get("cooldown")
             if cooldown:
                 rolled = self.dice.roll(str(cooldown), label=f"{pool_id} cooldown",
@@ -3021,9 +3134,8 @@ class Engine:
                     f"{', '.join(p.name for p in known)}.",
                     "schema")
             if going_to.described_only:
-                raise IntentError(
-                    f"travel: {going_to.name} can be seen from here but not reached.",
-                    "legality")
+                return self._refuse(
+                    intent, f"{going_to.name} can be seen from here but not reached.")
         elif biome == here.terrain:
             # The ground already underfoot. This used to compare the stored biome and
             # do nothing; without the field the same answer has to be said, or a party
@@ -3172,7 +3284,13 @@ class Engine:
             raise IntentError("loot: nobody here to do the taking", "refs")
         body = self.scene.actors.get(str(intent.params.get("from_", "")))
         if body is None:
-            raise IntentError("loot: no such body here", "refs")
+            # Validated a moment ago and gone now: a travel earlier in the same list
+            # left the room, or the ageing loop swept the body between turns. Nothing
+            # the player did wrong, so nothing is raised — and under containment the
+            # body may simply be in the room they left, which is said.
+            away = self._elsewhere(str(intent.params.get("from_", "")))
+            return self._refuse(
+                intent, away or "There is no body here to loot.")
         # The same question the watcher asks, spelled the same way. Both said
         # `hp <= 0 or state.down`, which differs from `is_down` at exactly 0 hit
         # points — and there the creature is *disabled*: conscious, upright, and
@@ -3255,16 +3373,19 @@ class Engine:
         # the scene owns; `travel` is the only thing that changes it.
         biome = biomes.canonical(str(self.scene.biome or ""))
         if biome is None:
-            raise IntentError(
-                "forage: nowhere in particular. Set the ground first with "
-                "{\"op\": \"travel\", \"params\": {\"biome\": \"forest\"}}.",
-                "legality")
+            return self._refuse(
+                intent, "The ground here has not been named, so there is nothing to "
+                        "search. Travel somewhere first.")
 
         track_id = str(intent.params.get("track") or "herbalist").strip().lower()
         try:
             track = worldclass.get(track_id)
-        except KeyError as exc:
-            raise IntentError(f"forage: {exc}", "refs") from exc
+        except KeyError:
+            # A craft the world does not have is a fact about the world, not a
+            # malformed intent; said, and the search does not happen.
+            return self._refuse(
+                intent, f"There is no craft called {track_id} to forage by. Foraging "
+                        f"uses herbalist unless another craft is named.")
         level = actor.track(track.id).level
         ceiling = worldclass.tier_rank(track.at(level).max_tier)
 
@@ -3472,15 +3593,21 @@ class Engine:
 
         held = actor.stock.get(item_id)
         if held is None or held.count < 1:
-            raise IntentError(
-                f"use_item: {actor.name} is not carrying {item_id!r}. They have: "
-                f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}", "legality")
+            # "I drink my healing potion" with none was the commonest 502 in play, and
+            # it deleted the player's own line. The same check runs at validate time
+            # now, where the model gets its retry with this list in hand; this is the
+            # floor for a list that changed under itself.
+            return self._refuse(
+                intent, f"{actor.name} is not carrying {item_id}. They have: "
+                        f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}.")
         if target not in self.scene.actors:
-            raise IntentError(f"use_item: unknown target {target!r}", "refs")
+            away = self._elsewhere(target)
+            return self._refuse(intent, away or f"There is no {target} here to use it on.")
 
         use = consumables.plan(held, how=how, target=target, because=intent.because)
         if not use.ok:
-            raise IntentError(f"use_item: {'; '.join(use.problems)}", "legality")
+            return self._refuse(intent, f"{use.item} cannot be used that way: "
+                                        f"{'; '.join(use.problems)}.")
 
         # The dose is spent whichever way it was used, and spent before the effects
         # resolve. A poison that kills the drinker mid-resolution has still been drunk.
@@ -3494,8 +3621,11 @@ class Engine:
         if how == "coat":
             weapon = str(intent.params.get("weapon") or actor.equipped or "").lower()
             if not weapons_mod.has(weapon):
-                raise IntentError(
-                    f"use_item: {actor.name} has no weapon {weapon!r} to coat", "legality")
+                # The dose is already spent above, on purpose — a jar opened over
+                # nothing is still opened — and the refusal says so.
+                return self._refuse(
+                    intent, f"{actor.name} has no weapon called {weapon or 'nothing'} "
+                            f"to coat; the dose is spent on the air.")
             actor.coating = consumables.Coating(
                 item=use.item, weapon=weapon,
                 specs=[dict(s) for s in (held.specs or [])],
@@ -3554,14 +3684,17 @@ class Engine:
 
         held = actor.stock.get(item_id)
         if held is None or held.count < 1:
-            raise IntentError(
-                f"sell: {actor.name} is not carrying {item_id!r}. They have: "
-                f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}", "legality")
+            # Printed, and also checked at validate time so the model can name the
+            # thing they do carry — see `_refuse` for why a raise here reached the
+            # player as a 502 with their sentence deleted.
+            return self._refuse(
+                intent, f"{actor.name} is not carrying {item_id}. They have: "
+                        f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}.")
         count = min(count, held.count)
 
         buyer = intent.params.get("to")
         if buyer and buyer not in self.scene.actors:
-            raise IntentError(f"sell: unknown buyer {buyer!r}", "refs")
+            return self._refuse(intent, self._elsewhere(buyer) or f"There is no {buyer} here to sell to.")
         who = self.scene.actors[buyer].name if buyer else "the stallholder"
 
         # The same three coordinates the shelf is drawn on, read the same way
@@ -3640,7 +3773,7 @@ class Engine:
 
         seller = intent.params.get("from_")
         if seller and seller not in self.scene.actors:
-            raise IntentError(f"buy: unknown seller {seller!r}", "refs")
+            return self._refuse(intent, self._elsewhere(seller) or f"There is no {seller} here to buy from.")
         who = self.scene.actors[seller].name if seller else "the stallholder"
 
         place = str(self.scene.location_id or "nowhere")
@@ -3651,12 +3784,15 @@ class Engine:
         found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
                      None)
         if found is None:
-            # Named, not blank. The same reasoning `use_item` and `sell` follow: a blind
-            # rejection costs the GM a whole regeneration to learn one word.
+            # Named, not blank, and printed: what is on a counter TODAY is a fact only
+            # the engine holds — the shelf is drawn from a seeded table and the day is
+            # in the key — so neither the player nor the model could have known, and a
+            # 502 that deleted the player's sentence was the wrong answer to a question
+            # only this line can answer.
             near = ", ".join(sorted(str(getattr(m, "id", "")) for m in counter)[:12])
-            raise IntentError(
-                f"buy: {who} has no {item_id!r} on the counter today. They have: "
-                f"{near or 'nothing'}", "legality")
+            return self._refuse(
+                intent, f"{who} has no {item_id} on the counter today. On the counter: "
+                        f"{near or 'nothing'}.")
 
         price = round(pricing.worth(found) * count, 2)
         cp = int(round(price * 100))
@@ -3737,7 +3873,15 @@ class Engine:
             pool = casting.slot_pool(level)
             spent = actor.spend_pool(pool, 1)
             if not spent["ok"]:
-                raise IntentError(f"cast: {actor.name} has no {pool} left", "legality")
+                # The mid-list case, measured: six casts in one list PASS validation
+                # against two prepared slots, because `_check_cast` reads the count
+                # before anything runs. The third used to raise here — after two slots
+                # were gone and two fireballs had landed — and the 502 threw all of it
+                # away. Printed instead: what was cast stands, and this one does not.
+                # Validate is NOT taught to simulate the list; that is a second resolver.
+                return self._refuse(
+                    intent, f"{actor.name} has no {pool} left, so {spell.name} is not "
+                            f"cast. What was cast before it stands.")
             if casting.caster_data(actor).get("prepare_from") == "spellbook":
                 casting.unprepare(actor, spell.id, 1)
             state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
@@ -4398,9 +4542,12 @@ class Engine:
     def _op_move(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("who") or intent.actor
         actor = self.scene.actors[ref]
-        zone = intent.params["zone"]
         was = self.scene.zones.get(ref, "near")
         square = intent.params.get("square")
+        # A move with neither a square nor a zone word keeps the zone it had: the
+        # square, when there is one, re-derives the zone below anyway, and a zone word
+        # the fiction never contains is not worth a rejected turn.
+        zone = str(intent.params.get("zone") or was).strip().lower()
 
         # An attack of opportunity has already resolved by the time we get here — it was
         # spliced in front of this intent precisely so it could land before the move did.
@@ -4651,7 +4798,7 @@ class Engine:
         """
         item = str(intent.params.get("item", "")).strip()
         if not item:
-            raise IntentError("give: needs something to give", "schema")
+            return self._refuse(intent, "Nothing was named to hand over, so nothing changes hands.")
         count = max(1, int(intent.params.get("count", 1) or 1))
         pc = self.scene.pc()
 
@@ -4809,9 +4956,13 @@ class Engine:
         wanted = str(intent.params.get("ability", "")).strip()
         path, found, effects = leveling.find_ability(actor, wanted)
         if not found:
-            raise IntentError(
-                f"use_ability: {actor.name} has no ability called {wanted!r}. "
-                f"Their paths are {', '.join(actor.paths) or 'none'}.", "legality")
+            # Names the fix, not the fault: this used to print the PATHS ("Their paths
+            # are blood spike") when the list the model needed was the abilities — the
+            # same list the brief already computes, now from the one helper both use.
+            names = leveling.usable_names(actor)
+            return self._refuse(
+                intent, f"{actor.name} has no ability called {wanted}. They can use: "
+                        f"{', '.join(names) or 'nothing yet'}.")
         if leveling.is_passive(actor, found):
             # "Using" a passive was worse than a wasted action: Swift Strikes stood in
             # for the attack it exists to modify, and the fight went a round with no
@@ -4975,6 +5126,32 @@ class Engine:
             tell=" ".join(bits) + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    def _refuse(self, intent: Intent, why: str) -> Outcome:
+        """A refusal the player could not have foreseen, as a printable Outcome.
+
+        The design contract's rule, made into one door: a refusal whose reason the
+        player had no way to know is a sentence in the transcript, never a raised
+        error. Inform's `check` rulebook is the model — an action that cannot happen
+        prints why and stops, and the story never errors; "You aren't holding that"
+        is prose, not a traceback.
+
+        Stage 7 measured what a raise here actually cost. `_advance` catches a
+        resolution-time raise ONCE, returns HTTP 502 with the raw engine string, and
+        pops the player's own sentence from the transcript. There is no retry: these
+        fire during `run()`, after `validate()` has passed, so the five-attempt schedule
+        never sees them. The plan of record classified twenty-two of these raises as
+        "correct — the model can name another item", and that is true at validate time
+        and false here, where nobody is listening. Every resolution-time refusal now
+        comes through this door; where the check is cheap it is ALSO made at validate
+        time, so the model gets its retry with the list in hand.
+
+        `effects=[]` and a tell, which is what fifteen refusals already looked like;
+        this only gives the shape a name. The tell is a fact the narrator dresses, and
+        the claims scrubber will not let prose claim the thing that did not happen.
+        """
+        return Outcome(intent_id=intent.id, op=intent.op, effects=[],
+                       tell=" ".join(str(why).split()), because=intent.because)
 
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
         """Why this ability cannot be used right now, as a printable sentence — or "".
