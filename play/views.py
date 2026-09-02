@@ -328,6 +328,36 @@ def resurrect(request):
 
 
 @require_GET
+def alive(request):
+    """A window saying it is still open. The only endpoint that is about the process.
+
+    Every page loads `js/keepalive.js`, which calls this on a timer; `desktop.py` shuts
+    the server down when the calls stop. It exists because the packaged exe otherwise
+    outlives the browser it opened — measured 2026-09-01, two processes still holding
+    port 8917 and a handle on their own `.exe` four hours after the last request. The
+    reasoning, the prior art and the three designs that were refused are in
+    `pathfindergm/liveness.py`.
+
+    Deliberately the cheapest view in the app: no campaign is loaded, no save is
+    touched, nothing is drained. It runs every fifteen seconds forever and must never
+    become a reason for a request log to be unreadable or for a turn to be slower.
+
+    The interval is answered rather than hard-coded in the page, so the two halves
+    cannot drift apart — CLAUDE.md's "when you fix a rule, grep for every copy of it",
+    settled by not having a second copy.
+    """
+    from pathfindergm import liveness
+
+    liveness.touch()
+    response = JsonResponse({"ok": True, "every": liveness.PING_SECONDS})
+    # A cached heartbeat is a heartbeat that stops reaching the server while the page is
+    # still on screen, which would end a live game. Say so rather than rely on the fact
+    # that no browser caches an XHR by default today.
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@require_GET
 def characters(request):
     """Everyone who has been played, and everyone available to play."""
     c = campaign_mod.current()

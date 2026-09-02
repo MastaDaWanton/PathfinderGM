@@ -11,6 +11,12 @@ combat-panel gates, the player-rolled forage round trip with its herbalism break
 the garbage-face guard, the world-upload cache keyed on more than mtime, and the
 player-boundary hand-back (which runs before the model, so no Ollama is needed).
 
+Since 2026-09-01 it also proves the exe's *lifetime*, which nothing here checked before
+and which cost four hours of orphaned server holding port 8917 and a handle on its own
+file. That check gets a launch of its own, at the end, because the rest of this file is
+the other half of the proof: it drives the packaged exe over HTTP for minutes without
+ever sending a heartbeat, and is not reaped out from under itself.
+
     python tools/prove_build.py                        # builds dist/PathfinderGM.exe is assumed
     python tools/prove_build.py --exe dist/PathfinderGM.exe
 """
@@ -200,6 +206,112 @@ def check_a_turn_nobody_can_take_is_refused_in_prose(http: Http) -> None:
     if "come round" in said.lower():
         faults.append("a petrified character was told they had woken up")
     note("a turn nobody can take is refused in prose, before any model", faults)
+
+
+def pid_alive(pid: int) -> bool:
+    out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                         capture_output=True, text=True).stdout
+    return str(pid) in out
+
+
+def check_the_game_stops_when_its_last_window_does(exe: Path) -> None:
+    """Close the window and watch the real exe go away by itself.
+
+    The defect, measured 2026-09-01: `dist\\PathfinderGM.exe` double-clicked at 10:35:08,
+    browser closed at 12:01:35, still serving at 16:20 — PIDs 27840 and 30176 holding
+    127.0.0.1:8917 and an exclusive handle on the .exe, which made the next
+    `python -m PyInstaller pathfindergm.spec --noconfirm` fail with `PermissionError:
+    [WinError 5] Access is denied`.
+
+    A theory about process lifetime is not a fact until the built exe has been started
+    and closed and the process table checked, so this is a whole extra launch of its own
+    rather than a fast assertion bolted onto the one above: the reaper is armed by the
+    *first* heartbeat, and every other check in this file runs without ever sending one.
+    That is itself half the proof — the prover drove this exe over HTTP for minutes and
+    was not reaped out from under itself.
+
+    `PATHFINDER_GM_IDLE_GRACE` turns the 180-second grace down to 20. The knob exists for
+    exactly this reason and for the same reason `PATHFINDER_GM_DATA` does; a check that
+    costs three minutes of wall clock is a check that gets commented out.
+    """
+    grace = 20
+    data = Path(tempfile.mkdtemp(prefix="pfgm-window-"))
+    env = dict(os.environ, PATHFINDER_GM_DATA=str(data),
+               PATHFINDER_GM_IDLE_GRACE=str(grace))
+    proc = subprocess.Popen([str(exe), "--no-browser"], env=env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    portfile = data / "server.json"
+    try:
+        for _ in range(120):
+            if portfile.exists():
+                break
+            time.sleep(1)
+        else:
+            note("the game stops when its last window does",
+                 ["the exe never came up"])
+            return
+        hand = json.loads(portfile.read_text(encoding="utf-8"))
+        # The pid in the portfile is the PyInstaller *child* — the process that actually
+        # holds the port. The bootloader this prover spawned is the other half of the
+        # pair the orphan was made of, and both have to go.
+        child, base = hand["pid"], hand["url"].rstrip("/")
+        http = Http(base)
+
+        # Be a window for three beats. Nothing else in this file does, which is why
+        # nothing else in this file can be killed by what follows.
+        #
+        # The clock starts at the LAST BEAT, not after the loop. Measured the first time
+        # this ran: with a trailing sleep between the final beat and the stopwatch, the
+        # exe was reported closing "after 19s" inside its own 20s grace — a fault against
+        # a build that was behaving perfectly, because the two seconds it had already
+        # been silent for were not being counted. The server's grace is measured from the
+        # last heartbeat, so this has to be too.
+        last_beat = 0.0
+        for i in range(3):
+            s, _b = http.get("/api/alive")
+            if s != 200:
+                note("the game stops when its last window does",
+                     [f"/api/alive answered {s}"])
+                return
+            last_beat = time.monotonic()
+            if i < 2:
+                time.sleep(2)
+        still_here = pid_alive(child)
+
+        # And now the player closes the window: the beats simply stop.
+        deadline = last_beat + grace + 45
+        while time.monotonic() < deadline and pid_alive(child):
+            time.sleep(1)
+        took = time.monotonic() - last_beat
+
+        faults = []
+        if not still_here:
+            faults.append("the exe died while a window was still checking in")
+        if pid_alive(child):
+            faults.append(f"backend pid {child} outlived its last window by {took:.0f}s "
+                          f"— this is the orphan")
+        else:
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                faults.append(f"the child exited but bootloader pid {proc.pid} did not "
+                              f"— it still holds the handle on the .exe")
+            if took < grace:
+                faults.append(f"it closed after {took:.0f}s, inside its own {grace}s "
+                              f"grace — a minimised window would be killed too")
+            # The reaper wakes every 5s, so the grace plus one tick plus the time to
+            # unwind serve_forever is the whole honest budget. Much beyond that and
+            # something is sleeping longer than it claims to.
+            if took > grace + 20:
+                faults.append(f"it took {took:.0f}s to notice a {grace}s silence")
+            if portfile.exists():
+                faults.append("the portfile survived, so the exit was not the clean one "
+                              "— a stale handshake tells a launcher a dead server is live")
+        note(f"the game stops when its last window does ({took:.0f}s after the last "
+             f"heartbeat, grace {grace}s)", faults)
+    finally:
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                       capture_output=True)
 
 
 def run_checks(http: Http, repo: Path) -> None:
@@ -460,6 +572,10 @@ def main() -> None:
         note("log file carries the banner and the request lines", faults)
     finally:
         stop(proc)
+
+    # Last, and on a launch of its own: everything above ran for minutes without sending
+    # a heartbeat, which is the half of this that cannot be asserted.
+    check_the_game_stops_when_its_last_window_does(exe)
 
     print(f"\n{'ALL CLEAN' if not FAULTS else f'{len(FAULTS)} FAULT(S)'}")
     for f in FAULTS:
