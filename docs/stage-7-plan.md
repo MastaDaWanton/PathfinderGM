@@ -223,13 +223,31 @@ item" — but no retry exists at resolution: `_advance` catches once, answers 50
 the player's line. So every remaining resolution-time refusal now prints — the seven
 "needs a target" schema raises, the three "unknown target/buyer/seller" refs raises
 (which under containment say *where* the person is), the armament-not-formed, the
-nameless ground, the described-only place, the unknown craft — and the cheap checks
-(is the item in the satchel, is that an ability they have) are ALSO made in
-`_check_legality`, where the model does get its retry with the list in hand. The
-ratchet in `tests/test_stage7_refusals.py` lists every raise left inside a resolver
+nameless ground, the described-only place, the unknown craft.
+
+**Where the validate-time line falls, drawn by a probe.** A first cut also rejected
+"not carrying that", "not on the counter today" and "the pool is empty" at validate, on
+the theory that the model could then name something else. Probed against gemma-4-12B:
+asked to drink a potion the satchel did not hold, the model never proposed `use_item`
+at all — it emitted a bare `heal` and a `drink`, and narrated a vial that did not exist.
+A rejection for a fact about the world hands the model a reason to route around the
+refusal, and the player never learns the truth. So the line is the contract's own: what
+the MODEL got wrong (a way of using a jar that does not exist, a weapon it is not
+holding, a pool or an ability or an ability score by a name nobody has) rejects in
+`_check_legality` with the fix named, and the model retries; what the PLAYER could not
+have known (the satchel, the counter, the pool's level, the body's whereabouts) prints
+at resolution, and the player reads it. The sheet's drink button maps a printed refusal
+back to a 400, because a button that did nothing owes an error and not a redraw.
+
+The ratchet in `tests/test_stage7_refusals.py` lists every raise left inside a resolver
 with its reason: nine that cannot fire (the PC cannot be removed) and the travel floors
 under a validate-time refusal that already named the fix. No `legality` raise survives
 in a resolver.
+
+**Left open, and named by the same probe:** the model routing around the op entirely —
+a bare `heal 1d8+1` for a potion nobody holds is a model authoring an effect with no
+document behind it. That is stage 8's territory (effects come from documents), not a
+refusal.
 
 **7c**: `use_ability` names the abilities, from the one helper `leveling.usable_names`
 the brief now shares; `ability_damage` names the six scores. **7d**: the brief carries

@@ -62,9 +62,11 @@ def test_an_empty_or_unknown_pool_is_two_sentences_and_neither_is_an_error():
     spend = {"op": "resource", "actor": "pc", "because": "t",
              "params": {"pool": "rage", "spend": True, "amount": 2}}
     _run(engine, spend)
-    with pytest.raises(IntentError) as e:
-        engine.validate([dict(spend, params={"pool": "rage", "spend": True, "amount": 1})])
-    assert "0 left" in str(e.value) and "no pool called" not in str(e.value).lower()
+    # Empty is a fact about the sheet the player could not know: printed, not
+    # rejected — a rejection would only invite the model to route around it.
+    out = _run(engine, dict(spend, params={"pool": "rage", "spend": True, "amount": 1}))
+    assert out.effects == [] and "0 left" in out.tell
+    assert "No pool called" not in out.tell
     # The mid-list shape: two spends of the same pool in one list each pass validation
     # against the pool as it stands, and the second prints at resolution — distinctly
     # from the pool never having existed.
@@ -108,12 +110,7 @@ def test_a_thing_not_on_the_counter_today_is_printed_with_the_counter():
     s, engine = _yard()
     raw = {"op": "buy", "actor": "pc", "because": "t",
            "params": {"item": "moon rock", "from_": "c1"}}
-    # The counter is drawn from a seeded table, so validate can read it too and the
-    # model gets to name something that is on it.
-    with pytest.raises(IntentError) as e:
-        engine.validate([raw])
-    assert "on the counter today" in str(e.value) and "They have:" in str(e.value)
-    out = engine.run(parse_all([raw])).outcomes[0]
+    out = engine.run(engine.validate([raw])).outcomes[0]
     assert out.effects == []
     assert "no moon rock on the counter today" in out.tell and "On the counter:" in out.tell
 
@@ -135,23 +132,18 @@ def test_a_body_that_left_between_validate_and_run_is_printed_not_raised():
 
 # --- the ones the plan called "correct to raise", at the door where nobody listens ----
 
-def test_drinking_a_potion_you_do_not_have_is_refused_twice_and_raised_never():
-    """"I drink my healing potion" with none was the commonest 502 in play. Validate
-    refuses it with the satchel listed, so the model can name the thing they do carry;
-    if a list changes under itself the resolver prints the same sentence."""
+def test_drinking_a_potion_you_do_not_have_is_a_sentence_not_a_502():
+    """"I drink my healing potion" with none was the commonest 502 in play, and it
+    deleted the player's own line."""
     s, engine = _yard()
     raw = {"op": "use_item", "actor": "pc", "because": "t",
            "params": {"item": "potion of cure light wounds"}}
-    with pytest.raises(IntentError) as e:
-        engine.validate([raw])
-    assert e.value.check == "legality" and "They have:" in str(e.value)
-
-    # The floor: reached only when validation is bypassed, which is what a list that
-    # spent the item earlier in itself amounts to.
-    from rules.intents import parse_all
-
-    out = engine.run(parse_all([raw])).outcomes[0]
-    assert out.effects == [] and "is not carrying" in out.tell
+    # Not rejected at validate: what the satchel holds is a fact about the world, and
+    # a live probe showed a validate-time rejection of it only taught the model to
+    # emit a bare `heal` and narrate a vial that did not exist. Printed, with the
+    # satchel listed, so the player reads the truth.
+    out = engine.run(engine.validate([raw])).outcomes[0]
+    assert out.effects == [] and "is not carrying" in out.tell and "They have:" in out.tell
 
 
 def test_an_unknown_ability_names_the_abilities_not_the_paths():

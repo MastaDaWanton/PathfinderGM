@@ -1479,21 +1479,22 @@ class Engine:
         # "is that an ability they have" are single lookups against the actor as it
         # stands, not a simulation of the list; the resolution-time floor below each
         # op still prints when the list has changed under itself.
-        if intent.op in ("use_item", "sell") and intent.actor:
+        # The line, drawn by a live probe. A first cut of this also rejected "not
+        # carrying that", "not on the counter today" and "the pool is empty" here, on
+        # the theory that the model could then name something else. Probed against
+        # gemma-4-12B: asked to drink a potion the satchel did not hold, the model
+        # never proposed `use_item` at all — it emitted a bare `heal` and a `drink`,
+        # and narrated a vial that did not exist. A rejection for a FACT ABOUT THE
+        # WORLD hands the model a reason to route around the refusal; the player then
+        # never learns the truth. So the line is the contract's own: what the MODEL
+        # got wrong (a way of using a jar that does not exist, a weapon it is not
+        # holding, a pool or an ability by a name nobody has) rejects here with the
+        # fix named; what the PLAYER could not have known prints at resolution.
+        if intent.op == "use_item" and intent.actor:
             actor = self.scene.get(intent.actor)
             item_id = str(intent.params.get("item", "")).strip().lower()
-            if actor is not None and item_id:
-                held = actor.stock.get(item_id)
-                if held is None or held.count < 1:
-                    raise IntentError(
-                        f"{intent.op}: {actor.name} is not carrying {item_id!r}. They "
-                        f"have: {', '.join(sorted(actor.stock)) or 'nothing crafted'}",
-                        "legality", index)
-                if intent.op == "use_item":
-                    # Whether a jar can be thrown, drunk or painted on is a fact about
-                    # the jar, and the weapon to coat is a fact about the sheet: both
-                    # are single lookups, and both used to be found out at
-                    # resolution.
+            held = actor.stock.get(item_id) if actor is not None and item_id else None
+            if held is not None and held.count >= 1:
                     how = str(intent.params.get("how", "drink")).strip().lower()
                     use = consumables.plan(held, how=how,
                                            target=intent.params.get("to") or intent.actor,
@@ -1515,39 +1516,14 @@ class Engine:
                 or (self.scene.pc().ref if self.scene.pc() else None)
             target = self.scene.get(ref) if ref else None
             pool_id = str(intent.params.get("pool", "")).strip().lower()
-            if target is not None and pool_id:
-                pool = target.pool(pool_id)
-                if pool is None:
-                    raise IntentError(
-                        f"resource: no pool called {pool_id!r} on {target.name}. Their "
-                        f"pools are: {', '.join(sorted(target.pools)) or 'none'}.",
-                        "legality", index)
-                amount = intent.params.get("amount", 1)
-                if not pool.ready:
-                    raise IntentError(
-                        f"resource: {pool_id} recharges in {pool.cooldown_left} "
-                        f"round{'' if pool.cooldown_left == 1 else 's'}",
-                        "legality", index)
-                if isinstance(amount, int) and pool.current < amount:
-                    raise IntentError(
-                        f"resource: {pool_id}: {pool.current} left, {amount} needed",
-                        "legality", index)
-        if intent.op == "buy" and intent.params.get("item"):
-            from . import market as market_mod
-            # The counter is drawn from a seeded table keyed on the day, so what is on
-            # it is known here as well as at resolution; asked here, the model can
-            # name something that IS on it.
-            item_id = str(intent.params["item"]).strip().lower()
-            seller = intent.params.get("from_")
-            place = str(self.scene.location_id or "nowhere")
-            stall = str(intent.params.get("stall") or seller or "market")
-            day = market_mod.day_of(self.scene.clock_minutes)
-            counter = market_mod.on_sale(place, stall, day, self.scene.market_taken)
-            if not any(str(getattr(m, "id", "")).lower() == item_id for m in counter):
-                near = ", ".join(sorted(str(getattr(m, "id", "")) for m in counter)[:12])
+            # A pool by a name nobody has is the model's error — the contract's own
+            # worked example — and rejects here with the pools named. Empty, or still
+            # recharging, is a fact about the sheet and prints at resolution.
+            if target is not None and pool_id and target.pool(pool_id) is None:
                 raise IntentError(
-                    f"buy: no {item_id!r} on the counter today. They have: "
-                    f"{near or 'nothing'}", "legality", index)
+                    f"resource: no pool called {pool_id!r} on {target.name}. Their "
+                    f"pools are: {', '.join(sorted(target.pools)) or 'none'}.",
+                    "legality", index)
         if intent.op == "ability_damage":
             ab = str(intent.params.get("ability", "")).strip().lower()
             if ab and ab not in ABILITY_FULL:

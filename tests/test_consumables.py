@@ -234,11 +234,14 @@ def test_the_last_dose_leaves_the_satchel(board):
 
 
 def test_using_something_you_do_not_have_is_refused(board):
+    """Printed, since stage 7: what the satchel holds is a fact the player could not
+    have known, so it is a sentence with the satchel listed rather than a raise that
+    reached them as a 502 with their own line deleted."""
     scene, engine = board
-    with pytest.raises(IntentError, match="not carrying"):
-        engine.run(engine.validate([
-            {"op": "use_item", "actor": "pc",
-             "params": {"item": "nothing#1", "how": "drink"}}]))
+    out = engine.run(engine.validate([
+        {"op": "use_item", "actor": "pc",
+         "params": {"item": "nothing#1", "how": "drink"}}])).outcomes[0]
+    assert out.effects == [] and "not carrying" in out.tell
 
 
 def test_a_restorative_actually_heals(board):

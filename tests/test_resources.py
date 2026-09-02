@@ -186,14 +186,17 @@ def test_the_engine_spends_and_says_what_is_left(engine):
 
 
 def test_spending_an_empty_pool_is_refused_not_ignored(engine):
-    """An ability that fires with an empty pool is one the player thinks they still have."""
+    """An ability that fires with an empty pool is one the player thinks they still
+    have. Refused out loud — and printed, since stage 7: how much is left in a pool is
+    a fact the player could not have known, and the sentence is theirs to read."""
     pc = engine.scene.pc()
     resources.define(pc, {"id": "ki", "max": "1"})
     pc.spend_pool("ki", 1)
-    with pytest.raises(IntentError, match="0 left"):
-        engine.run(engine.validate([
-            {"op": "resource", "actor": "pc",
-             "params": {"pool": "ki", "amount": 1, "spend": True}}]))
+    out = engine.run(engine.validate([
+        {"op": "resource", "actor": "pc",
+         "params": {"pool": "ki", "amount": 1, "spend": True}}])).outcomes[0]
+    assert out.effects == [] and "0 left" in out.tell
+    assert pc.pool("ki").current == 0
 
 
 def test_spending_can_start_a_rolled_cooldown(engine):

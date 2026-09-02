@@ -105,13 +105,13 @@ def test_a_price_the_player_agreed_to_can_only_lower_the_ask(engine):
 
 
 def test_selling_what_you_are_not_carrying_is_refused_by_name(engine):
-    """A legality error names what they do have, the same way `use_item` does — a blind
-    rejection costs the GM a whole regeneration to learn one word."""
-    from rules.intents import IntentError
-
-    with pytest.raises(IntentError) as caught:
-        run(engine, {"op": "sell", "actor": "pc", "params": {"item": "moonshine#9"}})
-    assert "not carrying" in str(caught.value)
+    """The refusal names what they do have. Printed, since stage 7: what is in the
+    satchel is a fact the player could not have known, and a raise here reached them
+    as a 502 with their own sentence deleted — a live probe showed the model routing
+    around a validate-time rejection of the same fact rather than learning from it."""
+    out = run(engine, {"op": "sell", "actor": "pc", "params": {"item": "moonshine#9"}})
+    assert out[0].effects == []
+    assert "not carrying" in out[0].tell and "They have:" in out[0].tell
 
 
 def test_selling_more_than_you_have_sells_what_you_have(engine):
@@ -271,12 +271,11 @@ def test_an_empty_purse_buys_nothing_and_says_the_price(engine):
 
 
 def test_buying_what_is_not_on_the_counter_names_what_is(engine):
-    """A blind rejection costs the GM a whole regeneration to learn one word."""
-    from rules.intents import IntentError
-
-    with pytest.raises(IntentError) as caught:
-        run(engine, {"op": "buy", "actor": "pc", "params": {"item": "moon-cheese"}})
-    assert "on the counter" in str(caught.value)
+    """What is on the counter TODAY is a fact only the engine holds; the refusal prints
+    it, and the player learns what the stall does have."""
+    out = run(engine, {"op": "buy", "actor": "pc", "params": {"item": "moon-cheese"}})
+    assert out[0].effects == []
+    assert "on the counter today" in out[0].tell and "On the counter:" in out[0].tell
 
 
 def test_a_stall_does_not_stock_what_it_could_not_have_bought():

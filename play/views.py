@@ -1536,6 +1536,11 @@ def use_item(request):
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
     tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    if not any(o.effects for o in resolution.outcomes):
+        # A refusal, printed by the engine since stage 7 rather than raised: the only
+        # `use_item` outcome with no effects. The button shows it as the error it is
+        # and the sheet does not redraw, which is what a button that did nothing owes.
+        return JsonResponse({"error": tell or "Nothing happened."}, status=400)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
     from rules.sheet import full_sheet
