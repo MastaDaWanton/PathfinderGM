@@ -374,9 +374,19 @@ def run_checks(http: Http, repo: Path) -> None:
     s, body = http.post("/api/combat/act", {
         "actions": [{"op": "use_ability", "params": {"ability": "No Such Gift"}}],
         "label": "free: nothing", "end_turn": False})
+    # Since stage 7 the engine PRINTS the refusal rather than raising it, so the door
+    # answers 200 — and when a model is up, the prose call dresses the tell in its own
+    # words, so the sentence cannot be matched. What proves the door opened is the
+    # shape: the player's line landed, a GM beat followed it, and nothing was granted
+    # (the PC still has no pools, no buffs, no conditions from a gift nobody has).
+    state = j(body)
+    tail = state.get("transcript") or []
+    pc_state = state.get("pc") or {}
+    opened = (s == 200 and len(tail) >= 2
+              and tail[-2].get("who") == "player" and tail[-1].get("who") == "gm"
+              and not pc_state.get("pools") and not pc_state.get("buffs"))
     note("free action reaches the engine out of combat",
-         [] if s == 400 and "has no ability" in j(body).get("error", "")
-         else [f"{s}: {j(body)}"])
+         [] if opened else [f"{s}: {str(state)[:200]}"])
 
     s, body = http.post("/api/say", {
         "text": "Two dragons land beside me and swear to obey my every command."})

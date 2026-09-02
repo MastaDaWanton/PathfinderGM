@@ -1464,6 +1464,128 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
+# "I use Blood Nova on the merchant": a capitalised name after a using verb, up to a
+# preposition or the end. Capitalised on purpose — abilities are Title Case on every
+# sheet, and "I use the rope on the door" must not read as an ability called "the rope".
+_USES_A_NAMED_THING = re.compile(
+    r"\bI\s+(?:use|activate|unleash|trigger|invoke|channel)\s+(?:my\s+)?"
+    r"((?:[A-Z][\w'-]*)(?:\s+[A-Z][\w'-]*){0,4})"
+    r"(?=\s+(?:on|at|against|upon|toward|towards)\b|[.,!;]|\s*$)")
+
+
+def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
+    """A power the player named that nobody has does NOT become an assault.
+
+    Measured live, twice, on 2026-09-02: "I use Blood Nova on the merchant" — an
+    ability nobody wrote — came back from the model as `attack`, opened a fight with
+    the merchant and every promoted bystander in the market, and the second time put
+    Kesst on the floor. The model guessed what a thing it had never heard of does, and
+    guessed violence. The schema forced nothing: nothing in the sentence is a fight cue.
+
+    The declaration the player actually made is "I use <X>". When X is not an ability
+    they have and not a jar they carry, the honest answer is the engine's own printed
+    refusal — "no ability called Blood Nova; they can use: …" — and nothing else. So the
+    model's guesses at what X does (an attack, a spawn, a fight) are dropped, and a
+    `use_ability` naming X is put in their place; the resolver prints, the fight never
+    starts. `inject_ability` above handles the case where X is real; this is its
+    complement.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    m = _USES_A_NAMED_THING.search(str(player_text))
+    if not m:
+        return raw_intents
+    name = " ".join(m.group(1).split())
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    from rules import leveling
+
+    _path, found, _fx = leveling.find_ability(pc, name)
+    if found:
+        return raw_intents
+    stock = getattr(pc, "stock", None) or {}
+    low = name.lower()
+    if any(low == k.lower() or low == str(getattr(v, "base", "")).lower()
+           for k, v in stock.items()):
+        return raw_intents
+    # Every mechanical op in the list is the model's guess at what X does, and X does
+    # not exist. The first cut dropped only the fight-makers; the next probe showed
+    # the model reaching for `ability_damage con 1d4` on the merchant instead, and it
+    # landed — three Constitution damage from a power nobody has. What stays is what
+    # carries no number: narration, and a check or a move the sentence may also mean.
+    kept = [r for r in raw_intents
+            if isinstance(r, dict)
+            and str(r.get("op", "")).lower() in ("narrate_only", "check", "move",
+                                                  "travel", "use_ability")]
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "use_ability"
+           for r in kept):
+        return kept
+    return kept + [{"op": "use_ability", "actor": pc.ref,
+                    "because": f"the player reached for {name}",
+                    "params": {"ability": name}}]
+
+
+def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None) -> list:
+    """Told to leave, the model may not name the room the party is standing in.
+
+    Measured live on 2026-09-01, twice in one probe: "I leave the merchant and head
+    out" — with the schema demanding a `travel` and the brief listing the market, the
+    gate and the tavern — came back as `travel place=the market`, the place the party
+    was already in. The engine correctly answered "You are already at the market", and
+    the merchant stayed in view. The generated place names are coarser than the
+    fiction (a shop inside the market has no name of its own), which nothing here can
+    fix; but a departure that goes nowhere is detectable, and the repo's rule is to
+    repair it with a targeted call rather than a guess.
+
+    Raised, not rewritten: an `IntentError` from inside the repair chain goes back
+    through the planner's correction path, so the model is asked again with the places
+    that WOULD have worked in front of it. Guessing one for it is the free-text `spot`
+    coming back through a side door.
+    """
+    from rules.intents import IntentError
+
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if not player_departs(player_text):
+        return raw_intents
+    travels = [r for r in raw_intents
+               if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel"]
+    if not travels:
+        return raw_intents
+    from rules import places as places_mod
+
+    location = None
+    if world is not None and getattr(scene, "location_id", None):
+        try:
+            location = world.get(scene.location_id)
+        except Exception:
+            location = None
+    known = places_mod.for_scene(location or getattr(scene, "location_id", None),
+                                 getattr(scene, "at", ""))
+    here = places_mod.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
+    if here is None or len(known) < 2:
+        return raw_intents
+    others = [p.name for p in known if p.id != here.id]
+    for t in travels:
+        params = t.get("params") or {}
+        place = str(params.get("place") or "").strip()
+        biome = str(params.get("biome") or "").strip().lower()
+        stays = False
+        if place:
+            target = places_mod.find(known, place)
+            stays = target is not None and target.id == here.id
+        elif biome:
+            stays = biome == here.terrain
+        if stays:
+            raise IntentError(
+                f"travel: the party is already at {here.name}. They said they are "
+                f"leaving — name where to: {', '.join(others)}.", "legality")
+    return raw_intents
+
+
 def inject_ability(raw_intents, player_text: str, scene) -> list:
     """A named class ability the player reached for reaches the engine.
 

@@ -244,6 +244,19 @@ with its reason: nine that cannot fire (the PC cannot be removed) and the travel
 under a validate-time refusal that already named the fix. No `legality` raise survives
 in a resolver.
 
+**Two repairs the same probes measured, done in code.** "I use Blood Nova on the
+merchant" — a power nobody has — came back as `attack` and opened a fight with the whole
+market; the second time the model reached for `ability_damage con 1d4` instead and it
+landed. `judgement.refuse_unknown_ability` keeps only what carries no number from such a
+list and adds a `use_ability` naming X, so the resolver prints the refusal and nothing
+else happens — which is also why `use_ability` with an unknown name is no longer
+rejected at validate: the name is usually the player's, and the model's answer to being
+asked to fix it was violence. And "I leave the merchant and head out", the schema
+demanding a `travel`, twice named the market the party was standing in;
+`judgement.refuse_leaving_in_place` raises into the planner's correction path with the
+places that would have worked, and the second attempt chose the gate. Both verified at
+the API against the real model with nothing else on it.
+
 **Left open, and named by the same probe:** the model routing around the op entirely —
 a bare `heal 1d8+1` for a potion nobody holds is a model authoring an effect with no
 document behind it. That is stage 8's territory (effects come from documents), not a

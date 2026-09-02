@@ -207,6 +207,10 @@ class GMAgent:
                 raw = judgement.inject_sale(raw, player_input, self.engine.scene)
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
+                # And its complement: a power the player named that nobody has is a
+                # printed refusal, never the model's guess at what it does.
+                raw = judgement.refuse_unknown_ability(raw, player_input,
+                                                       self.engine.scene)
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.
@@ -220,6 +224,10 @@ class GMAgent:
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
+                # A departure that names the room the party is in is asked again with
+                # the rooms that would have worked; raises into the correction path.
+                raw = judgement.refuse_leaving_in_place(raw, player_input,
+                                                        self.engine.scene, self.world)
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)

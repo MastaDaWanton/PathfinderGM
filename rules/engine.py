@@ -1530,20 +1530,12 @@ class Engine:
                 raise IntentError(
                     f"ability_damage: no ability score called {ab!r}. The six are: "
                     f"{', '.join(ABILITY_FULL)}.", "schema", index)
-        if intent.op == "use_ability":
-            from . import leveling
-
-            ref = intent.params.get("actor") or intent.actor
-            actor = self.scene.get(ref) if ref else self.scene.pc()
-            wanted = str(intent.params.get("ability", "")).strip()
-            if actor is not None and wanted:
-                _path, found, _fx = leveling.find_ability(actor, wanted)
-                if not found:
-                    names = leveling.usable_names(actor)
-                    raise IntentError(
-                        f"use_ability: {actor.name} has no ability called {wanted!r}. "
-                        f"They can use: {', '.join(names) or 'nothing yet'}.",
-                        "legality", index)
+        # `use_ability` with a name nobody has is NOT rejected here, on purpose. The
+        # name is usually the PLAYER's ("I use Blood Nova on the merchant"), and
+        # `judgement.refuse_unknown_ability` puts it into the list precisely so the
+        # resolver prints the refusal with the real names — a rejection would send the
+        # model back round for something it cannot fix, and the model's answer to that,
+        # measured live, was an attack.
         if intent.op == "rest" and self.scene.in_encounter:
             # "Any significant interruption during your rest prevents you from healing
             # that night." Being in a fight is the significant interruption.

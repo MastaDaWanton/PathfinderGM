@@ -669,23 +669,22 @@ def test_an_ability_above_the_characters_tier_is_refused_with_the_number():
 
 
 def test_an_ability_from_a_path_never_taken_is_not_theirs():
-    from rules.intents import IntentError
-
+    """Printed, since stage 7: an ability by a name they do not have is a sentence
+    naming what they can use, never a raise — and never, as measured live, the
+    model's guess that it must be an attack."""
     eng, _ = _table(paths=("coagulator",))
-    with pytest.raises(IntentError):
-        _use(eng, ability="Blood Mine")
+    out = _use(eng, ability="Blood Mine")
+    assert out.effects == [] and "no ability called Blood Mine" in out.tell
 
 
 def test_an_ability_nobody_wrote_is_refused_and_says_which_abilities_they_have():
     """This used to say which PATHS they had — "Their paths are blood spike" — when the
     list the model needed was the abilities. Stage 7: the message names the fix, from
     the one helper the brief shares."""
-    from rules.intents import IntentError
-
     eng, _ = _table()
-    with pytest.raises(IntentError) as e:
-        _use(eng, ability="Blood Accountancy")
-    said = str(e.value)
+    out = _use(eng, ability="Blood Accountancy")
+    said = out.tell
+    assert out.effects == []
     assert "They can use:" in said and "paths" not in said
     names = leveling.usable_names(eng.scene.pc())
     assert names and all(n in said for n in names), (names, said)

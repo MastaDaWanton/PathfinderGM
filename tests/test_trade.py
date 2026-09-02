@@ -940,16 +940,22 @@ def test_free_actions_go_straight_to_the_engine_out_of_combat():
     assert r.status_code == 409 and "No fight" in r.json()["error"]
 
     # ...but a free-action use_ability gets PAST that gate. The ability is deliberately
-    # one nobody has: the engine's own refusal ("has no ability called...") proves the
-    # door opened, and an IntentError pops the transcript and saves nothing — so the
-    # test cannot flip a real toggle on whatever campaign is live.
+    # one nobody has: the engine's own printed refusal ("no ability called...") proves
+    # the door opened, and a refusal grants nothing — so the test cannot flip a real
+    # toggle on whatever campaign is live.
     r = Client().post("/api/combat/act", data=_json.dumps(
         {"actions": [{"op": "use_ability",
                       "params": {"ability": "An Ability No Test Should Grant"}}],
          "label": "free: nothing", "end_turn": False}),
         content_type="application/json")
-    assert r.status_code == 400
-    assert "has no ability" in r.json()["error"]
+    assert r.status_code == 200, r.content[:200]
+    # The tell, off the turn log rather than the transcript: the prose call dresses
+    # the refusal in its own words, and the record of what the engine decided is the
+    # log's job.
+    last = next(x for x in reversed(cm.current().turn_log)
+                if x.get("kind") == "resolution")
+    tells = " ".join(o.get("tell", "") for o in last["outcomes"])
+    assert "no ability called" in tells, tells
 
 
 

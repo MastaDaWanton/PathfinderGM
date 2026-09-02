@@ -153,10 +153,13 @@ def test_an_unknown_ability_names_the_abilities_not_the_paths():
     from rules import leveling
 
     s, engine = _yard()
-    with pytest.raises(IntentError) as e:
-        engine.validate([{"op": "use_ability", "actor": "pc", "because": "t",
-                          "params": {"ability": "Blood Nova"}}])
-    assert "They can use:" in str(e.value) and "paths" not in str(e.value)
+    # Printed, not rejected: the name is usually the player's, and the model cannot
+    # fix what the player asked for — its answer to being asked to, measured live,
+    # was an attack.
+    out = _run(engine, {"op": "use_ability", "actor": "pc", "because": "t",
+                        "params": {"ability": "Blood Nova"}})
+    assert out.effects == []
+    assert "They can use:" in out.tell and "paths" not in out.tell
     assert leveling.usable_names(s.pc()) == []
 
 
