@@ -31,9 +31,14 @@ const PROBES = [
   { key: 'save-roundtrip', prompt: 'Save and reload a campaign whose PC has a document-backed feat; assert the bonus is applied exactly once after load (not doubled, not dropped), and that a snapshot/restore around a refused turn leaves it intact. Report the numbers before save, after load, and after a refused turn.' },
   { key: 'model-choice', prompt: 'Against the real model in a throwaway campaign: a character who DOES carry a healing jar says "I drink my healing potion"; a wizard with a prepared spell says "I cast magic missile at the thug". Assert the effects that land carry a source the engine resolved (the jar id, the spell id) and that no bare number was authored by the model. Report the intents and the sources recorded on the outcomes.' },
 ]
-const probes = await Promise.all(PROBES.map(p => () => agent(
-  `${CONTEXT}\n\nYou are running ONE acceptance probe for stage 8: ${p.key}. ${p.prompt}\n\nWrite whatever script you need under the session scratchpad, never into the repository. Set PATHFINDER_GM_DATA or override CAMPAIGN_DIR to a temp directory before importing the app. Fail loudly and specifically; a probe that could not run is a failure with the reason, not a pass.`,
-  { label: `probe:${p.key}`, phase: 'Probe', schema: PROBE_SCHEMA })).map(f => f()))
+// One at a time, on purpose: every probe drives the same local Ollama, and two model
+// runs at once stalled its queue for seven minutes in the places stage.
+const probes = []
+for (const p of PROBES) {
+  probes.push(await agent(
+    `${CONTEXT}\n\nYou are running ONE acceptance probe for stage 8: ${p.key}. ${p.prompt}\n\nWrite whatever script you need under the session scratchpad, never into the repository. Set PATHFINDER_GM_DATA or override CAMPAIGN_DIR to a temp directory before importing the app. Never run two model-driven probes at once. Fail loudly and specifically; a probe that could not run is a failure with the reason, not a pass.`,
+    { label: `probe:${p.key}`, phase: 'Probe', schema: PROBE_SCHEMA }))
+}
 
 phase('Audit')
 const audit = await agent(

@@ -143,9 +143,10 @@ def check_a_feat_names_itself(http: Http) -> None:
     """
     s, body = http.get("/api/sheet")
     faults = [] if s == 200 else [f"sheet answered {s}"]
-    rows = (j(body).get("attacks") or []) if s == 200 else []
+    rows = ((j(body).get("offense") or {}).get("attacks") or []) if s == 200 else []
     named = {str(r.get("name", r.get("weapon", ""))).lower():
-             [str(t.get("source", "")) for t in (r.get("attack") or [])] for r in rows}
+             [str(t.get("source", "")) if isinstance(t, dict) else str(t)
+              for t in ((r.get("attack") or {}).get("terms") or [])] for r in rows}
     sword = next((terms for name, terms in named.items() if "longsword" in name), None)
     if sword is None:
         faults.append(f"no longsword attack row on the sheet: {sorted(named)}")
