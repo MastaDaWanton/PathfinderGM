@@ -38,6 +38,7 @@ from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
+from . import hazards
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import (
@@ -1514,6 +1515,38 @@ class Engine:
                 f"use_item item=<id> for a jar, cast spell=<id> for a spell, "
                 f"use_ability ability=<name> for a power. The engine supplies the "
                 f"amount from the document.", "legality", index)
+        # The outliers the maps found beside the seven (stage 8d): dice inside a
+        # save's branches, a guard's absorb/share numbers, and a pool gained out of
+        # nowhere. Each is the model authoring a number; each names the door.
+        if intent.op == "save" and not intent.origin:
+            for branch in ("on_failure", "on_success"):
+                got = intent.params.get(branch) or {}
+                if isinstance(got, dict) and got.get("damage"):
+                    raise IntentError(
+                        f"save: the {branch} damage is a number nobody wrote down. A "
+                        f"spell's save carries its own dice (cast spell=<id>); a fall "
+                        f"or a fire is hazard rule=<id>. A bare save carries a "
+                        f"condition, not dice.", "legality", index)
+        if intent.op == "guard" and not intent.origin:
+            kind = str(intent.params.get("kind", "redirect"))
+            numbered = [k for k in ("amount", "uses") if intent.params.get(k)]
+            if kind != "redirect" or numbered:
+                raise IntentError(
+                    f"guard: {kind} with {', '.join(numbered) or 'a number'} is an "
+                    f"ability's to declare — use_ability ability=<name> and its "
+                    f"document sets the amount. A plain guard is kind=redirect with "
+                    f"no numbers.", "legality", index)
+        if intent.op == "resource" and not intent.params.get("spend") \
+                and not intent.origin:
+            raise IntentError(
+                f"resource: a pool is not gained by saying so. Pools refill by "
+                f"rest ({{\"op\": \"rest\"}}) or by an ability's document "
+                f"(use_ability ability=<name>); spend=true spends one.",
+                "legality", index)
+        if intent.op == "hazard":
+            trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
+            if trouble:
+                raise IntentError(f"hazard: {trouble}", "legality", index)
         if intent.op == "use_item" and intent.actor:
             actor = self.scene.get(intent.actor)
             said = str(intent.params.get("item", "")).strip().lower()
@@ -2436,6 +2469,50 @@ class Engine:
             tell=self._damage_tell(hit) + self._by(intent, ".") + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    def _op_hazard(self, intent: Intent, partial: dict) -> Outcome:
+        """A fall, a fire, acid, cold: the rule rolls, the model only named it.
+
+        Stage 8d's one new op. The row in content/rules/hazards.json declares its
+        slot and its dice per unit; validate has already checked the slot against the
+        row's bounds, so nothing here is a number the model wrote. The record carries
+        `origin: rule:<id>` and the tell names the rule, the way a jar's heal names
+        the jar.
+        """
+        ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
+        if not ref or ref not in self.scene.actors:
+            return self._refuse(intent, "The hazard names nobody, so nobody is hurt by it.")
+        target = self.scene.actors[ref]
+        plan = hazards.plan(str(intent.params["rule"]), intent.params)
+        origin = f"rule:{plan['rule']}"
+        rolls, effects, bits = [], [], []
+        if plan.get("first_die_nonlethal"):
+            roll = self.dice.roll(plan["first_die"], label=f"{plan['name']} (deliberate)",
+                                  visibility="hidden")
+            rolls.append(roll)
+            hit = self._apply_damage(target, roll.total, plan["type"], lethality="nonlethal")
+            hit["origin"] = origin
+            effects.append(hit)
+        if plan.get("dice"):
+            roll = self.dice.roll(plan["dice"], label=plan["name"], visibility="hidden")
+            rolls.append(roll)
+            hit = self._apply_damage(target, roll.total, plan["type"],
+                                     lethality=plan["lethality"])
+            hit["origin"] = origin
+            effects.append(hit)
+        for hit in list(effects):
+            bits.append(self._damage_tell(hit))
+        crossed = []
+        for ref2 in {e["ref"] for e in effects if e.get("kind") == "damage"}:
+            crossed.extend(self._hp_state_effects(self.scene.actors[ref2]))
+        effects.extend(crossed)
+        tell = (f"{target.name} meets {plan['name']} ({plan['slot'].replace('_', ' ')} "
+                f"{plan['value']}; the rule rolls {plan.get('first_die', '')}"
+                f"{'+' if plan.get('first_die') and plan.get('dice') else ''}"
+                f"{plan.get('dice', '')}). " + " ".join(bits)
+                + self._hp_state_tell(crossed))
+        return Outcome(intent_id=intent.id, op="hazard", rolls=rolls, effects=effects,
+                       tell=" ".join(tell.split()), because=intent.because)
 
     @staticmethod
     def _by(intent: Intent, sep: str = "") -> str:
@@ -4517,7 +4594,7 @@ class Engine:
         ref = intent.params["to"]
         target = self.scene.actors[ref]
         towards = intent.actor or (intent.targets() or [None])[0]
-        penalty = abs(int(intent.params.get("penalty", 4) or 0))
+        penalty = compulsion.PENALTY
 
         duration = intent.params.get("duration")
         rounds = None

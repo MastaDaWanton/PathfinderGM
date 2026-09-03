@@ -539,3 +539,25 @@ enhancement oil and two +1 morale songs, Power Attack on — longsword terms BAB
 Str +3, oil +1 (enhancement), one song +1 (morale; the second did not stack),
 Power Attack −1, Weapon Focus +1; damage Str +3, Power Attack +2; the shortbow
 carried neither feat. 2,909 passed.
+
+**8d shipped, 2026-09-03.** The outliers the maps found beside the seven: a `save`
+whose branch carries dice and no origin is refused at validate naming `cast spell=<id>`
+and `hazard rule=<id>` (a bare save keeps its condition); a `guard` that is not a plain
+redirect, or carries `amount`/`uses`, is refused naming `use_ability`; a `resource`
+gain with no origin is refused naming `rest` and `use_ability` (spending is untouched);
+`compel` lost its `penalty` param — the rule's −4 is `compulsion.PENALTY`, and a model
+`penalty: -40` is refused as an unknown param. `content/rules/hazards.json` ships eight
+rows from the Core Rulebook's Environment chapter — falling, catching fire, lava, acid,
+cold, heat, starvation, thirst — each declaring its one slot with bounds
+(`distance_ft` 10–200, `rounds`, `hours`, `days`) and its dice per unit; `rules/hazards.py`
+reads it, `Engine._check_legality` refuses a slot outside the row's bounds or a rule not
+in the file with the rules listed, and `_op_hazard` rolls the row with `origin:
+rule:<id>` on the record and the rule named in the tell (a deliberate jump makes the
+first die nonlethal, per the row). The briefing teaches `hazard` and says a trap is
+narrated this stage. The spec ships `content/rules`; conftest isolates the hazards
+cache. Measured live in a throwaway campaign, "I jump down from the thirty-foot wall"
+three of three: `hazard rule=falling distance_ft=30` every turn, a 3d6 record with
+`origin: rule:falling` where the list reached it (16 and 10 damage), and the turn
+suspended on the player's Acrobatics roll where the check came first. One earlier
+pass answered 502 once in three turns and the body was not captured; the re-run did
+not reproduce it, and it is recorded here rather than explained. 2,914 passed.

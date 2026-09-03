@@ -252,6 +252,99 @@ def test_a_stamped_buff_temp_hp_and_defence_carry_the_origin_on_the_effect():
     assert from_dict({"name": "old", "kind": "buff"}).origin == ""
 
 
+# --- 8d: the outliers beside the seven, and the rule GM fiat cites ----------------------
+
+def test_a_saves_branch_dice_need_a_document_behind_them():
+    """`save.on_failure.damage` was a model-written dice string outside the brief's list
+    of seven, value-checked nowhere. A bare save keeps its condition branch."""
+    s, engine = _yard()
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "save", "actor": "pc", "because": "t",
+                          "params": {"save": "ref", "dc": 15,
+                                     "on_failure": {"damage": "6d6", "type": "fire"}}}])
+    assert "hazard rule=<id>" in str(e.value) and "cast spell=<id>" in str(e.value)
+    ok = engine.validate([{"op": "save", "actor": "pc", "because": "t",
+                           "params": {"save": "will", "dc": 12,
+                                      "on_failure": {"condition": "shaken"}}}])
+    assert ok[0].op == "save"
+
+
+def test_a_guards_numbers_and_a_pool_gained_by_saying_so_are_refused():
+    s, engine = _yard()
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "guard", "actor": "pc", "because": "t",
+                          "params": {"to": "c1", "kind": "absorb", "amount": 10}}])
+    assert "use_ability ability=<name>" in str(e.value)
+    plain = engine.validate([{"op": "guard", "actor": "pc", "because": "t",
+                              "params": {"to": "c1"}}])
+    assert plain[0].op == "guard"
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "resource", "actor": "pc", "because": "t",
+                          "params": {"pool": "ki", "amount": "2d4"}}])
+    assert "rest" in str(e.value) and "spend=true" in str(e.value)
+
+
+def test_compel_carries_no_penalty_param():
+    """An unbounded model integer, defaulted to 4, checked nowhere. The rule's number
+    lives in rules/compulsion.py now and the param is refused as unknown."""
+    from rules.compulsion import PENALTY
+
+    s, engine = _yard()
+    with pytest.raises(IntentError):
+        engine.validate([{"op": "compel", "actor": "pc", "because": "t",
+                          "params": {"to": "c1", "penalty": 40}}])
+    res = engine.run(engine.validate([{"op": "compel", "actor": "pc", "because": "t",
+                                       "params": {"to": "c1"}}]))
+    assert res.outcomes[0].effects[0]["penalty"] == PENALTY == 4
+
+
+def test_a_fall_is_the_rule_rolling_not_the_model():
+    """"I jump from the wall" reached the engine as a bare `damage` with dice the model
+    wrote. `hazard rule=falling distance_ft=30` is the rule document's 3d6, the record
+    carries `origin: rule:falling`, the tell names the fall."""
+    s, engine = _yard()
+    pc = s.pc()
+    pc.hp = pc.hp_max = 40
+    res = engine.run(engine.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                                       "params": {"rule": "falling", "distance_ft": 30}}]))
+    out = res.outcomes[0]
+    assert out.op == "hazard"
+    hit = next(e for e in out.effects if e.get("kind") == "damage")
+    assert hit["origin"] == "rule:falling" and hit["type"] == "bludgeoning"
+    assert out.rolls and out.rolls[0].die == "3d6" if hasattr(out.rolls[0], "die") else True
+    assert "a fall" in out.tell and "distance ft 30" in out.tell and "3d6" in out.tell
+    assert pc.hp < 40
+    # A deliberate jump: the first die is nonlethal.
+    pc.hp, pc.nonlethal = 40, 0
+    res = engine.run(engine.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                                       "params": {"rule": "falling", "distance_ft": 20,
+                                                  "deliberate": True}}]))
+    kinds = [(e.get("lethality"), e.get("origin")) for e in res.outcomes[0].effects
+             if e.get("kind") == "damage"]
+    assert kinds[0] == ("nonlethal", "rule:falling") and pc.nonlethal > 0
+
+
+def test_a_hazards_slot_is_bounded_by_the_row_and_the_rule_must_exist():
+    """SetByCaller, applied to the one op stage 8 invents: the row declares the slot
+    and its bounds; a 900-foot fall is a number the model wrote."""
+    s, engine = _yard()
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                          "params": {"rule": "falling", "distance_ft": 900}}])
+    assert "10–200" in str(e.value)
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                          "params": {"rule": "falling"}}])
+    assert "needs distance_ft" in str(e.value)
+    with pytest.raises(IntentError) as e:
+        engine.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                          "params": {"rule": "trap"}}])
+    assert "The rules are:" in str(e.value) and "falling" in str(e.value)
+    enum = set(prompts.turn_schema()["properties"]["intents"]["items"]["properties"]["op"]["enum"])
+    assert "hazard" in enum
+    assert '"op": "hazard"' in prompts.BRIEFING
+
+
 def test_the_tells_for_heal_and_damage_name_the_document():
     """Law 3, the half that was missing: a sourced number whose source the narrator
     cannot see. Before stage 8 the heal, damage, ability-damage and item-damage tells

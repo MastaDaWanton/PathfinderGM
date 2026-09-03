@@ -302,7 +302,7 @@ def test_a_compulsion_penalises_and_never_prohibits():
     always swing at whoever it likes; doing so is just worse."""
     s, e = board()
     e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
-                       "params": {"to": "c2", "penalty": 4}}], origin="author:test"))
+                       "params": {"to": "c2"}}], origin="author:test"))
     # Not an error, not a refusal — the attack validates and resolves.
     res = e.run(e.validate([{"op": "attack", "actor": "c2", "target": "c1",
                              "because": "ignoring the taunt",
@@ -398,22 +398,27 @@ def test_the_tell_says_what_defying_it_costs():
     """"The thug is compelled" tells a player nothing they can act on."""
     s, e = board()
     res = e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
-                             "params": {"to": "c2", "penalty": 4,
+                             "params": {"to": "c2",
                                         "duration": {"amount": 3, "unit": "round"}}}], origin="author:test"))
     assert "to attack anyone else" in res.outcomes[0].tell
     assert "3 rounds" in res.outcomes[0].tell
 
 
-def test_a_negative_penalty_is_read_as_how_bad_rather_than_double_negated():
-    """Stored positive and applied negative, because a stored -4 gets double-negated by
-    somebody eventually."""
+def test_the_penalty_is_the_rules_number_and_not_a_param():
+    """`penalty` was an unbounded model integer, defaulted to 4, checked nowhere — a
+    number outside stage 8's list of seven that the maps found. The rule's −4 lives in
+    rules/compulsion.py and the param is refused as unknown with the op's real params
+    named, so a model cannot write −40."""
+    from rules.intents import IntentError
+
     s, e = board()
+    with pytest.raises(IntentError, match="unknown param"):
+        e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
+                     "params": {"to": "c2", "penalty": -40}}], origin="author:test")
     e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
-                       "params": {"to": "c2", "penalty": -4}}], origin="author:test"))
+                       "params": {"to": "c2"}}], origin="author:test"))
     assert [m.value for m in compulsion.penalty_against(s.actors["c2"], "c1")] == [-4]
 
-
-# --- persistence ---------------------------------------------------------------------------------
 
 def test_compulsions_survive_a_save():
     a = load_pc("fixtures/pc-kesst.json")

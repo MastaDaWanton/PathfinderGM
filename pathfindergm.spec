@@ -33,6 +33,7 @@ CONTENT_DIRS = [
     "bestiary",
     "classes",
     "feats",
+    "rules",       # stage 8d: the hazard rows GM fiat cites (content/rules/hazards.json)
     "ingredients",
     "materials",
     "spells",

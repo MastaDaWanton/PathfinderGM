@@ -220,6 +220,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.
     "ability_damage": (("ability", "amount"), ("to", "drain"), "hidden"),
+    # A fall, a fire, acid, cold: the rule document GM fiat cites (content/rules/
+    # hazards.json). The model names the rule and fills its one slot — how far, how
+    # many rounds — and the engine rolls the row. Stage 8d: before this a fall was a
+    # bare `damage` with dice the model wrote.
+    "hazard": (("rule",), ("to", "distance_ft", "rounds", "hours", "days",
+                           "deliberate", "immersed"), "hidden"),
     # Acid on a scabbard, a sundered blade. Objects have hardness and hit points of their
     # own, and neither is on anybody's character sheet.
     "item_damage": (("amount",), ("to", "item", "type"), "hidden"),
@@ -291,7 +297,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Being pulled towards a target you did not choose. `to` is who is compelled; the
     # actor is who they are pulled towards. It penalises and never prohibits — see the
     # header of rules/compulsion.py, which is where that decision is argued.
-    "compel": (("to",), ("penalty", "duration", "why"), "hidden"),
+    # The penalty is the rule's (−4, rules/compulsion.py), not a param: it was an
+    # unbounded model integer until stage 8d.
+    "compel": (("to",), ("duration", "why"), "hidden"),
     # Standing between a blow and the person it was aimed at. The actor is the guardian.
     "guard": (("to",), ("kind", "amount", "range_ft", "uses", "pool"), "hidden"),
     "begin_encounter": (("sides",), ("surprise",), "hidden"),

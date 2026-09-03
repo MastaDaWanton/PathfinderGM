@@ -590,6 +590,12 @@ carries its own. A potion or a poultice is used by its id from the CARRYING list
 spell or the power and applies what it says. Never narrate a wound closing without one
 of these; if you do, the character walks away as hurt as they arrived and the player will
 see it on the sheet. A jar the character is not carrying cannot be used: say so.
+A fall, a fire, acid, cold, thirst — the world hurting someone with no spell or blade
+behind it — is a rule you cite, never dice you write: {"op": "hazard", "params":
+{"rule": "falling", "distance_ft": 30, "to": "<ref>"}}. The rules are falling
+(distance_ft), catching-fire, lava, acid (rounds), cold, heat, thirst (hours),
+starvation (days); you supply only that one number and the rule supplies the dice.
+Add "deliberate": true for a chosen jump. A trap is narrated this stage, not rolled.
 When the party moves onto different ground, say so: {"op": "travel", "params":
 {"biome": "forest"}}. The biomes are urban, grassland, farmland, forest, jungle, swamp,
 hills, mountain, desert, tundra, coast, underground, ruins, planar. What can be found by

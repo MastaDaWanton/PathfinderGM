@@ -1,0 +1,72 @@
+{
+  "_about": [
+    "Stage 8d: the rule document GM fiat cites. A fall, a fire, acid, cold — numbers the",
+    "model used to write into a bare `damage`. Each row declares its slot (the one scalar",
+    "only the fiction supplies, with bounds) and the dice per unit of it; the engine",
+    "rolls the row, never the model. Core Rulebook, Environment chapter, as cited per row.",
+    "Traps are not here: a trap is its own document and stays narrated this stage."
+  ],
+  "falling": {
+    "name": "a fall",
+    "source": "CRB, Environment: Falling — 1d6 per 10 feet, to a maximum of 20d6; a deliberate jump makes the first 1d6 nonlethal",
+    "slot": {"name": "distance_ft", "min": 10, "max": 200, "per": 10},
+    "dice_per_unit": "1d6",
+    "type": "bludgeoning",
+    "deliberate_first_die_nonlethal": true
+  },
+  "catching-fire": {
+    "name": "catching fire",
+    "source": "CRB, Environment: Catching on Fire — 1d6 fire per round until extinguished",
+    "slot": {"name": "rounds", "min": 1, "max": 10, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "fire"
+  },
+  "lava": {
+    "name": "lava",
+    "source": "CRB, Environment: Lava Effects — 2d6 fire per round of contact; 20d6 per round immersed",
+    "slot": {"name": "rounds", "min": 1, "max": 10, "per": 1},
+    "dice_per_unit": "2d6",
+    "type": "fire",
+    "immersed_dice_per_unit": "20d6"
+  },
+  "acid": {
+    "name": "acid",
+    "source": "CRB, Environment: Acid Effects — 1d6 per round of contact; 10d6 per round immersed",
+    "slot": {"name": "rounds", "min": 1, "max": 10, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "acid",
+    "immersed_dice_per_unit": "10d6"
+  },
+  "cold": {
+    "name": "exposure to cold",
+    "source": "CRB, Environment: Cold Dangers — 1d6 nonlethal per hour of exposure below 40°F on a failed Fortitude save",
+    "slot": {"name": "hours", "min": 1, "max": 24, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "cold",
+    "lethality": "nonlethal"
+  },
+  "heat": {
+    "name": "exposure to heat",
+    "source": "CRB, Environment: Heat Dangers — 1d4 nonlethal per hour above 90°F on a failed Fortitude save",
+    "slot": {"name": "hours", "min": 1, "max": 24, "per": 1},
+    "dice_per_unit": "1d4",
+    "type": "fire",
+    "lethality": "nonlethal"
+  },
+  "starvation": {
+    "name": "starvation",
+    "source": "CRB, Environment: Starvation and Thirst — 1d6 nonlethal per day without food past the first three",
+    "slot": {"name": "days", "min": 1, "max": 30, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "untyped",
+    "lethality": "nonlethal"
+  },
+  "thirst": {
+    "name": "thirst",
+    "source": "CRB, Environment: Starvation and Thirst — 1d6 nonlethal per hour without water past the first day",
+    "slot": {"name": "hours", "min": 1, "max": 48, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "untyped",
+    "lethality": "nonlethal"
+  }
+}

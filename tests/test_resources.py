@@ -170,7 +170,7 @@ def test_the_engine_grants_a_stack_to_a_target(engine):
     engine.run(engine.validate([
         {"op": "resource", "because": "the javelin leaves two stacks",
          "params": {"pool": "blood_stack", "to": "c1", "amount": 2}},
-    ]))
+    ], origin="author:test"))
     assert engine.scene.actors["c1"].pool("blood_stack").current == 2
 
 
@@ -180,7 +180,7 @@ def test_the_engine_spends_and_says_what_is_left(engine):
     res = engine.run(engine.validate([
         {"op": "resource", "actor": "pc", "because": "one more attack",
          "params": {"pool": "ki", "amount": 1, "spend": True}},
-    ]))
+    ], origin="author:test"))
     assert "spends 1 ki" in res.outcomes[0].tell
     assert pc.pool("ki").current == 5
 
@@ -194,7 +194,7 @@ def test_spending_an_empty_pool_is_refused_not_ignored(engine):
     pc.spend_pool("ki", 1)
     out = engine.run(engine.validate([
         {"op": "resource", "actor": "pc",
-         "params": {"pool": "ki", "amount": 1, "spend": True}}])).outcomes[0]
+         "params": {"pool": "ki", "amount": 1, "spend": True}}], origin="author:test")).outcomes[0]
     assert out.effects == [] and "0 left" in out.tell
     assert pc.pool("ki").current == 0
 
@@ -205,7 +205,7 @@ def test_spending_can_start_a_rolled_cooldown(engine):
     engine.run(engine.validate([
         {"op": "resource", "actor": "pc", "because": "the stacks tear loose",
          "params": {"pool": "vortex", "amount": 1, "spend": True, "cooldown": "1d3"}},
-    ]))
+    ], origin="author:test"))
     assert 1 <= pc.pool("vortex").cooldown_left <= 3
 
 
@@ -215,7 +215,7 @@ def test_a_night_in_the_engine_refills_the_pools(engine):
     pc.spend_pool("ki", 6)
 
     res = engine.run(engine.validate([{"op": "rest", "actor": "pc",
-                                       "params": {"kind": "night"}}]))
+                                       "params": {"kind": "night"}}], origin="author:test"))
     assert pc.pool("ki").current == 6
     assert "Recovered: ki" in res.outcomes[0].tell
 

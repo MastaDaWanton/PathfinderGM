@@ -23,6 +23,10 @@ from dataclasses import dataclass
 
 from .dice import Modifier
 
+# 1e's compulsion: −4 to attack anyone but the one you are drawn to. The rule's
+# number, in one place — it was an unbounded model integer param until stage 8d.
+PENALTY = 4
+
 
 @dataclass
 class Compulsion:
