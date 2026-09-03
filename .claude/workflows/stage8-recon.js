@@ -12,6 +12,11 @@ export const meta = {
 const REPO = 'H:/coding/PathfinderGM/.claude/worktrees/gracious-ishizaka-a20934'
 const CONTEXT = `Repository: ${REPO} (a git worktree; read and grep only there). Read ${REPO}/docs/stage-8-brief.md FIRST and in full: it is the kickoff brief and carries the scope, the measured defect, what exists to build on, and what is refused. Then read CLAUDE.md and docs/design-contract.md for the laws. Be economical with the repository: grep, then read what the grep found.`
 
+// Phase gating, added after a usage limit killed all twelve agents at once: run with
+// args {only: ['research']}, then {only: ['maps']}, then {only: ['critic'], prior: {research, maps}}.
+const ONLY = (args && args.only) || ['research', 'maps', 'critic']
+const PRIOR = (args && args.prior) || {}
+
 const RESEARCH_SCHEMA = {
   type: 'object',
   properties: {
@@ -58,7 +63,8 @@ const TRADITIONS = [
   { key: 'datafmt', prompt: 'How feats are encoded as data in PCGen, Hero Lab, and Pathbuilder (and the pf1e FoundryVTT system if not covered elsewhere). Primary sources: PCGen\'s LST file documentation (BONUS: tokens, PRExxx prerequisites, JEP formulas), Hero Lab\'s authoring kit docs (eval scripts), and anything Pathbuilder\'s author has written about the data model. What can each grammar express, what needed a script escape hatch, and what did their authors say they would do differently? Look for the boundary where data stops and code starts, because that boundary is stage 8\'s design decision.' },
   { key: 'if-validation', prompt: 'How interactive fiction and MUD engines refuse a change the world cannot account for. Primary sources: Inform 7\'s Writing with Inform on the action processing rulebooks (before/instead/check/carry out/report), Evennia docs on commands and the object model, and DikuMUD/CircleMUD spell/skill tables (spells.c, spell_parser.c: how a spell\'s numbers come from the table and not the caller). The question in another register: where does a number that changes the world have to come from, and what happens when code asks for one with no table behind it?' },
 ]
-const research = pipeline(TRADITIONS, t => agent(
+const PICK_T = (args && args.traditions) || null
+const research = !ONLY.includes('research') ? Promise.resolve(PRIOR.research || []) : pipeline(TRADITIONS.filter(t => !PICK_T || PICK_T.includes(t.key)), t => agent(
   `You are researching prior art for stage 8 of a rules-engine compliance programme. ${CONTEXT}\n\nSearch the internet and read PRIMARY sources; a blog post counts only when its author is the tradition's own. ${t.prompt}\n\nReport ONLY what you confirmed in a source you actually read. Anything you believe but could not confirm goes in 'unsourced'. Cite the exact document for each claim. Say plainly when a question has no answer in the sources.`,
   { label: `research:${t.key}`, phase: 'Research', schema: RESEARCH_SCHEMA }))
 
@@ -71,7 +77,8 @@ const SUBSYSTEMS = [
   { key: 'gm-side', focus: 'gm/prompts.py and gm/judgement.py: where the model is TAUGHT the effect ops (examples, briefing lines, the op reference in cheat_messages, turn_schema), and every injector or repair that EMITS heal/damage/buff/temp_hp/defence/condition/ability_damage/item_damage. Also gm/agent.py narrate paths that read those outcomes. If an effect op were to require a source document, what in the prompts and injectors would have to change, and what would the model be shown to choose from?' },
   { key: 'corpus', focus: 'The shipped content as data: content/feats/feats.json (all of it: shape, counts, the distribution of what the benefit text contains — typed bonuses, unlocks, prerequisites-only), content/classes/*.json grants grammar (every field the classbuilder validates: read rules/classbuilder.py validators), and content/spells + content/materials effect specs as consumed by rules/effectspec.py. The question: could the grants grammar express the feats as they are written, and for what fraction? Sample twenty feats across kinds and say for each whether grants expresses it, and if not what field would be needed. Numbers, not impressions.' },
 ]
-const maps = pipeline(SUBSYSTEMS, s => agent(
+const PICK_S = (args && args.subsystems) || null
+const maps = !ONLY.includes('maps') ? Promise.resolve(PRIOR.maps || []) : pipeline(SUBSYSTEMS.filter(s => !PICK_S || PICK_S.includes(s.key)), s => agent(
   `${CONTEXT}\n\nYou are mapping ONE subsystem for stage 8: ${s.key}. Focus: ${s.focus}\n\nUse grep and read the actual code. Report file:line for everything. Do not propose designs; map. Be exhaustive within your subsystem — a missed site is a bug in the refactor.`,
   { label: `map:${s.key}`, phase: 'Map', schema: MAP_SCHEMA }))
 
@@ -81,7 +88,7 @@ const maps_ok = mapped.filter(Boolean)
 log(`research: ${research_ok.length}/${TRADITIONS.length}; maps: ${maps_ok.length}/${SUBSYSTEMS.length}`)
 
 phase('Critic')
-const critic = await agent(
+const critic = !ONLY.includes('critic') ? null : await agent(
   `${CONTEXT}\n\nYou are the critic. Below are (A) research reports on how traditions bind an effect to its source and encode passives as data, and (B) code maps of every channel a number takes onto the sheet in this repository. REFUTE, do not summarise.\n\nFor (A): find overclaims — a claim not supported by the cited source, or contradicted by it. Open the cited sources yourself to spot-check. Then state in one paragraph what the traditions GENUINELY agree on about (1) where an effect's provenance lives, (2) how a runtime value enters without the caller authoring the effect, (3) where the data/code boundary for passives fell in practice and why.\n\nFor (B): grep the code. Are there number channels or feat name-branches NO map covers? List them with file:line. Are the "sixteen computed feats" and "eight name-branches" and "sixth modifier channel" claims from the plan borne out, and what are the actual numbers? Which of the four document doors do the maps disagree about?\n\nEnd with the five highest-risk facts for the stage, each one sentence, and a recommendation on whether the two halves in the brief (feats as documents; effects come from documents) are one change or two, with the reason.\n\n(A) RESEARCH:\n${JSON.stringify(research_ok, null, 1)}\n\n(B) MAPS:\n${JSON.stringify(maps_ok, null, 1)}`,
   { label: 'critic', phase: 'Critic' })
 
