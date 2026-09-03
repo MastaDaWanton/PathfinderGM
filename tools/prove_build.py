@@ -341,7 +341,7 @@ def run_checks(http: Http, repo: Path) -> None:
         "abilities": {"str": 16, "dex": 14, "con": 14, "int": 10, "wis": 12,
                       "cha": 8},
         "skills": ["climb", "survival"],
-        "feats": ["power attack", "weapon focus"],
+        "feats": ["power attack", {"id": "weapon-focus", "target": "longsword"}],
         "begin": True, "world": ""})
     note("character created and campaign begun",
          [] if s == 200 else [f"{s}: {j(body)}"])

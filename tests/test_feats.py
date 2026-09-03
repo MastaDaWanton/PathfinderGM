@@ -28,7 +28,6 @@ import pytest
 
 from rules import feats
 from rules.sheet import load_pc
-from rules.tables import FEATS as MECHANICAL
 
 
 @pytest.fixture
@@ -252,20 +251,22 @@ def test_a_better_character_qualifies_for_more(kesst):
     assert len(feats.available(kesst)) > lean
 
 
-# --- the hand-written table still runs the engine ---------------------------------------------------
+# --- the documents run the engine (stage 8) -----------------------------------------------
 
-def test_the_sixteen_mechanical_feats_are_untouched():
-    """These are code, not data. The index does not replace them — no spreadsheet column
-    encodes "use Dex in place of Str on attack rolls"."""
-    assert MECHANICAL["weapon finesse"]["finesse"] is True
-    assert MECHANICAL["improved initiative"]["initiative"] == 4
-    assert MECHANICAL["lightning reflexes"]["saves"]["ref"] == 2
+def test_the_mechanical_feats_are_documents_now():
+    """They were code: a hand-written table of sixteen and name-branches in the sheet.
+    Stage 8 made them documents in the class grants vocabulary, validated on load."""
+    docs = feats.documents()
+    assert docs["weapon-finesse"]["attack_ability"]["use"] == "dex"
+    assert docs["improved-initiative"]["modifiers"][0]["amount"] == 4
+    assert docs["lightning-reflexes"]["modifiers"][0] == {
+        "type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped"}
 
 
 def test_a_mechanical_feat_is_reachable_from_the_index():
     """Both halves describe the same feat, and the index says which ones the engine
     actually computes with."""
-    assert feats.get("weapon-finesse").mechanical.get("finesse") is True
+    assert feats.get("weapon-finesse").mechanical.get("attack_ability")
     assert feats.get("acrobatic-steps").mechanical == {}
 
 

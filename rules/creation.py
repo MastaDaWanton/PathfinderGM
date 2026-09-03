@@ -460,13 +460,29 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # --- feats ---------------------------------------------------------------------
     feat_budget = 1 + (1 if race and race.get("bonus_feat") else 0) \
         + (1 if cid == "fighter" else 0)
-    feat_ids = [str(f).strip().lower() for f in (payload.get("feats") or [])]
+    # A feat is a string id, or {"id": ..., "target": ...} for one that binds to a
+    # chosen weapon — Weapon Focus, Weapon Specialization, a Weapon Proficiency. The
+    # forge used to write every one bare, and a bare Weapon Focus was +1 with every
+    # weapon; under the documents it would be +1 with none, so the target is asked
+    # for here, with the fix named.
+    raw_feats = payload.get("feats") or []
+    feat_ids = [str(f.get("id", "") if isinstance(f, dict) else f).strip().lower()
+                for f in raw_feats]
     feats_named: list[str] = []
-    for fid in feat_ids:
+    for f, fid in zip(raw_feats, feat_ids):
         try:
-            feats_named.append(feats_mod.get(fid).name.lower())
+            feat = feats_mod.get(fid)
         except LookupError:
             problems.append(f"No feat called {fid!r}.")
+            continue
+        target = str(f.get("target", "") if isinstance(f, dict) else "").strip().lower()
+        doc = feats_mod.documents().get(feat.id)
+        if feats_mod.needs_target(doc) and not target:
+            problems.append(
+                f"{feat.name} needs a weapon: send {{\"id\": \"{feat.id}\", "
+                f"\"target\": \"<weapon>\"}}.")
+            continue
+        feats_named.append(feat.name.lower() + (f" ({target})" if target else ""))
     if len(feat_ids) > feat_budget:
         problems.append(f"That is {len(feat_ids)} feats against {feat_budget} "
                         f"(one, plus one for a human, plus one for a fighter).")

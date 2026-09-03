@@ -1,14 +1,11 @@
 """Feats, and whether a character actually qualifies for one.
 
-`tables.FEATS` holds sixteen feats as Python because the engine reads *mechanics* off them
-— Weapon Finesse swaps an ability on attack rolls, Improved Initiative is worth four, Power
-Attack has its own arithmetic. Those sixteen are hand-written on purpose and stay that way:
-they are code, not data, and no spreadsheet column encodes "use Dex in place of Str".
-
 `content/feats/feats.json` holds all 1,478 as data — names, types, prose, sources and, most
-of the point, **typed prerequisites**. The two are layered rather than merged into one
-thing, because they answer different questions. "What does this feat do to my attack roll?"
-is `tables.FEATS`. "May this character take it?" is here.
+of the point, **typed prerequisites**. `content/feats/mechanics/*.json` holds, for the feats
+the engine computes with, a *document* in the class `grants` vocabulary (stage 8): "what
+does this feat do to my attack roll?" is `document()`, read live by the sheet the way worn
+gear is; "may this character take it?" is `meets`, here. Before stage 8 the first question
+was answered by a hand-written Python table of sixteen and name-branches in the sheet.
 
 **What `meets` will and will not claim.** About seven feats in ten have prerequisites that
 are fully machine-checkable. The rest carry at least one clause the extractor could not
@@ -25,7 +22,6 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .tables import FEATS as MECHANICAL
 
 # Conditions the checker understands. A condition kind not in here is treated as unknown
 # rather than ignored — see the module docstring.
@@ -64,8 +60,8 @@ class Feat:
 
     @property
     def mechanical(self) -> dict:
-        """The hand-written entry, if this feat is one the engine actually computes with."""
-        return MECHANICAL.get(self.name.strip().lower(), {})
+        """The feat's mechanics document, if the engine computes with this feat."""
+        return documents().get(self.id, {})
 
     @property
     def line(self) -> str:
@@ -227,6 +223,16 @@ def resolve(raw: str) -> tuple[Feat | None, str | None]:
         return get(name), target
     except KeyError:
         return None, target
+
+
+def needs_target(doc: dict | None) -> bool:
+    """Whether a document binds to the sheet's parenthetical — Weapon Focus (rapier)."""
+    if not doc:
+        return False
+    if any("$target" in str(t) for t in doc.get("tags") or ()):
+        return True
+    return any("$target" in str(v) for spec in doc.get("modifiers") or ()
+               if isinstance(spec, dict) for v in (spec.get("scope") or {}).values())
 
 
 def document(raw: str) -> dict | None:

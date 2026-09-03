@@ -2268,7 +2268,8 @@ class Engine:
             or not self.scene.initiative
             or not self._has_acted(defender.ref)
         )
-        cmd_mods = defender.cmd_modifiers(flat_footed)
+        cmd_mods = defender.cmd_modifiers(
+            flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
         cmd = sum(x.value for x in cmd_mods)
         cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
 

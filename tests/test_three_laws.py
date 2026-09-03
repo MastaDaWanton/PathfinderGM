@@ -897,8 +897,8 @@ def test_the_best_only_channels_never_add_up():
 # is the work remaining, and it may only go down.
 _NAMED_IN_ENGINE = {
     "rules/engine.py": 3,     # 'control blood' x1, 'swift strikes' x2 — stage 9
-    "rules/sheet.py": 12,     # power attack x6, weapon focus/specialisation x4,
-                              # weapon finesse x1, 'blood bending' x1 — stages 8 and 9
+    "rules/sheet.py": 1,      # 'blood bending' x1 — stage 9. Stage 8c retired the
+                              # eleven feat names: every feat is a document now.
 }
 
 

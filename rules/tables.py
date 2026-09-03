@@ -171,44 +171,9 @@ SAVE_ABILITY = {"fort": "con", "ref": "dex", "will": "wis"}
 
 # Only feats the engine actually applies. A feat on the sheet that is not here is carried
 # as flavour and contributes nothing — better than silently pretending it worked.
-FEATS: dict[str, dict] = {
-    "weapon finesse": {"name": "Weapon Finesse", "finesse": True},
-    "stealthy": {"name": "Stealthy", "skills": {"stealth": 2, "escape artist": 2}},
-    "alertness": {"name": "Alertness", "skills": {"perception": 2, "sense motive": 2}},
-    "acrobatic": {"name": "Acrobatic", "skills": {"acrobatics": 2, "fly": 2}},
-    "deceitful": {"name": "Deceitful", "skills": {"bluff": 2, "disguise": 2}},
-    "persuasive": {"name": "Persuasive", "skills": {"diplomacy": 2, "intimidate": 2}},
-    "improved initiative": {"name": "Improved Initiative", "initiative": 4},
-    "lightning reflexes": {"name": "Lightning Reflexes", "saves": {"ref": 2}},
-    "iron will": {"name": "Iron Will", "saves": {"will": 2}},
-    "great fortitude": {"name": "Great Fortitude", "saves": {"fort": 2}},
-    "toughness": {"name": "Toughness", "hp_bonus": True},
-    "dodge": {"name": "Dodge", "ac": 1, "ac_type": "dodge"},
-    "point-blank shot": {"name": "Point-Blank Shot", "ranged_near": {"attack": 1, "damage": 1}},
-    # Weapon Focus is per-weapon: sheets write it as "weapon focus (rapier)".
-    "weapon focus": {"name": "Weapon Focus", "weapon_attack": 1},
-    "weapon specialization": {"name": "Weapon Specialization", "weapon_damage": 2},
-    # Power Attack is a choice made per attack, not a passive bonus, so the numbers are
-    # computed in sheet.power_attack_terms() rather than sitting in this table.
-    "power attack": {"name": "Power Attack", "power_attack": True,
-                     "requires": {"bab": 1, "str": 13}},
-}
-
 # Feats written with a parenthesised target, e.g. "weapon focus (rapier)".
 FEAT_TARGET_RE = r"^(?P<feat>[^(]+?)\s*\((?P<target>[^)]+)\)$"
 
-
-def power_attack_terms(bab: int, two_handed: bool) -> tuple[int, int]:
-    """PF1e Power Attack: -1 attack for +2 damage, both scaling every 4 points of BAB,
-    and half again as much damage in two hands.
-
-    Returns (attack_penalty, damage_bonus), attack_penalty negative.
-    """
-    steps = 1 + max(0, bab) // 4
-    damage = steps * 2
-    if two_handed:
-        damage = (steps * 3)
-    return -steps, damage
 
 # --- Conditions ------------------------------------------------------------------
 

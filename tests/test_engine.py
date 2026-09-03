@@ -322,8 +322,10 @@ def test_power_attack_is_declared_by_the_gm_but_scored_by_the_engine(scene):
         "armour": "breastplate", "weapons": ["greatsword"], "equipped": "greatsword",
     }, ref="brute")
     assert brute.bab == 8
-    # BAB 8 -> 3 steps of Power Attack; two-handed, so +3 damage per step.
-    assert brute.power_attack_terms("greatsword") == (-3, 9)
+    # BAB 8 -> 3 steps of Power Attack; two-handed, so +3 damage per step. Stage 8:
+    # the arithmetic is the feat document's (`-(1 + bab // 4)`, twice that on damage,
+    # a third rung two-handed), read through the funnel with the weapon in hand — the
+    # numbers pinned here did not move when tables.power_attack_terms was deleted.
     atk = sum(m.value for m in brute.attack_modifiers("greatsword", power_attack=True))
     plain = sum(m.value for m in brute.attack_modifiers("greatsword"))
     assert plain - atk == 3

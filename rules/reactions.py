@@ -90,12 +90,22 @@ def budget_for(actor, name: str = "attack_of_opportunity") -> int:
     with Combat Reflexes. The feat is checked by name because that is how feats are held on
     the sheet; a creature with a negative Dexterity modifier still gets its one.
     """
-    if name != "attack_of_opportunity":
-        return 1
-    base = 1
-    if any("combat reflexes" in str(f).lower() for f in actor.feats):
-        base += max(0, actor.ability_mod("dex"))
-    return base
+    # Stage 8: the count comes from the feat's document (`budget`), not from a
+    # substring match on the sheet — which also matched "mythic combat reflexes".
+    # The best budget any held feat declares, and never fewer than one.
+    from . import feats as feats_mod, resources
+
+    best = 1
+    for raw in getattr(actor, "feats", ()) or ():
+        doc = feats_mod.document(raw)
+        formula = ((doc or {}).get("budget") or {}).get(name)
+        if formula is None:
+            continue
+        try:
+            best = max(best, resources.evaluate(formula, actor))
+        except resources.FormulaError:
+            continue
+    return best
 
 
 def threatens(scene, watcher_ref: str, square) -> bool:

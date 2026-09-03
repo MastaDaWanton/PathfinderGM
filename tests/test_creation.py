@@ -22,7 +22,7 @@ def spec(**over):
         "name": "Durga Stonebrow", "race": "dwarf", "class": "fighter", "pronouns": "she/her",
         "abilities": {"str": 16, "dex": 14, "con": 14, "int": 10, "wis": 12, "cha": 8},
         "skills": ["climb", "intimidate"],
-        "feats": ["power attack", "weapon focus"],
+        "feats": ["power attack", {"id": "weapon-focus", "target": "longsword"}],
     }
     base.update(over)
     return base
@@ -158,11 +158,11 @@ def test_a_human_fighter_gets_three_feats_and_a_dwarf_one_fewer():
     """One for everyone, one for a human, one for a fighter — the budget is stated in
     the refusal so the player learns the rule from being refused."""
     _, problems = creation.build(spec(
-        feats=["power attack", "weapon focus", "toughness"]))
+        feats=["power attack", {"id": "weapon-focus", "target": "longsword"}, "toughness"]))
     assert any("feats against 2" in p for p in problems)
     built, problems = creation.build(spec(
         race="human", bonus_ability="str",
-        feats=["power attack", "weapon focus", "toughness"]))
+        feats=["power attack", {"id": "weapon-focus", "target": "longsword"}, "toughness"]))
     assert problems == []
 
 

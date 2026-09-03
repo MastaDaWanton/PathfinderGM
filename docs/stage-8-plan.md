@@ -515,3 +515,27 @@ time and 9 without the feat; `Stealthy` named among the Stealth terms on
 `/api/sheet`; the whole suite 2,902 passed; the live feat read costs 0.25 ms per four
 channel reads with four feats held. Still in the table until 8c: Weapon Finesse,
 Weapon Focus, Weapon Specialization, Power Attack.
+
+**8c shipped, 2026-09-03.** Forty documents now (twelve from 8b, Weapon Focus and
+Specialization with `scope.weapon: "$target"`, Weapon Finesse as `attack_ability` with
+`if_better` and `when.weapon.finessable`, Power Attack as `choice: "power_attack"` with
+five conditional formula rungs — melee only, light +1, one-handed +2, two-handed +3 per
+step — Combat Reflexes as `budget`, the three Weapon Proficiency feats as
+`proficient.weapon.$target` tags, and the twenty Improved/Greater manoeuvre feats
+generated over `MANEUVERS`, each scoped to its manoeuvre on CMB *and* CMD). The funnel
+carries a context: `_buff_mods(kind, target, ctx)` with the weapon (key, hands,
+category, light, finessable), the `power_attack` choice and the manoeuvre, threaded
+from the attack, damage, CMB and CMD builders; `_scope_holds`/`_when_holds` evaluate,
+and a key the context lacks drops the term. `has_state` reads `standing_tags()` — feat
+tags and the class proficiency list — beside stored effects, so `is_proficient` is a
+tag question. `can_power_attack` reads the prerequisites from feats.json (`meets`);
+the hard-coded BAB 1 / Str 13 copy is gone, and so are `tables.FEATS`,
+`tables.power_attack_terms`, `Actor.has_feat`, `_uses_finesse`, the suffix match and
+the substring match. The forge takes `{"id": "weapon-focus", "target": "longsword"}`
+and refuses a scoped feat with no target naming the fix; `from_dict` binds a bare
+one to the weapon in hand with a note, once. `_NAMED_IN_ENGINE["rules/sheet.py"]` is
+1 (Blood Bending, stage 9). Measured live in a throwaway campaign: Borin under a +1
+enhancement oil and two +1 morale songs, Power Attack on — longsword terms BAB +1,
+Str +3, oil +1 (enhancement), one song +1 (morale; the second did not stack),
+Power Attack −1, Weapon Focus +1; damage Str +3, Power Attack +2; the shortbow
+carried neither feat. 2,909 passed.

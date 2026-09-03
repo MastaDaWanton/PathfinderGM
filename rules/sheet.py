@@ -23,12 +23,11 @@ from .activeeffect import ActiveEffect
 from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
-    CLASSES, CONDITIONS, FEAT_TARGET_RE, FEATS,
+    CLASSES, CONDITIONS, FEAT_TARGET_RE,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
-    is_physical, iterative_attacks, material_for, normalise_damage_type,
-    power_attack_terms, save_for,
+    is_physical, iterative_attacks, material_for, normalise_damage_type, save_for,
 )
 
 
@@ -1158,7 +1157,10 @@ class Actor:
         from . import states
 
         q = (query or "").strip().lower()
-        return any(states.matches(t, q) for e in self.effects for t in e.tags)
+        # Stored effects' tags, then the standing ones a feat document or the class
+        # list grants without an effect (stage 8). The one door for both.
+        return (any(states.matches(t, q) for e in self.effects for t in e.tags)
+                or any(states.matches(t, q) for t in self.standing_tags()))
 
     # --- condition contributions --------------------------------------------------
 
@@ -1328,12 +1330,25 @@ class Actor:
             return base
         return weapons_mod.get(wanted)
 
-    def _uses_finesse(self, weapon: dict) -> bool:
-        return (
-            weapon.get("finessable", False)
-            and any(self._feat_name(f) == "weapon finesse" for f in self.feats)
-            and self.ability_mod("dex") > self.ability_mod("str")
-        )
+    def _attack_ability(self, weapon: dict, weapon_key: str | None = None) -> str | None:
+        """A feat document's `attack_ability` substitution, when its clause holds.
+
+        Weapon Finesse: `{"use": "dex", "if_better": true, "when": {"weapon":
+        {"finessable": true}}}` — the one feat that is a switch rather than a number.
+        It was a literal name-match in this method before stage 8.
+        """
+        from . import feats as feats_mod
+
+        ctx = self._roll_context(weapon_key)
+        for raw in self.feats:
+            sub = (feats_mod.document(raw) or {}).get("attack_ability")
+            if not isinstance(sub, dict) or not _when_holds(sub.get("when"), ctx):
+                continue
+            use = str(sub.get("use", "")).lower()
+            if sub.get("if_better") and self.ability_mod(use) <= self.ability_mod("str"):
+                continue
+            return use
+        return None
 
     @staticmethod
     def _feat_name(feat: str) -> str:
@@ -1345,15 +1360,6 @@ class Actor:
     def _feat_target(feat: str) -> str | None:
         m = re.match(FEAT_TARGET_RE, feat.strip(), re.IGNORECASE)
         return m.group("target").strip().lower() if m else None
-
-    def has_feat(self, name: str, target: str | None = None) -> bool:
-        name = name.strip().lower()
-        for f in self.feats:
-            if self._feat_name(f) != name:
-                continue
-            if target is None or self._feat_target(f) in (None, target.strip().lower()):
-                return True
-        return False
 
     def is_proficient(self, weapon_key: str | None = None) -> bool:
         """Proficiency comes from the class, or from a Martial/Simple Weapon Proficiency
@@ -1375,27 +1381,36 @@ class Actor:
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
-        granted = {p.lower() for p in self.class_data.get("proficiencies", ())}
-        for f in self.feats:
-            if self._feat_name(f).endswith("weapon proficiency"):
-                t = self._feat_target(f)
-                if t:
-                    granted.add(t)
-                granted.add(self._feat_name(f).split()[0])
-        return key in granted or w.get("prof") in granted
+        # Law 1: a permission is a tag. The class list and every proficiency feat
+        # answer through `has_state`, never through a suffix match on the feat name.
+        return (self.has_state(f"proficient.weapon.{key}")
+                or bool(w.get("prof")) and self.has_state(f"proficient.{w['prof']}"))
 
-    def power_attack_terms(self, weapon_key: str | None = None) -> tuple[int, int]:
-        w = self.weapon(weapon_key)
-        return power_attack_terms(self.bab, w.get("hands", 1) == 2)
+    def choice_feat(self, choice: str) -> dict | None:
+        """The held feat document that declares this attack-op choice, if any."""
+        from . import feats as feats_mod
+
+        for raw in self.feats:
+            doc = feats_mod.document(raw)
+            if doc and str(doc.get("choice", "")) == choice:
+                return doc
+        return None
 
     def can_power_attack(self) -> str | None:
-        """None if legal, otherwise why not. PF1e requires the feat, BAB +1 and Str 13."""
-        if not self.has_feat("power attack"):
-            return f"{self.name} does not have Power Attack"
-        if self.bab < 1:
-            return f"{self.name} has BAB +{self.bab}; Power Attack needs +1"
-        if self.ability_score("str") < 13:
-            return f"{self.name} has Str {self.ability_score('str')}; Power Attack needs 13"
+        """None if legal, otherwise why not.
+
+        The feat by its document (`choice: "power_attack"`), the prerequisites from
+        feats.json — BAB +1 and Str 13 used to be hard-coded here, a third copy
+        beside the index and the table.
+        """
+        from . import feats as feats_mod
+
+        doc = self.choice_feat("power_attack")
+        if doc is None:
+            return f"{self.name} does not have {feats_mod.get('power-attack').name}"
+        verdict = feats_mod.meets(self, doc["id"])
+        if verdict["unmet"]:
+            return f"{self.name} cannot use {doc['name']}: needs {', '.join(verdict['unmet'])}"
         return None
 
     def attack_modifiers(
@@ -1414,8 +1429,8 @@ class Actor:
             # applies and actually helps.
             if w["category"] == "ranged":
                 ab, label = "dex", "Dex"
-            elif self._uses_finesse(w):
-                ab, label = "dex", "Dex (Finesse)"
+            elif (sub := self._attack_ability(w, key)):
+                ab, label = sub, f"{sub.title()} (Finesse)"
             else:
                 ab, label = "str", "Str"
             am = self.ability_mod(ab)
@@ -1425,8 +1440,6 @@ class Actor:
             if not self.is_proficient(key):
                 mods.append(Modifier(NON_PROFICIENT_PENALTY,
                                      f"not proficient with {w['name']}"))
-            if self.has_feat("weapon focus", key):
-                mods.append(Modifier(1, "Weapon Focus"))
 
             # Size only when the number was derived. A stat block's printed attack bonus
             # already includes the creature's size, and adding it again gave a small
@@ -1438,14 +1451,13 @@ class Actor:
         if iteration:
             mods.append(Modifier(-5 * iteration, f"iterative #{iteration + 1}"))
 
-        if power_attack:
-            penalty, _ = self.power_attack_terms(key)
-            mods.append(Modifier(penalty, "Power Attack"))
-
         mods.extend(self._condition_mods("attack"))
         if w["category"] == "melee":
             mods.extend(self._condition_mods("melee_attack"))
-        mods.extend(self._buff_mods("combat_mod", "attack"))
+        # Weapon Focus and Power Attack arrive here now, scoped and conditional, from
+        # their documents — never as literals appended above.
+        mods.extend(self._buff_mods("combat_mod", "attack",
+                                    self._roll_context(key, power_attack=power_attack)))
         return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
@@ -1470,16 +1482,14 @@ class Actor:
             am = self.ability_mod("str")
             if am:
                 mods.append(Modifier(am, "Str"))
-        if self.has_feat("weapon specialization", key):
-            mods.append(Modifier(2, "Weapon Specialization"))
-        if power_attack:
-            _, bonus = self.power_attack_terms(key)
-            mods.append(Modifier(bonus, "Power Attack"))
         mods.extend(self._condition_mods("damage"))
         # The one funnel, which this list alone never read: a `combat_mod` aimed at
         # damage was accepted, saved, shown on the sheet — and absent from every
         # damage roll. Found by Blood Rage's +2 damage the day it became a document.
-        mods.extend(self._buff_mods("combat_mod", "damage"))
+        # Weapon Specialization and Power Attack's damage ride it too, from their
+        # documents, against the weapon in hand.
+        mods.extend(self._buff_mods("combat_mod", "damage",
+                                    self._roll_context(key, power_attack=power_attack)))
         return stack(mods)
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
@@ -1562,7 +1572,8 @@ class Actor:
     # separate columns, and getting them crossed makes every small creature better at
     # grappling than it should be.
 
-    def cmb_modifiers(self, maneuver: str | None = None) -> list[Modifier]:
+    def cmb_modifiers(self, maneuver: str | None = None,
+                      power_attack: bool = False) -> list[Modifier]:
         if self.flat_attack is not None:
             # An NPC stat block prints CMB directly; when it does not, the attack bonus
             # is the closest honest stand-in.
@@ -1576,19 +1587,19 @@ class Actor:
             size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
             if size_mod:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
-            if maneuver and self.has_feat(f"improved {maneuver}"):
-                mods.append(Modifier(2, f"Improved {maneuver.title()}"))
-            if maneuver and self.has_feat(f"greater {maneuver}"):
-                mods.append(Modifier(2, f"Greater {maneuver.title()}"))
 
         mods.extend(self._condition_mods("attack"))
         # The one funnel, which this list alone never read — the same gap
         # damage_modifiers had: a `combat_mod` aimed at cmb was in the authoring
-        # vocabulary, validated, saved, and absent from every manoeuvre roll.
-        mods.extend(self._buff_mods("combat_mod", "cmb"))
+        # vocabulary, validated, saved, and absent from every manoeuvre roll. The
+        # Improved/Greater <manoeuvre> family arrives here scoped to the manoeuvre.
+        mods.extend(self._buff_mods("combat_mod", "cmb",
+                                    self._roll_context(None, maneuver=maneuver,
+                                                       power_attack=power_attack)))
         return stack([m for m in mods if m.value])
 
-    def cmd_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
+    def cmd_modifiers(self, flat_footed: bool = False,
+                      maneuver: str | None = None) -> list[Modifier]:
         if self.flat_cmd is not None:
             mods = [Modifier(self.flat_cmd, "CMD")]
             if flat_footed and self.ability_mod("dex") > 0:
@@ -1608,7 +1619,10 @@ class Actor:
 
         # "Any penalties to a creature's AC also apply to its CMD."
         mods.extend(m for m in self._condition_mods("ac") if m.value < 0)
-        mods.extend(self._buff_mods("combat_mod", "cmd"))
+        # 1e grants Improved <manoeuvre> to CMD as well as CMB; the old branch gave
+        # CMB alone, and the document says both.
+        mods.extend(self._buff_mods("combat_mod", "cmd",
+                                    {"maneuver": maneuver} if maneuver else None))
         return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:
@@ -2242,7 +2256,48 @@ class Actor:
                     "cmd": self.flat_cmd is not None}.get(t, False)
         return False
 
-    def _feat_mods(self, kind: str, target: str) -> list["Modifier"]:
+    def standing_tags(self) -> tuple[str, ...]:
+        """Tags held without an effect: a feat document's `tags`, and the class's
+        proficiencies as `proficient.<category>` / `proficient.weapon.<key>`.
+
+        `has_state` reads stored effects' tags; feats are live-read, not stored, so
+        their tags need a second source or a Martial Weapon Proficiency feat is
+        invisible to the one question that should see it — and the class lists were
+        plain strings in `tables.CLASSES`, never tags at all. `$target` is the
+        parenthetical: the feat is one weapon per taking; the whole-category grant
+        the old suffix match gave (`split()[0]`) was a bug, not a rule.
+        """
+        from . import feats as feats_mod
+
+        out: list[str] = []
+        for p in self.class_data.get("proficiencies", ()):
+            p = str(p).strip().lower()
+            if p:
+                out.append(f"proficient.{p}" if p in ("simple", "martial", "exotic")
+                           else f"proficient.weapon.{p}")
+        for raw in self.feats:
+            doc = feats_mod.document(raw)
+            for tag in (doc or {}).get("tags") or ():
+                tag = str(tag)
+                if "$target" in tag:
+                    if not doc.get("target"):
+                        continue                   # bound to nothing yet
+                    tag = tag.replace("$target", str(doc["target"]).strip().lower())
+                out.append(tag)
+        return tuple(out)
+
+    def _roll_context(self, weapon_key: str | None = None, **extra) -> dict:
+        """What a scoped or conditional feat term is evaluated against."""
+        w = self.weapon(weapon_key)
+        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        return {"weapon": {"key": key, "hands": w.get("hands", 1),
+                           "category": w.get("category", "melee"),
+                           "light": bool(w.get("light", False)),
+                           "finessable": bool(w.get("finessable", False)),
+                           "ranged": w.get("category") == "ranged"},
+                **extra}
+
+    def _feat_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Modifiers from the feats this character holds, read off their documents.
 
         The sixth channel, retired: before stage 8 every feat term was a bare
@@ -2253,11 +2308,16 @@ class Actor:
         content/feats/mechanics, so removing the feat removes the term and nothing is
         ever saved twice.
 
-        A modifier carrying `scope` or `when` needs a roll context — which weapon, at
-        what range — that this funnel does not carry yet; it is DROPPED, never applied
+        A modifier carrying `scope` or `when` is evaluated against `ctx`, the roll
+        context the builder passes — which weapon (key, hands, category, light,
+        finessable), the `power_attack` choice, the manoeuvre, the range. A key the
+        context does not carry means the term is DROPPED, never applied
         unconditionally (Point-Blank Shot on a longsword would be the bug), and the
-        document's `not_yet` says so. The re-entrancy guard is for a formula: Toughness
-        feeds `hp_max`, and `resources.variables` can name `hp_max`.
+        document's `not_yet` says so. `$target` is the sheet's parenthetical — Weapon
+        Focus (rapier) — and a bare Weapon Focus binds nowhere (it used to bind
+        everywhere: `has_feat` matched a target of None against every weapon). The
+        re-entrancy guard is for a formula: Toughness feeds `hp_max`, and
+        `resources.variables` can name `hp_max`.
         """
         if getattr(self, "_reading_feats", False) or self._flat_for(kind, target):
             return []
@@ -2275,7 +2335,8 @@ class Actor:
                     if not isinstance(spec, dict) or spec.get("type") != kind \
                             or str(spec.get("target", "")).lower() != want:
                         continue
-                    if spec.get("scope") or spec.get("when"):
+                    if not _scope_holds(spec.get("scope"), doc, ctx) \
+                            or not _when_holds(spec.get("when"), ctx):
                         continue
                     if spec.get("formula"):
                         try:
@@ -2302,7 +2363,7 @@ class Actor:
     def loses_dex_to_ac(self) -> bool:
         return any(c.data.get("lose_dex_to_ac") for c in self.conditions)
 
-    def _buff_mods(self, kind: str, target: str) -> list["Modifier"]:
+    def _buff_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Everything timed or worn that moves this number.
 
         Worn gear joins here rather than at each call site because this is the one
@@ -2323,7 +2384,7 @@ class Actor:
                         and amount:
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
-        out += self._standing_mods(kind, target) + self._feat_mods(kind, target)
+        out += self._standing_mods(kind, target) + self._feat_mods(kind, target, ctx)
         # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
         # four shipped dodge feats had no reader for that clause, and nothing on the
         # sheet asked it of buffs either; one generic rule here, not one per feat.
@@ -2635,7 +2696,10 @@ class Actor:
                 s: sum(m.value for m in self.skill_modifiers(s))
                 for s in sorted(self.ranks)
             }
-            out["feats"] = [f if self._feat_target(f) else FEATS.get(self._feat_name(f), {}).get("name", f)
+            from . import feats as feats_mod
+
+            out["feats"] = [f if self._feat_target(f)
+                            else (feats_mod.document(f) or {}).get("name", f)
                             for f in self.feats]
             out["weapon"] = self.weapon()["name"]
         return out
@@ -2785,7 +2849,7 @@ def full_sheet(actor: Actor) -> dict:
     feats = []
     for f in actor.feats:
         base = Actor._feat_name(f)
-        known = FEATS.get(base)
+        known = None
         target = Actor._feat_target(f)
         # The index carries all 1,474 and the hand-written table carries the sixteen the
         # engine computes with. A feat in the index but not the table used to read
@@ -2802,8 +2866,6 @@ def full_sheet(actor: Actor) -> dict:
 
         if doc:
             effect = _document_effect_text(doc)
-        elif known:
-            effect = _feat_effect_text(known)
         elif entry and entry.benefit:
             effect = entry.benefit
         else:
@@ -3039,23 +3101,66 @@ def _document_effect_text(doc: dict) -> str:
     return text
 
 
-def _feat_effect_text(feat: dict) -> str:
-    bits = []
-    if feat.get("finesse"):
-        bits.append("Dex in place of Str on attack rolls with finessable weapons")
-    for label, key in (("skills", "skills"), ("saves", "saves")):
-        for what, v in (feat.get(key) or {}).items():
-            bits.append(f"{v:+d} {what}")
-    for key, label in (("initiative", "initiative"), ("ac", "AC"),
-                       ("weapon_attack", "attack with the chosen weapon"),
-                       ("weapon_damage", "damage with the chosen weapon")):
-        if feat.get(key):
-            bits.append(f"{feat[key]:+d} {label}")
-    if feat.get("power_attack"):
-        bits.append("trade attack bonus for damage, scaling with BAB")
-    if feat.get("hp_bonus"):
-        bits.append("bonus hit points")
-    return "; ".join(bits) or "no mechanical effect recorded"
+def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:
+    """A `scope` binds a term to one thing — the weapon or the manoeuvre in hand.
+
+    `$target` is the sheet's parenthetical; a feat with none binds nowhere. No context
+    at all (a bare `_buff_mods` read) means a scoped term does not apply.
+    """
+    if not scope:
+        return True
+    if not isinstance(scope, dict) or not ctx:
+        return False
+    for key, want in scope.items():
+        want = str(want)
+        if want == "$target":
+            want = str(doc.get("target") or "")
+            if not want:
+                return False
+        if key == "weapon":
+            have = str((ctx.get("weapon") or {}).get("key", ""))
+        else:
+            have = str(ctx.get(key, "") or "")
+        if have.strip().lower() != want.strip().lower():
+            return False
+    return True
+
+
+def _when_holds(when, ctx: dict | None) -> bool:
+    """A `when` is a condition on the roll context; an unevaluable key means no.
+
+    `{"weapon": {"category": "melee", "hands": 2}}` compares each weapon field;
+    `{"choice": "power_attack"}` asks the attack op's boolean; `{"range_ft": {"lte":
+    30}}` needs a range the context does not carry yet, so it is dropped — the plan's
+    rule for every clause nothing can evaluate.
+    """
+    if not when:
+        return True
+    if not isinstance(when, dict) or ctx is None:
+        return False
+    for key, want in when.items():
+        if key == "weapon":
+            w = ctx.get("weapon") or {}
+            for field_name, value in (want or {}).items():
+                if field_name not in w or w[field_name] != value:
+                    return False
+        elif key == "choice":
+            if not ctx.get(str(want)):
+                return False
+        elif isinstance(want, dict):
+            have = ctx.get(key)
+            if have is None:
+                return False
+            ops = {"lte": lambda a, b: a <= b, "gte": lambda a, b: a >= b,
+                   "lt": lambda a, b: a < b, "gt": lambda a, b: a > b,
+                   "eq": lambda a, b: a == b}
+            for op, bound in want.items():
+                if op not in ops or not ops[op](have, bound):
+                    return False
+        else:
+            if ctx.get(key) != want:
+                return False
+    return True
 
 
 def to_dict(actor: Actor) -> dict:
@@ -3532,6 +3637,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # points on load, Thor 23 -> 37, until this moved below the line that tells the
     # sheet how many dice it has.
     a.set_hp_max(int(data.get("hp_max", data.get("hp", 1)) or 1))
+    _bind_targets(a)
     return a
 
 
@@ -3539,6 +3645,31 @@ def load_pc(path: str | Path) -> Actor:
     with Path(path).open(encoding="utf-8") as fh:
         return from_dict(json.load(fh), ref="pc")
 
+
+
+def _bind_targets(actor: Actor) -> None:
+    """A bare Weapon Focus on a sheet is bound, once, to the weapon in hand.
+
+    The forge wrote every scoped feat untargeted (`creation.py` collected no weapon),
+    and `has_feat` matched a target of None against every weapon, so every forge-built
+    Weapon Focus was +1 with everything. Under the documents a bare `$target` feat
+    binds nowhere, and a save holding one would silently lose its bonus; so on load
+    it is rewritten to the equipped weapon with a note that says so, never dropped.
+    """
+    from . import feats as feats_mod
+
+    for i, raw in enumerate(list(actor.feats)):
+        doc = feats_mod.document(raw)
+        if not doc or doc.get("target") or not feats_mod.needs_target(doc):
+            continue
+        weapon = str(actor.equipped or "").strip().lower()
+        if not weapon:
+            continue
+        actor.feats[i] = f"{doc['name'].lower()} ({weapon})"
+        note = (f"[feat '{doc['name']}' had no weapon named; bound to the {weapon} in "
+                f"hand on load — write it as '{doc['name']} (<weapon>)' to choose]")
+        if note not in (actor.notes or ""):
+            actor.notes = (actor.notes + " " + note).strip() if actor.notes else note
 
 def validate(actor: Actor) -> None:
     """Legality checks that must fail loudly at load rather than quietly mid-scene."""
@@ -3570,9 +3701,8 @@ def validate(actor: Actor) -> None:
     from . import feats as feats_mod
 
     for f in actor.feats:
-        # A document, or (until stage 8c retires the last name-branches) a table
-        # entry: either way the engine applies something, and the note would lie.
-        if Actor._feat_name(f) in FEATS or feats_mod.document(f):
+        # A document means the engine applies something, and the note would lie.
+        if feats_mod.document(f):
             continue
         # Not fatal: an unrecognised feat contributes nothing and says so, which is
         # better than silently pretending it applied.

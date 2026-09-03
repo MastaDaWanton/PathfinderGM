@@ -22,7 +22,7 @@ from rules import feats as feats_mod
 from rules import ingredients, registry, spells, worldclass
 from rules import bestiary
 from rules.bestiary import TEMPLATES
-from rules.tables import ARMOUR, CLASSES, FEATS, SHIELDS, WEAPONS
+from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
 
 
 def _slug(name: str) -> str:
@@ -171,7 +171,7 @@ def benches() -> list[Bench]:
         ),
         Bench(
             id="feats", name="Feats", dir="feats",
-            shipped=len(FEATS), shipped_label="in the Core Rulebook tables",
+            shipped=len(feats_mod.documents()), shipped_label="with a mechanics document",
             blurb="Named modifiers the sheet applies. A feat that grants a permission "
                   "rather than a number needs the relaxation rules in "
                   "docs/homebrew-rules.md.",
@@ -324,10 +324,11 @@ def rows_for(bench_id: str) -> list[dict]:
         # `registry.find` therefore resolves. The hand-written table is keyed "weapon
         # finesse" with a space, so a row carrying that id drew a link to a 404. All 16
         # have an imported twin under the slug, so nothing is lost by preferring it.
-        applied = {_slug(k): v for k, v in FEATS.items()}
-        rows += [{"name": v.get("name", k), "kind": "feat", "mine": False, "id": k,
-                  "note": v.get("note", "") or "applied by the sheet"}
-                 for k, v in applied.items()]
+        # Stage 8: "applied" means a mechanics document exists for the id.
+        applied = set(feats_mod.documents())
+        rows += [{"name": feats_mod.all_feats()[k].name, "kind": "feat", "mine": False,
+                  "id": k, "note": "applied by the sheet, from its document"}
+                 for k in sorted(applied) if k in feats_mod.all_feats()]
         rows += [{"name": v.name, "kind": "feat", "mine": False, "id": k,
                   "note": (v.benefit or v.line or "")[:110]}
                  # Capped like the spell bench, and for the same reason: 1,474 rows is a

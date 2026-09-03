@@ -28,7 +28,7 @@ def spec(**over):
         "name": "Tier Test", "race": "dwarf", "class": "fighter", "pronouns": "she/her",
         "abilities": {"str": 16, "dex": 14, "con": 14, "int": 10, "wis": 12, "cha": 8},
         "skills": ["climb", "intimidate"],
-        "feats": ["power attack", "weapon focus"],
+        "feats": ["power attack", {"id": "weapon-focus", "target": "longsword"}],
     }
     base.update(over)
     return base

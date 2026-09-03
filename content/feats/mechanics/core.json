@@ -11,77 +11,791 @@
   ],
   "stealthy": {
     "modifiers": [
-      {"type": "skill_mod", "target": "stealth", "amount": 2, "bonus_type": "untyped"},
-      {"type": "skill_mod", "target": "escape artist", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "skill_mod",
+        "target": "stealth",
+        "amount": 2,
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "escape artist",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ],
-    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+    "not_yet": [
+      "skill.ranks >= 10 raises each to +4"
+    ]
   },
   "alertness": {
     "modifiers": [
-      {"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "untyped"},
-      {"type": "skill_mod", "target": "sense motive", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "skill_mod",
+        "target": "perception",
+        "amount": 2,
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "sense motive",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ],
-    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+    "not_yet": [
+      "skill.ranks >= 10 raises each to +4"
+    ]
   },
   "acrobatic": {
     "modifiers": [
-      {"type": "skill_mod", "target": "acrobatics", "amount": 2, "bonus_type": "untyped"},
-      {"type": "skill_mod", "target": "fly", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "skill_mod",
+        "target": "acrobatics",
+        "amount": 2,
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "fly",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ],
-    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+    "not_yet": [
+      "skill.ranks >= 10 raises each to +4"
+    ]
   },
   "deceitful": {
     "modifiers": [
-      {"type": "skill_mod", "target": "bluff", "amount": 2, "bonus_type": "untyped"},
-      {"type": "skill_mod", "target": "disguise", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "skill_mod",
+        "target": "bluff",
+        "amount": 2,
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "disguise",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ],
-    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+    "not_yet": [
+      "skill.ranks >= 10 raises each to +4"
+    ]
   },
   "persuasive": {
     "modifiers": [
-      {"type": "skill_mod", "target": "diplomacy", "amount": 2, "bonus_type": "untyped"},
-      {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "skill_mod",
+        "target": "diplomacy",
+        "amount": 2,
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ],
-    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+    "not_yet": [
+      "skill.ranks >= 10 raises each to +4"
+    ]
   },
   "improved-initiative": {
     "modifiers": [
-      {"type": "combat_mod", "target": "initiative", "amount": 4, "bonus_type": "untyped"}
+      {
+        "type": "combat_mod",
+        "target": "initiative",
+        "amount": 4,
+        "bonus_type": "untyped"
+      }
     ]
   },
   "lightning-reflexes": {
     "modifiers": [
-      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ]
   },
   "iron-will": {
     "modifiers": [
-      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ]
   },
   "great-fortitude": {
     "modifiers": [
-      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped"}
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
     ]
   },
   "dodge": {
     "modifiers": [
-      {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge"}
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "dodge"
+      }
     ]
   },
   "toughness": {
     "modifiers": [
-      {"type": "combat_mod", "target": "hp_max", "formula": "3 + max(0, hit_dice - 3)",
-       "bonus_type": "untyped"}
+      {
+        "type": "combat_mod",
+        "target": "hp_max",
+        "formula": "3 + max(0, hit_dice - 3)",
+        "bonus_type": "untyped"
+      }
     ]
   },
   "point-blank-shot": {
     "modifiers": [
-      {"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "untyped",
-       "when": {"weapon": {"category": "ranged"}, "range_ft": {"lte": 30}}},
-      {"type": "combat_mod", "target": "damage", "amount": 1, "bonus_type": "untyped",
-       "when": {"weapon": {"category": "ranged"}, "range_ft": {"lte": 30}}}
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "weapon": {
+            "category": "ranged"
+          },
+          "range_ft": {
+            "lte": 30
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "weapon": {
+            "category": "ranged"
+          },
+          "range_ft": {
+            "lte": 30
+          }
+        }
+      }
     ],
-    "not_yet": ["attack.range_ft: the attack op does not yet pass range into the roll context"]
+    "not_yet": [
+      "attack.range_ft: the attack op does not yet pass range into the roll context"
+    ]
+  },
+  "weapon-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "$target"
+        }
+      }
+    ]
+  },
+  "weapon-specialization": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "$target"
+        }
+      }
+    ]
+  },
+  "weapon-finesse": {
+    "attack_ability": {
+      "use": "dex",
+      "if_better": true,
+      "when": {
+        "weapon": {
+          "finessable": true
+        }
+      }
+    }
+  },
+  "power-attack": {
+    "choice": "power_attack",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "weapon": {
+            "category": "melee"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "2 * (1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "weapon": {
+            "category": "melee",
+            "light": false
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "weapon": {
+            "category": "melee",
+            "light": true
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "weapon": {
+            "category": "melee",
+            "hands": 2
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "off-hand weapons take the light rung; the sheet has no off-hand yet",
+      "touch attacks and effects that deal no hit-point damage are not excluded"
+    ]
+  },
+  "combat-reflexes": {
+    "budget": {
+      "attack_of_opportunity": "1 + max(0, dex_mod)"
+    },
+    "not_yet": [
+      "attacks of opportunity while flat-footed"
+    ]
+  },
+  "simple-weapon-proficiency": {
+    "tags": [
+      "proficient.weapon.$target"
+    ]
+  },
+  "martial-weapon-proficiency": {
+    "tags": [
+      "proficient.weapon.$target"
+    ]
+  },
+  "exotic-weapon-proficiency": {
+    "tags": [
+      "proficient.weapon.$target"
+    ]
+  },
+  "improved-bull-rush": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "bull rush"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "bull rush"
+        }
+      }
+    ],
+    "not_yet": [
+      "a bull rush attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-bull-rush": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "bull rush"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "bull rush"
+        }
+      }
+    ]
+  },
+  "improved-disarm": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        }
+      }
+    ],
+    "not_yet": [
+      "a disarm attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-disarm": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        }
+      }
+    ]
+  },
+  "improved-grapple": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "grapple"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "grapple"
+        }
+      }
+    ],
+    "not_yet": [
+      "a grapple attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-grapple": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "grapple"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "grapple"
+        }
+      }
+    ]
+  },
+  "improved-overrun": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "overrun"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "overrun"
+        }
+      }
+    ],
+    "not_yet": [
+      "a overrun attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-overrun": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "overrun"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "overrun"
+        }
+      }
+    ]
+  },
+  "improved-sunder": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        }
+      }
+    ],
+    "not_yet": [
+      "a sunder attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-sunder": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        }
+      }
+    ]
+  },
+  "improved-trip": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "trip"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "trip"
+        }
+      }
+    ],
+    "not_yet": [
+      "a trip attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-trip": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "trip"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "trip"
+        }
+      }
+    ]
+  },
+  "improved-reposition": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "reposition"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "reposition"
+        }
+      }
+    ],
+    "not_yet": [
+      "a reposition attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-reposition": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "reposition"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "reposition"
+        }
+      }
+    ]
+  },
+  "improved-dirty-trick": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "dirty trick"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "dirty trick"
+        }
+      }
+    ],
+    "not_yet": [
+      "a dirty trick attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-dirty-trick": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "dirty trick"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "dirty trick"
+        }
+      }
+    ]
+  },
+  "improved-steal": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "steal"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "steal"
+        }
+      }
+    ],
+    "not_yet": [
+      "a steal attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-steal": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "steal"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "steal"
+        }
+      }
+    ]
+  },
+  "improved-drag": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "drag"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "drag"
+        }
+      }
+    ],
+    "not_yet": [
+      "a drag attempt does not provoke an attack of opportunity"
+    ]
+  },
+  "greater-drag": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "drag"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "drag"
+        }
+      }
+    ]
   }
 }

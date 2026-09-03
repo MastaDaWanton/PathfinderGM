@@ -106,14 +106,13 @@ def build(actor) -> dict:
 
     # Feats: the sheet already prints their effect beside them, but the glossary carries
     # them too so a feat named in a grants column answers the same click.
-    from .tables import FEATS
+    from . import feats as feats_mod
+    from .sheet import _document_effect_text
 
     for feat in getattr(actor, "feats", []) or []:
-        found = FEATS.get(_clean(feat))
-        if found:
-            add(found.get("name", feat),
-                found.get("effect") or found.get("benefit") or "",
-                found.get("source", "feat"))
+        doc = feats_mod.document(feat)
+        if doc:
+            add(doc["name"], _document_effect_text(doc), "feat")
 
     return out
 
