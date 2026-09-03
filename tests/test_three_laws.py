@@ -995,3 +995,66 @@ def test_only_one_function_moves_the_world_clock():
     assert not unlisted, (
         f"the world clock is moved outside Scene.advance: {unlisted}. Call "
         f"scene.advance(minutes) so the effects, the pools and the body move with it.")
+
+
+# --- law 3, stage 8: every number that lands names the document it came from ------------
+
+_ORIGIN_KINDS = ("item", "spell", "ability", "rule", "ward", "creature", "author")
+
+
+def test_every_number_that_lands_names_a_document_it_came_from():
+    """Stage 8's law test. Measured 2026-09-02: `heal 1d8+1` for a potion nobody held
+    reached the sheet, and the engine's own potion emitted a byte-identical intent, so
+    nothing could tell them apart. Every door that turns a document into a number now
+    stamps where it came from — the jar, a spell, rest, a hazard — and every
+    heal/damage/temp_hp/buff record that lands carries `origin` of a known kind.
+    Walked here by driving each door in a test scene, not by reading the code."""
+    from rules.crafting import Stock
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.bestiary import instantiate
+    from rules.sheet import load_pc
+    from tests._places import stand_on
+    from tests.test_casting_executes import cast, wizard
+
+    def records(resolution):
+        return [e for o in resolution.outcomes for e in o.effects
+                if e.get("kind") in ("heal", "damage", "temp_hp", "buff", "defence")]
+
+    landed = []
+    # The jar door, on its last dose.
+    s = Scene(location_id="5bbd0c40345f"); stand_on(s, "urban")
+    pc = load_pc("fixtures/pc-kesst.json"); s.add(pc)
+    s.add(instantiate("guildhand", scene=s, name="the merchant"))
+    e = Engine(s, Dice(seed=3))
+    pc.hp = pc.hp_max - 5
+    pc.stock["draught#1"] = Stock(base="Healing Draught", count=1,
+                                  specs=[{"type": "heal", "dice": "1d8"}])
+    landed += records(e.run(e.validate([{"op": "use_item", "actor": "pc", "because": "t",
+                                         "params": {"item": "draught#1"}}])))
+    # A hazard, and a night's rest.
+    landed += records(e.run(e.validate([{"op": "hazard", "actor": "pc", "because": "t",
+                                         "params": {"rule": "falling", "distance_ft": 10}}])))
+    rest = e.run(e.validate([{"op": "rest", "actor": "pc", "because": "t",
+                              "params": {"kind": "night"}}]))
+    landed += [o.effects[0] for o in rest.outcomes if o.op == "rest" and o.effects]
+    # A spell, through the cast door.
+    s2 = Scene(location_id="5bbd0c40345f"); stand_on(s2, "urban")
+    s2.add(wizard(level=5, prepared={"magic-missile": 1}))
+    s2.add(instantiate("thug", scene=s2, name="the thug"))
+    landed += records(cast(Engine(s2, Dice(seed=5)), "magic-missile"))
+
+    assert len(landed) >= 4, landed
+    for rec in landed:
+        kind = str(rec.get("origin", "")).split(":", 1)[0]
+        assert kind in _ORIGIN_KINDS, (
+            f"a {rec.get('kind')} record landed with origin {rec.get('origin')!r}: "
+            f"{rec}")
+    # And the stamp is never the model's to write.
+    import pytest
+
+    from rules.intents import IntentError
+
+    with pytest.raises(IntentError, match="origin is the engine"):
+        e.validate([{"op": "heal", "actor": "pc", "because": "t",
+                     "params": {"amount": 1, "origin": "item:x"}}])

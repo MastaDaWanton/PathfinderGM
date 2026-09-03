@@ -132,6 +132,31 @@ def check_the_laws_hold(http: Http) -> None:
     note("a worn effect reaches its number and names itself", faults)
 
 
+def check_a_feat_names_itself(http: Http) -> None:
+    """Stage 8: a feat's bonus reaches its number through the same door a ring does.
+
+    The prover's own character was built with Weapon Focus (longsword). Before stage 8
+    the +1 was a literal in `attack_modifiers` that never read the table and bound to
+    every weapon; now it is a document, read live through the funnel, scoped to the
+    longsword, and the term on the sheet names the feat — provable exactly the way the
+    ring is.
+    """
+    s, body = http.get("/api/sheet")
+    faults = [] if s == 200 else [f"sheet answered {s}"]
+    rows = (j(body).get("attacks") or []) if s == 200 else []
+    named = {str(r.get("name", r.get("weapon", ""))).lower():
+             [str(t.get("source", "")) for t in (r.get("attack") or [])] for r in rows}
+    sword = next((terms for name, terms in named.items() if "longsword" in name), None)
+    if sword is None:
+        faults.append(f"no longsword attack row on the sheet: {sorted(named)}")
+    elif not any("Weapon Focus" in t for t in sword):
+        faults.append(f"Weapon Focus is not named among the longsword terms: {sword}")
+    for name, terms in named.items():
+        if "longsword" not in name and any("Weapon Focus" in t for t in terms):
+            faults.append(f"Weapon Focus leaked onto the {name}: {terms}")
+    note("a feat reaches its number through the funnel and names itself", faults)
+
+
 def check_it_survived_the_restart(http: Http) -> None:
     """The same ring, after the exe has been stopped and started on the same data.
 
@@ -534,6 +559,7 @@ def main() -> None:
 
         run_checks(http, repo)
         check_the_laws_hold(http)
+        check_a_feat_names_itself(http)
 
         # Stop the app and start it again on the same data directory. Every defect that
         # only shows itself after a restart was invisible to this prover until now,

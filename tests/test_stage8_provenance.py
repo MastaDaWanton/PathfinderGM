@@ -100,12 +100,23 @@ def test_the_player_turn_enum_offers_none_of_the_amount_ops():
 
 
 def test_a_bestiary_creatures_turn_is_the_one_named_exception():
-    """5,735 of 7,188 shipped creatures carry `special_attacks` no locator reads. On
-    such a creature's turn `damage` and `ability_damage` come back, stamped
-    `creature:<template>` by the engine — the ratchet lists this door by name."""
+    """5,735 of 7,188 shipped creatures carry `special_attacks` no locator reads
+    (measured 2026-09-02 by the recon). On such a creature's turn `damage` and
+    `ability_damage` come back, stamped `creature:<template>` by the engine — the
+    one door where the model still authors a number, listed here by name and by
+    count so the creature-document stage that retires it knows its size."""
+    from rules import bestiary
+
     assert {"damage", "ability_damage"} <= set(prompts._CREATURE_OPS)
     assert not ({"heal", "buff", "temp_hp", "defence", "item_damage"}
                 & set(prompts._CREATURE_OPS))
+    blocks = bestiary.imported()
+    with_specials = sum(1 for b in blocks.values() if b.get("special_attacks"))
+    assert with_specials >= 5000, with_specials      # the exception is not small
+    # A path-less creature's turn stamps its template; a classed one does not.
+    s, engine = _yard()
+    thug = s.actors["c1"]
+    assert thug.from_template and not thug.paths
 
 
 def test_the_prompt_teaches_no_number_for_what_heals_wards_or_poisons():

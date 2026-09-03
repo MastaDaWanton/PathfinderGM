@@ -60,7 +60,20 @@ in the brief; **one spatial coordinate** — `Actor.at` is a place id from
 read-only view of who is here, `Scene.move`/`Scene.remove` the only doors,
 `scene.biome` a parse of the id, refs minted once via `bestiary.next_ref` and
 never reused (docs/places-8b-plan.md; ratchet in
-`tests/test_one_spatial_authority.py`).
+`tests/test_one_spatial_authority.py`); **provenance** — `Intent.origin` /
+`origin_name` stamped only by `Engine.validate(raw, origin=...)` (`item:<id>`,
+`spell:<id>`, `ability:<path>/<key>`, `rule:<id>`, `creature:<template>`,
+`author:cheat`, `author:test`), a model-written `origin` refused at parse, the
+seven amount-ops plus save-branch dice, guard amounts and pool gains refused
+without a stamp and absent from the sampler enum, `ActiveEffect.origin` beside
+`source`, effect records and tells naming the document; **feats as documents**
+— `content/feats/mechanics/*.json` in the `grants` vocabulary plus `scope`,
+`when`, `choice`, `attack_ability`, `budget`, `tags`, `not_yet`, validated on load
+by `classbuilder.validate_feat_documents`, read live by `Actor._feat_mods` inside
+`_buff_mods(kind, target, ctx)` (never stored), `has_state` reading
+`standing_tags()`; **hazards** — `content/rules/hazards.json` rows with a bounded
+slot, the `hazard` op (docs/stage-8-plan.md; ratchets in
+`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
@@ -76,7 +89,21 @@ never reused (docs/places-8b-plan.md; ratchet in
 **Refused** (asked and answered — do not reopen without the user): the three GAS
 items above; models authoring numbers anywhere (validators refuse documents with
 the fix named, in the classbuilder's message style); presentation leading
-mechanics.
+mechanics; a stored `ActiveEffect` per feat (Foundry v11 abandoned the copied
+effect with an origin pointer — the feat list is the store); `origin` in the
+model-writable params (parse pops engine-owned keys silently, so it could not
+join that set); a validate-time source check as the primary defence (the sampler
+enum is; stage 7 measured what a rejection teaches); GM fiat with no rule row.
+
+**Still open after stage 8** (do not read a passing probe as proof): the
+`_op_use_ability` instant-effects loop records no per-number origin (the outcome
+record carries `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id;
+Point-Blank Shot's `when.range_ft` waits on the attack op passing range into the
+roll context (its term is dropped, per the rule); the wielded-weapon spec channel
+(masterwork, enchanted) has no reader — stage 9; bestiary special attacks have no
+locator, so a creature's fight turn keeps `damage`/`ability_damage` stamped
+`creature:<template>`; feat actions (Cleave, Vital Strike) have no `find_ability`
+branch; no level-up feat writer exists.
 
 ## Before designing anything: search for how it was already solved
 

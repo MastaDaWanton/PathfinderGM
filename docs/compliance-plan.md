@@ -211,9 +211,22 @@ the outcomes structurally establish instead, so reporting survives and invention
 **Stage 7 — refusals.** 35 resolution-time raises against 13 refusal Outcomes. Classify
 each: a raise is correct only when a *different* intent would have worked.
 
-**Stage 8 — feats as documents.** 16 of 1,474 computed, eight name-branches, a sixth
-modifier channel. Reuses the class `grants` grammar — a feat is an ability you always
-have.
+**Stage 8 — every number points at a document.** Shipped 2026-09-03
+(`docs/stage-8-plan.md`, the record). Planned as "feats as documents"; the recon found
+the same law broken from the model's side — `heal 1d8+1` for a potion nobody held, the
+prompt's own worked example handed back — and the stage became one principle on two
+surfaces. Provenance is `Intent.origin`, stamped by `Engine.validate(raw, origin=...)`
+after parse and refused at parse if the model writes it; the seven amount-ops (and the
+four outliers the maps found: save-branch dice, guard amounts, pool gains, compel's
+penalty) are refused at validate without a stamp and are not offered to the sampler at
+all, with a bestiary creature's fight turn as the one named exception; the jar, the
+coating, the cheat clerk and the tests stamp; hazards are a rule document
+(`content/rules/hazards.json`) the model cites by slot. Feats: forty documents in
+`content/feats/mechanics/`, read live through `_buff_mods` like worn gear with a roll
+context for `scope`/`when`/`choice`; the hand-written table, `power_attack_terms`,
+`has_feat`, the suffix and substring matches are gone; `_NAMED_IN_ENGINE` for the
+sheet is 1. The count in the sentence above was wrong both ways: fourteen applied, two
+read by nothing, three families the count missed.
 
 **Stage 9 — class-name strings out of the engine.** "control blood", Power Attack through
 the intent schema, Swift Strikes in the attack op, starting-kit class tables.
