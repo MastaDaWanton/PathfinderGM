@@ -999,9 +999,6 @@ def test_only_one_function_moves_the_world_clock():
 
 # --- law 3, stage 8: every number that lands names the document it came from ------------
 
-_ORIGIN_KINDS = ("item", "spell", "ability", "rule", "ward", "creature", "author")
-
-
 def test_every_number_that_lands_names_a_document_it_came_from():
     """Stage 8's law test. Measured 2026-09-02: `heal 1d8+1` for a potion nobody held
     reached the sheet, and the engine's own potion emitted a byte-identical intent, so
@@ -1043,13 +1040,22 @@ def test_every_number_that_lands_names_a_document_it_came_from():
     s2.add(wizard(level=5, prepared={"magic-missile": 1}))
     s2.add(instantiate("thug", scene=s2, name="the thug"))
     landed += records(cast(Engine(s2, Dice(seed=5)), "magic-missile"))
+    # A class ability's standing document — Blood Rage banks temporary hit points.
+    from tests.test_ability_documents import _fight
 
-    assert len(landed) >= 4, landed
+    _s3, e3 = _fight()
+    landed += records(e3.run(e3.validate([{"op": "use_ability", "actor": "pc",
+                                           "params": {"ability": "Blood Rage"}}])))
+
+    from rules import provenance
+
+    assert len(landed) >= 5, landed
     for rec in landed:
-        kind = str(rec.get("origin", "")).split(":", 1)[0]
-        assert kind in _ORIGIN_KINDS, (
+        assert provenance.well_formed(str(rec.get("origin", ""))), (
             f"a {rec.get('kind')} record landed with origin {rec.get('origin')!r}: "
             f"{rec}")
+    assert {str(r.get("origin", "")).split(":")[0] for r in landed} >= {
+        "item", "rule", "spell", "ability"}
     # And the stamp is never the model's to write.
     import pytest
 

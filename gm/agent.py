@@ -191,6 +191,8 @@ class GMAgent:
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.
                 raw = judgement.split_plural_targets(raw)
+                # The player's own cast, jar or power with no actor written is theirs.
+                raw = judgement.fill_missing_actor(raw, player_input, self.engine.scene)
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 raw = judgement.repair_misaimed_attack(

@@ -1367,6 +1367,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             c.transcript.append({"who": "gm", "kind": "consequence",
                                  "text": f"{actor.name} holds back."})
             continue
+        # Recorded the way a player turn is. Until stage 8 a creature's turn reached
+        # the log only when it failed, so the one door where a model still writes a
+        # number (a bestiary creature's `damage`, stamped creature:<template>) could
+        # not be audited off a saved campaign at all.
+        c.turn_log.append({"kind": "npc-turn", "ref": ref,
+                           "intents": [i.as_dict() for i in plan.intents],
+                           "outcomes": [o.as_dict() for o in resolution.outcomes]})
         if plan.narration:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 

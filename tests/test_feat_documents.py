@@ -132,6 +132,48 @@ def test_toughness_lands_on_hp_max_and_round_trips_twice():
     assert pc.hp_max == plain
 
 
+def test_the_same_feat_twice_yields_nothing_more():
+    """1e: "If a character has the same feat more than once, its benefits do not
+    stack unless indicated otherwise." The verifiers measured +12 against +11 for a
+    sheet listing Iron Will twice. Weapon Focus on two different weapons is two."""
+    pc = _kesst("iron will", "Iron Will", "iron-will")
+    assert [m.value for m in pc.save_modifiers("will") if m.source == "Iron Will"] == [2]
+    b = _borin()
+    b.feats = ["weapon focus (longsword)", "weapon focus (dagger)", "weapon focus (longsword)"]
+    assert "Weapon Focus" in _sources(b.attack_modifiers("longsword"))
+    assert "Weapon Focus" in _sources(b.attack_modifiers("dagger"))
+    assert _sources(b.attack_modifiers("longsword")).count("Weapon Focus") == 1
+
+
+def test_a_save_from_before_the_channel_finally_receives_its_toughness():
+    """The verifiers measured: Kesst plain is hp_max 9 / hp_base 8; a save written
+    before stage 8 with `toughness` in feats and the printed total 9 loaded as
+    hp_max 9 / hp_base 5 — the new inverse subtracted a channel the old total never
+    held, the holder never got the +3, and removing the feat left them at 6. The
+    saved shape now carries `hp_channels`; a dict without it is the old convention."""
+    old = to_dict(_kesst())                    # hp_max 9, no toughness, marker present
+    plain = old["hp_max"]
+    old["feats"] = ["toughness"]
+    old.pop("hp_channels")                     # a save from before the channel
+    a = from_dict(old)
+    assert a.hp_max == plain + 3 and a.hp_base == _kesst().hp_base
+    a.feats = []
+    assert a.hp_max == plain
+    # A save written since carries the marker and round-trips as it is.
+    fresh = _kesst("toughness")
+    again = from_dict(to_dict(fresh))
+    assert "hp_channels" in to_dict(fresh) and again.hp_max == fresh.hp_max == plain + 3
+
+
+def test_the_maximum_is_itemised_so_toughness_names_itself_like_a_ring():
+    from rules.sheet import full_sheet
+
+    pc = _kesst("toughness")
+    terms = full_sheet(pc)["defense"]["hp"]["max_terms"]["terms"]
+    assert any(t.get("source") == "Toughness" and t.get("value") == 3 for t in terms)
+    assert sum(t.get("value", 0) for t in terms) == pc.hp_max
+
+
 def test_a_formula_over_the_sheet_does_not_recurse():
     """`resources.variables` was eager and read `hp_max` before any formula was walked:
     `hp_max → _feat_mods → evaluate → variables → hp_max …` on every hit-point read."""

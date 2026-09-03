@@ -561,3 +561,59 @@ three of three: `hazard rule=falling distance_ft=30` every turn, a 3d6 record wi
 suspended on the player's Acrobatics roll where the check came first. One earlier
 pass answered 502 once in three turns and the body was not captured; the re-run did
 not reproduce it, and it is recorded here rather than explained. 2,914 passed.
+
+## Verification (`stage8-verify`, 2026-09-03)
+
+Five probes one at a time on the model, a ratchet audit, and a critic whose verdict on
+the tree it saw was **not yet** — fairly, because it read the worktree while the fixes
+for its own findings were uncommitted and the exe predated them. What it found and
+what was done:
+
+- **Unsourced heal**: clean 3 of 3 through the repo probe and a verbatim dump; the
+  verifier notes the pass is measured at the engine, after `declare_use_item` has
+  dropped the model's number-bearing ops, so "the model wrote no number" is inferred,
+  not read off a raw reply. Recorded, not changed.
+- **Feat through the door**: clean; Weapon Focus named on the longsword only, +3/−3 on
+  Toughness, no inflation over two round-trips. Two observations landed as code: the
+  hp block carried totals only, so Toughness could not name itself the way a ring does
+  — `defense.hp.max_terms` itemises the maximum now; and a feat removed by hand leaves
+  hp above the new maximum — no door removes a feat, recorded.
+- **Stacking**: typed stacking holds everywhere it was read, and three defects: the
+  engine's own roll dict round-trip dropped every bonus's type on the way to the turn
+  log (fixed, pinned); a feat listed twice counted twice against 1e's rule (fixed:
+  once per id and target, pinned); a masterwork weapon in the hands slot lends its
+  enhancement to every weapon (`_standing_mods` has no weapon scope — stage 9,
+  recorded in the ledger as a live door, not a future one).
+- **Save round-trip**: clean, twice, plus a refused turn restored. The critic then
+  measured the one the round-trip could not see: a save written *before* the channel
+  with Toughness already held loaded three short (hp_max 9 / hp_base 5, not 12 / 8),
+  because the new inverse subtracted a channel the old total never included, and
+  8e's own assertion would have passed it. `to_dict` writes `hp_channels` now and a
+  dict without it is read as the old convention, so the holder finally receives the
+  +3 — absent is not empty. Pinned with the critic's numbers.
+- **Model choice**: the jar half landed (`origin: item:healing-draught#1`); the spell
+  half was 0 of 2 at that commit — the model wrote `cast` with no actor six attempts
+  of seven, the door refused "no such actor None" as a refs error nothing repaired,
+  and the narrator described a hit nothing produced. Pre-stage-8 defects, but stage 8
+  made `cast` the only sanctioned door for a model-proposed damage. Fixed:
+  `fill_missing_actor` (the player's own cast, jar, power or hazard is the player's)
+  and a name→id lookup among the caster's known spells in `_check_cast`. Re-measured
+  live 3 of 3: one attempt each, no rejections, a damage record stamped
+  `spell:magic-missile`. The narrator's invented hit is a claims-scrubber gap and is
+  on the ledger.
+- **The creature exception, live**: three thug turns planned through `npc_turn` with
+  the fight open — the creature enum was used, every intent carried
+  `creature:<template>`, and the model chose `attack` all three times, so a
+  creature-authored number was not observed; the door is open and stamped, and
+  successful NPC turns are logged now (`kind: npc-turn` with intents and outcomes),
+  which they were not before.
+- **The trap sentence**: "I set off the trap" came back as `hazard rule=acid rounds=3`
+  — the model cited a rule rather than narrating, which the contract sanctions and
+  the 8d status did not predict. The number was the rule's; the acid was the model's
+  reading of the trap. Left as is, said here.
+- **The law walk** covers the jar, a hazard, rest, a spell and a class ability's
+  standing document, checked through `provenance.well_formed`; wards (`ward:<name>`)
+  and the ability loop's instant numbers remain on the ledger's open list.
+
+After the fixes: the whole suite 2,922 passed; the exe rebuilt and `prove_build` ALL
+CLEAN including the feat check.

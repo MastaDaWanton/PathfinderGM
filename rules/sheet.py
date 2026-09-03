@@ -2326,11 +2326,20 @@ class Actor:
         want = str(target).lower()
         out: list[Modifier] = []
         self._reading_feats = True
+        # 1e: "If a character has the same feat more than once, its benefits do not
+        # stack unless indicated otherwise." A sheet listing Iron Will twice counted
+        # it twice — the verifiers measured +12 against +11 — so one document, once,
+        # keyed by id and target (Weapon Focus (longsword) and (dagger) are two).
+        seen: set[tuple[str, str]] = set()
         try:
             for raw in self.feats:
                 doc = feats_mod.document(raw)
                 if not doc:
                     continue
+                key = (doc["id"], str(doc.get("target") or ""))
+                if key in seen:
+                    continue
+                seen.add(key)
                 for spec in doc.get("modifiers") or ():
                     if not isinstance(spec, dict) or spec.get("type") != kind \
                             or str(spec.get("target", "")).lower() != want:
@@ -2358,6 +2367,20 @@ class Actor:
         every other channel: two untyped Toughness-shaped terms add, two enhancement
         ones take the best."""
         return sum(m.value for m in stack(self._buff_mods("combat_mod", "hp_max")))
+
+    def hp_max_modifiers(self) -> list["Modifier"]:
+        """What the maximum is made of, itemised the way AC is.
+
+        The verifiers found the sheet's hp block carried totals only, so Toughness
+        could not name itself among the terms the way a ring does among AC terms —
+        the number moved and nothing said why.
+        """
+        mods = [Modifier(self.hp_base, "rolled hit points")]
+        con = self.ability_mod("con") * max(1, self.hit_dice)
+        if con:
+            mods.append(Modifier(con, f"Con × {max(1, self.hit_dice)} HD"))
+        mods.extend(stack(self._buff_mods("combat_mod", "hp_max")))
+        return mods
 
     @property
     def loses_dex_to_ac(self) -> bool:
@@ -2940,6 +2963,9 @@ def full_sheet(actor: Actor) -> dict:
         ],
         "defense": {
             "hp": {"current": actor.hp, "max": actor.hp_max,
+                   # Stage 8: the maximum itemised, so a feat names itself here the
+                   # way a ring does among the AC terms.
+                   "max_terms": _terms(actor.hp_max_modifiers()),
                    "temp": actor.temp_hp, "temp_source": actor.temp_hp_source,
                    # The threshold travels with the number, because the number alone says
                    # nothing: 12 non-lethal is nothing at 40 hit points and is a knockout
@@ -3173,6 +3199,8 @@ def to_dict(actor: Actor) -> dict:
         "shield": actor.shield, "natural_armour": actor.natural_armour,
         "weapons": actor.weapons, "equipped": actor.equipped,
         "hp": actor.hp, "hp_max": actor.hp_max,
+        # The total above includes the feat channel; see from_dict.
+        "hp_channels": ["feat"],
         "nonlethal": actor.nonlethal, "speed": actor.speed,
         "compulsions": [c.as_dict() for c in actor.compulsions],
         "coating": dict(actor.coating),
@@ -3636,7 +3664,17 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # two. Measured on the user's own saves: five of twelve characters gained hit
     # points on load, Thor 23 -> 37, until this moved below the line that tells the
     # sheet how many dice it has.
-    a.set_hp_max(int(data.get("hp_max", data.get("hp", 1)) or 1))
+    total = int(data.get("hp_max", data.get("hp", 1)) or 1)
+    # Which convention the saved total is in. Since stage 8 `set_hp_max` subtracts
+    # the feat channel (Toughness) so a printed total round-trips; a save written
+    # BEFORE the channel existed holds a total that never included it, and reading
+    # it under the new rule silently cost every Toughness holder three hit points —
+    # the verifiers measured hp_max 9 / hp_base 5 for a sheet that should read 12 /
+    # 8. `to_dict` writes the marker; its absence means the old convention, and the
+    # holder finally receives what the feat always promised. Absent is not empty.
+    if "hp_channels" not in data:
+        total += a._feat_hp()
+    a.set_hp_max(total)
     _bind_targets(a)
     return a
 

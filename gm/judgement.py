@@ -1567,6 +1567,35 @@ def _jar_instead(raw_intents, ref: str, item_id: str, because: str) -> list:
                     "params": {"item": item_id, "how": "drink"}}]
 
 
+# The ops a player turn's model reply may leave without an actor and mean the PC.
+_ACTS_ITSELF = ("cast", "use_item", "use_ability", "hazard")
+
+
+def fill_missing_actor(raw_intents, player_text: str, scene) -> list:
+    """A `cast` with no actor on the player's turn is the player casting.
+
+    Measured by the stage-8 verifiers, 2026-09-03: told to cast magic missile, the
+    model wrote {"op": "cast", "params": {"spell": "magic missile", "at": "c2"}} six
+    attempts of seven — the schema requires only `op` — and `_check_cast` refused
+    "no such actor None" as a refs error, which regenerates rather than repairs, so
+    every attempt burned on the same omission and the turn degraded to narration.
+    The fix is a fill, not a schema change: `fill_obvious_targets` already fills the
+    target the same way, and the actor of the player's own spell is not a guess.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() in _ACTS_ITSELF \
+                and not r.get("actor"):
+            r = dict(r, actor=pc.ref)
+        out.append(r)
+    return out
+
+
 def declare_use_item(raw_intents, player_text: str, scene) -> list:
     """A jar the player names is opened by the jar door, never by a written number.
 

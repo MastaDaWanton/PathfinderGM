@@ -356,6 +356,64 @@ def test_a_hazards_slot_is_bounded_by_the_row_and_the_rule_must_exist():
     assert '"op": "hazard"' in prompts.BRIEFING
 
 
+# --- what the verifiers found on the way -----------------------------------------------
+
+def test_a_roll_keeps_its_bonus_types_through_the_engines_own_dict_round_trip():
+    """Every multi-stage attack parks its roll as a dict and rehydrates it; the
+    rehydration rebuilt each Modifier without its type, so the turn log the browser
+    reads showed every bonus untyped and a morale +1 was indistinguishable from an
+    enhancement +1. Found by the stage-8 stacking probe."""
+    from rules.dice import Modifier, Roll
+    from rules.engine import _roll_from_dict
+
+    roll = Roll(die="1d20", faces=[11], label="attack",
+                modifiers=[Modifier(1, "a war song", "morale"),
+                           Modifier(1, "Weapon Focus", "untyped")])
+    back = _roll_from_dict(roll.as_dict())
+    assert [(m.source, m.type) for m in back.modifiers] == \
+        [("a war song", "morale"), ("Weapon Focus", "untyped")]
+
+
+def test_the_players_own_cast_with_no_actor_written_is_the_player_casting():
+    """Six of seven attempts wrote {"op": "cast", "params": {"spell": "magic missile",
+    "at": "c2"}} — the schema requires only `op` — and the cast door refused "no such
+    actor None" as a refs error nothing could repair. The actor of the player's own
+    spell is a fill, like the target; and the spell by its name is the id."""
+    from tests.test_casting_executes import wizard
+
+    s = Scene(location_id="5bbd0c40345f")
+    stand_on(s, "urban")
+    s.add(wizard(level=5, prepared={"magic-missile": 1}))
+    s.add(instantiate("thug", scene=s, name="the thug"))
+    engine = Engine(s, Dice(seed=5))
+    raw = judgement.fill_missing_actor(
+        [{"op": "cast", "params": {"spell": "magic missile", "at": "c1"}}],
+        "I cast magic missile at the thug", s)
+    assert raw[0]["actor"] == "pc"
+    intents = engine.validate(raw)
+    assert intents[0].params["spell"] == "magic-missile"
+    res = engine.run(intents)
+    assert any(e.get("kind") == "damage" and e.get("origin") == "spell:magic-missile"
+               for o in res.outcomes for e in o.effects)
+
+
+def test_an_origin_is_a_known_kind_and_a_non_empty_id():
+    """`rules/provenance.py` is the one list of kinds a door may stamp; a test can
+    ask "was this stamped by a door" without grepping strings, and a new door cannot
+    invent a kind nobody reads. Not a resolver: the jar's last dose is gone before
+    its own heal validates."""
+    from rules import provenance
+
+    for ok in ("item:healing-draught#1", "spell:magic-missile", "rule:falling",
+               "ability:battle blood/blood rage", "creature:thug", "author:cheat",
+               "author:test", "ward:web"):
+        assert provenance.well_formed(ok), ok
+    for bad in ("", "item", "item:", "author:model", "ability:blood rage",
+                "gm:fiat", "spell magic-missile"):
+        assert not provenance.well_formed(bad), bad
+    assert provenance.describe("rule:falling") == "rule falling"
+
+
 def test_the_tells_for_heal_and_damage_name_the_document():
     """Law 3, the half that was missing: a sourced number whose source the narrator
     cannot see. Before stage 8 the heal, damage, ability-damage and item-damage tells

@@ -4544,9 +4544,26 @@ class Engine:
         try:
             spell = spells_mod.get(str(intent.params["spell"]))
         except KeyError:
-            raise IntentError(
-                f"cast: no spell {intent.params['spell']!r}", "reference", index
-            ) from None
+            # By name, among the spells this caster knows — "magic missile" is what a
+            # model writes and `magic-missile` is the id. Stage 8's verifiers found
+            # the id-only lookup would have been the next refusal after the actor.
+            said = " ".join(str(intent.params["spell"]).lower().replace("-", " ").split())
+            spell = None
+            for sid in list(getattr(actor, "spellbook", []) or []) \
+                    + list((getattr(actor, "prepared", {}) or {}).keys()):
+                try:
+                    cand = spells_mod.get(str(sid))
+                except KeyError:
+                    continue
+                if " ".join(str(cand.name).lower().split()) == said:
+                    spell = cand
+                    intent.params["spell"] = cand.id
+                    break
+            if spell is None:
+                raise IntentError(
+                    f"cast: no spell {intent.params['spell']!r}. Name one they know, by "
+                    f"id: {', '.join(list(getattr(actor, 'spellbook', []) or [])[:8]) or 'none'}.",
+                    "reference", index) from None
 
         data = casting.caster_data(actor)
         level = casting.spell_level_for(actor, spell)
@@ -5352,9 +5369,11 @@ class Engine:
             per_hd = int(r.get("per_hit_die", 0) or 0)
             amount = per_hd * actor.hit_dice
             if amount > 0 and not r.get("inactive"):
-                got = actor.gain_temp_hp(amount, source=found.title())
+                got = actor.gain_temp_hp(amount, source=found.title(),
+                                         origin=f"ability:{path}/{found}")
                 effects.append({"ref": actor.ref, "kind": "temp_hp",
-                                "temp_hp": actor.temp_hp, **got})
+                                "temp_hp": actor.temp_hp, **got,
+                                "origin": f"ability:{path}/{found}"})
                 said.append(f"{amount} temporary hit points "
                             f"({per_hd} per Hit Die)")
         return {"effects": effects,
@@ -5878,7 +5897,12 @@ def _intent_from_dict(d: dict) -> Intent:
 def _roll_from_dict(d: dict) -> Roll:
     return Roll(
         die=d["die"], faces=list(d["faces"]),
-        modifiers=[Modifier(m["value"], m["source"]) for m in d["modifiers"]],
+        # The type rides along: without it every bonus on a multi-stage attack — parked
+        # as a dict between the roll and its resolution — reached the turn log untyped,
+        # and the browser's popup could not say a morale +1 from an enhancement +1.
+        # Found by the stage-8 verifiers' stacking probe.
+        modifiers=[Modifier(m["value"], m["source"], str(m.get("type", "") or ""))
+                   for m in d["modifiers"]],
         label=d.get("label", ""), visibility=d.get("visibility", "hidden"),
     )
 

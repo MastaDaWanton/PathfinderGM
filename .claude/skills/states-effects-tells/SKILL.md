@@ -100,10 +100,16 @@ enum is; stage 7 measured what a rejection teaches); GM fiat with no rule row.
 record carries `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id;
 Point-Blank Shot's `when.range_ft` waits on the attack op passing range into the
 roll context (its term is dropped, per the rule); the wielded-weapon spec channel
-(masterwork, enchanted) has no reader — stage 9; bestiary special attacks have no
-locator, so a creature's fight turn keeps `damage`/`ability_damage` stamped
-`creature:<template>`; feat actions (Cleave, Vital Strike) have no `find_ability`
-branch; no level-up feat writer exists.
+(masterwork, enchanted) has no reader — stage 9 — and worse, a weapon record put in
+the `hands` slot through the sheet editor lends its enhancement to EVERY weapon
+(`_standing_mods` has no weapon scope: a live door, measured by the verifiers);
+bestiary special attacks have no locator, so a creature's fight turn keeps
+`damage`/`ability_damage` stamped `creature:<template>` (three live thug turns chose
+`attack`; the door is open, unused, and logged as `kind: npc-turn` now); feat actions
+(Cleave, Vital Strike) have no `find_ability` branch; no level-up feat writer exists;
+the claims scrubber let prose describe a struck target after a `cast` that never
+resolved (measured once, before the actor fill); "I set off the trap" came back as
+`hazard rule=acid` — a cited rule, sanctioned, not the narration the plan predicted.
 
 ## Before designing anything: search for how it was already solved
 
