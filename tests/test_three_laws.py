@@ -393,6 +393,9 @@ _REACHES = {
     ("save_mod", "ref"): lambda a: sum(m.value for m in a.save_modifiers("ref")),
     ("save_mod", "will"): lambda a: sum(m.value for m in a.save_modifiers("will")),
     ("combat_mod", "touch_ac"): lambda a: a.touch_ac(),
+    # Stage 8: Toughness's channel, symmetric with set_hp_max so a printed total
+    # round-trips; a buff aimed here moves the maximum like any other.
+    ("combat_mod", "hp_max"): lambda a: a.hp_max,
     ("skill_mod", "stealth"):
         lambda a: sum(m.value for m in a.skill_modifiers("stealth")),
     ("speed", "land"): lambda a: a.speed_feet,

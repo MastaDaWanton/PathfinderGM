@@ -20,6 +20,7 @@ from __future__ import annotations
 import ast
 import operator
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from .tables import ABILITIES, ability_modifier
@@ -49,32 +50,63 @@ class FormulaError(ValueError):
     """The formula names something that does not exist, or does something it may not."""
 
 
-def variables(actor) -> dict[str, int]:
+class _Lazy(Mapping):
+    """The formula vocabulary, each name computed the first time it is asked for.
+
+    Eager was a recursion: stage 8 feeds a feat's formula into `hp_max` (Toughness is
+    `3 + max(0, hit_dice - 3)`), and reading every variable up front meant
+    `hp_max → _feat_mods → evaluate → variables → hp_max …` on every hit-point read.
+    A formula over `hit_dice` never touches `hp_max` now, and one that names the
+    channel it feeds is stopped by `_feat_mods`' own re-entrancy guard instead.
+    """
+
+    def __init__(self, actor, names: dict):
+        self._actor, self._names, self._got = actor, names, {}
+
+    def __getitem__(self, key):
+        if key not in self._names:
+            raise KeyError(key)
+        if key not in self._got:
+            self._got[key] = self._names[key]()
+        return self._got[key]
+
+    def __iter__(self):
+        return iter(self._names)
+
+    def __len__(self):
+        return len(self._names)
+
+
+def variables(actor) -> Mapping:
     """Everything a formula may refer to, read off the sheet.
 
     Named explicitly rather than exposing the Actor: a formula should be able to say
     `con_mod` and should not be able to say `actor.__class__`.
     """
-    out = {
-        "level": actor.level,
-        "hit_dice": actor.hit_dice,
-        "hp": actor.hp,
-        "hp_max": actor.hp_max,
-        "temp_hp": actor.temp_hp,
-        "bab": actor.bab,
+    names = {
+        "level": lambda: actor.level,
+        "hit_dice": lambda: actor.hit_dice,
+        "hp": lambda: actor.hp,
+        "hp_max": lambda: actor.hp_max,
+        "temp_hp": lambda: actor.temp_hp,
+        "bab": lambda: actor.bab,
     }
+
     # A branching class tiers its abilities against its own track rather than against
     # character level, so a formula has to be able to say so. Zero for every class that
     # does not branch, which is every class but one.
-    from . import leveling
+    def _tracks():
+        from . import leveling
 
-    tracks = leveling.control_blood(actor)
-    out["control_blood"] = max(tracks.values())
-    out["control_blood_a"], out["control_blood_b"] = tracks["a"], tracks["b"]
+        return leveling.control_blood(actor)
+
+    names["control_blood"] = lambda: max(_tracks().values())
+    names["control_blood_a"] = lambda: _tracks()["a"]
+    names["control_blood_b"] = lambda: _tracks()["b"]
     for ab in ABILITIES:
-        out[ab] = actor.ability_score(ab)
-        out[f"{ab}_mod"] = actor.ability_mod(ab)
-    return out
+        names[ab] = (lambda a=ab: actor.ability_score(a))
+        names[f"{ab}_mod"] = (lambda a=ab: actor.ability_mod(a))
+    return _Lazy(actor, names)
 
 
 def evaluate(formula, actor) -> int:

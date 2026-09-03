@@ -858,7 +858,8 @@ class Actor:
         follows the score wherever it goes — a belt, a poison, a class's permanent
         growth, a rage. The floor is 1 because a living thing has at least one.
         """
-        return max(1, self.hp_base + self.ability_mod("con") * max(1, self.hit_dice))
+        return max(1, self.hp_base + self.ability_mod("con") * max(1, self.hit_dice)
+                   + self._feat_hp())
 
     @hp_max.setter
     def hp_max(self, total: int) -> None:
@@ -872,8 +873,15 @@ class Actor:
         self.set_hp_max(total)
 
     def set_hp_max(self, total: int) -> None:
-        """The total, stored as the rolled base that makes it true."""
-        self.hp_base = int(total) - self.ability_mod("con") * max(1, self.hit_dice)
+        """The total, stored as the rolled base that makes it true.
+
+        Symmetric with the read, feat channel included: `from_dict` calls this with
+        the saved total, and a Toughness whose +3 was read but not subtracted here
+        grew the base by three on every load — the Thor 23 → 37 class of bug, pinned
+        by the save-twice test.
+        """
+        self.hp_base = (int(total) - self.ability_mod("con") * max(1, self.hit_dice)
+                        - self._feat_hp())
 
     def base_ability_score(self, ab: str) -> int:
         """Before damage and drain — what it heals back towards."""
@@ -1215,10 +1223,6 @@ class Actor:
                 mods.append(Modifier(am, ability.title()))
             if acp_applies and self.armour_check_penalty:
                 mods.append(Modifier(self.armour_check_penalty, "armour check"))
-            for feat in self.feats:
-                bonus = FEATS.get(self._feat_name(feat), {}).get("skills", {}).get(skill)
-                if bonus:
-                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
         if skill == "stealth":
             size_mod = SIZES.get(self.size, SIZES["medium"])["stealth"]
@@ -1255,10 +1259,6 @@ class Actor:
             am = self.ability_mod(SAVE_ABILITY[save])
             if am:
                 mods.append(Modifier(am, SAVE_ABILITY[save].title()))
-            for feat in self.feats:
-                bonus = FEATS.get(self._feat_name(feat), {}).get("saves", {}).get(save)
-                if bonus:
-                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
         mods.extend(self._condition_mods("saves"))
         mods.extend(self._buff_mods("save_mod", save))
@@ -1274,10 +1274,6 @@ class Actor:
             am = self.ability_mod("dex")
             if am:
                 mods.append(Modifier(am, "Dex"))
-            for feat in self.feats:
-                bonus = FEATS.get(self._feat_name(feat), {}).get("initiative")
-                if bonus:
-                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
         mods.extend(self._buff_mods("combat_mod", "initiative"))
         return stack(mods)
 
@@ -1519,10 +1515,6 @@ class Actor:
                 dex = min(self.ability_mod("dex"), armour["max_dex"])
                 if dex:
                     mods.append(Modifier(dex, "Dex"))
-            for feat in self.feats:
-                bonus = FEATS.get(self._feat_name(feat), {}).get("ac")
-                if bonus:
-                    mods.append(Modifier(bonus, FEATS[self._feat_name(feat)]["name"]))
 
             # As with attack: a printed AC already accounts for size.
             size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
@@ -2228,6 +2220,88 @@ class Actor:
         return Buff(kind=kind, target=target, amount=int(amount), source=source,
                     rounds_left=rounds, note=note)
 
+    def _flat_for(self, kind: str, target: str) -> bool:
+        """Whether a printed stat-block number already stands in for this channel.
+
+        A feat's term is inside the printed total, so the live read contributes nothing
+        on top — every feat loop this replaced sat under the `else` of the flat branch,
+        and a monster with Will +0 printed and Iron Will listed is Will +0.
+        """
+        t = str(target).lower()
+        if kind == "skill_mod":
+            return t in self.flat_skills
+        if kind == "save_mod":
+            return t in self.flat_saves
+        if kind == "combat_mod":
+            return {"initiative": self.flat_initiative is not None,
+                    "ac": self.flat_ac is not None,
+                    "touch_ac": self.flat_ac is not None,
+                    "attack": self.flat_attack is not None,
+                    "cmb": self.flat_attack is not None,
+                    "damage": bool(self.flat_damage),
+                    "cmd": self.flat_cmd is not None}.get(t, False)
+        return False
+
+    def _feat_mods(self, kind: str, target: str) -> list["Modifier"]:
+        """Modifiers from the feats this character holds, read off their documents.
+
+        The sixth channel, retired: before stage 8 every feat term was a bare
+        `Modifier` appended inside a builder from a hand-written Python table — untyped
+        (Dodge's `dodge` sat in the table and was dropped), never through the funnel,
+        and two of the sixteen (Toughness, Point-Blank Shot) read by nothing at all.
+        Now a feat is read the way a worn ring is: live, from
+        content/feats/mechanics, so removing the feat removes the term and nothing is
+        ever saved twice.
+
+        A modifier carrying `scope` or `when` needs a roll context — which weapon, at
+        what range — that this funnel does not carry yet; it is DROPPED, never applied
+        unconditionally (Point-Blank Shot on a longsword would be the bug), and the
+        document's `not_yet` says so. The re-entrancy guard is for a formula: Toughness
+        feeds `hp_max`, and `resources.variables` can name `hp_max`.
+        """
+        if getattr(self, "_reading_feats", False) or self._flat_for(kind, target):
+            return []
+        from . import feats as feats_mod, resources
+
+        want = str(target).lower()
+        out: list[Modifier] = []
+        self._reading_feats = True
+        try:
+            for raw in self.feats:
+                doc = feats_mod.document(raw)
+                if not doc:
+                    continue
+                for spec in doc.get("modifiers") or ():
+                    if not isinstance(spec, dict) or spec.get("type") != kind \
+                            or str(spec.get("target", "")).lower() != want:
+                        continue
+                    if spec.get("scope") or spec.get("when"):
+                        continue
+                    if spec.get("formula"):
+                        try:
+                            amount = resources.evaluate(spec["formula"], self)
+                        except resources.FormulaError:
+                            continue
+                    else:
+                        amount = int(spec.get("amount", 0) or 0)
+                    if amount:
+                        out.append(Modifier(amount, doc["name"],
+                                            _bonus_type(spec.get("bonus_type"))))
+        finally:
+            self._reading_feats = False
+        return out
+
+    def _feat_hp(self) -> int:
+        """The `hp_max` channel — feats, buffs, worn gear — read in one place so
+        `set_hp_max` can subtract exactly what the read added. Stacked by type like
+        every other channel: two untyped Toughness-shaped terms add, two enhancement
+        ones take the best."""
+        return sum(m.value for m in stack(self._buff_mods("combat_mod", "hp_max")))
+
+    @property
+    def loses_dex_to_ac(self) -> bool:
+        return any(c.data.get("lose_dex_to_ac") for c in self.conditions)
+
     def _buff_mods(self, kind: str, target: str) -> list["Modifier"]:
         """Everything timed or worn that moves this number.
 
@@ -2249,7 +2323,14 @@ class Actor:
                         and amount:
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
-        return out + self._standing_mods(kind, target)
+        out += self._standing_mods(kind, target) + self._feat_mods(kind, target)
+        # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
+        # four shipped dodge feats had no reader for that clause, and nothing on the
+        # sheet asked it of buffs either; one generic rule here, not one per feat.
+        if kind == "combat_mod" and str(target).lower() in ("ac", "touch_ac", "cmd") \
+                and self.loses_dex_to_ac:
+            out = [m for m in out if m.type != "dodge"]
+        return out
 
     def remove_condition(self, key: str) -> None:
         key = key.strip().lower()
@@ -2715,18 +2796,23 @@ def full_sheet(actor: Actor) -> dict:
             entry = feats_mod.get(base)
         except KeyError:
             pass
+        # Stage 8: the document is what the engine applies; the table's copy is what
+        # remains until 8c retires the last name-branches.
+        doc = feats_mod.document(f)
 
-        if known:
+        if doc:
+            effect = _document_effect_text(doc)
+        elif known:
             effect = _feat_effect_text(known)
         elif entry and entry.benefit:
             effect = entry.benefit
         else:
             effect = "carried as flavour — the engine applies nothing"
 
-        name = (known or {}).get("name") or (entry.name if entry else f)
+        name = (doc or known or {}).get("name") or (entry.name if entry else f)
         feats.append({
             "name": name + (f" ({target})" if target else ""),
-            "applied": known is not None,
+            "applied": doc is not None or known is not None,
             "known": entry is not None,
             "id": entry.id if entry else "",
             "types": entry.types if entry else [],
@@ -2920,6 +3006,37 @@ def _reachable_spells(actor: Actor, data: dict) -> list[str]:
     if data.get("prepare_from") == "spellbook":
         return list(dict.fromkeys(list(actor.spellbook) + list(actor.prepared)))
     return list(actor.prepared)
+
+
+def _document_effect_text(doc: dict) -> str:
+    """What a feat document applies, in the sheet page's words.
+
+    Generated from the document rather than written per feat, so the page cannot say
+    "bonus hit points" for a feat that adds none — which is what the hand-written
+    text did for Toughness for as long as the table had no reader.
+    """
+    bits = []
+    for spec in doc.get("modifiers") or ():
+        if not isinstance(spec, dict):
+            continue
+        amount = spec.get("formula") or f"{int(spec.get('amount', 0) or 0):+d}"
+        what = str(spec.get("target", "")).replace("_", " ")
+        typed = str(spec.get("bonus_type") or "")
+        typed = f" ({typed})" if typed and typed != "untyped" else ""
+        waits = " — when " + ", ".join(
+            f"{k} {v}" for k, v in (spec.get("when") or {}).items()) if spec.get("when") else ""
+        bits.append(f"{amount} {what}{typed}{waits}")
+    for tag in doc.get("tags") or ():
+        bits.append(f"grants {tag}")
+    for name, formula in (doc.get("budget") or {}).items():
+        bits.append(f"{name.replace('_', ' ')}: {formula}")
+    if doc.get("attack_ability"):
+        bits.append(f"{str(doc['attack_ability'].get('use', '')).title()} in place of "
+                    f"Str on attack rolls")
+    text = "; ".join(bits) or "no mechanical effect recorded"
+    if doc.get("not_yet"):
+        text += ". Not yet: " + "; ".join(str(x) for x in doc["not_yet"])
+    return text
 
 
 def _feat_effect_text(feat: dict) -> str:
@@ -3450,8 +3567,12 @@ def validate(actor: Actor) -> None:
                     f"{actor.name}: {rank} ranks in {skill} exceeds character level "
                     f"{actor.level}"
                 )
+    from . import feats as feats_mod
+
     for f in actor.feats:
-        if Actor._feat_name(f) in FEATS:
+        # A document, or (until stage 8c retires the last name-branches) a table
+        # entry: either way the engine applies something, and the note would lie.
+        if Actor._feat_name(f) in FEATS or feats_mod.document(f):
             continue
         # Not fatal: an unrecognised feat contributes nothing and says so, which is
         # better than silently pretending it applied.

@@ -1,0 +1,87 @@
+{
+  "_about": [
+    "Stage 8: a feat's mechanics as a document, keyed by the feat's id in feats.json.",
+    "The grammar is the class `grants` vocabulary (rules/classbuilder.py validates it):",
+    "modifiers[{type, target, amount | formula, bonus_type, scope, when}], tags,",
+    "budget, choice, attack_ability, not_yet. Applied live, like worn gear: the feat",
+    "list is the store, rules/sheet.py:_feat_mods reads these on every roll, and",
+    "removing the feat removes the term. Nothing here is saved onto a character.",
+    "A modifier with `scope` or `when` needs a roll context; where the sheet has none",
+    "yet, the term is dropped, never applied, and `not_yet` says which clause waits."
+  ],
+  "stealthy": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "stealth", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "escape artist", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+  },
+  "alertness": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "sense motive", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+  },
+  "acrobatic": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "acrobatics", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "fly", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+  },
+  "deceitful": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "bluff", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "disguise", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+  },
+  "persuasive": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "diplomacy", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": ["skill.ranks >= 10 raises each to +4"]
+  },
+  "improved-initiative": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "initiative", "amount": 4, "bonus_type": "untyped"}
+    ]
+  },
+  "lightning-reflexes": {
+    "modifiers": [
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped"}
+    ]
+  },
+  "iron-will": {
+    "modifiers": [
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped"}
+    ]
+  },
+  "great-fortitude": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped"}
+    ]
+  },
+  "dodge": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge"}
+    ]
+  },
+  "toughness": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "hp_max", "formula": "3 + max(0, hit_dice - 3)",
+       "bonus_type": "untyped"}
+    ]
+  },
+  "point-blank-shot": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "untyped",
+       "when": {"weapon": {"category": "ranged"}, "range_ft": {"lte": 30}}},
+      {"type": "combat_mod", "target": "damage", "amount": 1, "bonus_type": "untyped",
+       "when": {"weapon": {"category": "ranged"}, "range_ft": {"lte": 30}}}
+    ],
+    "not_yet": ["attack.range_ft: the attack op does not yet pass range into the roll context"]
+  }
+}

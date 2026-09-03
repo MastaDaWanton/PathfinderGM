@@ -493,3 +493,25 @@ exists: Inform's word-match-then-ask, shared by the door, the legality check and
 declarer. Fifty-four test sites stamp `author:test`. Not yet: `_op_use_ability`'s
 instant effects loop records no per-number origin (the outcome record carries
 `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id; 8d's outliers.
+
+**8b shipped, 2026-09-03.** `content/feats/mechanics/core.json` (a subfolder, because
+`all_feats` globs `content/feats/*.json` as feat lists) carries twelve documents in the
+`grants` modifier vocabulary — the five skill feats, the three save feats, Improved
+Initiative, Dodge typed `dodge` at last, Toughness as `3 + max(0, hit_dice - 3)` on the
+new `hp_max` target, Point-Blank Shot with its `when` and a `not_yet`. `feats.document`
+is the one normaliser (name, id, or "Weapon Focus (rapier)"); `documents()` validates
+on first load through `classbuilder.validate_feat_documents`, which refuses unknown
+keys and unknown fields with the fix named. `Actor._feat_mods` reads them inside
+`_buff_mods` beside worn gear; a `scope`/`when` term is dropped, never applied; a
+formula is guarded against re-entry, and `resources.variables` is lazy — eager, it
+read `hp_max` before walking any formula and recursed on every hit-point read.
+`hp_max` reads the channel and `set_hp_max` subtracts it. The four table loops are
+gone (`test_the_four_table_loops_are_gone_from_the_sheet`), the dodge/lose-Dex rule is
+one generic line in `_buff_mods`, the page's feat text is generated from the document,
+and `validate()`'s "carried as flavour" is only written for a feat with neither
+document nor table entry. Measured: Toughness +3 with the sheet saved and reloaded
+three times through the API in a throwaway data directory, `hp_max` 12 / base 8 each
+time and 9 without the feat; `Stealthy` named among the Stealth terms on
+`/api/sheet`; the whole suite 2,902 passed; the live feat read costs 0.25 ms per four
+channel reads with four feats held. Still in the table until 8c: Weapon Finesse,
+Weapon Focus, Weapon Specialization, Power Attack.

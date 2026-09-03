@@ -161,6 +161,89 @@ def get(feat_id: str) -> Feat:
     return found
 
 
+# --- mechanics as documents (stage 8) ---------------------------------------------------
+#
+# content/feats/mechanics/*.json, keyed by feat id, in the class `grants` vocabulary.
+# A subfolder on purpose: `all_feats` globs content/feats/*.json as feat lists, and a
+# mechanics file beside feats.json would have been read as one. The OGL text in
+# feats.json is not edited; a document is the engine's reading of the benefit.
+#
+# Applied live, never stored: rules/sheet.py:_feat_mods reads these on every roll the
+# way worn gear is read off the slots, so the feat list is the store and removing the
+# string removes the term. Foundry v11 abandoned copying item effects onto the actor
+# with an `origin` pointer for exactly the questions a stored copy raises — applied
+# once, twice or never on a save that predates it — and this is the same choice.
+
+_DOCS: dict[str, dict] | None = None
+
+
+def documents() -> dict[str, dict]:
+    """Every feat mechanics document, keyed by feat id, validated on first load.
+
+    Load-time validation the way spells and creatures get it: a document with an
+    unknown target or an unknown key is refused here with the fix named, rather than
+    applied as nothing in play.
+    """
+    global _DOCS
+    if _DOCS is None:
+        from django.conf import settings
+
+        from . import classbuilder
+
+        out: dict[str, dict] = {}
+        folder = Path(settings.BASE_DIR) / "content" / "feats" / "mechanics"
+        for path in (sorted(folder.glob("*.json")) if folder.is_dir() else []):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError(f"{path.name}: a map of feat id → document.")
+            for fid, doc in data.items():
+                if str(fid).startswith("_"):
+                    continue                    # `_about` and its kin
+                out[str(fid).strip().lower()] = doc
+        problems = classbuilder.validate_feat_documents(out)
+        if problems:
+            raise ValueError("content/feats/mechanics: " + " | ".join(problems))
+        _DOCS = out
+    return _DOCS
+
+
+def resolve(raw: str) -> tuple[Feat | None, str | None]:
+    """The one normaliser: a sheet string → (the feat, its parenthetical target).
+
+    Four normalisers used to disagree — `sheet._feat_name`, `_held`, `glossary._clean`,
+    `homebrew._slug` — and the sheet stores lower-cased names while feats.json is keyed
+    by id, so "Weapon Focus (rapier)", "weapon focus (rapier)" and "weapon-focus" all
+    have to reach the same document. Name or id, the parenthetical stripped and kept.
+    """
+    import re
+
+    from .tables import FEAT_TARGET_RE
+
+    text = str(raw or "").strip()
+    m = re.match(FEAT_TARGET_RE, text, re.IGNORECASE)
+    name = m.group("feat").strip() if m else text
+    target = m.group("target").strip().lower() if m else None
+    try:
+        return get(name), target
+    except KeyError:
+        return None, target
+
+
+def document(raw: str) -> dict | None:
+    """The mechanics document for a feat as written on a sheet, or None.
+
+    Carries `id`, `name` (the display name every term is labelled with) and `target`
+    (the parenthetical, for `$target` scopes) on top of the authored fields.
+    """
+    feat, target = resolve(raw)
+    if feat is None:
+        return None
+    doc = documents().get(feat.id)
+    if doc is None:
+        return None
+    return {**doc, "id": feat.id, "name": feat.name, "target": target}
+
+
 def _held(actor) -> set[str]:
     """Feat ids this character has, both as written and with any parenthetical dropped.
 

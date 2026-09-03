@@ -61,7 +61,12 @@ VOCAB: dict[str, list[dict]] = {
         ("attack", "Attack rolls"), ("damage", "Damage rolls"), ("ac", "Armour class"),
         ("touch_ac", "Touch AC"), ("cmb", "CMB"), ("cmd", "CMD"),
         ("initiative", "Initiative"), ("caster_level", "Caster level checks"),
-        ("spell_resistance", "Checks to overcome SR"))],
+        ("spell_resistance", "Checks to overcome SR"),
+        # Stage 8: Toughness is "+3 hit points, +1 per Hit Die beyond 3" and had no
+        # target to land on — it sat in the hand-written feat table read by nothing.
+        # The channel is symmetric on the sheet (`set_hp_max` subtracts it) so a
+        # printed total round-trips.
+        ("hp_max", "Maximum hit points"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),

@@ -984,6 +984,109 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
         _ = toggled  # the condition names themselves are free text, checked by toggles
 
 
+# --- feat documents (stage 8) ------------------------------------------------------------
+
+# What a feat document may carry. Everything else is refused, because the applier
+# ignores what it does not know and a silently ignored field is a feat that quietly
+# does less than its author wrote — `effectspec.validate` never rejected an unknown
+# key, and the homebrew editor has offered feats an `effects` field for a year that
+# `feats.from_dict` dropped on the floor.
+_FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
+                            "not_yet", "requires", "requires_not"})
+_FEAT_MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "scope",
+                            "when", "note"})
+
+
+def validate_feat_document(feat_id: str, doc) -> list[str]:
+    """One feat's mechanics, checked with the fix named.
+
+    The same modifier grammar the class documents use (`validate_effect`, the four
+    modifier types, the target vocabulary), plus the fields stage 8 added for feats:
+    `scope` and `when` on a modifier (a roll context the sheet evaluates, dropped when
+    it has none), `budget` (a count, like attacks of opportunity), `choice` (a boolean
+    the attack op may carry), `attack_ability` (a substitution), `not_yet` (the clauses
+    the engine has no reader for, said out loud).
+    """
+    problems: list[str] = []
+    at = f"feats.{feat_id}"
+    if not isinstance(doc, dict):
+        return [f"{at}: a document is an object."]
+    unknown = sorted(set(doc) - _FEAT_DOC_KEYS)
+    if unknown:
+        problems.append(
+            f"{at}: unknown field(s) {', '.join(unknown)}. A feat document carries: "
+            f"{', '.join(sorted(_FEAT_DOC_KEYS))}.")
+    for i, spec in enumerate(doc.get("modifiers") or []):
+        mat = f"{at}.modifiers[{i}]"
+        if not isinstance(spec, dict) or str(spec.get("type", "")) not in _MOD_TYPES:
+            problems.append(
+                f"{mat}: a feat's modifiers are the four modifier types — "
+                f"{', '.join(_MOD_TYPES)} — because they ride the sheet's own lists.")
+            continue
+        extra = sorted(set(spec) - _FEAT_MOD_KEYS)
+        if extra:
+            problems.append(
+                f"{mat}: unknown key(s) {', '.join(extra)}; the applier would ignore "
+                f"them, so they are refused. A modifier carries: "
+                f"{', '.join(sorted(_FEAT_MOD_KEYS))}.")
+        if spec.get("amount") is None and not spec.get("formula"):
+            problems.append(f"{mat}: an amount (a number) or a formula over the sheet.")
+        probe = {k: v for k, v in spec.items()
+                 if k in ("type", "target", "amount", "formula", "bonus_type", "note")}
+        problems.extend(validate_effect(probe, mat, ()))
+        for cond in ("scope", "when"):
+            if cond in spec and not isinstance(spec[cond], dict):
+                problems.append(
+                    f"{mat}.{cond}: an object — scope {{\"weapon\": \"$target\"}}, "
+                    f"when {{\"range_ft\": {{\"lte\": 30}}}}.")
+    for field_name in ("tags", "not_yet", "requires", "requires_not"):
+        got = doc.get(field_name)
+        if got is not None and (not isinstance(got, (list, tuple))
+                                or any(not str(q).strip() for q in got)):
+            problems.append(f"{at}.{field_name}: a list of strings.")
+    budget = doc.get("budget")
+    if budget is not None:
+        bad = (not isinstance(budget, dict) or not budget
+               or any(resources.check(v) for v in budget.values()))
+        if bad:
+            problems.append(
+                f"{at}.budget: a map of reaction → formula, like "
+                f"{{\"attack_of_opportunity\": \"1 + dex_mod\"}}.")
+    choice = doc.get("choice")
+    if choice is not None:
+        from .intents import OPS
+
+        allowed = OPS["attack"][1]
+        if str(choice) not in allowed:
+            problems.append(
+                f"{at}.choice: {str(choice)!r} is not a boolean the attack op carries. "
+                f"One of: {', '.join(allowed)}.")
+    sub = doc.get("attack_ability")
+    if sub is not None:
+        from .tables import ABILITIES
+
+        if not isinstance(sub, dict) or str(sub.get("use", "")) not in ABILITIES:
+            problems.append(
+                f"{at}.attack_ability: {{\"use\": \"dex\", \"if_better\": true}} — "
+                f"which score feeds the attack roll instead of Strength.")
+    return problems
+
+
+def validate_feat_documents(docs: dict) -> list[str]:
+    """The whole file: every id must be a feat, every document must validate."""
+    from . import feats as feats_mod
+
+    problems: list[str] = []
+    known = feats_mod.all_feats()
+    for fid, doc in (docs or {}).items():
+        if str(fid) not in known:
+            problems.append(
+                f"feats.{fid}: no feat with that id in feats.json. Documents are keyed "
+                f"by id, never by name — two Foeslayers and 155 mythic namesakes.")
+        problems.extend(validate_feat_document(str(fid), doc))
+    return problems
+
+
 def validate_class(d: dict) -> list[str]:
     """Everything wrong with an authored class, each with the fix rather than the fault.
 
