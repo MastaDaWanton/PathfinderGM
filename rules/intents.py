@@ -448,6 +448,17 @@ class Intent:
     # Engine-owned params the GM supplied and we dropped. Not an error, but the log is
     # the early warning that a prompt has drifted.
     ignored_params: list[str] = field(default_factory=list)
+    # Where the number came from — `item:<stock id>`, `spell:<id>`, `ability:<path>/
+    # <key>`, `rule:<id>`, `creature:<template>`, `author:cheat`, `author:test` — and
+    # the display name the tell uses. Never in `params`, because `parse` treats params
+    # as the model's and pops engine-owned keys silently; this is stamped after parse
+    # by `Engine.validate(raw, origin=...)`, the one trusted path, so a door's own heal
+    # and the model's are distinguishable for the first time. Stage 8, 2026-09-03:
+    # measured twice, "I drink my healing potion" with an empty satchel became a bare
+    # `heal 1d8+1` — the prompt's own worked example handed back — and the engine
+    # applied it, because nothing could tell it from the potion's.
+    origin: str = ""
+    origin_name: str = ""
 
     def targets(self) -> list[str]:
         if self.target is None:
@@ -459,6 +470,7 @@ class Intent:
             "id": self.id, "op": self.op, "actor": self.actor, "target": self.target,
             "because": self.because, "params": self.params, "visibility": self.visibility,
             "ignored_params": self.ignored_params,
+            "origin": self.origin, "origin_name": self.origin_name,
         }
 
 
@@ -592,6 +604,14 @@ def parse(raw: dict, index: int = 0) -> Intent:
         raise IntentError(
             f"{op}: missing required param(s) {', '.join(missing)}", "schema", index
         )
+
+    # Ahead of the engine-owned pop on purpose: that set IGNORES, it does not refuse,
+    # and provenance is the one thing a model asserting it must be told about.
+    if "origin" in params or "origin_name" in params:
+        raise IntentError(
+            f"{op}: origin is the engine's to stamp, never yours. Name the document "
+            f"instead: use_item item=<id> for a jar, cast spell=<id> for a spell, "
+            f"use_ability ability=<name> for a power.", "schema", index)
 
     unknown = set(params) - set(required) - set(optional)
     ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
@@ -937,6 +957,14 @@ def _check_params(intent: Intent, index: int) -> None:
             )
         else:
             circ["value"] = val
+
+
+# The ops whose `amount` lands on a sheet. Every one of them needs an origin the engine
+# stamped: a jar, a spell, an ability, a rule, a creature's stat block, or the author.
+# The model is not offered these ops at the sampler (gm.prompts.turn_schema); the check
+# in Engine._check_legality is the backstop for the engine's own doors.
+AMOUNT_OPS: frozenset[str] = frozenset(
+    {"damage", "heal", "buff", "temp_hp", "defence", "ability_damage", "item_damage"})
 
 
 def parse_all(raw_intents: list) -> list[Intent]:

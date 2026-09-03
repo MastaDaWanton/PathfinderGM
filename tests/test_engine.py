@@ -33,7 +33,7 @@ def fight(engine):
 
 
 def run(engine, raw):
-    return engine.run(engine.validate(raw))
+    return engine.run(engine.validate(raw, origin="author:test"))
 
 
 def play_through(engine, raw, faces):
@@ -42,7 +42,7 @@ def play_through(engine, raw, faces):
     The PC rolls their own to-hit *and* their own damage, so one attack can suspend
     several times. Returns (resolution, prompts_seen).
     """
-    res = engine.run(engine.validate(raw))
+    res = engine.run(engine.validate(raw, origin="author:test"))
     prompts = []
     supply = list(faces)
     while res.awaiting:
@@ -153,7 +153,7 @@ def test_an_npc_roll_can_never_be_player_visible(engine):
     intents = engine.validate([{
         "op": "check", "actor": "c1", "visibility": "player",
         "params": {"skill": "perception", "dc": {"band": "tough"}},
-    }])
+    }], origin="author:test")
     assert intents[0].visibility == "hidden"
 
     res = engine.run(intents)
@@ -166,7 +166,7 @@ def test_the_pcs_own_roll_keeps_player_visibility(engine):
     intents = engine.validate([{
         "op": "check", "actor": "pc", "visibility": "player",
         "params": {"skill": "stealth", "dc": {"band": "tough"}},
-    }])
+    }], origin="author:test")
     assert intents[0].visibility == "player"
 
 
@@ -335,7 +335,7 @@ def test_power_attack_without_the_feat_is_refused(engine):
     """Kesst has neither the feat nor the BAB nor the Str for it."""
     with pytest.raises(IntentError, match="does not have Power Attack"):
         engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
-                          "params": {"power_attack": True}}])
+                          "params": {"power_attack": True}}], origin="author:test")
 
 
 def test_non_proficiency_costs_four(scene):
@@ -381,7 +381,7 @@ def test_spawn_mints_a_real_ref_the_gm_can_then_use(engine, scene):
     res = run(engine, [{"op": "spawn", "params": {"template": "watchman", "count": 2}}])
     made = res.outcomes[0].effects[0]["actors"]
     assert [m["ref"] for m in made] == ["c2", "c3"]
-    engine.validate([{"op": "attack", "actor": "c2", "target": "pc"}])
+    engine.validate([{"op": "attack", "actor": "c2", "target": "pc"}], origin="author:test")
 
 
 def test_seeded_dice_make_a_whole_scene_reproducible(scene):
@@ -392,7 +392,7 @@ def test_seeded_dice_make_a_whole_scene_reproducible(scene):
         s.add(load_pc("fixtures/pc-kesst.json"))
         s.add(instantiate("thug", scene=s))
         e = Engine(s, Dice(seed=7))
-        r = e.run(e.validate([{"op": "attack", "actor": "c1", "target": "pc"}]))
+        r = e.run(e.validate([{"op": "attack", "actor": "c1", "target": "pc"}], origin="author:test"))
         return [roll.faces for roll in r.outcomes[0].rolls]
 
     assert play() == play()

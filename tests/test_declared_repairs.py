@@ -53,9 +53,14 @@ def test_a_real_ability_and_a_carried_jar_are_left_to_their_own_injectors():
     s.pc().stock["tea#1"] = Stock(base="Woundwart Tea", count=1,
                                   specs=[{"type": "heal", "dice": "1d8"}])
     proposed = [{"op": "attack", "actor": "pc", "target": "c1"}]
-    # A jar by its base name: not this injector's business.
+    # A jar by its base name: the jar door opens it. Before stage 8 this returned the
+    # list untouched, which let a model-written `heal` through beside the real potion
+    # and landed the number twice; now the attack (no number in it) stays and the
+    # `use_item` is added, so the tea's own document supplies what it does.
     assert judgement.refuse_unknown_ability(proposed, "I use Woundwart Tea on the merchant", s) \
-        == proposed
+        == proposed + [{"op": "use_item", "actor": "pc",
+                        "because": "the player reached for Woundwart Tea",
+                        "params": {"item": "tea#1", "how": "drink"}}]
     # Lowercase after the verb is an object, not a named power: "the rope" is not an
     # ability called "the rope".
     assert judgement.refuse_unknown_ability(proposed, "I use the rope on the door", s) \

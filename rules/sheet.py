@@ -620,7 +620,7 @@ class Actor:
 
     def grant_defence(self, kind: str, against: str, amount: int = 0,
                       bypass: str = "", source: str = "",
-                      rounds: int | None = None) -> ActiveEffect:
+                      rounds: int | None = None, origin: str = "") -> ActiveEffect:
         """Put a defence on this creature — innate when `rounds` is None, timed when not.
 
         The one door for all four. A stat block's `Immune cold` and a potion of fire
@@ -635,7 +635,8 @@ class Actor:
             # (kind, key, source) as one record, so keying on `against` alone made
             # DR 10/silver and DR 3/— the same record — the second refreshed the first
             # and a creature with two kinds of damage reduction silently had one.
-            key=f"{against}|{bypass}", source=source or "", amount=int(amount),
+            key=f"{against}|{bypass}", source=source or "", origin=origin,
+            amount=int(amount),
             duration="until-dismissed" if rounds is None else "rounds",
             rounds_left=rounds,
             payload={"against": str(against), "amount": int(amount),
@@ -1638,9 +1639,9 @@ class Actor:
         return [e for e in self.effects if e.kind == "temp_hp"]
 
     def _new_temp_effect(self, amount: int, source: str,
-                         rounds: int | None) -> ActiveEffect:
+                         rounds: int | None, origin: str = "") -> ActiveEffect:
         return ActiveEffect(name=source or "temporary hit points", kind="temp_hp",
-                            source=source, amount=amount,
+                            source=source, origin=origin, amount=amount,
                             duration="until-dismissed" if rounds is None else "rounds",
                             rounds_left=rounds, stacking="stack")
 
@@ -1650,7 +1651,7 @@ class Actor:
         return bool(self.overrides.get(rule, False))
 
     def gain_temp_hp(self, amount: int, source: str = "",
-                     rounds: int | None = None) -> dict:
+                     rounds: int | None = None, origin: str = "") -> dict:
         """1e: temporary hit points from different sources do not stack — the best applies.
 
         Adding them would be the obvious implementation and it is wrong in a way that
@@ -1671,13 +1672,15 @@ class Actor:
         """
         amount = max(0, int(amount))
         existing = next((e for e in self._temp_effects() if e.source == source), None)
+        if existing is not None and origin:
+            existing.origin = origin
 
         if houserules.magic_stacking() and not self.allows("temp_hp.stacks"):
             if existing:
                 existing.amount, existing.rounds_left = amount, rounds
                 return {"temp_hp": self.temp_hp, "refreshed": True, "source": source,
                         "stacked": True}
-            self.effects.append(self._new_temp_effect(amount, source, rounds))
+            self.effects.append(self._new_temp_effect(amount, source, rounds, origin))
             return {"temp_hp": self.temp_hp, "added": amount, "source": source,
                     "stacked": True}
 
@@ -1686,7 +1689,7 @@ class Actor:
                 existing.amount += amount
                 existing.rounds_left = rounds
             else:
-                self.effects.append(self._new_temp_effect(amount, source, rounds))
+                self.effects.append(self._new_temp_effect(amount, source, rounds, origin))
             return {"temp_hp": self.temp_hp, "added": amount, "source": source,
                     "stacked": True}
 
@@ -1699,7 +1702,7 @@ class Actor:
         if amount > self.temp_hp:
             was = self.temp_hp
             self.effects = [e for e in self.effects if e.kind != "temp_hp"]
-            self.effects.append(self._new_temp_effect(amount, source, rounds))
+            self.effects.append(self._new_temp_effect(amount, source, rounds, origin))
             return {"temp_hp": amount, "replaced": was, "source": source}
         return {"temp_hp": self.temp_hp, "ignored": amount,
                 "source": self.temp_hp_source}
@@ -2189,7 +2192,7 @@ class Actor:
 
     def add_buff(self, kind: str, target: str, amount: int, source: str = "",
                  rounds: int | None = None, note: str = "",
-                 bonus_type: str = "") -> "Buff":
+                 bonus_type: str = "", origin: str = "") -> "Buff":
         """Grant a timed bonus. Same source on the same roll reapplies, not stacks.
 
         `bonus_type` is 1e's channel — alchemical, morale, enhancement — and it used to
@@ -2212,10 +2215,12 @@ class Actor:
                 m["bonus_type"] = typed
                 e.rounds_left = rounds
                 e.duration = "until-dismissed" if rounds is None else "rounds"
+                e.origin = origin or e.origin
                 return Buff(kind=kind, target=target, amount=int(amount),
                             source=source, rounds_left=rounds, note=note)
         self.effects.append(ActiveEffect(
             name=source or f"{int(amount):+d} {target}", kind="buff", source=source,
+            origin=origin,
             duration="until-dismissed" if rounds is None else "rounds",
             rounds_left=rounds,
             modifiers=[{"kind": kind, "target": target, "amount": int(amount),

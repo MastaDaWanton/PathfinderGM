@@ -538,7 +538,7 @@ def test_crossing_a_hit_point_threshold_is_said_out_loud():
         scene, engine = fight(6)
         got = engine.run(engine.validate(
             [{"op": "damage", "actor": "pc", "target": "c1", "because": "she hits",
-              "params": {"amount": amount, "type": "slashing"}}]))
+              "params": {"amount": amount, "type": "slashing"}}], origin="author:test"))
         tell = got.outcomes[0].tell
         written = sorted(c.key for c in scene.get("c1").conditions)
         assert written, f"{amount} damage crossed no threshold; this proves nothing"
@@ -575,8 +575,8 @@ def test_the_scrubber_knows_what_the_dice_already_decided():
         engine = Engine(scene, Dice(seed=seed))
         intent = [{"op": "attack", "actor": "pc", "target": "c1",
                    "visibility": "hidden", "because": "she swings", "params": {}}]
-        engine.run(engine.validate(intent))        # the battle gate opens the fight
-        return engine.run(engine.validate(intent))
+        engine.run(engine.validate(intent, origin="author:test"))        # the battle gate opens the fight
+        return engine.run(engine.validate(intent, origin="author:test"))
 
     found = {}
     for seed in range(1, 60):
@@ -674,7 +674,7 @@ def test_an_ability_that_deals_damage_can_kill():
 
     got = engine.run(engine.validate(
         [{"op": "use_ability", "actor": "pc", "because": "she strikes",
-          "params": {"ability": "blood spike projectile", "to": "c1"}}]))
+          "params": {"ability": "blood spike projectile", "to": "c1"}}], origin="author:test"))
 
     assert thug.hp < 0, "the ability did no damage; this proves nothing"
     written = sorted(c.key for c in thug.conditions)

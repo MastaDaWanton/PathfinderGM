@@ -38,7 +38,13 @@ class ActiveEffect:
     name: str = ""                    # what the sheet and the tell call it
     kind: str = "effect"              # condition | buff | temp_hp | coating | ability
     key: str = ""                     # the condition key, for conditions
-    source: str = ""                  # what put it here
+    source: str = ""                  # what put it here — the label the popup shows
+    # The document reference behind `source` (`item:<id>`, `spell:<id>`, ...), when a
+    # door stamped one. Foundry's word: the field it freed for "who applied this from
+    # outside" once effects stopped being copied off items. Not a dependency the
+    # applicator checks — a potion's last dose has no stock row by the time its heal
+    # lands — but what a test can ask "was this stamped by a door" of.
+    origin: str = ""
     duration: str = "until-dismissed"
     rounds_left: int | None = None    # None = until dismissed
     # Granted tags: the vocabulary entry for a condition, a stance's own tag for an
@@ -60,7 +66,7 @@ class ActiveEffect:
     def as_dict(self) -> dict:
         return {
             "name": self.name, "kind": self.kind, "key": self.key,
-            "source": self.source, "duration": self.duration,
+            "source": self.source, "origin": self.origin, "duration": self.duration,
             "rounds_left": self.rounds_left, "tags": list(self.tags),
             "modifiers": [dict(m) for m in self.modifiers],
             "amount": self.amount, "payload": dict(self.payload),
@@ -125,6 +131,8 @@ def from_dict(d: dict) -> ActiveEffect:
         kind=str(d.get("kind", "effect") or "effect"),
         key=str(d.get("key", "") or ""),
         source=str(d.get("source", "") or ""),
+        # "" for every effect saved before stage 8: the law is about what arrives.
+        origin=str(d.get("origin", "") or ""),
         duration=str(d.get("duration", "until-dismissed") or "until-dismissed"),
         rounds_left=d.get("rounds_left"),
         tags=_tags_on_load(d),

@@ -234,7 +234,7 @@ def test_the_engine_can_declare_a_packet_nonlethal():
         {"op": "damage", "actor": "pc", "because": "the pommel, not the edge",
          "params": {"to": "c1", "amount": 4, "type": "bludgeoning",
                     "lethality": "nonlethal"}},
-    ]))
+    ], origin="author:test"))
     assert thug.hp == before
     assert thug.nonlethal == 4
     assert "non-lethal" in res.outcomes[0].tell

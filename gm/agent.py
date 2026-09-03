@@ -198,6 +198,9 @@ class GMAgent:
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
                 raw = judgement.redirect_attacks_off_corpses(
                     raw, player_input, self.engine.scene) or raw
+                # Before survival: a drunk potion is the jar door, not a waterskin
+                # sip, and never a number the model wrote.
+                raw = judgement.declare_use_item(raw, player_input, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
                 # Sale first, then goods. Selling is the more specific reading of handing
                 # something over and it is the one that pays — and the order was the other
@@ -409,8 +412,11 @@ class GMAgent:
                 # MODEL minting a million gold, and on this one path the number
                 # is the author's own. Applied before, it was clamped straight
                 # back and the live probe read identically either way.
+                # The author's hand is a source: `/cheat` keeps the amount-ops and
+                # the number is theirs, stamped as such.
                 intents = judgement.keep_the_authors_numbers(
-                    self.engine.validate(raw), wish)
+                    self.engine.validate(raw, origin="author:cheat",
+                                         origin_name="the author's word"), wish)
             except IntentError as exc:
                 rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
                 messages = _with_correction(base, reply.text, str(exc))
@@ -440,6 +446,17 @@ class GMAgent:
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places())
         base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round)
+        # Stage 8's one named exception. A bestiary creature has no path, spellbook
+        # or satchel, and its bite's poison lives in a stat block no locator reads
+        # yet, so on its turn `damage` and `ability_damage` stay and the origin is
+        # its template — the engine names the source, the model still writes the
+        # number, and the ratchet lists this door by count until a creature-document
+        # stage retires it. A creature WITH a class path uses its documents like
+        # anyone else.
+        template = str(getattr(actor, "from_template", "") or "")
+        bestiary = bool(template) and not getattr(actor, "paths", None)
+        ops = prompts._CREATURE_OPS if (bestiary and self.engine.scene.in_encounter) else ()
+        origin = f"creature:{template}" if bestiary else ""
         messages = base
         attempts: list[Attempt] = []
         rejections: list[str] = []
@@ -455,11 +472,12 @@ class GMAgent:
                                 # retry loop the schema exists to eliminate.
                                 schema=prompts.turn_schema(
                                     fighting=self.engine.scene.in_encounter,
-                                    refs=tuple(self.engine.scene.actors)))
+                                    refs=tuple(self.engine.scene.actors), ops=ops))
             attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()
-                intents = self.engine.validate(data.get("intents"))
+                intents = self.engine.validate(data.get("intents"), origin=origin,
+                                               origin_name=actor.name if origin else "")
             except (ValueError, IntentError) as exc:
                 rejections.append(f"attempt {n + 1}: {exc}")
                 messages = _with_correction(base, reply.text, str(exc))

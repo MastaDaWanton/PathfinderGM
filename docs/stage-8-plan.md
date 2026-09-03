@@ -470,3 +470,26 @@ Rewrite the 8c probe:
 **8d — the outliers and hazards.** Files: `content/rules/hazards.json` (rows with declared slots and bounds), `rules/intents.py` (`hazard` row; `compel.penalty`/`guard` numbers/`resource` gain removed), `rules/engine.py` (`_op_hazard`; `save` branch dice from a document only), `gm/prompts.py` (`hazard` taught; traps refused as narrated). **Probe:** "I jump from the thirty-foot wall" against the live model yields `hazard rule=falling distance_ft=30`, a 3d6 damage record whose `origin` is `rule:falling` and whose record carries `distance_ft: 30`, and "I set off the trap" yields narration and no damage record.
 
 **8e — the ratchet.** Files: `tests/test_three_laws.py` (the five tests, with the bestiary exception excluded by name and count), `tools/prove_build.py` (feat check beside the ring check), `docs/compliance-plan.md`, the skill ledger, the memory note. **Probe:** `tools/prove_build.py` against the packaged build and a throwaway data directory seeded with a pre-stage save holding `weapon focus`, `iron will` and `toughness`: every term on the sheet names its document, the bare Weapon Focus is bound to `equipped` with its note, and `hp_max` matches the pre-stage save's printed total.
+
+## Status
+
+**8a shipped, 2026-09-03.** `Intent.origin`/`origin_name` stamped by
+`Engine.validate(raw, origin=...)` after parse; a model-written `origin` refused at
+parse with the doors named; `AMOUNT_OPS` refused at legality without a stamp; the
+sampler enum carries none of the seven on player or NPC turns, with the bestiary
+creature's fight turn as the one named exception (`_CREATURE_OPS`, `creature:<template>`);
+the jar door, the coating door, the cheat clerk and the tests stamp; heal, damage,
+ability-damage and item-damage tells name the document; `ActiveEffect.origin` on
+buffs, temporary pools, defences and stance documents; the brief lists the satchel by
+id; `declare_use_item` runs before survival and the jar branch of
+`refuse_unknown_ability` opens the door instead of standing aside. Measured against
+the live model (`tools/probe_unsourced_effects.py`): empty satchel, three of three —
+`use_item item="healing potion"` and the printed refusal, hit points unmoved; with a
+Healing Draught, three of three — `use_item item=healing-draught#1`, a heal record
+with `origin: item:healing-draught#1`, the tell "from Healing Draught", the jar spent.
+The inverse probe first failed three of three on a synonym ("healing potion" against
+"Healing Draught", an exact-id lookup), which is why `consumables.resolve_stock`
+exists: Inform's word-match-then-ask, shared by the door, the legality check and the
+declarer. Fifty-four test sites stamp `author:test`. Not yet: `_op_use_ability`'s
+instant effects loop records no per-number origin (the outcome record carries
+`ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id; 8d's outliers.

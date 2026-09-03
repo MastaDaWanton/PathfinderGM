@@ -52,14 +52,14 @@ def board(pc_at=(5, 5), ally_at=(6, 5), foe_at=(8, 5), mapped=True):
 def guard(engine, kind="redirect", protects="c1", actor="pc", **params):
     return engine.run(engine.validate([
         {"op": "guard", "actor": actor, "because": "Crimson Guard",
-         "params": {"to": protects, "kind": kind, "range_ft": 10, **params}}]))
+         "params": {"to": protects, "kind": kind, "range_ft": 10, **params}}], origin="author:test"))
 
 
 def hurt(engine, to="c1", amount=12, dtype="fire", lethality="lethal"):
     return engine.run(engine.validate([
         {"op": "damage", "actor": "c2", "because": "a hurled flask",
          "params": {"to": to, "amount": amount, "type": dtype,
-                    "lethality": lethality}}]))
+                    "lethality": lethality}}], origin="author:test"))
 
 
 # --- interception: the four kinds ---------------------------------------------------------
@@ -171,7 +171,7 @@ def test_guards_do_not_each_get_the_full_packet():
     guard(e, "absorb", amount=10)
     e.run(e.validate([{"op": "guard", "actor": "c2", "because": "a rival ward",
                        "params": {"to": "c1", "kind": "absorb", "amount": 10,
-                                  "range_ft": 20}}]))
+                                  "range_ft": 20}}], origin="author:test"))
     ally_before = s.actors["c1"].hp
     hurt(e, amount=12)
     assert s.actors["c1"].hp == ally_before              # 10 + 2 eaten, nothing left
@@ -284,7 +284,7 @@ def test_an_unknown_guard_kind_is_refused_at_validation():
     s, e = board()
     with pytest.raises(IntentError, match="kind must be one of"):
         e.validate([{"op": "guard", "actor": "pc",
-                     "params": {"to": "c1", "kind": "parry"}}])
+                     "params": {"to": "c1", "kind": "parry"}}], origin="author:test")
 
 
 def test_damage_is_untouched_when_nobody_is_guarding():
@@ -302,11 +302,11 @@ def test_a_compulsion_penalises_and_never_prohibits():
     always swing at whoever it likes; doing so is just worse."""
     s, e = board()
     e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
-                       "params": {"to": "c2", "penalty": 4}}]))
+                       "params": {"to": "c2", "penalty": 4}}], origin="author:test"))
     # Not an error, not a refusal — the attack validates and resolves.
     res = e.run(e.validate([{"op": "attack", "actor": "c2", "target": "c1",
                              "because": "ignoring the taunt",
-                             "params": {"full_attack": False}}]))
+                             "params": {"full_attack": False}}], origin="author:test"))
     assert res.outcomes[0].op == "attack"
 
 
@@ -332,7 +332,7 @@ def test_the_penalty_reaches_the_attack_roll():
     s, e = board()
     compulsion.add(s.actors["c2"], by="pc", penalty=4, source="a taunt")
     res = e.run(e.validate([{"op": "attack", "actor": "c2", "target": "c1",
-                             "because": "defying it", "params": {"full_attack": False}}]))
+                             "because": "defying it", "params": {"full_attack": False}}], origin="author:test"))
     terms = res.outcomes[0].rolls[0].modifiers
     assert any(m.source == "a taunt" and m.value == -4 for m in terms)
 
@@ -399,7 +399,7 @@ def test_the_tell_says_what_defying_it_costs():
     s, e = board()
     res = e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
                              "params": {"to": "c2", "penalty": 4,
-                                        "duration": {"amount": 3, "unit": "round"}}}]))
+                                        "duration": {"amount": 3, "unit": "round"}}}], origin="author:test"))
     assert "to attack anyone else" in res.outcomes[0].tell
     assert "3 rounds" in res.outcomes[0].tell
 
@@ -409,7 +409,7 @@ def test_a_negative_penalty_is_read_as_how_bad_rather_than_double_negated():
     somebody eventually."""
     s, e = board()
     e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
-                       "params": {"to": "c2", "penalty": -4}}]))
+                       "params": {"to": "c2", "penalty": -4}}], origin="author:test"))
     assert [m.value for m in compulsion.penalty_against(s.actors["c2"], "c1")] == [-4]
 
 

@@ -212,15 +212,15 @@ def test_the_engine_grants_temporary_hit_points(engine, scene):
     engine.run(engine.validate([
         {"op": "temp_hp", "actor": "pc", "because": "the blood closes over her arms",
          "params": {"amount": 8, "source": "blood rage"}},
-    ]))
+    ], origin="author:test"))
     assert pc.temp_hp == 8
 
 
 def test_a_second_source_is_refused_and_says_so(engine, scene):
     engine.run(engine.validate([
-        {"op": "temp_hp", "actor": "pc", "params": {"amount": 8, "source": "rage"}}]))
+        {"op": "temp_hp", "actor": "pc", "params": {"amount": 8, "source": "rage"}}], origin="author:test"))
     res = engine.run(engine.validate([
-        {"op": "temp_hp", "actor": "pc", "params": {"amount": 3, "source": "a potion"}}]))
+        {"op": "temp_hp", "actor": "pc", "params": {"amount": 3, "source": "a potion"}}], origin="author:test"))
     assert "do not stack" in res.outcomes[0].tell
     assert scene.pc().temp_hp == 8
 
@@ -231,7 +231,7 @@ def test_the_engine_heals(engine, scene):
     res = engine.run(engine.validate([
         {"op": "heal", "actor": "pc", "because": "a draught of something foul",
          "params": {"amount": 4}},
-    ]))
+    ], origin="author:test"))
     assert pc.hp == 7
     assert "recovers 4 hit points" in res.outcomes[0].tell
 
@@ -242,7 +242,7 @@ def test_healing_above_zero_stops_the_dying(engine, scene):
     pc.apply_hp_state()
     assert pc.has_condition("dying")
 
-    engine.run(engine.validate([{"op": "heal", "actor": "pc", "params": {"amount": 6}}]))
+    engine.run(engine.validate([{"op": "heal", "actor": "pc", "params": {"amount": 6}}], origin="author:test"))
     assert pc.hp == 3
     assert not pc.has_condition("dying") and not pc.has_condition("unconscious")
 
@@ -256,7 +256,7 @@ def test_a_soaked_hit_says_where_the_damage_went(engine, scene):
     res = engine.run(engine.validate([
         {"op": "damage", "target": "c1", "because": "the beam catches it",
          "params": {"amount": 12, "type": "slashing"}},
-    ]))
+    ], origin="author:test"))
     tell = res.outcomes[0].tell
     assert "7" in tell and "DR 5/—" in tell
 
@@ -265,7 +265,7 @@ def test_an_energy_hit_is_not_soaked_and_reads_plainly(engine, scene):
     thug = scene.actors["c1"]
     thug.reductions = [Reduction(5)]
     res = engine.run(engine.validate([
-        {"op": "damage", "target": "c1", "params": {"amount": 9, "type": "fire"}}]))
+        {"op": "damage", "target": "c1", "params": {"amount": 9, "type": "fire"}}], origin="author:test"))
     assert "9 fire damage." in res.outcomes[0].tell
 
 

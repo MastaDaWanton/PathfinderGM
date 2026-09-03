@@ -1021,7 +1021,10 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
 
     if _EATS.search(player_text) and "eat" not in present:
         out.append({"op": "eat", "because": "the player said they eat"})
-    if _DRINKS.search(player_text) and "drink" not in present:
+    # A drunk potion is `use_item`, declared before this runs; the waterskin sip is
+    # for the sentence that names no jar.
+    if (_DRINKS.search(player_text) and "drink" not in present
+            and "use_item" not in present):
         out.append({"op": "drink", "because": "the player said they drink"})
     # Sleep last: you eat before you bed down, and the rest op's own legality check
     # still applies — mid-fight it is refused with the reason, not silently dropped.
@@ -1508,9 +1511,13 @@ def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     stock = getattr(pc, "stock", None) or {}
     low = name.lower()
-    if any(low == k.lower() or low == str(getattr(v, "base", "")).lower()
-           for k, v in stock.items()):
-        return raw_intents
+    jar = next((k for k, v in stock.items()
+                if low == k.lower() or low == str(getattr(v, "base", "")).lower()), None)
+    if jar is not None:
+        # X is a jar they carry. The first cut returned the list untouched here,
+        # which let the model's own `heal` through beside the real potion; the jar
+        # door is the only thing that may put a number on the sheet for it.
+        return _jar_instead(raw_intents, pc.ref, jar, f"the player reached for {name}")
     # Every mechanical op in the list is the model's guess at what X does, and X does
     # not exist. The first cut dropped only the fight-makers; the next probe showed
     # the model reaching for `ability_damage con 1d4` on the merchant instead, and it
@@ -1526,6 +1533,78 @@ def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
     return kept + [{"op": "use_ability", "actor": pc.ref,
                     "because": f"the player reached for {name}",
                     "params": {"ability": name}}]
+
+
+# "I drink my healing potion", "I quaff the elixir", "I throw the flask at c1",
+# "I apply the salve": a using verb and, somewhere after it, a jar word. The jar itself
+# is matched against the satchel by name; the sentence only has to be about one.
+_USES_A_JAR = re.compile(
+    r"\bI\s+(?:drink|quaff|swallow|down|gulp|sip|throw|hurl|lob|apply|smear|rub|"
+    r"use|uncork|open)\b[^.!?]{0,60}?\b"
+    r"(potion|draught|elixir|tincture|tea|philtre|philter|salve|poultice|vial|flask|"
+    r"tonic|brew|remedy|antidote|oil|styptic|balm|unguent|jar)s?\b", re.I)
+
+
+def _jar_instead(raw_intents, ref: str, item_id: str, because: str) -> list:
+    """The list with every number-bearing op dropped and one `use_item` in its place.
+
+    A model shown a potion still writes `heal 1d8+1` beside it — measured in the
+    stage-7 probes — so the guess and the door cannot both stay: the door is the
+    only source of the number, and the guess would land a second one.
+    """
+    from rules.intents import AMOUNT_OPS
+
+    kept = [r for r in raw_intents
+            if isinstance(r, dict)
+            and str(r.get("op", "")).lower() not in AMOUNT_OPS
+            and str(r.get("op", "")).lower() != "drink"]
+    for r in kept:
+        if (str(r.get("op", "")).lower() == "use_item"
+                and str((r.get("params") or {}).get("item", "")).strip().lower() == item_id):
+            return kept
+    kept = [r for r in kept if str(r.get("op", "")).lower() != "use_item"]
+    return kept + [{"op": "use_item", "actor": ref, "because": because,
+                    "params": {"item": item_id, "how": "drink"}}]
+
+
+def declare_use_item(raw_intents, player_text: str, scene) -> list:
+    """A jar the player names is opened by the jar door, never by a written number.
+
+    Stage 8's declarer. Measured twice on 2026-09-02 (docs/stage-7-plan.md): "I drink
+    my healing potion" with an empty satchel came back as a bare `heal 1d8+1` — the
+    prompt's own worked example — and the engine applied it. With a jar in the
+    satchel the same sentence came back as `heal` beside the potion, so the number
+    landed twice. The sentence declares one thing: a jar is being used. If the satchel
+    holds one that matches, the turn gets `use_item` by id and every number-bearing
+    op is dropped. If nothing matches, the turn gets `use_item` naming what was said,
+    and the engine prints "not carrying that; they have: …" — the truth the player
+    needs — and the numbers are dropped all the same, because there is no jar to
+    supply one.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    m = _USES_A_JAR.search(str(player_text))
+    if not m:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    from rules.consumables import resolve_stock
+
+    stock = getattr(pc, "stock", None) or {}
+    # The words after the verb, e.g. "my healing potion" — the same resolver the jar
+    # door uses, so the declarer and the engine cannot disagree about which jar.
+    wanted = " ".join(str(player_text)[m.start():m.end()].split()[2:]).strip(".,!;").lower()
+    iid, _fits = resolve_stock(stock, wanted)
+    if iid is not None:
+        return _jar_instead(raw_intents, pc.ref, iid,
+                            "the player drinks it; the jar says what it does")
+    # Nothing carried fits: the door prints "not carrying" with the real satchel, or
+    # "which do you mean" when two fit, and the written numbers go all the same.
+    return _jar_instead(raw_intents, pc.ref, " ".join(wanted.split()[-2:]) or wanted,
+                        "the player reached for a jar")
 
 
 def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None) -> list:
@@ -2002,6 +2081,9 @@ def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
 
 
 _DECLARERS = (
+    # Before survival: "I drink my healing potion" is a jar, not a waterskin, and
+    # the survival injector stands down when a `use_item` is already in the list.
+    ("jar", lambda raw, text, scene, world: declare_use_item(raw, text, scene)),
     ("survival", lambda raw, text, scene, world: inject_survival(raw, text, scene)),
     # Before travel, and only here: `inject_travel` bows out when a travel is already
     # present, so a leaving sentence that also names new ground still gets its one

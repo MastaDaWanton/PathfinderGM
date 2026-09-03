@@ -38,7 +38,7 @@ from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll
 from .grid import Grid
-from .intents import Intent, IntentError, parse_all
+from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import (
     CONDITIONS,
@@ -836,13 +836,14 @@ class Scene:
                 rolled //= 2
             if kind == "heal":
                 return [{"kind": "heal", "ref": victim.ref,
-                         "amount": victim.heal(rolled), "source": ward.source}]
+                         "amount": victim.heal(rolled), "source": ward.source,
+                         "origin": f"ward:{ward.source}"}]
             d = victim.take_damage(rolled, str(spec.get("damage_type") or "untyped"),
                                    (), str(spec.get("lethality") or "lethal"))
             out.append({"kind": "damage", "ref": victim.ref, "amount": d["taken"],
                         "type": d["type"], "rolled": rolled, "saved": saved,
                         "hp_after": victim.hp, "hp_max": victim.hp_max,
-                        "source": ward.source})
+                        "source": ward.source, "origin": f"ward:{ward.source}"})
             for c in victim.apply_hp_state():
                 out.append({"kind": "condition", "ref": victim.ref, "condition": c,
                             "from": ward.source})
@@ -1310,10 +1311,22 @@ class Engine:
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
-    def validate(self, raw_intents: list) -> list[Intent]:
+    def validate(self, raw_intents: list, *, origin: str = "",
+                 origin_name: str = "") -> list[Intent]:
         """Schema, then refs, then legality. Raises IntentError carrying which check
-        failed so the caller can choose between regenerating and repairing."""
+        failed so the caller can choose between regenerating and repairing.
+
+        `origin` is the one trusted stamp of provenance. A door that turns a document
+        into intents — the jar (`item:<id>`), a coating, the cheat clerk
+        (`author:cheat`), a test (`author:test`) — passes it here, after parse, where
+        the model cannot reach it; a model-written `origin` in params is refused at
+        parse. Resolved by the door while it still holds the document, because the
+        jar's last dose is popped from the satchel before its own heal is validated.
+        """
         intents = parse_all(raw_intents)
+        for intent in intents:
+            intent.origin = str(origin or "")
+            intent.origin_name = str(origin_name or "")
         # Refs an earlier intent in this same list will have created by the time a later
         # one runs. Without this, "two bravos step out of the dark and I fight them" is
         # impossible to express: the whole list is validated before any of it runs, so a
@@ -1490,10 +1503,23 @@ class Engine:
         # got wrong (a way of using a jar that does not exist, a weapon it is not
         # holding, a pool or an ability by a name nobody has) rejects here with the
         # fix named; what the PLAYER could not have known prints at resolution.
+        #
+        # The backstop of stage 8: a number with nothing behind it. The sampler no
+        # longer offers these ops to the model at all (gm.prompts.turn_schema), so the
+        # message here is for the engine's own doors and for a prompt that has
+        # drifted — and it still names the fix rather than the fault.
+        if intent.op in AMOUNT_OPS and not intent.origin:
+            raise IntentError(
+                f"{intent.op}: no document behind this number. Name what does it: "
+                f"use_item item=<id> for a jar, cast spell=<id> for a spell, "
+                f"use_ability ability=<name> for a power. The engine supplies the "
+                f"amount from the document.", "legality", index)
         if intent.op == "use_item" and intent.actor:
             actor = self.scene.get(intent.actor)
-            item_id = str(intent.params.get("item", "")).strip().lower()
-            held = actor.stock.get(item_id) if actor is not None and item_id else None
+            said = str(intent.params.get("item", "")).strip().lower()
+            item_id, _fits = (consumables.resolve_stock(actor.stock, said)
+                              if actor is not None and said else (None, []))
+            held = actor.stock.get(item_id) if item_id else None
             if held is not None and held.count >= 1:
                     how = str(intent.params.get("how", "drink")).strip().lower()
                     use = consumables.plan(held, how=how,
@@ -2394,6 +2420,7 @@ class Engine:
             value = int(amount)
         hit = self._apply_damage(target, value, intent.params["type"],
                                  lethality=str(intent.params.get("lethality", "lethal")))
+        hit["origin"] = intent.origin
         effects = [hit]
         # Every creature the blow actually reached, which after interception is not always
         # the one it was aimed at. Keyed off the effects rather than off `target`, because
@@ -2405,9 +2432,22 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=self._damage_tell(hit) + self._hp_state_tell(crossed),
+            tell=self._damage_tell(hit) + self._by(intent, ".") + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    @staticmethod
+    def _by(intent: Intent, sep: str = "") -> str:
+        """The clause that names the document behind a number, for the tell.
+
+        Law 3 is only half kept by a sourced number whose source the narrator cannot
+        see: the heal, damage, ability-damage and item-damage tells named nothing
+        before stage 8, so the narrator could not have said what healed. `sep` is
+        what to put in front when the tell already ended with a full stop.
+        """
+        if not intent.origin_name:
+            return ""
+        return f"{sep} from {intent.origin_name}" if sep else f" from {intent.origin_name}"
 
     def _hurt_refs(self, head: dict) -> list[str]:
         refs = [head["ref"]]
@@ -2454,7 +2494,7 @@ class Engine:
         source = str(intent.params.get("source") or "a preparation")
         rounds = _rounds_from(intent.params.get("duration"))
         target.grant_defence(kind, against, amount=amount, bypass=bypass,
-                             source=source, rounds=rounds)
+                             source=source, rounds=rounds, origin=intent.origin)
         said = {
             "damage_reduction": f"damage reduction {amount}/{bypass or '—'}",
             "immunity": f"immunity to {against}",
@@ -2464,7 +2504,8 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="defence",
             effects=[{"ref": target.ref, "kind": "defence", "defence": kind,
-                      "against": against, "amount": amount, "rounds": rounds}],
+                      "against": against, "amount": amount, "rounds": rounds,
+                      "origin": intent.origin}],
             tell=f"{target.name} has {said}" + (
                 f" for {rounds} round(s)." if rounds else " while it lasts."),
             because=intent.because)
@@ -2493,7 +2534,8 @@ class Engine:
             rounds = int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
         actor.add_buff(kind, target, amount, source=source, rounds=rounds,
                        note=str(intent.params.get("note", "")),
-                       bonus_type=str(intent.params.get("bonus_type", "")))
+                       bonus_type=str(intent.params.get("bonus_type", "")),
+                       origin=intent.origin)
         span = ""
         if rounds:
             span = f" for {rounds // 600} hour(s)" if rounds >= 600 else \
@@ -2502,7 +2544,8 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="buff",
             effects=[{"ref": actor.ref, "kind": "buff", "type": kind, "target": target,
-                      "amount": amount, "rounds": rounds, "source": source}],
+                      "amount": amount, "rounds": rounds, "source": source,
+                      "origin": intent.origin}],
             tell=f"{actor.name} gains {amount:+d} {target}{span} ({source}).",
             because=intent.because,
         )
@@ -2549,7 +2592,7 @@ class Engine:
                          + (f" ({target.nonlethal} remains)" if target.nonlethal else ""))
         if temp_banked:
             parts.append(f"banks {temp_banked} as temporary vitality")
-        tell = (f"{target.name} " + ", ".join(parts) + "."
+        tell = (f"{target.name} " + ", ".join(parts) + self._by(intent) + "."
                 if parts else f"{target.name} is already unhurt.")
         # Coming back is the half a cure is FOR, and it was silent in both channels: the
         # effects list said `heal` and nothing else, and the tell counted hit points
@@ -2568,7 +2611,8 @@ class Engine:
             intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
             effects=[{"ref": target.ref, "kind": "heal", "amount": healed,
                       "nonlethal_healed": nl_healed, "temp_banked": temp_banked,
-                      "hp_after": target.hp, "hp_max": target.hp_max}]
+                      "hp_after": target.hp, "hp_max": target.hp_max,
+                      "origin": intent.origin}]
                     + [{"ref": target.ref, "kind": "condition", "condition": k,
                         "ends": True} for k in lifted],
             tell=tell,
@@ -2588,7 +2632,7 @@ class Engine:
             amount = roll.total
 
         source = str(intent.params.get("source") or intent.because or "").strip()
-        result = target.gain_temp_hp(amount, source)
+        result = target.gain_temp_hp(amount, source, origin=intent.origin)
         if "ignored" in result:
             tell = (f"{target.name} already has {result['temp_hp']} temporary hit points "
                     f"from {result['source'] or 'another source'}; these do not stack.")
@@ -2596,7 +2640,8 @@ class Engine:
             tell = f"{target.name} gains {result['temp_hp']} temporary hit points."
         return Outcome(
             intent_id=intent.id, op="temp_hp", rolls=[roll] if roll else [],
-            effects=[{"ref": target.ref, "kind": "temp_hp", "temp_hp": target.temp_hp}],
+            effects=[{"ref": target.ref, "kind": "temp_hp", "temp_hp": target.temp_hp,
+                      "origin": intent.origin}],
             tell=tell, because=intent.because,
         )
 
@@ -2628,9 +2673,11 @@ class Engine:
                 intent, f"No ability score called {ab}. The six are: "
                         f"{', '.join(ABILITY_FULL)}.")
 
-        effects = [{"ref": target.ref, "kind": "ability_damage", **res}]
+        effects = [{"ref": target.ref, "kind": "ability_damage", **res,
+                    "origin": intent.origin}]
         bits = [f"{target.name} takes {res['amount']} {ABILITY_FULL[ab]} "
-                f"{'drain' if drain else 'damage'} (now {res['score']})."]
+                f"{'drain' if drain else 'damage'} (now {res['score']})"
+                f"{self._by(intent)}."]
         if res["hp_change"]:
             bits.append(f"Hit points {res['hp_change']:+d} "
                         f"({target.hp}/{target.hp_max}).")
@@ -2677,9 +2724,12 @@ class Engine:
                         f"{r['hardness']} — {state}.")
         if not bits:
             bits.append(f"Nothing {target.name} carries is marked by it.")
+        if intent.origin_name:
+            bits.append(f"The cause: {intent.origin_name}.")
         return Outcome(
             intent_id=intent.id, op="item_damage", rolls=[roll] if roll else [],
-            effects=[{"ref": target.ref, "kind": "item_damage", **r} for r in results],
+            effects=[{"ref": target.ref, "kind": "item_damage", **r,
+                      "origin": intent.origin} for r in results],
             tell=" ".join(bits), because=intent.because,
         )
 
@@ -3529,7 +3579,8 @@ class Engine:
                                 "item": coat.item},
                      "tell": f"The {coat.item} on the blade does nothing to "
                              f"{defender.name}."}]
-        resolution = self.run(self.validate(intents))
+        resolution = self.run(self.validate(intents, origin=f"item:{coat.item}",
+                                            origin_name=coat.item))
         out = [{"effect": {"ref": defender.ref, "kind": "coating_spent",
                            "item": coat.item, "weapon": weapon_key},
                 "tell": f"The {coat.item} goes into the wound."}]
@@ -3555,18 +3606,25 @@ class Engine:
         op's business. Rolling it here would mean a second, hidden attack resolver.
         """
         actor = self.scene.actors[intent.actor]
-        item_id = str(intent.params["item"]).strip().lower()
+        said = str(intent.params["item"]).strip().lower()
         how = str(intent.params.get("how", "drink")).strip().lower()
         target = intent.params.get("to") or intent.actor
 
-        held = actor.stock.get(item_id)
+        # By id, by name, or by the words the player used — "my healing potion" is
+        # the Healing Draught. Two jars that both fit are a question, not a guess.
+        item_id, fits = consumables.resolve_stock(actor.stock, said)
+        held = actor.stock.get(item_id) if item_id else None
         if held is None or held.count < 1:
             # "I drink my healing potion" with none was the commonest 502 in play, and
             # it deleted the player's own line. The same check runs at validate time
             # now, where the model gets its retry with this list in hand; this is the
             # floor for a list that changed under itself.
+            if len(fits) > 1:
+                return self._refuse(
+                    intent, f"Which does {actor.name} mean by {said}: "
+                            f"{', '.join(fits)}? Nothing is opened until they say.")
             return self._refuse(
-                intent, f"{actor.name} is not carrying {item_id}. They have: "
+                intent, f"{actor.name} is not carrying {said}. They have: "
                         f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}.")
         if target not in self.scene.actors:
             away = self._elsewhere(target)
@@ -3609,7 +3667,12 @@ class Engine:
 
         # Drink and throw both deliver now. The intents go through validation because
         # anything reaching the engine does, including what the engine itself proposed.
-        resolution = self.run(self.validate(use.intents)) if use.intents else None
+        # Stamped here, with the jar still in hand: `held` may already be popped from
+        # the satchel (the last dose), so provenance is resolved by the door, not
+        # looked up later.
+        resolution = (self.run(self.validate(use.intents, origin=f"item:{item_id}",
+                                             origin_name=use.item))
+                      if use.intents else None)
         if resolution is not None:
             effects.extend(e for o in resolution.outcomes for e in o.effects)
 
@@ -3950,12 +4013,14 @@ class Engine:
                 healed = target.heal(amount)
                 state["effects"].append({
                     "ref": target.ref, "kind": "heal", "amount": healed,
-                    "rolled": amount, "hp_after": target.hp, "hp_max": target.hp_max})
+                    "rolled": amount, "hp_after": target.hp, "hp_max": target.hp_max,
+                    "origin": f"spell:{spell.id}"})
                 state["tells"].append(
                     f"{target.name} recovers {healed} hit points.")
             elif amount > 0:
                 hit = self._apply_damage(target, amount, plan["damage_type"],
                                          lethality=plan["lethality"])
+                hit["origin"] = f"spell:{spell.id}"
                 state["effects"].append(hit)
                 # What the target actually lost, not what the die said: a 30-point
                 # fireball against fire resistance 10 is 20, and a GM told the first
@@ -5089,7 +5154,8 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="use_ability", rolls=rolls,
             effects=[{"ref": actor.ref, "kind": "use_ability", "ability": found,
-                      "path": path, "resolved": len(done), "narrated": len(narrated)}]
+                      "path": path, "resolved": len(done), "narrated": len(narrated),
+                      "origin": f"ability:{path}/{found}"}]
                     + crossed,
             tell=" ".join(bits) + self._hp_state_tell(crossed),
             because=intent.because,
@@ -5196,6 +5262,7 @@ class Engine:
 
         actor.apply_effect(ActiveEffect(
             name=found.title(), kind="condition", key=key, source=found.title(),
+            origin=f"ability:{path}/{found}",
             tags=tags, modifiers=mods, payload=payload, periodic=periodic))
         if mods:
             effects.append({"ref": actor.ref, "kind": "stance", "ability": found,
@@ -5408,7 +5475,7 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="rest",
             effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
-                      "hours": hours, "hp_after": actor.hp}],
+                      "hours": hours, "hp_after": actor.hp, "origin": "rule:rest"}],
             tell=" ".join(bits)
                  + (f" In the night, level {levelled['level']} settles: "
                     f"+{levelled['hp']} hp"
@@ -5723,6 +5790,10 @@ def _intent_from_dict(d: dict) -> Intent:
         op=d["op"], actor=d.get("actor"), target=d.get("target"),
         because=d.get("because", ""), params=d.get("params") or {},
         visibility=d.get("visibility", "hidden"), id=d.get("id", "i1"),
+        # The stamp survives the suspend/resume round trip the same way the rest
+        # does; the first cut of stage 8 lost it here, and every op saw "".
+        origin=str(d.get("origin", "") or ""),
+        origin_name=str(d.get("origin_name", "") or ""),
     )
 
 

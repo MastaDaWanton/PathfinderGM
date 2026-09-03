@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 
 from rules import states
-from rules.intents import OPS as _OPS
+from rules.intents import AMOUNT_OPS, OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
 
 # One example per shape the GM actually needs. Demonstration, not description — and the
@@ -295,8 +295,8 @@ EXAMPLES = [
                 "Look for another way out of the room",
             ],
             "intents": [
-                {"op": "heal", "actor": "pc", "because": "the last of the draught",
-                 "params": {"amount": "1d8+1"}},
+                {"op": "use_item", "actor": "pc", "because": "the last of the draught",
+                 "params": {"item": "healing-draught#1", "how": "drink"}},
             ],
         },
     },
@@ -581,14 +581,15 @@ When the fighting stops — they run, they yield, the player gets clear — end 
 {"op": "end_encounter"}. Nobody can rest while a fight is still running.
 When the player sleeps or makes camp, use {"op": "rest", "params": {"kind": "night"}}
 — that is how wounds heal. "bed rest" is a full day and night and heals twice as much.
-A potion, a poultice, a spell that mends: {"op": "heal", "params": {"amount": "1d8+1"}}.
-Something that wards a person rather than mending them — a blessing, a shield of force —
-grants temporary hit points: {"op": "temp_hp", "params": {"amount": "2d6",
-"source": "the ward"}}. Never narrate a wound closing without one of these; if you do,
-the character walks away as hurt as they arrived and the player will see it on the sheet.
-Poison, disease, or anything that saps a body rather than wounding it damages a score:
-{"op": "ability_damage", "params": {"ability": "con", "amount": "1d4"}}. Add
-"drain": true only when the loss is permanent.
+You never write a number for what heals, wards, poisons or burns: the thing that does it
+carries its own. A potion or a poultice is used by its id from the CARRYING list:
+{"op": "use_item", "actor": "pc", "params": {"item": "<the jar's id>", "how": "drink"}}
+("throw" at a ref in "to", "coat" for a blade). A spell is cast by name:
+{"op": "cast", "params": {"spell": "<the spell>", "at": "<ref>"}}. A class power is
+{"op": "use_ability", "params": {"ability": "<name>"}}. The engine reads the jar, the
+spell or the power and applies what it says. Never narrate a wound closing without one
+of these; if you do, the character walks away as hurt as they arrived and the player will
+see it on the sheet. A jar the character is not carrying cannot be used: say so.
 When the party moves onto different ground, say so: {"op": "travel", "params":
 {"biome": "forest"}}. The biomes are urban, grassland, farmland, forest, jungle, swamp,
 hills, mountain, desert, tundra, coast, underground, ruins, planar. What can be found by
@@ -609,9 +610,6 @@ than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe
 methods the work passed through, `risky` if the harvesting was dangerous, and
 "failed": true when it spoils — a ruined batch still teaches something. The character does
 not need to have chosen the class; doing the work is how they take it up.
-Acid, and anything that eats what a person is carrying:
-{"op": "item_damage", "params": {"amount": "2d6", "type": "acid"}} — name an "item" for
-one thing, or leave it out and everything they carry takes it.
 Selling something out of the satchel:
 {"op": "sell", "actor": "pc", "params": {"item": "<the jar's id>", "count": 1,
 "to": "<the buyer's ref, if they are in the scene>"}} — the engine prices it, checks what
@@ -755,6 +753,15 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
                 f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}"
             )
+            # The jars, by id. `use_item` takes the id and nothing else in the brief
+            # named one, so the model had no way to say it and wrote `heal 1d8+1`
+            # instead — the recon's gm-side map: "the model is never shown anything
+            # it could cite". A player character is the only one with a satchel.
+            stock = getattr(actor, "stock", None) or {}
+            if stock:
+                jars = ", ".join(f"{iid} ({s.base}" + (f" ×{s.count}" if s.count > 1 else "")
+                                 + ")" for iid, s in sorted(stock.items()))
+                lines.append(f"    CARRYING (use_item by id): {jars}")
         else:
             note = actor.notes.split(".")[0] if actor.notes else ""
             # How they feel about the player, when anything has said. The attitude
@@ -1192,9 +1199,22 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
 # the GM narrating a punch and proposing nothing — stops being something to detect and
 # repair, and becomes something the sampler cannot emit.
 
-# Ops that resolve a turn in a fight. `narrate_only` is deliberately absent.
+# Ops that resolve a turn in a fight. `narrate_only` is deliberately absent, and so
+# are `damage` and `heal` since stage 8: a number the model wrote has no document
+# behind it, and the sampler is where that is stopped — a validate-time rejection
+# taught the model to route around (docs/stage-7-plan.md); an enum it cannot emit
+# from has no route. Potions are `use_item`, spells are `cast`, powers are
+# `use_ability`; the document supplies the number.
 _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools",
-              "guard", "end_encounter", "check", "save", "damage", "heal")
+              "guard", "end_encounter", "check", "save")
+
+# The one exception, named: a bestiary creature has no path, no spellbook and no
+# satchel, and its bite's poison lives in a stat block no locator reads yet — 5,735
+# of 7,188 shipped creatures carry `special_attacks`. On such a creature's turn the
+# two ops come back, and the engine stamps `creature:<template>` as the origin: the
+# engine names the source, the model still authors the number, and the ratchet lists
+# this door by name until a creature-document stage retires it.
+_CREATURE_OPS = _FIGHT_OPS + ("damage", "ability_damage")
 
 
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
@@ -1217,7 +1237,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         "properties": {
             "op": {"type": "string",
                    "enum": (sorted(ops) if ops else
-                            list(_FIGHT_OPS) if fighting else sorted(_OPS))},
+                            list(_FIGHT_OPS) if fighting else
+                            sorted(op for op in _OPS if op not in AMOUNT_OPS))},
             "actor": ({"type": "string", "enum": list(refs)} if refs
                       else {"type": "string"}),
             "target": ({"type": "string", "enum": list(refs)} if refs

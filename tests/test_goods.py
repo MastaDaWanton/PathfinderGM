@@ -130,7 +130,7 @@ def engine():
 
 
 def run(engine, raw):
-    return engine.run(engine.validate([raw])).outcomes
+    return engine.run(engine.validate([raw], origin="author:test")).outcomes
 
 
 def test_taking_something_puts_it_in_your_hands(engine):
@@ -242,7 +242,7 @@ def test_an_untargeted_heal_is_aimed_at_the_player_rather_than_killing_the_turn(
     assert out[0]["actor"] == "pc"
 
     engine = Engine(scene, Dice(seed=1))
-    engine.run(engine.validate(out))            # no IntentError
+    engine.run(engine.validate(out, origin="author:test"))            # no IntentError
 
 
 # --- what kind of thing it is decides where it goes ----------------------------------

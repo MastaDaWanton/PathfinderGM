@@ -427,6 +427,64 @@ def _gate_intent(poison: Poison, target: str, because: str) -> list[dict]:
              "visibility": "player"}]
 
 
+# Words that mean "a jar" and carry nothing about WHICH jar. "My healing potion" and a
+# Healing Draught are the same thing to the player; Inform's parser matches an object
+# on any word of its name and asks when two still fit, and that is the shape here.
+JAR_WORDS = frozenset({
+    "potion", "potions", "draught", "draughts", "elixir", "elixirs", "tincture",
+    "tinctures", "tea", "teas", "philtre", "philter", "salve", "salves", "poultice",
+    "poultices", "vial", "vials", "flask", "flasks", "tonic", "tonics", "brew", "brews",
+    "remedy", "remedies", "antidote", "antidotes", "oil", "oils", "balm", "balms",
+    "unguent", "jar", "jars", "bottle", "bottles", "dose", "doses", "my", "the", "a",
+    "an", "of", "some"})
+
+
+def resolve_stock(stock: dict, said: str) -> tuple[str | None, list[str]]:
+    """The satchel entry the player means by `said`, or the candidates that still fit.
+
+    Measured on 2026-09-03 with the stage-8 inverse probe: "I drink my healing
+    potion" with a Healing Draught in the satchel came back as `use_item item="healing
+    potion"`, and the door — an exact-id lookup — printed "not carrying healing
+    potion. They have: healing-draught#1" three times out of three. The player knew
+    exactly what they had; the engine refused them over a synonym.
+
+    Exact id or base name wins. Otherwise every content word of `said` (the jar words
+    above stripped) is matched against the words of each entry's id and base; the best
+    score above zero wins outright when it is unique. Nothing named and exactly one
+    jar carried is that jar; nothing named and several carried is a question, and the
+    caller prints the candidates rather than guessing — a potion drunk by guess would
+    be the poison.
+    """
+    said_l = " ".join(str(said or "").lower().split())
+    if not stock:
+        return None, []
+    for iid, s in stock.items():
+        if said_l in (iid.lower(), str(getattr(s, "base", "") or "").lower()):
+            return iid, [iid]
+    # The `#N` dose suffix is bookkeeping, not a word: "nothing#1" must not match
+    # "tincture#1" on the 1.
+    def _words(text: str) -> list[str]:
+        return [w for w in re.split(r"[^a-z0-9]+", re.sub(r"#\d+", " ", text.lower()))
+                if w and not w.isdigit()]
+
+    content = [w for w in _words(said_l) if w not in JAR_WORDS]
+    scored: list[tuple[int, str]] = []
+    for iid, s in stock.items():
+        words = set(_words(f"{iid} {getattr(s, 'base', '')}"))
+        score = sum(1 for w in content if w in words or any(
+            x.startswith(w) or w.startswith(x) for x in words if len(w) > 3))
+        if score:
+            scored.append((score, iid))
+    if scored:
+        best = max(sc for sc, _ in scored)
+        hits = [iid for sc, iid in scored if sc == best]
+        return (hits[0] if len(hits) == 1 else None), hits
+    if not content and len(stock) == 1:
+        only = next(iter(stock))
+        return only, [only]
+    return None, (sorted(stock) if not content else [])
+
+
 def plan(stock, how: str = "drink", target: str = "pc",
          because: str = "") -> Use:
     """What using this item actually does, as intents the engine can validate."""

@@ -77,7 +77,7 @@ def test_a_fight_already_under_way_is_not_second_guessed(scene):
     engine = Engine(scene, Dice(seed=4))
     engine.run(engine.validate([
         {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
-    ]))
+    ], origin="author:test"))
     assert review("I look for a way out.", [ATTACK], scene).ok
 
 
@@ -149,11 +149,11 @@ def test_a_creature_the_GM_cannot_speak_for_still_swings(scene):
     engine = Engine(scene, Dice(seed=8))
     engine.run(engine.validate([
         {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
-    ]))
+    ], origin="author:test"))
     fallback = judgement.default_npc_action(scene, "c1")
     assert fallback and fallback[0]["op"] == "attack"
     assert fallback[0]["target"] == "pc"
-    engine.validate(fallback)              # the fallback is not exempt from validation
+    engine.validate(fallback, origin="author:test")              # the fallback is not exempt from validation
 
 
 def test_the_fallback_picks_the_most_hurt_enemy(scene):
@@ -163,7 +163,7 @@ def test_the_fallback_picks_the_most_hurt_enemy(scene):
     engine.run(engine.validate([{
         "op": "begin_encounter",
         "params": {"sides": {"them": ["c1"], "pc": ["pc", other.ref]}},
-    }]))
+    }], origin="author:test"))
     scene.get("pc").hp = 2
     assert judgement.default_npc_action(scene, "c1")[0]["target"] == "pc"
 
@@ -172,7 +172,7 @@ def test_there_is_no_fallback_for_a_creature_that_cannot_act(scene):
     engine = Engine(scene, Dice(seed=8))
     engine.run(engine.validate([
         {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
-    ]))
+    ], origin="author:test"))
     scene.get("c1").add_condition("unconscious")
     assert judgement.default_npc_action(scene, "c1") is None
 
@@ -304,7 +304,7 @@ def test_there_is_no_fallback_when_nobody_is_left_to_fight(scene):
     engine = Engine(scene, Dice(seed=8))
     engine.run(engine.validate([
         {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
-    ]))
+    ], origin="author:test"))
     scene.get("pc").add_condition("unconscious")
     assert judgement.default_npc_action(scene, "c1") is None
 
@@ -372,7 +372,7 @@ def test_the_spawned_victim_survives_validation(stale_scene):
     amended = judgement.repair_misaimed_attack(
         raw, "I charge the winged woman.", stale_scene)
     engine = Engine(stale_scene, Dice(seed=7))
-    intents = engine.validate(amended)
+    intents = engine.validate(amended, origin="author:test")
     assert [i.op for i in intents] == ["spawn", "attack"]
 
 
@@ -685,7 +685,7 @@ def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
     assert [i["op"] for i in raw] == ["spawn", "begin_encounter", "attack"]
 
     engine = Engine(scene, Dice(seed=5))
-    res = engine.run(engine.validate(raw))
+    res = engine.run(engine.validate(raw, origin="author:test"))
     assert scene.zones["c1"] == "engaged"
     assert scene.distance_between("pc", "c1") == 5, "not within reach of a punch"
     # The swing itself is DEFERRED now, not rolled: a battle that begins and resolves
@@ -723,7 +723,7 @@ def test_a_thrown_weapon_opens_at_a_throwing_distance():
         raw = judgement.inject_fight([], said, scene)
         assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
         engine = Engine(scene, Dice(seed=5))
-        engine.run(engine.validate(raw))
+        engine.run(engine.validate(raw, origin="author:test"))
         return scene.distance_between("pc", "c1")
 
     # Each opens at its own range now rather than one generic fifteen feet: the weapon
@@ -749,7 +749,7 @@ def _opens_at(said):
     raw = judgement.inject_fight([], said, scene)
     assert any(i["op"] == "spawn" for i in raw), f"no fight started: {said}"
     engine = Engine(scene, Dice(seed=5))
-    engine.run(engine.validate(raw))
+    engine.run(engine.validate(raw, origin="author:test"))
     return scene.distance_between("pc", "c1"), scene.grid.width
 
 
@@ -850,7 +850,7 @@ def test_a_sale_to_a_merchant_who_is_not_there_is_dropped_not_fatal():
              "params": {"item": "x", "to": "nobody-here"}, "because": "x"}]
     amended = judgement.drop_unfulfillable_trades(only, scene)
     assert [r["op"] for r in amended] == ["narrate_only"]
-    Engine(scene, Dice(seed=3)).validate(amended)   # must not raise
+    Engine(scene, Dice(seed=3)).validate(amended, origin="author:test")   # must not raise
 
     # A sale to somebody actually present is not this function's business.
     from rules.sheet import from_dict
@@ -899,7 +899,7 @@ def test_a_bare_check_is_given_the_average_band_not_five_rejections():
         {"op": "check", "actor": "pc", "params": {"skill": "climb"},
          "because": "the rise is steep"}])
     assert raw[0]["params"]["dc"] == {"band": "average"}
-    assert [i.op for i in eng.validate(raw)] == ["check"]
+    assert [i.op for i in eng.validate(raw, origin="author:test")] == ["check"]
 
     # A check that already knows what it is up against is not touched.
     keep_dc = [{"op": "check", "actor": "pc",
@@ -917,7 +917,7 @@ def test_a_bare_check_is_given_the_average_band_not_five_rejections():
         [{"op": "narrate_only", "actor": "pc", "params": {}, "because": "x"}],
         "I climb the nearest rise to see further.", scene)
     chained = judgement.fill_bare_checks(chained)
-    assert [i.op for i in eng.validate(chained)] == ["narrate_only", "check"]
+    assert [i.op for i in eng.validate(chained, origin="author:test")] == ["narrate_only", "check"]
 
 
 
@@ -1103,7 +1103,7 @@ def test_a_pair_of_guards_is_two_guards():
     e = Engine(s, Dice(seed=2))
     out = e.run(e.validate([{"op": "spawn", "because": "t",
                              "params": {"template": "watchman",
-                                        "name": "pair of guards"}}])).outcomes[0]
+                                        "name": "pair of guards"}}], origin="author:test")).outcomes[0]
     made = out.effects[0]["actors"]
     assert len(made) == 2
     assert all(m["name"] == "guard" for m in made)
@@ -1261,7 +1261,7 @@ def test_an_unaimed_item_damage_is_a_refusal_not_a_dead_turn():
     s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
     e = Engine(s, Dice(seed=1))
     out = e.run(e.validate([{"op": "item_damage", "because": "t",
-                             "params": {"amount": 4}}])).outcomes[0]
+                             "params": {"amount": 4}}], origin="author:test")).outcomes[0]
     assert "Nobody's gear" in out.tell
 
 

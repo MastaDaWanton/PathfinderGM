@@ -148,7 +148,7 @@ def test_the_engine_resolves_ability_damage(engine, scene):
     res = engine.run(engine.validate([
         {"op": "ability_damage", "target": "pc", "because": "the blood boils in her arm",
          "params": {"ability": "con", "amount": 2}},
-    ]))
+    ], origin="author:test"))
     assert pc.ability_score("con") == pc.base_ability_score("con") - 2
     assert "Constitution damage" in res.outcomes[0].tell
 
@@ -159,7 +159,7 @@ def test_an_invented_ability_is_refused(engine):
     with pytest.raises(IntentError):
         engine.run(engine.validate([
             {"op": "ability_damage", "target": "pc",
-             "params": {"ability": "luck", "amount": 2}}]))
+             "params": {"ability": "luck", "amount": 2}}], origin="author:test"))
 
 
 # --- objects -----------------------------------------------------------------------------
@@ -227,7 +227,7 @@ def test_the_engine_damages_one_named_item(engine, scene):
     res = engine.run(engine.validate([
         {"op": "item_damage", "target": "pc", "because": "the acid finds her sleeve",
          "params": {"item": "silk cloak", "amount": 9, "type": "acid"}},
-    ]))
+    ], origin="author:test"))
     assert "silk cloak" in res.outcomes[0].tell
     assert scene.pc().item("silk cloak").destroyed
 
@@ -235,7 +235,7 @@ def test_the_engine_damages_one_named_item(engine, scene):
 def test_gear_that_shrugs_it_off_is_not_narrated_one_by_one(engine, scene):
     """A list of eleven items that all took nothing buries the one that did not."""
     res = engine.run(engine.validate([
-        {"op": "item_damage", "target": "pc", "params": {"amount": 1, "type": "acid"}}]))
+        {"op": "item_damage", "target": "pc", "params": {"amount": 1, "type": "acid"}}], origin="author:test"))
     assert "Nothing" in res.outcomes[0].tell
 
 

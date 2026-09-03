@@ -36,7 +36,7 @@ def _table():
 
 def _drink(engine, spec):
     return engine.run(engine.validate(
-        consumables._spec_to_intents(spec, "pc", "drinks it", 1.0)))
+        consumables._spec_to_intents(spec, "pc", "drinks it", 1.0), origin="author:test"))
 
 
 # --- the four are one store now --------------------------------------------------------
@@ -155,13 +155,13 @@ def test_the_defence_op_refuses_with_the_fix_named():
     pc, engine = _table()
     with pytest.raises(IntentError, match="is not a kind of defence"):
         engine.validate([{"op": "defence", "actor": "pc", "because": "t",
-                          "params": {"kind": "warding", "against": "fire"}}])
+                          "params": {"kind": "warding", "against": "fire"}}], origin="author:test")
     with pytest.raises(IntentError, match="needs `against`"):
         engine.validate([{"op": "defence", "actor": "pc", "because": "t",
-                          "params": {"kind": "immunity"}}])
+                          "params": {"kind": "immunity"}}], origin="author:test")
     with pytest.raises(IntentError, match="needs an amount"):
         engine.validate([{"op": "defence", "actor": "pc", "because": "t",
-                          "params": {"kind": "damage_reduction"}}])
+                          "params": {"kind": "damage_reduction"}}], origin="author:test")
 
 
 def test_an_op_that_declares_a_param_keeps_it():
@@ -202,7 +202,7 @@ def test_a_creature_refuses_a_condition_it_is_immune_to():
     z, engine = _skeleton()
     out = engine.run(engine.validate([
         {"op": "condition", "actor": "pc", "because": "a spell",
-         "params": {"condition": "paralyzed", "to": z.ref}}])).outcomes[-1]
+         "params": {"condition": "paralyzed", "to": z.ref}}], origin="author:test")).outcomes[-1]
     assert not z.has_condition("paralyzed")
     assert out.effects == [], "a refused condition may change nothing"
     assert "immune to undead traits" in out.tell
