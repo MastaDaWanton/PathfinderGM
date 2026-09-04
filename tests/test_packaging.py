@@ -784,9 +784,75 @@ def test_the_portfile_is_written_after_bind_and_removed_on_shutdown():
 def test_the_home_page_says_which_build_it_is():
     """"add a version tracker to the main page and i dont have to wonder" —
     after a session of findings filed against a build that had already been
-    superseded. Dev reads git live; the packaged build is stamped by
-    tools/stamp_version.py before PyInstaller runs."""
+    superseded. Dev reads git live, off the request thread; the packaged build
+    reads the file the spec wrote."""
     from pathfindergm import version
 
+    got = version.build(wait=15)
+    assert got and got != version.UNSTAMPED and got.endswith("(dev)")
+
+
+def test_the_frozen_build_reads_its_stamp_and_never_runs_anything(monkeypatch, tmp_path):
+    """Measured 2026-09-04 on the Explorer-launched shell: three home requests parked
+    on `subprocess.communicate` inside `version.build`, because every packaged build
+    ever shipped was "unstamped" (the stamper was never wired in) and so ran `git log`
+    from the exe on every home load; that git hung with no console and the timeout's
+    kill left the real git holding the pipes. `/` never answered, the window never
+    painted, nothing appeared. Frozen, the stamp is a file, and no process is ever
+    spawned — a bundle has no working copy to ask."""
+    import subprocess
+    from pathfindergm import version
+
+    def never(*a, **k):
+        raise AssertionError("the frozen build spawned a process for its version")
+    monkeypatch.setattr(subprocess, "run", never)
+    monkeypatch.setattr(subprocess, "Popen", never)
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(paths, "resource_root", lambda: tmp_path)
+
+    assert version.build() == version.UNSTAMPED          # no file: says so, no crash
+    (tmp_path / version.STAMP_FILE).write_text("abc1234 2026-09-04 17:52\n", encoding="utf-8")
+    assert version.build() == "abc1234 2026-09-04 17:52"
+
+
+def test_the_dev_version_lookup_never_holds_a_request(monkeypatch):
+    """The same incident, dev side: `python desktop.py` under the shell is spawned the
+    same hidden, piped way, so a git that hangs there would hang the home page in dev
+    too. The lookup runs on its own daemon thread and `build()` answers with what it
+    knows. Measured: a git that never returns costs the caller 0.0s."""
+    import subprocess, time
+    from pathfindergm import version
+
+    def hangs(*a, **k):
+        time.sleep(30)
+        raise AssertionError("unreachable")
+    monkeypatch.setattr(subprocess, "run", hangs)
+    monkeypatch.setattr(paths, "is_frozen", lambda: False)
+    monkeypatch.setattr(version, "_dev_stamp", None)
+    monkeypatch.setattr(version, "_dev_thread", None)
+
+    started = time.perf_counter()
     got = version.build()
-    assert got and got != "unstamped"
+    assert time.perf_counter() - started < 0.5
+    assert got == version.UNSTAMPED
+
+
+def test_the_spec_ships_the_build_stamp():
+    """The stamp is written by the spec at build time and shipped beside OGL.txt; the
+    old `tools/stamp_version.py` edited the working copy and was wired into nothing,
+    which is how every build shipped unstamped."""
+    text = SPEC.read_text(encoding="utf-8")
+    assert "build-stamp.txt" in text and '"."' in text
+    assert not (ROOT / "tools" / "stamp_version.py").exists()
+
+
+def test_the_shell_shows_its_window_even_when_the_page_never_paints():
+    """`show: false` plus `ready-to-show` is a window nobody can see or close when the
+    first paint never comes — which it did not, above, for two double-clicks. The
+    shell keeps the flash-free path and adds a bounded fallback, and a failed
+    main-frame load is a dialog with the reason rather than a blank window."""
+    text = (ROOT / "electron" / "main.js").read_text(encoding="utf-8")
+    assert "SHOW_ANYWAY_MS" in text
+    assert "mainWindow.isVisible()" in text
+    assert "did-fail-load" in text
+    assert re.search(r"once\('ready-to-show'.*clearTimeout\(showAnyway\)", text)

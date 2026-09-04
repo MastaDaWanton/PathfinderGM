@@ -27,6 +27,8 @@ const readline = require('readline');
 const READY = 'PATHFINDERGM_READY';
 /** No migrations and no collectstatic — a onefile unpack plus Django setup. */
 const STARTUP_TIMEOUT_MS = 60_000;
+/** How long a first paint may take before the window is shown regardless. */
+const SHOW_ANYWAY_MS = 5_000;
 
 let backend = null;
 let backendUrl = null;
@@ -146,7 +148,25 @@ function createWindow(url) {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  // Shown on first paint, and failing that, shown anyway. Measured 2026-09-04: the
+  // backend answered every route but `/`, whose view was parked on a hung git call;
+  // the page never painted, `ready-to-show` never fired, and the user double-clicked
+  // twice — once as administrator — and saw nothing. A hidden window is a window the
+  // user cannot even close. Electron's own guidance for a slow first paint is to show
+  // at once on a `backgroundColor` matching the app; this keeps the flash-free first
+  // paint for the normal case and puts the leather on screen within a few seconds
+  // for the abnormal one, where the page's own error is then visible.
+  const showAnyway = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+  }, SHOW_ANYWAY_MS);
+  mainWindow.once('ready-to-show', () => { clearTimeout(showAnyway); mainWindow.show(); });
+  // A main-frame load that fails outright (backend gone between READY and here) is a
+  // startup failure with a reason, not a blank window. -3 is ERR_ABORTED, which a
+  // navigation superseding another raises and which is not a failure.
+  mainWindow.webContents.on('did-fail-load', (event, code, description, target, isMainFrame) => {
+    if (!isMainFrame || code === -3) return;
+    showStartupFailure(new Error(`The game's page failed to load (${description}, ${target}).`));
+  });
   mainWindow.loadURL(url);
 
   // Anything genuinely external (the OGL links, World Bible's repo) belongs in the

@@ -32,6 +32,16 @@ def note(name: str, faults: list[str]) -> None:
     FAULTS.extend(f"{name}: {f}" for f in faults)
 
 
+def registry_path() -> str:
+    """Machine PATH then user PATH, as Explorer composes it for a double-clicked app."""
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + "
+         "[Environment]::GetEnvironmentVariable('PATH','User')"],
+        capture_output=True, text=True)
+    return out.stdout.strip() or os.environ.get("PATH", "")
+
+
 def pid_alive(pid: int) -> bool:
     out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
                          capture_output=True, text=True).stdout
@@ -52,6 +62,13 @@ def main() -> None:
         if not exe.exists():
             print(f"no packaged shell at {exe}"); sys.exit(2)
         cmd, cwd = [str(exe)], exe.parent
+        # The PATH Explorer gives a double-clicked app, not the developer shell's.
+        # Measured 2026-09-04: this prover passed while the same build, launched from
+        # Explorer, never showed a window — the home view shelled out to git, and the
+        # git the registry PATH reaches first (Git's cmd wrapper) hung with no console
+        # where the dev shell's mingw git answered in 80ms. A prover that inherits the
+        # developer's environment proves the developer's launch, not the user's.
+        env["PATH"] = registry_path()
     else:
         cmd, cwd = ["npx", "electron", "."], REPO / "electron"
 

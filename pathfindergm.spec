@@ -59,6 +59,26 @@ datas += [
     ("OGL-NOTICE.md", "."),
 ]
 
+# The build stamp the home page prints, asked of git HERE — once, at build time, by a
+# process that has a console — and shipped as a file. `pathfindergm.version` reads the
+# file when frozen and never runs anything: the version that asked git at request time
+# hung every home-page load of the Explorer-launched shell (see that module's docstring).
+# Written into `build/` so the working copy is never edited by packaging.
+import subprocess
+from pathlib import Path
+
+_stamp_dir = Path("build")
+_stamp_dir.mkdir(exist_ok=True)
+_stamp = subprocess.run(
+    ["git", "log", "-1", "--format=%h %cd", "--date=format:%Y-%m-%d %H:%M"],
+    capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
+_stamp_text = _stamp.stdout.strip() if _stamp.returncode == 0 else ""
+if not _stamp_text:
+    raise SystemExit("could not read the git stamp for build-stamp.txt — "
+                     "build from a checkout with git on PATH")
+(_stamp_dir / "build-stamp.txt").write_text(_stamp_text + "\n", encoding="utf-8")
+datas += [(str(_stamp_dir / "build-stamp.txt"), ".")]
+
 # Deliberately NOT bundled, so the reasons are on the record rather than rediscovered:
 #   reference/  — 2.8 MB of extracted rulebook text read only by tests and by
 #                 reference/build_reference.py. No runtime code path opens it.
