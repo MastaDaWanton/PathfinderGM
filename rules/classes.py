@@ -98,6 +98,19 @@ def get(class_id: str) -> dict:
     return all_classes().get((class_id or "").strip().lower(), {})
 
 
+def member_noun(class_id: str) -> str:
+    """What to call one person of this class.
+
+    Eleven of the thirteen shipped names are already nouns for a person — a Rogue, a
+    Paladin — so this never bit until a class was named for the practice rather than
+    the practitioner: the opening read "You are Masta, a Blood Bending". The document
+    carries the word (`member`) and falls back to the name, so a homebrew class named
+    "Storm Calling" fixes itself by saying so rather than by a special case here.
+    """
+    cls = get(class_id)
+    return str(cls.get("member") or cls.get("name") or class_id or "").strip()
+
+
 def features_at(class_id: str, level: int) -> list[str]:
     """Everything this class has granted by the time it reaches this level."""
     cls = get(class_id)

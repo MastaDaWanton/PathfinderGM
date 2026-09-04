@@ -96,7 +96,7 @@ def test_nothing_in_the_opening_names_the_shipped_fixture():
     import re
 
     for s in opening.SITUATIONS:
-        for text in (s.when, s.where, s.doing, s.who):
+        for text in (s.when, s.where, s.doing, s.who, s.edge):
             stray = re.findall(r"(?<![.!?] )(?<!^)\b[A-Z][a-z]{2,}", text)
             assert not stray, (text, stray)
 
@@ -162,15 +162,11 @@ def test_the_roll_is_stable_for_a_game_and_varies_between_games():
     assert len({opening.roll(f"game-{n}") for n in range(40)}) > 1
 
 
-def test_the_opening_says_all_four_things():
-    """The ask: where I am in the world as my character knows it, where I am
-    physically, who I am, and what I am currently doing."""
-    world, town = a_world()
-
+def _game(world, town, cls: str = "ranger", seed=None):
     @dataclass
     class FakePC:
         name: str = "Averil Stane"
-        char_class: str = "ranger"
+        char_class: str = cls
 
     @dataclass
     class FakeScene:
@@ -178,15 +174,140 @@ def test_the_opening_says_all_four_things():
             return FakePC()
 
     class FakeCampaign:
-        id, seed = "four-beats", None
+        id = "four-beats"
         scene = FakeScene()
 
     game = FakeCampaign()
-    game.world, game.location = world, town
-    text = opening.compose(game, "a stranger here")
-    assert "A drowned coast" in text                       # the world, as known
-    assert "Averthorn" in text and "Turf roofs" in text     # where, physically
-    assert "Averil Stane" in text and "a ranger" in text    # who
-    assert "close enough to speak to" in text              # what, and someone to do it with
-    assert text.rstrip().endswith("What do you do?")
-    assert len(text) > 400, "the ask was for a larger opening than one sentence"
+    game.world, game.location, game.seed = world, town, seed
+    return game
+
+
+def test_the_opening_says_who_where_and_what_is_going_on():
+    """Nelson's overture, on the opening of *Trinity* (*The Craft of Adventure*, 2nd
+    ed., §"The Overture"): "Already you know: who you are …; exactly where you are …;
+    and what is going on". All three, and the place's own props carrying the setting
+    rather than a paragraph of stated facts."""
+    world, town = a_world()
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert "Averthorn" in text                                   # exactly where
+    # The fact's own words and its own capitals, joined into English: the export
+    # writes "Turf roofs, low stone walls" as a field, and only the last comma
+    # becomes a conjunction.
+    assert "Turf roofs and low stone walls" in text
+    assert "Averil Stane" in text and "a Ranger" in text         # who
+    assert "The reeve" not in text, "the strain is the GM's note, not the first screen"
+    body = text.split("\n\n")
+    assert len(body) == 4, body
+
+
+def test_something_is_already_happening_when_the_game_picks_up():
+    """The player used to arrive beside a man in a doorway with nothing in motion:
+    "You are watching a thing being made that you half know how to make. The
+    apprentice minding the door is close enough to speak to. What do you do?"
+
+    Dungeon World's rule for a first session (SRD, "First Session") is to "start the
+    session with a group of player characters … in a tense situation", and Nelson's
+    overture has to carry "what is going on" as well as who and where. Every situation
+    now opens on something already moving, and it is never explained: the explanation
+    is the GM's private note, and asking is the player's first turn.
+    """
+    world, town = a_world()
+    for s in opening.SITUATIONS:
+        assert s.edge, s
+        assert s.edge.rstrip().endswith("."), s
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert "close enough to speak to" not in text
+    assert "has stopped to watch." in text
+
+
+def test_the_question_carries_the_role_the_player_is_playing():
+    """Nelson, same essay, on Infocom's *Witness*: it "asks pointedly on the first
+    turn" — "What should you, the detective, do now?" — and he raises it under telling
+    the player who to be. "What do you do?" is that question with the role removed."""
+    world, town = a_world()
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert text.rstrip().endswith("What should you, the Ranger, do now?")
+    # And the word is the one the class document uses for a person of that class.
+    blooded = opening.compose(_game(world, town, cls="blood bending"), "a stranger here")
+    assert "a Blood Bender" in blooded and "the Blood Bender, do now?" in blooded
+    assert "a Blood Bending" not in blooded, "the class name is not a noun for a person"
+
+
+def test_the_opening_is_striking_and_concise():
+    """Nelson: the opening "ought to be striking and concise (not an effort to sit
+    through, like the title page of `Beyond Zork')". His model does it in two
+    paragraphs and 83 words. Measured across all twelve situations on 2026-09-03 this
+    runs 79 to 91 words; the old one ran past 200, most of it the export's premise.
+
+    A ceiling rather than an exact count, because a world with a longer place name or
+    a longer architecture fact legitimately costs a few words.
+    """
+    world, town = a_world()
+    counts = []
+    for s in opening.SITUATIONS:
+        game = _game(world, town)
+        text = _with_situation(s, lambda: opening.compose(game, "a stranger here"))
+        counts.append(len(text.split()))
+    assert max(counts) <= 110, counts
+    assert min(counts) >= 60, counts
+
+
+def _with_situation(situation, fn):
+    """Compose against one named situation rather than whichever the seed rolls."""
+    original = opening.situation_for
+    opening.situation_for = lambda _campaign: situation
+    try:
+        return fn()
+    finally:
+        opening.situation_for = original
+
+
+def test_the_first_screen_is_not_a_list_of_promises():
+    """D.G. Jerz, *Exposition in Interactive Fiction*: "Casual details like these are
+    often found enriching ordinary prose narratives, but when they appear in the
+    opening screen of an IF game, they take on a great deal of prominence" — every
+    noun on the first screen reads as a thing the player may touch.
+
+    Measured on the user's own world, 2026-09-03: the opening's first paragraph was
+    sixteen comma-separated facts joined by semicolons, read straight out of the
+    export's `premise`, which is the set of dials World Bible generated the world
+    with — "varying by region" appeared three times and one value carried its own
+    typo. Nobody was born knowing that, and none of it could be touched.
+    """
+    world, town = a_world()
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert text.count(";") == 0, text
+    assert "A drowned coast" not in text, "the premise is the generator's dials"
+    assert "What you know" not in text
+
+
+def test_the_narrator_never_decides_for_the_player():
+    """Jerz, same essay, on an opening that says "you realize", "you can't bear" and
+    "you decide": "The player doesn't get the chance to respond emotionally to the
+    scene, and to decide upon a course of action accordingly." He calls "something
+    tells you" a "narrative cop-out". Detected rather than remembered, which is this
+    repo's own rule about prompt rules versus mechanical checks."""
+    import re
+
+    banned = re.compile(r"you reali[sz]e|you decide|you can't bear|"
+                        r"something tells you|you feel that", re.I)
+    world, town = a_world()
+    for s in opening.SITUATIONS:
+        game = _game(world, town)
+        text = _with_situation(s, lambda: opening.compose(game, "a stranger here"))
+        found = banned.findall(text)
+        assert not found, (s.where, found)
+
+
+def test_the_person_beside_you_is_not_watching_themselves():
+    """The edge is about the world and the watcher is about the person, and the first
+    cut mixed them: the crier's situation read "The crier has stopped in the middle of
+    a notice … The crier working through the notices has stopped to watch." Three of
+    the twelve did this. The edge may not name the person it is being watched by."""
+    for s in opening.SITUATIONS:
+        # The person-word itself: the first real word after "the" — "crier",
+        # "foreman", "watchman". Not every long word in the phrase, or "the woman at
+        # the bread stall" would forbid an edge about a stall.
+        words = [w for w in s.who.lower().split() if w != "the" and len(w) > 3]
+        assert words, s.who
+        assert words[0] not in s.edge.lower(), (s.who, s.edge)

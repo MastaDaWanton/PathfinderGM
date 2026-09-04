@@ -340,6 +340,14 @@ CLASS_SCHEMA: list[Section] = [
                        help="As it is printed. Capitals and punctuation are yours; only "
                             "the id has to be plain.",
                        example="Storm Caller"),
+            ClassField("member", "One of them is called",
+                       consumer="play/opening.py:who_you_are — the opening sentence",
+                       help="The noun for a person of this class, when the class name "
+                            "is not one. Most names already are: a Rogue, a Paladin. "
+                            "\"Blood Bending\" is not, and the opening read \"You are "
+                            "Masta, a Blood Bending\" until this existed. Defaults to "
+                            "the name.",
+                       example="Blood Bender"),
             ClassField("summary", "Summary", type="textarea",
                        consumer="rules/creation.py:options → the creation forge card; "
                                 "the Class tab",
