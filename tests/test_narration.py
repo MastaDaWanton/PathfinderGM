@@ -1638,7 +1638,8 @@ def test_the_prose_schema_admits_what_the_prose_prompt_demonstrates():
     from gm import prompts
 
     schema = prompts.prose_schema(min_chars=0, max_chars=2000)
-    shown = list(prompts.EXAMPLES) + list(prompts.COMBAT_EXAMPLES)
+    shown = (list(prompts.EXAMPLES) + list(prompts.COMBAT_EXAMPLES)
+             + list(prompts.CARRY_ON_EXAMPLES))
     assert shown, "the prose call is built on these; an empty list would pass vacuously"
     for ex in shown:
         reply = dict(ex["reply"])
@@ -1662,3 +1663,61 @@ def test_the_prose_reply_still_only_has_to_carry_narration():
     jsonschema.validate({"narration": "just the prose"}, schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({"suggestions": []}, schema)
+
+
+# --- Continue is shown what continuing looks like ----------------------------------------
+
+def test_continue_replaces_the_turn_examples_with_its_own():
+    """Measured live, 2026-09-04, five presses of Continue out of five: the player was
+    at a public ritual in a market and every beat put them shoulder-first against a
+    door into a room the scene does not contain — a cellar, a vestibule, a store of
+    timber and grain.
+
+    Not copied words. `build_echo_index` finds zero shared six-word phrases between the
+    beat and the examples, so the lexical echo detector could not see it and honestly
+    cannot: the *situation* is what was copied. Worked example 11 is "I put my shoulder
+    to the door and force it", it ends on "Do you take it?" with the shove still in the
+    air, and it is the last thing the model sees before the player's line. Told to
+    "carry the scene on from where it stopped", a model with no demonstration of what
+    that means finishes the nearest stopped thing in front of it.
+
+    After: zero of five, and the beats are in the market the player is standing in.
+    """
+    from gm import prompts
+
+    msgs = prompts.call_prose_messages("BRIEF", [], prompts.CARRY_ON, [])
+    shown = [m["content"] for m in msgs if m.get("role") == "assistant"]
+    assert len(shown) == len(prompts.CARRY_ON_EXAMPLES)
+    blob = " ".join(shown).lower()
+    for forbidden in ("door", "hinge", "cellar", "vestibule", "shoulder to the"):
+        assert forbidden not in blob, forbidden
+
+    # An ordinary turn is untouched: it still gets the full set.
+    ordinary = prompts.call_prose_messages("BRIEF", [], "I draw my sword", [])
+    assert len([m for m in ordinary if m.get("role") == "assistant"]) == \
+        len(prompts.EXAMPLES)
+
+
+def test_the_continue_examples_continue_rather_than_start_something():
+    """Nobody acts, nothing new arrives, the place and the people already here go on —
+    and every one hands the turn back, because the beat the player did not take is
+    still a beat that ends with them holding it."""
+    from gm import prompts
+
+    for ex in prompts.CARRY_ON_EXAMPLES:
+        assert ex["player"] == prompts.CARRY_ON
+        narration = ex["reply"]["narration"]
+        assert narration.rstrip().endswith("What do you do?"), narration[-60:]
+        # The prose call reads `narration` and nothing else; these demonstrate that.
+        assert set(ex["reply"]) == {"narration"}
+
+
+def test_the_continue_line_has_one_definition():
+    """The prose call recognises this exact string to swap its examples in, and the
+    view sends it. Two copies that have to match byte for byte is how the stale one
+    ships."""
+    from play import views
+
+    from gm import prompts
+
+    assert views.CARRY_ON is prompts.CARRY_ON

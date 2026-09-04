@@ -685,9 +685,13 @@ def prepare_spells(request):
 # something the character does, because the whole point is that the player is *not*
 # acting: a turn that put "I wait" in the box would have the character stand there while
 # the question they just asked went on not being answered.
-CARRY_ON = ("I take no action. Carry the scene on from where it stopped: if I asked "
-            "somebody something, let them answer in their own words, and let the people "
-            "and the place here go on doing what they were doing.")
+#
+# One definition, in `gm/prompts.py` beside the examples that teach it. It was written
+# out again here, and the prose call now recognises this exact string to swap in
+# Continue's own demonstrations — two copies of a string that has to match byte for
+# byte is how the stale one ships (CLAUDE.md, "when you fix a rule, grep for every
+# copy of it").
+CARRY_ON = prompts.CARRY_ON
 
 
 @require_POST

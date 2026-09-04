@@ -812,7 +812,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
 
 
 def call_one_messages(briefing_scene: str, history: list[dict], player_input: str,
-                      in_combat: bool = False, enemy: str | None = None) -> list[dict]:
+                      in_combat: bool = False, enemy: str | None = None,
+                      examples: list[dict] | None = None) -> list[dict]:
     """The turn prompt, in one of two modes.
 
     Out of a fight the model is shown long examples and asked to build a scene. In one it
@@ -824,7 +825,10 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
     being asked for three sentences, and demonstration volume is what wins.
     """
     briefing = BRIEFING + (COMBAT_BRIEFING_EXTRA if in_combat else "")
-    examples = COMBAT_EXAMPLES if in_combat else EXAMPLES
+    # An explicit set replaces both — Continue is the caller that passes one, and its
+    # examples have to be the only scene-shaped thing the model can see.
+    if examples is None:
+        examples = COMBAT_EXAMPLES if in_combat else EXAMPLES
 
     messages = [{"role": "system", "content": briefing + "\n\n" + briefing_scene}]
     for ex in examples:
@@ -897,6 +901,63 @@ def call_one_intents_only(briefing_scene: str, history: list[dict], player_input
     return out
 
 
+# The Continue button's line, written here rather than typed by the player, and kept
+# beside the examples that teach it because the two only work together.
+CARRY_ON = ("I take no action. Carry the scene on from where it stopped: if I asked "
+            "somebody something, let them answer in their own words, and let the people "
+            "and the place here go on doing what they were doing.")
+
+# Continue's own demonstrations, and they REPLACE the turn examples rather than extend
+# them — the same choice, for the same reason, that the combat set replaces them.
+#
+# Measured live on 2026-09-04, five presses of Continue out of five: the player was at a
+# public ritual in a market, and every beat put them shoulder-first against a door into
+# a room the scene does not contain — a cellar, a vestibule, a store of timber and
+# grain. Not copied words: `build_echo_index` found zero shared six-word phrases, so the
+# lexical detector could not see it and honestly cannot. It is the *situation* being
+# copied. Worked example 11 is "I put my shoulder to the door and force it", it ends on
+# "Do you take it?" with the shove still in the air, and it is the last thing the model
+# is shown before the player's line. Told to "carry the scene on from where it stopped",
+# a model with no demonstration of what that means completes the nearest stopped thing
+# in front of it.
+#
+# So Continue is shown what it looks like: nobody acts, nothing new arrives, the place
+# and the people already here go on. Every one ends by handing the turn back, and none
+# of them opens a door.
+CARRY_ON_EXAMPLES: list[dict] = [
+    {
+        "player": CARRY_ON,
+        "reply": {"narration": (
+            "Nobody fills the gap. The woman with the tally-stick goes back to her "
+            "counting, one bead at a time, and the man who had been about to speak "
+            "closes his mouth and looks at his hands instead. Somewhere behind you a "
+            "child is being told twice to stand still. The quiet does not break so "
+            "much as thin out, the way it does when people decide separately that "
+            "whatever it was is over. The one who stopped to watch is still watching, "
+            "and has not moved from where they were. What do you do?")},
+    },
+    {
+        "player": CARRY_ON,
+        "reply": {"narration": (
+            "He takes his time about it. 'That depends who is asking,' he says at "
+            "last, and he does not look up from the strap he is working. 'And you have "
+            "not said.' The rain has got into the ruts and the water is going the wrong "
+            "way down the middle of them, and two of his people have stopped pretending "
+            "not to listen. He waits. He is not going to say the next part first. "
+            "What do you do?")},
+    },
+    {
+        "player": CARRY_ON,
+        "reply": {"narration": (
+            "The line shuffles forward a pace and stops again. Whatever is happening at "
+            "the front of it is still happening, and still not being explained back "
+            "down the length of it. The old man ahead of you shifts his weight off the "
+            "bad leg and says, to nobody, that this is not how it usually goes. Nothing "
+            "has come apart. Nothing has been decided either. What do you do?")},
+    },
+]
+
+
 PROSE_AFTER_EXTRA = """
 THIS TURN: the engine has already resolved it, and what it decided is below. Write the
 turn as prose — the scene, the people in it, what just happened — and put nothing in the
@@ -922,7 +983,9 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     prose at all is an empty page, and most town turns are `narrate_only`.
     """
     messages = call_one_messages(briefing_scene, history, player_input,
-                                 in_combat=in_combat, enemy=enemy)
+                                 in_combat=in_combat, enemy=enemy,
+                                 examples=(CARRY_ON_EXAMPLES
+                                           if player_input == CARRY_ON else None))
     messages[0] = {"role": "system",
                    "content": messages[0]["content"] + "\n" + PROSE_AFTER_EXTRA}
     said = "\n".join(f"- {t}" for t in tells if t)
