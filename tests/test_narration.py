@@ -1607,3 +1607,58 @@ def test_a_deflection_leaves_a_fingerprint():
     assert reintroduces_the_present(lost, ["the woman"]) == ["the woman"]
     assert reintroduces_the_present("She looks up as you enter.", ["the woman"]) == []
     assert reintroduces_the_present("A watchman shoulders past.", ["the woman"]) == []
+
+
+# --- the prose call's prompt and its schema must describe the same reply -----------------
+
+def test_the_prose_schema_admits_what_the_prose_prompt_demonstrates():
+    """The player's first turn died on this, live, 2026-09-04.
+
+    `call_prose_messages` builds on the TURN prompt, so the model is shown twelve
+    worked examples and every one of them is `{"narration", "suggestions", "intents"}`.
+    `PROSE_AFTER_EXTRA` then says to put nothing in the "intents" list — a sentence
+    that only parses if there is one. The schema allowed `narration` alone.
+
+    Against that, a one-key grammar does not produce one key. It produces the
+    demonstrated object crammed into the narration string and escaped, which never
+    closes: the live reply ended
+
+        ...is in your pocket?\\", \\"suggestions\\": [\\"Leave the room...\\"],
+        \\"intents\\": []}<tool_call|>
+
+    and 1,068 characters of good prose were lost to "Unterminated string starting at:
+    line 1 column 15". Reproduced four times in eight runs against the same prompt.
+
+    So the ratchet is not "the schema has these keys" but "the schema accepts what the
+    prompt demonstrates" — checked by validating the examples' own replies against it,
+    so moving either one without the other fails here rather than in play.
+    """
+    import jsonschema
+
+    from gm import prompts
+
+    schema = prompts.prose_schema(min_chars=0, max_chars=2000)
+    shown = list(prompts.EXAMPLES) + list(prompts.COMBAT_EXAMPLES)
+    assert shown, "the prose call is built on these; an empty list would pass vacuously"
+    for ex in shown:
+        reply = dict(ex["reply"])
+        reply["narration"] = "x"          # length is the caller's floor, not the shape
+        jsonschema.validate(reply, schema)
+
+    # And the instruction still agrees with the shape it is allowed to ask for.
+    if "intents" in prompts.PROSE_AFTER_EXTRA:
+        assert "intents" in schema["properties"], (
+            "the prose instruction talks about an intents list the schema forbids")
+
+
+def test_the_prose_reply_still_only_has_to_carry_narration():
+    """The other half: `suggestions` and `intents` are admitted, never required, and
+    never read. A model that answers with prose alone is correct."""
+    import jsonschema
+
+    from gm import prompts
+
+    schema = prompts.prose_schema(min_chars=0, max_chars=2000)
+    jsonschema.validate({"narration": "just the prose"}, schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({"suggestions": []}, schema)

@@ -219,6 +219,10 @@ def _listed(text: str) -> str:
     parts = [p.strip() for p in str(text or "").split(",") if p.strip()]
     if len(parts) < 2:
         return " ".join(str(text or "").split())
+    # An Oxford comma leaves the conjunction on the last item — "merchants, artisans,
+    # farmers, and herders" — and adding another produced "farmers and and herders".
+    if parts[-1].lower().startswith("and "):
+        parts[-1] = parts[-1][4:].strip()
     if len(parts) == 2:
         return f"{parts[0]} and {parts[1]}"
     return ", ".join(parts[:-1]) + f" and {parts[-1]}"
@@ -277,6 +281,49 @@ def what_you_know(world, place) -> str:
     return f"What you know, the way anyone born to it knows it: {body}.{tail}"
 
 
+def the_world_here(place) -> str:
+    """Two sentences of where this is, from the place's own fiction.
+
+    The preface the player asked for, and the thing the first cut of this rewrite
+    threw out with the dials. The distinction that matters is not prose versus list,
+    it is *whose fact it is*: the export's `premise` is the set of knobs World Bible
+    generated the world with ("varying by region", three times), while the settlement
+    carries what its author actually wrote about it — how it is governed, what a day
+    in it looks like. The first is unusable at any length. The second only ever needed
+    to be a sentence instead of a field.
+
+    Two, and no more. Nelson's prologue "has to establish an atmosphere, and give out
+    a little background information", and Emily Short: "This is a medium that rewards
+    restraint."
+
+    Case is the export's own, for the reason `_clause` records. The shipped worlds
+    write these lower case — "matriarchal clan law", "morning markets, evening
+    prayers" — and a world that capitalises them keeps its capitals rather than having
+    this app respell its names.
+    """
+    if place is None:
+        return ""
+    # Each sentence has its own keys, because the fact has to fit the sentence.
+    # `ORDER_KEYS` leads with "Social Classes" and gave "Vyrakon keeps to merchants,
+    # artisans, farmers and herders", and `LIFE_KEYS` leads with "Urban Life" and gave
+    # "The day here is mixed economy with market-driven trade" — a rule that is a list
+    # of trades and a day that is an economy. What the place is ruled by and what a
+    # day in it looks like are two questions, so they read two sets of keys.
+    said = []
+    for keys, template in (
+        (("Formal Power", "Governance", "Administration"), "{name} keeps to {fact}."),
+        (("Social Classes",), "Its people are {fact}."),
+    ):
+        fact = _first_fact(place, keys)
+        if fact:
+            said.append(template.format(name=place.name, fact=_listed(_clause(fact))))
+            break
+    day = _first_fact(place, ("Daily Norms", "Daily Life", "Customs", "Urban Life"))
+    if day:
+        said.append(f"The day here is {_listed(_clause(day))}.")
+    return " ".join(said)
+
+
 def who_you_are(pc, standing: str) -> str:
     """Name and calling first, then where that leaves you here.
 
@@ -330,7 +377,17 @@ def compose(campaign, standing: str) -> str:
     # Where, with the place's own architecture as the props that carry it. Don
     # Carson, *Environmental Storytelling*: "it is the physical space that does much
     # of the work of conveying the story."
-    where = (f"{here.when} in {place.name}." if place is not None else f"{here.when}.")
+    # The preface has already named the place, so the clock does not name it again:
+    # "Vyrakon keeps to matriarchal clan law. … Morning in Vyrakon." said it twice in
+    # three sentences.
+    # …but only when it really did name it. "Its people are …" is the preface for a
+    # place that describes its classes and not its government, and it names nobody, so
+    # suppressing the clock's "in Vyrakon" there left the opening never saying where
+    # it was — the one thing Nelson's overture may not drop.
+    preface = the_world_here(place)
+    named = place is not None and place.name in preface
+    where = (f"{here.when} in {place.name}." if place is not None and not named
+             else f"{here.when}.")
     where += f" You are {here.where}"
     look = _first_fact(place, LOOK_KEYS)
     # Case left exactly as the export wrote it, for the reason `_clause` records:
@@ -358,7 +415,7 @@ def compose(campaign, standing: str) -> str:
     asked = f"What should you, the {kind}, do now?" if kind else "What do you do now?"
 
     parts = [p for p in (
-        where,
+        f"{preface} {where}".strip(),
         edge,
         f"{who_you_are(pc, standing)} {here.doing}",
         asked,

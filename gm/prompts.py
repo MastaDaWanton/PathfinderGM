@@ -1151,7 +1151,28 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
         narration["minLength"] = int(min_chars)
     if max_chars:
         narration["maxLength"] = min(int(max_chars), GRAMMAR_MAXLENGTH_CEILING)
-    return {"type": "object", "properties": {"narration": narration},
+    # `suggestions` and `intents` are admitted and never read, because the prose call
+    # is shown the TURN prompt — twelve worked examples, every one of them a three-key
+    # object — and `PROSE_AFTER_EXTRA` then tells the model to leave the intents list
+    # empty, which is a sentence that only makes sense if there is one. A one-key
+    # grammar against that demonstration does not produce one key: it produces the
+    # three-key object crammed into the narration string, escaped, and never closed.
+    #
+    # Measured live on the player's first turn, 2026-09-04, and reproduced four times
+    # in eight runs against the same prompt. The reply ended:
+    #
+    #     ...the secret is in your pocket?\", \"suggestions\": [\"Leave the room...\"],
+    #     \"intents\": []}<tool_call|>
+    #
+    # — 1,068 characters of perfectly good prose lost to `Unterminated string starting
+    # at: line 1 column 15`. The model was obeying the prompt and refused by the
+    # grammar. This repo's own rule is that instruction volume loses to demonstration
+    # volume; the cheap half of that is to stop demonstrating one shape and requiring
+    # another. `tests/test_prompts.py` pins the two together.
+    return {"type": "object",
+            "properties": {"narration": narration,
+                           "suggestions": {"type": "array", "items": {"type": "string"}},
+                           "intents": {"type": "array"}},
             "required": ["narration"]}
 
 

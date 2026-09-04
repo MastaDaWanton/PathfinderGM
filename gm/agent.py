@@ -988,6 +988,7 @@ class GMAgent:
         attempts: list[Attempt] = []
         text, reply = "", None
         for model, host, provider, key in schedule:
+            reply = None
             try:
                 reply = client.chat(
                     messages, model, host, as_json=True, think=False,
@@ -995,7 +996,15 @@ class GMAgent:
                     api_key=key, schema=schema)
                 text = str(reply.json().get("narration", "")).strip()
             except Exception as exc:
-                attempts.append(Attempt("prose", 0.0, model, note=str(exc)[:120]))
+                # The reply itself, and the real elapsed time. The turn log's own
+                # comment records learning this once — "the attempts were unpacked
+                # into `_` and dropped, so the one diagnosable artefact never
+                # existed" — and this path still dropped both, so a live prose
+                # failure logged `0.0s` and an empty string. The malformed JSON of
+                # 2026-09-04 could only be read by reproducing it.
+                attempts.append(Attempt(
+                    "prose", getattr(reply, "seconds", 0.0), model,
+                    getattr(reply, "text", "") or "", note=str(exc)[:120]))
                 continue
             declined = narration_mod.reads_as_a_refusal(text)
             # A deflection is a refusal that reads as prose: rather than saying

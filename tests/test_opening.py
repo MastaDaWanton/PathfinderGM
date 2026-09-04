@@ -311,3 +311,51 @@ def test_the_person_beside_you_is_not_watching_themselves():
         words = [w for w in s.who.lower().split() if w != "the" and len(w) > 3]
         assert words, s.who
         assert words[0] not in s.edge.lower(), (s.who, s.edge)
+
+
+def test_the_world_is_introduced_from_the_place_not_the_dials():
+    """The preface the first cut of this rewrite threw out with the bathwater.
+
+    Reported at the table: "the intro to the world is missing". Deleting the premise
+    was right — it is the set of knobs World Bible generated with — but the settlement
+    carries what its author actually wrote, and that only ever needed to be a sentence
+    instead of a field.
+
+    Each sentence reads its own keys, because the fact has to fit the sentence. The
+    first cut shared one list and produced "Vyrakon keeps to merchants, artisans,
+    farmers and herders" (a rule that is a list of trades) and "The day here is mixed
+    economy with market-driven trade" (a day that is an economy).
+    """
+    world, town = a_world()
+    town.facts["Formal Power"] = "matriarchal clan law"
+    town.facts["Daily Norms"] = "morning markets, evening prayers"
+    said = opening.the_world_here(town)
+    assert said == ("Averthorn keeps to matriarchal clan law. "
+                    "The day here is morning markets and evening prayers.")
+
+    # A place that describes its people and not its government still gets a preface,
+    # and the clock still names the place, because that preface does not.
+    del town.facts["Formal Power"]
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert "Its people are Reeve, freeholders and bonded labour." in text
+    assert "Averthorn" in text, "the one thing the overture may not drop"
+
+
+def test_an_oxford_comma_does_not_become_two_conjunctions():
+    """"merchants, artisans, farmers, and herders" is a field with the conjunction
+    already on the last item, and joining it again read "farmers and and herders"."""
+    assert opening._listed("merchants, artisans, farmers, and herders") == \
+        "merchants, artisans, farmers and herders"
+    assert opening._listed("wooden buildings, thatched roofs") == \
+        "wooden buildings and thatched roofs"
+    assert opening._listed("matriarchal clan law") == "matriarchal clan law"
+
+
+def test_a_world_that_describes_nothing_still_opens_and_still_names_the_place():
+    """The preface is what the place says about itself, so a place that says nothing
+    simply has none — and then the clock carries the name, as it always did."""
+    world, town = a_world()
+    town.facts.clear()
+    assert opening.the_world_here(town) == ""
+    text = opening.compose(_game(world, town), "a stranger here")
+    assert text.startswith("Evening in Averthorn.") or "in Averthorn." in text
