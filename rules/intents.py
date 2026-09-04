@@ -992,6 +992,15 @@ def parse_all(raw_intents: list) -> list[Intent]:
 
 # --- Check 4: the outcome-claim detector ------------------------------------------------
 
+# An enclosed place the player could be said to have entered, with its article and up
+# to three adjectives — commas included, because "a small, stifling room" is the live
+# example and `\w+` alone cannot cross the comma. One definition, used by both of the
+# movement patterns below.
+_A_PLACE = (r"(?:the|a|an|another)\s+(?:[\w-]+,?\s+){0,3}?"
+            r"(?:door|doorway|room|chamber|hall|hallway|corridor|passage|passageway|"
+            r"vestibule|cellar|stairwell|threshold|gate|archway|antechamber|office|"
+            r"study|library|kitchen|storeroom|shop|house|building)\b")
+
 # Phrasings that assert a mechanical result. Every one of these is something a model
 # actually produced in testing while being asked, in the prompt, not to.
 _OUTCOME_PATTERNS: list[tuple[str, str]] = [
@@ -999,6 +1008,28 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     (r"\b\d+\s*(?:points? of\s*)?damage\b", "states a damage number"),
     (r"\byour?\s+(?:hit points?|hp)\b", "states hit points"),
     (r"\byou (?:succeed|fail|manage to|barely make|don't make)\b", "states success or failure"),
+    # Where the player is standing is the engine's — `Actor.at`, one writer, the whole
+    # point of the places stage. Measured live 2026-09-04: the turn resolved to
+    # `narrate_only`, the scene stayed at the market, and the prose read "the door
+    # gives way with a groan of complaining wood, and you are shoved forward into a
+    # small, stifling room", then furnished the room with a desk, a man and a coin.
+    # The fiction moved the character and the state did not, which is the same class of
+    # lie as a narrated hit that never rolled.
+    #
+    # Deliberately narrow. It fires on the player crossing into an enclosed place —
+    # into/through a door, a room, a passage — and not on ordinary movement inside a
+    # scene ("you step closer", "you move to the rail"), because within a place is the
+    # model's to describe. `travel` and `move` back it.
+    (rf"\byou (?:are |get )?"
+     rf"(?:step|steps|stepped|stumble|stumbles|walk|walks|move|moves|push|pushes|"
+     rf"shove|shoved|pushed|carried|pulled|swept|spill|spills|duck|ducks|slip|slips|"
+     rf"enter|enters|entered|cross|crosses|crossed)\w*\s+"
+     rf"(?:forward\s+|back\s+|out\s+|in\s+)?(?:through|into|inside|past)\s+"
+     rf"{_A_PLACE}",
+     "states the player went somewhere; where they are is the engine's"),
+    # The same claim with no verb in it at all.
+    (rf"\byou find yourself\s+(?:in|inside|within|standing in)\s+{_A_PLACE}",
+     "states the player went somewhere; where they are is the engine's"),
     (r"\byou(?:'re| are) (?:hit|struck|wounded|killed|dead)\b", "states being hit"),
     # The determiner list grew from live play: "Your blade bites deep into her side" and
     # "His fist connects with a sickening crunch" both printed in *setup* narration,
@@ -1195,6 +1226,7 @@ _BACKED_BY = {
     "items": ("states items gained; the pockets are the engine's to fill",
               "states items gained; the satchel is the engine's to fill"),
     "xp": ("states advancement; levels and experience are the engine's",),
+    "moved": ("states the player went somewhere; where they are is the engine's",),
 }
 
 
@@ -1250,6 +1282,11 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
             allow("items")
         if op == "xp":
             allow("xp")
+        # Where the party is standing is `Actor.at`, and the engine is its one writer
+        # (docs/places-8b-plan.md). Prose may say the player went through a door only
+        # when an op actually took them through one.
+        if op in ("travel", "move"):
+            allow("moved")
     return frozenset(backed)
 
 

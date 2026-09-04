@@ -1721,3 +1721,57 @@ def test_the_continue_line_has_one_definition():
     from gm import prompts
 
     assert views.CARRY_ON is prompts.CARRY_ON
+
+
+# --- where the player is standing is the engine's ----------------------------------------
+
+def test_prose_may_not_walk_the_player_through_a_door_the_engine_never_opened():
+    """Measured live, 2026-09-04. The player asked "I ask what happened" while standing
+    in a market. The engine resolved `narrate_only` — nothing — and `scene.at` stayed
+    at the market. The prose read:
+
+        The door gives way with a groan of complaining wood, and you are shoved
+        forward into a small, stifling room.
+
+    and then furnished the room with a desk, a man and a coin, and `note_cast` promoted
+    the man to a real actor. The fiction moved the character and the state did not.
+
+    That is the same class of lie as a narrated hit that never rolled, so it is caught
+    by the same machinery: where the party stands is `Actor.at` and the engine is its
+    one writer (docs/places-8b-plan.md), so crossing into an enclosed place is a claim,
+    and `travel` or `move` is what backs it.
+    """
+    from rules.intents import claims_the_engine_backs, find_outcome_claims
+
+    nothing = claims_the_engine_backs([{"op": "narrate_only", "effects": []}])
+    travelled = claims_the_engine_backs([{"op": "travel", "effects": []}])
+
+    live = ("The door gives way with a groan of complaining wood, and you are shoved "
+            "forward into a small, stifling room. The air here is thick with the smell "
+            "of old paper.")
+    assert find_outcome_claims(live, backed=nothing), "the live beat must be caught"
+    assert not find_outcome_claims(live, backed=travelled), "a travel backs it"
+
+    for moved in ("You step through the doorway into the cellar below.",
+                  "You are pushed into another room entirely.",
+                  "You find yourself inside a cramped vestibule.",
+                  "You find yourself standing in the library.",
+                  "You duck through the archway."):
+        assert find_outcome_claims(moved, backed=nothing), moved
+
+
+def test_moving_about_inside_the_scene_is_still_the_narrators_to_describe():
+    """Deliberately narrow. Within a place the model may move the player freely — it is
+    crossing OUT of one that the engine owns — and a check that fired on "you step
+    closer to the fire" would make ordinary prose unwritable."""
+    from rules.intents import claims_the_engine_backs, find_outcome_claims
+
+    nothing = claims_the_engine_backs([{"op": "narrate_only", "effects": []}])
+    for fine in ("You step closer to the fire.",
+                 "You move to the rail and look down.",
+                 "You push through the crowd towards the stall.",
+                 "You shoulder your way through the press of bodies.",
+                 "You look through the doorway at the room beyond.",
+                 "You reach into your coat for the flask.",
+                 "The servant steps into the room with a jug."):
+        assert not find_outcome_claims(fine, backed=nothing), fine
