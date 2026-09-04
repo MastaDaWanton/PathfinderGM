@@ -438,12 +438,32 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     return c
 
 
-def opening_text(campaign: Campaign) -> str:
-    """The first thing the player reads. Built in `play/opening.py`, which explains at
-    length why it is rolled and why it names nothing the world did not."""
-    from . import opening
+def opening_text(campaign: Campaign, written: bool = True) -> str:
+    """The first thing the player reads.
 
-    return opening.compose(campaign, _standing(campaign.world, campaign.scene.pc()))
+    The template in `play/opening.py` is the material and the floor; the prose model
+    writes the screen from the place's own paragraphs and is checked against them
+    (`play/opening_prose.py`), and a draft that fails its checks twice is dropped for
+    the template. What was wrong with the last draft is logged, because a floor that
+    is reached silently is a floor nobody notices being reached.
+
+    `written=False` is for the game nobody asked for: `_begin` enrols the shipped
+    pregen when there is no save at all, from the home page's own request, and a
+    home page that waits on a cold 12B model to draw the shelf is the hung home page
+    of this morning over again.
+    """
+    import logging
+
+    from . import opening, opening_prose
+
+    skeleton = opening.compose(campaign, _standing(campaign.world, campaign.scene.pc()))
+    if not written:
+        return skeleton
+    text, wrong = opening_prose.write(campaign, opening.situation_for(campaign), skeleton)
+    if wrong:
+        logging.getLogger(__name__).warning(
+            "opening fell back to the template: %s", "; ".join(wrong))
+    return text
 
 
 def _standing(world, pc) -> str:
@@ -627,7 +647,7 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     c = new_campaign(campaign_id, character=character)
     entry = roster.enrol(c.scene.pc(), campaign_id)
     c.character_id = entry.id
-    c.transcript.append({"who": "gm", "text": opening_text(c)})
+    c.transcript.append({"who": "gm", "text": opening_text(c, written=False)})
     c.save()
     return c
 

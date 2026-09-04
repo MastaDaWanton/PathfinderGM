@@ -79,8 +79,8 @@ SITUATIONS: tuple[Situation, ...] = (
     Situation("Just past noon", "in a crowded common room at the height of the meal",
               "You have a bowl in front of you and half of it left.",
               "the man clearing the next table",
-              "The corner nearest the door has gone quiet, and the quiet is spreading "
-              "outward table by table."),
+              "The clatter nearest the door has died, and the hush is spreading inward "
+              "one table at a time."),
     Situation("Late afternoon", "in a work yard, loud with somebody else's trade",
               "You are waiting on a job of work, and have been waiting a while.",
               "the foreman with the tally board",
@@ -325,24 +325,45 @@ def the_world_here(place) -> str:
 
 
 def who_you_are(pc, standing: str) -> str:
-    """Name and calling first, then where that leaves you here.
+    """Name, then where that leaves you here, then what you carry.
+
+    No class label. "You are Borin Achereth, a Fighter" was the player's own example
+    of what not to write, 2026-09-04: a game label where a person should be. What
+    they carry is on the sheet and says the same thing the way a room would see it
+    — a longsword at the hip reads as a fighter without the word.
 
     The standing already carries an em dash — "Zhilakai — flightless, in a city whose
-    nobility is not" — so folding the class in with another one gave a sentence with
-    two of them and no main clause.
-
-    The calling is the word the class document uses for one of its people, not the
-    class's own name: eleven of the thirteen shipped names are already nouns for a
-    person, and the two that are not produced "You are Masta, a Blood Bending".
+    nobility is not" — so nothing else here adds one.
     """
-    from rules import classes as classes_mod
-
-    kind = classes_mod.member_noun(pc.char_class) if pc.char_class else ""
     line = f"You are {pc.name}"
-    if kind:
-        line += f", {_article(kind)} {kind}"
     standing = " ".join((standing or "").split()).rstrip(".")
-    return f"{line}. {standing[0].upper() + standing[1:]}." if standing else f"{line}."
+    # The standing's case is its own: it begins with a people's name — "Nahyrin, a
+    # long way from anyone who knows you" — and lower-casing it respelled the world.
+    if standing:
+        line += f", {standing}"
+    carry = carrying(pc)
+    if carry:
+        line += f", {carry}"
+    return line + "."
+
+
+def carrying(pc) -> str:
+    """What is on this character that a room would notice, from the sheet.
+
+    The weapon first because it is what a stranger's eye goes to; then the armour.
+    Nothing invented: an unarmed character in no armour carries nothing worth a
+    clause and gets none.
+    """
+    if pc is None:
+        return ""
+    weapon = (getattr(pc, "equipped", "") or "").strip()
+    armour = (getattr(pc, "armour", "") or "").strip()
+    bits = []
+    if weapon and weapon.lower() not in ("unarmed", "none"):
+        bits.append(f"with {_article(weapon)} {weapon} at your side")
+    if armour and armour.lower() != "none":
+        bits.append(f"in {armour}")
+    return " and ".join(bits)
 
 
 def _article(word: str) -> str:
@@ -374,20 +395,22 @@ def compose(campaign, standing: str) -> str:
     place, pc = campaign.location, campaign.scene.pc()
     here = situation_for(campaign)
 
+    # Who is here and what they are doing about it, in one breath, so the person the
+    # player can speak to is the person the thing is happening to.
+    watcher = _sentence(here.who)[:-1]
+    # "Has stopped to watch", not "has stopped working": half the people in the table
+    # are not working — the old man ahead of you in a queue, the stranger sharing a
+    # step — and the one verb has to fit all twelve.
+    edge = (f"{here.edge} {watcher} has stopped to watch." if here.edge
+            else f"{watcher} is close enough to speak to.")
+
     # Where, with the place's own architecture as the props that carry it. Don
     # Carson, *Environmental Storytelling*: "it is the physical space that does much
-    # of the work of conveying the story."
-    # The preface has already named the place, so the clock does not name it again:
-    # "Vyrakon keeps to matriarchal clan law. … Morning in Vyrakon." said it twice in
-    # three sentences.
-    # …but only when it really did name it. "Its people are …" is the preface for a
-    # place that describes its classes and not its government, and it names nobody, so
-    # suppressing the clock's "in Vyrakon" there left the opening never saying where
-    # it was — the one thing Nelson's overture may not drop.
-    preface = the_world_here(place)
-    named = place is not None and place.name in preface
-    where = (f"{here.when} in {place.name}." if place is not None and not named
-             else f"{here.when}.")
+    # of the work of conveying the story." The place's law and its day come AFTER the
+    # room, as the ground the moment stands on — the player's critique of the old
+    # order was that it "opens with distant lore" and buries the tension under it.
+    where = f"{here.when}"
+    where += f" in {place.name}." if place is not None else "."
     where += f" You are {here.where}"
     look = _first_fact(place, LOOK_KEYS)
     # Case left exactly as the export wrote it, for the reason `_clause` records:
@@ -395,30 +418,17 @@ def compose(campaign, standing: str) -> str:
     # "khy'vyr-centric clans", which is this app respelling one of the world's own
     # names. A capital mid-sentence is the smaller cost.
     where += f", among {_listed(_clause(look))}." if look else "."
-
-    # Who is here and what they are doing about it, in one breath, so the person the
-    # player can speak to is the person the thing is happening to.
-    watcher = _sentence(here.who)[:-1]
-    # "Has stopped to watch", not "has stopped working": half the people in the table
-    # are not working — the old man ahead of you in a queue, the stranger sharing a
-    # step — and the one verb has to fit all twelve.
-    edge = f"{here.edge} {watcher} has stopped to watch." if here.edge else \
-        f"{watcher} is close enough to speak to."
-
-    kind = ""
-    if pc is not None and pc.char_class:
-        from rules import classes as classes_mod
-
-        kind = classes_mod.member_noun(pc.char_class)
-    # The document's own capitals, in both places: "a Blood Bender" two lines above
-    # and "the blood bender" here was the same word printed two ways on one screen.
-    asked = f"What should you, the {kind}, do now?" if kind else "What do you do now?"
+    preface = the_world_here(place)
 
     parts = [p for p in (
-        f"{preface} {where}".strip(),
         edge,
+        f"{where} {preface}".strip(),
         f"{who_you_are(pc, standing)} {here.doing}",
-        asked,
+        # The role used to ride in the question, after Infocom's *Witness*. The
+        # player called it a game label in a place for prose, and they were right
+        # that the sheet already shows it: the sword in the paragraph above is the
+        # role.
+        "What do you do?",
     ) if p]
     return "\n\n".join(parts)
 

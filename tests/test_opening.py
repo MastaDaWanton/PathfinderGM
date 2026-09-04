@@ -162,11 +162,14 @@ def test_the_roll_is_stable_for_a_game_and_varies_between_games():
     assert len({opening.roll(f"game-{n}") for n in range(40)}) > 1
 
 
-def _game(world, town, cls: str = "ranger", seed=None):
+def _game(world, town, cls: str = "ranger", seed=None, weapon: str = "",
+          worn: str = ""):
     @dataclass
     class FakePC:
         name: str = "Averil Stane"
         char_class: str = cls
+        equipped: str = weapon
+        armour: str = worn
 
     @dataclass
     class FakeScene:
@@ -186,18 +189,22 @@ def test_the_opening_says_who_where_and_what_is_going_on():
     """Nelson's overture, on the opening of *Trinity* (*The Craft of Adventure*, 2nd
     ed., §"The Overture"): "Already you know: who you are …; exactly where you are …;
     and what is going on". All three, and the place's own props carrying the setting
-    rather than a paragraph of stated facts."""
+    rather than a paragraph of stated facts — in the ORDER the player asked for on
+    2026-09-04: the thing going wrong first, the place second, the person third.
+    The old order opened on "Vyrakon keeps to matriarchal clan law" and buried the
+    hush spreading through the room under it."""
     world, town = a_world()
     text = opening.compose(_game(world, town), "a stranger here")
-    assert "Averthorn" in text                                   # exactly where
+    body = text.split("\n\n")
+    assert len(body) == 4, body
+    assert "has stopped to watch." in body[0]                    # what is going on
+    assert "Averthorn" in body[1]                                 # exactly where
     # The fact's own words and its own capitals, joined into English: the export
     # writes "Turf roofs, low stone walls" as a field, and only the last comma
     # becomes a conjunction.
-    assert "Turf roofs and low stone walls" in text
-    assert "Averil Stane" in text and "a Ranger" in text         # who
+    assert "Turf roofs and low stone walls" in body[1]
+    assert body[2].startswith("You are Averil Stane")            # who
     assert "The reeve" not in text, "the strain is the GM's note, not the first screen"
-    body = text.split("\n\n")
-    assert len(body) == 4, body
 
 
 def test_something_is_already_happening_when_the_game_picks_up():
@@ -220,17 +227,26 @@ def test_something_is_already_happening_when_the_game_picks_up():
     assert "has stopped to watch." in text
 
 
-def test_the_question_carries_the_role_the_player_is_playing():
-    """Nelson, same essay, on Infocom's *Witness*: it "asks pointedly on the first
-    turn" — "What should you, the detective, do now?" — and he raises it under telling
-    the player who to be. "What do you do?" is that question with the role removed."""
+def test_the_role_is_what_you_carry_not_a_label():
+    """The first cut put the class in the question after Infocom's *Witness* — "What
+    should you, the detective, do now?" — and on the sentence: "You are Borin
+    Achereth, a Fighter." The player named both as the failure, 2026-09-04: "replace
+    game labels with immersive flavor", and their own revision showed the fighter as
+    "hand near your blade". The sheet already knows what is at the hip; the word for
+    the class appears nowhere on the first screen."""
     world, town = a_world()
     text = opening.compose(_game(world, town), "a stranger here")
-    assert text.rstrip().endswith("What should you, the Ranger, do now?")
-    # And the word is the one the class document uses for a person of that class.
+    assert text.rstrip().endswith("What do you do?")
+    import re
+
+    assert not re.search(r"ranger", text, re.I), text     # "stranger" is not a class
     blooded = opening.compose(_game(world, town, cls="blood bending"), "a stranger here")
-    assert "a Blood Bender" in blooded and "the Blood Bender, do now?" in blooded
-    assert "a Blood Bending" not in blooded, "the class name is not a noun for a person"
+    assert "Blood Bend" not in blooded
+    # And what they carry does the showing, from the sheet, never invented.
+    armed = opening.compose(_game(world, town, weapon="longsword", worn="chain shirt"),
+                            "a stranger here")
+    assert "with a longsword at your side and in chain shirt" in armed
+    assert "at your side" not in text, "an unarmed character is not handed a weapon"
 
 
 def test_the_opening_is_striking_and_concise():

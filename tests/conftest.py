@@ -71,6 +71,18 @@ def clear_content_caches() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_test_waits_on_the_written_opening(monkeypatch):
+    """Starting a campaign asks the prose model to write the opening. Measured the
+    day it landed: 166 tests start one, and with Ollama up the two-minute suite ran
+    past ten minutes at ten seconds a call. The template is what every test that
+    is not about the written opening gets; `tests/test_opening_prose.py` turns the
+    model back on and stubs the client."""
+    from play import opening_prose
+
+    monkeypatch.setattr(opening_prose, "ENABLED", False)
+
+
+@pytest.fixture(autouse=True)
 def _campaign_dir_never_leaks():
     """No test may leave CAMPAIGN_DIR pointing somewhere the next one can see.
 
