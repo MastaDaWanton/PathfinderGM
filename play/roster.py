@@ -183,13 +183,18 @@ def revive(character_id: str, actor: Actor) -> Entry | None:
 # --- Who is available to play ------------------------------------------------------------
 
 def retire_file(character_id: str) -> tuple[bool, str]:
-    """Take a character off the roster.
+    """Delete a character, and the game they were playing with them.
 
-    Archived rather than unlinked, which is the same choice `campaign._read` makes for
-    a save it cannot parse and `tools/prune_roster.py` made for the duplicate Kessts:
-    the row leaves the page, the file stays on disk. A character is the record of a
-    game somebody played, and "delete" that cannot be undone is the one button nobody
-    should be one misclick away from.
+    This used to archive: the row left the page and the file moved to
+    `characters/archive`, on the argument that a record of a game somebody played
+    should not be one misclick from gone. Asked for in as many words to stop —
+    "just delete them" — after the archive folders filled with kesst-vayr-2 through
+    -7 and the campaigns directory kept twenty saves for a roster of five. The
+    confirmation dialog is the guard; the file is not a second one.
+
+    The campaign goes with the character because a save is named for its character
+    (`Campaign.path()` is `campaigns/<character id>.json`) and is nothing without
+    them: it was the orphaned saves that made the folder unreadable.
     """
     entry = load(character_id)
     if entry is None:
@@ -201,12 +206,13 @@ def retire_file(character_id: str) -> tuple[bool, str]:
         return False, (f"{entry.name} is the character you are playing. Switch to "
                        f"somebody else first.")
 
-    archive = root() / "archive"
-    archive.mkdir(parents=True, exist_ok=True)
-    src = path_for(character_id)
-    if src.exists():
-        src.rename(archive / src.name)
-    return True, f"{entry.name} is off the roster. Their file is in {archive}."
+    path_for(character_id).unlink(missing_ok=True)
+    campaign_dir = Path(settings.CAMPAIGN_DIR)
+    for save in (character_id, entry.campaign_id):
+        if save:
+            (campaign_dir / f"{save}.json").unlink(missing_ok=True)
+            campaign_mod._LIVE.pop(save, None)
+    return True, f"{entry.name} is deleted, and so is their game."
 
 
 def pregens() -> list[dict]:

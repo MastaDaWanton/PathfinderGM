@@ -386,6 +386,16 @@ def _self_check() -> int:
         if not p.is_file():
             problems.append(f"{name} missing — must not be distributed without it")
 
+    # The shelf as THIS launch sees it, user directory included. A world the player put
+    # there and cannot see on the front page is a question only the running build can
+    # answer, and "is the file there?" is the wrong question — it was there.
+    from play import library
+
+    print(f"worlds_dir    {library.user_dir()}")
+    for card in library.worlds():
+        where = "shipped" if card.shipped else "yours"
+        print(f"world/{card.id:<26} {where:<8} {card.problem or 'ok'}")
+
     # The string-imported halves of the app. PyInstaller's static analysis cannot see
     # `import_module("rules.spells")`, so these are exactly the modules that go missing.
     for kind_id, kind in registry.KINDS.items():

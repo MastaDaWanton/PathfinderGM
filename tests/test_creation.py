@@ -456,18 +456,35 @@ def test_a_character_can_be_deleted(client, tmp_path, settings):
     assert made not in [e.id for e in roster.everyone()]
 
 
-def test_the_file_is_archived_rather_than_unlinked(client, tmp_path, settings):
-    """A character is the record of a game somebody played. The row leaves the page
-    and the file stays on disk — the same choice `campaign._read` makes for a save it
-    cannot parse, and the one `tools/prune_roster.py` made for the duplicate Kessts."""
-    from play import roster
+def test_delete_deletes_the_file_and_the_game_and_archives_nothing(client, tmp_path, settings):
+    """This used to archive — "the row leaves the page and the file stays on disk" —
+    and the user asked in as many words to stop: the archive folders held
+    kesst-vayr-2 through -7 and the campaigns directory kept twenty saves for a
+    roster of five. Measured on the real data directory, 2026-09-04. The confirmation
+    dialog is the guard now; nothing is kept and no archive folder is made."""
+    from pathlib import Path
+    from play import campaign as cm, roster
 
-    r = client.post("/api/character/create", data=json.dumps(spec(name="Archived")),
+    r = client.post("/api/character/create", data=json.dumps(spec(name="Gone")),
                     content_type="application/json")
     made = r.json()["id"]
-    client.post("/api/character/delete", data=json.dumps({"id": made}),
+    # Give them a game, then switch away so they are not the one being played.
+    client.post("/api/character/switch", data=json.dumps({"id": made}),
                 content_type="application/json")
-    assert (roster.root() / "archive" / f"{made}.json").exists()
+    save = Path(settings.CAMPAIGN_DIR) / f"{made}.json"
+    assert save.exists()
+    other = client.post("/api/character/create", data=json.dumps(spec(name="Other")),
+                        content_type="application/json").json()["id"]
+    client.post("/api/character/switch", data=json.dumps({"id": other}),
+                content_type="application/json")
+
+    r = client.post("/api/character/delete", data=json.dumps({"id": made}),
+                    content_type="application/json")
+    assert r.status_code == 200, r.content
+    assert not roster.path_for(made).exists()
+    assert not save.exists()
+    assert made not in cm._LIVE
+    assert not (roster.root() / "archive").exists()
 
 
 def test_the_character_being_played_cannot_be_deleted(client, tmp_path, settings):

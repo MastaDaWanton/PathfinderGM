@@ -1673,8 +1673,8 @@ function askToDelete(who) {
     veil.className = "askveil";
     veil.innerHTML = `<div class="askbox" role="dialog" aria-modal="true">
       <h3>Delete ${esc(who)}?</h3>
-      <p>They come off the roster. Their file is kept in the
-        <code>characters/archive</code> folder, so this can be undone by hand.</p>
+      <p>They come off the roster, and their game is deleted with them.
+        This cannot be undone.</p>
       <div class="askrow">
         <button class="quiet" data-ask="no">Keep them</button>
         <button class="go danger" data-ask="yes">Delete ${esc(who)}</button>
