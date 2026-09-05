@@ -1625,6 +1625,20 @@ def test_a_deflection_leaves_a_fingerprint():
     assert reintroduces_the_present("A watchman shoulders past.", ["the woman"]) == []
 
 
+def test_a_group_is_not_reintroduced_by_one_more_of_its_kind():
+    """Reported at the table, 2026-09-04, two holding lines in a row: "a group of men
+    in fine tunics" had been promoted to four actors called "man", the next beat
+    said "a man" of the drover, and gemma's good answer was thrown away as "lost
+    the scene, re-introduced man, man, man, man". A name several actors share is a
+    group's, and a group cannot walk in as a stranger."""
+    from gm.narration import reintroduces_the_present
+
+    beat = "A man leans on the gatepost and spits. 'The same thing as everybody,' he says."
+    assert reintroduces_the_present(beat, ["man", "man", "man", "man"]) == []
+    # One of him, though, is a person, and the rule above still holds for her.
+    assert reintroduces_the_present("A woman is there.", ["the woman", "man", "man"]) == ["the woman"]
+
+
 # --- the prose call's prompt and its schema must describe the same reply -----------------
 
 def test_the_prose_schema_admits_what_the_prose_prompt_demonstrates():

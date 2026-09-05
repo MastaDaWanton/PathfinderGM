@@ -1815,7 +1815,20 @@ def reintroduces_the_present(text: str, names) -> list[str]:
     if not text:
         return []
     found = []
+    # A group is not a person. The cast ledger promotes "a group of men in fine
+    # tunics" to four actors each called "man", and "a man" in the next beat is not
+    # the fingerprint above — there are four of him already and the prose has every
+    # right to a fifth. Reported at the table, 2026-09-04: two beats in a row fell
+    # to the holding line because gemma's good answer read "lost the scene,
+    # re-introduced man, man, man, man" and was thrown away, and the fallback model
+    # then died on its budget. A name that several actors share is a group's.
+    from collections import Counter
+
+    shared = {n for n, c in Counter(str(n or "").strip().lower() for n in names or ()).items()
+              if c > 1}
     for name in names or ():
+        if str(name or "").strip().lower() in shared:
+            continue
         head = str(name or "").strip().lower().split()[-1:] or [""]
         head = head[0]
         if len(head) < 3:
