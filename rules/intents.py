@@ -999,7 +999,8 @@ def parse_all(raw_intents: list) -> list[Intent]:
 _A_PLACE = (r"(?:the|a|an|another)\s+(?:[\w-]+,?\s+){0,3}?"
             r"(?:door|doorway|room|chamber|hall|hallway|corridor|passage|passageway|"
             r"vestibule|cellar|stairwell|threshold|gate|archway|antechamber|office|"
-            r"study|library|kitchen|storeroom|shop|house|building)\b")
+            r"study|library|kitchen|storeroom|shop|house|building|cell|vault|"
+            r"space)\b")
 
 # Phrasings that assert a mechanical result. Every one of these is something a model
 # actually produced in testing while being asked, in the prompt, not to.

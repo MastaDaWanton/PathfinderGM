@@ -132,7 +132,24 @@ def unquoted(text: str) -> str:
 # `minLength` is neither, it is the grammar.
 #
 # The fight keeps its own numbers below. This is the half the table asked to grow.
-MIN_SCENE_CHARS = 600
+#
+# And asked again, 2026-09-04: "i want more text and more description per generation",
+# and what was measured that hour rewrote the paragraph above. For the prose model
+# now in use (gemma-4 12B) a minLength in the grammar does compile, and does harm:
+# held inside a string it had finished, the model wrote the rest of the object into
+# it escaped — the suggestions key, the intents key — on three turns in four, which
+# `cut_schema_bleed` trimmed back to a beat UNDER the floor. So the prose call
+# carries no floor in its grammar (`prompts.prose_schema` says why) and the floor
+# lives here: `review` reports a short beat as `too-short` with the fix named, and
+# the repair call that follows writes the room — the repo's sanctioned shape, detect
+# in code and repair with a targeted call. Measured: three beats of 703-791
+# characters were each repaired to 1,469-1,579, with the brief's new paragraphs of
+# the place (`prompts.place_in_its_own_words`) as the material.
+#
+# The floor may therefore sit ABOVE what the examples demonstrate. Growing the
+# examples instead was tried first and reverted the same hour: the model copied
+# their FURNITURE, and a common room got "the heavy oak desk you just searched".
+MIN_SCENE_CHARS = 800
 
 # In a fight the pace of the prose is the pace of the fight. Three or four sentences is
 # the right answer and 900 characters of weather is not, so the floor drops and there is a
@@ -1714,6 +1731,18 @@ _SCHEMA_BLEED = re.compile(
       | ```+
       | \{\s*"narration"\s*:
     )''')
+
+
+# "A merchant (c4) is haggling loudly" — the brief's refs, which exist so the model can
+# NAME people in its intents, shipped to the page in the prose. Measured live,
+# 2026-09-04, four of them in one beat. The tag goes; the noun before it stays.
+_REF_TAG = re.compile(r"\s*\(\s*(?:c|n|pc)\d*\s*\)")
+
+
+def strip_ref_tags(text: str) -> tuple[str, int]:
+    """The prose with the brief's "(c4)" tags removed, and how many there were."""
+    cleaned, n = _REF_TAG.subn("", text or "")
+    return cleaned, n
 
 
 def cut_schema_bleed(text: str) -> tuple[str, list[str]]:

@@ -223,7 +223,15 @@ def test_length_is_only_asked_of_the_turn_narration():
 
 
 def test_a_full_scene_passes():
+    """The example is under the floor now — the floor is a repair trigger above the
+    demonstrations, not their measure — so the scene here is the example plus the
+    room, which is what the repair asks for."""
     scene = prompts.EXAMPLES[0]["reply"]["narration"]
+    scene = scene.replace("The lamp is at the far end of its arc now.",
+                          "The yard is a square of nothing much: a cart with one wheel "
+                          "off, a heap of slate under a tarpaulin the wind keeps lifting, "
+                          "and the tannery coming over the wall on every gust. The lamp "
+                          "is at the far end of its arc now.")
     r = narration.review(scene, min_chars=narration.MIN_SCENE_CHARS)
     assert not any(f.kind in ("too-short", "no-hand-back") for f in r.findings)
 
@@ -244,7 +252,11 @@ def test_a_turn_that_never_hands_back_is_caught():
             "you would have to turn sideways to pass another person. A ledger lies open "
             "on the nearest table with a line ruled under one entry and nothing written "
             "beside it. The clerk turns a page. Outside, the rain gets heavier, and the "
-            "gutter above the window begins to spill over onto the sill.")
+            "gutter above the window begins to spill over onto the sill. The stove in the "
+            "corner has gone out and nobody has noticed, and the cold has got into the "
+            "paper, so that every page he turns makes the same stiff sound. Along the "
+            "far wall a row of pigeonholes holds letters nobody has collected, the "
+            "topmost furred with dust, and a cat asleep on the ledger press.")
     assert len(text) > narration.MIN_SCENE_CHARS
     r = narration.review(text, min_chars=narration.MIN_SCENE_CHARS)
     assert [f.kind for f in r.findings] == ["no-hand-back"]
@@ -912,7 +924,10 @@ def test_the_scene_floor_is_what_the_examples_demonstrate():
     320 was set as a floor well under what the examples show, so a brief beat survived —
     and it turned out to bite nothing: a 20-turn town run measured mean 839 characters and
     a minimum of 559. Every turn cleared it by a wide margin."""
-    assert narration.MIN_SCENE_CHARS == 600
+    # 800 since "i want more text and more description per generation", 2026-09-04,
+    # and ABOVE the examples on purpose: for gemma the grammar never compiled at 600
+    # anyway, so the floor lives in `review` and the repair call, not the sampler.
+    assert narration.MIN_SCENE_CHARS == 800
     # The fight keeps its own pace. This is the half that was asked to grow.
     assert narration.MIN_COMBAT_CHARS == 140
     assert narration.MAX_COMBAT_CHARS == 600
@@ -922,7 +937,7 @@ def test_the_floor_reaches_the_sampler_rather_than_the_prompt():
     """A `minLength` in the schema is neither instruction nor demonstration — it is the
     grammar, which is why it works where asking for length never has."""
     schema = prompts.turn_schema(min_chars=narration.MIN_SCENE_CHARS)
-    assert schema["properties"]["narration"]["minLength"] == 600
+    assert schema["properties"]["narration"]["minLength"] == narration.MIN_SCENE_CHARS
 
 
 
@@ -1407,7 +1422,8 @@ def test_no_schema_asks_ollama_for_a_grammar_it_cannot_compile():
     for schema in schemas:
         for cap in caps(schema):
             assert cap <= prompts.GRAMMAR_MAXLENGTH_CEILING, json.dumps(schema)[:120]
-    assert prompts.GRAMMAR_MAXLENGTH_CEILING == 2000
+    # 1800 since 2026-09-04: gemma-4 12B refuses 2000 and compiles 1800 (see the constant).
+    assert prompts.GRAMMAR_MAXLENGTH_CEILING == 1800
 
 
 
@@ -1775,3 +1791,29 @@ def test_moving_about_inside_the_scene_is_still_the_narrators_to_describe():
                  "You reach into your coat for the flask.",
                  "The servant steps into the room with a jug."):
         assert not find_outcome_claims(fine, backed=nothing), fine
+
+
+# --- "i want more text and more description per generation", 2026-09-04 -------------------
+
+def test_the_briefs_refs_never_reach_the_page():
+    """"A merchant (c4) is haggling loudly over a crate of spices" — four of the
+    brief's refs shipped in one live beat once the beats grew long enough to name
+    everybody. The tag goes, the noun stays, and the count is reported."""
+    text, n = narration.strip_ref_tags(
+        "A merchant (c4) is haggling. A laborer (c3) pauses; a man ( c2 ) weaves "
+        "through the stalls and a stranger (c1) inspects a piece of iron (not a ref).")
+    assert n == 4
+    assert "(c" not in text and "( c" not in text
+    assert "(not a ref)" in text
+    assert text.startswith("A merchant is haggling. A laborer pauses; a man weaves")
+
+
+def test_the_prose_floor_is_not_in_the_grammar():
+    """Measured on gemma-4 12B with minLength=800 in the prose schema: the grammar
+    compiled and the model, held inside a string it had finished, wrote the rest
+    of the object into it escaped — '", "suggestions": ["Wait for someone to' —
+    three turns in four, each trimmed back UNDER the floor by cut_schema_bleed.
+    The floor is review's to report and the repair call's to fix."""
+    schema = prompts.prose_schema(min_chars=narration.MIN_SCENE_CHARS, max_chars=2200)
+    assert "minLength" not in schema["properties"]["narration"]
+    assert schema["properties"]["narration"]["maxLength"] == prompts.GRAMMAR_MAXLENGTH_CEILING

@@ -38,11 +38,15 @@ ENABLED = True
 
 # The bounds the checks hold the prose to. Below the floor it is the template with
 # adjectives; above the ceiling it is Beyond Zork's title page.
-MIN_WORDS = 90
-MAX_WORDS = 180
+# Raised from 90-180 the same day on "i want more text and more description per
+# generation"; the brief and the example grew with them, since the example is what
+# the model measures itself against and the bounds only catch what it got wrong.
+MIN_WORDS = 170
+MAX_WORDS = 340
 
 BRIEF = """You are the Game Master opening a tabletop campaign. Write the first thing the
-player reads: four short paragraphs, then a question, about 120 words in all.
+player reads: four paragraphs, then a question, about 250 words in all. Each paragraph
+is three or four sentences, and the second — the place — is the longest.
 
 The order is the whole craft:
 1. The thing already going wrong, first, as something seen or heard — never explained.
@@ -85,15 +89,23 @@ EXAMPLE = {
     "assistant": json.dumps({"opening": (
         "The porters at the water's edge stop talking all at once. Not a lull — a "
         "stop. Twenty men with their loads down, looking out at a channel with nothing "
-        "on it.\n\n"
+        "on it, and the gulls that were working the shallows have lifted off together "
+        "and gone up the cliff. The only sound left is the water working at the "
+        "stones.\n\n"
         "Hollin Stair climbs the cliff behind you in flights of wet stone, the houses "
         "stacked under slate, the boats drawn up at the foot with their nets steaming "
-        "in the cold. The tide sets the day here and the boat-owners set everything "
-        "else, which is why a ferry that has not come is not a delay to these men but "
-        "a verdict.\n\n"
+        "in the cold. Every flight of the stair has its own smell — tar at the "
+        "bottom, then fish, then woodsmoke from the houses — and the whole place is "
+        "wet, the steps worn to a dish in the middle by four hundred years of feet. "
+        "The tide sets the day here and the boat-owners set everything else, which "
+        "is why a ferry that has not come is not a delay to these men but a "
+        "verdict; somebody with a hull has decided something, and the porters are "
+        "waiting to find out what.\n\n"
         "You stand a little apart from them with a boat-hook in your fist and a jerkin "
         "that has seen better coasts, Marrish by your face, and nobody on this landing "
-        "knows your name.\n\n"
+        "knows your name. You came down the stair this morning with the last of your "
+        "money and a letter you have not opened, meaning to be across the water by "
+        "noon.\n\n"
         "The porter beside you has not picked his load back up. What do you do?"
     )}),
 }
@@ -199,7 +211,7 @@ def _ask(messages: list[dict], cfg: dict) -> str:
     reply = client.chat(messages, model=cfg["model"], host=cfg.get("host", ""),
                         provider=cfg.get("provider", "ollama"),
                         api_key=cfg.get("api_key", ""), schema=SCHEMA,
-                        think=False, temperature=0.8, num_predict=500)
+                        think=False, temperature=0.8, num_predict=900)
     try:
         text = reply.json().get("opening", "")
     except (ValueError, AttributeError):

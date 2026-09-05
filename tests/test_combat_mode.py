@@ -97,8 +97,9 @@ def test_a_fight_that_stops_to_describe_the_weather_is_caught():
 
 
 def test_there_is_no_ceiling_outside_a_fight():
-    long_one = prompts.EXAMPLES[0]["reply"]["narration"]
-    assert not narration.review(long_one, min_chars=narration.MIN_SCENE_CHARS).findings
+    long_one = prompts.EXAMPLES[0]["reply"]["narration"] * 3
+    findings = narration.review(long_one, min_chars=narration.MIN_SCENE_CHARS).findings
+    assert not [f for f in findings if f.kind.startswith("too-long")]
 
 
 # --- reasoning models -------------------------------------------------------------------

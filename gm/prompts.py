@@ -661,6 +661,30 @@ def _states_of(actor) -> str:
     return f" Conditions: {', '.join(names)}."
 
 
+PLACE_WORDS_BUDGET = 900
+
+
+def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
+    """The first paragraph of the sections that describe what a place LOOKS like —
+    architecture and daily life before governance and history — cut to a budget at
+    a sentence end. A world that ships no sections answers ""."""
+    wanted = ("architecture", "urban life", "daily life", "geography", "terrain")
+    picked = []
+    for title in wanted:
+        for s in getattr(location, "sections", None) or []:
+            if str(s.get("title", "")).strip().lower() == title:
+                for p in s.get("paragraphs") or []:
+                    if str(p).strip():
+                        picked.append(" ".join(str(p).split()))
+                        break
+    text = " ".join(picked)
+    if len(text) > budget:
+        cut = text[:budget]
+        end = max(cut.rfind(". "), cut.rfind(".\n"))
+        text = cut[:end + 1] if end > 0 else cut
+    return text.strip()
+
+
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=()) -> str:
     """The world facts the GM may draw on this turn.
@@ -703,6 +727,17 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                     "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
             if location.fact(key):
                 lines.append(f"  {key}: {location.fact(key)}")
+        # The place in its author's own words, not only its fields. Asked for as "more
+        # text and more description per generation", and the fields cannot supply it:
+        # "wooden buildings, thatched roofs" is all the brief ever said of Vyrakon,
+        # while its export carries a paragraph on timber framed for a cyclone coast
+        # and low districts that flood. Measured the turn this landed without: with
+        # nothing real to describe, the model furnished a common room with "the heavy
+        # oak desk you just searched" — the study from worked example ten. Two
+        # paragraphs, capped, because the brief is a budget.
+        told = place_in_its_own_words(location)
+        if told:
+            lines.append(f"  THE PLACE, IN ITS OWN WORDS: {told}")
         parents = [e.name for e in world.ancestors(location.id) if e.kind != "WORLD"]
         if parents:
             lines.append(f"  Within: {', '.join(parents)}")
@@ -1210,8 +1245,13 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
         guarantee is Ollama-only, and the except paths are why that is survivable.
     """
     narration: dict = {"type": "string"}
-    if min_chars:
-        narration["minLength"] = int(min_chars)
+    # `min_chars` is accepted and deliberately NOT put in the grammar. Measured
+    # 2026-09-04 on gemma-4 12B with minLength=800: the grammar compiled and the
+    # model, held inside a string it had finished, wrote the rest of the object
+    # into it escaped — '", "suggestions": ["Wait for someone to' — on three turns
+    # in four; `cut_schema_bleed` trimmed each back to 703-791 characters, under the
+    # floor it was meant to guarantee. The floor is `narration.review`'s to report
+    # and the repair call's to fix, which lengthened all three to 1,469-1,579.
     if max_chars:
         narration["maxLength"] = min(int(max_chars), GRAMMAR_MAXLENGTH_CEILING)
     # `suggestions` and `intents` are admitted and never read, because the prose call
@@ -1245,7 +1285,14 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
 # fails, 2200 fails. The first value shipped was 2200, and every single call in the
 # audit run came back 503. Both schema builders clamp here so nobody can reintroduce
 # that by passing a bigger number.
-GRAMMAR_MAXLENGTH_CEILING = 2000
+#
+# Re-measured 2026-09-04 on gemma-4 12B, the prose model now in use: 2000 fails the
+# same way ("failed to parse grammar", HTTP 400) and 1800 compiles. The client had
+# been stripping `maxLength` on that 400 and carrying on, so every prose call to
+# gemma ran with NO ceiling — and with a floor in the grammar the string could only
+# end when the token budget did: "Unterminated string" on two turns in three. 1800
+# holds for both models measured.
+GRAMMAR_MAXLENGTH_CEILING = 1800
 
 
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",

@@ -701,6 +701,9 @@ class GMAgent:
         text, bled = narration_mod.cut_schema_bleed(text)
         if bled:
             repairs.append(f"schema bled into the prose: cut from {bled[0]!r}")
+        text, tagged = narration_mod.strip_ref_tags(text)
+        if tagged:
+            repairs.append(f"the brief's refs on the page: stripped {tagged}")
         text = narration_mod.destutter(text)
         text, cut = narration_mod.drop_repeated_beats(text, earlier)
         if cut:
@@ -990,9 +993,15 @@ class GMAgent:
         for model, host, provider, key in schedule:
             reply = None
             try:
+                # 1400, not 900. Measured 2026-09-04 with the scene floor at 1000
+                # characters: two turns in three died "Unterminated string" on
+                # BOTH models — the narration ran towards the 2,000-character
+                # ceiling, and with the suggestions and the escaped quotes on top
+                # the 900-token budget ended inside the string. The grammar can
+                # close a string it is given the tokens to close.
                 reply = client.chat(
                     messages, model, host, as_json=True, think=False,
-                    temperature=0.8, num_predict=900, provider=provider,
+                    temperature=0.8, num_predict=1400, provider=provider,
                     api_key=key, schema=schema)
                 text = str(reply.json().get("narration", "")).strip()
             except Exception as exc:

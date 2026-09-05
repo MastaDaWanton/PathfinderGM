@@ -95,17 +95,17 @@ def test_the_material_allows_the_worlds_own_words_and_nothing_else():
     assert "Salt Market" in text and "Vyrakon" in text and "longsword" in text
     assert {"Salt", "Market", "Vyrakon", "Borin", "Achereth"} <= allowed
     assert not opening_prose.problems(
-        "The Salt Market has gone quiet. " * 16 + "You are Borin Achereth in Vyrakon. "
+        "The Salt Market has gone quiet. " * 30 + "You are Borin Achereth in Vyrakon. "
         "What do you do?", allowed, "Vyrakon", "Borin Achereth")
     wrong = opening_prose.problems(
-        "The Salt Market has gone quiet. " * 16 + "A keeper called Grimble watches you, "
+        "The Salt Market has gone quiet. " * 30 + "A keeper called Grimble watches you, "
         "Borin, in Vyrakon. What do you do?", allowed, "Vyrakon", "Borin Achereth")
     assert any("Grimble" in w for w in wrong), wrong
 
 
 @pytest.mark.parametrize("draft, expect", [
     ("Short. What do you do?", "words"),
-    ("word " * 200 + "What do you do?", "cut it"),
+    ("word " * 400 + "What do you do?", "cut it"),
     ("A quiet room in Vyrakon. " * 20 + "You, Borin, sit still.", "end with the question"),
     ("The room in Vyrakon holds 12 men. " * 15 + "Borin, what do you do?", "digits"),
     ("You realize the room in Vyrakon has gone still. " * 12 + "Borin, what do you do?",
@@ -176,10 +176,10 @@ def test_a_bad_draft_is_repaired_once_with_the_complaint_and_then_dropped(monkey
         calls.append(messages)
         n = len(calls)
         if n == 1:
-            return Reply(json.dumps({"opening": "Old Grimble looks up. " * 32 + "Borin, in Vyrakon, what do you do?"}))
+            return Reply(json.dumps({"opening": "Old Grimble looks up. " * 60 + "Borin, in Vyrakon, what do you do?"}))
         return Reply(json.dumps({"opening": (
             "The clatter nearest the door has died, and the hush is spreading inward "
-            "one table at a time. " * 6 + "Vyrakon's cyclone thatch drips over you, "
+            "one table at a time. " * 12 + "Vyrakon's cyclone thatch drips over you, "
             "Borin Achereth, longsword at your side. What do you do?")}))
     monkeypatch.setattr(client, "chat", fake_chat)
     monkeypatch.setattr(opening_prose, "ENABLED", True)
@@ -202,7 +202,7 @@ def test_a_draft_that_ignores_the_places_own_writing_is_sent_back():
     skeleton = _skeleton(c)
     _, allowed = opening_prose.material(c, SITUATION, skeleton)
     prose = c.location.prose
-    bland = ("The hush spreads through the room in Vyrakon. " * 12
+    bland = ("The hush spreads through the room in Vyrakon. " * 24
              + "You are Borin Achereth. What do you do?")
     found = opening_prose.problems(bland, allowed, "Vyrakon", "Borin Achereth",
                                    prose=prose, skeleton=skeleton)
