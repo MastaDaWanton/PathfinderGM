@@ -856,3 +856,10 @@ def test_the_shell_shows_its_window_even_when_the_page_never_paints():
     assert "mainWindow.isVisible()" in text
     assert "did-fail-load" in text
     assert re.search(r"once\('ready-to-show'.*clearTimeout\(showAnyway\)", text)
+    # And the window exists BEFORE the backend is spawned, showing a starting page.
+    # Measured on a real launch the same day: a 61-second unpack on a busy disk met
+    # a 60-second timeout, READY arrived one second after "could not start", and a
+    # running game sat behind an error box. A slow start must look like one.
+    assert text.index("createWindow();") < text.index("await startBackend()")
+    assert "STARTING_PAGE" in text and "Starting the game" in text
+    assert "STARTUP_TIMEOUT_MS = 180_000" in text

@@ -25,8 +25,15 @@ const path = require('path');
 const readline = require('readline');
 
 const READY = 'PATHFINDERGM_READY';
-/** No migrations and no collectstatic — a onefile unpack plus Django setup. */
-const STARTUP_TIMEOUT_MS = 60_000;
+/**
+ * No migrations and no collectstatic — a onefile unpack plus Django setup. 60s was
+ * the first value, and it fired on a real launch, 2026-09-04: the unpack took 61
+ * seconds on a disk busy with something else, READY arrived one second after the
+ * shell had put up "could not start", and a running game sat behind an error box.
+ * The window is on screen from the first second now (see createWindow), so a slow
+ * start LOOKS like a slow start; this is only for a backend that never comes.
+ */
+const STARTUP_TIMEOUT_MS = 180_000;
 /** How long a first paint may take before the window is shown regardless. */
 const SHOW_ANYWAY_MS = 5_000;
 
@@ -131,7 +138,21 @@ function stopBackend() {
   }, 3000);
 }
 
-function createWindow(url) {
+/**
+ * What the window shows before the backend answers: the leather, the name, and
+ * the honest word "starting". Inline, because nothing is being served yet.
+ */
+const STARTING_PAGE = 'data:text/html;charset=utf-8,' + encodeURIComponent(
+  '<!doctype html><title>Pathfinder GM</title>'
+  + '<body style="margin:0;height:100vh;display:flex;align-items:center;'
+  + 'justify-content:center;background:#16100b;color:#c9b48a;'
+  + 'font:20px Georgia,serif;letter-spacing:.04em">'
+  + '<div style="text-align:center"><div style="font-size:34px;margin-bottom:.6em">'
+  + 'Pathfinder GM</div><div style="opacity:.75">Starting the game… the first '
+  + 'launch on a slow disk can take a minute.</div></div></body>'
+);
+
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -167,7 +188,10 @@ function createWindow(url) {
     if (!isMainFrame || code === -3) return;
     showStartupFailure(new Error(`The game's page failed to load (${description}, ${target}).`));
   });
-  mainWindow.loadURL(url);
+  // The starting page first; the game's URL replaces it the moment READY arrives
+  // (`showGame`). Created BEFORE the backend is spawned, so the user has a window —
+  // one they can close — from the first second, however long the unpack takes.
+  mainWindow.loadURL(STARTING_PAGE);
 
   // Anything genuinely external (the OGL links, World Bible's repo) belongs in the
   // real browser.
@@ -183,6 +207,10 @@ function createWindow(url) {
   });
 
   mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+function showGame(url) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(url);
 }
 
 function showStartupFailure(error) {
@@ -216,8 +244,9 @@ if (!app.requestSingleInstanceLock()) {
     // reads as somebody else's window. Same fix as World Bible's.
     nativeTheme.themeSource = 'dark';
     try {
+      createWindow();
       const url = await startBackend();
-      createWindow(url);
+      showGame(url);
     } catch (error) {
       showStartupFailure(error);
     }
