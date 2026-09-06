@@ -29,7 +29,7 @@ never wrote, which is the failure `CLAUDE.md` files under "ground every name".
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from rules.dice import Dice
 
@@ -66,6 +66,13 @@ class Situation:
     # GM's private note is what the answer is drawn from.
     edge: str = ""
     template: str = "guildhand"
+    # Why the character came here today. The oldest finding in interactive fiction,
+    # re-found at this table on 2026-09-05 ("hardly even know what i am supposed to be
+    # doing"): Emily Short's answer to an opening whose goal "is not sufficiently
+    # obvious" is "an obvious starting problem, even if it's not the main goal of the
+    # game". Concrete, small, and the character's own; the world's story arrives on
+    # top of it.
+    errand: str = ""
 
 
 # Deliberately ordinary. The player can go looking for trouble — the point is that
@@ -132,6 +139,37 @@ SITUATIONS: tuple[Situation, ...] = (
               "The words have stopped in the wrong place. Nobody has picked them up, "
               "and nobody is looking at anybody else."),
 )
+
+
+# One errand per situation, in the table's order. Each is a thing a stranger with a
+# thin purse would actually be doing, and each can be walked away from — the point is
+# that the player knows what they were about when the world interrupts it.
+ERRANDS: tuple[str, ...] = (
+    "You came to sell what you carried in and buy a week's food with the money.",
+    "You came for a meal you could afford and the name of somebody who hires.",
+    "You came for a day's paid work before your money runs out.",
+    "You came for water, and to hear where a stranger can sleep tonight.",
+    "You came because the road ended here, with a purse about a week from empty.",
+    "You came to hear the notices read, in case one of them wants someone like you.",
+    "You came looking for a workshop that might take on a pair of hands for pay.",
+    "You came in out of the weather to find a bed you can pay for.",
+    "You came to ask for a place on a cart going somewhere with work in it.",
+    "You came to eat cheaply and to watch the town before you ask anything of it.",
+    "You came out to find a bed for the night before the lamps are lit.",
+    "You came to be seen standing with the town, because a stranger who is not "
+    "seen gets talked about.",
+)
+assert len(ERRANDS) == len(SITUATIONS)
+SITUATIONS = tuple(replace(s, errand=e) for s, e in zip(SITUATIONS, ERRANDS))
+
+
+def suggestions_for(situation: Situation) -> list[str]:
+    """Three things the player could do from here, in their own voice, for the
+    template opening; the written opening supplies its own."""
+    who = situation.who
+    return [f"Ask {who} what is going on",
+            "Go and see for myself",
+            "Keep to what I came here for"]
 
 
 def _first_fact(place, keys) -> str:
@@ -395,20 +433,12 @@ def compose(campaign, standing: str) -> str:
     place, pc = campaign.location, campaign.scene.pc()
     here = situation_for(campaign)
 
-    # Who is here and what they are doing about it, in one breath, so the person the
-    # player can speak to is the person the thing is happening to.
-    watcher = _sentence(here.who)[:-1]
-    # "Has stopped to watch", not "has stopped working": half the people in the table
-    # are not working — the old man ahead of you in a queue, the stranger sharing a
-    # step — and the one verb has to fit all twelve.
-    edge = (f"{here.edge} {watcher} has stopped to watch." if here.edge
-            else f"{watcher} is close enough to speak to.")
-
-    # Where, with the place's own architecture as the props that carry it. Don
-    # Carson, *Environmental Storytelling*: "it is the physical space that does much
-    # of the work of conveying the story." The place's law and its day come AFTER the
-    # room, as the ground the moment stands on — the player's critique of the old
-    # order was that it "opens with distant lore" and buries the tension under it.
+    # WHERE first. "I have no idea what is going on or where i am" was said,
+    # 2026-09-05, of an opening that led with the thing going wrong and named the
+    # place in its second paragraph. A person orients in one order: where am I, why
+    # am I here and what am I doing, what is happening, what could I do about it.
+    # Don Carson, *Environmental Storytelling*: "it is the physical space that does
+    # much of the work of conveying the story."
     where = f"{here.when}"
     where += f" in {place.name}." if place is not None else "."
     where += f" You are {here.where}"
@@ -420,17 +450,40 @@ def compose(campaign, standing: str) -> str:
     where += f", among {_listed(_clause(look))}." if look else "."
     preface = the_world_here(place)
 
+    # WHY: who you are, why you came, what you are doing.
+    why = f"{who_you_are(pc, standing)} {here.errand} {here.doing}".strip()
+
+    # WHAT: the thing already happening, and the person it is happening beside.
+    watcher = _sentence(here.who)[:-1]
+    # "Has stopped to watch", not "has stopped working": half the people in the table
+    # are not working — the old man ahead of you in a queue, the stranger sharing a
+    # step — and the one verb has to fit all twelve.
+    edge = (f"{here.edge} {watcher} has stopped to watch." if here.edge
+            else f"{watcher} is close enough to speak to.")
+
+    # NOW: what you could do, then the ask. The role used to ride in the question,
+    # after Infocom's *Witness*; the player called it a game label, and the sheet
+    # already shows it in the paragraph above.
+    could = suggestions_for(here)
+    now = (f"You could {_lower_first(could[0])}, {_lower_first(could[1])}, or "
+           f"{_lower_first(could[2])}. What do you do?")
+
     parts = [p for p in (
-        edge,
         f"{where} {preface}".strip(),
-        f"{who_you_are(pc, standing)} {here.doing}",
-        # The role used to ride in the question, after Infocom's *Witness*. The
-        # player called it a game label in a place for prose, and they were right
-        # that the sheet already shows it: the sword in the paragraph above is the
-        # role.
-        "What do you do?",
+        why,
+        edge,
+        now,
     ) if p]
     return "\n\n".join(parts)
+
+
+def _lower_first(text: str) -> str:
+    """A suggestion, in the player's voice, folded into the narrator's sentence:
+    "Ask the drover what is going on" becomes "ask the drover what is going on", and
+    "Go and see for myself" becomes "go and see for yourself"."""
+    text = text.strip()
+    text = text[:1].lower() + text[1:]
+    return re.sub(r"\bmyself\b", "yourself", re.sub(r"\b[Ii] came\b", "you came", text))
 
 
 # World-agnostic undercurrents, for a world that ships no unwritten hooks. Shapes, not

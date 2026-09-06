@@ -95,10 +95,10 @@ def test_the_material_allows_the_worlds_own_words_and_nothing_else():
     assert "Salt Market" in text and "Vyrakon" in text and "longsword" in text
     assert {"Salt", "Market", "Vyrakon", "Borin", "Achereth"} <= allowed
     assert not opening_prose.problems(
-        "The Salt Market has gone quiet. " * 30 + "You are Borin Achereth in Vyrakon. "
+        "The Salt Market of Vyrakon has gone quiet. " * 30 + "You are Borin Achereth. "
         "What do you do?", allowed, "Vyrakon", "Borin Achereth")
     wrong = opening_prose.problems(
-        "The Salt Market has gone quiet. " * 30 + "A keeper called Grimble watches you, "
+        "The Salt Market of Vyrakon has gone quiet. " * 30 + "A keeper called Grimble watches you, "
         "Borin, in Vyrakon. What do you do?", allowed, "Vyrakon", "Borin Achereth")
     assert any("Grimble" in w for w in wrong), wrong
 
@@ -157,8 +157,8 @@ def test_a_model_that_is_down_is_the_template_not_a_failed_start(monkeypatch):
     monkeypatch.setattr(opening_prose, "ENABLED", True)
     c = _campaign()
     skeleton = _skeleton(c)
-    text, wrong = opening_prose.write(c, SITUATION, skeleton)
-    assert text == skeleton
+    text, could, wrong = opening_prose.write(c, SITUATION, skeleton, ["Ask", "Look"])
+    assert text == skeleton and could == ["Ask", "Look"]
     assert wrong and "failed" in wrong[0]
 
 
@@ -176,17 +176,22 @@ def test_a_bad_draft_is_repaired_once_with_the_complaint_and_then_dropped(monkey
         calls.append(messages)
         n = len(calls)
         if n == 1:
-            return Reply(json.dumps({"opening": "Old Grimble looks up. " * 60 + "Borin, in Vyrakon, what do you do?"}))
+            return Reply(json.dumps({"opening": "Old Grimble looks up. " * 60 + "Borin, in Vyrakon, what do you do?",
+                                     "suggestions": ["Ask him what he wants", "Leave"]}))
         return Reply(json.dumps({"opening": (
-            "The clatter nearest the door has died, and the hush is spreading inward "
-            "one table at a time. " * 12 + "Vyrakon's cyclone thatch drips over you, "
-            "Borin Achereth, longsword at your side. What do you do?")}))
+            "Vyrakon's cyclone thatch drips over you. The clatter nearest the door has "
+            "died, and the hush is spreading inward one table at a time. " * 12
+            + "You are Borin Achereth, longsword at your side. What do you do?"),
+            "suggestions": ["Ask the man clearing the table what happened",
+                            "Look at the door", "Finish my bowl"]}))
     monkeypatch.setattr(client, "chat", fake_chat)
     monkeypatch.setattr(opening_prose, "ENABLED", True)
     c = _campaign()
-    text, wrong = opening_prose.write(c, SITUATION, _skeleton(c))
+    text, could, wrong = opening_prose.write(c, SITUATION, _skeleton(c))
     assert wrong == []
-    assert text.startswith("The clatter nearest the door")
+    assert text.startswith("Vyrakon's cyclone thatch")
+    assert could == ["Ask the man clearing the table what happened",
+                     "Look at the door", "Finish my bowl"]
     assert len(calls) == 2
     complaint = calls[1][-1]["content"]
     assert "Grimble" in complaint and "Rewrite it" in complaint
@@ -202,7 +207,7 @@ def test_a_draft_that_ignores_the_places_own_writing_is_sent_back():
     skeleton = _skeleton(c)
     _, allowed = opening_prose.material(c, SITUATION, skeleton)
     prose = c.location.prose
-    bland = ("The hush spreads through the room in Vyrakon. " * 24
+    bland = ("The hush spreads through the room in Vyrakon. " * 30
              + "You are Borin Achereth. What do you do?")
     found = opening_prose.problems(bland, allowed, "Vyrakon", "Borin Achereth",
                                    prose=prose, skeleton=skeleton)
@@ -224,5 +229,6 @@ def test_the_game_nobody_asked_for_does_not_wait_on_the_model(monkeypatch):
         raise AssertionError("the default game called the prose model")
     monkeypatch.setattr(client, "chat", never)
     c = _campaign()
-    text = cm.opening_text(c, written=False)
+    text, could = cm.opening_text(c, written=False)
     assert text.endswith("What do you do?")
+    assert len(could) == 3

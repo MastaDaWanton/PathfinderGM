@@ -18,9 +18,18 @@ did not get from the material, digits, a missing question, a copied example, a
 decision made for the player — and repaired once with the complaint named, or
 dropped for the template. The template is the floor, never the ceiling.
 
-Sly Flourish, *Writing Awesome Read-Aloud Text*: decide "the one main thing you want
-your players to get", keep it focused, and cut. The one thing here is the thing
-already going wrong in the room; the place is the ground it happens on.
+The second verdict, 2026-09-05, after many starts: "the order of information is
+strange … I have no idea what is going on or where i am. hardly even know what i am
+supposed to be doing." That is the oldest finding in interactive fiction. Emily
+Short, on an opening where "the player's goal is not sufficiently obvious": give
+them "an obvious starting problem, even if it's not the main goal of the game", and
+a prologue "should have a very clearly articulated goal" and set up "the player's
+character and long-term motivation" (*Plot, scene by scene*; *WIP Rescue*). Nelson's
+overture said who, where, what — it never said WHY, and a player who does not know
+why they are standing there cannot choose anything. So the opening now carries an
+errand — why the character came here today — and the order is the order a person
+orients in: where am I, why am I here and what am I doing, what is happening, and
+what could I do about it.
 """
 from __future__ import annotations
 
@@ -37,25 +46,32 @@ from gm.narration import build_echo_index, invented_names
 ENABLED = True
 
 # The bounds the checks hold the prose to. Below the floor it is the template with
-# adjectives; above the ceiling it is Beyond Zork's title page.
-# Raised from 90-180 the same day on "i want more text and more description per
-# generation"; the brief and the example grew with them, since the example is what
-# the model measures itself against and the bounds only catch what it got wrong.
-MIN_WORDS = 170
-MAX_WORDS = 340
+# adjectives; above the ceiling it is Beyond Zork's title page. Raised from 90-180 on
+# "i want more text and more description per generation"; the brief and the example
+# grew with them, since the example is what the model measures itself against.
+MIN_WORDS = 200
+MAX_WORDS = 380
 
 BRIEF = """You are the Game Master opening a tabletop campaign. Write the first thing the
-player reads: four paragraphs, then a question, about 250 words in all. Each paragraph
-is three or four sentences, and the second — the place — is the longest.
+player reads: four paragraphs, then a question, about 280 words in all. Each paragraph
+is three to five sentences.
 
-The order is the whole craft:
-1. The thing already going wrong, first, as something seen or heard — never explained.
-2. Where they are, physically: what the room or street looks, sounds and smells like,
-   built from the place's own material below. Weave in ONE thing about how this place
-   is run, as the reason the moment matters, not as a lecture.
-3. Who they are, shown by what they carry and where they come from, never by a class
-   name or a label.
-4. A question that asks what they do.
+The order is how a person orients, and it is the whole craft:
+1. WHERE. Name the place and say what kind of place it is, then the exact spot the
+   player is standing in — what it looks, sounds and smells like, built from the
+   place's own writing below. This is the longest paragraph.
+2. WHY. Who the player is (shown by what they carry and where they come from, never
+   a class name), why they came here today — the errand in the material — and what
+   they are doing at this moment.
+3. WHAT. The thing already happening, as seen and heard from where they stand; then
+   what it looks like it means to someone standing there, drawn from how the place
+   is run or from what is really going on underneath. Show the visible edge of that;
+   never state its cause outright. The person beside them belongs here.
+4. NOW. Two or three concrete things the player could do next, in one sentence, and
+   then the question of what they do.
+
+Then give two to four short suggestions — one line each, in the player's voice, each
+one a thing they could say or do right now.
 
 Use only names that appear in the material. Never write digits. Never decide for the
 player ("you realise", "you decide", "something tells you"). Write to the player as
@@ -77,47 +93,73 @@ EXAMPLE = {
         "everything and the porters carry it.\n"
         "Character: Teodor Vance. Heritage: Marrish, a long way from anyone who knows "
         "you. Carrying: a boat-hook, a leather jerkin.\n"
+        "Why they are here today: You came to be across the water by noon, with the "
+        "last of your money and a letter you have not opened.\n"
         "Situation: Low tide. On the landing, waiting for the ferry that has not come. "
         "The porter beside you has put his load down.\n"
         "Already happening: The porters at the water's edge have stopped talking, all "
-        "at once, and are looking out at the empty channel.\n\n"
+        "at once, and are looking out at the empty channel.\n"
+        "What is really going on underneath (show its visible edge only): the "
+        "boat-owners have quietly agreed to stop the ferry until the reeve is replaced.\n\n"
         "The template says: Low tide. You are on the landing among slate roofs and "
-        "stone stairs. The porters have stopped talking. You are Teodor Vance, "
-        "Marrish, a long way from anyone who knows you, with a boat-hook in hand. You "
-        "are waiting for the ferry. What do you do?"
+        "stone stairs. You are Teodor Vance, Marrish, a long way from anyone who knows "
+        "you, with a boat-hook in hand. You came to be across the water by noon. You "
+        "are waiting for the ferry. The porters have stopped talking. What do you do?"
     ),
     "assistant": json.dumps({"opening": (
-        "The porters at the water's edge stop talking all at once. Not a lull — a "
-        "stop. Twenty men with their loads down, looking out at a channel with nothing "
-        "on it, and the gulls that were working the shallows have lifted off together "
-        "and gone up the cliff. The only sound left is the water working at the "
-        "stones.\n\n"
-        "Hollin Stair climbs the cliff behind you in flights of wet stone, the houses "
-        "stacked under slate, the boats drawn up at the foot with their nets steaming "
-        "in the cold. Every flight of the stair has its own smell — tar at the "
-        "bottom, then fish, then woodsmoke from the houses — and the whole place is "
-        "wet, the steps worn to a dish in the middle by four hundred years of feet. "
-        "The tide sets the day here and the boat-owners set everything else, which "
-        "is why a ferry that has not come is not a delay to these men but a "
-        "verdict; somebody with a hull has decided something, and the porters are "
-        "waiting to find out what.\n\n"
-        "You stand a little apart from them with a boat-hook in your fist and a jerkin "
-        "that has seen better coasts, Marrish by your face, and nobody on this landing "
-        "knows your name. You came down the stair this morning with the last of your "
-        "money and a letter you have not opened, meaning to be across the water by "
-        "noon.\n\n"
-        "The porter beside you has not picked his load back up. What do you do?"
-    )}),
+        "Hollin Stair is a fishing town that climbs its cliff in flights of wet stone, "
+        "the houses stacked under slate above the boats drawn up at the foot. You are "
+        "on the landing at the bottom of it, where the stair meets the water: a shelf "
+        "of black rock slick with weed, nets steaming in the cold, the smell of tar "
+        "and fish and, from the houses above, woodsmoke. The steps behind you are worn "
+        "to a dish in the middle by four hundred years of feet. The tide is out, and "
+        "the channel beyond the landing is a stretch of grey water with nothing on "
+        "it.\n\n"
+        "You are Teodor Vance, Marrish by your face, with a boat-hook in your fist "
+        "and a jerkin that has seen better coasts, and nobody on this landing knows "
+        "your name. You came down the stair this morning with the last of your money "
+        "and a letter you have not opened, meaning to be across the water by noon; "
+        "the ferry is the only way over, and you have been standing here long enough "
+        "to have counted the boats twice.\n\n"
+        "The porters at the water's edge have stopped talking, all at once. Not a lull "
+        "— a stop. Twenty men with their loads down, looking out at the empty channel, "
+        "and the gulls have lifted off the shallows together. The tide sets the day "
+        "here and the boat-owners set everything else, which is why a ferry that has "
+        "not come is not a delay to these men but a verdict: somebody with a hull has "
+        "decided something, and the porters are waiting to find out what. The porter "
+        "beside you has not picked his load back up.\n\n"
+        "You could ask him what a stopped ferry means here, go up the stair and find "
+        "whoever owns the boats, or open the letter while you wait. What do you do?"
+    ), "suggestions": [
+        "Ask the porter beside me what a stopped ferry means here",
+        "Climb the stair and find who owns the boats",
+        "Open the letter while I wait",
+    ]}),
 }
 
 SCHEMA = {"type": "object",
-          "properties": {"opening": {"type": "string"}},
-          "required": ["opening"]}
+          "properties": {"opening": {"type": "string"},
+                         "suggestions": {"type": "array", "items": {"type": "string"}}},
+          "required": ["opening", "suggestions"]}
 
 # Jerz's cop-outs, the same list `tests/test_opening.py` holds the template to.
 _DECIDES = re.compile(r"you reali[sz]e|you decide|you can't bear|something tells you|"
                       r"you feel that", re.I)
 _WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*")
+
+
+def underneath(campaign) -> str:
+    """The campaign's undercurrent, from the GM's private note, or "".
+
+    The note is the one place the thread lives (`opening.private_note`), so this
+    reads it back rather than rolling again — a second roll would be a second story.
+    """
+    from . import opening
+
+    for h in getattr(campaign, "history", None) or []:
+        if str(h.get("content", "")).startswith(opening.NOTE_PREFIX):
+            return opening.note_thread(h["content"])
+    return ""
 
 
 def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
@@ -141,13 +183,24 @@ def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
         people = campaign.world.get(pc.world_people_id) if pc.world_people_id else None
         heritage = people.name if people is not None else (pc.heritage or pc.race or "")
         lines.append(f"Character: {pc.name}. Heritage: {heritage}. Carrying: {carrying}.")
+    if situation.errand:
+        lines.append(f"Why they are here today: {situation.errand}")
     lines.append(f"Situation: {situation.when}. {situation.where}. {situation.doing}")
     lines.append(f"Already happening: {situation.edge}")
+    thread = underneath(campaign)
+    if thread:
+        lines.append("What is really going on underneath (show its visible edge only, "
+                     f"never its cause): {thread}")
     text = "\n".join(lines)
     allowed = set(re.findall(r"\b[A-Z][A-Za-z'’-]+\b", text + " " + skeleton))
     if pc is not None:
         allowed.update(_WORD.findall(pc.name))
-    return f"Material:\n{text}\n\nThe template says: {skeleton}", allowed
+    # The template's own "You could …" line is withheld: shown it, the model copied
+    # it word for word on three drafts of three ("go and see for yourself, or keep to
+    # what you came here for") while its separate suggestions were specific and good.
+    # The choices are the model's to write from the scene it just wrote.
+    shown = "\n\n".join(p for p in skeleton.split("\n\n") if not p.startswith("You could "))
+    return f"Material:\n{text}\n\nThe template says: {shown}", allowed
 
 
 _STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their", "which",
@@ -174,12 +227,13 @@ def drawn_from_the_place(text: str, prose: str, skeleton: str) -> list[str]:
 
 
 def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
-             prose: str = "", skeleton: str = "") -> list[str]:
+             prose: str = "", skeleton: str = "",
+             suggestions: list[str] | None = None) -> list[str]:
     """Everything wrong with a draft, each named so the repair call can fix only that."""
     out = []
     if prose and skeleton and not drawn_from_the_place(text, prose, skeleton):
         out.append("it describes nothing the place's own writing describes; put one "
-                   "physical detail from that writing into the second paragraph")
+                   "physical detail from that writing into the first paragraph")
     words = len(text.split())
     if words < MIN_WORDS:
         out.append(f"only {words} words — it needs at least {MIN_WORDS}")
@@ -193,16 +247,27 @@ def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
         out.append(f'"{m.group(0)}" decides for the player; describe, do not decide')
     for name in invented_names(text, allowed):
         out.append(f"{name!r} is a name the material does not contain; remove it")
+    # Where first: the place is named in the first paragraph or the reader is lost
+    # before the second. "I have no idea … where i am" was said of an opening that
+    # named the place in its second paragraph, after the thing going wrong.
+    first = text.split("\n\n")[0] if text else ""
     if place_name and place_name not in text:
         out.append(f"it never says where this is; name {place_name}")
+    elif place_name and place_name not in first:
+        out.append(f"the first paragraph must say where this is; name {place_name} in it")
     if pc_name and pc_name.split()[0] not in text:
         out.append(f"it never says who the player is; name {pc_name}")
     if build_echo_index(text) & build_echo_index(json.loads(EXAMPLE["assistant"])["opening"]):
         out.append("it copies the example about the ferry; this is not a ferry landing")
+    if suggestions is not None:
+        clean = [s for s in suggestions if isinstance(s, str) and 3 <= len(s.split()) <= 16]
+        if not 2 <= len(clean) <= 4:
+            out.append("give two to four suggestions, each one short line in the "
+                       "player's voice")
     return out
 
 
-def _ask(messages: list[dict], cfg: dict) -> str:
+def _ask(messages: list[dict], cfg: dict) -> tuple[str, list[str]]:
     # `think=False` is load-bearing, as it is on every prose call in `gm/agent.py`:
     # measured here first, the 12B gemma spent the whole budget in its thinking
     # channel and returned content "" — the format grammar constrains only the
@@ -211,16 +276,24 @@ def _ask(messages: list[dict], cfg: dict) -> str:
     reply = client.chat(messages, model=cfg["model"], host=cfg.get("host", ""),
                         provider=cfg.get("provider", "ollama"),
                         api_key=cfg.get("api_key", ""), schema=SCHEMA,
-                        think=False, temperature=0.8, num_predict=900)
+                        think=False, temperature=0.8, num_predict=1100)
     try:
-        text = reply.json().get("opening", "")
+        data = reply.json()
+        text, offered = data.get("opening", ""), data.get("suggestions", [])
     except (ValueError, AttributeError):
-        text = ""
-    return " ".join(str(text or "").split("\r")).strip()
+        text, offered = "", []
+    # A model that writes "\n" inside the JSON string hands back a literal backslash-n;
+    # measured on the second live draft, "grain.\n\nThe room is still".
+    text = str(text or "").replace("\\n", "\n").replace("\r", "")
+    offered = [" ".join(str(s).split()) for s in (offered or []) if str(s).strip()]
+    return text.strip(), offered
 
 
-def write(campaign, situation, skeleton: str) -> tuple[str, list[str]]:
-    """The written opening, or the skeleton, with what was wrong with the last draft.
+def write(campaign, situation, skeleton: str,
+          fallback_suggestions: list[str] | None = None
+          ) -> tuple[str, list[str], list[str]]:
+    """The written opening and its suggestions, or the skeleton and the template's,
+    with what was wrong with the last draft.
 
     One write, one repair with the complaint named, then the template. Never raises:
     a model that is not running is a flat first screen, not a campaign that fails to
@@ -228,11 +301,12 @@ def write(campaign, situation, skeleton: str) -> tuple[str, list[str]]:
     """
     from . import modelcfg
 
+    floor = (skeleton, list(fallback_suggestions or []))
     if not ENABLED:
-        return skeleton, ["the written opening is switched off"]
+        return *floor, ["the written opening is switched off"]
     cfg = modelcfg.for_role("prose") or modelcfg.for_role("narrator")
     if not cfg:
-        return skeleton, ["no prose model configured"]
+        return *floor, ["no prose model configured"]
     user, allowed = material(campaign, situation, skeleton)
     place = campaign.location
     pc = campaign.scene.pc()
@@ -240,24 +314,28 @@ def write(campaign, situation, skeleton: str) -> tuple[str, list[str]]:
                 {"role": "user", "content": EXAMPLE["user"]},
                 {"role": "assistant", "content": EXAMPLE["assistant"]},
                 {"role": "user", "content": user}]
+
+    def check(draft, offered):
+        return problems(draft, allowed, place.name if place is not None else "",
+                        pc.name if pc is not None else "",
+                        prose=getattr(place, "prose", "") or "", skeleton=skeleton,
+                        suggestions=offered)
+
     found: list[str] = []
     try:
-        draft = _ask(messages, cfg)
-        found = problems(draft, allowed, place.name if place is not None else "",
-                         pc.name if pc is not None else "",
-                         prose=getattr(place, "prose", "") or "", skeleton=skeleton)
+        draft, offered = _ask(messages, cfg)
+        found = check(draft, offered)
         if draft and not found:
-            return narration.destutter(draft), []
+            return narration.destutter(draft), offered, []
         if draft:
-            messages += [{"role": "assistant", "content": json.dumps({"opening": draft})},
+            messages += [{"role": "assistant",
+                          "content": json.dumps({"opening": draft, "suggestions": offered})},
                          {"role": "user", "content": "Rewrite it. What is wrong:\n"
                                                      + "\n".join(f"- {p}" for p in found)}]
-            draft = _ask(messages, cfg)
-            found = problems(draft, allowed, place.name if place is not None else "",
-                             pc.name if pc is not None else "",
-                             prose=getattr(place, "prose", "") or "", skeleton=skeleton)
+            draft, offered = _ask(messages, cfg)
+            found = check(draft, offered)
             if draft and not found:
-                return narration.destutter(draft), []
+                return narration.destutter(draft), offered, []
     except Exception as exc:                       # noqa: BLE001 — the floor is the point
         found = [f"the prose model failed: {exc}"]
-    return skeleton, found
+    return *floor, found

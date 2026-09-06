@@ -188,23 +188,37 @@ def _game(world, town, cls: str = "ranger", seed=None, weapon: str = "",
 def test_the_opening_says_who_where_and_what_is_going_on():
     """Nelson's overture, on the opening of *Trinity* (*The Craft of Adventure*, 2nd
     ed., §"The Overture"): "Already you know: who you are …; exactly where you are …;
-    and what is going on". All three, and the place's own props carrying the setting
-    rather than a paragraph of stated facts — in the ORDER the player asked for on
-    2026-09-04: the thing going wrong first, the place second, the person third.
-    The old order opened on "Vyrakon keeps to matriarchal clan law" and buried the
-    hush spreading through the room under it."""
+    and what is going on". All three, in the order a person orients — where, why and
+    who, what, now. Two verdicts set it: 2026-09-04, "opens with distant lore" and
+    buries the tension; 2026-09-05, of the tension-first order that replaced it, "I
+    have no idea what is going on or where i am. hardly even know what i am supposed
+    to be doing" — Emily Short's oldest note, that a player needs "an obvious
+    starting problem". Where comes first; the errand is on the screen."""
     world, town = a_world()
     text = opening.compose(_game(world, town), "a stranger here")
     body = text.split("\n\n")
     assert len(body) == 4, body
-    assert "has stopped to watch." in body[0]                    # what is going on
-    assert "Averthorn" in body[1]                                 # exactly where
+    assert body[0].split()[0] in ("Mid-morning", "Just", "Late", "Early", "Morning",
+                                  "Midday", "Afternoon", "Evening", "Dusk")
+    assert "Averthorn" in body[0]                                 # exactly where, first
     # The fact's own words and its own capitals, joined into English: the export
     # writes "Turf roofs, low stone walls" as a field, and only the last comma
     # becomes a conjunction.
-    assert "Turf roofs and low stone walls" in body[1]
-    assert body[2].startswith("You are Averil Stane")            # who
+    assert "Turf roofs and low stone walls" in body[0]
+    assert body[1].startswith("You are Averil Stane")            # who, and why
+    assert "You came" in body[1]
+    assert "has stopped to watch." in body[2]                    # what is going on
+    assert body[3].startswith("You could ") and body[3].endswith("What do you do?")
     assert "The reeve" not in text, "the strain is the GM's note, not the first screen"
+
+
+def test_every_situation_carries_an_errand_the_player_can_act_on():
+    for s in opening.SITUATIONS:
+        assert s.errand.startswith("You came"), s.errand
+        assert s.errand.endswith("."), s.errand
+    assert len({s.errand for s in opening.SITUATIONS}) == len(opening.SITUATIONS)
+    could = opening.suggestions_for(opening.SITUATIONS[0])
+    assert len(could) == 3 and could[0].startswith("Ask the woman at the bread stall")
 
 
 def test_something_is_already_happening_when_the_game_picks_up():
@@ -264,7 +278,10 @@ def test_the_opening_is_striking_and_concise():
         game = _game(world, town)
         text = _with_situation(s, lambda: opening.compose(game, "a stranger here"))
         counts.append(len(text.split()))
-    assert max(counts) <= 110, counts
+    # 150 since 2026-09-05: the errand ("You came for a day's paid work…") and the
+    # "You could…" line each cost a sentence, on the player's own finding that the
+    # screen said neither why they were there nor what they might do about it.
+    assert max(counts) <= 150, counts
     assert min(counts) >= 60, counts
 
 

@@ -438,7 +438,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     return c
 
 
-def _open_with(c: Campaign, text: str) -> None:
+def _open_with(c: Campaign, opened: tuple[str, list[str]]) -> None:
     """The opening onto the page AND into the model's history.
 
     It went onto the page only, and the consequence was measured on the player's own
@@ -448,11 +448,15 @@ def _open_with(c: Campaign, text: str) -> None:
     been shown, which was worked example eleven's door. The narrator continues what
     is in front of it; the opening has to be in front of it.
     """
+    text, suggestions = opened
     c.transcript.append({"who": "gm", "text": text})
     c.history.append({"role": "assistant", "content": text})
+    # The opening's own "you could": the page shows them as it shows a turn's, so
+    # the first screen already has three things to press.
+    c.suggestions = list(suggestions or [])
 
 
-def opening_text(campaign: Campaign, written: bool = True) -> str:
+def opening_text(campaign: Campaign, written: bool = True) -> tuple[str, list[str]]:
     """The first thing the player reads.
 
     The template in `play/opening.py` is the material and the floor; the prose model
@@ -470,14 +474,16 @@ def opening_text(campaign: Campaign, written: bool = True) -> str:
 
     from . import opening, opening_prose
 
+    here = opening.situation_for(campaign)
     skeleton = opening.compose(campaign, _standing(campaign.world, campaign.scene.pc()))
+    could = opening.suggestions_for(here)
     if not written:
-        return skeleton
-    text, wrong = opening_prose.write(campaign, opening.situation_for(campaign), skeleton)
+        return skeleton, could
+    text, suggestions, wrong = opening_prose.write(campaign, here, skeleton, could)
     if wrong:
         logging.getLogger(__name__).warning(
             "opening fell back to the template: %s", "; ".join(wrong))
-    return text
+    return text, suggestions
 
 
 def _standing(world, pc) -> str:
@@ -557,7 +563,7 @@ def switch_to(character_id: str) -> Campaign:
         c = new_campaign(campaign_id, character=entry.actor,
                          world_source=entry.world_source or None)
         c.character_id = character_id
-        c.transcript.append({"who": "gm", "text": opening_text(c)})
+        _open_with(c, opening_text(c))
         c.save()
         _LIVE[campaign_id] = c
         if not entry.campaign_id:
