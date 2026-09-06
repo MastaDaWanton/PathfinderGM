@@ -863,3 +863,15 @@ def test_the_shell_shows_its_window_even_when_the_page_never_paints():
     assert text.index("createWindow();") < text.index("await startBackend()")
     assert "STARTING_PAGE" in text and "Starting the game" in text
     assert "STARTUP_TIMEOUT_MS = 180_000" in text
+
+
+def test_the_map_paints_foes_red_and_bystanders_white():
+    """"make the bystanders white and the enemies bright red." The page is told each
+    actor's side and paints by it; a bystander is a non-player on no side while a
+    fight is on."""
+    text = (ROOT / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    assert "#map .token.foe { fill: #e0261e" in text
+    assert "#map .token.bystander { fill: #f2ecdd" in text
+    assert '" bystander"' in text and '" foe"' in text
+    views = (ROOT / "play" / "views.py").read_text(encoding="utf-8")
+    assert '"side": next((s for s, refs in (c.scene.sides or {}).items()' in views

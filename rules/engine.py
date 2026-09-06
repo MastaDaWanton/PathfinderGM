@@ -2021,7 +2021,7 @@ class Engine:
         if partial.get("attack_state") is None:
             opened = False
             if not self.scene.in_encounter:
-                opened = self._ensure_encounter(intent.actor)
+                opened = self._ensure_encounter(intent.actor, intent.target)
             if opened or self._battle_joined:
                 self._battle_joined = True
                 # The initiator keeps the action they declared — the rule
@@ -2044,7 +2044,7 @@ class Engine:
                           f"{', '.join(foes) or defender.name}. Nothing has landed "
                           f"yet — the first blow is still to be struck."),
                     because=intent.because)
-        self._ensure_encounter(intent.actor)
+        self._ensure_encounter(intent.actor, intent.target)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         # A granted strike exists only while its toggle is formed. Refused here with
@@ -2284,7 +2284,7 @@ class Engine:
         """
         key = intent.params["manoeuvre"]
         m = MANEUVERS[key]
-        self._ensure_encounter(intent.actor)
+        self._ensure_encounter(intent.actor, intent.target)
 
         mods = list(actor.cmb_modifiers(key))
 
@@ -2389,7 +2389,7 @@ class Engine:
             because=intent.because,
         )
 
-    def _ensure_encounter(self, initiator: str) -> bool:
+    def _ensure_encounter(self, initiator: str, target: str | None = None) -> bool:
         """Start a fight the moment someone swings, if one is not already running.
         Returns whether it opened one — the attack op defers its swing when it did.
 
@@ -2405,7 +2405,20 @@ class Engine:
         """
         if self.scene.in_encounter:
             return False
-        combatants = [r for r, a in self.scene.actors.items() if not a.is_down]
+        standing = [r for r, a in self.scene.actors.items() if not a.is_down]
+        # Who the fight is WITH. Every standing non-player used to go on "them":
+        # reported at the table with the map open, 2026-09-06, a servant who had
+        # been standing beside the player was laid out on the enemy side of a fight
+        # the player picked with a hooded man. The fight is between the initiator's
+        # side and the one they swung at; everybody else is a bystander — on the map,
+        # off the initiative, and painted so — until they join it themselves (an
+        # NPC that attacks is added to a side by `_op_attack`).
+        pc_side = [r for r in standing if self.scene.actors[r].is_pc]
+        if target and target in self.scene.actors and target not in pc_side:
+            them = [target]
+        else:
+            them = [r for r in standing if not self.scene.actors[r].is_pc]
+        combatants = pc_side + [r for r in them if r in standing]
         if len(combatants) < 2:
             return False
 
@@ -2419,10 +2432,7 @@ class Engine:
 
         self.scene.initiative = rolls
         self.scene.round = 1
-        sides = {
-            "pc": [r for r in combatants if self.scene.actors[r].is_pc],
-            "them": [r for r in combatants if not self.scene.actors[r].is_pc],
-        }
+        sides = {"pc": pc_side, "them": [r for r in them if r in standing]}
         self.scene.sides = sides
         self.scene.acted = {initiator}
         self.scene.turn = next(
@@ -4902,6 +4912,14 @@ class Engine:
                         min(self.scene.grid.width - 1, pc_side + away),
                         max(0, min(self.scene.grid.height - 1, row)))
                     foe_row += 1
+        # The bystanders — in the room, in no side — go on the board too, at their
+        # own zones, so the map shows the room the prose described and not only the
+        # two people hitting each other in it.
+        bystanders = [r for r in self.scene.actors
+                      if r not in self.scene.positions
+                      and not any(r in refs for refs in sides.values())]
+        if bystanders:
+            self.scene.place_by_zone(bystanders)
         self.scene.resync_zones()
 
     def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:

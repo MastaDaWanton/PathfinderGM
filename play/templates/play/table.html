@@ -278,6 +278,10 @@
   #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1;
                 transition: cx .4s ease, cy .4s ease; }
   #map .token.pc { fill: var(--gold); }
+  /* Who is in the fight and who is only standing in the room. Asked for in as many
+     words, 2026-09-06: "make the bystanders white and the enemies bright red". */
+  #map .token.foe { fill: #e0261e; stroke: #5a0c08; }
+  #map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
   #map .token.down { opacity: .35; }
   #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
                   pointer-events: none; }
@@ -1933,7 +1937,9 @@ function renderMap(s) {
     const [c, r] = a.at;
     const n = a.squares || 1;
     const down = a.hp <= 0;
-    parts.push(`<rect class="token${a.is_pc ? " pc" : ""}${down ? " down" : ""}"
+    const side = a.is_pc ? " pc" : a.side ? (a.side === "pc" || a.side === "you" ? " ally" : " foe")
+      : (s.scene.in_encounter ? " bystander" : "");
+    parts.push(`<rect class="token${side}${down ? " down" : ""}"
       x="${c * CELL + 2}" y="${r * CELL + 2}"
       width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
       <title>${esc(a.name)} — ${a.hp}/${a.hp_max}</title></rect>`);

@@ -163,6 +163,10 @@ def _state(c) -> dict:
             "actors": [
                 {"ref": r, "name": a.name, "hp": a.hp, "hp_max": a.hp_max,
                  "zone": c.scene.zones.get(r, "near"), "is_pc": a.is_pc,
+                 # Which side of the fight, or "" for a bystander the fight has not
+                 # touched — the map paints foes red and bystanders white.
+                 "side": next((s for s, refs in (c.scene.sides or {}).items()
+                               if r in refs), ""),
                  "size": a.size, "squares": grid.size_squares(a.size),
                  "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
                  "conditions": [x.name for x in a.conditions]}
