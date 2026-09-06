@@ -1219,9 +1219,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             judgement.promote_cast(c.scene, introduced)
             # And whoever the beat says stopped watching is in the fight, with their
             # kind: "the second guard draws" is a second guard on the initiative.
-            for ref in judgement.joiners(c.scene, text):
-                if agent.engine.join_fight(ref):
-                    repairs.append(f"{c.scene.actors[ref].name} joined the fight")
+            for ref, side in judgement.joiners(c.scene, text):
+                if agent.engine.join_fight(ref, side):
+                    repairs.append(f"{c.scene.actors[ref].name} joined the fight "
+                                   f"on {'your' if side == 'pc' else 'their'} side")
                     agent.engine.rally(ref)
             c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
             c.history.append({"role": "assistant", "content": text})

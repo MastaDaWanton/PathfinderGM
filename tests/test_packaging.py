@@ -872,6 +872,7 @@ def test_the_map_paints_foes_red_and_bystanders_white():
     text = (ROOT / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
     assert "#map .token.foe { fill: #e0261e" in text
     assert "#map .token.bystander { fill: #f2ecdd" in text
+    assert "#map .token.ally { fill: #6fc276" in text          # on your side: green
     assert '" bystander"' in text and '" foe"' in text
     views = (ROOT / "play" / "views.py").read_text(encoding="utf-8")
     assert '"side": next((s for s, refs in (c.scene.sides or {}).items()' in views

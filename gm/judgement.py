@@ -2668,11 +2668,46 @@ _JOINS = (r"(?:draws|lunges|charges|attacks|swings|strikes|comes at you|steps in
           r"sword|staff|spear|cudgel|fist|fists)|wades in|rushes (?:you|in|forward))")
 
 
-def joiners(scene, gm_beat: str) -> list[str]:
-    """Refs of the bystanders this beat says have joined the fight, or []."""
+# The words that say WHOSE side a joiner takes. On yours: they act against a foe by
+# name, or for you in as many words. On theirs: they act against you. With nothing
+# said, a person who stops watching to draw a blade is presumed against you — the
+# fight is the player's, and a stranger's help is the surprise, not the rule.
+_FOR_YOU = re.compile(
+    r"\b(?:to your (?:aid|side|defence|defense|rescue)|at your side|beside you|"
+    r"between you and|in front of you|(?:defends?|covers?|shields?|protects?|helps?) you|"
+    r"on your side|with you|for you|alongside you|takes your (?:side|part))\b", re.I)
+_AGAINST_YOU = re.compile(
+    r"\b(?:at|on|toward|towards|for|into) you\b"
+    r"|\byour (?:arm|throat|shoulder|wrist|face|chest|neck|legs?)\b", re.I)
+
+
+def _side_taken(sentence: str, foes: list[str]) -> str:
+    """Which side a sentence puts its joiner on: "pc" or "them"."""
+    against_you = _AGAINST_YOU.search(sentence)
+    for_you = _FOR_YOU.search(sentence)
+    at_a_foe = any(
+        re.search(r"\b(?:at|on|toward|towards|into|against|with)\s+(?:the\s+)?"
+                  r"(?:\w+\s+){0,2}" + re.escape(f) + r"s?\b", sentence, re.I)
+        for f in foes if f)
+    if for_you or (at_a_foe and not against_you):
+        return "pc"
+    return "them"
+
+
+def joiners(scene, gm_beat: str) -> list[tuple[str, str]]:
+    """(ref, side) for each bystander this beat says has joined the fight, or [].
+
+    "add allies joining on my side too" (2026-09-06): the side is read from the
+    sentence — a guard who "steps between you and the thug" or "swings at the thug"
+    joins on the player's side; one who "comes at you" joins against them.
+    """
     if scene is None or not getattr(scene, "in_encounter", False) or not gm_beat:
         return []
     sides = getattr(scene, "sides", None) or {}
+    foe_heads = [(str(scene.actors[r].name).split() or [""])[-1]
+                 for s, refs in sides.items() if s not in ("pc", "you")
+                 for r in refs if r in scene.actors]
+    foe_heads = [h[:-1] if h.endswith("s") and len(h) > 3 else h for h in foe_heads]
     out = []
     for ref, actor in scene.actors.items():
         if actor.is_pc or actor.is_down or any(ref in refs for refs in sides.values()):
@@ -2685,8 +2720,10 @@ def joiners(scene, gm_beat: str) -> list[str]:
         # hooded guard draws" is the guard's draw, four words from the merchant.
         rx = re.compile(r"\b" + re.escape(head) + r"s?\b(?:\s+\w+){0,3}?\s+" + _JOINS + r"\b",
                         re.I)
-        if rx.search(gm_beat):
-            out.append(ref)
+        for sentence in re.split(r"(?<=[.!?])\s+", gm_beat):
+            if rx.search(sentence):
+                out.append((ref, _side_taken(sentence, foe_heads)))
+                break
     return out
 
 

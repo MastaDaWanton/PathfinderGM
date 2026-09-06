@@ -138,8 +138,31 @@ def test_the_prose_can_put_a_bystander_into_the_fight():
     engine._ensure_encounter(pc.ref, target=thug.ref)
     beat = ("The merchant flinches as the hooded guard draws a cudgel and comes at you. "
             "The thug grins.")
-    assert judgement.joiners(s, beat) == [guard.ref]
+    assert judgement.joiners(s, beat) == [(guard.ref, "them")]
     assert engine.join_fight(guard.ref)
     assert guard.ref in s.sides["them"] and merchant.ref not in s.sides["them"]
     # Already in: nothing to join twice.
     assert judgement.joiners(s, beat) == []
+
+
+def test_a_bystander_can_join_on_the_players_side():
+    """"add allies joining on my side too." Whose side is read from the sentence:
+    a guard who steps between you and the thug, or swings at the thug, is yours;
+    one who comes at you is theirs; one who only draws is presumed against you."""
+    def room():
+        s = Scene()
+        pc = s.add(load_pc("fixtures/pc-kesst.json"))
+        thug = s.add(instantiate("thug", scene=s, name="the thug"), zone="engaged")
+        guard = s.add(instantiate("watchman", scene=s, name="the watchman"), zone="near")
+        engine = Engine(s, Dice(seed=6))
+        engine._ensure_encounter(pc.ref, target=thug.ref)
+        return s, engine, pc, thug, guard
+
+    s, engine, pc, thug, guard = room()
+    assert judgement.joiners(s, "The watchman steps between you and the thug, blade out.")         == [(guard.ref, "pc")]
+    assert judgement.joiners(s, "The watchman swings his cudgel at the thug.")         == [(guard.ref, "pc")]
+    assert judgement.joiners(s, "The watchman draws and comes at you.")         == [(guard.ref, "them")]
+    assert judgement.joiners(s, "The watchman draws.") == [(guard.ref, "them")]
+    assert engine.join_fight(guard.ref, "pc")
+    assert guard.ref in s.sides["pc"] and guard.ref not in s.sides["them"]
+    assert guard.ref in {r for r, _ in s.initiative}
