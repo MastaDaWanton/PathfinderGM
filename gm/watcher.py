@@ -392,7 +392,11 @@ def _propose_undercurrent(job: dict, cfg: dict) -> dict | None:
     if sentence is None:
         return None
     return {"job": "undercurrent", "campaign": job["campaign"],
-            "was": job["was"], "sentence": sentence}
+            "was": job["was"], "sentence": sentence,
+            # Whether the old thread was concluded or only moved: the story award
+            # (`Engine.award_story`) pays the two differently.
+            "action": str(data.get("action", "")).strip().lower(),
+            "thread": thread}
 
 
 def _valid_thread(data: dict, known) -> str | None:
@@ -476,4 +480,12 @@ def _apply_undercurrent(c, p: dict) -> bool:
                           "content": opening.private_note(p["sentence"])})
     c.turn_log.append({"kind": "watcher", "did": "undercurrent",
                        "note": p["sentence"]})
+    # Resolving a situation pays. The CRB's story award — double a CR-equal-to-level
+    # fight for a storyline concluded, and half of one here for a storyline moved —
+    # lands as its own line on the page, since the watcher writes between turns and
+    # has no beat to ride on. "i should be receiving EXP for ... resolving situations".
+    line = c.engine().award_story(p.get("action", ""), p.get("thread", "")).strip()
+    if line:
+        c.transcript.append({"who": "gm", "text": line, "kind": "setup"})
+        c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
     return True

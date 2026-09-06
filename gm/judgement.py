@@ -278,7 +278,7 @@ def _can_be_fought(actor) -> bool:
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is
 # deliberately absent: who you are hitting is never obvious from the op alone.
-_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "condition",
+_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "prospect", "condition",
              "ability_damage", "resource", "give"}
 
 
@@ -2072,6 +2072,57 @@ def inject_forage(raw_intents, player_text: str, scene) -> list:
 # CLAUDE.md records what a duplicated rule costs — a consequence rule was fixed in one
 # prompt and left stale in the other, and the bug went on shipping from the copy nobody
 # looked at.
+# "a search for ore": the same door as forage, for the ground's minerals. The nouns
+# are the ore words, so "I search for the guard" and "I look for my purse" cannot
+# fire; a false prospect charges hours and a Survival toll.
+_PROSPECTS = re.compile(r"\bprospect(?:s|ing)?\b", re.I)
+_ORE_WORDS = r"(?:ores?|minerals?|veins?|iron|copper|tin|silver|gold|lead|metal|seams?)"
+_GATHERS_ORE = re.compile(
+    # "search the hillside for ore", "look for a vein", "pan the stream for gold":
+    # the verb, then "for", then the ore word within a couple of words — so "I look
+    # at the silver ring" and "I search for the guard" cannot fire.
+    r"\b(?:gather|search|look|hunt|scout|pan|dig|prospect)\b[^.!?]{0,30}?"
+    r"\bfor\s+(?:\w+\s+){0,2}" + _ORE_WORDS + r"\b"
+    # "dig out the iron", "mine the seam": the digging verbs need no "for".
+    r"|\b(?:dig|mine)\b[^.!?]{0,20}?\b" + _ORE_WORDS + r"\b", re.I)
+
+
+def inject_prospect(raw_intents, player_text: str, scene) -> list:
+    """Make a declared search for ore reach the engine — `inject_forage`'s twin."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "prospect" in present:
+        return raw_intents
+    if not (_PROSPECTS.search(player_text) or _GATHERS_ORE.search(player_text)):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    params: dict = {}
+    hours = _FOR_HOURS.search(player_text)
+    if hours:
+        params["hours"] = max(1, min(48, int(hours.group(1))))
+    if "forage" in present:
+        # The model heard "search the hillside for ore" and reached for the one
+        # gathering op it knows (measured on the first live probe): the same
+        # expedition, against the wrong stock list. Turned into the right one.
+        out = []
+        for r in raw_intents:
+            if isinstance(r, dict) and str(r.get("op", "")).lower() == "forage":
+                r = dict(r, op="prospect", params=dict(r.get("params") or {}, **params))
+                r["params"].pop("track", None)
+                r["params"].pop("biome", None)
+            out.append(r)
+        return out
+    return list(raw_intents) + [{
+        "op": "prospect", "actor": pc.ref, "params": params,
+        "because": "the player said they search for ore",
+    }]
+
+
 def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
     """The player is walking out: the turn must carry a `travel`, and the model must
     say to where.
@@ -2132,6 +2183,7 @@ _DECLARERS = (
     # rolls its tables — the other way round forages the old ground, or errors
     # "nowhere in particular" when there is none.
     ("forage", lambda raw, text, scene, world: inject_forage(raw, text, scene)),
+    ("prospect", lambda raw, text, scene, world: inject_prospect(raw, text, scene)),
     ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
 )

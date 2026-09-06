@@ -108,3 +108,57 @@ def ready_to_level(actor) -> bool:
     if level >= 20:
         return False
     return int(getattr(actor, "xp", 0) or 0) >= total_for(level + 1)
+
+
+# --- experience for things that are not fights ------------------------------------------
+#
+# "i should be receiving EXP for doing things and resolving situations and succeeding on
+# checks otherwise It will take a lot for an individual to level, and they are forced to
+# seek out violence." The Core Rulebook agrees in principle and is thin in practice:
+# "Story Awards" (Gamemastering, Awarding Experience) pay double the XP of a CR equal to
+# the APL for concluding a major storyline, and traps and hazards pay as the CR they
+# carry; a skill check overcome has no line of its own. So the check award is this
+# app's own rule, written down here so it can be argued with: a DC is read as a CR the
+# way a trap's is — every two points of DC above 10 is a CR — and a check pays a QUARTER
+# of that CR's fight award, because a check is one roll and a fight is a dozen. DC 15
+# is 100 XP, DC 20 is 300, DC 25 is 600; a first-level character needs 2,000 to advance,
+# so twenty moderate checks or seven hard ones is a level, against five CR 1 fights.
+
+CHECK_SHARE = 4          # a check is a quarter of the fight its DC would be
+STORY = {"new": 2.0, "advance": 0.5}   # of a CR = level award; "new" is the CRB's double
+
+
+def cr_for_dc(dc: int) -> float:
+    """A difficulty class read as a challenge rating, the way a trap's is."""
+    steps = (int(dc) - 10) / 2
+    if steps < 1:
+        return 1 / 3 if steps >= 0 else 0
+    return min(20, int(steps))
+
+
+def challenge_award(level: int, dc: int | None) -> int:
+    """What beating this DC is worth to a character of this level, or 0.
+
+    Nothing for a DC the character could not fail — under 10 + half their level is
+    routine, not a challenge — and never more than the fight award of their own level:
+    a lucky roll against an absurd DC is not five fights.
+    """
+    if dc is None:
+        return 0
+    if int(dc) < 10 + max(0, int(level)) // 2:
+        return 0
+    cr = cr_for_dc(int(dc))
+    # Below CR 1 — a DC of 10 or 11 — is routine: measured on the first live probe,
+    # a DC 10 Perception check to notice a crowd paid 33 XP, which is a level in
+    # sixty glances.
+    if not cr or cr < 1:
+        return 0
+    award = CR_AWARD.get(cr) or CR_AWARD.get(round(cr, 3)) or 0
+    cap = CR_AWARD.get(max(1, min(20, int(level))), 0)
+    return max(0, min(award // CHECK_SHARE, cap))
+
+
+def story_award(level: int, action: str) -> int:
+    """A storyline concluded ("new") pays the CRB's double; one advanced pays half."""
+    share = STORY.get(str(action or "").lower(), 0)
+    return int(CR_AWARD.get(max(1, min(20, int(level))), 0) * share)

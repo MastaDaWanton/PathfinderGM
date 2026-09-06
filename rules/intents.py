@@ -250,6 +250,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # wants to spend. Every hour is its own Survival check, and past a day awake every
     # hour is also a Will save against dropping where you stand.
     "forage": ((), ("actor", "track", "biome", "hours"), "player"),
+    # Ore, not herbs: the same expedition against the blacksmith's stock list, in
+    # ground that carries it — mountain, hills, underground, a bog for bog iron.
+    "prospect": ((), ("actor", "hours"), "player"),
     # Stripping a body. "I loot the watchman I take everything" was narration and
     # nothing else — the coins, the sword, the chain shirt all described and none of
     # them in the inventory — the same gap the trade op closed for shops. `from` is

@@ -214,6 +214,15 @@ class Scene:
     # place anybody itself and its distance was simply lost — every archer
     # opened at the `far` default of forty feet however far they said they were.
     spawn_feet: dict[str, int] = field(default_factory=dict)
+    # Checks already paid for, "skill|dc|place" → the day it was paid. A DC beaten once
+    # is a challenge; the same DC beaten nine times in a row is a grind, and a ledger
+    # that paid for the grind would send the player to climb the same wall all
+    # afternoon (`rules/xp.py`, challenge_award).
+    rewarded: dict[str, int] = field(default_factory=dict)
+    # Finds that are booked but not yet in hand: the vein the cave worm is sitting on.
+    # Each is {"guard": ref, "what": ..., "found": {...}, "stock": [...]} and pays out
+    # when the guard is dead or gone (`rules/gathering.py`).
+    guarded_finds: list[dict] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -1911,6 +1920,11 @@ class Engine:
                 if verdict == "success" else
                 f"{actor.name} misses the {skill} check by {-margin}."
             )
+        if verdict == "success":
+            # A check beaten is a challenge overcome, and it pays — the number to beat
+            # being the DC, or on an opposed check the other side's own roll.
+            beaten = (opposing_roll.total if opposing_roll else resolved_dc.final)
+            tell += self.reward_check(actor, skill, beaten)
 
         return Outcome(
             intent_id=intent.id, op="check", rolls=rolls, dc=resolved_dc.as_dict(),
@@ -3644,11 +3658,154 @@ class Engine:
         if worked < hours:
             tell += (f" They meant to keep at it for {hours} and did not last.")
 
+        # Once per expedition, the ground answers back (`rules/gathering.py`): a
+        # rich patch, a bear, or a hollow full of the good stuff with something
+        # sitting on it. After the haul is carried, because a rich find doubles what
+        # was actually found, and a guarded one is booked rather than handed over.
+        effects = [{"ref": actor.ref, "kind": "forage", **result}]
+        tell += self._gathering_encounter(actor, biome, level, "herbs",
+                                          found=result["found"], effects=effects)
+
         return Outcome(
-            intent_id=intent.id, op="forage",
-            effects=[{"ref": actor.ref, "kind": "forage", **result}],
+            intent_id=intent.id, op="forage", effects=effects,
             tell=tell, because=intent.because,
         )
+
+    def _gathering_encounter(self, actor, biome: str, level: int, what: str, *,
+                             found: dict | None = None, stock: list | None = None,
+                             effects: list) -> str:
+        """The expedition's one encounter roll, applied. Returns the tell's clause.
+
+        A rich find multiplies the haul in hand. A creature is brought on by the one
+        door creatures come in by (`_bring_in`), far off; an aggressive one starts the
+        fight the moment it is seen, with the player's own first swing still theirs.
+        A guarded find is booked on the scene and paid when the guard is down or gone
+        (`_settle_guarded_finds`), so the vein is real and the fight for it is real.
+        """
+        from . import gathering
+
+        pc = self.scene.pc()
+        enc = gathering.roll(biome, max(1, int(level)), self.dice)
+        if enc.kind == "quiet":
+            return ""
+        clause = " " + gathering.describe(enc, what)
+        effects.append({"kind": "gathering", "encounter": enc.kind, "roll": enc.roll,
+                        "creature": (enc.creature or {}).get("name", ""),
+                        "aggressive": enc.aggressive})
+        if enc.kind == "rich":
+            for iid, n in list((found or {}).items()):
+                actor.carry(iid, int(n) * (enc.yield_times - 1),
+                            at_minute=self.scene.clock_minutes)
+            for s in stock or []:
+                actor.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
+                                               kind=s.get("kind", "ore"),
+                                               craft=s.get("craft", "smithing")),
+                                int(s.get("count", 1)) * (enc.yield_times - 1))
+            return clause
+        made = self._bring_in(enc.creature["id"], count=1, name=enc.creature["name"])
+        ref = made[0]["ref"]
+        self.scene.zones[ref] = "far"
+        self.scene.positions.pop(ref, None)
+        if self.scene.grid is not None and self.scene.positions:
+            self.scene.place_by_zone([ref])
+        if enc.kind == "guarded":
+            self.scene.guarded_finds.append({
+                "guard": ref, "what": f"{what} find",
+                "found": {iid: int(n) * enc.yield_times for iid, n in (found or {}).items()},
+                "stock": [dict(s, count=int(s.get("count", 1)) * enc.yield_times)
+                          for s in (stock or [])],
+            })
+        elif enc.aggressive and pc is not None and actor.ref == pc.ref:
+            self._ensure_encounter(pc.ref, target=ref)
+        return clause
+
+    def _op_prospect(self, intent: Intent, partial: dict) -> Outcome:
+        """Search the ground here for what can be dug out of it.
+
+        The forage op's shape, against the blacksmith's stock list instead of the
+        herbalist's: the ores that carry this biome in their tags are the table, the
+        Survival check and the hours and the body's toll are the same, and the
+        expedition rolls the same encounter — "a search for ore and find a massive
+        vein guarded by a cave worm".
+        """
+        from . import blacksmith
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            raise IntentError("prospect: nobody here to look", "refs")
+        busy = self._too_busy_to_forage(actor)
+        if busy:
+            return Outcome(intent_id=intent.id, op="prospect", effects=[],
+                           tell=f"No prospecting happens. {busy}", because=intent.because)
+        biome = biomes.canonical(str(self.scene.biome or ""))
+        if biome is None:
+            return self._refuse(
+                intent, "The ground here has not been named, so there is nothing to "
+                        "search. Travel somewhere first.")
+        ores = [m for m in blacksmith.materials().values()
+                if m.kind == "ore" and biome in (m.biomes or [])]
+        if not ores:
+            return Outcome(intent_id=intent.id, op="prospect", effects=[],
+                           tell=f"{actor.name} looks, and there is no ore in "
+                                f"{biomes.describe(biome).lower()} to find.",
+                           because=intent.because)
+        hours = max(1, int(intent.params.get("hours", 1) or 1))
+        level = actor.track("blacksmith").level if hasattr(actor, "track") else 1
+        face = None
+        if actor.is_pc:
+            if "player_face" in partial:
+                face = int(partial.pop("player_face"))
+            else:
+                mods = foraging.check_mods(actor, level)
+                raise _NeedsPlayerRoll({
+                    "label": f"Survival check — prospecting ({biome})",
+                    "die": "1d20", "actor": actor.name, "min": 1, "max": 20,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": foraging.dc_for(biome), "because": intent.because,
+                    "intent_id": intent.id,
+                }, {})
+        toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
+        worked = max(1, toll.hours)
+        dc = foraging.dc_for(biome)
+        mods = foraging.check_mods(actor, level)
+        bonus = sum(m.value for m in mods)
+        # Common ore is the bulk of any seam; rarer ore turns up when the check clears
+        # the DC by more. The player's face on the first hour, the engine's after.
+        stock: list[dict] = []
+        for hour in range(worked):
+            die = face if (hour == 0 and face is not None) else self.dice.roll(
+                "1d20", label="prospecting", visibility="hidden").total
+            margin = die + bonus - dc
+            if margin < 0:
+                continue
+            tiers = ["common"] + (["uncommon"] if margin >= 5 else []) \
+                + (["rare"] if margin >= 10 else [])
+            pool = [m for m in ores if m.tier in tiers] or ores
+            pick = pool[self.dice.roll(f"1d{len(pool)}", label="which ore",
+                                       visibility="hidden").total - 1]
+            count = 1 + margin // 5
+            stock.append({"base": pick.name, "tier": pick.tier, "kind": "ore",
+                          "craft": "smithing", "count": count})
+        for s in stock:
+            actor.add_stock(crafting.Stock(base=s["base"], tier=s["tier"], kind="ore",
+                                           craft="smithing"), s["count"])
+        self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
+        span = f"{worked} hour{'s' if worked != 1 else ''}"
+        if stock:
+            got = ", ".join(f"{s['count']}× {s['base']}" for s in stock)
+            tell = f"{span} of digging: {actor.name} comes back with {got}."
+        else:
+            tell = f"{actor.name} spends {span} and turns up nothing worth carrying."
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        effects = [{"ref": actor.ref, "kind": "prospect", "stock": stock,
+                    "hours": worked, "toll": toll.as_dict()}]
+        tell += self._gathering_encounter(actor, biome, level, "ore",
+                                          stock=stock, effects=effects)
+        return Outcome(intent_id=intent.id, op="prospect", effects=effects,
+                       tell=tell, because=intent.because)
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
@@ -4868,16 +5025,56 @@ class Engine:
                         f"{'carries' if len(set(fallen)) == 1 else 'carry'} no price in "
                         f"the bestiary, so the award is the GM's to make.") + coin
             return coin
+        return self.award_xp(pc, total, ", ".join(names)) + coin
+
+    def award_xp(self, pc, total: int, reason: str) -> str:
+        """The one writer of experience, and the one sentence that says so.
+
+        Fights paid here first; now checks and storylines do too ("i should be
+        receiving EXP for doing things and resolving situations and succeeding on
+        checks", 2026-09-06). Second person at the source: this line reaches the
+        page raw by design, and "MastaDaWanton gains 135 XP" was the one
+        third-person survivor of the gemma4 fight audit's final run.
+        """
+        from . import xp as xp_mod
+
+        total = int(total or 0)
+        if total <= 0 or pc is None or not pc.is_pc:
+            return ""
         pc.xp = int(getattr(pc, "xp", 0) or 0) + total
         nxt = xp_mod.total_for(min(20, pc.level + 1))
-        # Second person at the source: this line reaches the page raw by design,
-        # and "MastaDaWanton gains 135 XP" was the one third-person survivor of
-        # the gemma4 fight audit's final run.
-        line = (f" You gain {total:,} XP for {', '.join(names)} "
+        line = (f" You gain {total:,} XP for {reason} "
                 f"({pc.xp:,} of {nxt:,} for level {min(20, pc.level + 1)}).")
         if xp_mod.ready_to_level(pc):
             line += " Enough to advance — it will settle with a night's sleep."
-        return line + coin
+        return line
+
+    def reward_check(self, actor, skill: str, dc: int | None) -> str:
+        """Pay for a check beaten, once per DC per place per day, or ""."""
+        from . import xp as xp_mod
+
+        if actor is None or not actor.is_pc or dc is None:
+            return ""
+        award = xp_mod.challenge_award(actor.level, dc)
+        if not award:
+            return ""
+        day = self.scene.clock_minutes // (24 * 60)
+        key = f"{skill}|{int(dc)}|{self.scene.at or ''}"
+        if self.scene.rewarded.get(key) == day:
+            return ""
+        self.scene.rewarded[key] = day
+        return self.award_xp(actor, award, f"the {skill} check (DC {int(dc)})")
+
+    def award_story(self, action: str, thread: str = "") -> str:
+        """The CRB's story award, when the undercurrent is concluded or advanced."""
+        from . import xp as xp_mod
+
+        pc = self.scene.pc()
+        if pc is None:
+            return ""
+        total = xp_mod.story_award(pc.level, action)
+        what = ("seeing a matter through" if action == "new" else "moving a matter along")
+        return self.award_xp(pc, total, what + (f": {thread}" if thread else ""))
 
     def _settle_treasure(self) -> str:
         """What the fallen were carrying, into the PC's purse.
@@ -5003,6 +5200,8 @@ class Engine:
                     if self.scene.conscious(r)]
         xp_line = self._settle_xp()
         self.scene.end_encounter()
+        # The vein the guardian was sitting on, now that the guardian is not.
+        xp_line += self._settle_guarded_finds()
         return Outcome(
             intent_id=intent.id, op="end_encounter",
             effects=[{"kind": "encounter", "ended": True}],
@@ -5010,6 +5209,31 @@ class Engine:
                                           if standing else "") + xp_line,
             because=intent.because,
         )
+
+    def _settle_guarded_finds(self) -> str:
+        """Pay out every booked find whose guard is dead or gone, or ""."""
+        pc = self.scene.pc()
+        if pc is None or not self.scene.guarded_finds:
+            return ""
+        kept, lines = [], []
+        for g in self.scene.guarded_finds:
+            guard = self.scene.actors.get(g.get("guard", ""))
+            if guard is not None and not guard.is_down and guard.hp > 0:
+                kept.append(g)
+                continue
+            got = []
+            for iid, n in (g.get("found") or {}).items():
+                pc.carry(iid, int(n), at_minute=self.scene.clock_minutes)
+                got.append(f"{n}× {ing_mod.get(iid).name}")
+            for s in g.get("stock") or []:
+                pc.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
+                                            kind=s.get("kind", "ore"),
+                                            craft=s.get("craft", "smithing")),
+                             int(s.get("count", 1)))
+                got.append(f"{s.get('count', 1)}× {s['base']}")
+            lines.append(f" The {g.get('what', 'find')} is yours now: {', '.join(got)}.")
+        self.scene.guarded_finds = kept
+        return "".join(lines)
 
     def _op_give(self, intent: Intent, partial: dict) -> Outcome:
         """Something changes hands.

@@ -236,6 +236,7 @@ class GMAgent:
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
+                raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
                 raw = judgement.bulk_give_is_a_loot(raw, self.engine.scene)
                 raw = judgement.inject_loot(raw, player_input, self.engine.scene)
                 # Last, and after the target fills: a fight the player declared and the

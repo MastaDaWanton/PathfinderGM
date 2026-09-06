@@ -222,6 +222,8 @@ class Campaign:
                 # and the fight starting put every archer back at the forty-foot
                 # default, however far the spawn said they were.
                 "spawn_feet": self.scene.spawn_feet,
+                "rewarded": dict(self.scene.rewarded),
+                "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -313,6 +315,8 @@ class Campaign:
                           for k, v in (s.get("market_taken") or {}).items()},
             spawn_feet={str(k): int(v)
                         for k, v in (s.get("spawn_feet") or {}).items()},
+            rewarded={str(k): int(v) for k, v in (s.get("rewarded") or {}).items()},
+            guarded_finds=[dict(g) for g in (s.get("guarded_finds") or [])],
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),
