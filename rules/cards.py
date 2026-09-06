@@ -1,0 +1,430 @@
+"""Situation cards: the facts of a situation, on an index card the engine keeps.
+
+The drift the player named, 2026-09-06: a woman, her supplies, a jar to seal — and by
+the time the jar is sealed the model has lost her, because nothing wrote her down. A
+language model rebuilds the world from the text in front of it every turn, and
+whatever is not in that text stops existing (Lost in Stories, Microsoft 2026; the D&D
+state-tracking model of Callison-Burch et al. 2022 got the state right 58% of the
+time when asked to infer it). Every tradition that beat this did the same thing:
+stop asking the model to remember, and hand it a small written record that
+something else keeps.
+
+The record here is Fate's situation aspect on an index card, with Inform's scene
+lifecycle (begins when, ends when) and Blades in the Dark's clock (how close it is
+to changing), delivered the way every lorebook delivers a note — AI Dungeon's Story
+Cards, NovelAI's Lorebook, KoboldAI's and SillyTavern's World Info all scan the last
+few turns for an entry's keys and slip the matching entries in front of the model,
+most relevant first, within a budget, and take them out when the keys stop
+appearing. Keyword scanning, not the model; a scan window; always-on for the
+situation you are standing in; a budget; no chaining (Kobold's documented limit is a
+fine first design).
+
+Three laws, applied:
+  one vocabulary — a card's tags are hierarchical (`situation.errand`,
+    `situation.strain`, `situation.hook`) and queried by prefix through
+    `states.matches`, never by string equality;
+  one applicator — a card that puts a state on a person does it as an ActiveEffect
+    with source `card:<id>` through `Actor.apply_effect`, and taking the card off the
+    table removes it; nothing is added outside the funnel;
+  severed tells — facts arrive on a card from the engine's own tells, the opening,
+    the world's export or a validated proposal; the model never writes one directly.
+
+Provenance, stage 8's rule: every card says where it came from — `opening`,
+`world:<entity id>`, `engine:<op>`, `watcher`, `author:test`.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from . import states
+from .activeeffect import ActiveEffect
+
+STAGES = ("open", "moving", "resolved", "dropped")
+FACT_CAP = 8
+CLOCK_DEFAULT = 4
+# How many of the most recent beats the keys are scanned over, and how much card text
+# the brief may carry. Small on purpose: the Stanford agents result is that a handful
+# of relevant lines beats the whole history.
+SCAN_BEATS = 3
+BUDGET_CHARS = 1400
+# Resolved cards stay on the table this many turns, so a beat can refer back to what
+# just ended, then leave the brief.
+LINGER_TURNS = 3
+
+# The tag families cards use. Prefix-queried like every other tag in `rules/states.py`.
+TAG_ERRAND = "situation.errand"      # why the character came here today
+TAG_STRAIN = "situation.strain"      # what is wrong with this place, from the export
+TAG_HOOK = "situation.hook"          # the world's own unwritten hooks — the GM's
+TAG_WORLD = "situation.world"        # authored by World Bible, shipped with the world
+TAG_PLAY = "situation.play"          # arose in play
+
+_STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their", "which",
+         "have", "been", "were", "your", "into", "over", "under", "than", "them", "they",
+         "what", "when", "where", "about", "after", "before", "through", "while", "would",
+         "could", "should", "these", "those", "other", "every", "still", "being", "came",
+         "come", "will", "just", "only", "some", "more", "much", "very", "then", "than",
+         "also", "does", "done", "make", "made", "take", "took", "gets", "goes", "went",
+         "know", "knows", "something", "anything", "nothing", "somebody", "anybody"}
+
+
+@dataclass
+class Card:
+    id: str
+    title: str
+    facts: list[str] = field(default_factory=list)
+    keys: list[str] = field(default_factory=list)
+    tags: tuple[str, ...] = ()
+    people: list[str] = field(default_factory=list)   # actor refs, or names for the world's
+    place: str = ""                                    # a place id (`Actor.at`), or ""
+    stage: str = "open"
+    clock: int = 0
+    clock_max: int = CLOCK_DEFAULT
+    origin: str = ""
+    secret: bool = False        # the GM's to know, never on the prose's brief
+    always_on: bool = False     # in front of the model whether or not a key appears
+    opened_at: int = 0          # scene clock, minutes
+    touched: int = 0            # transcript turn last touched
+    resolved_turn: int = 0
+    grants: list[dict] = field(default_factory=list)   # [{"to": ref, "tags": [...]}]
+
+    def as_dict(self) -> dict:
+        return {
+            "id": self.id, "title": self.title, "facts": list(self.facts),
+            "keys": list(self.keys), "tags": list(self.tags), "people": list(self.people),
+            "place": self.place, "stage": self.stage, "clock": self.clock,
+            "clock_max": self.clock_max, "origin": self.origin, "secret": self.secret,
+            "always_on": self.always_on, "opened_at": self.opened_at,
+            "touched": self.touched, "resolved_turn": self.resolved_turn,
+            "grants": [dict(g) for g in self.grants],
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Card":
+        return cls(
+            id=str(d.get("id", "")), title=str(d.get("title", "")),
+            facts=[str(f) for f in d.get("facts") or []],
+            keys=[str(k).lower() for k in d.get("keys") or []],
+            tags=tuple(str(t) for t in d.get("tags") or ()),
+            people=[str(p) for p in d.get("people") or []],
+            place=str(d.get("place") or ""),
+            stage=str(d.get("stage") or "open"),
+            clock=int(d.get("clock", 0) or 0),
+            clock_max=int(d.get("clock_max", CLOCK_DEFAULT) or CLOCK_DEFAULT),
+            origin=str(d.get("origin") or ""), secret=bool(d.get("secret", False)),
+            always_on=bool(d.get("always_on", False)),
+            opened_at=int(d.get("opened_at", 0) or 0), touched=int(d.get("touched", 0) or 0),
+            resolved_turn=int(d.get("resolved_turn", 0) or 0),
+            grants=[dict(g) for g in d.get("grants") or []],
+        )
+
+    def is_(self, query: str) -> bool:
+        """Prefix query over the card's tags — `card.is_("situation.errand")`."""
+        return any(states.matches(t, query) for t in self.tags)
+
+    @property
+    def live(self) -> bool:
+        return self.stage in ("open", "moving")
+
+
+# --- keys ----------------------------------------------------------------------------------
+
+def keys_from(*texts: str) -> list[str]:
+    """The trigger words of a card, from its own text: the content words, four letters
+    or more, minus the stop list. A lorebook asks its author to type triggers; here the
+    engine writes them from what the card says, so "seal the jar" hits the card about
+    the jar without anyone having typed 'jar'."""
+    out: list[str] = []
+    for text in texts:
+        for w in re.findall(r"[A-Za-z][A-Za-z'-]{3,}", text or ""):
+            low = re.sub(r"'s$", "", w.lower().strip("'-"))   # "woman's" is about the woman
+            if len(low) >= 4 and low not in _STOP and low not in out:
+                out.append(low)
+    return out
+
+
+def _hits(card: Card, haystack: str) -> int:
+    low = haystack.lower()
+    return sum(1 for k in card.keys if re.search(r"\b" + re.escape(k) + r"\w{0,2}\b", low))
+
+
+# --- the table --------------------------------------------------------------------------------
+
+def load(scene) -> list[Card]:
+    return [Card.from_dict(d) for d in (getattr(scene, "cards", None) or [])]
+
+
+def save(scene, cards: list[Card]) -> None:
+    scene.cards = [c.as_dict() for c in cards]
+
+
+def find(scene, card_id: str) -> Card | None:
+    return next((c for c in load(scene) if c.id == card_id), None)
+
+
+def open_card(scene, card: Card, turn: int = 0) -> Card:
+    """Put a card on the table, once, and grant what it grants through the applicator."""
+    cards = load(scene)
+    if any(c.id == card.id for c in cards):
+        return next(c for c in cards if c.id == card.id)
+    card.opened_at = int(getattr(scene, "clock_minutes", 0) or 0)
+    card.touched = int(turn)
+    if not card.keys:
+        card.keys = keys_from(card.title, *card.facts)
+    cards.append(card)
+    save(scene, cards)
+    _grant(scene, card)
+    return card
+
+
+def _grant(scene, card: Card) -> None:
+    actors = getattr(scene, "actors", {}) or {}
+    for g in card.grants:
+        who = actors.get(str(g.get("to", "")))
+        tags = tuple(str(t) for t in g.get("tags") or ())
+        if who is None or not tags:
+            continue
+        who.apply_effect(ActiveEffect(
+            name=card.title, kind="situation", key=card.id, source=f"card:{card.id}",
+            origin=card.origin, duration="until-dismissed", tags=tags))
+
+
+def _ungrant(scene, card: Card) -> None:
+    for who in (getattr(scene, "actors", {}) or {}).values():
+        who.remove_effects(source=f"card:{card.id}")
+
+
+def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> Card | None:
+    """A fact lands on a card: dedupe, cap, move the stage and the clock. A full
+    clock resolves the card. Returns the card, or None if there is no such card."""
+    cards = load(scene)
+    card = next((c for c in cards if c.id == card_id), None)
+    if card is None or not card.live:
+        return card
+    fact = " ".join(str(fact or "").split())
+    if fact and fact not in card.facts:
+        card.facts.append(fact)
+        card.facts = card.facts[-FACT_CAP:]
+    card.touched = int(turn)
+    if card.stage == "open":
+        card.stage = "moving"
+    if tick:
+        card.clock = min(card.clock_max, card.clock + 1)
+        if card.clock >= card.clock_max:
+            card.stage = "resolved"
+            card.resolved_turn = int(turn)
+            _ungrant(scene, card)
+    save(scene, cards)
+    return card
+
+
+def resolve(scene, card_id: str, how: str = "resolved", turn: int = 0) -> Card | None:
+    cards = load(scene)
+    card = next((c for c in cards if c.id == card_id), None)
+    if card is None:
+        return None
+    card.stage = "resolved" if how != "dropped" else "dropped"
+    card.resolved_turn = int(turn)
+    _ungrant(scene, card)
+    save(scene, cards)
+    return card
+
+
+def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
+    """The engine's own tells land on the cards they concern, mechanically.
+
+    A tell that names one of a card's people, or hits one of its keys, is a fact
+    about that situation — "Borin gives the woman the sealed jar" belongs on the
+    woman's card. Ticks the clock only for a tell with a person on it: a check
+    beaten near the jar is movement, weather is not. Returns the card ids touched.
+    """
+    cards = load(scene)
+    if not cards:
+        return []
+    actors = getattr(scene, "actors", {}) or {}
+    touched: list[str] = []
+    for o in outcomes or []:
+        tell = " ".join(str(getattr(o, "tell", "") or "").split())
+        if not tell or len(tell) < 12:
+            continue
+        low = tell.lower()
+        for card in cards:
+            if not card.live:
+                continue
+            named = False
+            for ref in card.people:
+                a = actors.get(ref)
+                name = (a.name if a is not None else ref).lower()
+                if name and name in low:
+                    named = True
+                    break
+            if named or _hits(card, tell) >= 2:
+                touch(scene, card.id, tell[:200], turn=turn, tick=named)
+                touched.append(card.id)
+    return touched
+
+
+# --- what the model is shown -------------------------------------------------------------------
+
+def active(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = False,
+           budget: int = BUDGET_CHARS) -> list[Card]:
+    """The cards in front of the model this turn, most relevant first, within budget.
+
+    Order: the live card always-on at this place, then live cards whose keys appear in
+    the scan window (most hits first, then most recently touched), then cards resolved
+    within the last few turns so a beat can refer to what just ended. Secret cards
+    only when asked for — the plan may know them; the prose may not.
+    """
+    cards = [c for c in load(scene) if secret or not c.secret]
+    here = str(getattr(scene, "at", "") or "")
+    window = " ".join((recent or [])[-SCAN_BEATS:])
+    scored: list[tuple[tuple, Card]] = []
+    for c in cards:
+        if c.stage in ("resolved", "dropped"):
+            if c.stage == "resolved" and turn - c.resolved_turn <= LINGER_TURNS:
+                scored.append(((3, 0, c.touched), c))
+            continue
+        pinned = c.always_on or (c.place and c.place == here)
+        hits = _hits(c, window)
+        if pinned:
+            scored.append(((0, -hits, -c.touched), c))
+        elif hits:
+            scored.append(((1, -hits, -c.touched), c))
+    scored.sort(key=lambda t: t[0])
+    out, spent = [], 0
+    for _, c in scored:
+        cost = len(c.title) + sum(len(f) for f in c.facts)
+        if out and spent + cost > budget:
+            continue
+        out.append(c)
+        spent += cost
+    return out
+
+
+def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = False) -> str:
+    """The cards as the brief states them: facts the engine keeps, not suggestions."""
+    shown = active(scene, recent, turn=turn, secret=secret)
+    if not shown:
+        return ""
+    actors = getattr(scene, "actors", {}) or {}
+    lines = ["SITUATIONS (kept by the engine; facts, not suggestions — keep them true, "
+             "and let the player move them):"]
+    for c in shown:
+        who = ", ".join(
+            (actors[r].name if r in actors else r) + (f" ({r})" if r in actors else "")
+            for r in c.people)
+        stage = {"open": "just begun", "moving": "in motion", "resolved": "settled",
+                 "dropped": "let go"}.get(c.stage, c.stage)
+        head = f"  * {c.title} — {stage}"
+        if c.live and c.clock_max:
+            head += f", {c.clock}/{c.clock_max} of the way to changing"
+        if who:
+            head += f"; with {who}"
+        if c.secret:
+            head += " [the GM's alone; the player does not know this]"
+        lines.append(head + ".")
+        for f in c.facts:
+            lines.append(f"      - {f}")
+    return "\n".join(lines)
+
+
+# --- where cards come from ---------------------------------------------------------------------
+
+def from_opening(situation, place_id: str, watcher_ref: str, pc_name: str) -> Card:
+    """The card the game starts with: the errand, the thing already happening, the
+    person beside you. Always on: it is the situation the player is standing in."""
+    title = _title_from_errand(situation.errand) or "What you came here for"
+    facts = [f for f in (situation.errand, situation.doing, situation.edge) if f]
+    return Card(
+        id="opening", title=title, facts=facts,
+        keys=keys_from(title, *facts), tags=(TAG_ERRAND, TAG_PLAY),
+        people=[watcher_ref] if watcher_ref else [], place=place_id or "",
+        stage="open", origin="opening", always_on=True,
+    )
+
+
+def _title_from_errand(errand: str) -> str:
+    """"You came for a day's paid work before your money runs out." → "A day's paid
+    work before your money runs out"."""
+    text = " ".join((errand or "").split()).rstrip(".")
+    text = re.sub(r"^You came (?:to|for|because|out to|in out of the weather to|looking for)\s+",
+                  "", text, flags=re.I)
+    return (text[:1].upper() + text[1:])[:70] if text else ""
+
+
+def from_world(world, place_id: str = "") -> list[Card]:
+    """The cards a world ships with: the ones its author wrote (`play.cards`, the
+    contract in docs/campaign-format.md — World Bible does not write them yet), and
+    the ones every export already implies — a settlement's own strain, and each
+    unwritten hook as the GM's secret card. Nothing invented: every fact is the
+    export's own sentence."""
+    out: list[Card] = []
+    play = getattr(world, "play", None) or {}
+    for i, raw in enumerate(play.get("cards") or []):
+        if not isinstance(raw, dict) or not str(raw.get("title", "")).strip():
+            continue
+        facts = [str(f) for f in raw.get("facts") or [] if str(f).strip()]
+        cid = str(raw.get("id") or f"world-{i + 1}")
+        tags = tuple(str(t) for t in raw.get("tags") or ()) or ()
+        if not any(states.matches(t, "situation") for t in tags):
+            tags = (TAG_WORLD,) + tags
+        out.append(Card(
+            id=cid, title=str(raw["title"]).strip()[:80], facts=facts[:FACT_CAP],
+            keys=[str(k).lower() for k in raw.get("keys") or []] or keys_from(raw["title"], *facts),
+            tags=tags, people=[str(p) for p in raw.get("people") or []],
+            place=str(raw.get("place") or ""), stage="open",
+            clock_max=int(raw.get("clock", CLOCK_DEFAULT) or CLOCK_DEFAULT),
+            origin=f"world:{cid}", secret=bool(raw.get("secret", False)),
+            always_on=bool(raw.get("always_on", False)),
+        ))
+    entities = getattr(world, "entities", None) or {}
+    # The starting settlement's strain, from its own facts: "tensions between Vyrakon
+    # and Oorvieth's city government" — border control and taxation. Public knowledge
+    # in the place, so a visible card.
+    town = _entity_for(world, place_id)
+    if town is not None:
+        strain = _fact(town, ("Tension", "Conflict", "Volatility"))
+        cause = _fact(town, ("Cause", "Status"))
+        if strain:
+            facts = [_sentence(strain)] + ([_sentence(cause)] if cause else [])
+            out.append(Card(
+                id=f"strain-{town.id}", title=f"What is wrong in {town.name}",
+                facts=facts, keys=keys_from(town.name, *facts),
+                tags=(TAG_STRAIN, TAG_WORLD), place=place_id, stage="open",
+                clock_max=6, origin=f"world:{town.id}",
+            ))
+    for u in getattr(world, "unwritten", None) or []:
+        if not isinstance(u, dict):
+            continue
+        name = str(u.get("name") or "").strip()
+        why = str(u.get("why") or u.get("text") or u.get("hook") or "").strip()
+        if not (name and why):
+            continue
+        out.append(Card(
+            id=f"hook-{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')}",
+            title=name, facts=[_sentence(why)], keys=keys_from(name, why),
+            tags=(TAG_HOOK, TAG_WORLD), stage="open", clock_max=6,
+            origin=f"world:{u.get('id') or name}", secret=True,
+        ))
+    return out
+
+
+def _entity_for(world, place_id: str):
+    entities = getattr(world, "entities", None) or {}
+    eid = str(place_id or "").split("~", 1)[0]
+    if eid in entities:
+        return entities[eid]
+    return None
+
+
+def _fact(entity, keys) -> str:
+    for k in keys:
+        v = (entity.fact(k, "") or "").strip() if hasattr(entity, "fact") else ""
+        if v:
+            return v
+    return ""
+
+
+def _sentence(text: str) -> str:
+    text = " ".join(str(text or "").split()).rstrip(" .;,")
+    return text[:1].upper() + text[1:] + "." if text else ""

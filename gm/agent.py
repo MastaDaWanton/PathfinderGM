@@ -103,8 +103,12 @@ class GMAgent:
         reason to have one — and it inherits the final rejection, so it starts warned
         rather than fresh.
         """
+        # The plan sees the situation cards — the GM's secret ones included — keyed
+        # off the last few beats the view hands over (`self.recent`).
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
-                                    here=self.engine.here(), known=self.engine.places())
+                                    here=self.engine.here(), known=self.engine.places(),
+                                    recent=getattr(self, "recent", None), secret=True,
+                                    turn=getattr(self, "turn", 0))
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first

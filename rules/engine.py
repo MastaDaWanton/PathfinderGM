@@ -223,6 +223,10 @@ class Scene:
     # Each is {"guard": ref, "what": ..., "found": {...}, "stock": [...]} and pays out
     # when the guard is dead or gone (`rules/gathering.py`).
     guarded_finds: list[dict] = field(default_factory=list)
+    # The situation cards on the table (`rules/cards.py`): the facts of each situation
+    # in play, as dicts, kept by the engine and shown to the model when their keys
+    # appear in the last few beats. The store; `cards.load`/`cards.save` are the doors.
+    cards: list[dict] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.

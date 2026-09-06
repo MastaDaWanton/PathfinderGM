@@ -224,6 +224,7 @@ class Campaign:
                 "spawn_feet": self.scene.spawn_feet,
                 "rewarded": dict(self.scene.rewarded),
                 "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
+                "cards": [dict(c) for c in self.scene.cards],
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -317,6 +318,7 @@ class Campaign:
                         for k, v in (s.get("spawn_feet") or {}).items()},
             rewarded={str(k): int(v) for k, v in (s.get("rewarded") or {}).items()},
             guarded_finds=[dict(g) for g in (s.get("guarded_finds") or [])],
+            cards=[dict(c) for c in (s.get("cards") or [])],
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),
@@ -425,10 +427,21 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
-    scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
+    watcher = scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
+    # The situation cards the game starts with (`rules/cards.py`): the errand the
+    # player is standing in, always on; and the world's own — its author's, when
+    # World Bible ships some, and the ones every export implies: the starting
+    # settlement's strain, and each unwritten hook as the GM's secret card.
+    from rules import cards as cards_mod
+
+    pc = scene.pc()
+    cards_mod.open_card(scene, cards_mod.from_opening(
+        here, scene.at, watcher.ref, pc.name if pc is not None else ""))
+    for card in cards_mod.from_world(world, scene.at):
+        cards_mod.open_card(scene, card)
     # The campaign's opening undercurrent — the first world-state this app has ever
     # actually held. Rolled from the world's own unwritten hooks when it has them,
     # from a world-agnostic table when it does not, and planted in history as the

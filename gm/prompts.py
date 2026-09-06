@@ -693,7 +693,7 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
-                known=()) -> str:
+                known=(), recent=None, secret=False, turn=0) -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -759,6 +759,14 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
         scene, where=(here.name if here is not None and here.exits else ""))
     if held:
         lines.append("\n" + held)
+    # The situation cards whose keys appear in the last few beats, and the one the
+    # player is standing in (`rules/cards.py`). The plan may see the GM's secret
+    # cards; the prose never does.
+    from rules import cards as _cards
+
+    deck = _cards.brief(scene, recent, turn=turn, secret=secret)
+    if deck:
+        lines.append("\n" + deck)
     ledger = _judgement.cast_brief(scene)
     if ledger:
         lines.append("\n" + ledger)

@@ -134,6 +134,28 @@ the consuming application's job.
 | `travel` | `{from_id, to_id, from, to, carrying, friction}` — a route is also a road between two places that demonstrably deal with each other. |
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |
 | `timeline` | `{year, name, summary}`, sorted, undated events last. |
+| `cards` | `{id, title, facts[], keys[], tags[], people[], place, clock, secret, always_on}` — situation cards, see below. **World Bible does not write these yet**; the consumer derives a settlement's strain and each unwritten hook into cards when the list is absent. |
+
+### `play.cards[]` — situation cards
+
+A situation card is an index card of facts about one situation in the world, kept
+by the game engine and shown to the narrator whenever the situation is in play.
+Everything on it is the world's own sentence; nothing is a rule or a number.
+
+| Field | Meaning |
+|---|---|
+| `id` | durable, unique within the export (`salt-levy`) |
+| `title` | one line, under 80 characters: "The salt levy is due and nobody can pay it" |
+| `facts[]` | up to eight short sentences the narrator may state as true |
+| `keys[]` | trigger words; optional — the consumer derives them from the title and facts when absent |
+| `tags[]` | hierarchical, dot-separated; the consumer prefixes `situation.world` when none begins with `situation.` |
+| `people[]` | entity ids of the people the situation concerns |
+| `place` | the entity id of the settlement or place it belongs to, or empty for anywhere |
+| `clock` | how many steps it is from changing (default 4) |
+| `secret` | the GM's alone — never stated to the player until play reveals it |
+| `always_on` | in front of the narrator whether or not a key appears |
+
+The consumer's side of the contract is `rules/cards.py` and `docs/situation-cards.md`.
 
 ---
 

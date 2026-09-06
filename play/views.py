@@ -782,6 +782,7 @@ def say(request):
     c.transcript.append({"who": "player", "text": shown})
     world = c.world
     agent = GMAgent(world, c.engine())
+    _arm_cards(agent, c)
 
     # Free actions taken since the last spoken turn ride along as context rather than
     # having cost turns of their own. Into `history`, not `player_input`: the injectors
@@ -892,6 +893,7 @@ def combat_act(request):
 
     engine = c.engine()
     agent = GMAgent(c.world, engine)
+    _arm_cards(agent, c)
 
     if not raw:
         # End turn with nothing declared: the round moves on. Marked as acted so the
@@ -992,6 +994,7 @@ def roll(request):
         (t["text"] for t in reversed(c.transcript) if t["who"] == "player"), ""
     )
     agent = GMAgent(c.world, engine)
+    _arm_cards(agent, c)
     return _finish(c, agent, resolution, narration, player_input, plan=None)
 
 
@@ -1045,6 +1048,11 @@ def _advance(c, agent, narration, plan, player_input):
     undo = c.scene.snapshot()
     try:
         resolution = engine.run(plan.intents)
+        # The engine's tells land on the situation cards they concern — the one
+        # place a fact gets onto a card in play, and the model is not it.
+        from rules import cards as cards_mod
+
+        cards_mod.touch_from_outcomes(c.scene, resolution.outcomes, turn=len(c.transcript))
     except (IntentError, ValueError, KeyError) as exc:
         c.scene.restore(undo)
         # Validation is meant to cover everything resolution accepts, so reaching here
@@ -1096,6 +1104,16 @@ def _advance(c, agent, narration, plan, player_input):
     return _finish(c, agent, resolution, narration, player_input, plan)
 
 
+
+def _arm_cards(agent, c) -> None:
+    """Hand the agent what the situation cards are keyed off: the last few beats the
+    player read and their own line, and the turn number. The agent has the scene but
+    not the transcript, and the cards scan the transcript (`rules/cards.py`)."""
+    recent = [b["text"] for b in c.transcript[-4:] if b.get("text")]
+    agent.recent = recent
+    agent.turn = len(c.transcript)
+
+
 def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True):
     """Narrate what the engine decided, then let the world answer.
 
@@ -1137,7 +1155,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         brief = prompts.scene_brief(c.world, c.scene, c.location,
                                     _recent_events(c.world, c.location),
                                     here=agent.engine.here(),
-                                    known=agent.engine.places())
+                                    known=agent.engine.places(),
+                                    # The prose sees the cards in play, never the
+                                    # GM's secret ones.
+                                    recent=[b["text"] for b in c.transcript[-4:]],
+                                    turn=len(c.transcript))
         earlier = [b["text"] for b in c.transcript[-8:] if b["who"] == "gm"]
         try:
             text, repairs, prose_attempts = agent.narrate_turn(

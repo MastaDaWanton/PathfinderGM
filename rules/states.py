@@ -44,6 +44,18 @@ from __future__ import annotations
 # from the obvious implementation: `state.unable` contains `dead`, so a night's sleep
 # would raise a corpse; `state.held` contains `paralyzed`, so it would cure paralysis;
 # `state.senses` contains `blinded` and `deafened`, which in 1e end only with a spell.
+# Beside the condition families, the situation cards (`rules/cards.py`) carry tags in the
+# same vocabulary and are asked the same prefix questions:
+#
+#   situation.errand   why the character came here today (the opening's card)
+#   situation.strain   what is wrong with this place, from the export's own facts
+#   situation.hook     the world's unwritten hooks — the GM's, secret
+#   situation.world    authored by World Bible and shipped with the world
+#   situation.play     arose in play
+#
+# A card that puts a state on a person does it as an ActiveEffect through the one
+# applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for
+# every card-granted tag the way it answers for a condition.
 TAGS: dict[str, tuple[str, ...]] = {
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
     "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
