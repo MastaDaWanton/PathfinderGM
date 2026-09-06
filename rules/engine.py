@@ -1556,6 +1556,20 @@ class Engine:
                 f"rest ({{\"op\": \"rest\"}}) or by an ability's document "
                 f"(use_ability ability=<name>); spend=true spends one.",
                 "legality", index)
+        if intent.op == "travel" and intent.params.get("place"):
+            # A destination the scene does not hold is refused HERE, where the plan's
+            # repair loop reads the message and names a real one — not in `run`,
+            # where the same refusal was a 502 on the page ("there is no 'the
+            # merchant's gate' here", 2026-09-06). The lenient finder answers the
+            # GM's own dressing of a real place first ("the merchant's gate" is the
+            # gate), so this fires only for a place that is nowhere.
+            from . import places as places_mod
+
+            known = self.places()
+            if known and places_mod.find(known, str(intent.params["place"])) is None:
+                raise IntentError(
+                    f"travel: there is no {intent.params['place']!r} here. Name one of: "
+                    f"{', '.join(p.name for p in known)}.", "schema")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
@@ -3325,10 +3339,17 @@ class Engine:
         if place:
             going_to = places_mod.find(known, place)
             if going_to is None:
-                raise IntentError(
-                    f"travel: there is no {place!r} here. The places are: "
-                    f"{', '.join(p.name for p in known)}.",
-                    "schema")
+                # Printed, not raised. The raise above was written for the plan's
+                # repair loop and never reached it: `validate` does not look at the
+                # place, so the first sight of it was here in `run`, where a raise is
+                # a 502 on the page — "The engine refused the GM's intents: travel:
+                # there is no 'the merchant's gate' here", measured 2026-09-06, on
+                # "I say I will go there now, and ask him to point the way". The
+                # legality check now names the fix at validate time, where the model
+                # can act on it; this is the floor for anything that slips past.
+                return self._refuse(
+                    intent, f"There is no {place} here to go to. From here you can "
+                            f"reach {', '.join(p.name for p in known)}.")
             if going_to.described_only:
                 return self._refuse(
                     intent, f"{going_to.name} can be seen from here but not reached.")

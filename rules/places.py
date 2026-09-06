@@ -271,4 +271,15 @@ def find(places, wanted: str) -> Place | None:
     for p in places or ():
         if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the ")):
             return p
+    # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
+    # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
+    # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.
+    # The last word decides, and only when exactly one place ends in it — "the back
+    # streets" and "the street" would otherwise be a coin toss.
+    head = want.split()[-1].rstrip("s") if want.split() else ""
+    if len(head) >= 3:
+        ending = [p for p in places or ()
+                  if (p.name.lower().split() or [""])[-1].rstrip("s") == head]
+        if len(ending) == 1:
+            return ending[0]
     return None

@@ -254,3 +254,58 @@ def test_travel_within_the_same_biome_sheds_nobody(yard):
     s, engine = yard
     travel(engine, biome="urban")
     assert set(s.actors) == {"pc", "c1", "c2"}
+
+
+# --- an invented destination is a repair, then a printed refusal, never a 502 --------------
+
+def test_the_gms_dressing_of_a_real_place_finds_the_place():
+    """Measured at the table, 2026-09-06: the plan wrote `travel` to "the merchant's
+    gate" for a scene whose places were the market, the gate, the tavern, the temple,
+    the back streets and the workshops; the exact match failed and the page said 502.
+    The last word decides, and only when exactly one place ends in it."""
+    from dataclasses import dataclass
+
+    from rules import places
+
+    @dataclass
+    class P:
+        id: str
+        name: str
+
+    known = [P("a", "the market"), P("b", "the gate"), P("c", "the back streets"),
+             P("d", "the street"), P("e", "the workshops")]
+    assert places.find(known, "the merchant's gate").id == "b"
+    assert places.find(known, "the old market").id == "a"
+    assert places.find(known, "the workshop").id == "e"
+    assert places.find(known, "the north street") is None     # two end in "street"
+    assert places.find(known, "the harbour") is None
+
+
+def test_an_unknown_destination_is_refused_at_validate_with_the_places_named(yard):
+    """Where the plan's repair loop can read it. The raise used to live in `run`, so
+    the first sight of the bad place was after planning was over — a 502."""
+    from rules.intents import IntentError
+
+    _, engine = yard
+    try:
+        engine.validate([{"op": "travel", "actor": "pc", "because": "t",
+                          "params": {"place": "the crystal palace"}}], origin="author:test")
+    except IntentError as exc:
+        assert "there is no 'the crystal palace' here" in str(exc)
+        assert "Name one of:" in str(exc)
+    else:
+        raise AssertionError("an invented destination validated")
+
+
+def test_a_bad_place_that_reaches_run_is_a_printed_refusal_not_a_raise(yard):
+    """The floor under the floor: `validate` skipped (a save, a test), the op runs,
+    and the player reads a sentence instead of a gateway error."""
+    from rules.intents import Intent
+
+    _, engine = yard
+    intent = Intent(op="travel", actor="pc", because="t",
+                    params={"place": "the crystal palace"}, visibility="player", id="i1")
+    res = engine.run([intent])
+    out = res.outcomes[0]
+    assert "There is no the crystal palace here to go to" in out.tell
+    assert "From here you can reach" in out.tell
