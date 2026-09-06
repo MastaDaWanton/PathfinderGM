@@ -55,7 +55,7 @@ the people it concerns (actor refs), the place it belongs to (a place id, the sa
 | `opening` | the errand the player is standing in: why they came, what they are doing, what is already happening, with the person beside them; always on |
 | `world:<id>` | authored by World Bible in `play.cards[]` (not written yet); and, derived from every export today, the starting settlement's strain from its own `Tension`/`Cause` facts, and each `unwritten` hook as a secret card |
 | `engine:<op>` | facts that land from the engine's own tells — a tell naming one of the card's people, or hitting two of its keys, goes on the card |
-| `watcher` | reserved: a validated proposal to advance or resolve a card (not built) |
+| `watcher` | every three resolved turns the off-turn model reads the last beats against the live cards and proposes, per card, keep / advance with one fact / resolve, and at most one new card; a validator refuses a fact with a digit, a second sentence, or a name the world does not know, and a card the engine moved meanwhile is left alone; resolving pays the story award's advance share |
 
 **How they reach the model.** `prompts.scene_brief` carries a SITUATIONS block:
 the always-on card at this place first, then live cards whose keys appear in the
@@ -86,8 +86,10 @@ a validator; the model writes none — severed tells.
 
 ## Open
 
-- The watcher proposing card changes through a validator (advance, resolve, a new
-  fact from the transcript), the way it proposes the undercurrent.
 - A card's own `grants` used by a shipped card — the door exists and nothing walks
   through it yet.
 - World Bible writing `play.cards[]`.
+- The validator's trade on leading words: an advancing fact is checked with its first
+  word lower-cased ("Work is scarce." is not somebody called Work), so a stranger
+  who leads such a sentence slips onto a card; a new card's title and facts are
+  checked strictly unless the leading word was said at the table as a plain word.

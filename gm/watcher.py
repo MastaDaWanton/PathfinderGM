@@ -7,7 +7,7 @@ and never called." Every campaign carried a live undercurrent from turn one (pla
 `new_campaign`) and nothing ever moved it; every corpse carried exactly what its spawn
 kit rolled and nothing more personal than coin.
 
-Two jobs now, both garnish on a game that works without them:
+Three jobs now, all garnish on a game that works without them:
 
 **The corpse garnish.** While the player is thinking, the watcher may add ONE flavour
 item to a freshly dead actor — a locket, a half-burned note, a key. The model proposes
@@ -21,6 +21,11 @@ reads the recent transcript against the GM's private note and either leaves it a
 advances it one step, or — when the old thread has clearly resolved on stage — mints a
 new one, preferring the world's own unused unwritten hooks. One sentence, rewritten in
 place, never appended twice.
+
+**The situation cards.** Every `CARD_TURNS_BETWEEN_LOOKS` resolved turns, the watcher
+reads the last beats against the live cards (`rules/cards.py`) and says, per card,
+keep, advance with one fact, or resolve — and may propose one new card. A talking turn
+makes no tell, and this is how "she has the sealed jar" reaches the woman's card.
 
 **Race safety is the design, not a bolt-on.** The player may loot the corpse, walk the
 scene away, or the campaign may save mid-flight while the model is still thinking. So:
@@ -47,6 +52,12 @@ from . import client, narration as narration_mod
 # call runs while the player is typing — but the note should move at the pace of scenes,
 # not sentences.
 TURNS_BETWEEN_LOOKS = 7
+# How many resolved turns between looks at the situation cards. Oftener than the
+# undercurrent, because a card is meant to move at the pace of a conversation:
+# "as i seal the jar it seem to lose the initial situation" — a talking turn makes
+# no tell, and without this nothing would ever put "she has the sealed jar" on the
+# woman's card.
+CARD_TURNS_BETWEEN_LOOKS = 3
 
 # The closed price vocabulary. The model picks a word; the app's own `pricing` formula
 # turns the tier into a number (inert, no specs — a locket is priced as a locket, about
@@ -64,6 +75,7 @@ _GARNISHED: set[tuple[str, str]] = set()
 # Resolved-turn count at the last undercurrent look, per campaign. In memory on
 # purpose: a restart firing one look early is harmless.
 _LAST_LOOK: dict[str, int] = {}
+_LAST_CARD_LOOK: dict[str, int] = {}
 
 
 def _reset() -> None:
@@ -74,6 +86,7 @@ def _reset() -> None:
         _PENDING.clear()
         _GARNISHED.clear()
         _LAST_LOOK.clear()
+        _LAST_CARD_LOOK.clear()
 
 
 # --- kick: decide what the watcher should look at, in the request thread ---------------
@@ -143,6 +156,28 @@ def _jobs_for(c) -> list[dict]:
                        for b in c.transcript[-12:]],
             "hooks": [h for h in opening.hook_texts(c.world)
                       if h and h not in (thread or "")][:5],
+            "known": frozenset(known),
+        })
+
+    # The situation cards (`rules/cards.py`). A snapshot of each live card and of
+    # the people on the board, so the worker can neither touch the campaign nor
+    # invent a person: a fact may name only names that appear here.
+    from rules import cards as cards_mod
+
+    live = [k for k in cards_mod.load(c.scene) if k.live]
+    since = _LAST_CARD_LOOK.get(c.id, _LAST_LOOK[c.id])
+    if live and turns - since >= CARD_TURNS_BETWEEN_LOOKS:
+        _LAST_CARD_LOOK[c.id] = turns
+        jobs.append({
+            "job": "cards", "campaign": c.id, "turn": len(c.transcript),
+            "cards": [{"id": k.id, "title": k.title, "facts": list(k.facts),
+                       "stage": k.stage, "clock": k.clock, "secret": k.secret,
+                       "people": [c.scene.actors[r].name if r in c.scene.actors else r
+                                  for r in k.people]}
+                      for k in live],
+            "refs": {r: a.name for r, a in c.scene.actors.items() if not a.is_pc},
+            "recent": [f"{b.get('who', '?')}: {str(b.get('text', ''))[:400]}"
+                       for b in c.transcript[-8:]],
             "known": frozenset(known),
         })
     return jobs
@@ -238,6 +273,7 @@ def _work(jobs: list[dict]) -> None:
     for job in jobs:
         try:
             proposal = (_propose_garnish(job, cfg) if job["job"] == "garnish"
+                        else _propose_cards(job, cfg) if job["job"] == "cards"
                         else _propose_undercurrent(job, cfg))
         except Exception:
             proposal = None
@@ -399,6 +435,135 @@ def _propose_undercurrent(job: dict, cfg: dict) -> dict | None:
             "thread": thread}
 
 
+# --- the situation cards: what moved, in one sentence each ------------------------------
+
+FACT_LEN = (15, 220)
+TITLE_LEN = (8, 70)
+
+
+def _propose_cards(job: dict, cfg: dict) -> dict | None:
+    """Read the last few beats against the live cards and say what moved.
+
+    Per card: keep (the usual answer), advance with ONE new fact, or resolve. At most
+    one new card, for a situation that has plainly arisen and is on no card. Every
+    fact is a sentence in the world's own terms; a fact that names a stranger, or
+    carries a number, is refused here and never reaches the table.
+    """
+    deck = "".join(
+        f"- [{k['id']}] {k['title']} ({k['stage']}, clock {k['clock']})"
+        + (f"; with {', '.join(k['people'])}" if k["people"] else "") + "\n"
+        + "".join(f"    - {f}\n" for f in k["facts"])
+        for k in job.get("cards", []))
+    people = "".join(f"- {r}: {n}\n" for r, n in (job.get("refs") or {}).items())
+    data = _ask(
+        [{"role": "system", "content": _SYSTEM},
+         {"role": "user", "content":
+             "The situation cards on the table (facts the engine keeps):\n" + deck
+             + "\nThe people on the board, by ref:\n" + (people or "- nobody\n")
+             + "\nWhat has happened at the table recently:\n"
+             + "".join(f"{line}\n" for line in job.get("recent", []))
+             + "\nFor each card decide:\n"
+               '- "keep": nothing on it moved. This is the usual answer.\n'
+               '- "advance": play touched it; give ONE new fact, one sentence, what is '
+               "now true that was not.\n"
+               '- "resolve": it is plainly settled on stage.\n'
+               "And if a situation has plainly arisen that is on no card, propose one "
+               "new card: a title and one to three facts, naming its people by ref. "
+               "Otherwise leave it null.\n"
+               "Rules: facts are one sentence each, no numbers, and use no name that "
+               "does not already appear above.\n"
+               'Answer JSON: {"changes": [{"id": "...", "action": "keep" | "advance" | '
+               '"resolve", "fact": "..."}], "new": {"title": "...", "facts": ["..."], '
+               '"people": ["c1"]} | null}'}],
+        cfg,
+        prefer_thinking=True,
+        schema={"type": "object",
+                "properties": {
+                    "changes": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"},
+                                       "action": {"type": "string",
+                                                  "enum": ["keep", "advance", "resolve"]},
+                                       "fact": {"type": "string", "maxLength": 240}},
+                        "required": ["id", "action", "fact"]}},
+                    "new": {"type": ["object", "null"],
+                            "properties": {"title": {"type": "string", "maxLength": 80},
+                                           "facts": {"type": "array",
+                                                     "items": {"type": "string",
+                                                               "maxLength": 240}},
+                                           "people": {"type": "array",
+                                                      "items": {"type": "string"}}},
+                            "required": ["title", "facts", "people"]}},
+                "required": ["changes", "new"]})
+    if not isinstance(data, dict):
+        return None
+    known = job["known"]
+    ids = {k["id"]: k for k in job.get("cards", [])}
+    said = {w.lower() for line in job.get("recent", [])
+            for w in re.findall(r"[A-Za-z][A-Za-z'-]+", line) if w[:1].islower()}
+    changes = []
+    for ch in data.get("changes") or []:
+        if not isinstance(ch, dict) or str(ch.get("id", "")) not in ids:
+            continue
+        action = str(ch.get("action", "")).strip().lower()
+        was = (ids[ch["id"]]["stage"], ids[ch["id"]]["clock"])
+        if action == "advance":
+            fact = _valid_fact(ch.get("fact", ""), known)
+            if fact is None:
+                continue
+            changes.append({"id": ch["id"], "action": "advance", "fact": fact, "was": was})
+        elif action == "resolve":
+            changes.append({"id": ch["id"], "action": "resolve", "fact": "", "was": was})
+    new = None
+    raw = data.get("new")
+    if isinstance(raw, dict):
+        title = " ".join(str(raw.get("title", "")).split()).rstrip(".")
+        facts = [f for f in (_valid_fact(x, known, strict=True, said=said)
+                             for x in (raw.get("facts") or [])[:3]) if f]
+        refs = [str(r) for r in (raw.get("people") or [])
+                if str(r) in (job.get("refs") or {})]
+        titles = {k["title"].lower() for k in job.get("cards", [])}
+        if (TITLE_LEN[0] <= len(title) <= TITLE_LEN[1] and facts
+                and title.lower() not in titles
+                and _valid_fact(title + ".", known, strict=True, said=said) is not None
+                and not re.search(r"[0-9]", title)):
+            new = {"title": title, "facts": facts, "people": refs}
+    if not changes and new is None:
+        return None
+    return {"job": "cards", "campaign": job["campaign"], "turn": job.get("turn", 0),
+            "changes": changes, "new": new}
+
+
+def _valid_fact(text, known, strict: bool = False, said: set | None = None) -> str | None:
+    """One sentence, in bounds, no digits, no stranger — or None.
+
+    `strict` keeps the leading word capitalised for the stranger check: a NEW card
+    names its subject first ("Kaida's debt"), so the lower-casing trade below is
+    wrong for it — unless the leading word was `said` at the table as a plain word
+    ("work", in "I ask her for a day's work"), in which case "Work at the stall" is
+    a title and not a person. A card may be titled only with words that were said
+    or names the world knows."""
+    s = " ".join(str(text or "").split())
+    if not (FACT_LEN[0] <= len(s) <= FACT_LEN[1]):
+        return None
+    if not s.endswith((".", "!", "?")):
+        s += "."
+    if re.search(r"[.!?] ", s):
+        return None                       # one sentence means one
+    if re.search(r"[0-9]", s):
+        return None                       # no model authors a number
+    # The first word lower-cased before the check, unlike the undercurrent's: a card
+    # fact is a plain sentence and "Work is scarce." is not somebody called Work.
+    # The trade is a stranger who leads the sentence slipping through here; the
+    # people on a card are refs, and the page's own un-namer still stands.
+    lead = re.sub(r"['’]s$", "", s.split()[0].lower()) if s.split() else ""
+    soften = (not strict) or (lead in (said or set()))
+    head = s[:1].lower() + s[1:] if soften else s
+    if narration_mod.invented_names(f"They say: {head}", set(known)):
+        return None
+    return s
+
+
 def _valid_thread(data: dict, known) -> str | None:
     if str(data.get("action", "")).strip().lower() not in ("advance", "new"):
         return None
@@ -429,6 +594,8 @@ def drain(c) -> bool:
         try:
             if p["job"] == "garnish":
                 changed = _apply_garnish(c, p) or changed
+            elif p["job"] == "cards":
+                changed = _apply_cards(c, p) or changed
             else:
                 changed = _apply_undercurrent(c, p) or changed
         except Exception:
@@ -462,6 +629,61 @@ def _apply_garnish(c, p: dict) -> bool:
     c.turn_log.append({"kind": "watcher", "did": "garnish",
                        "ref": p["ref"], "item": label})
     return True
+
+
+def _apply_cards(c, p: dict) -> bool:
+    """Land the card proposals that still hold. A card the engine moved since the
+    model read it — a different stage or clock — is left alone: the tell that moved
+    it is the truer fact, and the model's was written against a table that is gone."""
+    from rules import cards as cards_mod
+
+    turn = len(c.transcript)
+    changed = False
+    lines: list[str] = []
+    engine = None
+    for ch in p.get("changes") or []:
+        card = cards_mod.find(c.scene, ch["id"])
+        if card is None or not card.live:
+            continue
+        if tuple(ch.get("was") or ()) != (card.stage, card.clock):
+            continue
+        if ch["action"] == "advance":
+            cards_mod.touch(c.scene, card.id, ch["fact"], turn=turn, tick=True)
+            c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                               "action": "advance", "fact": ch["fact"]})
+            changed = True
+        elif ch["action"] == "resolve":
+            cards_mod.resolve(c.scene, card.id, turn=turn)
+            c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                               "action": "resolve"})
+            changed = True
+        after = cards_mod.find(c.scene, card.id)
+        if after is not None and after.stage == "resolved":
+            # Resolving a situation pays: half a fight, the story award's "advance"
+            # share, on its own line — "i should be receiving EXP for ... resolving
+            # situations". Whether the model said resolve or an advance filled the
+            # clock.
+            engine = engine or c.engine()
+            line = engine.award_story("advance", card.title).strip()
+            if line:
+                lines.append(line)
+    new = p.get("new")
+    if isinstance(new, dict) and new.get("title"):
+        existing = {k.title.lower() for k in cards_mod.load(c.scene)}
+        if new["title"].lower() not in existing:
+            n = sum(1 for k in cards_mod.load(c.scene) if k.id.startswith("play-")) + 1
+            people = [r for r in new.get("people") or [] if r in c.scene.actors]
+            cards_mod.open_card(c.scene, cards_mod.Card(
+                id=f"play-{n}", title=new["title"], facts=list(new["facts"]),
+                tags=(cards_mod.TAG_PLAY,), people=people, place=str(c.scene.at or ""),
+                origin="watcher"), turn=turn)
+            c.turn_log.append({"kind": "watcher", "did": "card", "card": f"play-{n}",
+                               "action": "new", "title": new["title"]})
+            changed = True
+    for line in lines:
+        c.transcript.append({"who": "gm", "text": line, "kind": "setup"})
+        c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
+    return changed
 
 
 def _apply_undercurrent(c, p: dict) -> bool:

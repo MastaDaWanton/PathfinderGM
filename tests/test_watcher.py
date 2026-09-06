@@ -296,7 +296,8 @@ def test_the_undercurrent_only_fires_every_n_turns(campaign, monkeypatch):
     c = campaign
     watcher._jobs_for(c)
     _turns(c, watcher.TURNS_BETWEEN_LOOKS - 1)
-    assert watcher._jobs_for(c) == []
+    # The cards job has its own, shorter cadence; only the undercurrent is at issue.
+    assert [j for j in watcher._jobs_for(c) if j["job"] == "undercurrent"] == []
     _turns(c, 1)
     assert [j["job"] for j in watcher._jobs_for(c)] == ["undercurrent"]
 
@@ -366,3 +367,101 @@ def test_junk_json_changes_nothing(campaign, monkeypatch):
     _answer(monkeypatch, {"unexpected": "shape"})
     watcher._work(watcher._jobs_for(c))
     assert not watcher._PENDING
+
+
+# --- the situation cards move at the pace of a conversation ------------------------------
+
+def _cards_ready(c):
+    """Past the first look, with a live card that has a person on it."""
+    from rules import cards
+    watcher._jobs_for(c)
+    woman = instantiate("guildhand", scene=c.scene, name="the woman at the stall")
+    c.scene.add(woman, zone="near")
+    cards.open_card(c.scene, cards.Card(id="jar", title="The woman's jar to seal",
+                                        facts=["She asked you to seal a jar for her."],
+                                        people=[woman.ref], clock_max=2,
+                                        origin="author:test"), turn=1)
+    c.transcript.append({"who": "player", "text": "I seal the jar with wax and hand it back, and ask her for a day's work."})
+    c.transcript.append({"who": "gm", "text": "The woman at the stall takes the sealed jar and nods."})
+    _turns(c, watcher.CARD_TURNS_BETWEEN_LOOKS)
+    return woman
+
+
+def test_a_talking_turn_moves_a_card_through_the_watcher(campaign, monkeypatch):
+    """A talking turn makes no tell, so nothing put "she has the sealed jar" on the
+    woman's card — the drift the player named. The watcher reads the last beats
+    against the live cards and proposes one fact; validated, it lands and ticks."""
+    from rules import cards
+    c = campaign
+    _cards_ready(c)
+    _answer(monkeypatch, {"changes": [{"id": "jar", "action": "advance",
+                                       "fact": "She has the sealed jar now."}],
+                          "new": None})
+    jobs = watcher._jobs_for(c)
+    assert [j["job"] for j in jobs] == ["cards"]
+    watcher._work(jobs)
+    assert watcher.drain(c) is True
+    jar = cards.find(c.scene, "jar")
+    assert jar.stage == "moving" and jar.clock == 1
+    assert jar.facts[-1] == "She has the sealed jar now."
+    assert c.turn_log[-1] == {"kind": "watcher", "did": "card", "card": "jar",
+                              "action": "advance", "fact": "She has the sealed jar now."}
+
+
+def test_resolving_a_card_settles_it_and_pays_the_story_share(campaign, monkeypatch):
+    from rules import cards
+    c = campaign
+    _cards_ready(c)
+    before = c.scene.pc().xp
+    _answer(monkeypatch, {"changes": [{"id": "jar", "action": "resolve", "fact": ""}],
+                          "new": None})
+    watcher._work(watcher._jobs_for(c))
+    assert watcher.drain(c) is True
+    assert cards.find(c.scene, "jar").stage == "resolved"
+    assert c.scene.pc().xp - before == 200          # half a CR 1 fight, at level 1
+    assert "You gain 200 XP" in c.transcript[-1]["text"]
+    assert "jar" in c.transcript[-1]["text"]
+
+
+def test_a_fact_that_names_a_stranger_or_carries_a_number_never_lands(campaign, monkeypatch):
+    from rules import cards
+    c = campaign
+    _cards_ready(c)
+    _answer(monkeypatch, {"changes": [
+        {"id": "jar", "action": "advance", "fact": "The potter Grimble wants the jar too."},
+        {"id": "jar", "action": "advance", "fact": "She will pay 12 silver for it."},
+        {"id": "nope", "action": "resolve", "fact": ""}],
+        "new": {"title": "Kaida's debt", "facts": ["Kaida owes the stall."], "people": ["c1"]}})
+    watcher._work(watcher._jobs_for(c))
+    assert not watcher._PENDING
+    assert cards.find(c.scene, "jar").clock == 0
+
+
+def test_a_new_card_arises_from_play_with_its_people_by_ref(campaign, monkeypatch):
+    from rules import cards
+    c = campaign
+    woman = _cards_ready(c)
+    _answer(monkeypatch, {"changes": [{"id": "jar", "action": "keep", "fact": ""}],
+                          "new": {"title": "Work at the stall",
+                                  "facts": ["The woman has offered a day's work."],
+                                  "people": [woman.ref, "c99"]}})
+    watcher._work(watcher._jobs_for(c))
+    assert watcher.drain(c) is True
+    new = [k for k in cards.load(c.scene) if k.origin == "watcher"]
+    assert len(new) == 1 and new[0].title == "Work at the stall"
+    assert new[0].people == [woman.ref] and new[0].is_("situation.play")
+    assert new[0].place == c.scene.at
+
+
+def test_a_card_the_engine_moved_since_the_model_read_it_is_left_alone(campaign, monkeypatch):
+    """The tell that moved it is the truer fact; the model's was written against a
+    table that is gone."""
+    from rules import cards
+    c = campaign
+    _cards_ready(c)
+    _answer(monkeypatch, {"changes": [{"id": "jar", "action": "resolve", "fact": ""}],
+                          "new": None})
+    watcher._work(watcher._jobs_for(c))
+    cards.touch(c.scene, "jar", "The engine moved it first.", turn=5, tick=True)
+    assert watcher.drain(c) is False
+    assert cards.find(c.scene, "jar").stage == "moving"
