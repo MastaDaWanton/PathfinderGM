@@ -438,6 +438,20 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     return c
 
 
+def _open_with(c: Campaign, text: str) -> None:
+    """The opening onto the page AND into the model's history.
+
+    It went onto the page only, and the consequence was measured on the player's own
+    first turn, 2026-09-05: their save's history read private note, then "I ask what
+    is going on" — no step in the sun, no market, no stranger — and the prose model,
+    shown nothing of the scene it was continuing, wrote the nearest scene it had
+    been shown, which was worked example eleven's door. The narrator continues what
+    is in front of it; the opening has to be in front of it.
+    """
+    c.transcript.append({"who": "gm", "text": text})
+    c.history.append({"role": "assistant", "content": text})
+
+
 def opening_text(campaign: Campaign, written: bool = True) -> str:
     """The first thing the player reads.
 
@@ -647,7 +661,7 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     c = new_campaign(campaign_id, character=character)
     entry = roster.enrol(c.scene.pc(), campaign_id)
     c.character_id = entry.id
-    c.transcript.append({"who": "gm", "text": opening_text(c, written=False)})
+    _open_with(c, opening_text(c, written=False))
     c.save()
     return c
 
@@ -687,7 +701,7 @@ def begin_with(character, world_source=None) -> Campaign:
     # anywhere wrote the choice down.
     entry.world_source = str(c.world_source or "")
     roster.save(entry)
-    c.transcript.append({"who": "gm", "text": opening_text(c)})
+    _open_with(c, opening_text(c))
     c.save()
     _LIVE[entry.id] = c
     set_active(entry.id)

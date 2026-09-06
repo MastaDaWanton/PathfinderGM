@@ -383,29 +383,36 @@ EXAMPLES = [
             "intents": [{"op": "narrate_only", "because": "the pressure is hers, not the dice"}],
         },
     },
+    # This slot held "I put my shoulder to the door and force it" — a swollen frame,
+    # a rusted hinge, something heavy shifting on the other side. Retired 2026-09-05:
+    # it was the strongest attractor in the file. The Continue fix found it finishing
+    # every stopped scene; the movement-claim check found it walking players through
+    # doors the engine never opened; and on the player's own first turn, with no
+    # opening in the history, "I ask what is going on" came back as "You shoulder the
+    # door, and it groans" and then a corridor with a candle niche. A question asked of
+    # somebody busy, somewhere with water and no door, so nothing in it can be a room.
     {
-        "player": "I put my shoulder to the door and force it.",
+        "player": "I ask the boatwright what the shouting on the water is about.",
         "reply": {
-            "narration": "The frame is swollen with damp and the door is older than the "
-                         "frame. First shove, nothing but a shower of grit out of the "
-                         "lintel and a jarring all the way up into your shoulder. Second "
-                         "shove and you can feel where it will go — the top hinge is "
-                         "rusted almost through, and the whole thing is holding on the "
-                         "bottom two and a bolt you cannot see. Somewhere on the other "
-                         "side, something heavy shifts and settles, the way a thing does "
-                         "when it has been leaning against a door for a long time. You "
-                         "have got one good go at this before whatever is behind it knows "
-                         "you are coming. Do you take it?",
+            "narration": (
+                "He does not stop planing. The shaving curls off the strake and drops "
+                "onto the pile at his feet, and he watches the river over the top of the "
+                "work rather than you. 'Tide's wrong for it,' he says. 'That's the Harrow "
+                "boys trying to bring a barge in on the ebb, and the lock-keeper telling "
+                "them what he thinks of that.' Out past the slipway two lanterns are "
+                "moving on the black water, one of them going in circles. Somebody on the "
+                "far bank has started ringing a handbell, slowly, the way you would to be "
+                "heard rather than to raise an alarm. He runs his thumb along the edge he "
+                "has just made and looks at you properly for the first time. 'You're not "
+                "from the lock,' he says. 'So what do you want with it?' What do you tell "
+                "him?"
+            ),
             "suggestions": [
-                "Put everything into one more shove",
-                "Work the top hinge loose instead",
-                "Back off and find another way in",
+                "Tell him the truth about why you are here",
+                "Ask who the Harrow boys are",
+                "Watch the lanterns and say nothing yet",
             ],
-            "intents": [{
-                "op": "check", "actor": "pc", "because": "forcing a swollen door",
-                "params": {"skill": "climb", "dc": {"band": "tough"}},
-                "visibility": "player",
-            }],
+            "intents": [],
         },
     },
 ]
@@ -1004,9 +1011,18 @@ mechanical, this is a quiet beat: describe the place and the people and hand the
 """
 
 
+# How much of the scene as it stands the prose call is shown, and how much of each beat.
+# Two beats: the one being continued and the one before it, so a reply to a question
+# still knows what the question was asked in. Trimmed from the front, because the end
+# of a beat is where the scene was left.
+EARLIER_BEATS = 2
+EARLIER_CHARS = 1400
+
+
 def call_prose_messages(briefing_scene: str, history: list[dict], player_input: str,
                         tells: list[str], in_combat: bool = False,
-                        enemy: str | None = None) -> list[dict]:
+                        enemy: str | None = None,
+                        earlier: list[str] | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
 
     The *call-one* briefing and examples, not the consequence ones, because this is being
@@ -1024,9 +1040,19 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     messages[0] = {"role": "system",
                    "content": messages[0]["content"] + "\n" + PROSE_AFTER_EXTRA}
     said = "\n".join(f"- {t}" for t in tells if t)
+    # The scene as the player last read it, in front of the model that continues it.
+    # This call had NO history at all — `[]` at the call site, and the opening was
+    # never in the history either — and on the player's own first turn, 2026-09-05,
+    # "I ask what is going on" in a sunlit market came back as "You shoulder the door,
+    # and it groans": worked example eleven, the nearest scene the model had been shown.
+    # The narrator continues what is in front of it.
+    stood = [b[-EARLIER_CHARS:] for b in (earlier or []) if b][-EARLIER_BEATS:]
+    scene = ("What you narrated just before this — the scene as it stands, which you "
+             "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
+             if stood else "")
     messages[-1] = {
         "role": "user",
-        "content": (f"The player said: {player_input}\n\n"
+        "content": (scene + f"The player said: {player_input}\n\n"
                     + (f"What the engine decided:\n{said}" if said
                        else "The engine decided nothing mechanical this turn.")),
     }

@@ -5,6 +5,9 @@ actually produced in this repo's play sessions, recovered from the campaign save
 """
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 from gm import narration, prompts
@@ -1831,3 +1834,51 @@ def test_the_prose_floor_is_not_in_the_grammar():
     schema = prompts.prose_schema(min_chars=narration.MIN_SCENE_CHARS, max_chars=2200)
     assert "minLength" not in schema["properties"]["narration"]
     assert schema["properties"]["narration"]["maxLength"] == prompts.GRAMMAR_MAXLENGTH_CEILING
+
+
+# --- the narrator continues what is in front of it, 2026-09-05 ---------------------------
+
+def test_the_opening_is_in_the_models_history_not_only_on_the_page(tmp_path):
+    """The player's first turn, from their own save: history held the private note and
+    "I ask what is going on" — no step, no market, no stranger — and the prose model
+    wrote worked example eleven's door in a sunlit market. The opening goes into the
+    history the models are shown, as the assistant's own last beat."""
+    from django.test import override_settings
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.current("history-seed", reset=True)
+        opening = c.transcript[0]["text"]
+        assert any(h["role"] == "assistant" and h["content"] == opening for h in c.history)
+        # And it comes AFTER the private note, so the note still reads as the GM's own.
+        roles = [h["role"] for h in c.history]
+        assert roles.index("assistant") > 0 and roles[0] == "user"
+
+
+def test_the_prose_call_is_shown_the_scene_it_is_continuing():
+    """`call_prose_messages` was built with an empty history at its only call site. The
+    last beats the player read go into the final message, most recent last, trimmed
+    from the front so the end of the scene — where it was left — survives."""
+    beats = ["A" * 3000 + " the first beat ends here.", "The second beat, whole."]
+    msgs = prompts.call_prose_messages("BRIEF", [], "I look around.", [], earlier=beats)
+    last = msgs[-1]["content"]
+    assert "the scene as it stands" in last
+    assert "the first beat ends here." in last and "The second beat, whole." in last
+    assert last.index("the first beat ends here.") < last.index("The second beat, whole.")
+    assert "A" * 2000 not in last
+    assert last.index("The second beat, whole.") < last.index("The player said: I look around.")
+    # And with nothing narrated yet, nothing is claimed to have been.
+    bare = prompts.call_prose_messages("BRIEF", [], "I look around.", [])
+    assert "the scene as it stands" not in bare[-1]["content"]
+
+
+def test_no_worked_example_forces_a_door():
+    """"I put my shoulder to the door and force it" was the strongest attractor in the
+    file: it finished every stopped Continue, walked players through doors the engine
+    never opened, and on a first turn with no scene in front of the model it became
+    the scene. Retired for a question asked of a boatwright, somewhere with no door."""
+    for ex in prompts.EXAMPLES:
+        line = ex["player"].lower()
+        assert not re.search(r"\b(?:force|shoulder|break|kick)\b.*\bdoor\b", line), line
+    assert not any("swollen with damp" in ex["reply"]["narration"] for ex in prompts.EXAMPLES)

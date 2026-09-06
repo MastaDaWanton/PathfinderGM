@@ -967,7 +967,7 @@ class GMAgent:
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
         messages = prompts.call_prose_messages(
             brief, [], player_input, tells, in_combat=fighting,
-            enemy=self._current_enemy())
+            enemy=self._current_enemy(), earlier=earlier)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
