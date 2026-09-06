@@ -4889,9 +4889,18 @@ class Engine:
                 if has_pc:
                     self.scene.positions[ref] = (pc_side, mid + i)
                 else:
+                    # Fanned out from the middle row rather than stacked downward:
+                    # five people at one distance were laid as a column of five,
+                    # "not how the people should be lined up according to the
+                    # prose" (2026-09-06). Each stands at ITS OWN zone's distance —
+                    # the servant beside you at one square, the hooded man at the
+                    # far end at eight — and the rows alternate above and below
+                    # the player's, so a crowd is a crowd and not a wall.
+                    fan = (0, 1, -1, 2, -2, 3, -3, 4, -4)
+                    row = mid + fan[foe_row % len(fan)] + (foe_row // len(fan))
                     self.scene.positions[ref] = (
                         min(self.scene.grid.width - 1, pc_side + away),
-                        mid + foe_row)
+                        max(0, min(self.scene.grid.height - 1, row)))
                     foe_row += 1
         self.scene.resync_zones()
 

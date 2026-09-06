@@ -2482,7 +2482,8 @@ def player_departs(player_text: str) -> bool:
 
 # --- The cast ledger: people the prose introduced, held as scene state ----------------
 
-_CAST_ROLES = ("merchants?|traders?|vendors?|stall ?keepers?|shopkeepers?|"
+_CAST_ROLES = ("servants?|apprentices?|"
+               "merchants?|traders?|vendors?|stall ?keepers?|shopkeepers?|"
                "guards?|guardsmen|guardsman|watchmen|watchman|watchwoman|"
                "strangers?|priests?|priestess(?:es)?|labou?rers?|beggars?|"
                "nobles?|clansmen|clansman|clanswoman|artisans?|soldiers?|"
@@ -2503,6 +2504,67 @@ _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
     r"(?:" + _CAST_ROLES + r"))\b", re.I)
 _CAST_MAX = 8
+
+# Where a noted person stands, in the engine's own three words. Reported at the
+# table, 2026-09-06, with the map open: a servant "beside you", a hooded man "at the
+# far end of the corridor", a merchant and two guards — all five promoted to the same
+# zone and laid out as one column three squares off, "not how the people should be
+# lined up according to the prose". The prose says where they are in the same
+# handful of phrases every time; those phrases are read, and the ledger carries the
+# zone the engine places by (`SQUARES_BY_ZONE`: engaged 1, near 3, far 8 — 13th
+# Age's engaged / nearby / far away, which the engine already speaks). Looked for in
+# the words around the person, before and after, because English puts the place on
+# either side: "beside you a woman", "a woman beside you".
+_ZONE_CUES = (
+    ("engaged", re.compile(
+        r"\b(?:beside|next to|alongside|in front of|before|facing|against|over|"
+        r"right beside|up beside|close beside) you\b"
+        r"|\bat your (?:side|elbow|shoulder|table)\b"
+        r"|\bsharing (?:the|your) (?:step|table|bench|doorway|wall)\b"
+        r"|\bwithin (?:arm's |arm’s |an arm's )?reach\b"
+        r"|\bclose enough to touch\b"
+        r"|\b(?:grabs|grips|pins|seizes|shoves|catches|grapples) (?:you|your|at you)\b"
+        r"|\bleans in(?:to)? (?:close|toward you|towards you)\b", re.I)),
+    ("far", re.compile(
+        r"\b(?:at|from|on|down|across|near|by|in|through) the (?:far|other|opposite) "
+        r"(?:end|side|wall|corner|bank|door)\b"
+        r"|\bacross the (?:room|hall|yard|square|street|lane|market|water|courtyard|"
+        r"corridor|floor|bar|counter)\b"
+        r"|\b(?:in|at|from|through) the (?:doorway|door|gate|gateway|entrance|"
+        r"threshold|window|archway|shadows beyond|gloom)\b"
+        r"|\b(?:down|up|along) the (?:street|lane|road|corridor|hall|passage|row)\b"
+        r"|\bat the (?:back|rear|head|front) of the \w+\b"
+        r"|\bsome (?:way|distance) (?:off|away|back)\b"
+        r"|\b(?:a|several|some|twenty|thirty|forty|fifty) (?:paces|yards|feet) "
+        r"(?:away|off|back|distant)\b",
+        re.I)),
+)
+_ZONE_WINDOW = 90
+
+
+def zone_of_mention(beat: str, start: int, end: int) -> str:
+    """The zone the prose puts a person in, from the words around their mention.
+
+    Engaged wins over far when both appear, because a person touching you is not
+    also across the room; nothing said means `near`, the engine's own default.
+    """
+    lo, hi = max(0, start - _ZONE_WINDOW), min(len(beat), end + _ZONE_WINDOW)
+    # The window stops at a sentence end on each side: "He stands at the far end.
+    # Beside you, the servant …" must not hand the servant the far end.
+    before = beat[lo:start]
+    cut = max(before.rfind(". "), before.rfind("! "), before.rfind("? "))
+    if cut >= 0:
+        before = before[cut + 2:]
+    after = beat[end:hi]
+    cut = min([i for i in (after.find(". "), after.find("! "), after.find("? ")) if i >= 0],
+              default=-1)
+    if cut >= 0:
+        after = after[:cut + 1]
+    around = before + " " + beat[start:end] + " " + after
+    for zone, rx in _ZONE_CUES:
+        if rx.search(around):
+            return zone
+    return "near"
 
 
 def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
@@ -2542,7 +2604,8 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         heads.add(head)
         spans.append(m.span())
         scene.cast.append({"who": role, "turn": int(turn),
-                           "count": max(1, min(n, _PROMOTED_CAP))})
+                           "count": max(1, min(n, _PROMOTED_CAP)),
+                           "zone": zone_of_mention(gm_beat, *m.span())})
         added.append(role)
     for m in _CAST_INTRO.finditer(gm_beat):
         # A phrase already claimed by a group is not a second person: "a group
@@ -2571,7 +2634,8 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         if head in heads or head in real:
             continue
         heads.add(head)
-        scene.cast.append({"who": who, "turn": int(turn)})
+        scene.cast.append({"who": who, "turn": int(turn),
+                           "zone": zone_of_mention(gm_beat, *m.span())})
         added.append(who)
     # Old entries rot out: a bare "stranger" noted a dozen turns back fed a whole
     # invented library scene when a Continue arrived with nothing else to hold —
@@ -2723,6 +2787,7 @@ def promote_cast(scene, added) -> list[str]:
                 if e.get("ref") and e["ref"] in scene.actors
                 and scene.actors[e["ref"]].hp > 0]
     counts = {str(e.get("who")): int(e.get("count", 1) or 1) for e in scene.cast}
+    zones = {str(e.get("who")): str(e.get("zone") or "near") for e in scene.cast}
     made = []
     # A group is bodies, plural. "a group of six men" that promotes one actor is
     # the same lie as a pair of guards being one guard: the fiction says six and
@@ -2740,8 +2805,11 @@ def promote_cast(scene, added) -> list[str]:
                 break
         actor = instantiate(template, scene=scene, name=phrase)
         # Through the door. The fallback that wrote `scene.actors` directly would now
-        # write into a derived view and vanish; `add` stamps the place and the zone.
-        scene.add(actor)
+        # write into a derived view and vanish; `add` stamps the place and the zone —
+        # the zone the prose put them in, so the map lays them out where the words did.
+        scene.add(actor, zone=zones.get(phrase, "near"))
+        if getattr(scene, "grid", None) is not None:
+            scene.place_by_zone([actor.ref])
         for e in scene.cast:
             if e.get("who") == phrase and not e.get("ref"):
                 e["ref"] = actor.ref
