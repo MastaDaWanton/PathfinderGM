@@ -439,6 +439,15 @@ def _propose_undercurrent(job: dict, cfg: dict) -> dict | None:
 
 FACT_LEN = (15, 220)
 TITLE_LEN = (8, 70)
+# The words a title may use without having been said: the small grammar of titles.
+_TITLE_WORDS = frozenset({
+    "the", "a", "an", "of", "and", "or", "for", "to", "in", "at", "on", "with", "from",
+    "by", "into", "over", "under", "about", "task", "job", "work", "debt", "favour",
+    "favor", "matter", "trouble", "question", "price", "deal", "bargain", "errand",
+    "delivery", "search", "hunt", "watch", "wait", "missing", "lost", "stolen", "owed",
+    "unpaid", "promise", "promised", "secret", "warning", "threat", "offer", "request",
+    "who", "what", "where", "why", "how", "is", "are", "was", "has", "have", "not", "no",
+})
 
 
 def _propose_cards(job: dict, cfg: dict) -> dict | None:
@@ -523,9 +532,19 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
         refs = [str(r) for r in (raw.get("people") or [])
                 if str(r) in (job.get("refs") or {})]
         titles = {k["title"].lower() for k in job.get("cards", [])}
+        # A card may be titled only with words that were said at the table or names
+        # the world knows. Measured on the first live proposal: "The Warehouse Task",
+        # in Title Case as models write titles, was refused by the stranger check for
+        # "Warehouse" and "Task" — and "warehouse" was the prose's own word.
+        heard = {w.lower() for line in job.get("recent", [])
+                 for w in re.findall(r"[A-Za-z][A-Za-z'-]+", line)}
+        heard |= {w.lower() for name in known for w in re.findall(r"[A-Za-z][A-Za-z'-]+", name)}
+        heard |= {w.lower() for k in job.get("cards", [])
+                  for w in re.findall(r"[A-Za-z][A-Za-z'-]+", k["title"] + " " + " ".join(k["facts"]))}
+        words = [re.sub(r"['’]s$", "", w.lower()) for w in re.findall(r"[A-Za-z][A-Za-z'-]+", title)]
         if (TITLE_LEN[0] <= len(title) <= TITLE_LEN[1] and facts
                 and title.lower() not in titles
-                and _valid_fact(title + ".", known, strict=True, said=said) is not None
+                and words and all(w in heard or w in _TITLE_WORDS for w in words)
                 and not re.search(r"[0-9]", title)):
             new = {"title": title, "facts": facts, "people": refs}
     if not changes and new is None:
