@@ -93,3 +93,53 @@ def test_a_fight_is_with_the_one_you_swung_at_and_the_rest_are_bystanders():
     px = s.positions[pc.ref][0]
     assert s.positions[servant.ref][0] - px == 1
     assert s.positions[hooded.ref][0] - px == 8
+
+
+def test_a_foes_own_kind_come_in_with_them_and_civilians_stay_out():
+    """"make bystanders join the fight when they should." The pair of guards the
+    prose promoted together fight together: strike one and the other is on the
+    initiative. The merchant across the yard is not a third guard."""
+    s = Scene()
+    pc = s.add(load_pc("fixtures/pc-kesst.json"))
+    g1 = s.add(instantiate("watchman", scene=s, name="guards"), zone="near")
+    g2 = s.add(instantiate("watchman", scene=s, name="guard"), zone="far")
+    merchant = s.add(instantiate("guildhand", scene=s, name="the merchant"), zone="near")
+    engine = Engine(s, Dice(seed=3))
+    assert engine._ensure_encounter(pc.ref, target=g1.ref)
+    assert set(s.sides["them"]) == {g1.ref, g2.ref}
+    assert merchant.ref not in s.sides["them"]
+    assert {r for r, _ in s.initiative} == {pc.ref, g1.ref, g2.ref}
+
+
+def test_swinging_at_a_bystander_brings_them_in():
+    s = Scene()
+    pc = s.add(load_pc("fixtures/pc-kesst.json"))
+    thug = s.add(instantiate("thug", scene=s, name="the thug"), zone="engaged")
+    merchant = s.add(instantiate("guildhand", scene=s, name="the merchant"), zone="near")
+    engine = Engine(s, Dice(seed=4))
+    assert engine._ensure_encounter(pc.ref, target=thug.ref)
+    assert merchant.ref not in s.sides["them"]
+    intents = engine.validate([{"op": "attack", "actor": "pc", "target": merchant.ref,
+                                "because": "test"}], origin="author:test")
+    engine.run(intents)
+    assert merchant.ref in s.sides["them"]
+    assert merchant.ref in {r for r, _ in s.initiative}
+
+
+def test_the_prose_can_put_a_bystander_into_the_fight():
+    """"The second guard draws and comes at you" is a second guard on the initiative;
+    "the merchant flinches as the guard draws" is not a merchant in the fight."""
+    s = Scene()
+    pc = s.add(load_pc("fixtures/pc-kesst.json"))
+    thug = s.add(instantiate("thug", scene=s, name="the thug"), zone="engaged")
+    guard = s.add(instantiate("watchman", scene=s, name="the hooded guard"), zone="far")
+    merchant = s.add(instantiate("guildhand", scene=s, name="the merchant"), zone="near")
+    engine = Engine(s, Dice(seed=5))
+    engine._ensure_encounter(pc.ref, target=thug.ref)
+    beat = ("The merchant flinches as the hooded guard draws a cudgel and comes at you. "
+            "The thug grins.")
+    assert judgement.joiners(s, beat) == [guard.ref]
+    assert engine.join_fight(guard.ref)
+    assert guard.ref in s.sides["them"] and merchant.ref not in s.sides["them"]
+    # Already in: nothing to join twice.
+    assert judgement.joiners(s, beat) == []

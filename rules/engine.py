@@ -2022,6 +2022,12 @@ class Engine:
             opened = False
             if not self.scene.in_encounter:
                 opened = self._ensure_encounter(intent.actor, intent.target)
+            elif intent.target in self.scene.actors and not any(
+                    intent.target in refs for refs in self.scene.sides.values()):
+                # Swinging at a bystander brings them into the fight, and their kind
+                # with them.
+                self.join_fight(intent.target)
+                self.rally(intent.target)
             if opened or self._battle_joined:
                 self._battle_joined = True
                 # The initiator keeps the action they declared — the rule
@@ -2034,8 +2040,14 @@ class Engine:
                         self.scene.turn = i
                         self.scene.acted.add(intent.actor)
                         break
-                foes = [a.name for r, a in self.scene.actors.items()
-                        if r != intent.actor and not a.is_pc and not a.is_down]
+                # The other side, not everyone in the room: the tell named the
+                # bystanders as people squared off against.
+                mine = next((s for s, refs in self.scene.sides.items()
+                             if intent.actor in refs), None)
+                foes = [self.scene.actors[r].name
+                        for s, refs in self.scene.sides.items() if s != mine
+                        for r in refs if r in self.scene.actors
+                        and not self.scene.actors[r].is_down]
                 return Outcome(
                     intent_id=intent.id, op="attack",
                     effects=[{"ref": actor.ref, "kind": "battle_joined",
@@ -2442,7 +2454,67 @@ class Engine:
         # This path skipped the grid entirely: a swing that auto-started an encounter
         # played on a map that said no ground was mapped.
         self._lay_battlefield(sides)
+        if target:
+            self.rally(target)
         return True
+
+    # Templates whose people fight for each other. A guard comes to a guard's aid; a
+    # merchant does not draw for a merchant.
+    FIGHTING_KINDS = frozenset({"watchman", "thug", "guard dog", "soldier", "bandit",
+                                "mercenary", "bruiser"})
+
+    def join_fight(self, ref: str, side: str = "them") -> bool:
+        """A bystander enters the fight: rolled into the initiative, put on a side,
+        on the board if they were not. The one door for everybody who joins late —
+        the spawn op's arrival used to be the only one, and a person already in the
+        room had no way in at all ("make bystanders join the fight when they
+        should", 2026-09-06)."""
+        a = self.scene.actors.get(ref)
+        if a is None or not self.scene.in_encounter or a.is_down:
+            return False
+        if any(ref in refs for refs in self.scene.sides.values()):
+            return False
+        init = self.dice.d20(a.initiative_modifiers(), label=f"{a.name} initiative",
+                             visibility="hidden")
+        self.scene.initiative.append((ref, init.total))
+        self.scene.initiative.sort(key=lambda t: -t[1])
+        current = self.scene.current_ref()
+        self.scene.turn = next(
+            (i for i, (r, _) in enumerate(self.scene.initiative) if r == current),
+            self.scene.turn)
+        self.scene.sides.setdefault(side, []).append(ref)
+        if ref not in self.scene.positions and self.scene.grid is not None:
+            self.scene.place_by_zone([ref])
+        return True
+
+    def rally(self, ref: str) -> list[str]:
+        """The bystanders who come in on a foe's side when they are struck: the ones
+        of their own kind. Same head noun — "guard" beside "guards", the pair the
+        prose promoted together — or the same fighting template. Civilians stay out;
+        a merchant watching from across the yard is not a second guard."""
+        foe = self.scene.actors.get(ref)
+        if foe is None or not self.scene.in_encounter:
+            return []
+        side = next((s for s, refs in self.scene.sides.items() if ref in refs), None)
+        if side is None:
+            return []
+
+        def head(name: str) -> str:
+            word = (str(name or "").split() or [""])[-1].lower()
+            return word[:-1] if word.endswith("s") and len(word) > 3 else word
+
+        kind = foe.from_template if foe.from_template in self.FIGHTING_KINDS else ""
+        joined = []
+        for other, b in list(self.scene.actors.items()):
+            if other == ref or b.is_pc or b.is_down:
+                continue
+            if any(other in refs for refs in self.scene.sides.values()):
+                continue
+            same_name = head(b.name) == head(foe.name) and head(foe.name)
+            same_kind = kind and b.from_template == kind
+            if (same_name or same_kind) and self.join_fight(other, side):
+                joined.append(other)
+        return joined
 
     def _has_acted(self, ref: str) -> bool:
         """Whether this combatant has taken a turn in the current encounter."""

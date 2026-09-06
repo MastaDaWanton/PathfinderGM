@@ -2657,6 +2657,39 @@ def cast_brief(scene) -> str:
             f"not re-introduce them): {names}.")
 
 
+# A bystander the prose has just put into the fight. The verbs are the ones a beat
+# uses when somebody stops watching: read against each bystander's own name, within
+# the sentence, so "the merchant flinches as the guard draws" brings in the guard
+# and not the merchant.
+_JOINS = (r"(?:draws|lunges|charges|attacks|swings|strikes|comes at you|steps in|"
+          r"steps between|joins (?:the )?(?:fight|fray|brawl)|throws (?:him|her|them)self|"
+          r"grabs (?:you|your)|seizes (?:you|your)|closes (?:in|with you)|"
+          r"levels (?:a|his|her|their)|raises (?:a|his|her|their) (?:\w+ )?(?:club|blade|"
+          r"sword|staff|spear|cudgel|fist|fists)|wades in|rushes (?:you|in|forward))")
+
+
+def joiners(scene, gm_beat: str) -> list[str]:
+    """Refs of the bystanders this beat says have joined the fight, or []."""
+    if scene is None or not getattr(scene, "in_encounter", False) or not gm_beat:
+        return []
+    sides = getattr(scene, "sides", None) or {}
+    out = []
+    for ref, actor in scene.actors.items():
+        if actor.is_pc or actor.is_down or any(ref in refs for refs in sides.values()):
+            continue
+        head = (str(actor.name).split() or [""])[-1]
+        if len(head) < 3:
+            continue
+        # Their name's head word — "guard" for "the hooded guard" — then the verb
+        # within three words, so the verb is theirs: "the merchant flinches as the
+        # hooded guard draws" is the guard's draw, four words from the merchant.
+        rx = re.compile(r"\b" + re.escape(head) + r"s?\b(?:\s+\w+){0,3}?\s+" + _JOINS + r"\b",
+                        re.I)
+        if rx.search(gm_beat):
+            out.append(ref)
+    return out
+
+
 def clear_cast(scene) -> None:
     """The ledger of prose-people the narrator introduced HERE is emptied.
 
