@@ -100,6 +100,26 @@ STANDARD_CHOOSE = ({"amount": 2, "from": "physical"}, {"amount": 2, "from": "men
                    {"amount": -2, "from": "any"})
 HUMAN_CHOOSE = ({"amount": 2, "from": "any"},)
 
+# The pickers the Races bench draws from. Nothing on that page is typed but the name.
+ENERGIES = ("acid", "cold", "electricity", "fire", "sonic")
+ALIGNMENTS = ("chaotic", "evil", "good", "lawful")
+LANGUAGES = ("common", "dwarven", "elven", "gnome", "halfling", "orc", "goblin", "giant",
+             "draconic", "sylvan", "undercommon", "aquan", "auran", "ignan", "terran",
+             "celestial", "abyssal", "infernal", "aklo")
+SPEEDS = (20, 30, 40)
+# The Race Builder's ability-score options as the editor offers them; "fixed" is the
+# six-select row for anything the table does not name.
+ABILITY_OPTIONS = (
+    {"id": "standard", "name": "Standard — the player places +2 physical, +2 mental, −2 any",
+     "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"},
+                {"amount": -2, "from": "any"}]},
+    {"id": "human", "name": "Human heritage — the player places one +2",
+     "choose": [{"amount": 2, "from": "any"}]},
+    {"id": "flexible", "name": "Flexible — the player places two +2s",
+     "choose": [{"amount": 2, "from": "any"}, {"amount": 2, "from": "any"}]},
+    {"id": "fixed", "name": "Fixed — set each ability below", "choose": []},
+)
+
 _MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod")
 _BONUS_TYPES = ("racial", "untyped", "dodge", "natural", "circumstance", "enhancement",
                 "insight", "luck", "morale", "competence", "size")
@@ -110,6 +130,137 @@ _COMBAT_TARGETS = ("ac", "attack", "cmb", "cmd", "initiative", "hp_max", "touch_
 
 def slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", str(name or "").lower()).strip("-")
+
+
+# --- the anatomy catalogue: eidolon evolutions ---------------------------------------------
+# Advanced Player's Guide, the summoner's eidolon. A race on the bench is built from
+# these — "they can craft the anatomy from the Eidolon evolutions free of cost" — so an
+# evolution costs no race points here; `points` is the summoner's figure, kept for the
+# record. What each grants is written in the race grammar in content/races/evolutions.json
+# and expanded by `expand`; a placeholder `$choice` takes the picker's energy, skill,
+# ability, attack or alignment.
+
+def evolutions() -> dict[str, dict]:
+    path = _content_dir() / "evolutions.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {str(e["id"]): e for e in data.get("evolutions") or [] if isinstance(e, dict)}
+
+
+def _fill(value, choice: str):
+    if isinstance(value, str):
+        return value.replace("$choice", choice)
+    if isinstance(value, list):
+        return [_fill(v, choice) for v in value]
+    if isinstance(value, dict):
+        return {k: _fill(v, choice) for k, v in value.items()}
+    return value
+
+
+def expand(doc: dict) -> dict:
+    """What the document's evolutions grant, folded into the document's own fields.
+
+    The stored document keeps `evolutions` as picked; the tags, modifiers, weapons,
+    speed and size they imply are computed here every time, so correcting an
+    evolution in the catalogue corrects every race that took it. `move.*.base` and
+    `move.*.half` are resolved against the race's own speed once that is known.
+    """
+    d = dict(doc)
+    cat = evolutions()
+    tags = list(d.get("tags") or [])
+    mods = dict(d.get("mods") or {})
+    modifiers = list(d.get("modifiers") or [])
+    weapons = list(d.get("weapons") or [])
+    traits = list(d.get("traits") or [])
+    not_yet = list(d.get("not_yet") or [])
+    speed = int(d.get("speed") or 30)
+    size = str(d.get("size") or "medium")
+    for pick in d.get("evolutions") or []:
+        if not isinstance(pick, dict):
+            continue
+        ev = cat.get(str(pick.get("id", "")))
+        if not ev:
+            continue
+        choice = str(pick.get("choice") or "").strip().lower()
+        times = max(1, int(pick.get("times", 1) or 1))
+        for _ in range(times):
+            for tg in _fill(ev.get("tags") or [], choice):
+                if tg not in tags:
+                    tags.append(tg)
+            for m in _fill(ev.get("modifiers") or [], choice):
+                modifiers.append(dict(m))
+            for w in _fill(ev.get("weapons") or [], choice):
+                if not any(x.get("key") == w.get("key") for x in weapons):
+                    weapons.append(dict(w))
+            for k, v in (ev.get("mods") or {}).items():
+                mods[k] = mods.get(k, 0) + int(v)
+            if ev.get("mods_choice") and choice in ABILITIES:
+                mods[choice] = mods.get(choice, 0) + int(ev["mods_choice"])
+            speed += int(ev.get("speed_bonus") or 0)
+            if ev.get("size"):
+                size = str(ev["size"])
+        line = _fill(str(ev.get("line") or ev.get("name") or ""), choice or "—")
+        if line and line not in traits:
+            traits.append(line if times == 1 else f"{line} (x{times})")
+        waits = _fill(str(ev.get("not_yet") or ""), choice or "—")
+        if waits and waits not in not_yet:
+            not_yet.append(waits)
+    # Speeds that are "equal to base" or "half base" are numbers now.
+    resolved = []
+    for tg in tags:
+        if tg.endswith(".base"):
+            tg = tg[:-5] + f".{speed}"
+        elif tg.endswith(".half"):
+            tg = tg[:-5] + f".{max(5, speed // 2 // 5 * 5)}"
+        if tg not in resolved:
+            resolved.append(tg)
+    d.update({"tags": resolved, "mods": {k: v for k, v in mods.items() if v},
+              "modifiers": modifiers, "weapons": weapons, "traits": traits,
+              "not_yet": not_yet, "speed": speed, "size": size})
+    return d
+
+
+def speeds(doc: dict) -> dict[str, int]:
+    """Every way this body moves, in feet: land from the document, the rest from its
+    `move.<mode>.<ft>` tags."""
+    out = {"land": int(doc.get("speed") or 30)}
+    for tg in doc.get("tags") or []:
+        m = re.match(r"^move\.(fly|swim|climb|burrow)\.(\d+)$", str(tg))
+        if m:
+            out[m.group(1)] = max(out.get(m.group(1), 0), int(m.group(2)))
+    return out
+
+
+def senses(doc: dict) -> list[str]:
+    out = []
+    for tg in doc.get("tags") or []:
+        m = re.match(r"^sense\.([a-z-]+)(?:\.(\d+))?$", str(tg))
+        if m:
+            out.append(m.group(1).replace("-", " ") + (f" {m.group(2)} ft" if m.group(2) else ""))
+    return out
+
+
+def body_line(doc: dict) -> str:
+    """One sentence for the narrator's brief: how this body moves, senses and fights.
+    A tell about the body, not a rule — the narrator dresses it."""
+    parts = []
+    sp = speeds(doc)
+    moves = [f"{k} {v} ft" for k, v in sp.items() if k != "land"]
+    if moves:
+        parts.append("moves by " + ", ".join(moves) + " as well as on foot")
+    sn = senses(doc)
+    if sn:
+        parts.append("senses: " + ", ".join(sn))
+    naturals = [str(w.get("name") or w.get("key")) for w in doc.get("weapons") or []]
+    if naturals:
+        parts.append("natural weapons: " + ", ".join(naturals))
+    extra = [TAG_RP[t][1] for t in doc.get("tags") or [] if t in TAG_RP
+             and not t.startswith(("sense.", "move.", "natural."))]
+    if extra:
+        parts.append("; ".join(extra))
+    return "; ".join(parts)
 
 
 # --- loading ---------------------------------------------------------------------------
@@ -134,7 +285,16 @@ def _read_folder(folder: Path) -> dict[str, dict]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        entries = data.get("races") if isinstance(data, dict) and "races" in data else [data]
+        if not isinstance(data, dict):
+            continue
+        # A file holding many under "races", or one race on its own — which has a
+        # name. The evolutions catalogue sits in the same folder and has neither.
+        if "races" in data:
+            entries = data.get("races")
+        elif data.get("name") or data.get("id"):
+            entries = [data]
+        else:
+            continue
         for e in entries or []:
             if isinstance(e, dict):
                 rid = slug(e.get("id") or e.get("name") or path.stem)
@@ -224,6 +384,12 @@ def normalise(entry: dict) -> dict:
         d["budget"].setdefault("ranks", 1)
     d["description"] = str(d.get("description") or "").strip()
     d["origin"] = str(d.get("origin") or "yours")
+    evs = d.get("evolutions") or []
+    d["evolutions"] = [{"id": str(e.get("id", "")).strip().lower(),
+                        "choice": str(e.get("choice") or "").strip().lower(),
+                        "times": max(1, int(e.get("times", 1) or 1))}
+                       for e in evs if isinstance(e, dict) and str(e.get("id", "")).strip()]
+    d["weapons"] = [w for w in (d.get("weapons") or []) if isinstance(w, dict)]
     return d
 
 
@@ -231,9 +397,11 @@ def derive(entry: dict) -> dict:
     """What the document computes rather than stores: race points, the tier, the trait
     lines the tags imply. Declared as the `races` Kind's `derive` hook, so the bench
     shows it; the sheet reads it through `document`."""
-    d = normalise(entry)
-    d["rp"] = rp(d)
+    d = expand(normalise(entry))
+    d["rp"] = rp(entry)
     d["power"] = power(d["rp"])
+    d["speeds"] = speeds(d)
+    d["senses"] = senses(d)
     shown = list(d["traits"])
     for t in d["tags"]:
         line = TAG_RP.get(t, (0, ""))[1]
@@ -245,7 +413,9 @@ def derive(entry: dict) -> dict:
 
 
 def rp(doc: dict) -> int:
-    """Race points, from the Race Builder's tables, off the parts."""
+    """Race points, from the Race Builder's tables, off the parts. An evolution costs
+    nothing — the table's decision — so only what the document states outright is
+    priced; `expand` is deliberately not called here."""
     d = normalise(doc)
     total = TYPE_RP.get(d["type"], 3)
     total += SIZE_RP.get(d["size"], 7)
@@ -438,6 +608,32 @@ def validate(entry: dict) -> list[str]:
     for k in (entry.get("budget") or {}) if isinstance(entry.get("budget"), dict) else {}:
         if k not in BUDGET_RP:
             problems.append(f"budget: {k!r} — a race grants extra 'feats' or 'ranks'.")
+    cat = evolutions()
+    taken = {}
+    for i, pick in enumerate(d["evolutions"]):
+        at = f"evolutions[{i + 1}]"
+        ev = cat.get(pick["id"])
+        if not ev:
+            problems.append(f"{at}: {pick['id']!r} is not an evolution; pick from the "
+                            f"catalogue on the bench.")
+            continue
+        taken[pick["id"]] = taken.get(pick["id"], 0) + pick["times"]
+        choice = ev.get("choice")
+        pools = {"energy": ENERGIES, "alignment": ALIGNMENTS, "ability": ABILITIES,
+                 "skill": None, "attack": None}
+        if choice and not pick["choice"]:
+            problems.append(f"{ev['name']}: pick the {choice} it applies to.")
+        elif choice and pools.get(choice) and pick["choice"] not in pools[choice]:
+            problems.append(f"{ev['name']}: {pick['choice']!r} is not a {choice}; pick one "
+                            f"of {', '.join(pools[choice])}.")
+    for eid, n in taken.items():
+        ev = cat[eid]
+        if n > int(ev.get("takes", 1) or 1):
+            problems.append(f"{ev['name']}: may be taken {ev.get('takes', 1)} time(s), not {n}.")
+        for need in ev.get("needs") or []:
+            if need not in taken:
+                problems.append(f"{ev['name']} needs {cat.get(need, {}).get('name', need)} "
+                                f"first.")
     return problems
 
 
@@ -617,3 +813,21 @@ def save_from_bench(entry: dict) -> tuple[dict, list[str]]:
     if not problems:
         d["converted"] = False
     return d, problems
+
+
+def catalogue() -> dict:
+    """Everything the race editor draws its pickers from, in one payload."""
+    from .tables import SKILLS
+
+    return {
+        "types": list(TYPES), "sizes": list(SIZES), "speeds": list(SPEEDS),
+        "abilities": list(ABILITIES), "energies": list(ENERGIES),
+        "alignments": list(ALIGNMENTS), "languages": list(LANGUAGES),
+        "skills": sorted(SKILLS), "ability_options": list(ABILITY_OPTIONS),
+        "evolutions": sorted(evolutions().values(),
+                             key=lambda e: (e.get("group", ""), e.get("points", 0), e["name"])),
+        "attacks": ["bite", "claws", "gore", "slam", "pincers", "sting", "tail slap",
+                    "tentacle", "wing buffet"],
+        "budget": list(BUDGET_RP),
+        "tiers": list(TIERS),
+    }

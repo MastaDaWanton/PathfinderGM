@@ -1328,6 +1328,9 @@ class Actor:
             base["granted_by"] = g["key"]
             base["formed_with"] = g["ability"]
             return base
+        natural = self.natural_weapon(wanted)
+        if natural is not None:
+            return natural
         return weapons_mod.get(wanted)
 
     def _attack_ability(self, weapon: dict, weapon_key: str | None = None) -> str | None:
@@ -1361,12 +1364,53 @@ class Actor:
         m = re.match(FEAT_TARGET_RE, feat.strip(), re.IGNORECASE)
         return m.group("target").strip().lower() if m else None
 
+    def natural_weapon(self, key: str) -> dict | None:
+        """A natural attack the race document grants — claws, a bite, a sting — as a
+        weapon the sheet can swing, its die by this body's size.
+
+        Built here rather than in the weapons table for the same reason a granted
+        weapon is: the table cannot know who is asking, and a Small Korvu's claws are
+        not a Medium one's. Aliases are the key and the name, singular or plural, so
+        "claw", "claws" and "my talons" all reach the same entry (talons are claws).
+        A natural weapon is always proficient — it is the body.
+        """
+        from . import weapons as weapons_mod
+
+        doc = self._race_doc()
+        if not doc:
+            return None
+        want = " ".join(str(key or "").split()).lower()
+        want = {"talon": "claws", "talons": "claws", "claw": "claws", "fangs": "bite",
+                "teeth": "bite", "horns": "gore", "horn": "gore", "tail": "tail slap",
+                "pincer": "pincers", "tentacles": "tentacle", "wing buffet": "wings",
+                "wing": "wings"}.get(want, want)
+        for w in doc.get("weapons") or ():
+            names = {str(w.get("key", "")).lower(), str(w.get("name", "")).lower()}
+            if want not in names:
+                continue
+            base = dict(weapons_mod.get("unarmed"))
+            dice = w.get("damage") or {}
+            base.update({
+                "name": str(w.get("name") or w.get("key")),
+                "damage": str(dice.get(str(self.size or "medium").lower())
+                              or dice.get("medium") or base["damage"]),
+                "type": str(w.get("type") or "bludgeoning"),
+                "nonlethal": False, "prof": "natural", "natural": True,
+                "count": int(w.get("count", 1) or 1),
+                "secondary": bool(w.get("secondary")),
+                "hands": 0,
+            })
+            return base
+        return None
+
     def is_proficient(self, weapon_key: str | None = None) -> bool:
         """Proficiency comes from the class, or from a Martial/Simple Weapon Proficiency
         feat, or from the weapon being named specifically."""
         from . import weapons as weapons_mod
 
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        if self.natural_weapon(key) is not None:
+            return True                      # a body is proficient with itself
         # A granted weapon is your own fists with something over them, so proficiency
         # is the proficiency the document names (`proficiency_as`, usually unarmed).
         # It is not in the weapons table — it is built on the wearer from a class
@@ -1778,7 +1822,10 @@ class Actor:
         rules, not a damage type — stops nothing here and waits for the save path.
         """
         want = normalise_damage_type(dtype)
-        return any(normalise_damage_type(t) == want for t in self.immunities)
+        # The stat block's printed line, and the race document's `immune.<energy>` tag
+        # (an eidolon evolution, or a world's own people): one question, two sources.
+        return (any(normalise_damage_type(t) == want for t in self.immunities)
+                or self.has_state(f"immune.{want}"))
 
     def resistance(self, dtype: str) -> int:
         """Points of this energy shrugged off. 0 when none applies.
@@ -1788,8 +1835,17 @@ class Actor:
         leaving it to chance.
         """
         want = normalise_damage_type(dtype)
-        return max((v for k, v in self.resistances.items()
-                    if normalise_damage_type(k) == want), default=0)
+        printed = max((v for k, v in self.resistances.items()
+                       if normalise_damage_type(k) == want), default=0)
+        # `resist.<energy>.<points>` from the race document. The better one applies.
+        import re as _re
+
+        tagged = 0
+        for tag in self.standing_tags():
+            m = _re.match(r"^resist\.([a-z-]+)\.(\d+)$", str(tag))
+            if m and normalise_damage_type(m.group(1)) == want:
+                tagged = max(tagged, int(m.group(2)))
+        return max(printed, tagged)
 
     def vulnerable_to(self, dtype: str) -> bool:
         want = normalise_damage_type(dtype)
@@ -2514,7 +2570,14 @@ class Actor:
             self.add_condition("dead", source="hit points")
             changed.append("dead")
         elif self.hp < 0 and not self.has_condition("dead"):
-            if not self.has_condition("unconscious"):
+            # Ferocity (a half-orc's, or an evolution's): conscious and fighting below
+            # 0 as if disabled — staggered, and still dying a point a round — until
+            # −Con. A tag question, so a world's people with the trait get it too.
+            if self.has_state("ferocity"):
+                if not self.has_state("state.impaired.staggered"):
+                    self.add_condition("staggered", source="ferocity")
+                    changed.append("staggered")
+            elif not self.has_condition("unconscious"):
                 self.add_condition("unconscious", source="hit points")
                 changed.append("unconscious")
             # Stabilising once keeps you stable; fresh damage starts it again.
@@ -2999,6 +3062,10 @@ def full_sheet(actor: Actor) -> dict:
         # one place a player checks what their character can do was silent about half
         # of it.
         "traits": _racial_traits(actor),
+        # How this body moves, senses and fights, off the race document: a Korvu's
+        # fly speed and blindsense, an eidolon-built race's claws. Shown beside the
+        # traits so what the tags grant is on the one page a player checks.
+        "body": _race_body(actor),
         "abilities": [
             {"key": a, "name": ABILITY_NAMES[a], "score": actor.ability_score(a),
              "modifier": actor.ability_mod(a),
@@ -3372,6 +3439,24 @@ def _racial_traits(actor: Actor) -> list[dict]:
         return []
     return [{"name": t, "source": race.get("name", actor.race)}
             for t in race.get("trait_lines") or race.get("traits") or []]
+
+
+def _race_body(actor: Actor) -> dict:
+    from . import races as races_mod
+
+    doc = races_mod.document(str(actor.race or ""))
+    if not doc:
+        return {}
+    return {
+        "speeds": races_mod.speeds(doc), "senses": races_mod.senses(doc),
+        "natural_weapons": [
+            {"name": str(w.get("name") or w.get("key")),
+             "damage": (actor.natural_weapon(str(w.get("key"))) or {}).get("damage", ""),
+             "type": str(w.get("type") or ""), "count": int(w.get("count", 1) or 1),
+             "secondary": bool(w.get("secondary"))}
+            for w in doc.get("weapons") or ()],
+        "not_yet": list(doc.get("not_yet") or []),
+    }
 
 
 def _class_features(actor: Actor) -> list[str]:

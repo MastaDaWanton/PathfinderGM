@@ -210,7 +210,9 @@ def test_the_recovery_families_hold_exactly_the_lists_they_replaced():
 # that has to name those conditions — widening any of these guards to a family is how a
 # creature becomes unkillable, because a dying actor would never cross into dead.
 _LITERAL_KEY_SITES = {
-    "rules/sheet.py": (34, "apply_hp_state, apply_nonlethal_state, bleed_out, the "
+    # 35, not 34, since 2026-09-06: ferocity writes `staggered` from apply_hp_state —
+    # the same ladder, one more rung. The question beside it is a tag query.
+    "rules/sheet.py": (35, "apply_hp_state, apply_nonlethal_state, bleed_out, the "
                            "ability-zero states and rest's exhausted-to-fatigued "
                            "downgrade — the writers of the 1e ladders themselves"),
     "rules/engine.py": (11, "the dying/stable resolution, flat-footed and stunned as "

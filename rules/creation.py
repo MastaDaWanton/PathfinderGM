@@ -567,7 +567,11 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "abilities": abilities,
         "ranks": {s: 1 for s in picked},
         "feats": feats_named,
-        "weapons": list(kit["weapons"]),
+        # The body's own weapons beside the kit's: a race built with claws or a bite
+        # carries them by name, and the sheet builds the die by size when asked.
+        "weapons": list(kit["weapons"])
+                   + [str(w.get("key")) for w in (race.get("weapons") or [])
+                      if w.get("key") and str(w.get("key")) not in kit["weapons"]],
         "equipped": kit["weapons"][0],
         "armour": kit.get("armour", "none"),
         "shield": kit.get("shield", "none"),

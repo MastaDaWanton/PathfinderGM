@@ -1,0 +1,370 @@
+{% load static %}
+<title>Race editor — Pathfinder GM</title>
+<style>
+  /* The spell builder's vocabulary, so the three builder pages read as one application. */
+  :root {
+    --ink: #e6dcc6; --dim: #9a8b6f; --gold: #d9c08a; --gold-dim: #7a6543;
+    --sunk: #0c0a08; --alarm: #6e1f1f; --brew: #6fcf8f; --accent: #c9a227;
+    --body: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --display: Cinzel, Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; height: 100vh; overflow: hidden;
+    color: var(--ink); font: 400 15px/1.55 var(--body);
+    background: url("{% static 'img/grimoire-leather.jpg' %}") center / cover fixed #1a140c;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; padding: 12px 26px;
+    border-bottom: 1px solid var(--gold-dim);
+    background: url("{% static 'img/card-leather.jpg' %}") center / cover #241d15;
+  }
+  header h1 {
+    margin: 0; color: var(--gold); font: 400 21px/1 var(--display);
+    letter-spacing: .16em; text-transform: uppercase;
+  }
+  header small { color: var(--dim); font-style: italic; }
+  header .spacer { flex: 1; }
+  a.back { color: var(--gold); text-decoration: none; font-size: 13px; }
+  a.back:hover { color: #ffe7b4; }
+  main { height: calc(100vh - 52px); overflow: auto; padding: 22px 26px 60px; }
+  .leaf {
+    max-width: 980px; margin: 0 auto; padding: 20px 26px 30px;
+    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    background:
+      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+  }
+  h2.sect {
+    margin: 26px 0 4px; padding-bottom: 5px; color: var(--gold);
+    border-bottom: 1px solid #2b2319; font: 400 14px/1 var(--display);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  h2.sect:first-child { margin-top: 0; }
+  label { display: block; margin-top: 12px; color: var(--ink); font-size: 13.5px; }
+  .note { margin: 2px 0 0; color: var(--dim); font: italic 12.5px/1.4 var(--body); }
+  input[type=text], select {
+    width: 100%; margin-top: 4px; padding: 7px 9px; border-radius: 2px;
+    border: 1px solid rgba(150,120,60,.35); background: var(--sunk);
+    color: var(--ink); font: 400 14px/1.4 var(--body);
+  }
+  input:focus, select:focus { outline: none; border-color: var(--gold); }
+  button {
+    padding: 7px 14px; border-radius: 2px; cursor: pointer;
+    border: 1px solid var(--gold-dim); color: var(--ink);
+    background: linear-gradient(#2a2114, #1a140c);
+    font: 400 13px/1 var(--body);
+  }
+  button:hover { border-color: var(--gold); color: #ffe7b4; }
+  button.go { color: var(--gold); }
+  button.on { border-color: var(--accent); color: #f0dcae; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+  .picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; margin: 4px 12px 4px 0;
+         font-size: 13.5px; color: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 8px; margin-top: 8px; }
+  .evo { padding: 8px 10px; border: 1px solid rgba(150,120,60,.25); border-radius: 3px;
+         background: rgba(0,0,0,.25); }
+  .evo.on { border-color: var(--accent); background: rgba(201,162,39,.08); }
+  .evo b { color: var(--gold); font-weight: 400; }
+  .evo small { color: var(--dim); display: block; font-style: italic; }
+  .evo select { margin-top: 6px; }
+  .evo .times { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--dim); }
+  .evo .times button { padding: 2px 8px; }
+  .summary { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--gold-dim);
+             background: rgba(0,0,0,.2); font-size: 13.5px; }
+  .summary b { color: var(--gold); font-weight: 400; }
+  .banner { margin: 10px 0 0; padding: 9px 12px; border-radius: 2px; font-size: 13.5px; }
+  .banner.ok { color: var(--brew); border-left: 3px solid var(--brew);
+               background: rgba(31,110,63,.12); }
+  .banner.bad { color: #d08a7c; border-left: 3px solid var(--alarm);
+                background: rgba(110,31,31,.14); }
+  .startfrom {
+    display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 6px; border-radius: 3px;
+    border: 1px solid var(--gold-dim);
+    background: linear-gradient(rgba(60,48,26,.4), rgba(32,25,14,.45));
+  }
+  .startfrom .grow { flex: 1; min-width: 220px; }
+  .startfrom label { margin-top: 0; }
+</style>
+
+<header>
+  <h1>Race editor</h1>
+  <small>Pick everything; type only the name. The anatomy is the eidolon's evolutions, free.</small>
+  <span class="spacer"></span>
+  <a class="back" href="/">← the shelf</a>
+</header>
+
+<main>
+  <div class="leaf">
+    <div class="startfrom">
+      <div class="grow">
+        <label for="pick">Start from a race that exists</label>
+        <p class="note">Copies everything except the name. The shipped file is never changed.</p>
+        <select id="pick"><option value="">— begin with an empty race —</option></select>
+      </div>
+      <button type="button" id="load">Load as a starting point</button>
+    </div>
+    <div id="startnote"></div>
+
+    <div id="form"></div>
+    <div id="summary" class="summary"></div>
+
+    <div style="margin-top:22px;display:flex;gap:10px;align-items:center">
+      <button type="button" class="go" id="save">Save to my homebrew</button>
+      <button type="button" id="fresh">Start fresh</button>
+    </div>
+    <div id="banner"></div>
+  </div>
+</main>
+
+<script>
+const STATE = {{ state_json|safe }};
+const CAT = STATE.catalogue;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+function csrf() { const m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ""; }
+
+// The document as the pickers set it. Nothing here is typed but `name`.
+function empty() {
+  return { id: "", name: "", type: "humanoid", size: "medium", speed: 30,
+           option: "standard", mods: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+           budget: { feats: 0, ranks: 0 }, languages: ["common"], evolutions: [],
+           description: "" };
+}
+let D = empty();
+let STARTED_FROM = "";
+
+// A stored document arrives with `mods` and `choose`; the editor keeps one radio for
+// the option and six selects for the fixed row, so the two are reconciled here.
+function fromDoc(doc) {
+  const d = empty();
+  d.id = doc.id || ""; d.name = doc.name || "";
+  d.type = doc.type || "humanoid"; d.size = doc.size || "medium";
+  d.speed = Number(doc.speed || 30);
+  // The stored speed includes what extra legs added; the picker holds the base.
+  (doc.evolutions || []).forEach(e => {
+    const ev = CAT.evolutions.find(x => x.id === e.id);
+    if (ev && ev.speed_bonus) d.speed -= ev.speed_bonus * (e.times || 1);
+  });
+  if (![20, 30, 40].includes(d.speed)) d.speed = 30;
+  const choose = JSON.stringify(doc.choose || []);
+  const opt = CAT.ability_options.find(o => o.id !== "fixed" && JSON.stringify(o.choose) === choose);
+  d.option = opt ? opt.id : "fixed";
+  Object.keys(d.mods).forEach(a => { d.mods[a] = Number((doc.mods || {})[a] || 0); });
+  d.budget = { feats: Number((doc.budget || {}).feats || 0), ranks: Number((doc.budget || {}).ranks || 0) };
+  d.languages = (doc.languages || []).filter(l => CAT.languages.includes(l));
+  d.evolutions = (doc.evolutions || []).map(e => ({ id: e.id, choice: e.choice || "", times: e.times || 1 }));
+  d.description = doc.description || "";
+  d.origin = doc.origin || "";
+  d.people_id = doc.people_id || ""; d.world = doc.world || "";
+  return d;
+}
+
+function toDoc() {
+  const opt = CAT.ability_options.find(o => o.id === D.option) || CAT.ability_options[0];
+  const mods = {};
+  if (D.option === "fixed") Object.entries(D.mods).forEach(([a, v]) => { if (v) mods[a] = v; });
+  const budget = {};
+  if (D.budget.feats) budget.feats = D.budget.feats;
+  if (D.budget.ranks) budget.ranks = D.budget.ranks;
+  return { id: D.id || undefined, name: D.name, type: D.type, size: D.size, speed: D.speed,
+           mods, choose: opt.choose, budget, languages: D.languages,
+           evolutions: D.evolutions, description: D.description,
+           origin: D.origin || undefined, people_id: D.people_id || undefined,
+           world: D.world || undefined, converted: false };
+}
+
+function choicesFor(ev) {
+  if (ev.choice === "energy") return CAT.energies;
+  if (ev.choice === "alignment") return CAT.alignments;
+  if (ev.choice === "ability") return CAT.abilities;
+  if (ev.choice === "skill") return CAT.skills;
+  if (ev.choice === "attack") return CAT.attacks;
+  return [];
+}
+
+function draw() {
+  const groups = [...new Set(CAT.evolutions.map(e => e.group))];
+  $("#form").innerHTML = `
+    <h2 class="sect">The race</h2>
+    <label>Name</label>
+    <input type="text" data-name value="${esc(D.name)}" placeholder="Korvu">
+    <div class="row">
+      <div><label>Creature type</label>
+        <select data-set="type">${CAT.types.map(t => `<option value="${t}" ${D.type === t ? "selected" : ""}>${cap(t)}</option>`).join("")}</select></div>
+      <div><label>Size</label>
+        <select data-set="size">${CAT.sizes.map(t => `<option value="${t}" ${D.size === t ? "selected" : ""}>${cap(t)}</option>`).join("")}</select></div>
+      <div><label>Base speed</label>
+        <select data-set="speed">${CAT.speeds.map(t => `<option value="${t}" ${D.speed === t ? "selected" : ""}>${t} ft${t === 20 ? " (slow)" : t === 40 ? " (fast)" : ""}</option>`).join("")}</select></div>
+    </div>
+
+    <h2 class="sect">Ability scores</h2>
+    <p class="note">The Race Builder's options. The first three are placed by the player at the forge.</p>
+    <div class="picks">${CAT.ability_options.map(o => `
+      <button type="button" class="${D.option === o.id ? "on" : ""}" data-option="${o.id}">${esc(o.name)}</button>`).join("")}</div>
+    ${D.option === "fixed" ? `<div class="row" style="margin-top:8px">${CAT.abilities.map(a => `
+      <div><label>${a.toUpperCase()}</label>
+        <select data-mod="${a}">${[-4, -2, 0, 2, 4].map(v => `<option value="${v}" ${D.mods[a] === v ? "selected" : ""}>${v > 0 ? "+" : ""}${v}</option>`).join("")}</select></div>`).join("")}</div>` : ""}
+
+    <h2 class="sect">Feats, ranks and languages</h2>
+    <div class="picks">
+      <button type="button" class="${D.budget.feats ? "on" : ""}" data-budget="feats">Bonus feat at 1st level</button>
+      <button type="button" class="${D.budget.ranks ? "on" : ""}" data-budget="ranks">+1 skill rank per level</button>
+    </div>
+    <p class="note" style="margin-top:8px">Languages. The race's own tongue is always spoken.</p>
+    <div>${CAT.languages.map(l => `<label class="chk"><input type="checkbox" data-lang="${l}" ${D.languages.includes(l) ? "checked" : ""}> ${cap(l)}</label>`).join("")}</div>
+
+    <h2 class="sect">Anatomy — the eidolon's evolutions</h2>
+    <p class="note">Advanced Player's Guide. Free of cost here; the summoner's points are shown for the record. What the sheet cannot read yet is said on the card rather than dropped.</p>
+    ${groups.map(g => `<h3 style="margin:14px 0 0;color:var(--dim);font:italic 13px var(--body)">${cap(g)}</h3>
+      <div class="grid">${CAT.evolutions.filter(e => e.group === g).map(ev => {
+        const taken = D.evolutions.filter(x => x.id === ev.id);
+        const on = taken.length > 0;
+        const first = taken[0];
+        const opts = choicesFor(ev);
+        return `<div class="evo ${on ? "on" : ""}">
+          <label class="chk" style="margin:0"><input type="checkbox" data-evo="${ev.id}" ${on ? "checked" : ""}>
+            <b>${esc(ev.name)}</b> <span style="color:var(--dim)">· ${ev.points} pt</span></label>
+          <small>${esc(ev.line.replace("$choice", first && first.choice ? first.choice : "…"))}${ev.needs ? ` — needs ${ev.needs.join(", ")}` : ""}</small>
+          ${on && ev.choice ? `<select data-evochoice="${ev.id}"><option value="">— pick the ${ev.choice} —</option>${opts.map(c => `<option value="${c}" ${first.choice === c ? "selected" : ""}>${cap(c)}</option>`).join("")}</select>` : ""}
+          ${on && ev.takes > 1 ? `<div class="times">taken <button type="button" data-times="${ev.id}" data-dir="-1">−</button> ${first.times} <button type="button" data-times="${ev.id}" data-dir="1">+</button> of ${ev.takes}</div>` : ""}
+          ${on && ev.not_yet ? `<small style="margin-top:4px">not yet: ${esc(ev.not_yet.replace("$choice", first.choice || "…"))}</small>` : ""}
+        </div>`; }).join("")}</div>`).join("")}`;
+  drawSummary();
+}
+
+function drawSummary() {
+  const lines = [];
+  D.evolutions.forEach(e => {
+    const ev = CAT.evolutions.find(x => x.id === e.id);
+    if (ev) lines.push(ev.line.replace("$choice", e.choice || "…") + (e.times > 1 ? ` (x${e.times})` : ""));
+  });
+  const opt = CAT.ability_options.find(o => o.id === D.option);
+  const mods = D.option === "fixed"
+    ? Object.entries(D.mods).filter(([, v]) => v).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ") || "no adjustments"
+    : opt.name.split(" — ")[1];
+  $("#summary").innerHTML = `<b>${esc(D.name || "Unnamed")}</b> — ${esc(D.type)}, ${esc(D.size)}, ${D.speed} ft · ${esc(mods)}
+    ${D.budget.feats ? " · bonus feat" : ""}${D.budget.ranks ? " · +1 rank/level" : ""}
+    <br>${lines.length ? esc(lines.join(" · ")) : "<span style='color:var(--dim)'>no anatomy chosen yet</span>"}
+    <br><span style="color:var(--dim)">The table accepts up to ${STATE.race_rp} RP; evolutions cost none.</span>`;
+}
+
+document.addEventListener("input", e => {
+  const name = e.target.closest("[data-name]");
+  if (name) {
+    D.name = name.value;
+    // A new name is a new race. Opened on the dwarf and renamed "Editor Test", the
+    // first version saved under the dwarf's id — an overlay with claws shadowing the
+    // shipped dwarf for every character of it. The id follows the name unless the
+    // name is the one the page opened with.
+    if (STARTED_FROM && name.value.trim().toLowerCase() !== STARTED_FROM.toLowerCase()) D.id = "";
+    drawSummary(); return;
+  }
+});
+document.addEventListener("change", e => {
+  const set = e.target.closest("[data-set]");
+  if (set) { D[set.dataset.set] = set.dataset.set === "speed" ? Number(set.value) : set.value; draw(); return; }
+  const mod = e.target.closest("[data-mod]");
+  if (mod) { D.mods[mod.dataset.mod] = Number(mod.value); drawSummary(); return; }
+  const lang = e.target.closest("[data-lang]");
+  if (lang) {
+    D.languages = lang.checked ? [...D.languages, lang.dataset.lang] : D.languages.filter(l => l !== lang.dataset.lang);
+    return;
+  }
+  const evo = e.target.closest("[data-evo]");
+  if (evo) {
+    if (evo.checked) D.evolutions.push({ id: evo.dataset.evo, choice: "", times: 1 });
+    else D.evolutions = D.evolutions.filter(x => x.id !== evo.dataset.evo);
+    draw(); return;
+  }
+  const choice = e.target.closest("[data-evochoice]");
+  if (choice) {
+    const pick = D.evolutions.find(x => x.id === choice.dataset.evochoice);
+    if (pick) pick.choice = choice.value;
+    draw(); return;
+  }
+  const pk = e.target.closest("#pick");
+  if (pk) return;
+});
+document.addEventListener("click", async e => {
+  const opt = e.target.closest("[data-option]");
+  if (opt) { D.option = opt.dataset.option; draw(); return; }
+  const b = e.target.closest("[data-budget]");
+  if (b) { D.budget[b.dataset.budget] = D.budget[b.dataset.budget] ? 0 : 1; draw(); return; }
+  const times = e.target.closest("[data-times]");
+  if (times) {
+    const pick = D.evolutions.find(x => x.id === times.dataset.times);
+    const ev = CAT.evolutions.find(x => x.id === times.dataset.times);
+    if (pick && ev) pick.times = Math.max(1, Math.min(ev.takes, pick.times + Number(times.dataset.dir)));
+    draw(); return;
+  }
+});
+
+function fillPicker() {
+  $("#pick").innerHTML = `<option value="">— begin with an empty race —</option>`
+    + STATE.races.map(r => `<option value="${esc(r.id)}">${esc(r.name)} — ${esc(r.origin)}</option>`).join("");
+}
+
+async function open(id, keepName) {
+  const d = await (await fetch(`/api/races/open/${encodeURIComponent(id)}`)).json();
+  if (d.error) throw new Error(d.error);
+  D = fromDoc(d);
+  if (!keepName) { D.name = ""; D.id = ""; D.origin = ""; D.people_id = ""; D.world = ""; }
+  STARTED_FROM = d.name;
+  draw();
+  $("#startnote").innerHTML = keepName
+    ? `<div class="banner ok">Editing <b>${esc(d.name)}</b>${d.source === "yours" ? " — your copy" : " — saving writes your copy beside the shipped one"}.</div>`
+    : `<div class="banner ok">Started from <b>${esc(d.name)}</b>. Everything was copied except the name — give it one and it becomes a race of your own.</div>`;
+}
+
+$("#load").addEventListener("click", async () => {
+  const id = $("#pick").value;
+  $("#banner").innerHTML = "";
+  if (!id) { D = empty(); STARTED_FROM = ""; draw(); $("#startnote").innerHTML = ""; return; }
+  try { await open(id, false); }
+  catch (err) { $("#banner").innerHTML = `<div class="banner bad">${esc(err.message)}</div>`; }
+});
+$("#fresh").addEventListener("click", () => {
+  D = empty(); STARTED_FROM = ""; draw();
+  $("#startnote").innerHTML = ""; $("#banner").innerHTML = ""; $("#pick").value = "";
+});
+$("#save").addEventListener("click", async () => {
+  $("#banner").innerHTML = "";
+  try {
+    const r = await fetch("/api/bench/races/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify(toDoc()),
+    });
+    const raw = await r.text();
+    let d;
+    try { d = JSON.parse(raw); } catch { throw new Error(`The server failed (HTTP ${r.status}).`); }
+    if (!r.ok) {
+      const list = (d.problems || [d.error]).map(p => `<li>${esc(p)}</li>`).join("");
+      $("#banner").innerHTML = `<div class="banner bad">This race cannot be saved yet:
+        <ul style="margin:6px 0 0">${list}</ul></div>`;
+      return;
+    }
+    D.id = d.id;
+    $("#banner").innerHTML = `<div class="banner ok">Saved as <b>${esc(d.id)}</b>. The forge offers it now, and the sheet reads it live.</div>`;
+  } catch (err) {
+    $("#banner").innerHTML = `<div class="banner bad">${esc(err.message)}</div>`;
+  }
+});
+
+fillPicker();
+draw();
+if (STATE.open) { open(STATE.open, true).catch(err => {
+  $("#banner").innerHTML = `<div class="banner bad">${esc(err.message)}</div>`; }); }
+</script>
+<!-- The heartbeat that lets the packaged exe tell an open window from a closed
+     one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% static 'js/keepalive.js' %}"></script>

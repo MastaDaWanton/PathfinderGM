@@ -3034,6 +3034,16 @@ function tabFeats(s) {
             <td><b>${glossify(t.name)}</b></td>
             <td class="why">${esc(t.source)}</td></tr>`).join("")}
         </table>` : ""}
+      ${(s.body && (Object.keys(s.body.speeds || {}).length > 1 || (s.body.senses || []).length || (s.body.natural_weapons || []).length)) ? `
+        <h3 style="margin-top:22px">The body</h3>
+        <table class="sheet">
+          <tr><th>What</th><th>How</th></tr>
+          <tr><td><b>Moves</b></td><td class="why">${esc(Object.entries(s.body.speeds).map(([k, v]) => `${k} ${v} ft`).join(" · "))}</td></tr>
+          ${(s.body.senses || []).length ? `<tr><td><b>Senses</b></td><td class="why">${esc(s.body.senses.join(" · "))}</td></tr>` : ""}
+          ${(s.body.natural_weapons || []).map(w => `<tr><td><b>${esc(w.name)}</b></td>
+            <td class="why">${w.count > 1 ? `${w.count} × ` : ""}${esc(w.damage)} ${esc(w.type)}${w.secondary ? " · secondary" : ""}</td></tr>`).join("")}
+          ${(s.body.not_yet || []).map(n => `<tr><td><b>Not yet</b></td><td class="why">${esc(n)}</td></tr>`).join("")}
+        </table>` : ""}
       ${(s.class_features && s.class_features.length) ? `
         <h3 style="margin-top:22px">Class features</h3>
         <table class="sheet">

@@ -84,11 +84,50 @@ so they can be corrected; the forge offers them in that world whether or not the
 imported, the bench's copy winning where one exists. The house rule `core_races` keeps
 or hides the Core seven beside them; `race_rp` is the tier the forge accepts.
 
+## The anatomy: eidolon evolutions, free
+
+"fix the race editor so that its all dropdowns and pickers because they should not need
+to type anything other than a name. they can craft the anatomy from the Eidolon
+evolutions free of cost" (2026-09-06). The Races bench opens a page of pickers
+(`/homebrew/races/`): creature type, size, base speed, the Race Builder's ability
+options (or a six-select fixed row), the bonus feat and rank, languages as checkboxes,
+and the anatomy as the summoner's eidolon evolutions from the Advanced Player's Guide
+— `content/races/evolutions.json`, 54 of them, each with the picker it needs (an
+energy, a skill, an ability, an attack, an alignment) and how many times it may be
+taken. An evolution costs no race points; the summoner's own figure is kept for the
+record and shown on the card.
+
+The stored document keeps `evolutions` as picked. `rules/races.py:expand` turns them
+into the grammar every time the document is read — tags, modifiers, natural weapons,
+the speed the extra legs add, the size — so correcting an evolution in the catalogue
+corrects every race that took it, and nothing is saved twice.
+
+### What the engine reads now
+
+| Tag or field | Reader |
+|---|---|
+| `weapons[]` (claws, bite, gore, slam, sting, pincers, tail slap, tentacle, wing buffet) | `Actor.natural_weapon`: a weapon in the hand by the body's size, always proficient, reached by its name or an alias ("talons" are claws) |
+| `immune.<energy>` | `Actor.immune_to` beside the stat block's printed line |
+| `resist.<energy>.<n>` | `Actor.resistance`, the better of the printed and the tagged |
+| `ferocity` | `Actor.apply_hp_state`: below 0 the body is staggered and dying, not unconscious |
+| `move.fly|swim|climb|burrow.<ft>` | `races.speeds`, on the sheet's body block and in the narrator's brief as a fact of the body |
+| `sense.*` | `races.senses`, the same two places |
+| `proficient.simple|martial` | the existing proficiency question |
+| `skill_mod`, `combat_mod ac natural`, `mods` | the one funnel, as before |
+
+The brief's line — "A Korvu: moves by fly 30 ft as well as on foot; senses: blindsense
+30 ft; natural weapons: claws." — is a tell about the body, with no number the engine
+did not set, and the narrator may use it and may not contradict it.
+
+Still waiting on a reader, said on each card's `not yet` line: the grid reading a fly
+or swim speed as movement, reach, grab, trip, rend, rake, constrict, pounce, trample,
+poison and energy riders on natural attacks, breath weapons, webs, damage reduction by
+alignment, fast healing, spell resistance, frightful presence, extra arms.
+
 ## Still open
 
-- The engine has no fly, swim, climb or burrow speed, no natural attacks, no
-  ferocity reader: the tags are granted and priced, the `not_yet` lines say so, and
-  the readers are the next stage.
+- The grid does not yet move a flier or a swimmer by their own speed; the speeds are
+  on the sheet and in the brief, and the `not yet` lines above list the rest.
 - Saves "vs enchantment" / "vs poison" wait on the save roll naming its cause; the
   `when` clause has no key for it yet.
 - World Bible writing `play.races[]` — the memory `world-bible-next-export` carries the

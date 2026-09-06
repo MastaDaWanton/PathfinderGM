@@ -1115,9 +1115,11 @@ function paneHomebrew() {
         color:var(--gold);text-decoration:none;cursor:pointer;
         background:linear-gradient(#2a2114,#1a140c)"
         href="${esc(b.builder_url)}">${b.id === "spells"
-          ? "Write a spell →" : "Open the class builder →"}</a></p>
+          ? "Write a spell →" : b.id === "races" ? "Open the race editor →" : "Open the class builder →"}</a></p>
         <p class="note">${b.id === "spells"
           ? "Every field a spell has, on a page of its own — and you can start from any spell that already exists rather than typing thirty fields again."
+          : b.id === "races"
+          ? "All pickers, nothing typed but the name: type, size, speed, the Race Builder's ability options, and the anatomy from the eidolon's evolutions, free. Click a row below to open it there."
           : "A class is a level table, a set of features and — if it wants them — paths with tiered abilities. Too much shape for the form the other benches share, so it has a page of its own."}</p>` : ""}
       ${b.id === "spells" ? paneSpells() : ""}
       ${b.id === "rulesets" ? paneRules() : ""}
@@ -1978,6 +1980,11 @@ document.addEventListener("click", async e => {
     return;
   }
   const open = e.target.closest("[data-open]");
+  // A race opens on its own page of pickers rather than in the generated form.
+  if (open && BENCH && BENCH.bench.id === "races") {
+    location.href = `${BENCH.bench.builder_url}?open=${encodeURIComponent(open.dataset.open)}`;
+    return;
+  }
   if (open && BENCH && BENCH.bench.builder) {
     const d = await (await fetch(
       `/api/bench/${encodeURIComponent(BENCH.bench.id)}/open/${

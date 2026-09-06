@@ -64,7 +64,10 @@ def _count(name: str, key: str) -> int:
 # form. Keyed by bench id, valued by the URL. One entry today; a second kind with
 # repeating structure would be one line here rather than a branch in the template.
 PAGE_BUILDERS = {"classes": "/homebrew/classes/",
-                 "spells": "/homebrew/spells/"}
+                 "spells": "/homebrew/spells/",
+                 # All pickers: type, size, speed, the ability option and the anatomy
+                 # from the eidolon evolutions — nothing typed but the name.
+                 "races": "/homebrew/races/"}
 
 
 @dataclass

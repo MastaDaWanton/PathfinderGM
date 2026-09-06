@@ -61,7 +61,12 @@ from __future__ import annotations
 # document's tags (rules/races.py), held through `Actor.standing_tags` the way a feat's
 # are: `has_state("race.elf")` is the feat prerequisite's question, and
 # `has_state("sense.darkvision")` is the one a dark room will ask. The race string on
-# the sheet is the store, never the question.
+# the sheet is the store, never the question. The readers that exist today:
+# `immune.<energy>` and `resist.<energy>.<n>` in `Actor.immune_to` / `resistance`,
+# `ferocity` in `Actor.apply_hp_state`, `move.<mode>.<ft>` and `sense.*` on the sheet's
+# body block and in the narrator's brief, `proficient.*` in `Actor.is_proficient`. An
+# eidolon evolution (content/races/evolutions.json) grants these through the race
+# document's `expand`; what has no reader yet is on its `not_yet` line.
 #
 # A card that puts a state on a person does it as an ActiveEffect through the one
 # applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for

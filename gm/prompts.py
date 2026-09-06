@@ -814,11 +814,22 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 # fact, but it is the only honest thing to say when nobody has said.
                 body = (" Nobody has said what they look like. Do not describe their "
                         "body or assert anything about it; write what they do.")
+            # What the race document says this body can do — flies, sees in the dark,
+            # has claws — as a fact the narrator may use and may not contradict. A
+            # tell about the body, not a rule: no number in it the engine did not set.
+            race_doc = actor._race_doc()
+            bodily = ""
+            if race_doc:
+                from rules import races as races_mod
+
+                line = races_mod.body_line(race_doc)
+                if line:
+                    bodily = f" A {race_doc.get('name', actor.race)}: {line}."
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
-                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}"
+                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}"
             )
             # The jars, by id. `use_item` takes the id and nothing else in the brief
             # named one, so the model had no way to say it and wrote `heal 1d8+1`

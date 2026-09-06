@@ -220,3 +220,114 @@ def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client):
     finally:
         if path.exists():
             path.unlink()
+
+
+# --- the anatomy: eidolon evolutions, free of cost ----------------------------------------------
+
+def test_evolutions_expand_into_the_grammar_and_cost_no_race_points():
+    """"they can craft the anatomy from the Eidolon evolutions free of cost": claws
+    become a natural weapon, flight a fly speed at the base speed, +8 Stealth a
+    skill_mod, extra legs +10 ft — and none of it moves the race-point total."""
+    doc = {"name": "Built", "choose": list(races.STANDARD_CHOOSE),
+           "evolutions": [{"id": "claws"}, {"id": "flight"}, {"id": "skilled", "choice": "stealth"},
+                          {"id": "limbs-legs"}, {"id": "resistance", "choice": "fire"},
+                          {"id": "immunity", "choice": "cold"}, {"id": "ferocity"}]}
+    d = races.derive(doc)
+    assert d["speed"] == 40 and d["speeds"] == {"land": 40, "fly": 40}
+    assert [w["key"] for w in d["weapons"]] == ["claws"]
+    assert {"type": "skill_mod", "target": "stealth", "amount": 8, "bonus_type": "racial"} in d["modifiers"]
+    assert "resist.fire.5" in d["tags"] and "immune.cold" in d["tags"] and "ferocity" in d["tags"]
+    assert races.rp(doc) == 0 == races.rp({"name": "Bare", "choose": list(races.STANDARD_CHOOSE)})
+    assert races.validate(doc) == []
+    # A pick without its choice, and an attack without the body part it hangs off.
+    problems = races.validate({"name": "x", "evolutions": [{"id": "sting"}, {"id": "skilled"}]})
+    assert any("pick the skill" in p for p in problems)
+    assert any("needs Tail" in p for p in problems)
+    assert len(races.evolutions()) >= 50
+
+
+def _built(tmp_id="built-one", **evs):
+    doc = races.normalise({"id": tmp_id, "name": "Built One", "size": "small",
+                           "choose": list(races.STANDARD_CHOOSE),
+                           "evolutions": evs.get("evolutions", [])})
+    races.homebrew_dir(make=True).joinpath(f"{tmp_id}.json").write_text(
+        json.dumps(doc), encoding="utf-8")
+    return races.homebrew_dir().joinpath(f"{tmp_id}.json")
+
+
+def test_a_natural_weapon_is_in_the_hand_by_the_bodys_size_and_is_proficient():
+    path = _built(evolutions=[{"id": "claws"}, {"id": "bite"}])
+    try:
+        pc = load_pc("fixtures/pc-kesst.json")
+        pc.race = "built-one"
+        pc.size = "small"
+        claws = pc.weapon("claws")
+        assert claws["name"] == "claws" and claws["damage"] == "1d3"   # Small
+        assert claws["type"] == "slashing" and claws["natural"]
+        assert pc.weapon("talons")["name"] == "claws"                   # an alias
+        assert pc.is_proficient("claws") and pc.is_proficient("bite")
+        pc.size = "medium"
+        assert pc.weapon("bite")["damage"] == "1d6"
+    finally:
+        path.unlink()
+
+
+def test_immunity_resistance_and_ferocity_are_read_off_the_tags():
+    path = _built(evolutions=[{"id": "immunity", "choice": "cold"},
+                              {"id": "resistance", "choice": "fire"}, {"id": "ferocity"}])
+    try:
+        pc = load_pc("fixtures/pc-kesst.json")
+        pc.race = "built-one"
+        assert pc.immune_to("cold") and not pc.immune_to("fire")
+        assert pc.resistance("fire") == 5 and pc.resistance("acid") == 0
+        # Below 0 with ferocity: staggered and dying, not unconscious.
+        pc.hp = -2
+        pc.apply_hp_state()
+        assert pc.has_condition("staggered") and pc.has_condition("dying")
+        assert not pc.has_condition("unconscious")
+        pc.race = "human"
+        pc.remove_condition("staggered"); pc.remove_condition("dying")
+        pc.apply_hp_state()
+        assert pc.has_condition("unconscious")
+    finally:
+        path.unlink()
+
+
+def test_the_brief_tells_the_narrator_what_the_body_can_do():
+    from gm import prompts
+    from rules.engine import Engine, Scene
+
+    path = _built(evolutions=[{"id": "flight"}, {"id": "darkvision"}, {"id": "claws"}])
+    try:
+        s = Scene(location_id="5bbd0c40345f")
+        pc = load_pc("fixtures/pc-kesst.json")
+        pc.race = "built-one"
+        s.add(pc)
+        e = Engine(s, Dice(seed=1), world=WORLD)
+        brief = prompts.scene_brief(WORLD, s, WORLD.get("5bbd0c40345f"), here=e.here(), known=e.places())
+        assert "A Built One: moves by fly 30 ft as well as on foot; senses: darkvision 60 ft; natural weapons: claws." in brief
+    finally:
+        path.unlink()
+
+
+def test_the_race_editor_page_carries_the_catalogue_and_opens_a_race(client):
+    r = client.get("/homebrew/races/?open=dwarf")
+    assert r.status_code == 200
+    page = r.content.decode("utf-8")
+    assert '"evolutions"' in page and "Claws" in page and '"open": "dwarf"' in page
+    d = client.get("/api/races/open/dwarf").json()
+    assert d["source"] == "shipped" and d["rp"] > 0 and "sense.darkvision.60" in d["tags"]
+    # A pickers-built document saves through the same door as the bench.
+    body = {"name": "Editor Built", "type": "humanoid", "size": "medium", "speed": 30,
+            "mods": {}, "choose": list(races.STANDARD_CHOOSE), "budget": {},
+            "languages": ["common"],
+            "evolutions": [{"id": "bite"}, {"id": "skilled", "choice": "perception"}]}
+    r = client.post("/api/bench/races/save", data=json.dumps(body), content_type="application/json")
+    assert r.status_code == 200, r.content
+    try:
+        saved = json.loads(races.homebrew_dir().joinpath("editor-built.json").read_text(encoding="utf-8"))
+        assert saved["evolutions"] == [{"id": "bite", "choice": "", "times": 1},
+                                       {"id": "skilled", "choice": "perception", "times": 1}]
+        assert "natural.bite" in races.document("editor-built")["tags"]
+    finally:
+        races.homebrew_dir().joinpath("editor-built.json").unlink()

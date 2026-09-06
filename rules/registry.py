@@ -246,6 +246,14 @@ KINDS: dict[str, Kind] = {
             Field("not_yet", "Not yet", type="textarea",
                   help="What this race has that the sheet cannot read yet — said here "
                        "rather than silently dropped."),
+            # Set by the race editor's pickers rather than typed: the anatomy as eidolon
+            # evolutions, and where an imported race came from. Declared so the save
+            # keeps them — `save_thing` writes only the fields a kind declares.
+            Field("evolutions", "Anatomy (eidolon evolutions)", type="list"),
+            Field("weapons", "Natural weapons", type="list"),
+            Field("origin", "Origin"),
+            Field("people_id", "People"),
+            Field("world", "World"),
         ],
     ),
     "feats": Kind(
