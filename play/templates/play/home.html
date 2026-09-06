@@ -101,6 +101,10 @@
   /* --- cards --- */
   .cards { display: grid; gap: 32px;
            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  /* The cards' engraved frame (`.card::after`, inset -34px) reaches 34px past the
+     card. A button placed straight after the grid sat inside that reach: "Begin a
+     sandbox" printed across the bottom rule of "Someone new" (2026-09-05). */
+  .cards + .go { margin-top: 44px; }
   .card {
     background: linear-gradient(#191309, #120e09); border: 1px solid var(--edge);
     border-radius: 3px; padding: 16px 18px; text-align: left;

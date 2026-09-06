@@ -965,6 +965,7 @@ class GMAgent:
         """
         fighting = self.engine.scene.in_encounter
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
+        self.last_suggestions: list[str] = []
         messages = prompts.call_prose_messages(
             brief, [], player_input, tells, in_combat=fighting,
             enemy=self._current_enemy(), earlier=earlier)
@@ -1003,7 +1004,14 @@ class GMAgent:
                     messages, model, host, as_json=True, think=False,
                     temperature=0.8, num_predict=1400, provider=provider,
                     api_key=key, schema=schema)
-                text = str(reply.json().get("narration", "")).strip()
+                data = reply.json()
+                text = str(data.get("narration", "")).strip()
+                # The prose reply's own "you could". Under intents-first the plan
+                # call is told to write nothing, so its suggestions are empty, and
+                # this call's — admitted by the schema, and good — were parsed and
+                # dropped. Reported at the table, 2026-09-05: "there are no options
+                # there should be 3 options".
+                self.last_suggestions = _suggestions(data)
             except Exception as exc:
                 # The reply itself, and the real elapsed time. The turn log's own
                 # comment records learning this once — "the attempts were unpacked

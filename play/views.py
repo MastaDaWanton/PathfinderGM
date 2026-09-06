@@ -1140,6 +1140,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 resolution.outcomes, player_input, brief, earlier)
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
+        # The prose call's suggestions win when it made any: under intents-first
+        # the plan wrote none, and the page showed no options at all.
+        offered = list(getattr(agent, "last_suggestions", []) or [])
+        if offered:
+            c.suggestions = offered
         # Into the ledger, not the void: a live holding-line turn used to leave
         # no record of why the prose whiffed — the attempts were unpacked into
         # `_` and dropped, so the one diagnosable artefact never existed.

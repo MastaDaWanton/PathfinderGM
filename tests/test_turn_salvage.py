@@ -171,3 +171,58 @@ def test_the_turn_is_handed_to_the_fallback_model_before_the_player_sees_red(mon
     assert calls[:5] == [settings.MODELS["narrator"]["model"]] * 5
     assert calls[5] == settings.MODELS["fallback"]["model"]
     assert any("handing the turn to" in r for r in plan.rejections)
+
+
+def test_the_prose_calls_suggestions_are_kept_for_the_page(monkeypatch):
+    """"there are no options there should be 3 options." Under intents-first the plan
+    call writes no narration and no suggestions with it; the prose call's own —
+    admitted by its schema, and good — were parsed and dropped. A played turn showed
+    no chips at all. They are kept on the agent now, and the view takes them."""
+    from gm import agent as agent_mod
+    from rules.dice import Dice
+    from rules.engine import Engine
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    engine = Engine(scene, Dice(seed=7))
+
+    class FakeWorld:
+        name = "Testholme"
+        secret = ""
+        premise: dict = {}
+        entities: dict = {}
+        unwritten: list = []
+        chronology: list = []
+        factions: list = []
+
+        def ancestors(self, _):
+            return []
+
+    class FakeReply:
+        def __init__(self, text):
+            self.text, self.seconds, self.model = text, 0.0, "fake"
+
+        def json(self):
+            import json as j
+
+            return j.loads(self.text)
+
+    beat = ("The yard is quiet and the foreman is looking at his board rather than "
+            "at you, which is how a man looks when he has a name to strike off. " * 8
+            + "What do you do?")
+
+    def fake_chat(messages, model, host, **kw):
+        import json as j
+
+        return FakeReply(j.dumps({"narration": beat,
+                                  "suggestions": ["Ask him whose name it is",
+                                                  "Offer to take the job",
+                                                  "Leave the yard"],
+                                  "intents": []}))
+
+    monkeypatch.setattr(agent_mod.client, "chat", fake_chat)
+    gm = agent_mod.GMAgent(FakeWorld(), engine)
+    text, repairs, attempts = gm.narrate_turn([], "I wait.", "BRIEF", earlier=[])
+    assert text.startswith("The yard is quiet")
+    assert gm.last_suggestions == ["Ask him whose name it is", "Offer to take the job",
+                                   "Leave the yard"]
