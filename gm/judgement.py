@@ -2556,6 +2556,19 @@ _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
     r"(?:" + _CAST_ROLES + r"))\b", re.I)
 _CAST_MAX = 8
+# Words that cannot be part of a person's description: what separates "a tall hooded
+# stranger" from "the weaver is a man".
+_NOT_AN_ADJECTIVE = frozenset({
+    "is", "are", "was", "were", "be", "been", "being", "a", "an", "the", "and", "or",
+    "but", "of", "with", "other", "right", "wrong", "same", "some", "any", "no", "not",
+    "this", "that", "these", "those", "his", "her", "their", "its", "my", "your", "our",
+    "in", "on", "at", "to", "for", "from", "as", "by", "who", "whom", "which", "whose",
+    "has", "have", "had", "than", "then", "there", "here", "where", "when", "if", "so",
+    "very", "only", "just", "even", "still", "also", "too", "all", "both", "each",
+    "every", "few", "many", "most", "several", "such", "what", "how",
+})
+# Heads that name a crowd, not a person to speak to.
+_NOBODY_IN_PARTICULAR = frozenset({"people", "folk", "men", "women", "others"})
 
 # Where a noted person stands, in the engine's own three words. Reported at the
 # table, 2026-09-06, with the map open: a servant "beside you", a hooded man "at the
@@ -2682,7 +2695,27 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         # path — `_CAST_GROUP` claims "a group of four men" before this loop runs.
         if " of " in f" {who} ":
             continue
+        # The filler between the article and the role is up to three arbitrary words,
+        # and arbitrary is what they were. Booked at the table, 2026-09-06: "is a man",
+        # "other a woman", "right people", "Weaver's the stranger". A filler that is a
+        # verb, an article, a pronoun or a possessive is not an adjective, so the
+        # phrase is cut back to the adjectives after the last such word; a possessive
+        # means a place ("the Weaver's …") and a generic plural is nobody in particular.
+        words = who.split()
+        keep = 0
+        for i, w in enumerate(words[:-1]):
+            low = w.lower()
+            if low in _NOT_AN_ADJECTIVE:
+                keep = i + 1
+            if low.endswith(("'s", "’s")):
+                keep = None
+                break
+        if keep is None:
+            continue
+        who = " ".join(words[keep:])
         head = who.split()[-1].lower()
+        if head in _NOBODY_IN_PARTICULAR:
+            continue
         if head in heads or head in real:
             continue
         heads.add(head)

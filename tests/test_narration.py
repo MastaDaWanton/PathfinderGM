@@ -1882,3 +1882,42 @@ def test_no_worked_example_forces_a_door():
         line = ex["player"].lower()
         assert not re.search(r"\b(?:force|shoulder|break|kick)\b.*\bdoor\b", line), line
     assert not any("swollen with damp" in ex["reply"]["narration"] for ex in prompts.EXAMPLES)
+
+
+def test_a_place_name_is_not_a_stranger():
+    """"The Weaver's Rest is a place for those seeking rest" shipped as "The Weaver's
+    the stranger is a place…", 2026-09-06: "Rest" read as an invented person. A
+    capitalised word beside a place noun, or a place noun after a possessive, is
+    somewhere."""
+    from gm.narration import invented_names, unname_strangers
+
+    text = ("'The Weaver's Rest is a place for those seeking a quiet word,' she says. "
+            "Salt Market is closed. You could try Harrow Bridge, or ask Kaida.")
+    assert invented_names(text, set()) == ["Kaida"]
+    out, _ = unname_strangers(text, set())
+    assert "Weaver's Rest" in out and "Salt Market" in out and "Harrow Bridge" in out
+    assert "Kaida" not in out
+
+
+def test_a_beat_that_is_the_last_beat_again_is_cut_even_inside_quotes():
+    """"I thank her" came back as the previous two beats re-quoted nearly word for word
+    — the same sentences with the punctuation moved, every one inside her speech, so
+    the speech exemption shipped it. A beat that is mostly repeats is regurgitation
+    whatever the quote marks say; a guard repeating one line still is not."""
+    earlier = ["'Wisdom is a heavy burden to carry alone,' she says, her voice dropping "
+               "an octave. 'And the city is a labyrinth where one can easily lose their "
+               "way, or their head.' She hands you the paper. It is a map of the nearby "
+               "district, marked with small hand-drawn symbols."]
+    again = ("'Wisdom is a heavy burden to carry alone, ' she says, her voice dropping an "
+             "octave. 'And the city is a labyrinth where one can easily lose their way, "
+             "or their head. ' She hands you the paper. What do you do?")
+    kept, cut = narration.drop_repeated_beats(again, earlier)
+    # The two long sentences go; "She hands you the paper." is under the length a
+    # repeat is judged at, and stays.
+    assert cut == 2 and kept.strip() == "She hands you the paper. What do you do?"
+    # One line of speech repeated in a fresh beat is characterisation.
+    one = ("The guard shakes his head again. 'And the city is a labyrinth where one can "
+           "easily lose their way, or their head.' He does not move from the gate, and "
+           "the rain keeps on. The queue behind you mutters. What do you do?")
+    same, cut = narration.drop_repeated_beats(one, earlier)
+    assert cut == 0 and same == one

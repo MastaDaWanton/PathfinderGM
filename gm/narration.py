@@ -42,6 +42,23 @@ _QUOTED = re.compile(
 _SENTENCE = re.compile(r"[^.!?]+[.!?]?")
 
 # Capitalised words that are not names.
+# The nouns a place is named with. A capitalised token beside one of these — "the
+# Weaver's Rest", "Salt Market", "Harrow Bridge" — is somewhere, not somebody, and the
+# un-namer must leave it be: measured at the table, 2026-09-06, "The Weaver's Rest is a
+# place for those seeking rest" shipped as "The Weaver's the stranger is a place…", and
+# the cast ledger then booked "Weaver's the stranger" as a person.
+#
+# Only the nouns that are never a surname. "Vale", "Hill", "Wood", "Bank", "Reach",
+# "Ford", "Moor" are all people's names in this app's own tests ("Serath Vale"), and a
+# list that held them turned a person into a place.
+PLACE_NOUNS = frozenset({
+    "rest", "inn", "tavern", "alehouse", "market", "square", "street", "lane", "road",
+    "row", "gate", "gatehouse", "bridge", "district", "quarter", "ward", "hall",
+    "yard", "bazaar", "temple", "shrine", "tower", "keep", "crossing", "wharf", "dock",
+    "docks", "quay", "stairs", "landing", "chapel", "abbey", "guildhall", "exchange",
+    "cellars", "plaza", "arcade", "colonnade",
+})
+
 _NOT_A_NAME = {
     "the", "a", "an", "and", "but", "or", "so", "if", "when", "while", "as", "at", "in",
     "on", "of", "for", "from", "to", "with", "without", "into", "onto", "over", "under",
@@ -292,6 +309,17 @@ def destutter(text: str) -> str:
 _OPENS_SPEECH = re.compile(r"(?:^|\s)[\'‘\"“]")
 
 
+# Above this share of a beat's sentences already read, the beat is the last one again.
+REGURGITATED_SHARE = 40
+
+
+def _same_words(sentence: str) -> str:
+    """A sentence reduced to its words, so a re-quoting with the punctuation moved —
+    "'And the guards at the main gate are. '" for "…and the guards at the main gate
+    are…" — is the same sentence."""
+    return " ".join(re.findall(r"[a-z0-9']+", (sentence or "").lower()))
+
+
 def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]:
     """Delete sentences the player has already read, mechanically.
 
@@ -306,18 +334,33 @@ def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]
     """
     if not text or not earlier:
         return text or "", 0
-    recent = {s.strip().lower() for e in earlier[-6:]
+    recent = {_same_words(s) for e in earlier[-6:]
               for s in _SENTENCE.findall(e or "") if len(s.strip()) > 30}
+    recent.discard("")
     if not recent:
         return text, 0
+    sentences = [s.strip() for s in _SENTENCE.findall(text) if s.strip()]
+    repeated = [len(s) > 30 and _same_words(s) in recent for s in sentences]
+    # A beat that is mostly the last beat again is not a guard repeating himself,
+    # whatever the quote marks say. Reported at the table, 2026-09-06: "I thank her"
+    # came back as the previous two beats re-quoted nearly word for word, and every
+    # repeated sentence sat inside her speech, so the speech exemption shipped it.
+    regurgitated = (sum(repeated) >= 2
+                    and sum(repeated) * 100 >= REGURGITATED_SHARE * len(sentences))
     kept: list[str] = []
     cut = 0
-    for sentence in _SENTENCE.findall(text):
-        s = sentence.strip()
-        if (len(s) > 30 and s.lower() in recent
-                and not _OPENS_SPEECH.search(s)):
+    prev_cut = False
+    for s, again in zip(sentences, repeated):
+        if again and (regurgitated or not _OPENS_SPEECH.search(s)):
             cut += 1
+            prev_cut = True
             continue
+        # A cut sentence's closing quote lands at the head of the next one — "head. '
+        # She hands you" splits as "' She hands you" — and an unmatched leading quote
+        # after a cut is that orphan.
+        if prev_cut and s[:1] in "'‘’\"“”" and s.count(s[0]) % 2 == 1:
+            s = s[1:].lstrip()
+        prev_cut = False
         kept.append(s)
     if not kept or not cut:
         # Cutting everything would be worse than repeating; and zero cuts means the
@@ -1284,6 +1327,22 @@ def invented_names(text: str, known: set[str]) -> list[str]:
         tokens = re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", sentence)
         if not tokens:
             continue
+        # A place, by its shape: a capitalised token beside a place noun, or a place
+        # noun after a possessive ("the Weaver's Rest"), is somewhere, not somebody.
+        words = re.findall(r"[A-Za-z][a-zA-Z'’-]*", sentence)
+        placed: set[str] = set()
+        for i, w in enumerate(words):
+            prev = words[i - 1] if i else ""
+            nxt = words[i + 1] if i + 1 < len(words) else ""
+            # Both halves capitalised: "Salt Market" and "the Weaver's Rest" are places;
+            # "let Kaida rest" and "Serath Vale steps out" are people doing things.
+            if (w[:1].isupper() and w.lower() in PLACE_NOUNS
+                    and (prev[:1].isupper() or prev.endswith(("'s", "’s")))):
+                placed.add(w)
+                if prev[:1].isupper():
+                    placed.add(prev)
+            elif nxt[:1].isupper() and nxt.lower() in PLACE_NOUNS and w[:1].isupper():
+                placed.add(w)
         first = sentence.strip().split(" ")[0].strip(".,!?;:'\"")
         # A quote begins a sentence too. `_SENTENCE` splits on full stops, so the first
         # word *inside* speech sits mid-sentence and was read as a name: measured across
@@ -1310,6 +1369,8 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             if re.split(r"['’]", low)[0] in _NOT_A_NAME:
                 continue
             if tok == first or tok in opens_speech:   # a sentence start proves nothing
+                continue
+            if tok in placed:
                 continue
             if low not in found:
                 found.append(tok)

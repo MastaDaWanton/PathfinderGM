@@ -1527,3 +1527,23 @@ def test_a_crowd_is_people():
     judgement.promote_cast(s2, added)
     assert sorted(a.name for a in s2.actors.values()) == [
         "guard", "guard", "merchant"]
+
+
+def test_the_ledger_books_people_not_turns_of_phrase():
+    """Seen in the scene panel, 2026-09-06: "is a man", "other a woman", "right
+    people", "Weaver's the stranger", beside real people. A filler word that is a
+    verb, an article, a pronoun or a possessive is not an adjective; a possessive
+    means a place; a generic plural is nobody."""
+    from rules.engine import Scene
+    from rules.sheet import load_pc
+
+    s = Scene()
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    beat = ("The weaver is a man of few words. Beside him the other a woman waits. "
+            "It is where the right people find their way. The Weaver's the stranger "
+            "is a place for rest. A tall hooded stranger watches from the door.")
+    added = judgement.note_cast(s, beat, turn=3)
+    assert "is a man" not in added and "other a woman" not in added
+    assert "right people" not in added and not any("Weaver" in a for a in added)
+    assert "man" in added and "woman" in added
+    assert "tall hooded stranger" in added
