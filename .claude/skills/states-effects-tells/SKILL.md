@@ -73,7 +73,12 @@ by `classbuilder.validate_feat_documents`, read live by `Actor._feat_mods` insid
 `_buff_mods(kind, target, ctx)` (never stored), `has_state` reading
 `standing_tags()`; **hazards** — `content/rules/hazards.json` rows with a bounded
 slot, the `hazard` op (docs/stage-8-plan.md; ratchets in
-`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`).
+`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`); **the three
+doors places come in by** — a settlement's own words imply spots (`places.IMPLIED`),
+the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
+as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
+(`venture`); all of it in `Scene.founded`, read back through the one derivation
+`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —

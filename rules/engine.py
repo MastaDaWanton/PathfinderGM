@@ -227,6 +227,11 @@ class Scene:
     # in play, as dicts, kept by the engine and shown to the model when their keys
     # appear in the last few beats. The store; `cards.load`/`cards.save` are the doors.
     cards: list[dict] = field(default_factory=list)
+    # Places minted in play (`rules/places.py`, doors two and three): the stored
+    # exception to "derived, never stored", since the player made them. Place dicts
+    # with a parent and an owner; `places.with_founded` grafts them onto the derived
+    # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
+    founded: list[dict] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -3248,7 +3253,8 @@ class Engine:
         # The bare id when the world is not to hand: it is what seeds the layout, so a
         # scene still has its places without one.
         return places_mod.for_scene(found or self.scene.location_id, self.scene.at,
-                                    terrain_hint=self._terrain_hint(found))
+                                    terrain_hint=self._terrain_hint(found),
+                                    founded=self.scene.founded)
 
     def here(self):
         """The place the party is standing in. Never None — they are always somewhere."""
@@ -3277,7 +3283,8 @@ class Engine:
             found = (self.world.get(self.scene.location_id) if self.world else None)
             known = places_mod.for_scene(
                 found or self.scene.location_id, place_id,
-                terrain_hint=places_mod.terrain_of(place_id))
+                terrain_hint=places_mod.terrain_of(place_id),
+                founded=self.scene.founded)
             target = places_mod.find(known, place_id)
             if target is None:
                 raise ValueError(f"place_party: no place {place_id!r} here; the places "
@@ -3831,6 +3838,165 @@ class Engine:
                                           stock=stock, effects=effects)
         return Outcome(intent_id=intent.id, op="prospect", effects=effects,
                        tell=tell, because=intent.because)
+
+    # --- the doors places come in by (rules/places.py) --------------------------------
+
+    def _parent_place(self, wanted: str):
+        from . import places as places_mod
+
+        known = self.places()
+        if not str(wanted or "").strip():
+            return self.here(), known
+        return places_mod.find(known, str(wanted)), known
+
+    def _op_found(self, intent: Intent, partial: dict) -> Outcome:
+        """The player makes a place from where they stand: a base at a friend's house,
+        the alley behind the market. LambdaMOO's `@dig`: a room exists because a
+        command created it, with an owner and a link — never because the narrator
+        described it. The engine mints the id under the parent; the owner, if any, is a
+        person the engine already holds and is granted `holds.place.<slug>` through the
+        one applicator; and the base gets a situation card so what is done to it
+        accumulates (Blades in the Dark's lair). Standing there is a separate `travel`.
+        """
+        from . import cards as cards_mod
+        from . import places as places_mod
+        from .activeeffect import ActiveEffect
+
+        name = " ".join(str(intent.params.get("name") or "").split()).strip(".")
+        if not (3 <= len(name) <= 60):
+            return self._refuse(intent, "A place needs a name of a few words to be founded.")
+        parent, known = self._parent_place(str(intent.params.get("parent") or ""))
+        if parent is None:
+            return self._refuse(
+                intent, f"There is no {intent.params.get('parent')} here to found it off. "
+                        f"From here you can reach {', '.join(p.name for p in known)}.")
+        if places_mod.find(known, name) is not None:
+            return self._refuse(intent, f"{name} is already a place here.")
+        if len(places_mod.children_of(self.scene.founded, parent.id)) >= places_mod.MOST_CHILDREN:
+            return self._refuse(
+                intent, f"{parent.name} already has as many places hanging off it as one "
+                        f"place can hold; found it off somewhere else.")
+        owner_ref = str(intent.params.get("owner") or "").strip()
+        owner = None
+        if owner_ref:
+            owner = self.scene.actors.get(owner_ref)
+            if owner is None:
+                match = [a for a in self.scene.actors.values()
+                         if not a.is_pc and str(a.name).lower() == owner_ref.lower()]
+                owner = match[0] if len(match) == 1 else None
+            if owner is None:
+                return self._refuse(
+                    intent, f"Nobody here is called {owner_ref} to hold it. The people "
+                            f"here are {', '.join(f'{a.name} ({r})' for r, a in self.scene.actors.items() if not a.is_pc) or 'nobody'}.")
+        place = places_mod.mint(parent, name, str(intent.params.get("about") or "")[:120],
+                                owner=owner.ref if owner is not None else "",
+                                origin="found")
+        self.scene.founded.append(place.as_dict())
+        slug = place.id.rsplit("/", 1)[-1]
+        if owner is not None:
+            owner.apply_effect(ActiveEffect(
+                name=f"holds {name}", kind="situation", key=f"holds:{place.id}",
+                source=f"place:{place.id}", origin="found",
+                duration="until-dismissed", tags=(f"holds.place.{slug}",)))
+        pc = self.scene.pc()
+        cards_mod.open_card(self.scene, cards_mod.Card(
+            id=f"place-{slug}", title=f"{name}, off {parent.name}",
+            facts=[f"Founded from {parent.name}"
+                   + (f", held by {owner.name}" if owner is not None else "") + "."],
+            tags=("situation.place", cards_mod.TAG_PLAY),
+            people=[owner.ref] if owner is not None else [], place=place.id,
+            clock_max=6, origin="found"), turn=0)
+        held = f", held by {owner.name}" if owner is not None else ""
+        return Outcome(
+            intent_id=intent.id, op="found",
+            effects=[{"kind": "place", "id": place.id, "name": name,
+                      "parent": parent.id, "owner": place.owner}],
+            tell=f"{name} is a place now, off {parent.name}{held}. "
+                 f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
+            because=intent.because)
+
+    def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
+        """Ground gone into: the sewers under the town, a cave in the hills outside it.
+        Generated on entry from a seed off the parent's id (the roguelike answer), so the
+        same stairs lead to the same cellar next time; the way there costs the hours the
+        kind says, through the same body toll foraging pays; and something may live
+        there — from the bestiary, by the ground, never invented. The party is moved in.
+        """
+        from . import gathering
+        from . import places as places_mod
+
+        kind = str(intent.params.get("kind") or "").strip().lower()
+        if kind not in places_mod.VENTURES:
+            return self._refuse(
+                intent, f"There is no such ground as {kind or 'that'} to go into. The "
+                        f"kinds are: {', '.join(sorted(places_mod.VENTURES))}.")
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            return self._refuse(intent, "Nobody is here to go in.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight; end it or get clear first.")
+        parent, known = self._parent_place(str(intent.params.get("parent") or ""))
+        if parent is None:
+            return self._refuse(
+                intent, f"There is no {intent.params.get('parent')} here to go in from. "
+                        f"From here you can reach {', '.join(p.name for p in known)}.")
+        made = places_mod.venture_set(parent, kind)
+        head = made[0]
+        # The same place the second time: the id is seeded off the parent, so a return
+        # finds the venture already minted and simply goes there.
+        existing = places_mod.find(known, head.id)
+        if existing is None:
+            if len(places_mod.children_of(self.scene.founded, parent.id)) >= places_mod.MOST_CHILDREN:
+                return self._refuse(
+                    intent, f"{parent.name} already has as many places hanging off it "
+                            f"as one place can hold.")
+            for pl in made:
+                self.scene.founded.append(pl.as_dict())
+            fresh = True
+        else:
+            head = existing
+            fresh = False
+        spec = places_mod.VENTURES[kind]
+        hours = int(spec["hours"])
+        toll_note = ""
+        if hours:
+            toll = survival.pass_hours(actor, hours, self.dice, biome=head.terrain)
+            self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                               charge_body=False)
+            if toll.checks:
+                toll_note = f" The way cost them: {survival_note(toll)}"
+        # In through the one mover: the party goes, the escorts named come, the rest
+        # stay — exactly what `travel` does, by way of it.
+        travel = Intent(op="travel", actor=actor.ref, because=intent.because,
+                        params={"place": head.id, "with": list(intent.params.get("with") or [])},
+                        visibility="hidden", id=intent.id, origin=intent.origin,
+                        origin_name=intent.origin_name)
+        moved = self._op_travel(travel, {})
+        effects = [{"kind": "place", "id": head.id, "name": head.name, "parent": parent.id,
+                    "fresh": fresh, "spots": [m.name for m in made[1:]]}] + list(moved.effects)
+        tell = (f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
+                f"{parent.name}" + (f" — {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
+                + ". " + moved.tell + toll_note)
+        # Something may live here. Half the time, by the ground, from the bestiary.
+        pc = self.scene.pc()
+        level = getattr(pc, "level", 1) if pc is not None else 1
+        if self.dice.roll("1d2", label="is it inhabited", visibility="hidden").total == 2:
+            row = gathering.creature_for(head.terrain, max(1, int(level)), self.dice)
+            if row is not None:
+                born = self._bring_in(row["id"], count=1, name=row["name"])
+                ref = born[0]["ref"]
+                self.scene.zones[ref] = "far"
+                self.scene.positions.pop(ref, None)
+                aggressive = row.get("creature_type") in gathering.AGGRESSIVE
+                effects.append({"kind": "gathering", "encounter": "creature",
+                                "creature": row["name"], "aggressive": aggressive})
+                tell += (f" Something lives here: {gathering._an(row['name'])}"
+                         + (", and it has seen you." if aggressive else ", further in."))
+                if aggressive and pc is not None and actor.ref == pc.ref:
+                    self._ensure_encounter(pc.ref, target=ref)
+        return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
+                       because=intent.because)
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]

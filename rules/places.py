@@ -70,6 +70,77 @@ _WILD = (
     ("the high ground", "somewhere to see from"),
 )
 
+# --- door one: places the world implies ------------------------------------------------------
+#
+# "why did it not make a docks?" Vyrakon's export says "port access" and "cyclone-prone
+# coastlines", and the settlement table had no harbour row, so the facts that justified
+# one were never read. Each row: the words that imply the place, in the settlement's own
+# facts and paragraphs, and the spot they imply. Read mechanically, deterministic,
+# nothing the model authors — the world said it.
+IMPLIED = (
+    (("port", "harbour", "harbor", "dock", "docks", "quay", "wharf", "fishing", "ships",
+      "shipping", "boats"), ("the docks", "where the boats come in")),
+    (("river", "bridge", "ferry", "crossing"), ("the bridge", "over the water")),
+    (("guild", "guilds", "guildhall"), ("the guildhall", "where the trades meet")),
+    (("library", "archive", "archives", "scriptorium", "scribes"),
+     ("the library", "where the records are kept")),
+    (("walls", "fort", "fortress", "keep", "castle", "citadel", "garrison"),
+     ("the keep", "where the soldiers are")),
+    (("mine", "mines", "mining", "quarry", "ore"), ("the mine head", "where the ore comes up")),
+    (("shrine", "temple", "cathedral", "priests", "prayers", "faith"),
+     ("the shrine", "somewhere to be quiet")),
+    (("well", "spring", "cistern", "fountain"), ("the well", "where the water is")),
+)
+# A settlement may carry this many implied spots over its generated set — a port town
+# gets its docks even when the table has filled six — and no more.
+MOST_IMPLIED = 2
+
+# --- door three: ground you go into ----------------------------------------------------------
+#
+# "what if i choose to explore the sewers or i go outside the city to a cave." The
+# roguelike answer: not authored, GENERATED ON ENTRY FROM A SEED, so the same stairs lead
+# to the same cellar next time. Each kind: the ground it stands on (the engine's own biome
+# vocabulary), the spots it is made of, and how many hours the way there costs when it
+# lies outside the settlement (0 for something under or inside it).
+VENTURES: dict[str, dict] = {
+    "sewers": {"label": "the sewers", "terrain": "underground", "hours": 0,
+               "spots": (("the outfall", "where it meets the daylight"),
+                         ("the main channel", "the way the water goes"),
+                         ("the sump", "as low as it goes"))},
+    "cellar": {"label": "the cellars", "terrain": "underground", "hours": 0,
+               "spots": (("the stair", "the way down"),
+                         ("the vaults", "where things are kept"))},
+    "crypt": {"label": "the crypt", "terrain": "ruins", "hours": 0,
+              "spots": (("the stair", "the way down"),
+                        ("the niches", "where the dead are"),
+                        ("the deep chamber", "as far in as this goes"))},
+    "rooftops": {"label": "the rooftops", "terrain": "urban", "hours": 0,
+                 "spots": (("the ridge", "the high way across"),
+                           ("the gutter", "where it drops"))},
+    "alley": {"label": "the back alley", "terrain": "urban", "hours": 0,
+              "spots": ()},
+    "cave": {"label": "the cave", "terrain": "underground", "hours": 2,
+             "spots": (("the mouth", "the way in and out"),
+                       ("the throat", "where the light goes"),
+                       ("the deep chamber", "as far in as this goes"))},
+    "mine": {"label": "the old mine", "terrain": "underground", "hours": 2,
+             "spots": (("the adit", "the way in"),
+                       ("the gallery", "where they dug"),
+                       ("the flooded level", "as low as it goes"))},
+    "ruins": {"label": "the ruins", "terrain": "ruins", "hours": 2,
+              "spots": (("the gate", "the way in"),
+                        ("the courtyard", "the open middle"),
+                        ("the undercroft", "as low as it goes"))},
+    "tower": {"label": "the tower", "terrain": "ruins", "hours": 1,
+              "spots": (("the foot", "the way in"),
+                        ("the top", "somewhere to see from"))},
+}
+# How many places may hang off one parent, in play. Fate caps a conflict at two to four
+# zones and Inform calls for "a small number of named positions"; the ceiling applies per
+# parent, not to the world — a town of six, an alley of three, a sewer of four — so the
+# model's choice stays small while the world grows.
+MOST_CHILDREN = 6
+
 # The ground a settlement stands on, by construction. Four predicates used to answer
 # "is this a town" — `biomes.from_world`'s `kind == "CITY"`, `_settled` here,
 # `_at_market`'s `== "urban"` and the injector's `_SETTLEMENT_KINDS` — and the review
@@ -97,6 +168,13 @@ class Place:
     id: str = ""
     name: str = ""
     about: str = ""
+    # For a place minted in play (doors two and three): the place it hangs off, who
+    # holds it, and how it came to be — `found` (the player's declaration, with an
+    # owner) or `venture` (ground gone into, generated from a seed) — the same
+    # provenance rule every number carries. Empty on a generated place.
+    parent: str = ""
+    owner: str = ""
+    origin: str = ""
     # Read off the id, never stored beside it. `biome` as a sibling field on the scene
     # is precisely what let "both are urban" defeat the transition.
     terrain: str = ""
@@ -110,7 +188,8 @@ class Place:
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "about": self.about,
                 "terrain": self.terrain, "exits": list(self.exits),
-                "described_only": self.described_only}
+                "described_only": self.described_only,
+                "parent": self.parent, "owner": self.owner, "origin": self.origin}
 
 
 def from_dict(d: dict) -> Place:
@@ -119,6 +198,8 @@ def from_dict(d: dict) -> Place:
         about=str(d.get("about") or ""), terrain=str(d.get("terrain") or ""),
         exits=tuple(str(x) for x in (d.get("exits") or ())),
         described_only=bool(d.get("described_only")),
+        parent=str(d.get("parent") or ""), owner=str(d.get("owner") or ""),
+        origin=str(d.get("origin") or ""),
     )
 
 
@@ -180,8 +261,13 @@ def _settled(location, terrain: str = "") -> bool:
     return str(terrain or "").lower() in ("", URBAN)
 
 
+import re as _re
+
+_WORDS = _re.compile(r"[a-z][a-z'-]+")
+
+
 def _slug(label: str) -> str:
-    return "-".join(str(label).lower().split())
+    return "-".join(_re.sub(r"[^a-z0-9 ]", "", str(label).lower()).split())
 
 
 def _build(location_id: str, terrain: str, table) -> tuple[Place, ...]:
@@ -216,8 +302,43 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
         return (Place(id="here", name=name or "here", about="", terrain="", exits=()),)
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
-        return _build(here, URBAN, _SETTLEMENT)
+        return _with_implied(_build(here, URBAN, _SETTLEMENT), location)
     return _build(here, hint or "grassland", _WILD)
+
+
+def implied_spots(location) -> tuple[tuple[str, str], ...]:
+    """The spots a settlement's own facts and paragraphs imply, in table order."""
+    facts = getattr(location, "facts", None) or {}
+    prose = getattr(location, "prose", "") or ""
+    text = " ".join([*(str(v) for v in facts.values()), str(prose)]).lower()
+    words = set(_WORDS.findall(text))
+    out = []
+    for cues, spot in IMPLIED:
+        if any(c in words for c in cues):
+            out.append(spot)
+    return tuple(out)
+
+
+def _with_implied(home: tuple[Place, ...], location) -> tuple[Place, ...]:
+    """A settlement's generated set plus the spots its own words imply — the docks
+    for a port town — up to `MOST_IMPLIED`, connected like the rest."""
+    if not home:
+        return home
+    have = {p.name for p in home}
+    extra = [s for s in implied_spots(location) if s[0] not in have][:MOST_IMPLIED]
+    if not extra:
+        return home
+    prefix = region_key(location_of(home[0].id), home[0].terrain)
+    new_ids = [f"{prefix}:{_slug(label)}" for label, _ in extra]
+    all_ids = [p.id for p in home] + new_ids
+    rebuilt = [Place(id=p.id, name=p.name, about=p.about, terrain=p.terrain,
+                     exits=tuple(x for x in all_ids if x != p.id),
+                     described_only=p.described_only, parent=p.parent,
+                     owner=p.owner, origin=p.origin) for p in home]
+    rebuilt += [Place(id=pid, name=label, about=about, terrain=home[0].terrain,
+                      exits=tuple(x for x in all_ids if x != pid), origin="world")
+                for pid, (label, about) in zip(new_ids, extra)]
+    return tuple(rebuilt)
 
 
 def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
@@ -233,24 +354,113 @@ def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
     return _build(here, str(terrain or "").strip().lower() or "grassland", _WILD)
 
 
-def for_scene(location, at: str, terrain_hint: str = "") -> tuple[Place, ...]:
+def for_scene(location, at: str, terrain_hint: str = "",
+              founded=()) -> tuple[Place, ...]:
     """Every place the party can name from where they stand: home, plus the ground
-    they are on if it is not home.
+    they are on if it is not home, plus what play has minted here (`founded`).
 
     The ONE derivation. `Engine.places()` and the scene brief both used to compute this
     separately — two copies of a rule, the trap CLAUDE.md names — and now both call here.
     Region places share the `_WILD` names, and only one region is ever current, so a
     name resolves to one place.
+
+    Minted places are the stored exception to "derived, never stored" — they cannot be
+    derived, since the player made them — and they join here by parent: a place hangs
+    off the one it was made from, the parent gains an exit to it, and a name resolves
+    against where the party stands, so "the alley" by the market and "the alley" by the
+    library are two places with one word between them (LambdaMOO's rule: a room exists
+    because it was dug from somewhere, with an owner and a link).
     """
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
     if not ground or ground == home[0].terrain:
-        return home
-    if home[0].id == "here":
+        base = home
+    elif home[0].id == "here":
         # No location at all, but the party has been stood on named ground: that
         # ground is all there is.
-        return region_set(location_of(at), ground)
-    return home + region_set(location_of(at), ground)
+        base = region_set(location_of(at), ground)
+    else:
+        base = home + region_set(location_of(at), ground)
+    return with_founded(base, founded, at)
+
+
+def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place, ...]:
+    """Graft the minted places whose parent is in `base` — or whose parent is a minted
+    place already grafted, or who ARE where the party stands — onto the set, wiring
+    exits both ways. Minted places elsewhere in the world stay off the list, which is
+    what keeps the model's choice small."""
+    minted = [p if isinstance(p, Place) else from_dict(p) for p in (founded or ())]
+    if not minted:
+        return base
+    out = {p.id: p for p in base}
+    changed = True
+    while changed:
+        changed = False
+        for m in minted:
+            if m.id in out:
+                continue
+            reachable = (m.parent in out) or (at and (m.id == at or str(at).startswith(m.id + "/")))
+            if not reachable:
+                continue
+            out[m.id] = m
+            changed = True
+    # Exits both ways between a minted place and its parent, and between a minted
+    # place's own children and it; the derived set's exits are left as they were.
+    result: dict[str, Place] = {}
+    for pid, p in out.items():
+        exits = list(p.exits)
+        for q in out.values():
+            if q.parent == pid and q.id != pid and q.id not in exits:
+                exits.append(q.id)
+        if p.parent and p.parent in out and p.parent not in exits:
+            exits.append(p.parent)
+        result[pid] = Place(id=p.id, name=p.name, about=p.about, terrain=p.terrain,
+                            exits=tuple(exits), described_only=p.described_only,
+                            parent=p.parent, owner=p.owner, origin=p.origin)
+    return tuple(result.values())
+
+
+def children_of(founded, parent_id: str) -> list[Place]:
+    minted = [p if isinstance(p, Place) else from_dict(p) for p in (founded or ())]
+    return [p for p in minted if p.parent == parent_id]
+
+
+def child_id(parent_id: str, label: str) -> str:
+    """`{parent}/{slug}`: the id of a place made from another. The ground stays the
+    parent's unless the child says otherwise — `terrain_of` reads the head."""
+    return f"{parent_id}/{_slug(label)}"
+
+
+def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
+         owner: str = "", origin: str = "found") -> Place:
+    """A new place made from `parent`. The id carries the parent; the ground is the
+    parent's unless given. `exits` are wired by `with_founded` at read time."""
+    ground = str(terrain or "").strip().lower() or parent.terrain
+    pid = child_id(parent.id, label)
+    if ground and ground != parent.terrain:
+        # A different ground under the same roof: the sewers under a town. The head of
+        # the id says so, so `scene.biome` parses right when the party is down there.
+        pid = f"{region_key(location_of(parent.id), ground)}:{_slug(parent.name)}/{_slug(label)}"
+    return Place(id=pid, name=label, about=about, terrain=ground, exits=(),
+                parent=parent.id, owner=owner, origin=origin)
+
+
+def venture_set(parent: Place, kind: str) -> list[Place]:
+    """The places a venture of `kind` from `parent` is made of: the venture itself and
+    its seeded spots, all hanging off it. Generated on entry from the parent's id, so
+    the same stairs lead to the same cellar next time."""
+    spec = VENTURES[kind]
+    head = mint(parent, spec["label"], f"{kind} off {parent.name}",
+                terrain=spec["terrain"], origin="venture")
+    spots = list(spec["spots"])
+    if spots:
+        n = max(1, min(len(spots), 2 + _seed(head.id) % max(1, len(spots) - 1)))
+        spots = spots[:n]
+    out = [head]
+    for label, about in spots:
+        out.append(Place(id=child_id(head.id, label), name=label, about=about,
+                         terrain=head.terrain, exits=(), parent=head.id, origin="venture"))
+    return out
 
 
 def spots_for(location, terrain: str = "") -> tuple[Place, ...]:

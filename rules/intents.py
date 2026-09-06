@@ -245,6 +245,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # is the scene transition. Before it shed anybody, a gatekeeper wounded in the city
     # followed the player to the forest and took an NPC turn forever.
     "travel": ((), ("biome", "place", "note", "with"), "hidden"),
+    # Doors two and three of rules/places.py. `found`: the player makes a place from
+    # where they stand — a base at a friend's house, the alley behind the market —
+    # with an owner the engine knows; the engine mints the id, the narrator never
+    # does. `venture`: ground gone into — the sewers, a cave outside the town —
+    # generated from a seed on entry, the same next time; `parent` names the place
+    # it hangs off, default here.
+    "found": (("name",), ("actor", "owner", "parent", "about"), "player"),
+    "venture": (("kind",), ("actor", "parent", "name"), "player"),
     # Searching the ground. The roll is the player's: it is their afternoon.
     # `hours` because foraging is time now: a minimum of one, and as many as the player
     # wants to spend. Every hour is its own Survival check, and past a day awake every

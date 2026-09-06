@@ -53,6 +53,10 @@ from __future__ import annotations
 #   situation.world    authored by World Bible and shipped with the world
 #   situation.play     arose in play
 #
+# And the places a person holds (`rules/places.py`, door two): founding a place with an
+# owner grants that owner `holds.place.<slug>` through the one applicator, source
+# `place:<id>`, so "does anyone here hold a place?" is `has_state("holds.place")`.
+#
 # A card that puts a state on a person does it as an ActiveEffect through the one
 # applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for
 # every card-granted tag the way it answers for a condition.

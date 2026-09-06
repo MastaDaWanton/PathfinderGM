@@ -617,6 +617,17 @@ Everyone not named stays where they are.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
+A place the player makes theirs — a friend's house as a base, a rented room, the alley
+behind the market as their own — is founded, from where they stand, and is a place
+from then on: {"op": "found", "actor": "pc", "params": {"name": "Marra's house",
+"owner": "c2"}}. `owner` is the ref of the person it belongs to, if it is somebody's;
+`parent` names the place it hangs off when that is not where the party stands. Standing
+in it is a separate travel. Ground the player goes INTO that is not a named place yet —
+the sewers, a cellar, a crypt, the rooftops, an alley, a cave, a mine, ruins, a tower —
+is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
+market"}}. The engine makes the ground (the same ground next time), charges the hours
+the way there costs, moves the party in, and decides whether anything lives there —
+never invent a destination and never travel to a place the list above does not name.
 Foraging, harvesting or brewing at a world class — a craft the character works at rather
 than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe":
 "woundwort styptic", "tier": "common", "stages": 2, "risky": false}}. `stages` is how many

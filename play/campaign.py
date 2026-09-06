@@ -225,6 +225,7 @@ class Campaign:
                 "rewarded": dict(self.scene.rewarded),
                 "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
                 "cards": [dict(c) for c in self.scene.cards],
+                "founded": [dict(f) for f in self.scene.founded],
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -319,6 +320,7 @@ class Campaign:
             rewarded={str(k): int(v) for k, v in (s.get("rewarded") or {}).items()},
             guarded_finds=[dict(g) for g in (s.get("guarded_finds") or [])],
             cards=[dict(c) for c in (s.get("cards") or [])],
+            founded=[dict(f) for f in (s.get("founded") or [])],
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),

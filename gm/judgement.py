@@ -278,7 +278,8 @@ def _can_be_fought(actor) -> bool:
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is
 # deliberately absent: who you are hitting is never obvious from the op alone.
-_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "prospect", "condition",
+_SELF_OPS = {"heal", "temp_hp", "rest", "eat", "drink", "forage", "prospect", "found",
+             "venture", "condition",
              "ability_damage", "resource", "give"}
 
 
@@ -2123,6 +2124,106 @@ def inject_prospect(raw_intents, player_text: str, scene) -> list:
     }]
 
 
+# --- the doors places come in by (rules/places.py, doors two and three) ------------------
+
+# "we set up at Marra's house", "we make this our base", "I claim the cellar as ours".
+_FOUNDS = re.compile(
+    r"\b(?:set\s+up|make|establish|claim|found|take)\s+(?:this\s+|it\s+)?"
+    r"(?:(?:our|my|a|the)\s+)?(?:base|camp|home|headquarters|hideout|lair|safehouse|"
+    r"workshop|shop|place)\b(?:\s+(?:of\s+operations))?(?:\s+(?:at|in|here\s+at)\s+(.{3,60}?))?"
+    r"(?=[.,;!]|$)", re.I)
+_FOUNDS_AS = re.compile(
+    r"\b(?:claim|make|take)\s+(.{3,60}?)\s+as\s+(?:our|my)\s+(?:base|camp|home|"
+    r"headquarters|hideout|lair|safehouse)\b", re.I)
+# "I go down into the sewers", "I duck into the back alley behind the market", "I head
+# out to the cave in the hills".
+_VENTURE_KINDS = {
+    "sewers": "sewers", "sewer": "sewers", "drains": "sewers", "undercity": "sewers",
+    "cellar": "cellar", "cellars": "cellar", "vaults": "cellar", "basement": "cellar",
+    "crypt": "crypt", "catacombs": "crypt", "tomb": "crypt", "tombs": "crypt",
+    "rooftops": "rooftops", "roofs": "rooftops", "rooftop": "rooftops",
+    "alley": "alley", "alleyway": "alley", "alleys": "alley", "back alley": "alley",
+    "cave": "cave", "caves": "cave", "cavern": "cave", "caverns": "cave", "grotto": "cave",
+    "mine": "mine", "mines": "mine", "mineshaft": "mine",
+    "ruins": "ruins", "ruin": "ruins",
+    "tower": "tower",
+}
+_VENTURES = re.compile(
+    r"\b(?:go|head|climb|descend|duck|slip|venture|explore|enter|make\s+my\s+way|"
+    r"make\s+for|search|walk)\b[^.!?]{0,30}?\b(?:the|a|an|some)?\s*"
+    r"(" + "|".join(sorted(map(re.escape, _VENTURE_KINDS), key=len, reverse=True)) + r")\b"
+    r"(?:\s+(?:by|behind|beside|off|near|beneath|under|below)\s+(?:the\s+)?(\w[\w' -]{2,30}?))?"
+    r"(?=[.,;!]|\s+(?:and|to|for|with|in|of|on)\b|$)", re.I)
+
+
+def inject_found(raw_intents, player_text: str, scene) -> list:
+    """The player's declaration of a base becomes `found`, with the owner named if the
+    place is somebody's ("Marra's house" → Marra, when Marra is here)."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "found" in present:
+        return raw_intents
+    m = _FOUNDS_AS.search(player_text)
+    where = m.group(1) if m else ""
+    if not m:
+        m = _FOUNDS.search(player_text)
+        where = (m.group(1) or "") if m else ""
+    if not m:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    where = " ".join(where.split()).strip(" .,")
+    name = where or "our base"
+    owner = ""
+    for r, a in scene.actors.items():
+        if a.is_pc:
+            continue
+        # Any word of the name: "Marra's house" names Marra Vell by her first name.
+        words = [w for w in re.findall(r"[A-Za-z][A-Za-z'-]+", str(a.name)) if len(w) >= 3]
+        if any(re.search(r"\b" + re.escape(w) + r"(?:'s|’s)?\b", where, re.I) for w in words):
+            owner = r
+            break
+    params = {"name": name[:60]}
+    if owner:
+        params["owner"] = owner
+    return list(raw_intents) + [{
+        "op": "found", "actor": pc.ref, "params": params,
+        "because": "the player made this place theirs",
+    }]
+
+
+def inject_venture(raw_intents, player_text: str, scene) -> list:
+    """Going into a kind of ground becomes `venture`, with the parent named when the
+    sentence says ("the alley behind the market")."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "venture" in present or "found" in present:
+        return raw_intents
+    m = _VENTURES.search(player_text)
+    if not m or _MUSING.search(player_text[:m.start()]):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    kind = _VENTURE_KINDS[m.group(1).lower()]
+    params: dict = {"kind": kind}
+    if m.group(2):
+        params["parent"] = m.group(2).strip()
+    # A GM-planned travel to the same idea is the same intent, and the venture makes
+    # the place the travel could not find.
+    out = [r for r in raw_intents
+           if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "travel")]
+    return out + [{"op": "venture", "actor": pc.ref, "params": params,
+                   "because": "the player went in"}]
+
+
 def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
     """The player is walking out: the turn must carry a `travel`, and the model must
     say to where.
@@ -2184,6 +2285,8 @@ _DECLARERS = (
     # "nowhere in particular" when there is none.
     ("forage", lambda raw, text, scene, world: inject_forage(raw, text, scene)),
     ("prospect", lambda raw, text, scene, world: inject_prospect(raw, text, scene)),
+    ("found", lambda raw, text, scene, world: inject_found(raw, text, scene)),
+    ("venture", lambda raw, text, scene, world: inject_venture(raw, text, scene)),
     ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
 )
