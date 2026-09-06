@@ -1,0 +1,151 @@
+{
+  "_about": [
+    "The Core Rulebook's seven races as documents, in the grammar rules/races.py",
+    "validates: qualities (type, size, speed, ability mods) and traits, where a trait",
+    "is a `modifiers` entry in the feat/grants vocabulary when the engine can read it,",
+    "a `tags` entry when it is a permission or a sense, and a `not_yet` line when the",
+    "sheet has no reader for it yet. `traits` is the prose the forge shows. `rp` is not",
+    "stored: rules/races.py computes race points from the Advanced Race Guide's own",
+    "table, so nobody types a total that disagrees with the parts."
+  ],
+  "races": [
+    {
+      "id": "human",
+      "name": "Human",
+      "description": "Adaptable and ambitious; the race the Core Rulebook measures the others against.",
+      "type": "humanoid",
+      "size": "medium",
+      "speed": 30,
+      "mods": {},
+      "choose": [{"amount": 2, "from": "any"}],
+      "modifiers": [],
+      "tags": ["race.human"],
+      "budget": {"feats": 1, "ranks": 1},
+      "traits": ["+2 to one ability score", "bonus feat", "+1 skill rank per level"],
+      "languages": ["common"],
+      "not_yet": [],
+      "origin": "core"
+    },
+    {
+      "id": "dwarf",
+      "name": "Dwarf",
+      "description": "Stout, slow and hard to move; at home underground.",
+      "type": "humanoid",
+      "size": "medium",
+      "speed": 20,
+      "mods": {"con": 2, "wis": 2, "cha": -2},
+      "choose": [],
+      "modifiers": [
+        {"type": "combat_mod", "target": "cmd", "amount": 4, "bonus_type": "racial",
+         "when": {"maneuver": ["bull rush", "trip"]}}
+      ],
+      "tags": ["race.dwarf", "sense.darkvision.60", "move.steady"],
+      "budget": {},
+      "traits": ["darkvision 60 ft", "+4 CMD vs bull rush and trip",
+                 "+2 saves vs poison, spells and spell-like abilities",
+                 "speed never reduced by armour or load"],
+      "languages": ["common", "dwarven"],
+      "not_yet": ["+2 saves vs poison, spells and spell-like abilities waits on the save roll naming its cause"],
+      "origin": "core"
+    },
+    {
+      "id": "elf",
+      "name": "Elf",
+      "description": "Long-lived, keen-eyed and quick; poor in constitution.",
+      "type": "humanoid",
+      "size": "medium",
+      "speed": 30,
+      "mods": {"dex": 2, "int": 2, "con": -2},
+      "choose": [],
+      "modifiers": [
+        {"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "racial"}
+      ],
+      "tags": ["race.elf", "sense.low-light", "immune.sleep.magic"],
+      "budget": {},
+      "traits": ["low-light vision", "immune to magic sleep", "+2 saves vs enchantment",
+                 "+2 Perception"],
+      "languages": ["common", "elven"],
+      "not_yet": ["+2 saves vs enchantment waits on the save roll naming its school"],
+      "origin": "core"
+    },
+    {
+      "id": "gnome",
+      "name": "Gnome",
+      "description": "Small, curious and hard to fool with an illusion.",
+      "type": "humanoid",
+      "size": "small",
+      "speed": 20,
+      "mods": {"con": 2, "cha": 2, "str": -2},
+      "choose": [],
+      "modifiers": [],
+      "tags": ["race.gnome", "sense.low-light"],
+      "budget": {},
+      "traits": ["low-light vision", "small: +1 AC, +1 attack, +4 Stealth",
+                 "+2 saves vs illusions"],
+      "languages": ["common", "gnome", "sylvan"],
+      "not_yet": ["+2 saves vs illusions waits on the save roll naming its school"],
+      "origin": "core"
+    },
+    {
+      "id": "half-elf",
+      "name": "Half-Elf",
+      "description": "Of two peoples and at home in neither; sharp-eyed and adaptable.",
+      "type": "humanoid",
+      "size": "medium",
+      "speed": 30,
+      "mods": {},
+      "choose": [{"amount": 2, "from": "any"}],
+      "modifiers": [
+        {"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "racial"}
+      ],
+      "tags": ["race.half-elf", "sense.low-light", "immune.sleep.magic"],
+      "budget": {},
+      "traits": ["low-light vision", "immune to magic sleep", "Skill Focus at 1st level",
+                 "+2 Perception"],
+      "languages": ["common", "elven"],
+      "not_yet": ["Skill Focus at 1st level waits on the forge granting a chosen feat"],
+      "origin": "core"
+    },
+    {
+      "id": "half-orc",
+      "name": "Half-Orc",
+      "description": "Strong, fierce and slow to fall.",
+      "type": "humanoid",
+      "size": "medium",
+      "speed": 30,
+      "mods": {},
+      "choose": [{"amount": 2, "from": "any"}],
+      "modifiers": [
+        {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "racial"}
+      ],
+      "tags": ["race.half-orc", "sense.darkvision.60", "ferocity"],
+      "budget": {},
+      "traits": ["darkvision 60 ft", "ferocity: keep fighting below 0", "+2 Intimidate"],
+      "languages": ["common", "orc"],
+      "not_yet": ["ferocity waits on the downed resolution reading the tag"],
+      "origin": "core"
+    },
+    {
+      "id": "halfling",
+      "name": "Halfling",
+      "description": "Small, lucky and quick-fingered.",
+      "type": "humanoid",
+      "size": "small",
+      "speed": 20,
+      "mods": {"dex": 2, "cha": 2, "str": -2},
+      "choose": [],
+      "modifiers": [
+        {"type": "save_mod", "target": "fort", "amount": 1, "bonus_type": "racial"},
+        {"type": "save_mod", "target": "ref", "amount": 1, "bonus_type": "racial"},
+        {"type": "save_mod", "target": "will", "amount": 1, "bonus_type": "racial"},
+        {"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "racial"}
+      ],
+      "tags": ["race.halfling"],
+      "budget": {},
+      "traits": ["small: +1 AC, +1 attack, +4 Stealth", "+1 all saves", "+2 Perception"],
+      "languages": ["common", "halfling"],
+      "not_yet": [],
+      "origin": "core"
+    }
+  ]
+}

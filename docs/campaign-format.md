@@ -135,6 +135,30 @@ the consuming application's job.
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |
 | `timeline` | `{year, name, summary}`, sorted, undated events last. |
 | `cards` | `{id, title, facts[], keys[], tags[], people[], place, clock, secret, always_on}` — situation cards, see below. **World Bible does not write these yet**; the consumer derives a settlement's strain and each unwritten hook into cards when the list is absent. |
+| `races` | `{id, name, people_id, size, speed, body[], senses[], movement[], about}` — the world's peoples as playable races, see below. **World Bible does not write these yet**; the consumer derives one per `PEOPLE` with an anatomy when the list is absent. |
+
+### `play.races[]` — the world's own peoples as playable races
+
+**World Bible does not write these yet.** Until it does, the consumer derives one race per
+`PEOPLE` entity that carries an anatomy (`Anatomy`, `Body`, `Senses`, `Lifecycle` facts —
+the `people_anatomy` section), and offers a `PEOPLE` without one as a *heritage* of some
+other body rather than a race. When the list is present it is used instead. Everything
+in it is words; the consumer's Race Builder table (`rules/races.py`) turns the words into
+a priced document.
+
+| Field | Meaning |
+|---|---|
+| `id` | durable, unique within the export (`korvu`) |
+| `name` | the people's name as the forge shows it |
+| `people_id` | the `PEOPLE` entity this is the body of |
+| `size` | `small`, `medium` or `large` — a word, not a modifier |
+| `speed` | `slow`, `normal` or `fast` |
+| `body[]` | short sentences about the body plan: limbs, wings, hide, what it cannot do |
+| `senses[]` | short sentences about what they perceive and in what conditions |
+| `movement[]` | short sentences about how they move: climb, swim, fly, burrow |
+| `about` | one paragraph the forge shows |
+
+The consumer's side is `rules/races.py:from_world` and `docs/races.md`.
 
 ### `play.cards[]` — situation cards
 

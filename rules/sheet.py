@@ -2284,7 +2284,53 @@ class Actor:
                         continue                   # bound to nothing yet
                     tag = tag.replace("$target", str(doc["target"]).strip().lower())
                 out.append(tag)
+        # The race's own tags — `race.<id>`, its senses, its immunities — from its
+        # document (rules/races.py), so "is this an elf" and "can they see in the dark"
+        # are both `has_state` questions. `race == "human"` was the sheet's question
+        # before this, in two places, and a world's own people could answer neither.
+        race_doc = self._race_doc()
+        if race_doc:
+            out.extend(str(t) for t in race_doc.get("tags") or ())
         return tuple(out)
+
+    def _race_doc(self) -> dict | None:
+        """The race as a document, read live — the race id on the sheet is the store,
+        the way the feat list is; nothing of the document is ever saved onto the
+        character, so correcting a race on the bench corrects every character of it."""
+        from . import races as races_mod
+
+        if not str(self.race or "").strip():
+            return None
+        return races_mod.document(self.race)
+
+    def _race_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
+        """Modifiers from the race document, through the same reader feats use, so a
+        `when` clause or a `scope` behaves the same on a dwarf's CMD as on a feat."""
+        doc = self._race_doc()
+        if not doc or not doc.get("modifiers"):
+            return []
+        from . import resources
+
+        want = str(target).lower()
+        out: list[Modifier] = []
+        for spec in doc.get("modifiers") or ():
+            if not isinstance(spec, dict) or spec.get("type") != kind \
+                    or str(spec.get("target", "")).lower() != want:
+                continue
+            if not _scope_holds(spec.get("scope"), doc, ctx) \
+                    or not _when_holds(spec.get("when"), ctx):
+                continue
+            if spec.get("formula"):
+                try:
+                    amount = resources.evaluate(spec["formula"], self)
+                except resources.FormulaError:
+                    continue
+            else:
+                amount = int(spec.get("amount", 0) or 0)
+            if amount:
+                out.append(Modifier(amount, doc.get("name", self.race),
+                                    _bonus_type(spec.get("bonus_type"))))
+        return out
 
     def _roll_context(self, weapon_key: str | None = None, **extra) -> dict:
         """What a scoped or conditional feat term is evaluated against."""
@@ -2407,7 +2453,8 @@ class Actor:
                         and amount:
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
-        out += self._standing_mods(kind, target) + self._feat_mods(kind, target, ctx)
+        out += self._standing_mods(kind, target) + self._feat_mods(kind, target, ctx) \
+            + self._race_mods(kind, target, ctx)
         # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
         # four shipped dodge feats had no reader for that clause, and nothing on the
         # sheet asked it of buffs either; one generic rule here, not one per feat.
@@ -3318,13 +3365,13 @@ def _racial_traits(actor: Actor) -> list[dict]:
     the sheet shows afterwards. Imported here rather than at module scope because
     `rules.creation` imports this module.
     """
-    from .creation import RACES
+    from . import races as races_mod
 
-    race = RACES.get(str(actor.race or "").strip().lower())
+    race = races_mod.document(str(actor.race or ""))
     if not race:
         return []
     return [{"name": t, "source": race.get("name", actor.race)}
-            for t in race.get("traits", [])]
+            for t in race.get("trait_lines") or race.get("traits") or []]
 
 
 def _class_features(actor: Actor) -> list[str]:
@@ -3717,10 +3764,13 @@ def validate(actor: Actor) -> None:
         if actor.char_class not in classes.all_classes():
             raise IllegalSheet(f"{actor.name}: unknown class {actor.char_class!r}")
         cls = classes.get(actor.char_class)
-        # Ranks per level: class ranks + Int modifier, minimum 1, plus 1/level for humans.
+        # Ranks per level: class ranks + Int modifier, minimum 1, plus whatever the
+        # race document grants ("ranks +1" on a human's) — asked of the document,
+        # never of the name.
+        from . import races as races_mod
+
         per_level = max(1, cls["skill_ranks"] + ability_modifier(actor.abilities.get("int", 10)))
-        if actor.race.lower() == "human":
-            per_level += 1
+        per_level += races_mod.budget(actor.race, "ranks")
         allowed = per_level * actor.level
         spent = sum(actor.ranks.values())
         if spent > allowed:

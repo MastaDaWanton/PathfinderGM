@@ -65,6 +65,11 @@ class Kind:
     # Declared here rather than handled in `open_thing`, because a creature-shaped `if`
     # in the view is exactly what this module was written to delete.
     derive: str = ""
+    # `module:function(entry) -> (entry, problems)`: the save-time check with the fix
+    # named, for a kind whose fields are more than prose and effects — a race's
+    # one-per-line modifiers are parsed and refused here, so a document that would fail
+    # silently in play (a save called "fortitude" nothing reads) never reaches disk.
+    validate: str = ""
     id_field: str = "id"
 
     def as_dict(self) -> dict:
@@ -203,6 +208,45 @@ KINDS: dict[str, Kind] = {
         id="worldclasses", label="World classes", folder="world-classes", key="tracks",
         shipped_loader="rules.worldclass:tracks",
         fields=_named() + [Field("levels", "Levels", type="list")],
+    ),
+    "races": Kind(
+        id="races", label="Races", folder="races", key="races",
+        shipped_loader="rules.races:shipped",
+        derive="rules.races:for_bench",
+        validate="rules.races:save_from_bench",
+        # One-per-line text rather than `effects`: a race's traits ride the sheet's own
+        # modifier lists (the feat grammar), not the consumable pipeline, and the form's
+        # `list` type is a closed checkbox vocabulary. `rules/races.py` parses each line
+        # back and refuses one it cannot read, naming the shape to type.
+        fields=_named() + [
+            Field("type", "Creature type", type="choice",
+                  choices=("humanoid", "fey", "aberration", "monstrous humanoid",
+                           "outsider", "dragon", "plant", "construct", "undead")),
+            Field("size", "Size", type="choice", choices=("tiny", "small", "medium", "large")),
+            Field("speed", "Base speed (ft)", type="number",
+                  help="20 slow, 30 normal, 40 fast."),
+            Field("mods", "Fixed ability adjustments", type="textarea",
+                  help="One per line: con +2, cha -2."),
+            Field("choose", "Adjustments the player places", type="textarea",
+                  help="One per line: '+2 any' (a human's), or the Race Builder's "
+                       "standard '+2 physical', '+2 mental', '-2 any'."),
+            Field("modifiers", "Modifiers the sheet applies", type="textarea",
+                  help="One per line, the feat grammar: 'skill_mod perception +2 racial', "
+                       "'save_mod fort +1 racial', 'combat_mod cmd +4 racial when "
+                       "maneuver=bull rush|trip'."),
+            Field("tags", "Tags", type="textarea",
+                  help="One per line: sense.darkvision.60, sense.low-light, "
+                       "immune.sleep.magic, move.fly.30, natural.claws, ferocity. Priced "
+                       "from the Race Builder where it names them."),
+            Field("budget", "Extra feats and ranks", type="textarea",
+                  help="'feats +1', 'ranks +1' — a human's two lines."),
+            Field("traits", "Trait lines the forge shows", type="textarea",
+                  help="One per line, as the player will read them."),
+            Field("languages", "Languages", type="textarea", help="One per line."),
+            Field("not_yet", "Not yet", type="textarea",
+                  help="What this race has that the sheet cannot read yet — said here "
+                       "rather than silently dropped."),
+        ],
     ),
     "feats": Kind(
         id="feats", label="Feats", folder="feats", key="feats",

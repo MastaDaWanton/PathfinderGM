@@ -293,10 +293,12 @@ def _check(actor, cond: dict) -> bool | None:
         return actor.ranks.get(cond["skill"].strip().lower(), 0) >= int(cond["ranks"])
     if kind == "feat":
         return cond["feat"] in _held(actor) or cond["name"].strip().lower() in _held(actor)
+    # A tag question, not a string match: the race document grants `race.<id>`
+    # through `standing_tags`, and law one says ask the vocabulary.
     if kind == "race":
-        return (actor.race or "").strip().lower() == cond["race"]
+        return actor.has_state(f"race.{str(cond['race']).strip().lower()}")
     if kind == "race_any":
-        return (actor.race or "").strip().lower() in cond["races"]
+        return any(actor.has_state(f"race.{str(r).strip().lower()}") for r in cond["races"])
     if kind == "size":
         want, mine = cond["size"], (actor.size or "medium").strip().lower()
         if mine not in SIZE_ORDER or want not in SIZE_ORDER:

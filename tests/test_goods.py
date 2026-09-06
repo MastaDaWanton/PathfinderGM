@@ -335,7 +335,7 @@ def test_racial_traits_reach_the_sheet():
     """"feats and trait only shows feats and is missing my racial traits darkvision
     and ferocity." The tab is called Feats & Traits and listed only feats, so half of
     what a half-orc can do was nowhere on the page a player checks."""
-    from rules.creation import RACES
+    from rules import races
     from rules.sheet import full_sheet
 
     pc = load_pc("fixtures/pc-kesst.json")
@@ -343,16 +343,17 @@ def test_racial_traits_reach_the_sheet():
     names = [t["name"] for t in full_sheet(pc)["traits"]]
     assert "darkvision 60 ft" in names
     assert "ferocity: keep fighting below 0" in names
-    # One source with the forge, so a trait shown at creation is the trait shown after.
-    assert names == RACES["half-orc"]["traits"]
+    # One source with the forge, so a trait shown at creation is the trait shown after:
+    # the race document's own lines (rules/races.py), which the forge card shows too.
+    assert names == races.document("half-orc")["trait_lines"]
 
 
 def test_every_race_the_forge_offers_has_traits_on_the_sheet():
-    from rules.creation import RACES
+    from rules import races
     from rules.sheet import full_sheet
 
     pc = load_pc("fixtures/pc-kesst.json")
-    for race in RACES:
+    for race in races.shipped():
         pc.race = race
         assert full_sheet(pc)["traits"], race
 

@@ -21,44 +21,14 @@ from __future__ import annotations
 import re
 
 from . import casting, classes as classes_mod, dice, feats as feats_mod, houserules
+from . import races as races_mod
 from . import leveling
 from .sheet import from_dict, gender_from_pronouns, pronouns_for_gender
 from .tables import ARMOUR, SKILLS, WEAPONS
 
-# The Core Rulebook's seven. `mods` is what the race does to the scores; `any` means the
-# +2 lands where the player says (human, half-elf, half-orc), which is a required choice
-# rather than a default — silently picking for them is choosing their character.
-RACES: dict[str, dict] = {
-    "human":    {"name": "Human", "size": "medium", "speed": 30, "mods": {},
-                 "any": 2, "bonus_feat": True, "bonus_ranks": 1,
-                 "traits": ["+2 to one ability score", "bonus feat",
-                            "+1 skill rank per level"]},
-    "dwarf":    {"name": "Dwarf", "size": "medium", "speed": 20,
-                 "mods": {"con": 2, "wis": 2, "cha": -2},
-                 "traits": ["darkvision 60 ft", "+4 CMD vs bull rush and trip",
-                            "+2 saves vs poison, spells and spell-like abilities"]},
-    "elf":      {"name": "Elf", "size": "medium", "speed": 30,
-                 "mods": {"dex": 2, "int": 2, "con": -2},
-                 "traits": ["low-light vision", "immune to magic sleep",
-                            "+2 saves vs enchantment", "+2 Perception"]},
-    "gnome":    {"name": "Gnome", "size": "small", "speed": 20,
-                 "mods": {"con": 2, "cha": 2, "str": -2},
-                 "traits": ["low-light vision", "small: +1 AC, +1 attack, +4 Stealth",
-                            "+2 saves vs illusions"]},
-    "half-elf": {"name": "Half-Elf", "size": "medium", "speed": 30, "mods": {},
-                 "any": 2,
-                 "traits": ["low-light vision", "immune to magic sleep",
-                            "Skill Focus at 1st level", "+2 Perception"]},
-    "half-orc": {"name": "Half-Orc", "size": "medium", "speed": 30, "mods": {},
-                 "any": 2,
-                 "traits": ["darkvision 60 ft", "ferocity: keep fighting below 0",
-                            "+2 Intimidate"]},
-    "halfling": {"name": "Halfling", "size": "small", "speed": 20,
-                 "mods": {"dex": 2, "cha": 2, "str": -2},
-                 "traits": ["small: +1 AC, +1 attack, +4 Stealth", "+2 all saves",
-                            "+2 Perception"]},
-}
-
+# The races used to be a seven-row table here. They are documents in content/races
+# now (rules/races.py), in the feat grammar, so a world's own peoples and a table's
+# homebrew join by the same door and the sheet reads all of them live.
 # Core Rulebook Table 1-2, typed out because it is not linear and every generated
 # approximation of it is wrong at one end or the other.
 POINT_COSTS = {7: -4, 8: -2, 9: -1, 10: 0, 11: 1, 12: 2, 13: 3, 14: 5, 15: 7,
@@ -271,11 +241,48 @@ def _feat_index() -> list[dict]:
         key=lambda row: row["name"].lower())
 
 
-def options() -> dict:
+def _world(world_id: str):
+    """The world a forge was opened from, or None: a bad id is the caller's problem
+    to report, not this module's to raise over."""
+    if not world_id:
+        return None
+    try:
+        from play import library
+
+        return library.world(world_id)
+    except Exception:
+        return None
+
+
+def _races_for(world_id: str = "") -> dict[str, dict]:
+    """What the forge offers, derived: the world's own races (the bench's edited copy
+    winning), then the Core Rulebook's seven unless the table has turned them off.
+    Each carries `rp`, `power` and `of` (the world it belongs to) for the cards."""
+    out: dict[str, dict] = {}
+    world = _world(world_id)
+    if world is not None:
+        for d in races_mod.for_world(world):
+            out[d["id"]] = {**d, "of": getattr(world, "name", "") or world_id}
+    if houserules.core_races() or world is None:
+        for rid, d in races_mod.all_races().items():
+            if rid not in out and str(d.get("origin", "")) in ("core", "yours"):
+                out[rid] = {**races_mod.derive(d), "of": ""}
+    return out
+
+
+def _heritages_for(world_id: str = "") -> list[dict]:
+    world = _world(world_id)
+    return races_mod.heritages_from_world(world) if world is not None else []
+
+
+def options(world_id: str = "") -> dict:
     """Everything the creation wizard's forms are drawn from — one payload, no guessing."""
     return {
-        "races": [{"id": rid, **{k: v for k, v in r.items() if k != "bonus_feat"}}
-                  for rid, r in RACES.items()],
+        # The world's own races first, then the Core seven when the table allows them
+        # — a forge opened from a world's page offers what that world ships.
+        "races": list(_races_for(world_id).values()),
+        "race_rp": houserules.race_rp(),
+        "heritages": _heritages_for(world_id),
         "classes": [{"id": cid, "name": c.get("name", cid.title()),
                      # A homebrew class may declare notation rather than a number, so
                      # the label is made here rather than by pasting a "d" on the front
@@ -330,9 +337,10 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     if not name:
         problems.append("A character needs a name.")
 
-    race = RACES.get(str(payload.get("race", "")).strip().lower())
+    offered = _races_for(str(payload.get("world", "")).strip())
+    race = offered.get(races_mod.slug(str(payload.get("race", ""))))
     if race is None:
-        problems.append(f"Pick a race: {', '.join(RACES)}.")
+        problems.append(f"Pick a race: {', '.join(sorted(offered))}.")
 
     cid = str(payload.get("class", "")).strip().lower()
     # `classes_mod.get` answers an unknown class with an empty dict rather than raising,
@@ -418,16 +426,36 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
             f"Choose woman or man, or turn a pronoun set on in the house rules and pick "
             f"that — a set says both things at once.")
 
-    bonus_ab = str(payload.get("bonus_ability", "")).strip().lower()
+    # The adjustments the player places: one pick per `choose` entry of the race
+    # document — a human's one "+2 any", the Race Builder's standard "+2 physical,
+    # +2 mental, -2 any" a world's people is drafted with. `bonus_ability` is the old
+    # single-pick spelling and still answers the first slot.
+    picks = payload.get("choices")
+    if not isinstance(picks, list):
+        picks = [payload.get("bonus_ability")] if payload.get("bonus_ability") else []
+    picks = [str(p or "").strip().lower() for p in picks]
     if race:
-        if race.get("any"):
-            if bonus_ab not in abilities:
-                problems.append(f"A {race['name'].lower()} puts +2 where they choose — "
-                                f"say which ability.")
+        pools = {"physical": races_mod.PHYSICAL, "mental": races_mod.MENTAL}
+        for i, c in enumerate(race.get("choose") or []):
+            pool = pools.get(c["from"], races_mod.ABILITIES)
+            pick = picks[i] if i < len(picks) else ""
+            where = "any ability" if c["from"] == "any" else f"a {c['from']} ability"
+            if pick not in pool:
+                problems.append(f"A {race['name'].lower()} puts {c['amount']:+d} on "
+                                f"{where} — say which ability ({', '.join(pool)}).")
+            elif pick in picks[:i]:
+                problems.append(f"Each of a {race['name'].lower()}'s adjustments lands "
+                                f"on a different ability; {pick} is named twice.")
             else:
-                abilities[bonus_ab] += race["any"]
-        for ab, mod in race.get("mods", {}).items():
+                abilities[pick] += int(c["amount"])
+        for ab, mod in (race.get("mods") or {}).items():
             abilities[ab] += mod
+        if races_mod.rp(race) > houserules.race_rp():
+            problems.append(
+                f"{race['name']} is a {races_mod.rp(race)} RP race and this table "
+                f"allows {houserules.race_rp()} (the Race Builder's "
+                f"{races_mod.power(houserules.race_rp())} tier). Raise the tier on the "
+                f"Rulesets bench, or trim the race on the Races bench.")
 
     con_mod = (abilities.get("con", 10) - 10) // 2
     int_mod = (abilities.get("int", 10) - 10) // 2
@@ -436,7 +464,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     ranks_budget = 0
     if cls:
         ranks_budget = max(1, int(cls["skill_ranks"]) + int_mod) \
-            + (race.get("bonus_ranks", 0) if race else 0)
+            + (int((race.get("budget") or {}).get("ranks", 0)) if race else 0)
     picked = [str(s).strip().lower() for s in (payload.get("skills") or [])]
     for s in picked:
         if s not in SKILLS:
@@ -447,7 +475,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"That is {len(picked)} skills against "
                         f"{ranks_budget} ranks ({cls['skill_ranks']} class"
                         f"{' + Int' if int_mod else ''}"
-                        f"{' + human' if race and race.get('bonus_ranks') else ''}).")
+                        f"{' + race' if race and (race.get('budget') or {}).get('ranks') else ''}).")
 
     # --- paths ---------------------------------------------------------------------
     # A class that declares branches must have one chosen at creation: the user's own
@@ -458,7 +486,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     problems.extend(path_problems)
 
     # --- feats ---------------------------------------------------------------------
-    feat_budget = 1 + (1 if race and race.get("bonus_feat") else 0) \
+    feat_budget = 1 + (int((race.get("budget") or {}).get("feats", 0)) if race else 0) \
         + (1 if cid == "fighter" else 0)
     # A feat is a string id, or {"id": ..., "target": ...} for one that binds to a
     # chosen weapon — Weapon Focus, Weapon Specialization, a Weapon Proficiency. The
@@ -530,7 +558,9 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
     sheet = {
         "name": name, "kind": "pc", "class": cid, "level": 1,
-        "race": next(k for k, v in RACES.items() if v is race),
+        "race": race["id"],
+        # The people of the world this body belongs to, when it is a world's race.
+        "world_people_id": race.get("people_id") or None,
         "heritage": str(payload.get("heritage", "")).strip(),
         "pronouns": said_pronouns, "gender": said_gender,
         "size": race["size"], "speed": race["speed"],

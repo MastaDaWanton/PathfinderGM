@@ -43,6 +43,7 @@ urlpatterns = [
     path("api/settings/models", home_views.model_settings,
          name="model_settings"),
     path("api/homebrew/rules", home_views.house_rules, name="house_rules"),
+    path("api/homebrew/races/import", home_views.import_races, name="import_races"),
     path("api/effects/catalogue", home_views.effect_catalogue, name="effect_catalogue"),
     path("api/kinds", home_views.kind_catalogue, name="kind_catalogue"),
     path("api/effects/preview", home_views.effect_preview, name="effect_preview"),

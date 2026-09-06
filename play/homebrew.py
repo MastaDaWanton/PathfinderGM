@@ -20,6 +20,7 @@ from django.conf import settings
 
 from rules import feats as feats_mod
 from rules import ingredients, registry, spells, worldclass
+from rules import races as races_mod
 from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
@@ -170,6 +171,14 @@ def benches() -> list[Bench]:
                     "name or from the creature type where there is not. A guess says so.",
         ),
         Bench(
+            id="races", name="Races", dir="races",
+            shipped=len(races_mod.shipped()), shipped_label="in the Core Rulebook",
+            blurb="What a character is born as. Size, speed, ability adjustments and "
+                  "traits the sheet applies — priced in the Advanced Race Guide's race "
+                  "points. A world's own peoples import here from its export, and the "
+                  "forge offers them in that world.",
+        ),
+        Bench(
             id="feats", name="Feats", dir="feats",
             shipped=len(feats_mod.documents()), shipped_label="with a mechanics document",
             blurb="Named modifiers the sheet applies. A feat that grants a permission "
@@ -254,12 +263,23 @@ def rows_for(bench_id: str) -> list[dict]:
             from rules import effectspec
 
             lines = [effectspec.render(x) for x in (e.get("effects") or [])]                 if isinstance(e, dict) else []
+            note = ""
+            if bench_id == "races" and isinstance(e, dict):
+                # The same line the shipped rows carry, so an imported people reads
+                # beside a dwarf rather than as a file name.
+                d = races_mod.derive(e)
+                note = (f"{d['size']} · {d['speed']} ft · "
+                        + (", ".join(f"{c['amount']:+d} {c['from']}" for c in d["choose"])
+                           or "no adjustments")
+                        + f" · {d['rp']} RP ({d['power']})"
+                        + (" · unreviewed" if d.get("converted") else ""))
             rows.append({
                 "name": (e.get("name") if isinstance(e, dict) else None) or path.stem,
                 "kind": "yours", "id": path.stem, "mine": True,
-                "note": "; ".join(lines)
+                "note": note or "; ".join(lines)
                         or (e.get("summary") if isinstance(e, dict) else "")
                         or path.name,
+                "unreviewed": bool(isinstance(e, dict) and e.get("converted")),
             })
 
     if bench_id == "consumables":
@@ -280,6 +300,17 @@ def rows_for(bench_id: str) -> list[dict]:
                   "id": sp.id, "note": sp.line}
                  for sp in sorted(spells.all_spells().values(),
                                   key=lambda x: x.name.lower())[:200]]
+    elif bench_id == "races":
+        rows += [{"name": d["name"], "kind": d.get("origin", "core"), "mine": False,
+                  "id": k,
+                  "note": f"{d['size']} · {d['speed']} ft · "
+                          + (", ".join(f"{a} {v:+d}" for a, v in d["mods"].items())
+                             or ", ".join(f"{c['amount']:+d} {c['from']}" for c in d["choose"])
+                             or "no adjustments")
+                          + f" · {d['rp']} RP ({d['power']})"}
+                 for k, d in sorted(((k, races_mod.derive(v))
+                                     for k, v in races_mod.shipped().items()),
+                                    key=lambda kv: kv[1]["name"])]
     elif bench_id == "worldclasses":
         rows += [{"name": t.name, "kind": "track", "mine": False, "id": k,
                   "note": f"{t.max_level} levels · "

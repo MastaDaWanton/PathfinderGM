@@ -109,6 +109,15 @@ def get(world_id: str) -> WorldCard:
     return found
 
 
+def world(world_id: str):
+    """The loaded world behind a card, for what needs its entities — the forge
+    offering a world's own races, the Races bench importing them."""
+    card = get(world_id)
+    if not card.playable:
+        raise ValueError(card.problem)
+    return load_cached(Path(card.source))
+
+
 def import_world(source: Path) -> WorldCard:
     """Copy an export onto the shelf. Validated before it lands, so a file that cannot be
     read is refused at the point the user can still do something about it."""

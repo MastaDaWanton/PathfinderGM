@@ -135,15 +135,20 @@ def test_the_rules_endpoint_round_trips(client):
     # `pronoun_sets` is empty until a table turns some on: the forge offers she/her and
     # he/him to everybody, and anything else is opt-in.
     assert d["rules"] == {"point_buy": 20, "magic_stacking": False,
-                          "ability_cap": 18, "pronoun_sets": []}
+                          "ability_cap": 18, "pronoun_sets": [],
+                          # The Core seven offered beside a world's races, and the
+                          # Race Builder's standard tier as the forge's ceiling.
+                          "core_races": True, "race_rp": 10}
     assert d["tiers"][-1]["points"] == 100
+    assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40]
 
     r = client.post("/api/homebrew/rules",
                     data=json.dumps({"point_buy": 100, "magic_stacking": True}),
                     content_type="application/json")
     assert r.status_code == 200
     assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True,
-                                 "ability_cap": 18, "pronoun_sets": []}
+                                 "ability_cap": 18, "pronoun_sets": [],
+                                 "core_races": True, "race_rp": 10}
 
     r = client.post("/api/homebrew/rules", data=json.dumps({"point_buy": 37}),
                     content_type="application/json")

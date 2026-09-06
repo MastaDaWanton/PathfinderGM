@@ -1121,6 +1121,13 @@ function paneHomebrew() {
           : "A class is a level table, a set of features and — if it wants them — paths with tiered abilities. Too much shape for the form the other benches share, so it has a page of its own."}</p>` : ""}
       ${b.id === "spells" ? paneSpells() : ""}
       ${b.id === "rulesets" ? paneRules() : ""}
+      ${b.id === "races" ? `<p class="note">A world's peoples play as its races. The forge
+        offers them in that world already; importing writes them here as files you can
+        correct — the bench's copy wins.
+        ${STATE.worlds.filter(w => w.playable).map(w => `
+          <button class="quiet" data-importraces="${esc(w.id)}" style="margin:4px 6px 0 0">Import
+            the peoples of ${esc(w.name)}</button>`).join("")}</p>
+        ${BENCH.note ? `<div class="waiting" style="margin-bottom:14px">${esc(BENCH.note)}</div>` : ""}` : ""}
       ${b.builder === "effects" ? paneBuild(b) : ""}
       ${(BENCH.rows.length && !OWN_LISTING.includes(b.id)) ? `<div class="rows"><table>${BENCH.rows.map(r =>
         `<tr class="${r.mine ? "mine" : ""} ${r.id ? "open" : ""}"
@@ -1180,6 +1187,23 @@ function paneRules() {
         <h3>${c.cap ? c.cap : "∞"}</h3>
         <em>${esc(c.name)}${c.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
+
+    <h2 class="sect">Races</h2>
+    <p class="note">How strong a race the forge accepts, in the Advanced Race Guide's
+      race points — the Core seven are all inside the standard tier — and whether those
+      seven are offered beside a world's own peoples at all.</p>
+    <div class="cards tight">${(RULES.race_tiers || []).map(t => `
+      <button class="card pick ${r.race_rp === t.rp ? "on" : ""}" data-hbracerp="${t.rp}">
+        <h3>${t.rp} RP</h3>
+        <em>${esc(t.name)} · ${esc(t.note || "")}</em>
+      </button>`).join("")}</div>
+    <button class="card pick ${r.core_races === false ? "" : "on"}" data-hbcore="1"
+            style="max-width:340px;margin-top:8px">
+      <h3>${r.core_races === false ? "The world's races only" : "Core Rulebook races — offered"}</h3>
+      <em>${r.core_races === false
+        ? "In a world, the forge offers only the races that world ships."
+        : "Human, dwarf, elf, gnome, half-elf, half-orc and halfling, beside the world's own."}</em>
+    </button>
 
     <h2 class="sect">Magic effect stacking</h2>
     <p class="note">By the book, magical effects from different sources do not stack —
@@ -1364,7 +1388,7 @@ const PRONOUNS_FOR = { woman: "she/her", man: "he/him" };
 
 function forgeDefaults(opts) {
   return {
-    name: "", race: "", bonus_ability: "", heritage: "", pronouns: "", gender: "",
+    name: "", race: "", choices: [], heritage: "", pronouns: "", gender: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     skills: [], feats: [], spellbook: [], paths: [],
   };
@@ -1384,10 +1408,16 @@ function finalAbility(f, opts, ab) {
   let v = f.abilities[ab];
   if (race) {
     v += (race.mods && race.mods[ab]) || 0;
-    if (race.any && f.bonus_ability === ab) v += race.any;
+    // One pick per `choose` slot of the race document — a human's one "+2 any", the
+    // Race Builder's standard three a world's people is drafted with.
+    (race.choose || []).forEach((c, i) => { if (f.choices[i] === ab) v += c.amount; });
   }
   return v;
 }
+
+// The abilities one `choose` slot may land on.
+const POOLS = { physical: ["str", "dex", "con"], mental: ["int", "wis", "cha"],
+                any: ["str", "dex", "con", "int", "wis", "cha"] };
 
 function abilityMod(f, opts, ab) {
   return Math.floor((finalAbility(f, opts, ab) - 10) / 2);
@@ -1401,11 +1431,15 @@ function ranksBudget(f, opts) {
   // without complaint — and an elf, whose +2 Int is fixed in `mods` rather than chosen,
   // was short a rank in every build with no way to see why.
   const intMod = abilityMod(f, opts, "int");
-  return Math.max(1, cls.skill_ranks + intMod) + (f.race === "human" ? 1 : 0);
+  // Asked of the race document's budget, never of its name — `f.race === "human"`
+  // was the question here, and a world's own people could never answer it.
+  const race = opts.races.find(r => r.id === f.race);
+  return Math.max(1, cls.skill_ranks + intMod) + ((race && race.budget && race.budget.ranks) || 0);
 }
 
-function featBudget(f) {
-  return 1 + (f.race === "human" ? 1 : 0) + (f.class === "fighter" ? 1 : 0);
+function featBudget(f, opts) {
+  const race = opts.races.find(r => r.id === f.race);
+  return 1 + ((race && race.budget && race.budget.feats) || 0) + (f.class === "fighter" ? 1 : 0);
 }
 
 function spellCap(f, opts) {
@@ -1423,7 +1457,7 @@ function paneForge() {
   const race = opts.races.find(r => r.id === f.race);
   const cls = opts.classes.find(c => c.id === f.class);
   const spent = pointsSpent(f, opts);
-  const rb = ranksBudget(f, opts), fb = featBudget(f), sc = spellCap(f, opts);
+  const rb = ranksBudget(f, opts), fb = featBudget(f, opts), sc = spellCap(f, opts);
   const abfinal = ab => finalAbility(f, opts, ab);
   return `<div class="forge">
     <button class="quiet" data-unforge>← back</button>
@@ -1458,17 +1492,41 @@ function paneForge() {
     </div>
 
     <h2 class="sect">Race</h2>
+    ${opts.races.some(r => r.of) ? `<p class="note">The peoples of
+      ${esc(opts.races.find(r => r.of).of)} first — read off the world's own entries and
+      priced from the Race Builder — then the Core Rulebook's own${opts.races.some(r => !r.of)
+        ? "" : ", which this table has turned off on the Rulesets bench"}.</p>` : ""}
     <div class="cards tight">${opts.races.map(r => `
-      <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${r.id}">
-        <h3>${esc(r.name)}</h3>
-        <div class="traits">${r.traits.map(esc).join(" · ")}</div>
+      <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${r.id}"
+              ${r.rp > opts.race_rp ? `disabled title="${r.rp} RP: above this table's ${opts.race_rp} RP tier"` : ""}
+              style="${r.rp > opts.race_rp ? "opacity:.45" : ""}">
+        <h3>${esc(r.name)}${r.of ? ` <span class="pill now">of ${esc(r.of)}</span>` : ""}${
+          r.converted ? ` <span class="unread">unreviewed</span>` : ""}</h3>
+        <div class="stat">${esc(r.size)} · ${r.speed} ft · ${
+          Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ")
+          || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${c.amount} ${c.from}`).join(", ")
+          || "no adjustments"} · ${r.rp} RP</div>
+        <div class="traits">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
+        ${r.description && r.of ? `<em>${esc(r.description)}</em>` : ""}
       </button>`).join("")}</div>
-    ${race && race.any ? `
-      <p class="note">A ${esc(race.name.toLowerCase())} puts +2 where they choose:</p>
-      <div>${["str","dex","con","int","wis","cha"].map(ab => `
-        <button class="quiet" data-crbonus="${ab}" style="${
-          f.bonus_ability === ab ? "border-color:var(--accent);color:#f0dcae" : ""
-        }">${ab.toUpperCase()}</button>`).join(" ")}</div>` : ""}
+    ${race && (race.choose || []).length ? `
+      <p class="note">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
+        ? "+2 where they choose" : "the Race Builder's standard adjustments — each on a different ability"}:</p>
+      ${race.choose.map((c, i) => `<div style="margin:4px 0">
+        <span class="note" style="display:inline-block;width:110px">${c.amount > 0 ? "+" : ""}${c.amount} ${esc(c.from)}</span>
+        ${POOLS[c.from].map(ab => `
+        <button class="quiet" data-crbonus="${ab}" data-crslot="${i}" style="${
+          f.choices[i] === ab ? "border-color:var(--accent);color:#f0dcae" : ""
+        }">${ab.toUpperCase()}</button>`).join(" ")}</div>`).join("")}` : ""}
+    ${race && (race.not_yet || []).length ? `<p class="note">Not on the sheet yet:
+      ${race.not_yet.map(esc).join("; ")}.</p>` : ""}
+    ${(opts.heritages || []).length ? `
+      <p class="note" style="margin-top:12px">A people of ${esc(opts.races.find(r => r.of)?.of || "this world")}
+        that shares a body with the race above — a heritage, not a race:</p>
+      <div>${opts.heritages.map(h => `
+        <button class="quiet" data-crheritage="${esc(h.name)}" style="${
+          f.heritage === h.name ? "border-color:var(--accent);color:#f0dcae" : ""
+        }" title="${esc(h.summary || "")}">${esc(h.name)}</button>`).join(" ")}</div>` : ""}
 
     <h2 class="sect">Class</h2>
     <div class="cards">${opts.classes.map(c => `
@@ -1743,7 +1801,8 @@ document.addEventListener("click", async e => {
   }
 
   if (e.target.closest("[data-forge]")) {
-    const opts = await (await fetch("/api/create/options")).json();
+    // The world rides along so the forge offers that world's own races.
+    const opts = await (await fetch("/api/create/options" + (WORLD ? `?world=${encodeURIComponent(WORLD.id)}` : ""))).json();
     // The world whose page the forge was opened from rides with the form. Discarding
     // it here is why a character built from Fantasia's own page began in Pangrella —
     // the server fills a missing world with the shipped default, silently. Null when
@@ -1755,7 +1814,12 @@ document.addEventListener("click", async e => {
   if (FORGE) {
     const f = FORGE.form;
     const race = e.target.closest("[data-crrace]");
-    if (race) { f.race = race.dataset.crrace; f.bonus_ability = ""; render(); return; }
+    if (race) { f.race = race.dataset.crrace; f.choices = []; render(); return; }
+    const heritage = e.target.closest("[data-crheritage]");
+    if (heritage) {
+      f.heritage = f.heritage === heritage.dataset.crheritage ? "" : heritage.dataset.crheritage;
+      render(); return;
+    }
     const cls = e.target.closest("[data-crclass]");
     // Paths belong to the class that offers them, so changing class drops them.
     if (cls) { f.class = cls.dataset.crclass; f.paths = []; render(); return; }
@@ -1771,7 +1835,12 @@ document.addEventListener("click", async e => {
       render(); return;
     }
     const bonus = e.target.closest("[data-crbonus]");
-    if (bonus) { f.bonus_ability = bonus.dataset.crbonus; render(); return; }
+    if (bonus) {
+      const slot = Number(bonus.dataset.crslot || 0);
+      f.choices = [...f.choices];
+      f.choices[slot] = bonus.dataset.crbonus;
+      render(); return;
+    }
     const gender = e.target.closest("[data-crgender]");
     if (gender) {
       f.gender = gender.dataset.crgender;
@@ -1852,6 +1921,24 @@ document.addEventListener("click", async e => {
   if (e.target.closest("#savemodels")) { await saveModelSettings(); return; }
   const cap = e.target.closest("[data-hbcap]");
   if (cap) { await setHouseRule({ ability_cap: Number(cap.dataset.hbcap) }); return; }
+  const racerp = e.target.closest("[data-hbracerp]");
+  if (racerp) { await setHouseRule({ race_rp: Number(racerp.dataset.hbracerp) }); return; }
+  const core = e.target.closest("[data-hbcore]");
+  if (core) { await setHouseRule({ core_races: RULES.rules.core_races === false }); return; }
+  const imp = e.target.closest("[data-importraces]");
+  if (imp) {
+    imp.disabled = true;
+    try {
+      const d = await post("/api/homebrew/races/import", { world: imp.dataset.importraces });
+      BENCH = await (await fetch("/api/bench/races")).json();
+      BENCH.note = d.written.length
+        ? `${d.written.length} race${d.written.length === 1 ? "" : "s"} written to the bench: ${d.written.join(", ")}.`
+        : `${d.races.length ? d.races.join(", ") + " already on the bench" : "That world describes no people as a body"}${
+            d.heritages.length ? ` — ${d.heritages.join(", ")} are heritages, offered by name in the forge` : ""}.`;
+    } catch (err) { BENCH.note = err.message; }
+    render();
+    return;
+  }
 
   const bench = e.target.closest("[data-bench]");
   if (bench && !bench.disabled) {

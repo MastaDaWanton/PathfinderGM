@@ -57,6 +57,12 @@ from __future__ import annotations
 # owner grants that owner `holds.place.<slug>` through the one applicator, source
 # `place:<id>`, so "does anyone here hold a place?" is `has_state("holds.place")`.
 #
+# `race.<id>`, `sense.*`, `immune.*`, `move.*`, `natural.*`, `weakness.*` — a race
+# document's tags (rules/races.py), held through `Actor.standing_tags` the way a feat's
+# are: `has_state("race.elf")` is the feat prerequisite's question, and
+# `has_state("sense.darkvision")` is the one a dark room will ask. The race string on
+# the sheet is the store, never the question.
+#
 # A card that puts a state on a person does it as an ActiveEffect through the one
 # applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for
 # every card-granted tag the way it answers for a condition.

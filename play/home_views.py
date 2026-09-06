@@ -252,6 +252,10 @@ def open_thing(request, bench_id: str, thing_id: str):
     mine = homebrew.folder(homebrew.get(bench_id).dir) / f"{thing_id}.json"
     if mine.exists():
         d = json.loads(mine.read_text(encoding="utf-8"))
+        # Derived for yours as well as for shipped: a race's structured fields are
+        # rendered to the one-per-line text its form edits, and a file opened raw
+        # showed "[object Object]" in the modifiers box.
+        d = registry._derived(bench_id, d) if registry.KINDS.get(bench_id) else d
         d["source"] = "yours"
         return JsonResponse(d)
 
@@ -319,7 +323,18 @@ def save_thing(request, bench_id: str):
         kind = registry.get(bench_id)
     except LookupError:
         kind = None
-    entry = {"id": slug, "name": name}
+    # Over the file already there, so a key the form has no field for survives an
+    # edit: an imported race carries the world and the people it came from, and a
+    # save that rebuilt the file from the form alone dropped both — and with them the
+    # `world_people_id` every character of that race is stamped with.
+    path = homebrew.folder(bench.dir) / f"{slug}.json"
+    entry = {}
+    if path.exists():
+        try:
+            entry = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            entry = {}
+    entry.update({"id": slug, "name": name})
     if kind:
         for f in kind.fields:
             if f.name in ("name", "effects"):
@@ -332,8 +347,18 @@ def save_thing(request, bench_id: str):
     # Cleared on save: these have now been looked at by a person, which is a different
     # state from "the converter produced them and nobody has checked".
     entry["effects_converted"] = False
+    # A kind with its own grammar checks it here, with the fix named — a race's
+    # one-per-line modifiers are parsed back into documents and a line that cannot be
+    # read is refused rather than written as prose the sheet would never apply.
+    if kind and kind.validate:
+        module_name, _, func_name = kind.validate.partition(":")
+        from importlib import import_module
 
-    path = homebrew.folder(bench.dir) / f"{slug}.json"
+        entry, problems = getattr(import_module(module_name), func_name)(entry)
+        if problems:
+            return JsonResponse({"error": " ".join(problems), "problems": problems},
+                                status=400)
+
     path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
@@ -387,7 +412,9 @@ def creation_options(request):
     """
     from rules import creation
 
-    return JsonResponse(creation.options())
+    # The world the forge was opened from decides which races it offers: that
+    # world's own peoples first, the Core seven after when the table allows them.
+    return JsonResponse(creation.options(str(request.GET.get("world", "")).strip()))
 
 
 def house_rules(request):
@@ -404,9 +431,37 @@ def house_rules(request):
         rules, problems = houserules.set_active(body)
         if problems:
             return JsonResponse({"rules": rules, "problems": problems}, status=400)
+    from rules import races as races_mod
+
     return JsonResponse({"rules": houserules.active(),
                          "tiers": houserules.POINT_BUY_TIERS,
-                         "caps": houserules.ABILITY_CAPS})
+                         "caps": houserules.ABILITY_CAPS,
+                         "race_tiers": list(races_mod.TIERS)})
+
+
+@require_POST
+def import_races(request):
+    """Write a world's races onto the Races bench so they can be corrected.
+
+    The forge offers them in that world whether or not this was pressed; importing is
+    for editing. A file already on the bench is the table's own answer and is kept
+    unless `overwrite` says otherwise.
+    """
+    from rules import races as races_mod
+
+    body = read_body(request)
+    world_id = str(body.get("world", "")).strip()
+    try:
+        world = library.world(world_id)
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+    except Exception as exc:
+        return JsonResponse({"error": f"{world_id}: {exc}"}, status=400)
+    written = races_mod.import_from_world(world, overwrite=bool(body.get("overwrite")))
+    offered = [d["name"] for d in races_mod.from_world(world)]
+    return JsonResponse({"ok": True, "written": written, "races": offered,
+                         "heritages": [h["name"] for h in races_mod.heritages_from_world(world)],
+                         "path": str(races_mod.homebrew_dir())})
 
 
 def model_settings(request):

@@ -55,7 +55,14 @@ ABILITY_CAPS = [
 ]
 
 DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
-            "pronoun_sets": []}
+            "pronoun_sets": [],
+            # The Core Rulebook's seven offered beside a world's own races. Off, and a
+            # world's forge offers only the races the world ships — "instead of picking
+            # the fantasy races that ship with pathfinder".
+            "core_races": True,
+            # How strong a race the forge accepts, in the Advanced Race Guide's race
+            # points: 10 is the Race Builder's standard tier, the Core seven's own.
+            "race_rp": 10}
 
 # What the character forge offers everybody. Two, because that is what the table asked
 # for: "male and female should be the only options default".
@@ -122,6 +129,22 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
             current["point_buy"] = points
     if "magic_stacking" in updates:
         current["magic_stacking"] = bool(updates["magic_stacking"])
+    if "core_races" in updates:
+        current["core_races"] = bool(updates["core_races"])
+    if "race_rp" in updates:
+        from . import races as races_mod
+
+        allowed = {t["rp"] for t in races_mod.TIERS}
+        try:
+            points = int(updates["race_rp"])
+        except (TypeError, ValueError):
+            points = -1
+        if points not in allowed:
+            problems.append(
+                f"{updates['race_rp']!r} is not a race tier; the tiers are "
+                + ", ".join(f"{t['rp']} ({t['name']})" for t in races_mod.TIERS) + ".")
+        else:
+            current["race_rp"] = points
     if "pronoun_sets" in updates:
         raw = updates["pronoun_sets"]
         if isinstance(raw, str):
@@ -160,6 +183,14 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
     if not problems:
         _path().write_text(json.dumps(current, indent=2), encoding="utf-8")
     return active(), problems
+
+
+def core_races() -> bool:
+    return bool(active().get("core_races", DEFAULTS["core_races"]))
+
+
+def race_rp() -> int:
+    return int(active().get("race_rp", DEFAULTS["race_rp"]))
 
 
 def point_budget() -> int:
