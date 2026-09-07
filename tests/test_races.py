@@ -119,6 +119,9 @@ def test_a_race_over_the_tables_tier_is_refused_with_the_fix_named(tmp_path, mon
                            "tags": ["sense.darkvision.60", "move.fly.30"],
                            "choose": list(races.STANDARD_CHOOSE)})
     assert races.rp(doc) > races.STANDARD_RP
+    # The table's tier, pinned: this read the shared test data's rules file once, and
+    # a probe that had set the tier to 20 made the refusal vanish.
+    monkeypatch.setattr(houserules, "race_rp", lambda: races.STANDARD_RP)
     races.homebrew_dir(make=True).joinpath("dragonkin.json").write_text(
         json.dumps(doc), encoding="utf-8")
     try:

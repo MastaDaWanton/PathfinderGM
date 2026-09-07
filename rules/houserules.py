@@ -101,6 +101,17 @@ def active() -> dict:
         out["magic_stacking"] = bool(raw.get("magic_stacking", False))
         if raw.get("ability_cap") in {c["cap"] for c in ABILITY_CAPS}:
             out["ability_cap"] = int(raw["ability_cap"])
+        # The race tier and the Core-seven switch, re-read the way they are written.
+        # Missed when they were added: `set_active` wrote them and this whitelist
+        # dropped them, so the 20 and 40 RP buttons could be pressed and never held.
+        try:
+            from . import races as races_mod
+
+            if int(raw.get("race_rp", -1)) in {t["rp"] for t in races_mod.TIERS}:
+                out["race_rp"] = int(raw["race_rp"])
+        except (TypeError, ValueError):
+            pass
+        out["core_races"] = bool(raw.get("core_races", DEFAULTS["core_races"]))
         # Re-read the same way it is written. `set_active` validated these on the way in,
         # and a key this function does not name is silently dropped — which is the point
         # of the whitelist and was why a saved set came back as the defaults.

@@ -150,6 +150,20 @@ def test_the_rules_endpoint_round_trips(client):
                                  "ability_cap": 18, "pronoun_sets": [],
                                  "core_races": True, "race_rp": 10}
 
+    # The race tier and the Core-seven switch come back too. Measured 2026-09-07: the
+    # 20 and 40 RP buttons on the Rulesets bench could be pressed and never held,
+    # because `active()` whitelists what it reads and nobody had added these.
+    r = client.post("/api/homebrew/rules",
+                    data=json.dumps({"race_rp": 40, "core_races": False}),
+                    content_type="application/json")
+    assert r.status_code == 200
+    assert r.json()["rules"]["race_rp"] == 40 and r.json()["rules"]["core_races"] is False
+    assert client.get("/api/homebrew/rules").json()["rules"]["race_rp"] == 40
+    assert houserules.race_rp() == 40 and houserules.core_races() is False
+    r = client.post("/api/homebrew/rules", data=json.dumps({"race_rp": 25}),
+                    content_type="application/json")
+    assert r.status_code == 400 and "race tier" in r.json()["problems"][0]
+
     r = client.post("/api/homebrew/rules", data=json.dumps({"point_buy": 37}),
                     content_type="application/json")
     assert r.status_code == 400
