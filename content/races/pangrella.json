@@ -1,0 +1,80 @@
+{
+  "_about": [
+    "Pangrella's own races, from the export's own words (fixtures/pangrella-campaign.json).",
+    "The continents name the species — 'Winged: Kaelinorans, Flightless: Kyrexi' on",
+    "Kaelinora; 'Korvathyrans (winged), Kelvaxians (subterranean), Valtorians",
+    "(flightless)' on Korvathyr — and the six PEOPLE entries are cultures of them: a",
+    "Nahyrin is a Kaelinoran, a Zhilakai a Kyrexi, the Khra'gix, Khy'vyr and Nirkor are",
+    "Valtorian nomads. The Korvu, 'descended from the earliest Kyrexi migrants', have",
+    "avian wings, talons and echolocation in their own entry, so they are a body of",
+    "their own. Offered by the forge in this world only (`world`), beside the Core seven",
+    "when the table allows them. Anatomy is the eidolon's evolutions, free; nothing here",
+    "is a number the Race Builder or the catalogue did not set."
+  ],
+  "races": [
+    {
+      "id": "korvu", "name": "Korvu",
+      "description": "Korvu have avian-like wings and bodies, four limbs ending in sharp talons, and enhanced echolocation. Descended from the earliest Kyrexi migrants; matrilineal clans herding winged beasts across the Pangrellan grasslands, master craftsmen in auramancy.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "flight"}, {"id": "claws"}, {"id": "blindsense"}],
+      "budget": {}, "languages": ["common", "korvu"],
+      "origin": "world:fd4449bc9a64", "people_id": "fd4449bc9a64", "world": "pangrella-campaign",
+      "heritages": []
+    },
+    {
+      "id": "kaelinoran", "name": "Kaelinoran",
+      "description": "The winged people of Kaelinora — 'Winged: Kaelinorans, Flightless: Kyrexi'. Clan chiefs and settlers who founded Elyrielle and Torvathys after the Great Shattering; the spires of Mirabalos are built in their style.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "flight"}],
+      "budget": {}, "languages": ["common", "kaelinoran"],
+      "origin": "world:species:kaelinoran", "world": "pangrella-campaign",
+      "heritages": [{"people_id": "fa4c64db4d99", "name": "Nahyrin", "summary": "Kaelinoran Wastes nomads; honoured guests of the settled powers, trading partners with the Korvu."}]
+    },
+    {
+      "id": "kyrexi", "name": "Kyrexi",
+      "description": "The flightless people of Kaelinora, whose great migration of 1212 altered Vedrazhia's borders. Huts of their making stand beside the winged spires of Mirabalos.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "any"}],
+      "evolutions": [],
+      "budget": {"feats": 1, "ranks": 1}, "languages": ["common", "kyrexi"],
+      "origin": "world:species:kyrexi", "world": "pangrella-campaign",
+      "heritages": [{"people_id": "2aca2b7d6467", "name": "Zhilakai", "summary": "Flightless refugees from Kyrexi, founded by Aethonir, an exile who found peace in flightlessness; revered in Pangrellan society."}]
+    },
+    {
+      "id": "korvathyran", "name": "Korvathyran",
+      "description": "The winged people of Korvathyr, ten million of them by the continent's count — Kalixiri's winged stonework is theirs.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "flight"}],
+      "budget": {}, "languages": ["common", "korvathyran"],
+      "origin": "world:species:korvathyran", "world": "pangrella-campaign",
+      "heritages": []
+    },
+    {
+      "id": "valtorian", "name": "Valtorian",
+      "description": "The flightless people of Korvathyr's forests and mountain ranges — the Pillars of Korvu — scholars in Zhilorin's castes and nomads on the steppes.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "any"}],
+      "evolutions": [],
+      "budget": {"feats": 1, "ranks": 1}, "languages": ["common", "valtorian"],
+      "origin": "world:species:valtorian", "world": "pangrella-campaign",
+      "heritages": [
+        {"people_id": "cdb4f3464520", "name": "Khra'gix", "summary": "Valtorian nomads of the sacred ranges and Pangrellan oases; resonant crystal smiths, dependent on the settled powers for trade."},
+        {"people_id": "803ac9dbfb4a", "name": "Khy'vyr", "summary": "Ancient Valtorian wanderers of Korvathyr's central highlands; a matriarchal clan-confederacy, tolerated outcasts, weavers of silk and wind-song."},
+        {"people_id": "f4d28bb432f9", "name": "Nirkor", "summary": "Ancient Valtorian nomads ranging the Pangrellan steppes and Kelvaxian deserts; herders, occasional raiders, master craftsmen of Valtorian crystalwork."}
+      ]
+    },
+    {
+      "id": "kelvaxian", "name": "Kelvaxian",
+      "description": "The subterranean people of Korvathyr, five million strong; merchants who wield hidden influence over Zhilorin's trade, builders of the Kelvaxian canals.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "darkvision"}, {"id": "tremorsense"}],
+      "budget": {}, "languages": ["common", "kelvaxian"],
+      "origin": "world:species:kelvaxian", "world": "pangrella-campaign",
+      "heritages": []
+    }
+  ]
+}

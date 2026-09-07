@@ -1512,7 +1512,7 @@ function paneForge() {
         ${r.description && r.of ? `<em>${esc(r.description)}</em>` : ""}
       </button>`).join("")}</div>
     ${race && (race.choose || []).length ? `
-      <p class="note">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
+      <p class="note" style="margin-top:44px">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
         ? "+2 where they choose" : "the Race Builder's standard adjustments — each on a different ability"}:</p>
       ${race.choose.map((c, i) => `<div style="margin:4px 0">
         <span class="note" style="display:inline-block;width:110px">${c.amount > 0 ? "+" : ""}${c.amount} ${esc(c.from)}</span>
@@ -1522,6 +1522,13 @@ function paneForge() {
         }">${ab.toUpperCase()}</button>`).join(" ")}</div>`).join("")}` : ""}
     ${race && (race.not_yet || []).length ? `<p class="note">Not on the sheet yet:
       ${race.not_yet.map(esc).join("; ")}.</p>` : ""}
+    ${(race && (race.heritages || []).length) ? `
+      <p class="note" style="margin-top:12px">The peoples of ${esc(race.of || "this world")} who are
+        ${esc(race.name)}s — a heritage, not a race:</p>
+      <div>${race.heritages.map(h => `
+        <button class="quiet" data-crheritage="${esc(h.name)}" style="${
+          f.heritage === h.name ? "border-color:var(--accent);color:#f0dcae" : ""
+        }" title="${esc(h.summary || "")}">${esc(h.name)}</button>`).join(" ")}</div>` : ""}
     ${(opts.heritages || []).length ? `
       <p class="note" style="margin-top:12px">A people of ${esc(opts.races.find(r => r.of)?.of || "this world")}
         that shares a body with the race above — a heritage, not a race:</p>

@@ -390,6 +390,12 @@ def normalise(entry: dict) -> dict:
                         "times": max(1, int(e.get("times", 1) or 1))}
                        for e in evs if isinstance(e, dict) and str(e.get("id", "")).strip()]
     d["weapons"] = [w for w in (d.get("weapons") or []) if isinstance(w, dict)]
+    # The cultures of this body, for a world's race: a Nahyrin is a Kaelinoran. The
+    # forge offers them under the race rather than as a race of their own.
+    d["heritages"] = [{"people_id": str(h.get("people_id") or ""), "name": str(h.get("name") or "").strip(),
+                       "summary": str(h.get("summary") or "")}
+                      for h in (d.get("heritages") or []) if isinstance(h, dict) and h.get("name")]
+    d["world"] = str(d.get("world") or "")
     return d
 
 
@@ -407,6 +413,17 @@ def derive(entry: dict) -> dict:
         line = TAG_RP.get(t, (0, ""))[1]
         if line and not any(line.split()[0] in s for s in shown):
             shown.append(line)
+    # What the qualities grant, said too: a Kyrexi with a human's option and budget
+    # and no anatomy had no line at all on the sheet's Racial traits table.
+    if d["choose"] and not any("ability score" in s for s in shown):
+        parts = [f"{c['amount']:+d} {'any' if c['from'] == 'any' else c['from']}"
+                 for c in d["choose"]]
+        shown.append(("+2 to one ability score" if parts == ["+2 any"]
+                      else ", ".join(parts) + " ability scores, placed at the forge"))
+    if d["budget"].get("feats") and not any("bonus feat" in s for s in shown):
+        shown.append("bonus feat")
+    if d["budget"].get("ranks") and not any("skill rank" in s for s in shown):
+        shown.append("+1 skill rank per level")
     d["trait_lines"] = shown
     d["unpriced"] = [t for t in d["tags"] if t not in TAG_RP and not t.startswith("race.")]
     return d
@@ -737,12 +754,30 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
     })
 
 
+def world_key(world) -> str:
+    """How a race document names its world: the export file's stem — the shelf's own
+    id for it (`pangrella-campaign`) — falling back to the world's name as a slug."""
+    source = getattr(world, "source", None)
+    if source:
+        return Path(str(source)).stem.lower()
+    return slug(getattr(world, "id", "") or getattr(world, "name", "") or "")
+
+
+def written_for(world) -> dict[str, dict]:
+    """The race documents written for this world by hand — shipped in content/races
+    (Pangrella's, Fantasia's) or on the bench — keyed by id."""
+    key = world_key(world)
+    name = slug(getattr(world, "name", "") or "")
+    return {k: d for k, d in all_races().items()
+            if d.get("world") and d["world"].lower() in (key, name)}
+
+
 def from_world(world) -> list[dict]:
     """The races a world ships with: the ones its author wrote (`play.races[]`, the
     contract in docs/campaign-format.md — World Bible does not write them yet) and,
     when that list is absent, one per people whose entry describes a body."""
     out: list[dict] = []
-    world_id = str(getattr(world, "id", "") or getattr(world, "name", "") or "")
+    world_id = world_key(world)
     play = getattr(world, "play", None) or {}
     written = play.get("races") if isinstance(play, dict) else None
     if written:
@@ -767,28 +802,49 @@ def from_world(world) -> list[dict]:
     return out
 
 
+def _covered(written: dict) -> set[str]:
+    """The people ids the written race documents already speak for — as a race, or as
+    a heritage of one."""
+    out: set[str] = set()
+    for d in written.values():
+        if d.get("people_id"):
+            out.add(str(d["people_id"]))
+        for h in d.get("heritages") or []:
+            if h.get("people_id"):
+                out.add(str(h["people_id"]))
+    return out
+
+
 def heritages_from_world(world) -> list[dict]:
-    """The peoples that are not bodies of their own: a culture the forge's heritage
-    field offers by name, so a Nahyrin is a Nahyrin without becoming a separate race."""
+    """The peoples that are not bodies of their own and that no written race claims:
+    a culture the forge's heritage field offers by name, so a Nahyrin is a Nahyrin
+    without becoming a separate race. (A written race lists its own heritages.)"""
+    covered = _covered(written_for(world))
     out = []
     for ent in (getattr(world, "entities", None) or {}).values():
-        if str(getattr(ent, "kind", "")).upper() == "PEOPLE" and not is_species(ent):
+        if str(getattr(ent, "kind", "")).upper() == "PEOPLE" and not is_species(ent) \
+                and ent.id not in covered:
             out.append({"id": ent.id, "name": ent.name,
                         "summary": str(_facts(ent).get("Homeland") or "")})
     return sorted(out, key=lambda h: h["name"])
 
 
 def for_world(world) -> list[dict]:
-    """The races the forge offers in this world: the world's own, with the table's
-    edited copy winning where one exists on the bench (same id), each derived."""
+    """The races the forge offers in this world: the ones written for it by hand
+    (content/races, or the bench — the bench's copy winning on the same id), then a
+    draft for each people with a body that nothing written speaks for, each derived."""
+    written = written_for(world)
+    covered = _covered(written)
+    out = [derive(d) for d in written.values()]
     mine = authored()
-    out = []
     for d in from_world(world):
+        if d.get("people_id") in covered or d["id"] in written:
+            continue
         kept = mine.get(d["id"])
         if kept and str(kept.get("world") or "") in ("", d.get("world", "")):
             d = normalise({**d, **kept})
         out.append(derive(d))
-    return out
+    return sorted(out, key=lambda d: d["name"])
 
 
 def import_from_world(world, overwrite: bool = False) -> list[str]:
@@ -796,9 +852,10 @@ def import_from_world(world, overwrite: bool = False) -> list[str]:
     there is the table's own answer and is kept unless told otherwise."""
     written: list[str] = []
     folder = homebrew_dir(make=True)
+    covered = _covered(written_for(world))
     for d in from_world(world):
         path = folder / f"{d['id']}.json"
-        if path.exists() and not overwrite:
+        if path.exists() and not overwrite or d.get("people_id") in covered:
             continue
         path.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
         written.append(d["id"])

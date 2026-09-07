@@ -84,6 +84,32 @@ so they can be corrected; the forge offers them in that world whether or not the
 imported, the bench's copy winning where one exists. The house rule `core_races` keeps
 or hides the Core seven beside them; `race_rp` is the tier the forge accepts.
 
+## The two worlds' own races
+
+"can you make the specific races for the two worlds" (2026-09-06). Written by hand from
+each export's own words, in `content/races/pangrella.json` and
+`content/races/fantasia.json`, each carrying `world` so the forge offers it in that
+world only. `rules/races.py:written_for` finds them; `for_world` offers them first and
+drafts only a people nothing written speaks for; `heritages_from_world` offers only the
+peoples no written race claims.
+
+**Pangrella.** The continents name the species — "Winged: Kaelinorans, Flightless:
+Kyrexi"; "Korvathyrans (winged), Kelvaxians (subterranean), Valtorians (flightless)" —
+so those are the races, and the six `PEOPLE` entries are their cultures, listed on the
+race as `heritages`: a Nahyrin is a Kaelinoran, a Zhilakai a Kyrexi, the Khra'gix,
+Khy'vyr and Nirkor are Valtorian nomads. The Korvu, "descended from the earliest Kyrexi
+migrants", have avian wings, talons and echolocation in their own entry and are a body
+of their own. Flightless peoples take a human's option and budget; winged ones take
+flight; the subterranean Kelvaxians darkvision and tremorsense.
+
+**Fantasia.** All twelve peoples carry an anatomy, so each is a race, with the
+evolutions its sentences support and nothing more: the Xylthys' "long arms ending in
+webbed hands; webbed feet with sharp claws" and gills are swim, claws and breathing
+water; the Brynkorovi's quadrupedal plan is an extra pair of legs, their "poor in
+bright light" is light sensitivity, their vestigial wings are in the description and
+nowhere else; the Vylkori's two to three metres stay Medium, as the Race Builder keeps a
+player race, and the description says so.
+
 ## The anatomy: eidolon evolutions, free
 
 "fix the race editor so that its all dropdowns and pickers because they should not need

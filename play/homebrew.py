@@ -304,7 +304,9 @@ def rows_for(bench_id: str) -> list[dict]:
                  for sp in sorted(spells.all_spells().values(),
                                   key=lambda x: x.name.lower())[:200]]
     elif bench_id == "races":
-        rows += [{"name": d["name"], "kind": d.get("origin", "core"), "mine": False,
+        rows += [{"name": d["name"],
+                  "kind": (d["world"].replace("-campaign", "") if d.get("world") else "core"),
+                  "mine": False,
                   "id": k,
                   "note": f"{d['size']} · {d['speed']} ft · "
                           + (", ".join(f"{a} {v:+d}" for a, v in d["mods"].items())

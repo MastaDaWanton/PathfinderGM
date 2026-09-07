@@ -1,0 +1,124 @@
+{
+  "_about": [
+    "Fantasia's own races, from its export's own words — every one of its twelve PEOPLE",
+    "entries carries an anatomy (Anatomy, Body, Senses, Lifecycle), so each is a body of",
+    "its own. Descriptions are the entry's sentences; the anatomy is the eidolon's",
+    "evolutions the sentences support, free: 'long arms ending in webbed hands; webbed",
+    "feet with sharp claws' is swim and claws, 'eyes sensitive to low light … poor in",
+    "bright light' is low-light vision and light sensitivity. A body the catalogue has",
+    "no line for is in the description and nowhere else. Offered in Fantasia only."
+  ],
+  "races": [
+    {
+      "id": "khyr-kor", "name": "Khyr'kor",
+      "description": "Anthropomorphic humanoid with thick skin and dense fur: short stature, compact muscle, robust limbs ending in sharp claws, brown-black hide with grey undertones. Weak eyesight in low light, acute hearing, a keen sense of smell over long distances, perceptive of subtle vibrations in the ground. Fishers and gatherers of northern Aethonara's mangrove swamps, in matriarchal clans.",
+      "type": "humanoid", "size": "small", "speed": 20,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "claws"}, {"id": "scent"}, {"id": "tremorsense"}, {"id": "improved-natural-armor"}, {"id": "skilled", "choice": "perception"}],
+      "budget": {}, "languages": ["common", "khyr-kor"],
+      "origin": "world:e251e0cd3974", "people_id": "e251e0cd3974", "world": "fantasia-campaign"
+    },
+    {
+      "id": "morcheki", "name": "Morcheki",
+      "description": "Near-human variants with elongated limbs and eyes adapted for low light: 180–220 cm, slender, long arms ending in dexterous hands, skin pale to dark brown. Acute low-light vision and sensitive hearing, a poor sense of smell. Coastal towns and nomadic tribes of Aethonara's western delta, in clans by kinship and range.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "low-light-vision"}, {"id": "skilled", "choice": "perception"}],
+      "budget": {}, "languages": ["common", "morcheki"],
+      "origin": "world:7d5ac7de330e", "people_id": "7d5ac7de330e", "world": "fantasia-campaign"
+    },
+    {
+      "id": "xylthys", "name": "Xylthys",
+      "description": "Near-human variants with elongated limbs and gills: tall, slender, long arms ending in webbed hands, webbed feet with sharp claws, no visible nose or mouth. Excellent low-light vision, an acute sense of smell, poor hearing. Egg-layers of the mangrove forests and saltwater lakes of western Aethonara; fishing feeds the matriarchal clans.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "gills"}, {"id": "swim"}, {"id": "claws"}, {"id": "low-light-vision"}, {"id": "scent"}],
+      "budget": {}, "languages": ["common", "xylthys"],
+      "origin": "world:600648a4b8fc", "people_id": "600648a4b8fc", "world": "fantasia-campaign"
+    },
+    {
+      "id": "brynkorovi", "name": "Brynkorovi",
+      "description": "Near-human variants with a quadrupedal body plan and vestigial wings that do not fly: tall, agile, four limbs ending in sharp claws, grey-brown hide, good at climbing and poor at swimming. A keen sense of smell to a kilometre, acute hearing to ten, eyes sensitive to low light and poor in bright. Herders and hide-traders of Khra'gix's coastal savannahs in a kin-based clan confederacy.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "limbs-legs"}, {"id": "claws"}, {"id": "climb"}, {"id": "scent"}, {"id": "low-light-vision"}, {"id": "skilled", "choice": "perception"}],
+      "tags": ["weakness.light-sensitivity"],
+      "budget": {}, "languages": ["common", "brynkorovi"],
+      "origin": "world:8fd30f83a7ab", "people_id": "8fd30f83a7ab", "world": "fantasia-campaign"
+    },
+    {
+      "id": "jirakhani", "name": "Jirakhani",
+      "description": "Humanoid with a lean build and elongated limbs: 170–190 cm, long arms and legs, large feet, scaly skin from dark brown to light tan, agile and fast, defeated by steep terrain. Enhanced hearing, weak eyesight in bright light, and a sense for subtle vibrations in the air, best in humid places. Fishers, traders and craftsmen of Khra'gix's deltaic plain in matrilineal clans.",
+      "type": "humanoid", "size": "medium", "speed": 40,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "improved-natural-armor"}, {"id": "skilled", "choice": "perception"}],
+      "tags": ["weakness.light-sensitivity"],
+      "budget": {}, "languages": ["common", "jirakhani"],
+      "origin": "world:b2330cd18533", "people_id": "b2330cd18533", "world": "fantasia-campaign"
+    },
+    {
+      "id": "sulmari", "name": "Sulmari",
+      "description": "Near-human variants with elongated limbs and skin that shimmers in low light: tall, slender, long arms ending in sharp claws, dark grey skin, eyes sensitive to dim light. A keen sense of smell and hearing, poor eyesight in bright light, a feel for changes in air pressure. Litters of four, lifespans near a century; rainwater harvesters of the Great Mangrove Swamps of Khra'gix under a council of elders.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "claws"}, {"id": "scent"}, {"id": "low-light-vision"}],
+      "tags": ["weakness.light-sensitivity"],
+      "budget": {}, "languages": ["common", "sulmari"],
+      "origin": "world:79892eb0984d", "people_id": "79892eb0984d", "world": "fantasia-campaign"
+    },
+    {
+      "id": "khyzhi", "name": "Khyzhi",
+      "description": "Elfin variant with iridescent skin and wings for gliding: tall, slender, elongated limbs ending in delicate fingers, skin that shimmers in changing light, a wingspan up to three metres. Exceptional low-light vision, acute hearing, a sensitivity to air pressure. Fishers and cloud-forest foragers who fled the Great Flood of Arinthal; patrilineal clans with flexible membership.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "flight"}, {"id": "low-light-vision"}, {"id": "skilled", "choice": "perception"}],
+      "budget": {}, "languages": ["common", "khyzhi"],
+      "origin": "world:0fc838c04fb7", "people_id": "0fc838c04fb7", "world": "fantasia-campaign"
+    },
+    {
+      "id": "nyraxian", "name": "Nyraxian",
+      "description": "Humanoid Nahalorians with iridescent skin: short stature, slender limbs, webbed hands and feet, and translucent wings grown in adulthood. A keen sense of smell, exceptional low-light vision, and hearing that reaches infrasound. Matrilineal clans of Nahaloria's central cloud forests, living on the cloud plants and animals; maturity comes late, at twenty-five.",
+      "type": "humanoid", "size": "small", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "swim"}, {"id": "flight"}, {"id": "scent"}, {"id": "low-light-vision"}],
+      "budget": {}, "languages": ["common", "nyraxian"],
+      "origin": "world:d929c4cdd0a5", "people_id": "d929c4cdd0a5", "world": "fantasia-campaign"
+    },
+    {
+      "id": "vylkori", "name": "Vylkori",
+      "description": "Bioluminescent skin and a slender build two to three metres tall, elongated limbs ending in delicate fingers, iridescent scales, and wing-like appendages on the back for balance and display rather than flight. Enhanced low-light vision, an acute sense of smell, and a feel for vibrations in the ground. Matriarchal clans of Nahaloria's cloud forest whose shamans and healers hold the high places. Towering, but the Race Builder keeps a player race Medium.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "low-light-vision"}, {"id": "scent"}, {"id": "tremorsense"}, {"id": "improved-natural-armor"}, {"id": "skilled", "choice": "acrobatics"}],
+      "budget": {}, "languages": ["common", "vylkori"],
+      "origin": "world:07f81963cdb6", "people_id": "07f81963cdb6", "world": "fantasia-campaign"
+    },
+    {
+      "id": "kaelorian", "name": "Kaelorian",
+      "description": "Human-baseline with adaptations to extreme environments: tall and lean, long sinewy limbs, pale skin that resists the sun, agile climbers who cannot regrow a lost finger. Keen eyesight in low light, sensitive hearing, an acute sense of smell. Herders of the Scorched Wastes of Terraverde in matriarchal clans bound by kinship and reciprocity; short lives, thirty to forty years.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "climb"}, {"id": "low-light-vision"}, {"id": "scent"}, {"id": "skilled", "choice": "perception"}],
+      "budget": {}, "languages": ["common", "kaelorian"],
+      "origin": "world:f9a89406fece", "people_id": "f9a89406fece", "world": "fantasia-campaign"
+    },
+    {
+      "id": "korvath", "name": "Korvath",
+      "description": "Humanoid with elongated limbs and torso: tall and lean, long legs and short arms, pale skin with dark veins showing, sparse coarse hair; vulnerable to extreme cold and humidity. A keen sense of smell, poor eyesight in low light, and a sense for electrostatic charge. Migrants from the scorched badlands to the Blasted Wastes of Aerthys; matriarchal clans in castes of birth and occupation, whose artisans control auramancy.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "scent"}],
+      "budget": {}, "languages": ["common", "korvath"],
+      "origin": "world:70b588622ba3", "people_id": "70b588622ba3", "world": "fantasia-campaign"
+    },
+    {
+      "id": "zhilakai-of-fantasia", "name": "Zhilakai",
+      "description": "Anthropomorphic, humanoid with a reptilian twist: medium build, scaly skin, sharp claws, webbed feet, lean and agile, with eyes that see in the dark. Exceptional night vision, acute hearing, a keen sense of smell, a weak sense of taste. Matrilineal clans of the Scorched Spine mountains of Terraverde, respectful of elders, living by sustainable food production and trade.",
+      "type": "humanoid", "size": "medium", "speed": 30,
+      "mods": {}, "choose": [{"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"}, {"amount": -2, "from": "any"}],
+      "evolutions": [{"id": "improved-natural-armor"}, {"id": "claws"}, {"id": "swim"}, {"id": "darkvision"}, {"id": "scent"}, {"id": "skilled", "choice": "perception"}],
+      "budget": {}, "languages": ["common", "zhilakai"],
+      "origin": "world:1a03fe8b814b", "people_id": "1a03fe8b814b", "world": "fantasia-campaign"
+    }
+  ]
+}

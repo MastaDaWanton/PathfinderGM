@@ -30,7 +30,7 @@ WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
 def test_the_core_seven_ship_as_documents_priced_in_the_standard_tier():
     """The Race Builder caps a standard race at 10 RP, and every Core race prices
     inside it off its own parts — a human's bonus feat and extra rank alone are 8."""
-    docs = races.shipped()
+    docs = {k: d for k, d in races.shipped().items() if not d.get("world")}
     assert set(docs) == {"human", "dwarf", "elf", "gnome", "half-elf", "half-orc",
                          "halfling"}
     for rid, d in docs.items():
@@ -130,9 +130,11 @@ def test_a_race_over_the_tables_tier_is_refused_with_the_fix_named(tmp_path, mon
 
 # --- from the world ---------------------------------------------------------------------
 
-def test_a_people_with_a_body_is_a_race_and_one_without_is_a_heritage():
+def test_a_people_with_a_body_is_a_race_and_one_without_is_a_heritage(monkeypatch):
     """The fixture's six peoples: the Korvu carry Anatomy, Body, Senses and Lifecycle;
-    the other five are ethnic groups with no body of their own."""
+    the other five are ethnic groups with no body of their own. (With nothing written
+    for the world — Pangrella ships its races now, so that is switched off here.)"""
+    monkeypatch.setattr(races, "written_for", lambda w: {})
     drafted = races.from_world(WORLD)
     assert [d["name"] for d in drafted] == ["Korvu"]
     korvu = drafted[0]
@@ -164,16 +166,18 @@ def test_the_export_may_write_races_directly_in_words():
 def test_the_forge_offers_the_worlds_races_first_and_can_hide_the_core_seven(monkeypatch):
     monkeypatch.setattr("rules.creation._world", lambda wid: WORLD if wid == "pangrella" else None)
     got = options("pangrella")["races"]
-    assert got[0]["name"] == "Korvu" and got[0]["of"] == WORLD.name
-    assert {r["id"] for r in got} >= {"korvu", "human", "elf"}
+    assert got[0]["of"] == WORLD.name and got[0]["name"] == "Kaelinoran"
+    assert {r["id"] for r in got} >= {"korvu", "kaelinoran", "human", "elf"}
     monkeypatch.setattr(houserules, "core_races", lambda: False)
     got = options("pangrella")["races"]
-    assert [r["id"] for r in got] == ["korvu"]
+    assert [r["id"] for r in got] == ["kaelinoran", "kelvaxian", "korvathyran", "korvu",
+                                      "kyrexi", "valtorian"]
     # With no world there is always something to play.
     assert {r["id"] for r in options("")["races"]} >= {"human", "elf"}
 
 
-def test_importing_writes_drafts_the_bench_can_correct_and_keeps_an_edited_copy():
+def test_importing_writes_drafts_the_bench_can_correct_and_keeps_an_edited_copy(monkeypatch):
+    monkeypatch.setattr(races, "written_for", lambda w: {})
     folder = races.homebrew_dir(make=True)
     path = folder / "korvu.json"
     if path.exists():
@@ -191,7 +195,8 @@ def test_importing_writes_drafts_the_bench_can_correct_and_keeps_an_edited_copy(
             path.unlink()
 
 
-def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client):
+def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client, monkeypatch):
+    monkeypatch.setattr(races, "written_for", lambda w: {})
     """The generic save rebuilt the file from the form's declared fields alone, so an
     imported race lost `people_id` and `world` on its first correction — and with them
     the `world_people_id` every character of that race is stamped with."""
@@ -331,3 +336,38 @@ def test_the_race_editor_page_carries_the_catalogue_and_opens_a_race(client):
         assert "natural.bite" in races.document("editor-built")["tags"]
     finally:
         races.homebrew_dir().joinpath("editor-built.json").unlink()
+
+
+# --- the two worlds' own races -------------------------------------------------------------------
+
+def test_pangrella_ships_its_species_with_their_peoples_as_heritages():
+    """The continents name the species in their own words — winged Kaelinorans and
+    Korvathyrans, flightless Kyrexi and Valtorians, subterranean Kelvaxians — and the
+    Korvu are a body of their own. The six PEOPLE entries are cultures of those, so a
+    Nahyrin is offered as a Kaelinoran heritage and not as a race; nothing is drafted
+    twice."""
+    offered = {d["id"]: d for d in races.for_world(WORLD)}
+    assert set(offered) == {"korvu", "kaelinoran", "kyrexi", "korvathyran", "valtorian",
+                            "kelvaxian"}
+    assert "move.fly.30" in offered["kaelinoran"]["tags"]
+    assert "sense.blindsense.30" in offered["korvu"]["tags"] and "natural.claws" in offered["korvu"]["tags"]
+    assert "sense.darkvision.60" in offered["kelvaxian"]["tags"]
+    assert [h["name"] for h in offered["valtorian"]["heritages"]] == ["Khra'gix", "Khy'vyr", "Nirkor"]
+    assert [h["name"] for h in offered["kyrexi"]["heritages"]] == ["Zhilakai"]
+    assert races.heritages_from_world(WORLD) == []          # every people is spoken for
+    assert all(races.validate(d) == [] for d in offered.values())
+    assert all(races.rp(d) <= races.STANDARD_RP for d in offered.values())
+    # Not drafted twice, and not written twice: importing the world writes nothing.
+    assert races.import_from_world(WORLD) == []
+
+
+def test_every_shipped_world_race_validates_and_names_its_world():
+    for rid, d in races.shipped().items():
+        assert races.validate(d) == [], (rid, races.validate(d))
+        if d.get("world"):
+            assert d["world"] in ("pangrella-campaign", "fantasia-campaign"), rid
+            assert d["origin"].startswith("world:"), rid
+    fantasia = [d for d in races.shipped().values() if d.get("world") == "fantasia-campaign"]
+    assert len(fantasia) == 12
+    # Outside its world a world's race is not offered; inside, it is.
+    assert "khyzhi" not in {r["id"] for r in options("")["races"]}
