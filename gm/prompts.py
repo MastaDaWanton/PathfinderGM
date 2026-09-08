@@ -628,6 +628,16 @@ is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
 market"}}. The engine makes the ground (the same ground next time), charges the hours
 the way there costs, moves the party in, and decides whether anything lives there —
 never invent a destination and never travel to a place the list above does not name.
+When somebody gives the party a task and the player takes it on, it is a quest:
+{"op": "quest", "params": {"title": "Find the missing salt", "objectives": ["Ask the
+harbourmaster where the salt went", "Bring word back to Marra"], "giver": "c2",
+"reward": "a season's salt at cost"}}. Objectives are what is to be done, one sentence
+each, at most six; `giver` is the ref of the person who asked; `reward` is what was
+promised in words — no numbers anywhere, the engine prices it. When play plainly finishes
+one objective of a quest on the SITUATIONS list: {"op": "quest_step", "params":
+{"quest": "<the quest's id>", "objective": 1, "note": "what was done"}}. The last
+objective done finishes the quest and pays the award; never narrate a quest as finished
+unless the engine says it is.
 Foraging, harvesting or brewing at a world class — a craft the character works at rather
 than a skill they roll: {"op": "craft", "params": {"track": "herbalist", "recipe":
 "woundwort styptic", "tier": "common", "stages": 2, "risky": false}}. `stages` is how many

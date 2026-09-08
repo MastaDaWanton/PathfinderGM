@@ -171,6 +171,7 @@ def _jobs_for(c) -> list[dict]:
         jobs.append({
             "job": "cards", "campaign": c.id, "turn": len(c.transcript),
             "cards": [{"id": k.id, "title": k.title, "facts": list(k.facts),
+                       "kind": k.kind, "objectives": [dict(o) for o in k.objectives],
                        "stage": k.stage, "clock": k.clock, "secret": k.secret,
                        "people": [c.scene.actors[r].name if r in c.scene.actors else r
                                   for r in k.people]}
@@ -459,8 +460,11 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
     carries a number, is refused here and never reaches the table.
     """
     deck = "".join(
-        f"- [{k['id']}] {k['title']} ({k['stage']}, clock {k['clock']})"
+        f"- [{k['id']}] {'QUEST: ' if k.get('kind') == 'quest' else ''}{k['title']} "
+        f"({k['stage']}, clock {k['clock']})"
         + (f"; with {', '.join(k['people'])}" if k["people"] else "") + "\n"
+        + "".join(f"    [{'x' if o.get('done') else ' '}] objective {i + 1}: {o.get('text', '')}\n"
+                  for i, o in enumerate(k.get("objectives") or []))
         + "".join(f"    - {f}\n" for f in k["facts"])
         for k in job.get("cards", []))
     people = "".join(f"- {r}: {n}\n" for r, n in (job.get("refs") or {}).items())
@@ -476,13 +480,16 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
                '- "advance": play touched it; give ONE new fact, one sentence, what is '
                "now true that was not.\n"
                '- "resolve": it is plainly settled on stage.\n'
+               '- "objective": on a QUEST card, one of its objectives was plainly '
+               'done on stage; give its number and, as the fact, what was done.\n'
                "And if a situation has plainly arisen that is on no card, propose one "
                "new card: a title and one to three facts, naming its people by ref. "
                "Otherwise leave it null.\n"
                "Rules: facts are one sentence each, no numbers, and use no name that "
                "does not already appear above.\n"
                'Answer JSON: {"changes": [{"id": "...", "action": "keep" | "advance" | '
-               '"resolve", "fact": "..."}], "new": {"title": "...", "facts": ["..."], '
+               '"resolve" | "objective", "objective": 1, "fact": "..."}], '
+               '"new": {"title": "...", "facts": ["..."], '
                '"people": ["c1"]} | null}'}],
         cfg,
         prefer_thinking=True,
@@ -492,7 +499,9 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
                         "type": "object",
                         "properties": {"id": {"type": "string"},
                                        "action": {"type": "string",
-                                                  "enum": ["keep", "advance", "resolve"]},
+                                                  "enum": ["keep", "advance", "resolve",
+                                                           "objective"]},
+                                       "objective": {"type": "integer"},
                                        "fact": {"type": "string", "maxLength": 240}},
                         "required": ["id", "action", "fact"]}},
                     "new": {"type": ["object", "null"],
@@ -523,6 +532,16 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
             changes.append({"id": ch["id"], "action": "advance", "fact": fact, "was": was})
         elif action == "resolve":
             changes.append({"id": ch["id"], "action": "resolve", "fact": "", "was": was})
+        elif action == "objective" and ids[ch["id"]].get("kind") == "quest":
+            try:
+                n = int(ch.get("objective") or 0)
+            except (TypeError, ValueError):
+                n = 0
+            objs = ids[ch["id"]].get("objectives") or []
+            if 1 <= n <= len(objs) and not objs[n - 1].get("done"):
+                fact = _valid_fact(ch.get("fact", ""), known) or ""
+                changes.append({"id": ch["id"], "action": "objective", "objective": n,
+                                "fact": fact, "was": was})
     new = None
     raw = data.get("new")
     if isinstance(raw, dict):
@@ -676,6 +695,15 @@ def _apply_cards(c, p: dict) -> bool:
             c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
                                "action": "resolve"})
             changed = True
+        elif ch["action"] == "objective":
+            # A quest's objective seen done on stage. The engine ticks it, and the
+            # story award for the finished quest is paid below like any resolve.
+            done = cards_mod.objective_done(c.scene, card.id, int(ch["objective"]) - 1,
+                                            note=ch.get("fact", ""), turn=turn)
+            if done is not None:
+                c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                                   "action": "objective", "objective": ch["objective"]})
+                changed = True
         after = cards_mod.find(c.scene, card.id)
         if after is not None and after.stage == "resolved":
             # Resolving a situation pays: half a fight, the story award's "advance"
@@ -683,7 +711,8 @@ def _apply_cards(c, p: dict) -> bool:
             # situations". Whether the model said resolve or an advance filled the
             # clock.
             engine = engine or c.engine()
-            line = engine.award_story("advance", card.title).strip()
+            line = engine.award_story("new" if after.kind == "quest" else "advance",
+                                      card.title).strip()
             if line:
                 lines.append(line)
     new = p.get("new")

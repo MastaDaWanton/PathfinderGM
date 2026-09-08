@@ -3849,6 +3849,102 @@ class Engine:
             return self.here(), known
         return places_mod.find(known, str(wanted)), known
 
+    # --- quests: a task taken up (rules/cards.py, kind "quest") ------------------------------
+
+    def _op_quest(self, intent: Intent, partial: dict) -> Outcome:
+        """Somebody has given the party a task and the party has taken it. The GM
+        proposes it; the engine keeps it as a card with objectives, a giver who must be
+        a person on the board (or a name the world knows), and a promise in words —
+        never a number. Taking a quest pays nothing; finishing it pays the story award.
+        """
+        from . import cards as cards_mod
+
+        title = " ".join(str(intent.params.get("title") or "").split()).rstrip(".")
+        if not (4 <= len(title) <= 80):
+            return self._refuse(intent, "A quest needs a title of a few words.")
+        raw = intent.params.get("objectives")
+        if isinstance(raw, str):
+            raw = [x for x in re.split(r"[;\n]", raw)]
+        objectives = [" ".join(str(o).split()) for o in (raw or []) if str(o).strip()]
+        if not objectives:
+            return self._refuse(intent, "A quest needs at least one objective — what "
+                                        "is to be done, in a sentence each.")
+        if len(objectives) > 6:
+            return self._refuse(intent, "Six objectives at most; split the rest into a "
+                                        "quest of their own.")
+        if any(re.search(r"\d", o) for o in objectives) or re.search(r"\d", str(intent.params.get("reward") or "")):
+            return self._refuse(intent, "No numbers on a quest: say what is promised in "
+                                        "the world's words and the engine will price it.")
+        existing = {c.title.lower() for c in cards_mod.quests(self.scene)}
+        if title.lower() in existing:
+            return self._refuse(intent, f"{title} is already a quest on the table.")
+        giver = str(intent.params.get("giver") or "").strip()
+        if giver and giver not in self.scene.actors:
+            match = [r for r, a in self.scene.actors.items()
+                     if not a.is_pc and str(a.name).lower() == giver.lower()]
+            if len(match) == 1:
+                giver = match[0]
+            elif not self.world or self.world.get(giver) is None:
+                return self._refuse(
+                    intent, f"Nobody here is {giver} to give it. The people here are "
+                            f"{', '.join(f'{a.name} ({r})' for r, a in self.scene.actors.items() if not a.is_pc) or 'nobody'}.")
+        pc = self.scene.pc()
+        card = cards_mod.open_quest(
+            self.scene, title=title, objectives=objectives, giver=giver,
+            reward=str(intent.params.get("reward") or "")[:120],
+            facts=[str(intent.params.get("about") or "")][:1] if intent.params.get("about") else (),
+            people=[giver] if giver in self.scene.actors else [],
+            place=str(self.scene.at or ""), origin=intent.origin or "gm",
+            turn=0)
+        giver_name = (self.scene.actors[giver].name if giver in self.scene.actors
+                      else giver)
+        return Outcome(
+            intent_id=intent.id, op="quest",
+            effects=[{"kind": "quest", "id": card.id, "title": card.title,
+                      "objectives": objectives, "giver": giver}],
+            tell=f"{pc.name if pc else 'The party'} takes it on: {card.title}"
+                 + (f", for {giver_name}" if giver_name else "") + ". "
+                 + " ".join(f"({i + 1}) {o}" for i, o in enumerate(objectives)) + ".",
+            because=intent.because)
+
+    def _op_quest_step(self, intent: Intent, partial: dict) -> Outcome:
+        """One objective of a quest done. The card ticks; when the last one is done
+        the quest resolves and the story award is paid."""
+        from . import cards as cards_mod
+
+        wanted = str(intent.params.get("quest") or "").strip().lower()
+        live = [c for c in cards_mod.quests(self.scene) if c.live]
+        card = next((c for c in live if c.id.lower() == wanted or c.title.lower() == wanted), None)
+        if card is None:
+            return self._refuse(
+                intent, "No such quest is underway. "
+                        + ("The quests are: " + "; ".join(f"{c.title} [{c.id}]" for c in live) + "."
+                           if live else "Nothing has been taken on yet."))
+        try:
+            index = int(intent.params.get("objective")) - 1
+        except (TypeError, ValueError):
+            index = -1
+        if not (0 <= index < len(card.objectives)):
+            return self._refuse(
+                intent, f"{card.title} has objectives 1 to {len(card.objectives)}; say "
+                        f"which one was done.")
+        if card.objectives[index].get("done"):
+            return self._refuse(intent, f"Objective {index + 1} of {card.title} is already done.")
+        note = " ".join(str(intent.params.get("note") or "").split())
+        if re.search(r"\d", note):
+            note = ""
+        after = cards_mod.objective_done(self.scene, card.id, index, note=note, turn=0)
+        tell = f"Done: {card.objectives[index]['text']} ({card.title}, {after.clock}/{after.clock_max})."
+        effects = [{"kind": "quest_step", "id": card.id, "objective": index + 1,
+                    "finished": after.stage == "resolved"}]
+        if after.stage == "resolved":
+            line = self.award_story("new", card.title).strip()
+            tell += f" {card.title} is finished." + (f" {line}" if line else "")
+            if card.reward:
+                tell += f" Promised: {card.reward}."
+        return Outcome(intent_id=intent.id, op="quest_step", effects=effects, tell=tell,
+                       because=intent.because)
+
     def _op_found(self, intent: Intent, partial: dict) -> Outcome:
         """The player makes a place from where they stand: a base at a friend's house,
         the alley behind the market. LambdaMOO's `@dig`: a room exists because a

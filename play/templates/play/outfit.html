@@ -1,0 +1,212 @@
+{% load static %}
+<title>Outfitting — Pathfinder GM</title>
+<style>
+  :root {
+    --ink: #e6dcc6; --dim: #9a8b6f; --gold: #d9c08a; --gold-dim: #7a6543;
+    --sunk: #0c0a08; --alarm: #6e1f1f; --brew: #6fcf8f; --accent: #c9a227;
+    --body: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --display: Cinzel, Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; height: 100vh; overflow: hidden;
+    color: var(--ink); font: 400 15px/1.55 var(--body);
+    background: url("{% static 'img/grimoire-leather.jpg' %}") center / cover fixed #1a140c;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; padding: 12px 26px;
+    border-bottom: 1px solid var(--gold-dim);
+    background: url("{% static 'img/card-leather.jpg' %}") center / cover #241d15;
+  }
+  header h1 { margin: 0; color: var(--gold); font: 400 21px/1 var(--display);
+              letter-spacing: .16em; text-transform: uppercase; }
+  header small { color: var(--dim); font-style: italic; }
+  header .spacer { flex: 1; }
+  a.back { color: var(--gold); text-decoration: none; font-size: 13px; }
+  main { height: calc(100vh - 52px); overflow: auto; padding: 22px 26px 60px; }
+  .leaf {
+    max-width: 1100px; margin: 0 auto; padding: 20px 26px 30px;
+    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    background: linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 400px auto;
+  }
+  h2.sect { margin: 26px 0 4px; padding-bottom: 5px; color: var(--gold);
+    border-bottom: 1px solid #2b2319; font: 400 14px/1 var(--display);
+    letter-spacing: .12em; text-transform: uppercase; }
+  h2.sect:first-child { margin-top: 0; }
+  .note { margin: 2px 0 0; color: var(--dim); font: italic 12.5px/1.4 var(--body); }
+  .purse { position: sticky; top: 0; z-index: 2; display: flex; gap: 18px; align-items: baseline;
+    padding: 10px 14px; margin-bottom: 6px; border-radius: 3px; border: 1px solid var(--gold-dim);
+    background: linear-gradient(rgba(60,48,26,.92), rgba(32,25,14,.95)); }
+  .purse b { color: var(--gold); font-weight: 400; font-size: 17px; }
+  .purse .over { color: #d08a7c; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--dim); font-weight: 400; font-style: italic; padding: 4px 6px; }
+  td { padding: 4px 6px; border-top: 1px solid rgba(150,120,60,.15); }
+  td.n { text-align: right; white-space: nowrap; }
+  tr.have td { color: var(--gold); }
+  button { padding: 5px 10px; border-radius: 2px; cursor: pointer; border: 1px solid var(--gold-dim);
+    color: var(--ink); background: linear-gradient(#2a2114, #1a140c); font: 400 13px/1 var(--body); }
+  button:hover { border-color: var(--gold); color: #ffe7b4; }
+  button.go { color: var(--gold); padding: 9px 16px; }
+  button.tiny { padding: 2px 8px; }
+  input[type=text] { width: 100%; margin-top: 4px; padding: 7px 9px; border-radius: 2px;
+    border: 1px solid rgba(150,120,60,.35); background: var(--sunk); color: var(--ink);
+    font: 400 14px/1.4 var(--body); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .banner { margin: 10px 0 0; padding: 9px 12px; border-radius: 2px; font-size: 13.5px; }
+  .banner.ok { color: var(--brew); border-left: 3px solid var(--brew); background: rgba(31,110,63,.12); }
+  .banner.bad { color: #d08a7c; border-left: 3px solid var(--alarm); background: rgba(110,31,31,.14); }
+  .pack { padding: 10px 14px; border: 1px solid rgba(150,120,60,.25); border-radius: 3px;
+    background: rgba(0,0,0,.25); font-size: 13.5px; }
+  .pack b { color: var(--gold); font-weight: 400; }
+</style>
+
+<header>
+  <h1>Outfitting</h1>
+  <small>Spend the starting gold before the road. What is not spent stays in the purse.</small>
+  <span class="spacer"></span>
+  <a class="back" href="/">← the shelf</a>
+</header>
+
+<main>
+  <div class="leaf">
+    <div class="purse">
+      <span>Purse <b id="purse">…</b></span>
+      <span>Basket <b id="basket">0 gp</b></span>
+      <span id="left" class="note"></span>
+      <span class="spacer" style="flex:1"></span>
+      <button type="button" class="go" id="buy">Buy the basket</button>
+      <button type="button" class="go" id="begin">Begin the sandbox →</button>
+      <button type="button" id="shelf">Keep on the shelf</button>
+    </div>
+    <div id="banner"></div>
+
+    <div class="cols">
+      <div>
+        <h2 class="sect">Carrying</h2>
+        <div class="pack" id="pack">…</div>
+        <h2 class="sect">Weapons</h2>
+        <p class="note">The Core Rulebook's prices. A weapon you are not proficient with swings at −4.</p>
+        <input type="text" id="wfind" placeholder="find a weapon — longbow, dagger, glaive">
+        <div id="weapons"></div>
+      </div>
+      <div>
+        <h2 class="sect">Armour</h2>
+        <div id="armour"></div>
+        <h2 class="sect">Shields</h2>
+        <div id="shields"></div>
+        <h2 class="sect">Gear</h2>
+        <div id="gear"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const STATE = {{ state_json|safe }};
+const CAT = STATE.catalogue;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const gp = n => `${Number(n).toLocaleString(undefined, {maximumFractionDigits: 2})} gp`;
+function csrf() { const m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ""; }
+
+let ME = null;            // the character, as the server has them
+const BASKET = {};        // "kind:key" -> count
+
+function basketTotal() {
+  let t = 0;
+  for (const [id, n] of Object.entries(BASKET)) {
+    const [kind, key] = id.split(":");
+    const row = (CAT[kind === "armour" ? "armour" : kind === "shield" ? "shields" : kind === "gear" ? "gear" : "weapons"] || []).find(r => r.key === key);
+    if (row) t += row.cost_gp * n;
+  }
+  return t;
+}
+
+function rowsFor(kind, rows, filter) {
+  const list = filter ? rows.filter(r => r.name.toLowerCase().includes(filter)) : rows;
+  const shown = list.slice(0, 80);
+  return `<table><tr><th>Item</th><th>Detail</th><th class="n">Price</th><th class="n">Basket</th></tr>${shown.map(r => {
+    const id = `${kind}:${r.key}`; const n = BASKET[id] || 0;
+    const detail = kind === "weapon" ? `${r.damage} ${r.type} · ${r.prof}${r.hands === 2 ? " · two-handed" : ""}${r.category === "ranged" ? " · ranged" : ""}`
+      : kind === "armour" ? `+${r.ac} AC · max Dex ${r.max_dex} · check ${r.acp} · ${r.weight}`
+      : kind === "shield" ? `+${r.ac} AC · check ${r.acp}`
+      : (r.unit ? `${r.per} ${r.unit}` : "");
+    const have = ME && (kind === "weapon" ? ME.weapons.includes(r.key) : kind === "armour" ? ME.armour === r.key : kind === "shield" ? ME.shield === r.key : false);
+    return `<tr class="${have ? "have" : ""}"><td>${esc(r.name)}${have ? " · carried" : ""}</td><td class="note">${esc(detail)}</td>
+      <td class="n">${gp(r.cost_gp)}</td>
+      <td class="n"><button class="tiny" data-less="${esc(id)}">−</button> ${n} <button class="tiny" data-more="${esc(id)}">+</button></td></tr>`;
+  }).join("")}</table>${list.length > shown.length ? `<p class="note">${list.length - shown.length} more — narrow the search.</p>` : ""}`;
+}
+
+function draw() {
+  const total = basketTotal();
+  $("#basket").textContent = gp(total);
+  const left = ME ? ME.purse_gp - total : 0;
+  $("#left").innerHTML = ME ? (left < 0 ? `<span class="over">${gp(-left)} short</span>` : `${gp(left)} would be left`) : "";
+  $("#purse").textContent = ME ? ME.purse : "…";
+  $("#pack").innerHTML = ME ? `<b>${esc(ME.name)}</b>, ${esc(ME.class)}.<br>
+    Weapons: ${ME.weapons.map(esc).join(", ") || "none"}.<br>
+    Armour: ${esc(ME.armour)} · shield: ${esc(ME.shield)}.<br>
+    Pack: ${ME.stock.length ? ME.stock.map(esc).join(", ") : "empty"}.` : "…";
+  $("#weapons").innerHTML = rowsFor("weapon", CAT.weapons, ($("#wfind").value || "").trim().toLowerCase());
+  $("#armour").innerHTML = rowsFor("armour", CAT.armour, "");
+  $("#shields").innerHTML = rowsFor("shield", CAT.shields, "");
+  $("#gear").innerHTML = rowsFor("gear", CAT.gear, "");
+}
+
+async function load() {
+  const r = await fetch(`/api/outfit/${encodeURIComponent(STATE.character)}`);
+  const d = await r.json();
+  if (!r.ok) { $("#banner").innerHTML = `<div class="banner bad">${esc(d.error || "HTTP " + r.status)}</div>`; return; }
+  ME = d; draw();
+}
+
+document.addEventListener("click", async e => {
+  const more = e.target.closest("[data-more]"); const less = e.target.closest("[data-less]");
+  if (more) { BASKET[more.dataset.more] = (BASKET[more.dataset.more] || 0) + 1; draw(); return; }
+  if (less) { const id = less.dataset.less; BASKET[id] = Math.max(0, (BASKET[id] || 0) - 1); if (!BASKET[id]) delete BASKET[id]; draw(); return; }
+});
+document.addEventListener("input", e => { if (e.target.closest("#wfind")) draw(); });
+
+$("#buy").addEventListener("click", async () => {
+  const buys = Object.entries(BASKET).map(([id, count]) => { const [kind, key] = id.split(":"); return { kind, key, count }; });
+  if (!buys.length) { $("#banner").innerHTML = `<div class="banner bad">The basket is empty.</div>`; return; }
+  const r = await fetch(`/api/outfit/${encodeURIComponent(STATE.character)}/buy`, {
+    method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+    body: JSON.stringify({ buys }),
+  });
+  const d = await r.json();
+  if (!r.ok) { $("#banner").innerHTML = `<div class="banner bad">${(d.problems || [d.error]).map(esc).join("<br>")}</div>`; return; }
+  for (const k of Object.keys(BASKET)) delete BASKET[k];
+  $("#banner").innerHTML = `<div class="banner ok">Bought. ${esc(d.purse)} left.</div>`;
+  await load();
+});
+
+async function go(begin) {
+  if (Object.keys(BASKET).length) {
+    $("#banner").innerHTML = `<div class="banner bad">The basket has not been bought yet — buy it or empty it first.</div>`;
+    return;
+  }
+  if (!begin) { location.href = "/"; return; }
+  const r = await fetch("/api/resume", {
+    method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+    body: JSON.stringify({ id: STATE.character }),
+  });
+  const d = await r.json();
+  if (!r.ok) { $("#banner").innerHTML = `<div class="banner bad">${esc(d.error || "HTTP " + r.status)}</div>`; return; }
+  location.href = "/play/";
+}
+$("#begin").addEventListener("click", () => go(true));
+$("#shelf").addEventListener("click", () => go(false));
+
+load();
+</script>
+<!-- The heartbeat that lets the packaged exe tell an open window from a closed
+     one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% static 'js/keepalive.js' %}"></script>

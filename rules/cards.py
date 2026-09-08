@@ -58,6 +58,13 @@ TAG_STRAIN = "situation.strain"      # what is wrong with this place, from the e
 TAG_HOOK = "situation.hook"          # the world's own unwritten hooks — the GM's
 TAG_WORLD = "situation.world"        # authored by World Bible, shipped with the world
 TAG_PLAY = "situation.play"          # arose in play
+# A quest: a situation the player has taken up as a task, with a giver, objectives to
+# tick and something promised at the end. Baldur's Gate 3's journal keeps the same
+# two things apart — *objectives* say what to do next, *steps* (our facts) say what just
+# happened — and Skyrim's stages taught that objectives finish in any order and not
+# every one is reached. Kept as a card so the watcher, the brief and the XP award all
+# work on it unchanged; the quest log on the table page reads it by this tag.
+TAG_QUEST = "situation.quest"
 
 _STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their", "which",
          "have", "been", "were", "your", "into", "over", "under", "than", "them", "they",
@@ -87,6 +94,11 @@ class Card:
     touched: int = 0            # transcript turn last touched
     resolved_turn: int = 0
     grants: list[dict] = field(default_factory=list)   # [{"to": ref, "tags": [...]}]
+    # A quest's own fields; empty on an ordinary situation.
+    kind: str = "situation"                             # "situation" | "quest"
+    objectives: list[dict] = field(default_factory=list)   # [{"text": str, "done": bool}]
+    giver: str = ""                                     # an actor ref, or a name
+    reward: str = ""                                    # in the world's words, no number
 
     def as_dict(self) -> dict:
         return {
@@ -97,6 +109,8 @@ class Card:
             "always_on": self.always_on, "opened_at": self.opened_at,
             "touched": self.touched, "resolved_turn": self.resolved_turn,
             "grants": [dict(g) for g in self.grants],
+            "kind": self.kind, "objectives": [dict(o) for o in self.objectives],
+            "giver": self.giver, "reward": self.reward,
         }
 
     @classmethod
@@ -116,6 +130,10 @@ class Card:
             opened_at=int(d.get("opened_at", 0) or 0), touched=int(d.get("touched", 0) or 0),
             resolved_turn=int(d.get("resolved_turn", 0) or 0),
             grants=[dict(g) for g in d.get("grants") or []],
+            kind=str(d.get("kind") or "situation"),
+            objectives=[{"text": str(o.get("text", "")), "done": bool(o.get("done"))}
+                        for o in d.get("objectives") or [] if isinstance(o, dict)],
+            giver=str(d.get("giver") or ""), reward=str(d.get("reward") or ""),
         )
 
     def is_(self, query: str) -> bool:
@@ -322,10 +340,92 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
             head += f"; with {who}"
         if c.secret:
             head += " [the GM's alone; the player does not know this]"
+        if c.kind == "quest":
+            head = head.replace("  * ", "  * QUEST: ", 1)
         lines.append(head + ".")
+        if c.kind == "quest":
+            # Objectives first — what to do next — then the facts, what has happened.
+            for i, o in enumerate(c.objectives):
+                lines.append(f"      [{'x' if o.get('done') else ' '}] objective {i + 1}: "
+                             f"{o.get('text', '')}")
+            if c.reward:
+                lines.append(f"      promised: {c.reward}")
         for f in c.facts:
             lines.append(f"      - {f}")
     return "\n".join(lines)
+
+
+# --- quests -----------------------------------------------------------------------------------
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
+
+
+def _store(scene, card: Card) -> None:
+    """Write one card back among the others."""
+    items = load(scene)
+    save(scene, [card if x.id == card.id else x for x in items])
+
+
+def quests(scene) -> list[Card]:
+    return [c for c in load(scene) if c.kind == "quest"]
+
+
+def open_quest(scene, *, title: str, objectives, giver: str = "", reward: str = "",
+               facts=(), people=(), place: str = "", origin: str = "gm",
+               turn: int = 0) -> Card:
+    """A task taken up: a card of kind quest. The id is minted from the title."""
+    n = sum(1 for c in load(scene) if c.kind == "quest") + 1
+    cid = f"quest-{n}-{_slug(title)[:24]}"
+    obj = [{"text": " ".join(str(o).split()), "done": False} for o in objectives
+           if str(o).strip()][:6]
+    card = Card(
+        id=cid, title=str(title).strip()[:80], facts=[str(f) for f in facts if str(f).strip()],
+        keys=keys_from(title, *[o["text"] for o in obj]),
+        tags=(TAG_QUEST, TAG_PLAY), people=[p for p in people if p], place=place,
+        clock_max=max(1, len(obj)), origin=origin, always_on=True,
+        kind="quest", objectives=obj, giver=giver, reward=str(reward or ""),
+    )
+    return open_card(scene, card, turn=turn)
+
+
+def objective_done(scene, card_id: str, index: int, note: str = "", turn: int = 0) -> Card | None:
+    """Tick one objective. The clock is the count done; the quest resolves when every
+    objective is, and the note — what was done — lands as a fact."""
+    card = find(scene, card_id)
+    if card is None or card.kind != "quest" or not card.live:
+        return None
+    if not (0 <= index < len(card.objectives)):
+        return None
+    card.objectives[index]["done"] = True
+    card.clock = sum(1 for o in card.objectives if o.get("done"))
+    card.clock_max = max(1, len(card.objectives))
+    card.touched = turn
+    if card.stage == "open":
+        card.stage = "moving"
+    if note and note not in card.facts:
+        card.facts = (card.facts + [note])[-FACT_CAP:]
+    if card.clock >= card.clock_max:
+        card.stage = "resolved"
+        card.resolved_turn = turn
+    _store(scene, card)
+    return card
+
+
+def quest_log(scene) -> dict:
+    """What the table page shows: the quests underway, then the ones finished."""
+    actors = getattr(scene, "actors", {}) or {}
+
+    def row(c: Card) -> dict:
+        giver = actors[c.giver].name if c.giver in actors else c.giver
+        return {"id": c.id, "title": c.title, "stage": c.stage, "giver": giver,
+                "reward": c.reward, "objectives": [dict(o) for o in c.objectives],
+                "facts": list(c.facts), "done": sum(1 for o in c.objectives if o.get("done")),
+                "of": len(c.objectives)}
+
+    qs = quests(scene)
+    return {"active": [row(c) for c in qs if c.live],
+            "finished": [row(c) for c in qs if not c.live]}
 
 
 # --- where cards come from ---------------------------------------------------------------------

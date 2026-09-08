@@ -493,16 +493,16 @@ def is_physical(dtype: str | None) -> bool:
 # arrived, because nothing measured movement in feet before there were squares to cross.
 ARMOUR: dict[str, dict] = {
     "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0, "weight": "light"},
-    "padded": {"name": "padded armour", "ac": 1, "max_dex": 8, "acp": 0, "weight": "light"},
-    "leather": {"name": "leather armour", "ac": 2, "max_dex": 6, "acp": 0, "weight": "light"},
-    "studded leather": {"name": "studded leather", "ac": 3, "max_dex": 5, "acp": -1,
+    "padded": {"name": "padded armour", "cost_gp": 5, "ac": 1, "max_dex": 8, "acp": 0, "weight": "light"},
+    "leather": {"name": "leather armour", "cost_gp": 10, "ac": 2, "max_dex": 6, "acp": 0, "weight": "light"},
+    "studded leather": {"name": "studded leather", "cost_gp": 25, "ac": 3, "max_dex": 5, "acp": -1,
                         "weight": "light"},
-    "chain shirt": {"name": "chain shirt", "ac": 4, "max_dex": 4, "acp": -2,
+    "chain shirt": {"name": "chain shirt", "cost_gp": 100, "ac": 4, "max_dex": 4, "acp": -2,
                     "weight": "light"},
-    "breastplate": {"name": "breastplate", "ac": 6, "max_dex": 3, "acp": -4,
+    "breastplate": {"name": "breastplate", "cost_gp": 200, "ac": 6, "max_dex": 3, "acp": -4,
                     "weight": "medium"},
-    "chainmail": {"name": "chainmail", "ac": 6, "max_dex": 2, "acp": -5, "weight": "medium"},
-    "full plate": {"name": "full plate", "ac": 9, "max_dex": 1, "acp": -6, "weight": "heavy"},
+    "chainmail": {"name": "chainmail", "cost_gp": 150, "ac": 6, "max_dex": 2, "acp": -5, "weight": "medium"},
+    "full plate": {"name": "full plate", "cost_gp": 1500, "ac": 9, "max_dex": 1, "acp": -6, "weight": "heavy"},
 }
 
 # Core Rulebook table 7-6. A creature slowed by armour keeps the reduced speed until it
@@ -564,9 +564,9 @@ SLOT_ORDER_RIGHT = ("headband", "neck", "chest", "hands", "ring", "belt", "shiel
 
 SHIELDS: dict[str, dict] = {
     "none": {"name": "no shield", "ac": 0, "acp": 0},
-    "buckler": {"name": "buckler", "ac": 1, "acp": -1},
-    "light shield": {"name": "light shield", "ac": 1, "acp": -1},
-    "heavy shield": {"name": "heavy shield", "ac": 2, "acp": -2},
+    "buckler": {"name": "buckler", "cost_gp": 5, "ac": 1, "acp": -1},
+    "light shield": {"name": "light shield", "cost_gp": 9, "ac": 1, "acp": -1},
+    "heavy shield": {"name": "heavy shield", "cost_gp": 20, "ac": 2, "acp": -2},
 }
 
 # --- Combat manoeuvres ------------------------------------------------------------

@@ -67,7 +67,7 @@ class Entry:
         cls = a.class_data.get("name", "")
         return {
             "id": self.id, "name": self.name, "status": self.status,
-            "line": " · ".join(x for x in (a.heritage, a.race, f"{cls} {a.level}".strip())
+            "line": " · ".join(x for x in (a.heritage, _race_name(a.race), f"{cls} {a.level}".strip())
                                if x),
             "hp": f"{a.hp}/{a.hp_max}",
             "created": self.created, "died": self.died, "epitaph": self.epitaph,
@@ -118,6 +118,15 @@ def everyone() -> list[Entry]:
     # The living first, then the dead, newest first within each.
     out.sort(key=lambda e: (e.status != ALIVE, e.created), reverse=False)
     return out
+
+
+def _race_name(race_id: str) -> str:
+    """The race as the forge shows it, not its id: a card read
+    "zhilakai-of-fantasia · Blood Bending 1" (2026-09-07)."""
+    from rules import races as races_mod
+
+    doc = races_mod.get(str(race_id or ""))
+    return str(doc["name"]) if doc else str(race_id or "")
 
 
 def enrol(actor: Actor, campaign_id: str = "", world_source: str = "") -> Entry:
@@ -232,7 +241,7 @@ def pregens() -> list[dict]:
         out.append({
             "source": p.stem,
             "name": actor.name,
-            "line": " · ".join(x for x in (actor.heritage, actor.race,
+            "line": " · ".join(x for x in (actor.heritage, _race_name(actor.race),
                                            f"{cls} {actor.level}".strip()) if x),
             "hp": actor.hp_max,
             "notes": (actor.notes or "").strip().split("\n")[0],

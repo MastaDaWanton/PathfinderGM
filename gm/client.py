@@ -71,6 +71,49 @@ class Reply:
         return json.loads(text[start:end + 1])
 
 
+# How long Ollama keeps a model in memory after a request. Long enough to cover the
+# thinking between turns and a character build; the model is unloaded by `warm`'s
+# absence, never by a turn.
+KEEP_ALIVE = "45m"
+
+
+def warm(model: str, host: str, provider: str = "ollama") -> bool:
+    """Ask Ollama to load `model` now, and keep it. No prompt, so nothing is
+    generated; the call returns when the weights are in memory. Called in a thread
+    from the pages a player sits on before play — the shelf, the forge — so the
+    opening does not pay the cold load. Hosted providers have nothing to warm."""
+    if provider and provider != "ollama" or not model:
+        return False
+    try:
+        req = urllib.request.Request(
+            f"{host.rstrip('/')}/api/generate",
+            data=json.dumps({"model": model, "keep_alive": KEEP_ALIVE}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            resp.read()
+        return True
+    except Exception:
+        return False
+
+
+def warm_roles(*roles: str) -> None:
+    """Warm each role's model once, in the background, deduplicated by model."""
+    import threading
+
+    from play import modelcfg
+
+    seen = set()
+    for role in roles:
+        cfg = modelcfg.for_role(role) or {}
+        key = (cfg.get("model"), cfg.get("host"))
+        if not cfg.get("model") or key in seen:
+            continue
+        seen.add(key)
+        threading.Thread(target=warm, args=(cfg["model"], cfg.get("host", ""),
+                                            cfg.get("provider", "ollama")),
+                         daemon=True, name=f"warm-{role}").start()
+
+
 def chat(
     messages: list[dict],
     model: str,
@@ -108,6 +151,11 @@ def chat(
         # roughly 1.5GB of KV cache at 12B and ends the class.
         "options": {"temperature": temperature, "num_predict": num_predict,
                     "num_ctx": 16384},
+        # Stay loaded. Ollama's default unloads a model five minutes after its last
+        # request, and a player who spends six minutes building a character then
+        # waits the whole cold load again — 60 to 100 seconds on this machine — for
+        # the opening. Measured 2026-09-07: a warm opening is 22 s for two calls.
+        "keep_alive": KEEP_ALIVE,
     }
     # A schema, when the caller has one, rather than "some JSON please". Ollama passes
     # `format` to the sampler as a grammar, so a reply that breaks the schema is not

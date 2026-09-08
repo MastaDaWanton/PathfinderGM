@@ -35,6 +35,13 @@ def home(request):
     pc = active.scene.pc()
     from pathfindergm import version
 
+    # Load the models now, in the background, while the player reads the shelf or
+    # builds a character: the opening used to pay the cold load — 60 to 100 s on this
+    # machine — on top of its own two calls. "why is it taking forever to start a game."
+    from gm import client as gm_client
+
+    gm_client.warm_roles("narrator", "prose")
+
     return render(request, "play/home.html", {
         "build": version.build(),
         "state_json": json.dumps({
@@ -411,7 +418,10 @@ def creation_options(request):
     and a class list disagree about what exists.
     """
     from rules import creation
+    from gm import client as gm_client
 
+    # A character takes minutes to build; the model can be loading meanwhile.
+    gm_client.warm_roles("narrator", "prose")
     # The world the forge was opened from decides which races it offers: that
     # world's own peoples first, the Core seven after when the table allows them.
     return JsonResponse(creation.options(str(request.GET.get("world", "")).strip()))
@@ -527,6 +537,10 @@ def create_character(request):
     from rules.sheet import from_dict
 
     actor = from_dict(built["sheet"], ref="pc")
+    # Whole, on the first day. `build` sets hit points to the die plus Con and the
+    # loader then adds the feat channel to the maximum, so a character with Toughness
+    # began at 40 of 44 — wounded before the game started.
+    actor.hp = actor.hp_max
 
     # Which world the forge was opened from. Nothing carried this before, so a character
     # made from Fantasia's own page began in Pangrella — `new_campaign` fills a missing

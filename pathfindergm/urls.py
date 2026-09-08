@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.staticfiles.views import serve as static_serve
 from django.urls import path, re_path
 
-from play import class_views, race_views, spell_views, craft_views, home_views, views
+from play import class_views, outfit_views, race_views, spell_views, craft_views, home_views, views
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -76,6 +76,10 @@ urlpatterns = [
     path("homebrew/classes/", class_views.class_builder, name="class_builder"),
     path("homebrew/spells/", spell_views.spell_builder, name="spell_builder"),
     path("homebrew/races/", race_views.race_builder, name="race_builder"),
+    # Outfitting: the starting gold spent before the sandbox.
+    path("outfit/", outfit_views.outfit_page, name="outfit"),
+    path("api/outfit/<str:character_id>", outfit_views.outfit_state, name="outfit_state"),
+    path("api/outfit/<str:character_id>/buy", outfit_views.outfit_buy, name="outfit_buy"),
     path("api/races/open/<str:race_id>", race_views.race_open, name="race_open"),
     path("api/classes/catalogue", class_views.class_catalogue, name="class_catalogue"),
     path("api/classes/scaffold/<str:kind>", class_views.class_scaffold,

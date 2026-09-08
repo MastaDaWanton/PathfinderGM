@@ -236,6 +236,13 @@
   /* --- The forge: character creation ------------------------------------------- */
   .forge h2.sect { margin-top: 26px; }
   .forge .cards.tight { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 26px; }
+  /* Race cards carry a description and a trait line, and at 170px they ran tall and
+     thin — "so elongated vertically" (2026-09-07). Wider columns, the description
+     held to three lines, and the trait line small. */
+  .forge .cards.races { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 26px; }
+  .forge .cards.races .card em { display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; line-height: 1.4; }
+  .forge .cards.races .traits { font-size: 12px; line-height: 1.35; }
   /* The forge's own chosen-card rule used to live here at .12 opacity. Being four
      classes deep it beat the general one further down however the order fell, so the
      strongest glow in the sheet was the one nobody could see. Removed at source
@@ -1498,7 +1505,7 @@ function paneForge() {
       ${esc(opts.races.find(r => r.of).of)} first — read off the world's own entries and
       priced from the Race Builder — then the Core Rulebook's own${opts.races.some(r => !r.of)
         ? "" : ", which this table has turned off on the Rulesets bench"}.</p>` : ""}
-    <div class="cards tight">${opts.races.map(r => `
+    <div class="cards tight races">${opts.races.map(r => `
       <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${r.id}"
               ${r.rp > opts.race_rp ? `disabled title="${r.rp} RP: above this table's ${opts.race_rp} RP tier"` : ""}
               style="${r.rp > opts.race_rp ? "opacity:.45" : ""}">
@@ -1633,7 +1640,7 @@ function paneForge() {
 
     <div id="forgeproblems"></div>
     <div style="display:flex;gap:12px;margin-top:18px">
-      <button class="go" data-crsubmit="begin">Create &amp; play</button>
+      <button class="go" data-crsubmit="begin">Create &amp; outfit →</button>
       <button class="quiet" data-crsubmit="">Create for the roster</button>
     </div>
   </div>`;
@@ -1641,7 +1648,9 @@ function paneForge() {
 
 async function forgeSubmit(begin) {
   const f = FORGE.form;
-  const payload = { ...f, begin: !!begin, world: (FORGE && FORGE.world) || "" };
+  // Never `begin` here: the outfitting step comes between the sheet and the road, so
+  // the character goes onto the roster and the outfit page begins the game itself.
+  const payload = { ...f, begin: false, world: (FORGE && FORGE.world) || "" };
   delete payload.featstext; delete payload.spellstext;
   const say = lines => { $("#forgeproblems").innerHTML = `<div class="problems">${
     lines.map(p => `<div>${esc(p)}</div>`).join("")}</div>`; };
@@ -1675,7 +1684,11 @@ async function forgeSubmit(begin) {
     say(d.problems || [d.error || "something refused"]);
     return;
   }
-  if (begin) { window.location.href = "/play/"; return; }
+  if (begin) {
+    window.location.href = `/outfit/?character=${encodeURIComponent(d.id)}&world=${
+      encodeURIComponent((FORGE && FORGE.world) || "")}`;
+    return;
+  }
   // The roster block on this page is server-rendered state; a reload is the one honest
   // refresh that cannot drift from it. It reloads onto the *characters* tab naming who
   // was just made, because the plain reload landed on the shelf of worlds — the new

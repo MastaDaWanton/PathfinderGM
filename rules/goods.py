@@ -285,3 +285,49 @@ def describe(name: str, count: int = 1) -> str:
     if entry.get("table") == "weapon":
         return f"{head} — {entry['damage']} {entry['type']}, ×{entry['crit_mult']}"
     return f"{head} — +{entry.get('ac', 0)} AC"
+
+
+# --- adventuring gear, at the Core Rulebook's prices --------------------------------------------
+# What the outfitting screen sells beside the weapon and armour tables: "at the end of
+# making your character we need a buy screen to spend starting gold" (2026-09-07).
+# Prices are the Core Rulebook's own, in gold; a thing measured rather than counted
+# says its unit. Bought gear lands in `stock` like anything else the engine sells.
+GEAR: dict[str, dict] = {
+    "backpack": {"name": "backpack", "cost_gp": 2.0},
+    "bedroll": {"name": "bedroll", "cost_gp": 0.1},
+    "blanket": {"name": "blanket", "cost_gp": 0.5},
+    "rope": {"name": "hemp rope", "cost_gp": 1.0, "unit": "ft", "per": 50},
+    "silk rope": {"name": "silk rope", "cost_gp": 10.0, "unit": "ft", "per": 50},
+    "torch": {"name": "torch", "cost_gp": 0.01},
+    "lantern": {"name": "hooded lantern", "cost_gp": 7.0},
+    "oil": {"name": "flask of oil", "cost_gp": 0.1},
+    "rations": {"name": "trail rations", "cost_gp": 0.5, "unit": "days", "per": 1},
+    "waterskin": {"name": "waterskin", "cost_gp": 1.0},
+    "flint and steel": {"name": "flint and steel", "cost_gp": 1.0},
+    "healer's kit": {"name": "healer's kit", "cost_gp": 50.0},
+    "grappling hook": {"name": "grappling hook", "cost_gp": 1.0},
+    "crowbar": {"name": "crowbar", "cost_gp": 2.0},
+    "chalk": {"name": "chalk", "cost_gp": 0.01},
+    "sack": {"name": "sack", "cost_gp": 0.1},
+    "whetstone": {"name": "whetstone", "cost_gp": 0.02},
+    "tent": {"name": "tent", "cost_gp": 10.0},
+    "antitoxin": {"name": "antitoxin", "cost_gp": 50.0},
+    "shovel": {"name": "shovel", "cost_gp": 2.0},
+    "hammer": {"name": "hammer", "cost_gp": 0.5},
+    "pitons": {"name": "pitons", "cost_gp": 0.1},
+    "mirror": {"name": "small steel mirror", "cost_gp": 10.0},
+    "thieves' tools": {"name": "thieves' tools", "cost_gp": 30.0},
+    "spell component pouch": {"name": "spell component pouch", "cost_gp": 5.0},
+    "holy symbol": {"name": "wooden holy symbol", "cost_gp": 1.0},
+    "manacles": {"name": "manacles", "cost_gp": 15.0},
+    "candle": {"name": "candle", "cost_gp": 0.01, "unit": "hours", "per": 1},
+    "ink and paper": {"name": "ink and paper", "cost_gp": 8.4},
+    "signal whistle": {"name": "signal whistle", "cost_gp": 0.8},
+    "fishing net": {"name": "fishing net", "cost_gp": 4.0},
+    "cold-weather outfit": {"name": "cold-weather outfit", "cost_gp": 8.0},
+    "traveler's outfit": {"name": "traveler's outfit", "cost_gp": 1.0},
+    "climber's kit": {"name": "climber's kit", "cost_gp": 80.0},
+    "caltrops": {"name": "caltrops", "cost_gp": 1.0},
+    "sunrod": {"name": "sunrod", "cost_gp": 2.0},
+    "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0},
+}

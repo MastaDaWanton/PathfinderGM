@@ -129,6 +129,7 @@ def _usable_abilities(pc) -> list[dict]:
 
 def _state(c) -> dict:
     pc = c.scene.pc()
+    from rules import cards as cards_mod
     from rules import goods as goods_mod
 
     coins = goods_mod.coinage(c.world, c.location)
@@ -140,6 +141,9 @@ def _state(c) -> dict:
         "coinage": [{"id": x.id, "name": x.name, "plural": x.plural,
                      "copper": x.copper, "coined": x.coined} for x in coins],
         "suggestions": list(getattr(c, "suggestions", []) or []),
+        # The quest log: the tasks taken up, their objectives ticked or not, and the
+        # ones finished — read off the situation cards of kind quest.
+        "quests": cards_mod.quest_log(c.scene),
         # Whether the trade panel would open, decided here so the button and the
         # endpoint cannot disagree — the rule lives in `_merchant_here` and nowhere else.
         "merchant": (_merchant_here(c.scene).name if _merchant_here(c.scene) else ""),

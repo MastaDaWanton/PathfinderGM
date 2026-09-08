@@ -2573,6 +2573,24 @@ const FIGURE_SVG = `
   </g>
 </svg>`;
 
+// The quest log: the tasks taken up, read off the situation cards of kind quest the
+// engine keeps. Objectives say what to do next; the facts under them say what has
+// happened — Baldur's Gate 3's journal keeps the two apart for the same reason.
+function tabQuests() {
+  const q = (STATE && STATE.quests) || { active: [], finished: [] };
+  const one = (k, done) => `<div class="framed" style="margin:10px 0;padding:10px 14px">
+      <h3 style="margin:0 0 4px">${esc(k.title)}${done ? ` <span class="why">— finished</span>` : ""}</h3>
+      ${k.giver ? `<div class="why">for ${esc(k.giver)}</div>` : ""}
+      <ul style="margin:6px 0 0 18px;padding:0">${k.objectives.map(o =>
+        `<li style="${o.done ? "color:var(--dim);text-decoration:line-through" : ""}">${esc(o.text)}</li>`).join("")}</ul>
+      ${k.reward ? `<div class="why" style="margin-top:6px">promised: ${esc(k.reward)}</div>` : ""}
+      ${k.facts.length ? `<div class="why" style="margin-top:6px">${k.facts.map(esc).join(" · ")}</div>` : ""}
+    </div>`;
+  return `<h3 style="margin-top:0">Underway</h3>
+    ${q.active.length ? q.active.map(k => one(k, false)).join("") : `<p class="why">Nothing taken on yet. When somebody gives you a task and you take it, it is kept here.</p>`}
+    ${q.finished.length ? `<h3 style="margin-top:22px">Finished</h3>${q.finished.map(k => one(k, true)).join("")}` : ""}`;
+}
+
 const TABS = [
   ["defense",   "Defense",   s => tabDefense(s)],
   ["offense",   "Offense",   s => tabOffense(s)],
@@ -2584,6 +2602,7 @@ const TABS = [
   ["inventory", "Inventory", s => tabInventory(s)],
   ["companions","Companions",s => tabEmpty("No animal companion, familiar, cohort or mount.")],
   ["background","Background",s => tabBackground(s)],
+  ["quests",    "Quests",    s => tabQuests(s)],
   ["adventures","Adventures",s => tabEmpty("No adventure log yet. Sessions will be recorded here.")],
 ];
 

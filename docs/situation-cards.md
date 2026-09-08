@@ -93,3 +93,10 @@ a validator; the model writes none — severed tells.
   word lower-cased ("Work is scarce." is not somebody called Work), so a stranger
   who leads such a sentence slips onto a card; a new card's title and facts are
   checked strictly unless the leading word was said at the table as a plain word.
+
+
+## Quests (added 2026-09-07)
+
+A quest is a card of kind `quest`, tagged `situation.quest`, with objectives to tick, a
+giver and a promise in words; the log on the table page reads it by that tag. See
+`docs/quests-and-outfitting.md`.

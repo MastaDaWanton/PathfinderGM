@@ -251,6 +251,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # does. `venture`: ground gone into — the sewers, a cave outside the town —
     # generated from a seed on entry, the same next time; `parent` names the place
     # it hangs off, default here.
+    # A task taken up: a quest card with objectives to tick, a giver and a promise.
+    # `quest_step` ticks one objective by its number, with what was done as a note.
+    "quest": (("title", "objectives"), ("actor", "giver", "reward", "about"), "player"),
+    "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
     "found": (("name",), ("actor", "owner", "parent", "about"), "player"),
     "venture": (("kind",), ("actor", "parent", "name"), "player"),
     # Searching the ground. The roll is the player's: it is their afternoon.
