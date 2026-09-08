@@ -2347,7 +2347,30 @@ class Actor:
         race_doc = self._race_doc()
         if race_doc:
             out.extend(str(t) for t in race_doc.get("tags") or ())
+        # A stat block's own tags — the watchman's `role.guard` — read live off the
+        # template the creature came from, the way a feat's are read off its document.
+        if self.from_template:
+            from . import bestiary as bestiary_mod
+
+            block = bestiary_mod.lookup(str(self.from_template)) or {}
+            out.extend(str(t) for t in (block.get("tags") or ()) if str(t).strip())
         return tuple(out)
+
+    def noticed(self) -> list[str]:
+        """What this character has noticed and still holds: the names of the `knows.*`
+        situation effects a scheme or a card granted, each carrying the sentence its
+        grant said. A view like `conditions`, so the brief asks the sheet rather
+        than reaching into the effect store — the severing the three-laws ratchet
+        pins. Measured missing by the fairness critic (2026-09-08): a `knows.*` tag
+        alone put nothing in front of the player."""
+        out: list[str] = []
+        for e in self.effects:
+            if e.kind != "situation" or not any(str(t).startswith("knows.") for t in e.tags):
+                continue
+            name = str(e.name or "").strip()
+            if name and " " in name and name not in out:
+                out.append(name)
+        return out
 
     def _race_doc(self) -> dict | None:
         """The race as a document, read live — the race id on the sheet is the store,

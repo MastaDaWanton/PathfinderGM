@@ -156,8 +156,10 @@ def test_every_twist_names_fairness_tags_that_an_earlier_grant_supplies():
 def test_every_step_has_a_criterion_the_player_can_change():
     for sid, doc in _docs().items():
         for st in doc["steps"]:
-            kinds = [schemes._criterion_kind(c)[0] for c in st["criteria"]]
-            assert any(k in schemes._PLAYER_CHANGEABLE for k in kinds), f"{sid}/{st['id']}: {kinds}"
+            # The validator's own rule, not a copy of it: `has`/`holds` count when the
+            # subject is the player, `alive`/`present` only beside a place or event.
+            probe = {**doc, "steps": [dict(st, fairness=st.get("fairness") or ["knows.x"])]}
+            assert not any("could change" in p for p in schemes.validate(probe)), f"{sid}/{st['id']}"
 
 
 def test_the_lint_passes_on_the_shipped_line_and_names_the_fix_when_it_fails():

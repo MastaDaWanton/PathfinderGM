@@ -43,7 +43,10 @@ PLACE_KINDS = {
     # slot kind -> the place names the settlement set uses, in order of preference
     "market": ("the market",), "lodging": ("the tavern", "the inn"),
     "gate": ("the gate",), "temple": ("the temple",), "guildhall": ("the guildhall",),
-    "road": ("the gate",), "wild": (),
+    # The road is the open ground outside the walls, like the wild: a wanted player
+    # who was shown a way past the watch reaches it by biome, never through the arch.
+    # The fairness critic measured "fled" unreachable while the road WAS the gate.
+    "road": (), "wild": (),
 }
 # The criteria grammar. Each is a regex over one criterion string; the validator refuses
 # anything that matches none, naming these shapes.
@@ -51,8 +54,8 @@ _CRITERIA = {
     "at": re.compile(r"^(not\s+)?at\(\$(\w+)\)$"),
     "left": re.compile(r"^left\(\$(\w+)\)$"),
     "arrived": re.compile(r"^arrived\(\$(\w+)\)$"),
-    "has": re.compile(r"^(not\s+)?has\((pc|\$\w+),\s*([a-z0-9.\-_]+)\)$"),
-    "since": re.compile(r"^since\((open|campaign|[\w-]+)\)\s*>=\s*(\d+)([hd])$"),
+    "has": re.compile(r"^(not\s+)?has\((pc|\$\w+),\s*([a-z0-9.\-_$]+)\)$"),
+    "since": re.compile(r"^since\((open|campaign|left\(\$\w+\)|[\w-]+)\)\s*>=\s*(\d+)([hd])$"),
     "clock": re.compile(r"^clock\s*>=\s*(\d+)$"),
     "event": re.compile(r"^event:(\w+)(?:\(\$(\w+)\))?$"),
     "alive": re.compile(r"^(not\s+)?alive\(\$(\w+)\)$"),
@@ -60,10 +63,19 @@ _CRITERIA = {
     "holds": re.compile(r"^(not\s+)?holds\(pc,\s*\$(\w+)\)$"),
 }
 SHAPES = ("at($place)", "left($place)", "arrived($place)", "has(pc, tag)",
-          "has($slot, tag)", "since(open) >= 2h", "since(open) >= 2d", "clock >= 600",
+          "has($slot, tag)", "has(pc, state.wanted.$town)", "since(open) >= 2h",
+          "since(open) >= 2d", "since(left($market)) >= 1h", "clock >= 600",
           "event:give($slot)", "alive($slot)", "present($slot)", "holds(pc, $item)")
-# Criteria a player can change by acting. `since` and `clock` are not among them.
-_PLAYER_CHANGEABLE = ("at", "left", "arrived", "has", "event", "alive", "present", "holds")
+# Criteria a player can change by acting. `since` and `clock` are not among them;
+# `has`/`holds` only when the subject is the player; `alive`/`present` only beside a
+# place or event criterion (a person's state is the world's to change, not the
+# player's — the fairness critic validated a step keyed on the victim's life alone).
+_PLAYER_CHANGEABLE = ("at", "left", "arrived", "event")
+# What a scheme may put on or take off a person. The most dangerous edit in the
+# vocabulary is a `state.down` or `recovery.*` grant — a document could kill the
+# player with no hit-point change — so the families are listed, with the fix named.
+GRANTABLE = ("knows.", "state.wanted", "state.suspected", "state.hidden", "attitude.",
+             "role.", "holds.")
 _DIGIT = re.compile(r"\d")
 _SLOT = re.compile(r"\$(\w+)")
 
@@ -187,6 +199,17 @@ def validate(doc: dict) -> list[str]:
     steps = doc.get("steps") or []
     if not steps:
         problems.append("steps: a scheme does something; write at least one step.")
+    for i, g in enumerate(doc.get("grants_on_open") or []):
+        for tag in (g.get("tags") or []) if isinstance(g, dict) else []:
+            if not str(tag).startswith(GRANTABLE):
+                problems.append(f"grants_on_open[{i + 1}]: a scheme may grant {', '.join(GRANTABLE)} — not {tag!r}.")
+            if str(tag).startswith("knows.") and not str(g.get("say") or "").strip():
+                problems.append(f"grants_on_open[{i + 1}]: a knows.* grant needs a `say` — what the "
+                                f"player noticed, in a sentence the brief can carry — or the "
+                                f"foreshadowing is a tag nobody sees.")
+        if isinstance(g, dict):
+            check_digits(g.get("say", ""), f"grants_on_open[{i + 1}].say")
+            check_slots(g.get("say", ""), f"grants_on_open[{i + 1}].say")
     for i, act in enumerate(doc.get("on_open") or []):
         if not isinstance(act, dict) or act.get("do") not in ACTIONS:
             problems.append(f"on_open[{i + 1}]: action {act!r} — the vocabulary is {', '.join(ACTIONS)}.")
@@ -208,14 +231,21 @@ def validate(doc: dict) -> list[str]:
         if not crits:
             problems.append(f"{at}: a step needs criteria; it cannot fire on nothing.")
         changeable = False
+        kinds_here = []
         for c in crits:
             found = _criterion_kind(c)
             if found is None:
                 problems.append(f"{at}: {c!r} is not a criterion; the shapes are {', '.join(SHAPES)}.")
                 continue
+            kinds_here.append(found[0])
             if found[0] in _PLAYER_CHANGEABLE:
                 changeable = True
+            if found[0] in ("has", "holds") and found[1].group(2) == "pc":
+                changeable = True
             check_slots(c, at)
+        if not changeable and any(k in ("alive", "present") for k in kinds_here) \
+                and any(k in ("at", "arrived", "left", "event") for k in kinds_here):
+            changeable = True
         if crits and not changeable:
             problems.append(f"{at}: no criterion here is one the player could change — a step "
                             f"that fires on the clock alone is a cutscene; add at($place), "
@@ -241,6 +271,10 @@ def validate(doc: dict) -> list[str]:
             for tag in act.get("tags") or []:
                 if not re.fullmatch(r"[a-z][a-z0-9.\-_$]*", str(tag)):
                     problems.append(f"{at}: {tag!r} is not a tag.")
+                elif act["do"] in ("grant", "remove") and not str(tag).startswith(GRANTABLE):
+                    problems.append(f"{at}: a scheme may grant or remove {', '.join(GRANTABLE)} "
+                                    f"— not {tag!r}; a state that stops actions or ends "
+                                    f"on rest is the engine's to write.")
             check_digits(act.get("text", ""), at)
         tell = st.get("tell") or {}
         if not isinstance(tell, dict) or not any(k in tell for k in ("perceptible", "silent", "deferred", "teller")):
@@ -258,6 +292,18 @@ def validate(doc: dict) -> list[str]:
             if isinstance(st.get("tell"), dict) else ""
         twisty = any("knows." in " ".join(a.get("tags") or []) for a in grants) and \
             bool(re.search(r"\b(kin|lied?|lies|never)\b", told))
+        outs = (doc.get("outcomes") or {})
+        for a in [st.get("action")] + list(st.get("also") or []):
+            if isinstance(a, dict) and a.get("do") == "outcome":
+                o = outs.get(str(a.get("name") or "")) or {}
+                lays_state = any(str(tg).startswith("state.") and str(g.get("to", "pc")) == "pc"
+                                 for g in o.get("grants") or [] for tg in g.get("tags") or [])
+                fails = str(o.get("how") or "") == "failed"
+                if lays_state or fails:
+                    twisty = True
+            if isinstance(a, dict) and a.get("do") == "grant" and str(a.get("to", "pc")) == "pc" \
+                    and any(str(tg).startswith("state.") for tg in a.get("tags") or []):
+                twisty = True
         if (st.get("fairness") is not None or twisty) and not st.get("fairness"):
             problems.append(f"{at}: a twist needs foreshadowing — list under fairness the "
                             f"knows.* tags the brief must already have carried.")
@@ -273,6 +319,9 @@ def validate(doc: dict) -> list[str]:
             for tag in g.get("tags") or []:
                 if not re.fullmatch(r"[a-z][a-z0-9.\-_$]*", str(tag)):
                     problems.append(f"outcomes.{name}: {tag!r} is not a tag.")
+                elif not str(tag).startswith(GRANTABLE):
+                    problems.append(f"outcomes.{name}: a scheme may grant or remove "
+                                    f"{', '.join(GRANTABLE)} — not {tag!r}.")
     return problems
 
 
@@ -298,7 +347,7 @@ _ROLE_WORDS = {
 def _place_for(engine, kind: str, spec: dict) -> dict | None:
     scene = engine.scene
     known = engine.places()
-    if kind == "wild":
+    if kind in ("wild", "road"):
         found = engine.world.get(scene.location_id) if engine.world else None
         terrain = engine._terrain_hint(found) or "grassland"
         region = places_mod.region_set(scene.location_id, terrain)
@@ -347,7 +396,8 @@ def _role_for(engine, name: str, spec: dict, filled: dict, taken: set) -> dict |
     role = str(spec.get("role") or "")
     words = _ROLE_WORDS.get(role, (role,))
     cast = [c for c in _cast_candidates(engine) if c.get("id") not in taken]
-    pick = next((c for c in cast if any(w in str(c.get("role", "")).lower() for w in words)), None)
+    pick = next((c for c in cast if any(re.search(r"\b" + re.escape(w) + r"\b", str(c.get("role", "")).lower())
+                                        for w in words)), None)
     if pick is None and cast:
         # Deterministic: the cast in its own order, so the same world fills the same slot.
         pick = cast[len(taken) % len(cast)]
@@ -478,15 +528,21 @@ def open_scheme(engine, doc: dict, turn: int = 0) -> dict:
                 place=str(scene.at or ""), origin=f"scheme:{doc['id']}",
                 secret=bool(card.get("secret")), always_on=True), turn=turn)
         inst["cards"][card["key"]] = made.id
+    inst["town"] = str(scene.location_id or "")
     for g in doc.get("grants_on_open") or []:
-        _grant(scene, filled, g, f"scheme:{doc['id']}/open")
+        _grant(scene, filled, g, f"scheme:{doc['id']}/open", inst)
     scene.schemes.append(inst)
     # What the open does to the world besides its cards and grants — a witness who
     # goes to ground the moment the name is wanted — without spending the first tick
     # on it. Silent by nature: the open itself is not a thing the player witnesses.
+    done = []
     for act in doc.get("on_open") or []:
         if isinstance(act, dict):
             _do(engine, inst, doc, act, "open", turn)
+            done.append(str(act.get("do")))
+    if done:
+        inst["fired"]["open"] = {"clock": int(scene.clock_minutes), "turn": turn,
+                                 "silent": True, "tell": "", "actions": done}
     return inst
 
 
@@ -498,15 +554,19 @@ def _who(scene, filled: dict, ref: str):
     return scene.people.get(slot.get("ref", "")) if slot.get("kind") == "actor" else None
 
 
-def _tags_of(scene, g: dict) -> tuple[str, ...]:
-    """The tags a grant names, with `$town` spelled the way the readers spell it."""
+def _tags_of(scene, g: dict, inst: dict | None = None) -> tuple[str, ...]:
+    """The tags a grant names, with `$town` spelled the way the readers spell it —
+    the town the scheme OPENED in, off its instance, never the ground the player
+    happens to stand on when a later step fires (the three-laws critic moved the
+    party and watched a removal miss)."""
     from . import states
 
-    town = states.town_tag(scene.location_id)
+    where = (inst or {}).get("town") or scene.location_id
+    town = states.town_tag(where)
     return tuple(str(t).replace("$town", town) for t in g.get("tags") or ())
 
 
-def _remove(scene, filled: dict, g: dict) -> int:
+def _remove(scene, filled: dict, g: dict, inst: dict | None = None) -> int:
     """Take off every effect whose tags answer one of the prefixes named — the one
     removal, so clearing a name evaporates every bite (docs/wanted.md)."""
     from . import states
@@ -514,23 +574,26 @@ def _remove(scene, filled: dict, g: dict) -> int:
     who = _who(scene, filled, str(g.get("to", "pc")))
     if who is None:
         return 0
-    wanted = _tags_of(scene, g)
+    wanted = _tags_of(scene, g, inst)
     gone = who.remove_effects(match=lambda e: any(states.matches(str(tg), q)
                                                   for tg in e.tags for q in wanted))
     return len(gone)
 
 
-def _grant(scene, filled: dict, g: dict, source: str) -> None:
+def _grant(scene, filled: dict, g: dict, source: str, inst: dict | None = None) -> None:
     who = _who(scene, filled, str(g.get("to", "pc")))
     if who is None:
         return
-    tags = _tags_of(scene, g)
+    tags = _tags_of(scene, g, inst)
     if not tags:
         return
     key = f"{source}:{'+'.join(tags)}"
     if any(e.key == key for e in who.effects):
         return
-    who.apply_effect(ActiveEffect(name=tags[0].split(".")[-1].replace("-", " "),
+    # The effect's name is what the brief will say the player noticed: a `say` in
+    # the document's words, else the tag's leaf.
+    said = fill_text(str(g.get("say") or ""), filled) if inst is not None or filled else str(g.get("say") or "")
+    who.apply_effect(ActiveEffect(name=said or tags[0].split(".")[-1].replace("-", " "),
                                   kind="situation", key=key, source=source, origin=source,
                                   duration="until-dismissed", tags=tags))
 
@@ -574,6 +637,10 @@ def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict
         return any(e.get("event") == "travel" for e in events) and _at(scene, filled.get(m.group(1), {}))
     if kind == "has":
         neg, who, tag = m.group(1), m.group(2), m.group(3)
+        if "$town" in tag:
+            from . import states
+
+            tag = tag.replace("$town", states.town_tag(inst.get("town") or scene.location_id))
         actor = _who(scene, filled, who)
         v = bool(actor is not None and actor.has_state(tag))
         return (not v) if neg else v
@@ -583,6 +650,10 @@ def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict
             start = inst["opened_at"]
         elif anchor == "campaign":
             start = 0
+        elif anchor.startswith("left("):
+            start = (inst.get("left_at") or {}).get(anchor[6:-1])
+            if start is None:
+                return False
         else:
             start = (inst["fired"].get(anchor) or {}).get("clock")
             if start is None:
@@ -667,15 +738,38 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
                                           source=source, origin=source,
                                           duration="until-dismissed", tags=("state.hidden",)))
     elif what == "kill":
+        # Through the one damage door, so the death is a provenanced number on the
+        # record like any other, not a hit-point write above the ladder.
         who = _who(scene, filled, act.get("who", ""))
         if who is not None and not who.is_pc:
-            who.hp = -abs(who.ability_score("con")) - 1
+            amount = max(1, who.hp + abs(who.ability_score("con")) + 1)
+            if who.at == scene.at:
+                # In the room: the one damage door, packets landed like any blow.
+                hit = engine._apply_damage(who, amount, "untyped", lethality="lethal")
+            else:
+                # Off-stage: the door lands packets through the here-view and cannot
+                # reach a body in another room (measured: KeyError on the victim at
+                # the lodging while the player stood in the wild). The ladder is the
+                # same — hit points to the floor, `apply_hp_state` writes dead — and
+                # the number is on the instance with its provenance, which the door
+                # would have recorded had it been able to.
+                who.hp -= amount
+                hit = {"kind": "damage", "target": who.ref, "amount": amount,
+                       "dtype": "untyped", "off_stage": True}
+            if isinstance(hit, dict):
+                hit["origin"] = source
+            inst.setdefault("damage", []).append({"step": step_id, "who": who.ref,
+                                                  "origin": source, "record": hit})
             who.apply_hp_state()
     elif what == "bring_in":
         role = str(act.get("role") or "watchman")
         template = "watchman" if "guard" in role or "watch" in role else "thug" if "thug" in role else "guildhand"
         born = engine._bring_in(template, count=int(act.get("count", 1) or 1), side=str(act.get("side") or ""))
         inst.setdefault("brought", []).extend(b["ref"] for b in born)
+        if "guard" in role or "watch" in role:
+            for b in born:
+                _grant(scene, {"_": {"kind": "actor", "ref": b["ref"]}},
+                       {"to": "$_", "tags": ["role.guard"]}, source, inst)
     elif what == "fact":
         card = _card(scene, inst, act.get("card", ""))
         if card is not None:
@@ -683,7 +777,11 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
     elif what == "objective":
         card = _card(scene, inst, act.get("card", ""))
         if card is not None:
-            cards_mod.objective_done(scene, card.id, int(act.get("n", 1)) - 1, turn=turn)
+            done = cards_mod.objective_done(scene, card.id, int(act.get("n", 1)) - 1, turn=turn)
+            # The last objective resolves the card on its own; an outcome in the same
+            # step still owes its award for it.
+            if done is not None and not done.live:
+                inst.setdefault("_resolved_now", []).append(str(act.get("card", "")))
     elif what == "reveal_objective":
         card = _card(scene, inst, act.get("card", ""))
         if card is not None and card.kind == "quest":
@@ -693,11 +791,12 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
     elif what == "resolve":
         card = _card(scene, inst, act.get("card", ""))
         if card is not None:
+            inst.setdefault("_resolved_now", []).append(str(act.get("card", "")))
             cards_mod.resolve(scene, card.id, how=str(act.get("how") or "resolved"), turn=turn)
     elif what == "grant":
-        _grant(scene, filled, act, source)
+        _grant(scene, filled, act, source, inst)
     elif what == "remove":
-        _remove(scene, filled, act)
+        _remove(scene, filled, act, inst)
     elif what == "news":
         inst["news"].append({"carrier": act.get("carrier"), "reach": act.get("reach"),
                              "delay": _hours(act.get("delay")), "says": fill_text(act.get("says", ""), filled),
@@ -727,15 +826,23 @@ def _outcome(engine, inst: dict, doc: dict, name: str, turn: int) -> str:
     # Removals first, grants after: justice lifts the warrant, and a bargain lifts it
     # and lays the lesser one down in the same breath.
     for g in out.get("removes") or []:
-        _remove(scene, inst["slots"], g)
+        _remove(scene, inst["slots"], g, inst)
     for g in out.get("grants") or []:
-        _grant(scene, inst["slots"], g, source)
-    if out.get("resolve"):
-        card = _card(scene, inst, out["resolve"])
-        if card is not None and card.live:
+        _grant(scene, inst["slots"], g, source, inst)
+    card = _card(scene, inst, out["resolve"]) if out.get("resolve") else None
+    # Live now, or resolved by this same step's own `resolve` action a moment ago —
+    # not by a model's quest_step, which already paid.
+    was_live = bool(card is not None and (card.live or out["resolve"] in (inst.get("_resolved_now") or [])))
+    if card is not None and was_live:
+        if inst.get("_silent_step"):
+            # Resolved out of the player's sight: the card waits, so the quest log
+            # does not announce what the character has not learned. It lands with
+            # the next perceptible step of this scheme.
+            inst["pending_resolve"] = {"card": out["resolve"], "how": str(out.get("how") or "resolved")}
+        else:
             cards_mod.resolve(scene, card.id, how=str(out.get("how") or "resolved"), turn=turn)
-    if out.get("award"):
-        card = _card(scene, inst, out.get("resolve", "")) if out.get("resolve") else None
+    # The award pays once: a card the GM's own quest_step already finished has been paid.
+    if out.get("award") and (card is None or was_live):
         line = engine.award_story(str(out["award"]), card.title if card else doc.get("title", ""))
         if line:
             lines.append(line.strip())
@@ -784,15 +891,34 @@ def tick(engine, outcomes) -> list:
     # Stepping: one step per instance per tick, the most specific.
     for inst in list(scene.schemes):
         doc = docs.get(inst["scheme"])
-        if doc is None or inst.get("outcome"):
+        if doc is None:
+            continue
+        # An ended scheme still owes the player what it resolved out of their sight:
+        # it keeps ticking, for perceptible steps only, until the banked line and the
+        # deferred resolution have landed.
+        owes = bool(inst.get("banked") or inst.get("pending_resolve"))
+        if inst.get("outcome") and not owes:
             continue
         # Where the player has been, for `left($place)`.
         for name, slot in inst["slots"].items():
-            if slot.get("kind") == "place" and _at(scene, slot) and name not in inst["visited"]:
+            if slot.get("kind") != "place":
+                continue
+            here_now = _at(scene, slot)
+            if here_now and name not in inst["visited"]:
                 inst["visited"].append(name)
+            # The clock of leaving, per place, for `since(left($place))`: the fairness
+            # critic measured `since(open)` starting the murder clock while the player
+            # stood at the market between two short absences.
+            was_here = name in (inst.get("here_last") or [])
+            if was_here and not here_now:
+                inst.setdefault("left_at", {})[name] = int(scene.clock_minutes)
+        inst["here_last"] = [n for n, sl in inst["slots"].items()
+                             if sl.get("kind") == "place" and _at(scene, sl)]
         best = None
         for st in doc.get("steps") or []:
             if st["id"] in inst["fired"] and st.get("once", True):
+                continue
+            if inst.get("outcome") and ("silent" in (st.get("tell") or {}) or "deferred" in (st.get("tell") or {})):
                 continue
             crits = st.get("criteria") or []
             if not all(_criterion_holds(engine, inst, doc, c, events) for c in crits):
@@ -808,9 +934,12 @@ def tick(engine, outcomes) -> list:
         if best is not None:
             tell = best.get("tell") or {}
             silent = "silent" in tell or "deferred" in tell
+            inst["_silent_step"] = silent
             for act in [best.get("action")] + list(best.get("also") or []):
                 if isinstance(act, dict):
                     _do(engine, inst, doc, act, best["id"], turn)
+            inst.pop("_silent_step", None)
+            inst.pop("_resolved_now", None)
             said = fill_text(tell.get("perceptible") or tell.get("silent") or tell.get("deferred") or tell.get("teller") or "", inst["slots"])
             inst["fired"][best["id"]] = {"clock": int(scene.clock_minutes), "turn": turn,
                                          "silent": silent, "tell": said}
@@ -821,16 +950,28 @@ def tick(engine, outcomes) -> list:
                     cards_mod.touch(scene, cid, said, turn=turn, tick=False)
             extra = inst.get("award_line", "")
             inst["award_line"] = ""
-            if not silent and said:
-                made.append(Outcome(
-                    intent_id="", op="scheme",
-                    effects=[{"kind": "scheme", "scheme": doc["id"], "step": best["id"],
-                              "origin": f"scheme:{doc['id']}/{best['id']}"}],
-                    tell=said + (f" {extra}" if extra else ""), because="the world moves"))
-            elif extra:
-                made.append(Outcome(intent_id="", op="scheme",
-                                    effects=[{"kind": "scheme", "scheme": doc["id"], "step": best["id"]}],
-                                    tell=extra, because="the world moves"))
+            if silent:
+                # Banked, not said: an XP line for a step the character did not see
+                # would tell them the price was withdrawn out of sight (the leak
+                # critic measured it). It rides the next perceptible tell.
+                if extra:
+                    inst["banked"] = (inst.get("banked", "") + " " + extra).strip()
+            else:
+                pending = inst.pop("pending_resolve", None)
+                if pending:
+                    card = _card(scene, inst, pending["card"])
+                    if card is not None and card.live:
+                        cards_mod.resolve(scene, card.id, how=pending["how"], turn=turn)
+                banked = inst.pop("banked", "")
+                extra = " ".join(x for x in (banked, extra) if x)
+                if said:
+                    made.append(Outcome(
+                        intent_id="", op="scheme",
+                        effects=[{"kind": "scheme", "scheme": doc["id"], "step": best["id"],
+                                  "origin": f"scheme:{doc['id']}/{best['id']}"}],
+                        tell=said + (f" {extra}" if extra else ""), because="the world moves"))
+                elif extra:
+                    inst["banked"] = extra
         # News arrives by a route the character would meet.
         kept = []
         for item in inst.get("news") or []:
@@ -862,7 +1003,20 @@ def _news_arrives(engine, inst: dict, item: dict) -> tuple[bool, str]:
         if not urban and carrier != "courier":
             return False, ""
     if carrier == "gossip":
-        talker = next((a for a in scene.actors.values() if not a.is_pc), None)
+        # Somebody the character can see and would hear it from: not the hidden, not
+        # the dead, not the fight's other side. The leak critic measured the hidden
+        # giver of the murder narrating the murder as gossip (2026-09-08).
+        def can_talk(a):
+            return (not a.is_pc and not a.has_state("state.hidden") and not a.is_down
+                    and a.ref not in (scene.sides or {}).get("them", []))
+        witness_refs = [s.get("ref") for s in inst["slots"].values()
+                        if s.get("kind") == "actor"]
+        talker = next((a for a in scene.actors.values() if can_talk(a) and a.ref in witness_refs
+                       and not any(s.get("ref") == a.ref and n in ("giver", "victim")
+                                   for n, s in inst["slots"].items())), None) \
+            or next((a for a in scene.actors.values() if can_talk(a)
+                     and not any(s.get("ref") == a.ref and n in ("giver", "victim")
+                                 for n, s in inst["slots"].items())), None)
         if talker is None:
             return False, ""
         return True, f"{talker.name} says, as gossip does:"

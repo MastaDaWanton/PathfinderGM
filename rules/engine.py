@@ -2609,7 +2609,7 @@ class Engine:
         for ref, b in list(self.scene.actors.items()):
             if b.is_pc or b.is_down:
                 continue
-            is_law = b.has_state(states.GUARD) or b.from_template == "watchman"
+            is_law = b.has_state(states.GUARD)
             if is_law and self.join_fight(ref, against):
                 joined.append(ref)
         return joined
@@ -3531,6 +3531,11 @@ class Engine:
                     # in silence because the party changed rooms.
                     if a.has_state("state.down.dying"):
                         dying_tells.extend(self._resolve_dying(a))
+                    # Not the hidden, not the dead: "Left behind: the man hiding in
+                    # the back room and the body" is a fact the character does not
+                    # hold, and the tell lands on the visible card.
+                    if a.has_state("state.hidden") or a.has_state("state.down.dead"):
+                        continue
                     left.append(a.name)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
@@ -5515,7 +5520,7 @@ class Engine:
         # The law joins a declared fight the way it joins one that starts with a swing:
         # a guard who sees it begin in the town where the player is wanted takes the
         # other side (docs/wanted.md).
-        self._law_joins()
+        law_in = self._law_joins()
         # The turn pointer starts before the first combatant so the first advance lands
         # on whoever won initiative.
         self.scene.turn = -1
@@ -5523,11 +5528,20 @@ class Engine:
         # An attack riding this same batch is deferred: the fight this op opened is
         # announced, and the first swing belongs to whoever wins the first turn.
         self._battle_joined = True
-        names = ", ".join(self.scene.actors[r].name for r, _ in order)
+        # Rebuilt from the scene's own order, not the local one computed before the
+        # law joined: the three-laws critic measured a guard in the initiative and
+        # on the enemy side with no sentence saying so (2026-09-08).
+        order = list(self.scene.initiative)
+        names = ", ".join(self.scene.actors[r].name for r, _ in order if r in self.scene.actors)
+        law_note = ""
+        if law_in:
+            law_note = (" The watch comes in against you: "
+                        + ", ".join(self.scene.actors[r].name for r in law_in
+                                    if r in self.scene.actors) + ".")
         return Outcome(
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
-            effects=[{"kind": "initiative", "order": order}],
-            tell=f"Initiative: {names}.", because=intent.because,
+            effects=[{"kind": "initiative", "order": order, "law": list(law_in or [])}],
+            tell=f"Initiative: {names}.{law_note}", because=intent.because,
         )
 
     def _lay_battlefield(self, sides: dict) -> None:

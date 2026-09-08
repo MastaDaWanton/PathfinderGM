@@ -94,7 +94,8 @@
           "to": "pc",
           "tags": [
             "knows.giver-uneasy"
-          ]
+          ],
+          "say": "$giver would not meet your eye when asking, and kept looking toward $lodging"
         }
       ],
       "steps": [
@@ -121,7 +122,8 @@
           "criteria": [
             "left($market)",
             "not at($market)",
-            "since(open) >= 1h"
+            "not at($lodging)",
+            "since(left($market)) >= 1h"
           ],
           "action": {
             "do": "move",
@@ -151,7 +153,16 @@
           },
           "tell": {
             "perceptible": "$wild, the ground where $errand grows."
-          }
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.reached-wild"
+              ]
+            }
+          ]
         },
         {
           "id": "gathered",
@@ -234,7 +245,8 @@
             "at($market)",
             "holds(pc, $errand)",
             "not alive($victim)",
-            "not has(pc, knows.giver-lied)"
+            "not has(pc, knows.giver-lied)",
+            "has(pc, knows.reached-wild)"
           ],
           "fairness": [
             "knows.giver-uneasy",
@@ -271,7 +283,8 @@
           "criteria": [
             "at($lodging)",
             "has($giver, state.hidden)",
-            "alive($victim)"
+            "alive($victim)",
+            "has(pc, knows.reached-wild)"
           ],
           "action": {
             "do": "grant",
@@ -298,6 +311,33 @@
           ],
           "tell": {
             "perceptible": "$giver is here at $lodging, keeping out of sight of $market, with no errand to explain it; seen, $giver makes for the door and $road."
+          }
+        },
+        {
+          "id": "moot",
+          "criteria": [
+            "at($market)",
+            "not holds(pc, $errand)",
+            "has(pc, knows.news.killed)",
+            "not has(pc, knows.betrayed)",
+            "since(killed) >= 1d"
+          ],
+          "action": {
+            "do": "resolve",
+            "card": "errand",
+            "how": "dropped"
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.victim-dead"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "Whatever $giver wanted from $wild, nobody at $market is asking for it now."
           }
         }
       ],
@@ -394,7 +434,7 @@
             "Find $giver's ledger at $lodging",
             "Look at what was left on $victim, laid out at $temple"
           ],
-          "reward": "your name back, and $gate open to you again"
+          "reward": "your name off the warrant — though the watch will remember it — and the trail of who paid"
         },
         {
           "key": "road",
@@ -412,7 +452,7 @@
           "title": "What the town holds against you",
           "facts": [
             "$captain has your description from $giver, and the word is out at $gate and $market.",
-            "$patron paid for this and would like it to stay as it is; $giver has gone out to $wild."
+            "$patron paid for this and would like it to stay as it is; $giver keeps out of sight at $lodging until the road is safe."
           ]
         }
       ],
@@ -542,7 +582,10 @@
           },
           "tell": {
             "perceptible": "Two of the three hold together: enough to know it was $giver, and $patron's coin behind $giver."
-          }
+          },
+          "fairness": [
+            "knows.betrayed"
+          ]
         },
         {
           "id": "two-clues-witness-coin",
@@ -556,7 +599,10 @@
           },
           "tell": {
             "perceptible": "Two of the three hold together: enough to know it was $giver, and $patron's coin behind $giver."
-          }
+          },
+          "fairness": [
+            "knows.betrayed"
+          ]
         },
         {
           "id": "two-clues-ledger-coin",
@@ -570,7 +616,10 @@
           },
           "tell": {
             "perceptible": "Two of the three hold together: enough to know it was $giver, and $patron's coin behind $giver."
-          }
+          },
+          "fairness": [
+            "knows.betrayed"
+          ]
         },
         {
           "id": "way-out",
@@ -618,7 +667,10 @@
           ],
           "tell": {
             "perceptible": "$road, and the town behind you with your description on its wall."
-          }
+          },
+          "fairness": [
+            "knows.betrayed"
+          ]
         }
       ],
       "outcomes": {
@@ -631,6 +683,20 @@
               "tags": [
                 "knows.two-clues",
                 "knows.giver-to-find"
+              ]
+            },
+            {
+              "to": "pc",
+              "tags": [
+                "state.suspected.$town"
+              ]
+            }
+          ],
+          "removes": [
+            {
+              "to": "pc",
+              "tags": [
+                "state.wanted"
               ]
             }
           ]
@@ -646,9 +712,18 @@
               ]
             },
             {
-              "to": "$captain",
+              "to": "pc",
               "tags": [
-                "attitude.unfriendly"
+                "state.suspected.$town",
+                "knows.giver-to-find"
+              ]
+            }
+          ],
+          "removes": [
+            {
+              "to": "pc",
+              "tags": [
+                "state.wanted"
               ]
             }
           ]
@@ -796,6 +871,13 @@
             {
               "do": "outcome",
               "name": "loose-end"
+            },
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.patron-named"
+              ]
             }
           ],
           "tell": {
@@ -891,7 +973,7 @@
           "objectives": [
             "Go to where $patron keeps its accounts, at $hall",
             "Take the proof of the coin from what $patron holds there",
-            "Put it before $captain at $market, or sell it back to $envoy"
+            "Put it before $captain at $market, or sell it back to $envoy, at the cost of the watch's regard"
           ],
           "reward": "your name, or their coin"
         },
@@ -1005,7 +1087,10 @@
           ],
           "tell": {
             "perceptible": "$envoy takes it, pays, and says $patron will remember you as a friend, for now."
-          }
+          },
+          "fairness": [
+            "knows.patron-named"
+          ]
         },
         {
           "id": "sat-on",
@@ -1020,7 +1105,10 @@
           },
           "tell": {
             "silent": "$patron has had the days it needed; the accounts are moved from $hall and the price is set."
-          }
+          },
+          "fairness": [
+            "knows.patron-named"
+          ]
         },
         {
           "id": "too-slow",
@@ -1035,7 +1123,10 @@
           },
           "tell": {
             "silent": "$patron has had the days it needed; the accounts are moved from $hall and the price is set."
-          }
+          },
+          "fairness": [
+            "knows.patron-named"
+          ]
         }
       ],
       "outcomes": {
@@ -1110,10 +1201,31 @@
               "tags": [
                 "knows.patron-unbeaten"
               ]
+            },
+            {
+              "to": "pc",
+              "tags": [
+                "state.suspected.$town"
+              ]
+            }
+          ],
+          "removes": [
+            {
+              "to": "pc",
+              "tags": [
+                "state.wanted"
+              ]
             }
           ]
         }
-      }
+      },
+      "on_open": [
+        {
+          "do": "move",
+          "who": "$captain",
+          "to": "$market"
+        }
+      ]
     },
     {
       "id": "the-price-on-your-head",
@@ -1248,6 +1360,21 @@
           "tell": {
             "silent": "Far enough down $road from $market that $patron's coin does not reach."
           }
+        },
+        {
+          "id": "outrun",
+          "criteria": [
+            "not at($market)",
+            "not at($gate)",
+            "since(open) >= 5d"
+          ],
+          "action": {
+            "do": "outcome",
+            "name": "gone"
+          },
+          "tell": {
+            "silent": "Five days beyond $market and no hunter has found the trail: the price on your head buys nothing out here."
+          }
         }
       ],
       "outcomes": {
@@ -1283,6 +1410,14 @@
               "to": "pc",
               "tags": [
                 "knows.price-outrun"
+              ]
+            }
+          ],
+          "removes": [
+            {
+              "to": "pc",
+              "tags": [
+                "state.wanted"
               ]
             }
           ]

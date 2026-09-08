@@ -180,6 +180,7 @@ def _state(c) -> dict:
                  "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
                  "conditions": [x.name for x in a.conditions]}
                 for r, a in c.scene.actors.items()
+                if a.is_pc or not a.has_state("state.hidden")
             ],
             "grid": _grid_state(c.scene),
             # Blood on the ground. Sent whether or not there is a grid: without one

@@ -50,6 +50,9 @@ TEMPLATES: dict[str, dict] = {
         "notes": "Commoner 1. Tired, half-attentive, not paid enough to fight.",
     },
     "watchman": {
+        # Law one's writer for `role.guard`: the reader `_law_joins` asks the tag,
+        # and until this line nothing granted it — the guard joined by template name.
+        "tags": ["role.guard"],
         "xp": 135,
         "name": "watchman",
         "kind": "npc",

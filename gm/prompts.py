@@ -797,6 +797,12 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
 
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():
+        # Somebody hiding in the house is not in the room the character can see. The
+        # leak critic measured the giver of A Small Favour listed beside the corpse
+        # while the engine held him hidden (2026-09-08): the narrator was handed a
+        # presence the character could not know. Hidden people stay off this list.
+        if not actor.is_pc and actor.has_state("state.hidden"):
+            continue
         if actor.is_pc:
             # Both facts, in plain words. Pronouns alone were not enough and could not
             # have been: measured in play on a character who stood in front of a mirror,
@@ -835,11 +841,18 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 line = races_mod.body_line(race_doc)
                 if line:
                     bodily = f" A {race_doc.get('name', actor.race)}: {line}."
+            # What the character has noticed: the `knows.*` situation effects a
+            # scheme or a card granted, by the name each carries. Measured missing by
+            # the fairness critic: a tag alone put nothing in front of the player, so
+            # the foreshadowing the twist was gated on was bookkeeping the narrator
+            # never saw. A grant's `say` becomes the effect's name and lands here.
+            noticed = actor.noticed()
+            seen = (" What they have noticed: " + "; ".join(noticed) + ".") if noticed else ""
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
-                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}"
+                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}{seen}"
             )
             # The jars, by id. `use_item` takes the id and nothing else in the brief
             # named one, so the model had no way to say it and wrote `heal 1d8+1`

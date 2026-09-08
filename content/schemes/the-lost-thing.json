@@ -66,7 +66,8 @@
           "to": "pc",
           "tags": [
             "knows.giver-hides-something"
-          ]
+          ],
+          "say": "$giver looked away when asked how the $lost was lost"
         }
       ],
       "steps": [

@@ -676,3 +676,58 @@ line needed were closed by one hand on the merged tree:
 
 The three strict xfails the author left are passing tests now. `tools/scheme_lint.py`
 reports no problems on the shipped content.
+
+---
+
+## 10. Phase 4: the critics, and what closed (2026-09-08)
+
+Three critics read the merged work with one lens each; all reproduced their findings.
+`tests/test_scheme_critique.py` pins each fix with the measurement in its docstring.
+
+**Leak critic.** The authored and card layers were honest — silent steps stayed silent,
+secret cards never crossed into the prose brief or the state payload — but the
+engine's presence model had no notion of hidden: the brief's roster listed the hidden
+giver beside the corpse; the gossip carrier was the hidden giver narrating the murder
+he arranged; the travel tell named the hidden and the dead among those left behind;
+a silent step's XP line was emitted as a visible tell; a silent resolution showed in
+the quest log at once. Closed: the roster, the map and the travel tell skip the hidden
+(and the dead); gossip needs a visible, living, unaligned carrier who is not the
+giver or the victim; a silent step banks its award and defers its resolution until
+the scheme's next perceptible tell, and an ended scheme keeps ticking until it has
+delivered what it owes; the card brief names people from the store, never by bare ref.
+
+**Three-laws critic.** Two outright breaks and two silent tells: the law-joining reader
+decided "guard" by template string because `role.guard` had no writer; `scheme:` was
+stamped as an origin the provenance module refused; the off-stage kill wrote hit
+points above the ladder with no record; guards joining a declared fight got no
+sentence. Closed: the watchman template carries `role.guard` and `standing_tags`
+reads a block's tags; provenance knows `scheme`, `card` and `place`; the kill goes
+through the damage door when the body is in the room and by the ladder with a
+provenanced record when it is not (the door lands packets through the here-view and
+cannot reach another room — measured); the declared fight names the watch that came
+in. Also: `$town` resolves from the town the scheme opened in, never the ground the
+player stands on; a scheme may grant or remove only `knows.*`, the law's two states,
+`state.hidden`, `attitude.*`, `role.*` and `holds.*` — a document granting
+`state.down.dead` validated clean before; the award pays once; `on_open` is on the
+record.
+
+**Fairness critic.** The gate held mechanically but protected little: the twist detector
+read words in the tell, so the framing step with its fairness list deleted validated
+clean; `knows.giver-uneasy` was a tag the brief never rendered; the murder clock
+started at the open, not at the player's leaving, so a player who held the ingredient
+and visited the temple was framed; the escape the witness offered was unreachable
+because the road was the gate; "clear your name" resolved without lifting the warrant;
+justice was unreachable on the innocent path because the captain never moved; three of
+five endings left the player wanted forever. Closed: a step whose outcome lays a state
+on the player or fails a card is a twist by structure and needs fairness; a `knows.*`
+grant on the open needs a `say`, and the brief carries it as "What they have noticed"
+through a sheet view; `since(left($market))` starts the clock when the player leaves,
+and the frame needs `knows.reached-wild`; the road is open ground reached by biome with
+the way the witness showed; two-clues and fled lift the warrant and lay suspicion;
+Q4 moves the captain to the market on open; failure softens; silencing the giver
+still names the patron; Q5 has an outrun ending; the validator counts `has`/`holds`
+only for the player and `alive`/`present` only beside a place or event.
+
+Still open, and said: the "kin" role fills by job words the cast rarely uses; the
+`bring_in` guards are the hand-written watchman rather than the chooser's block; a
+town beyond the gate, the counter and the guards does not yet react to a warrant.

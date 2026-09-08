@@ -325,11 +325,15 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
     if not shown:
         return ""
     actors = getattr(scene, "actors", {}) or {}
+    people = getattr(scene, "people", None) or actors
     lines = ["SITUATIONS (kept by the engine; facts, not suggestions — keep them true, "
              "and let the player move them):"]
     for c in shown:
+        # Named from the store: a person elsewhere is still a name, not a bare ref
+        # the prose then copies ("with c3").
         who = ", ".join(
-            (actors[r].name if r in actors else r) + (f" ({r})" if r in actors else "")
+            (actors[r].name if r in actors else people[r].name if r in people else r)
+            + (f" ({r})" if r in actors else "")
             for r in c.people)
         stage = {"open": "just begun", "moving": "in motion", "resolved": "settled",
                  "dropped": "let go"}.get(c.stage, c.stage)

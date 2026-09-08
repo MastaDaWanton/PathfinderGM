@@ -24,6 +24,11 @@ KINDS = {
     "rule": "a row in content/rules/*.json, or rest",
     "ward": "the spell name a standing ward was placed by",
     "creature": "the bestiary template a path-less creature was spawned from",
+    # Doors added after stage 8, each a kind provenance can name: a scheme's step
+    # or outcome, a situation card's grant, a founded place's holding.
+    "scheme": "<scheme id>/<step|outcome|open|news>",
+    "card": "<card id>",
+    "place": "<place id>",
     "author": "cheat | test — the author's own hand",
 }
 
