@@ -40,6 +40,10 @@ POINT_BUY_TIERS = [
     {"points": 50, "name": "Demigod", "book": False},
     {"points": 75, "name": "Ascendant", "book": False},
     {"points": 100, "name": "The full hundred", "book": False},
+    # 0 is no budget at all — every score bought as high as the ceiling allows, which
+    # with no ceiling is the point-buy table's own top. "add an Unlimited option"
+    # (2026-09-08). Readers ask `point_budget()` and treat 0 as unlimited.
+    {"points": 0, "name": "Unlimited", "book": False},
 ]
 
 # How high one score may go before the race is applied. 18 is the Core Rulebook's own

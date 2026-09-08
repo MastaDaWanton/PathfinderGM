@@ -93,7 +93,10 @@ TIERS = ({"rp": STANDARD_RP, "name": "Standard", "book": True,
          {"rp": ADVANCED_RP, "name": "Advanced", "book": True,
           "note": "11–20 RP — drow, aasimar, tiefling territory"},
          {"rp": 40, "name": "Monstrous", "book": True,
-          "note": "above 20 RP — the Race Builder's monstrous tier"})
+          "note": "above 20 RP — the Race Builder's monstrous tier"},
+         # 0 is no cap: any race the bench holds, whatever it prices at.
+         {"rp": 0, "name": "Unlimited", "book": False,
+          "note": "no cap — any race on the bench, whatever it prices at"})
 
 # The Race Builder's standard ability-score option, and a human's.
 STANDARD_CHOOSE = ({"amount": 2, "from": "physical"}, {"amount": 2, "from": "mental"},

@@ -139,8 +139,8 @@ def test_the_rules_endpoint_round_trips(client):
                           # The Core seven offered beside a world's races, and the
                           # Race Builder's standard tier as the forge's ceiling.
                           "core_races": True, "race_rp": 10, "gm_view": False}
-    assert d["tiers"][-1]["points"] == 100
-    assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40]
+    assert d["tiers"][-2]["points"] == 100 and d["tiers"][-1]["points"] == 0   # Unlimited last
+    assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40, 0]   # Unlimited last
 
     r = client.post("/api/homebrew/rules",
                     data=json.dumps({"point_buy": 100, "magic_stacking": True}),
@@ -261,3 +261,42 @@ def test_only_a_listed_ceiling_can_be_set(isolated):
     rules, problems = houserules.set_active({"ability_cap": 19})
     assert problems and "19" in problems[0]
     assert rules["ability_cap"] == 18
+
+
+# --- Unlimited (asked for 2026-09-08) --------------------------------------------------------
+
+def test_unlimited_point_buy_is_a_tier_and_only_the_ceiling_stands(isolated):
+    """"for the Abilities point buy add an Unlimited option": 0 points is the tier, the
+    forge refuses nothing for cost, and the ability ceiling is the only wall."""
+    assert any(t["points"] == 0 and t["name"] == "Unlimited" for t in houserules.POINT_BUY_TIERS)
+    rules, problems = houserules.set_active({"point_buy": 0})
+    assert problems == [] and houserules.point_budget() == 0
+    six = spec(abilities={"str": 18, "dex": 18, "con": 18, "int": 18, "wis": 18, "cha": 18})
+    _, problems = creation.build(six)
+    assert not any("points" in p for p in problems), problems
+    # The ceiling still refuses a 19 by the book.
+    _, problems = creation.build(spec(abilities={"str": 19, "dex": 10, "con": 10,
+                                                 "int": 10, "wis": 10, "cha": 10}))
+    assert any("7 to 18" in p for p in problems)
+    assert creation.options()["point_budget"] == 0
+
+
+def test_unlimited_race_tier_accepts_any_race_on_the_bench(isolated):
+    """"for the RP cap ... add an Unlimited option": 0 RP is no cap."""
+    import json
+    from rules import races
+
+    assert any(t["rp"] == 0 and t["name"] == "Unlimited" for t in races.TIERS)
+    rules, problems = houserules.set_active({"race_rp": 0})
+    assert problems == [] and houserules.race_rp() == 0
+    doc = races.normalise({"id": "dragonkin-u", "name": "Dragonkin U", "type": "dragon",
+                           "tags": ["sense.darkvision.60", "move.fly.30"],
+                           "choose": list(races.STANDARD_CHOOSE)})
+    assert races.rp(doc) > races.STANDARD_RP
+    path = races.homebrew_dir(make=True) / "dragonkin-u.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    try:
+        _, problems = creation.build(spec(race="dragonkin-u", choices=["str", "cha", "wis"]))
+        assert not any("RP race" in p for p in problems), problems
+    finally:
+        path.unlink()

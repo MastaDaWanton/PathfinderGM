@@ -1181,7 +1181,7 @@ function paneRules() {
     <div class="cards tight">${RULES.tiers.map(t => `
       <button class="card pick ${r.point_buy === t.points ? "on" : ""}"
               data-hbtier="${t.points}">
-        <h3>${t.points} points</h3>
+        <h3>${t.points ? `${t.points} points` : "Unlimited"}</h3>
         <em>${esc(t.name)}${t.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
 
@@ -1189,7 +1189,8 @@ function paneRules() {
     <p class="note">How high one score may be bought before the race lands. 18 is the
       Core Rulebook's own ceiling and its point-buy table stops there; above it the
       cost is extrapolated from the book's own curve — 19 costs 21, 20 costs 26, 24
-      costs 50. No cap is not unlimited: the point budget is still a wall.</p>
+      costs 50. No cap on its own is not unlimited: the point budget is still a wall,
+      unless that is set to Unlimited too.</p>
     <div class="cards tight">${(RULES.caps || []).map(c => `
       <button class="card pick ${r.ability_cap === c.cap ? "on" : ""}"
               data-hbcap="${c.cap}">
@@ -1203,7 +1204,7 @@ function paneRules() {
       seven are offered beside a world's own peoples at all.</p>
     <div class="cards tight">${(RULES.race_tiers || []).map(t => `
       <button class="card pick ${r.race_rp === t.rp ? "on" : ""}" data-hbracerp="${t.rp}">
-        <h3>${t.rp} RP</h3>
+        <h3>${t.rp ? `${t.rp} RP` : "Unlimited"}</h3>
         <em>${esc(t.name)} · ${esc(t.note || "")}</em>
       </button>`).join("")}</div>
     <button class="card pick ${r.core_races === false ? "" : "on"}" data-hbcore="1"
@@ -1513,8 +1514,8 @@ function paneForge() {
         ? "" : ", which this table has turned off on the Rulesets bench"}.</p>` : ""}
     <div class="cards tight races">${opts.races.map(r => `
       <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${r.id}"
-              ${r.rp > opts.race_rp ? `disabled title="${r.rp} RP: above this table's ${opts.race_rp} RP tier"` : ""}
-              style="${r.rp > opts.race_rp ? "opacity:.45" : ""}">
+              ${opts.race_rp && r.rp > opts.race_rp ? `disabled title="${r.rp} RP: above this table's ${opts.race_rp} RP tier"` : ""}
+              style="${opts.race_rp && r.rp > opts.race_rp ? "opacity:.45" : ""}">
         <h3>${esc(r.name)}${r.of ? ` <span class="pill now">of ${esc(r.of)}</span>` : ""}${
           r.converted ? ` <span class="unread">unreviewed</span>` : ""}</h3>
         <div class="stat">${esc(r.size)} · ${r.speed} ft · ${
@@ -1594,12 +1595,12 @@ function paneForge() {
       }).join("")}</div>` : ""}
 
     <h2 class="sect">Abilities</h2>
-    <p class="note">Point buy, ${opts.point_budget} points. The race lands after.
+    <p class="note">Point buy, ${opts.point_budget ? `${opts.point_budget} points` : "unlimited"}. The race lands after.
       ${opts.ability_cap
         ? `No score above ${opts.ability_cap} before race.`
         : `No ceiling on a single score — the budget is the only wall.`}</p>
-    <div class="budget ${spent > opts.point_budget ? "over" : ""}">
-      <span>spent</span><b>${spent} / ${opts.point_budget}</b></div>
+    <div class="budget ${opts.point_budget && spent > opts.point_budget ? "over" : ""}">
+      <span>spent</span><b>${spent} / ${opts.point_budget || "∞"}</b></div>
     ${["str","dex","con","int","wis","cha"].map(ab => `
       <div class="abrow"><b>${ab.toUpperCase()}</b>
         <button data-abdn="${ab}" ${

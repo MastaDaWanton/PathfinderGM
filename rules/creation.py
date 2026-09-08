@@ -72,7 +72,10 @@ def _reachable_cap() -> int:
     cap = houserules.ability_cap()
     if cap:
         return cap
-    purse = houserules.point_budget() - 5 * POINT_COSTS[ABILITY_FLOOR]
+    budget = houserules.point_budget()
+    if not budget:
+        return 60                      # unlimited: the table's own top score
+    purse = budget - 5 * POINT_COSTS[ABILITY_FLOOR]
     top = 18
     while point_cost(top + 1) <= purse and top < 60:
         top += 1
@@ -375,7 +378,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         spent += point_cost(score)
         abilities[ab] = score
     budget = houserules.point_budget()
-    if spent > budget:
+    # 0 is the Unlimited tier: no budget at all, only the ceiling stands.
+    if budget and spent > budget:
         problems.append(f"That spends {spent} of {budget} points.")
 
     # One question, asked once, and the pronouns follow from it.
@@ -450,7 +454,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
                 abilities[pick] += int(c["amount"])
         for ab, mod in (race.get("mods") or {}).items():
             abilities[ab] += mod
-        if races_mod.rp(race) > houserules.race_rp():
+        if houserules.race_rp() and races_mod.rp(race) > houserules.race_rp():
             problems.append(
                 f"{race['name']} is a {races_mod.rp(race)} RP race and this table "
                 f"allows {houserules.race_rp()} (the Race Builder's "
