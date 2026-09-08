@@ -770,7 +770,7 @@ function paneWorlds() {
     <div style="margin:-14px 0 26px">
       <button class="go" data-forge>Create a character</button>
       <span class="note" style="margin-left:12px">Point buy, all eleven classes,
-        seven races — validated by the rules as you go.</span>
+        the world's own races and the Core seven — validated by the rules as you go.</span>
     </div>
     <h2 class="sect">Worlds on the shelf</h2>
     <p class="note">World Bible writes these; this app plays in them.</p>
@@ -835,7 +835,7 @@ function paneOneWorld() {
       <button class="card pick" data-forge style="border-style:dashed">
         <h3>Someone new</h3>
         <em>Build a character from nothing — point buy, class, skills, feats.</em>
-        <div class="stat">All eleven classes · seven races</div>
+        <div class="stat">All eleven classes · the world's races and the Core seven</div>
       </button></div>
     <button class="go" data-start="${esc(w.id)}" ${PICKED ? "" : "disabled"}
             style="${PICKED ? "" : "opacity:.4;cursor:not-allowed"}">
@@ -1500,6 +1500,12 @@ function paneForge() {
         ? esc(PRONOUNS_FOR[f.gender] || f.gender) : "&nbsp;"}</span>
     </div>
 
+    <h2 class="sect">World</h2>
+    <p class="note">Which world this character is for — its own peoples are the races on offer.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${STATE.worlds.filter(w => w.playable).map(w => `
+      <button class="quiet" data-crworld="${esc(w.id)}" style="${
+        FORGE.world === w.id ? "border-color:var(--accent);color:#f0dcae" : ""}">${esc(w.name)}</button>`).join("")}</div>
+
     <h2 class="sect">Race</h2>
     ${opts.races.some(r => r.of) ? `<p class="note">The peoples of
       ${esc(opts.races.find(r => r.of).of)} first — read off the world's own entries and
@@ -1823,18 +1829,29 @@ document.addEventListener("click", async e => {
   }
 
   if (e.target.closest("[data-forge]")) {
-    // The world rides along so the forge offers that world's own races.
-    const opts = await (await fetch("/api/create/options" + (WORLD ? `?world=${encodeURIComponent(WORLD.id)}` : ""))).json();
-    // The world whose page the forge was opened from rides with the form. Discarding
-    // it here is why a character built from Fantasia's own page began in Pangrella —
-    // the server fills a missing world with the shipped default, silently. Null when
-    // the forge is opened from the shelf or roster tabs, which keeps meaning "default".
-    FORGE = { opts, form: forgeDefaults(opts), world: WORLD ? WORLD.id : "" };
+    // The world the character is for. From a world's page, that world; from the
+    // shelf or the roster, the world of the game in progress, else the first on the
+    // shelf — the shelf's own button opened a forge with no world at all, and so with
+    // none of the world's races (2026-09-08). The forge shows the choice and lets it
+    // change, which refetches the races that world offers.
+    const playing = STATE.continue && STATE.worlds.find(w => w.name === STATE.continue.world);
+    const first = STATE.worlds.find(w => w.playable);
+    const worldId = WORLD ? WORLD.id : (playing ? playing.id : (first ? first.id : ""));
+    const opts = await (await fetch("/api/create/options" + (worldId ? `?world=${encodeURIComponent(worldId)}` : ""))).json();
+    FORGE = { opts, form: forgeDefaults(opts), world: worldId };
     render(); return;
   }
   if (e.target.closest("[data-unforge]")) { FORGE = null; render(); return; }
   if (FORGE) {
     const f = FORGE.form;
+    const world = e.target.closest("[data-crworld]");
+    if (world) {
+      // A different world offers different races; the rest of the form stands.
+      FORGE.world = world.dataset.crworld;
+      FORGE.opts = await (await fetch(`/api/create/options?world=${encodeURIComponent(FORGE.world)}`)).json();
+      if (!FORGE.opts.races.some(r => r.id === f.race)) { f.race = ""; f.choices = []; f.heritage = ""; }
+      render(); return;
+    }
     const race = e.target.closest("[data-crrace]");
     if (race) { f.race = race.dataset.crrace; f.choices = []; render(); return; }
     const heritage = e.target.closest("[data-crheritage]");
