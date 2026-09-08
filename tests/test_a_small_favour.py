@@ -399,16 +399,12 @@ def test_justice_at_the_market_with_the_proof():
 
 # --- the gaps, named -------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="grammar gap: a grant cannot carry the settlement's slug — "
-                   "the plan wants state.suspected.<town>; the document grants the family root.")
 def test_the_suspected_state_names_the_town():
     s, e, pc = _table()
     _betrayed(e, s, pc)
     assert pc.has_state(f"state.suspected.{TOWN}")
 
 
-@pytest.mark.xfail(strict=True, reason="grammar gap: no action removes an effect — justice cannot "
-                   "lift state.wanted, so every bite of it stays after the name is cleared.")
 def test_justice_lifts_the_wanted_state():
     s, e, pc = _table()
     _betrayed(e, s, pc)
@@ -420,9 +416,6 @@ def test_justice_lifts_the_wanted_state():
     assert not pc.has_state("state.wanted")
 
 
-@pytest.mark.xfail(strict=True, reason="grammar gap: slots are filled per instance — Wanted's "
-                   "$giver and $victim are fresh people, not the errand's, so the ledger names a "
-                   "stranger and the body at the temple is alive.")
 def test_the_later_schemes_share_the_errands_people():
     s, e, pc = _table()
     q1 = _betrayed(e, s, pc)
@@ -432,11 +425,14 @@ def test_the_later_schemes_share_the_errands_people():
 
 
 def test_a_slug_bearing_tag_and_a_family_grant_are_what_the_validator_allows():
-    """The record of the gap: `$town` in a tag is refused, the family root is accepted,
-    and `has(pc, state.wanted)` matches the family by prefix — so the query side is
-    not the gap; the grant side is."""
+    """The gap, closed the same day it was named: `$town` in a tag is the settlement's
+    own leaf, spelled by `states.town_tag` at grant time and never authored; the
+    family root is still accepted; and `has(pc, state.wanted)` matches the family by
+    prefix. A digit-bearing tag is still refused."""
     doc = json.loads(json.dumps(schemes.shipped()["a-small-favour"]))
     doc["outcomes"]["betrayed"]["grants"][0]["tags"] = ["state.suspected.$town"]
+    assert not any("not a tag" in p for p in schemes.validate(doc))
+    doc["outcomes"]["betrayed"]["grants"][0]["tags"] = ["State.Suspected"]
     assert any("not a tag" in p for p in schemes.validate(doc))
     from rules import states
     assert states.matches("state.wanted.somewhere", "state.wanted")

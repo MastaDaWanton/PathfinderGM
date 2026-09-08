@@ -144,3 +144,11 @@ gate opens at the open price with nothing else touched.
   soften wanted to suspected. Each is a reader to add, none needs a new store.
 - **Bounty hunters outside the town** (Skyrim above 1,000 gold) — refused for now: the
   state is per town on purpose, and a hunter on the road is a scheme, not a reader.
+
+
+## The way past the watch (added 2026-09-08)
+
+A wanted character who holds `knows.way-past-gate` — a witness's smuggler's door, a
+scheme's reward, anything granted through the applicator — may take the open road
+(a travel by biome off urban ground). The gate itself stays shut to them: the way
+past the watch is not the arch. `tests/test_a_small_favour.py` drives it.

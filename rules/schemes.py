@@ -32,7 +32,11 @@ from .activeeffect import ActiveEffect
 # --- the vocabulary -------------------------------------------------------------------------
 
 ACTIONS = ("move", "hide", "kill", "bring_in", "open_card", "fact", "objective",
-           "reveal_objective", "resolve", "grant", "news", "outcome")
+           "reveal_objective", "resolve", "grant", "remove", "news", "outcome")
+# Slots every scheme has without declaring them: `$town` is the settlement the scheme
+# opened in, as `states.town_tag` spells it, so a document can grant
+# `state.wanted.$town` without knowing the world (the town leaf is never authored).
+IMPLICIT_SLOTS = ("town",)
 CARRIERS = ("letter", "courier", "crier", "notice", "gossip", "kin", "invitation")
 REACHES = ("kin", "town", "region")
 PLACE_KINDS = {
@@ -48,7 +52,7 @@ _CRITERIA = {
     "left": re.compile(r"^left\(\$(\w+)\)$"),
     "arrived": re.compile(r"^arrived\(\$(\w+)\)$"),
     "has": re.compile(r"^(not\s+)?has\((pc|\$\w+),\s*([a-z0-9.\-_]+)\)$"),
-    "since": re.compile(r"^since\((open|campaign|[\w-]+)\)\s*>=\s*(\d+)h$"),
+    "since": re.compile(r"^since\((open|campaign|[\w-]+)\)\s*>=\s*(\d+)([hd])$"),
     "clock": re.compile(r"^clock\s*>=\s*(\d+)$"),
     "event": re.compile(r"^event:(\w+)(?:\(\$(\w+)\))?$"),
     "alive": re.compile(r"^(not\s+)?alive\(\$(\w+)\)$"),
@@ -56,8 +60,8 @@ _CRITERIA = {
     "holds": re.compile(r"^(not\s+)?holds\(pc,\s*\$(\w+)\)$"),
 }
 SHAPES = ("at($place)", "left($place)", "arrived($place)", "has(pc, tag)",
-          "has($slot, tag)", "since(open) >= 2h", "clock >= 600", "event:give($slot)",
-          "alive($slot)", "present($slot)", "holds(pc, $item)")
+          "has($slot, tag)", "since(open) >= 2h", "since(open) >= 2d", "clock >= 600",
+          "event:give($slot)", "alive($slot)", "present($slot)", "holds(pc, $item)")
 # Criteria a player can change by acting. `since` and `clock` are not among them.
 _PLAYER_CHANGEABLE = ("at", "left", "arrived", "has", "event", "alive", "present", "holds")
 _DIGIT = re.compile(r"\d")
@@ -143,13 +147,16 @@ def validate(doc: dict) -> list[str]:
         problems.append("slots: a scheme names its people, places and things as slots.")
         slots = {}
     for name, spec in slots.items():
-        if not isinstance(spec, dict) or not any(k in spec for k in ("role", "place", "item", "faction")):
-            problems.append(f"slots.{name}: say what fills it — role, place, item or faction.")
+        if not isinstance(spec, dict) or not any(k in spec for k in ("role", "place", "item", "faction", "from")):
+            problems.append(f"slots.{name}: say what fills it — role, place, item, faction, or "
+                            f"from: 'other-scheme.slot' to share another scheme's.")
         if isinstance(spec, dict) and spec.get("place") and spec["place"] not in PLACE_KINDS:
             problems.append(f"slots.{name}: a place kind is one of {', '.join(PLACE_KINDS)}.")
 
     def check_slots(text, at):
         for s in _slots_named(text):
+            if s in IMPLICIT_SLOTS:
+                continue
             if s not in slots:
                 problems.append(f"{at}: ${s} is not a slot of this scheme; declare it under slots.")
 
@@ -180,6 +187,14 @@ def validate(doc: dict) -> list[str]:
     steps = doc.get("steps") or []
     if not steps:
         problems.append("steps: a scheme does something; write at least one step.")
+    for i, act in enumerate(doc.get("on_open") or []):
+        if not isinstance(act, dict) or act.get("do") not in ACTIONS:
+            problems.append(f"on_open[{i + 1}]: action {act!r} — the vocabulary is {', '.join(ACTIONS)}.")
+        elif act["do"] in ("news", "outcome"):
+            problems.append(f"on_open[{i + 1}]: {act['do']} belongs on a step, not on the open.")
+        else:
+            for k in ("who", "to", "text"):
+                check_slots(act.get(k, ""), f"on_open[{i + 1}]")
     ids = set()
     for i, st in enumerate(steps):
         at = f"steps[{i + 1}]" + (f" ({st.get('id')})" if isinstance(st, dict) and st.get("id") else "")
@@ -223,6 +238,9 @@ def validate(doc: dict) -> list[str]:
                 problems.append(f"{at}: outcome {act.get('name')!r} is not declared under outcomes.")
             for k in ("who", "to", "text", "says"):
                 check_slots(act.get(k, ""), at)
+            for tag in act.get("tags") or []:
+                if not re.fullmatch(r"[a-z][a-z0-9.\-_$]*", str(tag)):
+                    problems.append(f"{at}: {tag!r} is not a tag.")
             check_digits(act.get("text", ""), at)
         tell = st.get("tell") or {}
         if not isinstance(tell, dict) or not any(k in tell for k in ("perceptible", "silent", "deferred", "teller")):
@@ -236,9 +254,10 @@ def validate(doc: dict) -> list[str]:
         # the open, or moves an outcome — must name its foreshadowing.
         grants = [a for a in [st.get("action")] + list(st.get("also") or [])
                   if isinstance(a, dict) and a.get("do") == "grant"]
+        told = str((st.get("tell") or {}).get("perceptible", "")).lower() \
+            if isinstance(st.get("tell"), dict) else ""
         twisty = any("knows." in " ".join(a.get("tags") or []) for a in grants) and \
-            any("kin" in t or "lie" in t or "never" in t
-                for t in [str(st.get("tell", {}).get("perceptible", ""))])
+            bool(re.search(r"\b(kin|lied?|lies|never)\b", told))
         if (st.get("fairness") is not None or twisty) and not st.get("fairness"):
             problems.append(f"{at}: a twist needs foreshadowing — list under fairness the "
                             f"knows.* tags the brief must already have carried.")
@@ -249,10 +268,10 @@ def validate(doc: dict) -> list[str]:
         if out.get("resolve") and out["resolve"] not in keys:
             problems.append(f"outcomes.{name}: resolves card {out['resolve']!r}, which is not one of "
                             f"this scheme's cards.")
-        for g in out.get("grants") or []:
+        for g in list(out.get("grants") or []) + list(out.get("removes") or []):
             check_slots(g.get("to", ""), f"outcomes.{name}")
             for tag in g.get("tags") or []:
-                if not re.fullmatch(r"[a-z][a-z0-9.\-_]*", str(tag)):
+                if not re.fullmatch(r"[a-z][a-z0-9.\-_$]*", str(tag)):
                     problems.append(f"outcomes.{name}: {tag!r} is not a tag.")
     return problems
 
@@ -374,9 +393,19 @@ def _item_for(engine, spec: dict, filled: dict) -> dict | None:
 
 def fill_slots(engine, doc: dict) -> dict:
     """Places first (people are put in them), then items (by the wild place's ground),
-    then people. Frozen on the instance."""
+    then people. Frozen on the instance. A slot written as {"from": "scheme.slot"}
+    takes the filled slot of that scheme's instance, so a line's later quests keep
+    the first quest's giver and captain rather than minting new people."""
     filled: dict = {}
-    slots = doc.get("slots") or {}
+    slots = dict(doc.get("slots") or {})
+    for name, spec in list(slots.items()):
+        src = str(spec.get("from") or "") if isinstance(spec, dict) else ""
+        if src and "." in src:
+            other, slot = src.split(".", 1)
+            inst = _find(engine.scene, other)
+            if inst is not None and slot in inst.get("slots", {}):
+                filled[name] = dict(inst["slots"][slot])
+                slots.pop(name)
     for name, spec in slots.items():
         if spec.get("place"):
             got = _place_for(engine, spec["place"], spec)
@@ -452,6 +481,12 @@ def open_scheme(engine, doc: dict, turn: int = 0) -> dict:
     for g in doc.get("grants_on_open") or []:
         _grant(scene, filled, g, f"scheme:{doc['id']}/open")
     scene.schemes.append(inst)
+    # What the open does to the world besides its cards and grants — a witness who
+    # goes to ground the moment the name is wanted — without spending the first tick
+    # on it. Silent by nature: the open itself is not a thing the player witnesses.
+    for act in doc.get("on_open") or []:
+        if isinstance(act, dict):
+            _do(engine, inst, doc, act, "open", turn)
     return inst
 
 
@@ -463,11 +498,33 @@ def _who(scene, filled: dict, ref: str):
     return scene.people.get(slot.get("ref", "")) if slot.get("kind") == "actor" else None
 
 
+def _tags_of(scene, g: dict) -> tuple[str, ...]:
+    """The tags a grant names, with `$town` spelled the way the readers spell it."""
+    from . import states
+
+    town = states.town_tag(scene.location_id)
+    return tuple(str(t).replace("$town", town) for t in g.get("tags") or ())
+
+
+def _remove(scene, filled: dict, g: dict) -> int:
+    """Take off every effect whose tags answer one of the prefixes named — the one
+    removal, so clearing a name evaporates every bite (docs/wanted.md)."""
+    from . import states
+
+    who = _who(scene, filled, str(g.get("to", "pc")))
+    if who is None:
+        return 0
+    wanted = _tags_of(scene, g)
+    gone = who.remove_effects(match=lambda e: any(states.matches(str(tg), q)
+                                                  for tg in e.tags for q in wanted))
+    return len(gone)
+
+
 def _grant(scene, filled: dict, g: dict, source: str) -> None:
     who = _who(scene, filled, str(g.get("to", "pc")))
     if who is None:
         return
-    tags = tuple(str(t) for t in g.get("tags") or ())
+    tags = _tags_of(scene, g)
     if not tags:
         return
     key = f"{source}:{'+'.join(tags)}"
@@ -521,7 +578,7 @@ def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict
         v = bool(actor is not None and actor.has_state(tag))
         return (not v) if neg else v
     if kind == "since":
-        anchor, hours = m.group(1), int(m.group(2))
+        anchor, hours = m.group(1), int(m.group(2)) * (24 if m.group(3) == "d" else 1)
         if anchor == "open":
             start = inst["opened_at"]
         elif anchor == "campaign":
@@ -639,6 +696,8 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
             cards_mod.resolve(scene, card.id, how=str(act.get("how") or "resolved"), turn=turn)
     elif what == "grant":
         _grant(scene, filled, act, source)
+    elif what == "remove":
+        _remove(scene, filled, act)
     elif what == "news":
         inst["news"].append({"carrier": act.get("carrier"), "reach": act.get("reach"),
                              "delay": _hours(act.get("delay")), "says": fill_text(act.get("says", ""), filled),
@@ -665,6 +724,10 @@ def _outcome(engine, inst: dict, doc: dict, name: str, turn: int) -> str:
     inst["outcome"] = name
     source = f"scheme:{doc['id']}/{name}"
     lines = []
+    # Removals first, grants after: justice lifts the warrant, and a bargain lifts it
+    # and lays the lesser one down in the same breath.
+    for g in out.get("removes") or []:
+        _remove(scene, inst["slots"], g)
     for g in out.get("grants") or []:
         _grant(scene, inst["slots"], g, source)
     if out.get("resolve"):

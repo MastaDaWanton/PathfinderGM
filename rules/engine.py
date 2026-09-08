@@ -3482,7 +3482,11 @@ class Engine:
             at_gate = " ".join(going_to.name.split()).lower().removeprefix("the ") == "gate"
             open_road = bool(want) and was_ground == places_mod.URBAN \
                 and going_to.terrain != places_mod.URBAN
-            if law and (at_gate or open_road):
+            # A way past the watch that somebody showed you — a scheme's witness, a
+            # smuggler's door — is a tag the player holds (`knows.way-past-gate`), and
+            # the road is open to them by it; the gate itself stays shut.
+            has_way = pc.has_state("knows.way-past-gate")
+            if law and (at_gate or (open_road and not has_way)):
                 found = self.world.get(self.scene.location_id) if self.world else None
                 town_name = str(getattr(found, "name", "") or "the town")
                 if law == "wanted":
@@ -4442,7 +4446,9 @@ class Engine:
         stall = str(intent.params.get("stall") or buyer or "market")
         day = market_mod.day_of(self.scene.clock_minutes)
 
-        asking = round(pricing.what_a_shop_pays(held) * count, 2)
+        # The seller's standing with this town's law moves the price (docs/wanted.md):
+        # a fence pays a fugitive less for the reason he charges them more.
+        asking = round(pricing.what_a_shop_pays(held, seller=actor, town=place) * count, 2)
         # A price the player has already agreed to caps the ask — that is the haggle,
         # and the trade screen is where it gets named. It can only ever lower the price
         # asked: a player cannot talk a stall into paying more than the goods are worth
@@ -4532,7 +4538,7 @@ class Engine:
                 intent, f"{who} has no {item_id} on the counter today. On the counter: "
                         f"{near or 'nothing'}.")
 
-        price = round(pricing.worth(found) * count, 2)
+        price = round(pricing.worth(found, buyer=actor, town=place) * count, 2)
         cp = int(round(price * 100))
         purse, paid = goods.spend(actor.purse, cp)
         coins = goods.coinage()
@@ -5506,6 +5512,10 @@ class Engine:
         self.scene.acted = set()
         self.scene.sides = {k: list(v) for k, v in intent.params["sides"].items()}
         self._lay_battlefield(intent.params["sides"])
+        # The law joins a declared fight the way it joins one that starts with a swing:
+        # a guard who sees it begin in the town where the player is wanted takes the
+        # other side (docs/wanted.md).
+        self._law_joins()
         # The turn pointer starts before the first combatant so the first advance lands
         # on whoever won initiative.
         self.scene.turn = -1

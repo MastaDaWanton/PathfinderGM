@@ -648,3 +648,31 @@ What the plan asked for, what the grammar could not say, and what was written in
     `against`, which would make a third side the fight does not read. Written: `them`.
 17. **The twist heuristic** in the validator substring-matches `kin`, `lie`, `never`;
     "looking", "lies", "keeping" trip it. A word-boundary match is the fix.
+
+---
+
+## 9. Phase 3 merged, and the gaps closed (2026-09-08)
+
+Three agents in worktrees, each with a file-ownership map, merged in turn with the
+whole suite green after each: the codex chooser and NPCs bench (docs/npc-codex.md),
+the wanted state with its three readers (docs/wanted.md), and "A Small Favour" as
+authored with its lint (§8). Of the seventeen gaps the author named, the ones the
+line needed were closed by one hand on the merged tree:
+
+- `$town` is an implicit slot in a tag: `state.suspected.$town` is spelled by
+  `states.town_tag` at grant time and never authored.
+- `remove` joins the action vocabulary, and an outcome may carry `removes`: justice
+  lifts the warrant; a bargain lifts it and lays the lesser one down.
+- A slot may be `{"from": "other-scheme.slot"}`: the later quests keep the errand's
+  giver, victim, witness, captain and patron rather than minting strangers.
+- `since(...)` takes days as well as hours.
+- `on_open` actions: the open moves people (the witness goes to ground; the giver
+  flees to the wild) without spending the first tick.
+- The twist heuristic reads words, not substrings ("looking" is not "kin").
+- The gate honours `knows.way-past-gate` on the open road, the way a witness's door
+  is meant to, while the arch stays shut.
+- The narrated buy and sell pay the wanted price; a GM-declared fight brings the
+  guards in as a swing does.
+
+The three strict xfails the author left are passing tests now. `tools/scheme_lint.py`
+reports no problems on the shipped content.

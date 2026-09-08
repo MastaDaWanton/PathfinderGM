@@ -11,59 +11,220 @@
       "id": "the-lost-thing",
       "title": "The lost thing",
       "about": "A giver's lost keepsake, a rival who took it, and a lie about how it was lost.",
-      "opens": ["at($market)", "since(campaign) >= 0h"],
+      "opens": [
+        "at($market)",
+        "since(campaign) >= 0h"
+      ],
       "slots": {
-        "giver": {"role": "trader", "level": "pc", "prefer": "cast", "at": "$market"},
-        "rival": {"role": "kin", "level": "pc", "at": "$wild"},
-        "market": {"place": "market"},
-        "wild": {"place": "wild", "hours": 2},
-        "lost": {"item": "keepsake", "biome": "$wild"}
+        "giver": {
+          "role": "trader",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$market"
+        },
+        "rival": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$wild"
+        },
+        "market": {
+          "place": "market"
+        },
+        "wild": {
+          "place": "wild",
+          "hours": 2
+        },
+        "lost": {
+          "item": "keepsake",
+          "biome": "$wild"
+        }
       },
       "cards": [
-        {"key": "errand", "kind": "quest", "title": "Find $giver's lost $lost",
-         "objectives": ["Search $wild for the $lost", "Bring the $lost back to $giver"],
-         "giver": "$giver", "reward": "$giver's gratitude, and a good word at the market"},
-        {"key": "truth", "secret": true, "title": "Who really has the $lost",
-         "facts": ["$rival, $giver's own kin, took the $lost and is out at $wild with it.",
-                   "$giver did not lose it; $giver says so because the quarrel shames them."]}
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Find $giver's lost $lost",
+          "objectives": [
+            "Search $wild for the $lost",
+            "Bring the $lost back to $giver"
+          ],
+          "giver": "$giver",
+          "reward": "$giver's gratitude, and a good word at the market"
+        },
+        {
+          "key": "truth",
+          "secret": true,
+          "title": "Who really has the $lost",
+          "facts": [
+            "$rival, $giver's own kin, took the $lost and is out at $wild with it.",
+            "$giver did not lose it; $giver says so because the quarrel shames them."
+          ]
+        }
       ],
-      "grants_on_open": [{"to": "pc", "tags": ["knows.giver-hides-something"]}],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.giver-hides-something"
+          ]
+        }
+      ],
       "steps": [
-        {"id": "found",
-         "criteria": ["at($wild)", "present($rival)", "alive($rival)"],
-         "action": {"do": "objective", "card": "errand", "n": 1},
-         "also": [{"do": "grant", "to": "pc", "tags": ["knows.rival-has-it"]},
-                  {"do": "reveal_objective", "card": "errand", "text": "Decide who the $lost belongs with"}],
-         "tell": {"perceptible": "$rival is here, and has the $lost."}},
-        {"id": "twist",
-         "criteria": ["at($wild)", "present($rival)", "has(pc, knows.rival-has-it)"],
-         "fairness": ["knows.giver-hides-something"],
-         "action": {"do": "fact", "card": "errand",
-                    "text": "$rival says $giver is kin, and that the $lost was never lost but taken back."},
-         "also": [{"do": "grant", "to": "pc", "tags": ["knows.rival-is-kin"]}],
-         "tell": {"perceptible": "$rival says it plainly: $giver is kin, and the $lost was never lost."}},
-        {"id": "returned",
-         "criteria": ["at($market)", "present($giver)", "has(pc, knows.rival-has-it)", "holds(pc, $lost)"],
-         "action": {"do": "objective", "card": "errand", "n": 2},
-         "also": [{"do": "outcome", "name": "returned"}],
-         "tell": {"perceptible": "$giver takes the $lost back."}},
-        {"id": "given-away",
-         "criteria": ["event:give($rival)", "has(pc, knows.rival-is-kin)"],
-         "action": {"do": "outcome", "name": "gave-to-rival"},
-         "tell": {"perceptible": "$rival keeps the $lost."}},
-        {"id": "rival-comes-to-town",
-         "criteria": ["left($wild)", "not at($wild)", "since(open) >= 6h", "alive($rival)", "not has(pc, knows.rival-is-kin)"],
-         "action": {"do": "move", "who": "$rival", "to": "$market"},
-         "also": [{"do": "news", "carrier": "gossip", "reach": "town", "delay": "0h",
-                   "says": "Two of $giver's household were heard quarrelling at the market."}],
-         "tell": {"silent": "$rival comes to the market looking for $giver."}}
+        {
+          "id": "found",
+          "criteria": [
+            "at($wild)",
+            "present($rival)",
+            "alive($rival)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.rival-has-it"
+              ]
+            },
+            {
+              "do": "reveal_objective",
+              "card": "errand",
+              "text": "Decide who the $lost belongs with"
+            }
+          ],
+          "tell": {
+            "perceptible": "$rival is here at $wild, and has the $lost."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($wild)",
+            "present($rival)",
+            "has(pc, knows.rival-has-it)"
+          ],
+          "fairness": [
+            "knows.giver-hides-something"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$rival says $giver is kin, and that the $lost was never lost but taken back."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.rival-is-kin"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$rival says it plainly: $giver is kin, and the $lost was never lost."
+          }
+        },
+        {
+          "id": "returned",
+          "criteria": [
+            "at($market)",
+            "present($giver)",
+            "has(pc, knows.rival-has-it)",
+            "holds(pc, $lost)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "returned"
+            }
+          ],
+          "tell": {
+            "perceptible": "At $market, $giver takes the $lost back."
+          }
+        },
+        {
+          "id": "given-away",
+          "criteria": [
+            "event:give($rival)",
+            "has(pc, knows.rival-is-kin)"
+          ],
+          "action": {
+            "do": "outcome",
+            "name": "gave-to-rival"
+          },
+          "tell": {
+            "perceptible": "$rival keeps the $lost."
+          }
+        },
+        {
+          "id": "rival-comes-to-town",
+          "criteria": [
+            "left($wild)",
+            "not at($wild)",
+            "since(open) >= 6h",
+            "alive($rival)",
+            "not has(pc, knows.rival-is-kin)"
+          ],
+          "action": {
+            "do": "move",
+            "who": "$rival",
+            "to": "$market"
+          },
+          "also": [
+            {
+              "do": "news",
+              "carrier": "gossip",
+              "reach": "town",
+              "delay": "0h",
+              "says": "Two of $giver's household were heard quarrelling at the market."
+            }
+          ],
+          "tell": {
+            "silent": "$rival comes to the market looking for $giver."
+          }
+        }
       ],
       "outcomes": {
-        "returned": {"resolve": "errand", "award": "new",
-                     "grants": [{"to": "$giver", "tags": ["attitude.friendly"]}]},
-        "gave-to-rival": {"resolve": "errand", "how": "dropped", "award": "advance",
-                          "grants": [{"to": "$rival", "tags": ["attitude.friendly"]},
-                                     {"to": "$giver", "tags": ["attitude.unfriendly"]}]}
+        "returned": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$giver",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        },
+        "gave-to-rival": {
+          "resolve": "errand",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$rival",
+              "tags": [
+                "attitude.friendly"
+              ]
+            },
+            {
+              "to": "$giver",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
       }
     }
   ]
