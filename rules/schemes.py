@@ -351,7 +351,10 @@ def _place_for(engine, kind: str, spec: dict) -> dict | None:
         found = engine.world.get(scene.location_id) if engine.world else None
         terrain = engine._terrain_hint(found) or "grassland"
         region = places_mod.region_set(scene.location_id, terrain)
-        p = region[0]
+        # The wild is where a travel by ground lands, the region's first place, so a
+        # person put there is met on arrival; the road is the region's edge — the way
+        # out — a place apart from it.
+        p = region[2] if kind == "road" and len(region) > 2 else region[0]
         return {"kind": "place", "id": p.id, "name": p.name, "terrain": p.terrain,
                 "region": True, "hours": int(spec.get("hours", 2) or 2)}
     for name in PLACE_KINDS.get(kind, ()):
@@ -365,7 +368,7 @@ def _place_for(engine, kind: str, spec: dict) -> dict | None:
     return None
 
 
-def _cast_candidates(engine) -> list[dict]:
+def _cast_candidates(engine, anywhere: bool = False) -> list[dict]:
     """The world's own people at this location, from play.cast, not yet on the board."""
     world = engine.world
     if world is None:
@@ -377,7 +380,7 @@ def _cast_candidates(engine) -> list[dict]:
     for c in play.get("cast") or []:
         if not isinstance(c, dict) or str(c.get("id")) in on_board:
             continue
-        if str(c.get("home_id") or "") == here:
+        if str(c.get("home_id") or "") == here or anywhere:
             out.append(c)
     return out
 
@@ -396,6 +399,11 @@ def _role_for(engine, name: str, spec: dict, filled: dict, taken: set) -> dict |
     role = str(spec.get("role") or "")
     words = _ROLE_WORDS.get(role, (role,))
     cast = [c for c in _cast_candidates(engine) if c.get("id") not in taken]
+    if not cast:
+        # The town's own people are spoken for: somebody from elsewhere in the world,
+        # here today — grounded, named by the world, never by the role word. The
+        # playtest found every non-giver role in both towns named "standing".
+        cast = [c for c in _cast_candidates(engine, anywhere=True) if c.get("id") not in taken]
     pick = next((c for c in cast if any(re.search(r"\b" + re.escape(w) + r"\b", str(c.get("role", "")).lower())
                                         for w in words)), None)
     if pick is None and cast:
@@ -437,7 +445,12 @@ def _item_for(engine, spec: dict, filled: dict) -> dict | None:
     pool = pool or list(ingredients.all_ingredients().values())
     if not pool:
         return None
-    pick = sorted(pool, key=lambda i: i.name)[hash(engine.scene.location_id) % len(pool)]
+    taken = {str(s.get("id")) for inst in engine.scene.schemes for s in inst.get("slots", {}).values()
+             if s.get("kind") == "item"}
+    pool = sorted(pool, key=lambda i: i.name)
+    free = [i for i in pool if i.id not in taken] or pool
+    seed = sum(ord(ch) for ch in f"{engine.scene.location_id}:{spec.get('item', '')}")
+    pick = free[seed % len(free)]
     return {"kind": "item", "id": pick.id, "name": pick.name, "biome": biome}
 
 
@@ -615,6 +628,13 @@ def _holds(pc, slot: dict) -> bool:
     if pc is None or not slot:
         return False
     want = str(slot.get("name") or "").lower()
+    if any(str(s.base).lower() == want and s.count > 0 for s in pc.stock.values()):
+        return True
+    # The satchel, by ingredient id: foraging writes it (`Actor.carry`), and the
+    # playtest found the frame unreachable because only the shelf was read.
+    iid = str(slot.get("id") or "").lower()
+    inv = getattr(pc, "inventory", None) or {}
+    return bool(iid) and int(inv.get(iid, 0) or 0) > 0
     return any(str(s.base).lower() == want and s.count > 0 for s in pc.stock.values()) \
         or str(slot.get("id") or "") in (pc.materials if hasattr(pc, "materials") else {})
 
@@ -800,7 +820,7 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
     elif what == "news":
         inst["news"].append({"carrier": act.get("carrier"), "reach": act.get("reach"),
                              "delay": _hours(act.get("delay")), "says": fill_text(act.get("says", ""), filled),
-                             "born": int(scene.clock_minutes), "born_turn": engine._scheme_tick,
+                             "born": int(scene.clock_minutes), "born_tick": int(inst.get("ticks", 0)),
                              "step": step_id})
     elif what == "outcome":
         _outcome(engine, inst, doc, str(act.get("name") or ""), turn)
@@ -862,8 +882,6 @@ def tick(engine, outcomes) -> list:
     if pc is None:
         return []
     turn = int(getattr(engine, "turn", 0) or 0)
-    engine._scheme_tick = int(getattr(engine, "_scheme_tick", 0)) + 1
-    fired_now = engine._scheme_tick
     events = _events_from(outcomes)
     made: list = []
     if not ENABLED:
@@ -896,9 +914,13 @@ def tick(engine, outcomes) -> list:
         # An ended scheme still owes the player what it resolved out of their sight:
         # it keeps ticking, for perceptible steps only, until the banked line and the
         # deferred resolution have landed.
-        owes = bool(inst.get("banked") or inst.get("pending_resolve"))
+        owes = bool(inst.get("banked") or inst.get("pending_resolve") or inst.get("news"))
         if inst.get("outcome") and not owes:
             continue
+        # The instance's own tick count, persisted with it: the live app builds a fresh
+        # Engine per request, and a counter on the engine read 1 forever, so news born
+        # on "tick 1" never arrived (playtest, 2026-09-08).
+        inst["ticks"] = int(inst.get("ticks", 0)) + 1
         # Where the player has been, for `left($place)`.
         for name, slot in inst["slots"].items():
             if slot.get("kind") != "place":
@@ -977,7 +999,7 @@ def tick(engine, outcomes) -> list:
         for item in inst.get("news") or []:
             # Never on the tick it was born: word takes at least one beat to travel,
             # and a step and its gossip landing together read as one event.
-            if scene.clock_minutes - item["born"] < item["delay"] * 60                     or item.get("born_turn") == fired_now:
+            if scene.clock_minutes - item["born"] < item["delay"] * 60                     or int(item.get("born_tick", -1)) >= int(inst.get("ticks", 0)):
                 kept.append(item)
                 continue
             arrived, how = _news_arrives(engine, inst, item)

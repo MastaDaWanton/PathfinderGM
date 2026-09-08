@@ -731,3 +731,42 @@ only for the player and `alive`/`present` only beside a place or event.
 Still open, and said: the "kin" role fills by job words the cast rarely uses; the
 `bring_in` guards are the hand-written watchman rather than the chooser's block; a
 town beyond the gate, the counter and the guards does not yet react to a warrant.
+
+---
+
+## 11. Phase 4: the playtest, and what closed (2026-09-08)
+
+A playtest agent drove both shipped worlds on the dev server with the real model,
+twenty-nine turns in Pangrella and fourteen in Fantasia, and reported "not playable as
+shipped". Its confirmed findings, each now pinned in `tests/test_scheme_critique.py`:
+
+- **The frame could never fire from real play.** `holds(pc, $errand)` read the crafted
+  shelf; foraging writes the satchel. The satchel is read now.
+- **News never arrived in the live app.** The tick counter lived on an Engine the app
+  rebuilds per request, so it read one forever and the "never on the tick it was
+  born" guard held every time. The count lives on the instance and persists.
+- **Empty roles became people called "standing".** Both shipped towns have three cast
+  members; the lost thing takes two and the errand's giver the third. A role the
+  town cannot fill now takes a cast member from elsewhere in the world, a visitor,
+  and is never named after the role word.
+- **The wild place could not be reached by the name the card used.** "The approach"
+  and "the edge" resolve from inside the town now, at validate and at run, as a
+  travel by their ground; when the model sends both a biome and a same-ground place,
+  the new ground wins.
+- **Three 502s from "travel: say where".** A printable refusal now, naming the places
+  here and the open ground outside.
+- **Two schemes in one town wanted the same herb, and the road was the wild.** Items
+  are chosen apart, seeded by place and slot rather than a salted hash; the road is
+  the region's edge.
+- **"I wait ten hours" was narrate_only.** Stated waiting is an `advance_time`
+  through the judgement's declaration door (`inject_wait`).
+
+What the playtest confirmed working: every slot filled from the world's own cast with
+no invented name; silent steps produced no tell; the honest path fired nothing; the
+kill carried its provenance; no scheme error, no 500.
+
+Model-side faults it recorded and this pass does not touch: prose that hums a thing
+never held, names the engine's pennyroyal a tamarisk, invents a tavern's name, or
+seats the hidden giver beside the corpse when the prose call builds its own roster;
+two "the moment holds" stalls in the murder scene; a rest turn rendered as the raw
+tell. Those belong with the narrator's reliability work, and are on the ledger.

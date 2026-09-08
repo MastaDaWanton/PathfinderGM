@@ -159,10 +159,12 @@ def test_travel_with_neither_ground_nor_room_says_what_to_type(yard):
     attempt resolved it 38% of the time — the model wanted a place and the op only
     offered ground."""
     s, engine = yard
-    with pytest.raises(IntentError) as e:
-        engine.run(engine.validate(
-            [{"op": "travel", "because": "she goes", "params": {}}]))
-    assert '"biome"' in str(e.value) and '"place"' in str(e.value)
+    # A printable refusal now, not a raise: it passed validate and raised in run, which
+    # the table showed as a 502 three times in one playtest (2026-09-08). The fix is
+    # still named — the places here and the open ground outside.
+    out = engine.run(engine.validate(
+        [{"op": "travel", "because": "she goes", "params": {}}])).outcomes[0]
+    assert out.effects == [] and "where to" in out.tell and "reach" in out.tell
 
 
 # --- departing --------------------------------------------------------------------------

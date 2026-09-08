@@ -2088,6 +2088,47 @@ _GATHERS_ORE = re.compile(
     r"|\b(?:dig|mine)\b[^.!?]{0,20}?\b" + _ORE_WORDS + r"\b", re.I)
 
 
+# "I wait at the market for ten hours", "I spend the whole day here", "we linger till
+# evening": time the player means to pass. The playtest measured both as
+# `narrate_only` with the clock unmoved, so a scheme keyed on the hours never came.
+_WAITS = re.compile(
+    r"\b(?:wait|linger|rest here|stay here|spend|pass|idle|kill time|while away)\b[^.]{0,40}?"
+    r"\b(?:(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|twelve|half a|the whole|all|the rest of the)\s+"
+    r"(hours?|hour|day|days|morning|afternoon|evening|night|watch))\b", re.I)
+_WORDS_TO_N = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+               "seven": 7, "eight": 8, "nine": 9, "ten": 10, "twelve": 12, "half a": 0.5,
+               "the whole": 1, "all": 1, "the rest of the": 0.5}
+_UNIT_HOURS = {"hour": 1, "hours": 1, "day": 10, "days": 10, "morning": 4, "afternoon": 4,
+               "evening": 3, "night": 8, "watch": 4}
+
+
+def inject_wait(raw_intents, player_text: str, scene) -> list:
+    """Time the player says they pass becomes `advance_time`, in minutes."""
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if present & {"advance_time", "rest", "forage", "prospect", "travel", "venture"}:
+        return raw_intents
+    m = _WAITS.search(player_text)
+    if not m:
+        return raw_intents
+    n = m.group(1).lower() if m.group(1) else "1"
+    count = float(n) if n.isdigit() else _WORDS_TO_N.get(n, 1)
+    unit = m.group(2).lower()
+    hours = count * _UNIT_HOURS.get(unit, 1)
+    minutes = int(max(10, min(24 * 60, round(hours * 60))))
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    return [r for r in raw_intents if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")] + [{
+        "op": "advance_time", "actor": pc.ref,
+        "params": {"amount": minutes, "unit": "minutes"},
+        "because": "the player passed the time",
+    }]
+
+
 def inject_prospect(raw_intents, player_text: str, scene) -> list:
     """Make a declared search for ore reach the engine — `inject_forage`'s twin."""
     if not isinstance(raw_intents, list) or not player_text or scene is None:
@@ -2285,6 +2326,7 @@ _DECLARERS = (
     # "nowhere in particular" when there is none.
     ("forage", lambda raw, text, scene, world: inject_forage(raw, text, scene)),
     ("prospect", lambda raw, text, scene, world: inject_prospect(raw, text, scene)),
+    ("wait", lambda raw, text, scene, world: inject_wait(raw, text, scene)),
     ("found", lambda raw, text, scene, world: inject_found(raw, text, scene)),
     ("venture", lambda raw, text, scene, world: inject_venture(raw, text, scene)),
     ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),

@@ -1575,7 +1575,15 @@ class Engine:
             from . import places as places_mod
 
             known = self.places()
-            if known and places_mod.find(known, str(intent.params["place"])) is None:
+            # The open ground outside the walls answers by name too — the region
+            # places a scheme's card names ("the approach", "the edge") — the same
+            # lookup `_op_travel` makes, so validate and run agree.
+            outside = ()
+            if self.world is not None:
+                terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
+                if terrain:
+                    outside = places_mod.region_set(self.scene.location_id, terrain)
+            if known and places_mod.find(known, str(intent.params["place"])) is None                     and places_mod.find(outside, str(intent.params["place"])) is None:
                 raise IntentError(
                     f"travel: there is no {intent.params['place']!r} here. Name one of: "
                     f"{', '.join(p.name for p in known)}.", "schema")
@@ -3383,11 +3391,19 @@ class Engine:
         want = str(intent.params.get("biome") or "").strip().lower()
         place = " ".join(str(intent.params.get("place") or "").split())
         if not want and not place:
-            raise IntentError(
-                'travel: say where. Either new ground — "biome": "forest" — or a new '
-                'spot on the same ground — "place": "the market square".',
-                "schema")
+            from . import places as places_mod
+
+            return self._refuse(
+                intent, "Nobody moves: where to? From here you can reach "
+                        f"{', '.join(p.name for p in self.places())}, or the open ground "
+                        f"outside — {', '.join(sorted(biomes.BIOMES))}.")
         biome = biomes.canonical(want) if want else None
+        if biome is not None and place:
+            from . import places as places_mod
+
+            named = places_mod.find(self.places(), place)
+            if named is not None and named.terrain != biome:
+                place = ""
         if want and biome is None:
             raise IntentError(
                 f"travel: {want!r} is not a biome. The biomes are: "
@@ -3406,6 +3422,16 @@ class Engine:
         here = self.here()
         if place:
             going_to = places_mod.find(known, place)
+            if going_to is None and self.world is not None:
+                # The open ground outside the walls, by name: the region places the
+                # scheme cards name. Reached as a travel by their ground.
+                found = self.world.get(self.scene.location_id)
+                terrain = self._terrain_hint(found) or ""
+                if terrain:
+                    region = places_mod.region_set(self.scene.location_id, terrain)
+                    going_to = places_mod.find(region, place)
+                    if going_to is not None:
+                        biome = going_to.terrain
             if going_to is None:
                 # Printed, not raised. The raise above was written for the plan's
                 # repair loop and never reached it: `validate` does not look at the
@@ -3539,6 +3565,12 @@ class Engine:
                     left.append(a.name)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
+                # Between the walls and the open ground is an hour on foot either way
+                # — the playtest measured a two-hour wild place reached in no time, so
+                # a scheme keyed on the hours never came. Inside the walls, or across
+                # the same open ground, stays free: the map is small there.
+                if (was_ground == places_mod.URBAN) != (going_to.terrain == places_mod.URBAN):
+                    self.scene.advance(60, charge_body=False)
             else:
                 # A scene with no player (some tests) is placed rather than moved: the
                 # party record has three writers and this door is not a fourth.

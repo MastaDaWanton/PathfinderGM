@@ -202,3 +202,106 @@ def test_a_step_keyed_only_on_another_persons_state_is_not_player_changeable():
     st = next(x for x in doc["steps"] if x["id"] == "killed")
     st["criteria"] = ["alive($victim)", "since(open) >= 3h"]
     assert any("killed" in p and "could change" in p for p in schemes.validate(doc))
+
+
+# --- the playtest agent (2026-09-08) ---------------------------------------------------------------
+
+def test_a_foraged_ingredient_counts_as_held():
+    """Playtest finding 2: `holds(pc, $errand)` read the crafted shelf only; foraging
+    writes the satchel, so the frame could never fire from real play."""
+    s, e, pc = _table()
+    slot = {"kind": "item", "id": "pennyroyal", "name": "Pennyroyal"}
+    assert not schemes._holds(pc, slot)
+    pc.carry("pennyroyal", 2)
+    assert schemes._holds(pc, slot)
+
+
+def test_news_arrives_across_requests_not_only_within_one_engine():
+    """Playtest finding 3: the tick counter lived on an Engine the live app rebuilds
+    per request, so it read 1 forever and news born on tick 1 never arrived."""
+    import json as _json
+
+    s, e, pc = _table()
+    doc = {"id": "probe2", "title": "Probe", "slots": {"market": {"place": "market"}},
+           "cards": [{"key": "q", "kind": "quest", "title": "A probe quest", "objectives": ["x"]}],
+           "steps": [{"id": "word", "criteria": ["at($market)", "since(open) >= 1h"],
+                      "action": {"do": "news", "carrier": "crier", "reach": "town", "delay": "0h",
+                                 "says": "Something happened."},
+                      "tell": {"silent": "it happened"}}],
+           "outcomes": {}}
+    path = schemes.homebrew_dir(make=True) / "probe2.json"
+    path.write_text(_json.dumps(doc), encoding="utf-8")
+    try:
+        inst = schemes.open_scheme(e, doc)
+        wait = lambda eng, m: eng.run(eng.validate([{"op": "advance_time", "actor": "pc", "because": "t",
+                                                     "params": {"amount": m, "unit": "minutes"}}], origin="author:test"))
+        wait(e, 61)
+        assert inst["news"] and "word" in inst["fired"]
+        # A fresh engine on the same scene, as the next request would build.
+        e2 = Engine(s, Dice(seed=4), world=WORLD)
+        res = wait(e2, 1)
+        told = [o.tell for o in res.outcomes if o.op == "scheme"]
+        assert told and "Something happened." in told[0]
+        assert not inst["news"]
+    finally:
+        path.unlink()
+
+
+def test_a_role_no_cast_member_here_can_fill_is_never_named_after_the_role():
+    """Playtest finding 1: with three cast members in the town and four roles, the
+    victim was a man called "standing"."""
+    s, e, pc = _table()
+    doc = schemes.shipped()["a-small-favour"]
+    inst = schemes.open_scheme(e, doc)
+    for name, slot in inst["slots"].items():
+        if slot.get("kind") == "actor":
+            person = s.people[slot["ref"]]
+            assert person.name.lower() not in ("standing", "companion", "guard officer", "trader", "kin"), (name, person.name)
+
+
+def test_two_schemes_in_one_town_want_different_things_and_the_road_is_not_the_wild():
+    """Playtest finding 7: the errand and the lost thing both asked for the same herb,
+    and road and wild were one place."""
+    s, e, pc = _table()
+    a = schemes.open_scheme(e, schemes.shipped()["the-lost-thing"])
+    b = schemes.open_scheme(e, schemes.shipped()["a-small-favour"])
+    assert a["slots"]["lost"]["id"] != b["slots"]["errand"]["id"]
+    assert b["slots"]["road"]["id"] != b["slots"]["wild"]["id"]
+
+
+def test_travel_with_nowhere_named_is_a_printable_refusal():
+    """Playtest finding 5: a travel with neither place nor biome passed validate and
+    raised in run — three 502s in one session."""
+    s, e, pc = _table()
+    out = e.run(e.validate([{"op": "travel", "actor": "pc", "because": "t", "params": {"note": "back"}}],
+                           origin="author:test")).outcomes[0]
+    assert out.effects == [] and "where to" in out.tell and "the gate" in out.tell
+
+
+def test_the_open_ground_is_reachable_by_the_name_the_card_uses():
+    """Playtest finding 4: "the approach" on the quest card could not be travelled to
+    by name from inside the town; only a travel by biome reached it."""
+    s, e, pc = _table()
+    out = e.run(e.validate([{"op": "travel", "actor": "pc", "because": "t", "params": {"place": "the heart of it"}}],
+                           origin="author:test")).outcomes[0]
+    assert out.effects, out.tell
+    assert "the-heart-of-it" in s.at
+    # New ground beats a same-ground place when the model sends both.
+    e.place_party(MARKET)
+    out = e.run(e.validate([{"op": "travel", "actor": "pc", "because": "t",
+                             "params": {"biome": "grassland", "place": "the gate"}}], origin="author:test")).outcomes[0]
+    assert "grassland" in s.at
+
+
+def test_saying_you_wait_passes_the_time():
+    """Playtest finding 6: "I wait at the market for ten hours" was narrate_only and the
+    clock did not move, so a scheme keyed on the hours never came."""
+    from gm import judgement
+
+    s, e, pc = _table()
+    raw = judgement.inject_wait([{"op": "narrate_only"}], "I wait at the market for ten hours.", s)
+    assert raw and raw[-1]["op"] == "advance_time" and raw[-1]["params"]["amount"] == 600
+    raw = judgement.inject_wait([], "We spend the whole day here.", s)
+    assert raw[-1]["params"]["amount"] == 600
+    assert judgement.inject_wait([], "How long would we wait?", s) == []
+    assert judgement.inject_wait([{"op": "rest"}], "I rest here for an hour", s) == [{"op": "rest"}]
