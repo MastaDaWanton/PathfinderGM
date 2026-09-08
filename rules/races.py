@@ -648,8 +648,11 @@ def validate(entry: dict) -> list[str]:
                             f"of {', '.join(pools[choice])}.")
     for eid, n in taken.items():
         ev = cat[eid]
-        if n > int(ev.get("takes", 1) or 1):
-            problems.append(f"{ev['name']}: may be taken {ev.get('takes', 1)} time(s), not {n}.")
+        # Once-only evolutions stay once-only; a repeatable one has no ceiling — "I
+        # should be able to have as many arms and legs as I want" (2026-09-08). The
+        # summoner's own per-level limits are the summoner's, not a race's.
+        if int(ev.get("takes", 1) or 1) == 1 and n > 1:
+            problems.append(f"{ev['name']}: may be taken once, not {n} times.")
         for need in ev.get("needs") or []:
             if need not in taken:
                 problems.append(f"{ev['name']} needs {cat.get(need, {}).get('name', need)} "
@@ -886,8 +889,8 @@ def catalogue() -> dict:
         "skills": sorted(SKILLS), "ability_options": list(ABILITY_OPTIONS),
         "evolutions": sorted(evolutions().values(),
                              key=lambda e: (e.get("group", ""), e.get("points", 0), e["name"])),
-        "attacks": ["bite", "claws", "gore", "slam", "pincers", "sting", "tail slap",
-                    "tentacle", "wing buffet"],
+        "attacks": ["unarmed strike", "bite", "claws", "gore", "slam", "pincers", "sting",
+                    "tail slap", "tentacle", "wing buffet"],
         "budget": list(BUDGET_RP),
         "tiers": list(TIERS),
     }

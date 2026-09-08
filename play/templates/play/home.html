@@ -240,9 +240,21 @@
      thin — "so elongated vertically" (2026-09-07). Wider columns, the description
      held to three lines, and the trait line small. */
   .forge .cards.races { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 26px; }
-  .forge .cards.races .card em { display: -webkit-box; -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; line-height: 1.4; }
-  .forge .cards.races .traits { font-size: 12px; line-height: 1.35; }
+  /* Cut, not expanded: one line of traits with an ellipsis, and a details button
+     that opens the whole card (2026-09-08). */
+  .forge .cards.races .traits.clip { font-size: 12px; line-height: 1.35; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .forge .cards.races .cardinfo { display: inline-block; margin-top: 8px; padding: 3px 9px;
+    font-size: 12px; cursor: pointer; }
+  #racecard { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6);
+    align-items: center; justify-content: center; }
+  #racecard.on { display: flex; }
+  #racecard .sheet { max-width: 560px; width: calc(100% - 40px); max-height: 80vh; overflow: auto;
+    padding: 20px 24px; border: 1px solid var(--gold-dim); border-radius: 3px;
+    background: linear-gradient(#191309, #120e09); color: var(--ink); }
+  #racecard h3 { margin: 0 0 6px; color: var(--gold); font: 400 18px/1.2 var(--display); }
+  #racecard p { margin: 8px 0; font: 14px/1.5 var(--body); }
+  #racecard .why { color: var(--dim); font-style: italic; font-size: 13px; }
   /* The forge's own chosen-card rule used to live here at .12 opacity. Being four
      classes deep it beat the general one further down however the order fell, so the
      strongest glow in the sheet was the one nobody could see. Removed at source
@@ -1372,6 +1384,32 @@ function paneCharacters() {
 // a courtesy, and the submit round-trips the whole form and renders every problem at once.
 let FORGE = null;   // { opts, form } while the forge is open
 
+// The whole race card, on demand: the forge's cards show one clipped line and a
+// details button, so twelve races fit on a screen.
+function showRaceCard(id) {
+  const r = FORGE && FORGE.opts.races.find(x => x.id === id);
+  if (!r) return;
+  let box = document.getElementById("racecard");
+  if (!box) {
+    box = document.createElement("div"); box.id = "racecard";
+    box.addEventListener("click", ev => { if (ev.target === box || ev.target.closest("[data-closecard]")) box.classList.remove("on"); });
+    document.body.appendChild(box);
+  }
+  const mods = Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ")
+    || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${c.amount} ${c.from}`).join(", ") || "no adjustments";
+  box.innerHTML = `<div class="sheet">
+    <h3>${esc(r.name)}${r.of ? ` <span class="pill now">of ${esc(r.of)}</span>` : ""}</h3>
+    <div class="why">${esc(r.type || "humanoid")} · ${esc(r.size)} · ${r.speed} ft · ${esc(mods)} · ${r.rp} RP (${esc(r.power || "")})</div>
+    ${r.description ? `<p>${esc(r.description)}</p>` : ""}
+    <p><b>Traits.</b> ${(r.trait_lines || r.traits || []).map(esc).join(" · ") || "none"}</p>
+    ${(r.languages || []).length ? `<p><b>Languages.</b> ${r.languages.map(esc).join(", ")}</p>` : ""}
+    ${(r.heritages || []).length ? `<p><b>Peoples.</b> ${r.heritages.map(h => esc(h.name)).join(", ")}</p>` : ""}
+    ${(r.not_yet || []).length ? `<p class="why">Not on the sheet yet: ${r.not_yet.map(esc).join("; ")}.</p>` : ""}
+    <div style="margin-top:12px"><button class="quiet" data-closecard>close</button></div>
+  </div>`;
+  box.classList.add("on");
+}
+
 function featName(fid) {
   const found = FORGE?.opts.feats.find(x => x.id === fid);
   return found ? found.name : fid;
@@ -1522,8 +1560,8 @@ function paneForge() {
           Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ")
           || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${c.amount} ${c.from}`).join(", ")
           || "no adjustments"} · ${r.rp} RP</div>
-        <div class="traits">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
-        ${r.description && r.of ? `<em>${esc(r.description)}</em>` : ""}
+        <div class="traits clip">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
+        <span class="quiet cardinfo" data-crinfo="${esc(r.id)}" title="the whole card">details</span>
       </button>`).join("")}</div>
     ${race && (race.choose || []).length ? `
       <p class="note" style="margin-top:44px">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
@@ -1853,6 +1891,8 @@ document.addEventListener("click", async e => {
       if (!FORGE.opts.races.some(r => r.id === f.race)) { f.race = ""; f.choices = []; f.heritage = ""; }
       render(); return;
     }
+    const info = e.target.closest("[data-crinfo]");
+    if (info) { e.preventDefault(); e.stopPropagation(); showRaceCard(info.dataset.crinfo); return; }
     const race = e.target.closest("[data-crrace]");
     if (race) { f.race = race.dataset.crrace; f.choices = []; render(); return; }
     const heritage = e.target.closest("[data-crheritage]");

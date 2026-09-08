@@ -161,7 +161,10 @@ function fromDoc(doc) {
   Object.keys(d.mods).forEach(a => { d.mods[a] = Number((doc.mods || {})[a] || 0); });
   d.budget = { feats: Number((doc.budget || {}).feats || 0), ranks: Number((doc.budget || {}).ranks || 0) };
   d.languages = (doc.languages || []).filter(l => CAT.languages.includes(l));
-  d.evolutions = (doc.evolutions || []).map(e => ({ id: e.id, choice: e.choice || "", times: e.times || 1 }));
+  d.evolutions = [];
+  (doc.evolutions || []).forEach(e => {
+    for (let n = 0; n < (e.times || 1); n++) d.evolutions.push({ id: e.id, choice: e.choice || "", times: 1 });
+  });
   d.description = doc.description || "";
   d.origin = doc.origin || "";
   d.people_id = doc.people_id || ""; d.world = doc.world || "";
@@ -226,17 +229,24 @@ function draw() {
     <p class="note">Advanced Player's Guide. Free of cost here; the summoner's points are shown for the record. What the sheet cannot read yet is said on the card rather than dropped.</p>
     ${groups.map(g => `<h3 style="margin:14px 0 0;color:var(--dim);font:italic 13px var(--body)">${cap(g)}</h3>
       <div class="grid">${CAT.evolutions.filter(e => e.group === g).map(ev => {
-        const taken = D.evolutions.filter(x => x.id === ev.id);
-        const on = taken.length > 0;
-        const first = taken[0];
+        // One row per take. A repeatable evolution ("I should be able to have as many
+        // arms and legs as I want") gets an add button and every take its own picker,
+        // so three resistances are three energies and not one energy three times.
+        const takes = D.evolutions.map((x, i) => ({ ...x, i })).filter(x => x.id === ev.id);
+        const on = takes.length > 0;
         const opts = choicesFor(ev);
+        const repeatable = ev.takes > 1;
         return `<div class="evo ${on ? "on" : ""}">
           <label class="chk" style="margin:0"><input type="checkbox" data-evo="${ev.id}" ${on ? "checked" : ""}>
-            <b>${esc(ev.name)}</b> <span style="color:var(--dim)">· ${ev.points} pt</span></label>
-          <small>${esc(ev.line.replace("$choice", first && first.choice ? first.choice : "…"))}${ev.needs ? ` — needs ${ev.needs.join(", ")}` : ""}</small>
-          ${on && ev.choice ? `<select data-evochoice="${ev.id}"><option value="">— pick the ${ev.choice} —</option>${opts.map(c => `<option value="${c}" ${first.choice === c ? "selected" : ""}>${cap(c)}</option>`).join("")}</select>` : ""}
-          ${on && ev.takes > 1 ? `<div class="times">taken <button type="button" data-times="${ev.id}" data-dir="-1">−</button> ${first.times} <button type="button" data-times="${ev.id}" data-dir="1">+</button> of ${ev.takes}</div>` : ""}
-          ${on && ev.not_yet ? `<small style="margin-top:4px">not yet: ${esc(ev.not_yet.replace("$choice", first.choice || "…"))}</small>` : ""}
+            <b>${esc(ev.name)}</b> <span style="color:var(--dim)">· ${ev.points} pt${repeatable ? " · repeatable" : ""}</span></label>
+          <small>${esc(ev.line.replace("$choice", ev.choice ? "…" : ""))}${ev.needs ? ` — needs ${ev.needs.join(", ")}` : ""}</small>
+          ${takes.map((pk, n) => `<div class="times" style="gap:8px">
+            ${repeatable ? `<span>${n + 1}.</span>` : ""}
+            ${ev.choice ? `<select data-evochoice="${pk.i}" style="margin-top:0"><option value="">— pick the ${ev.choice} —</option>${opts.map(c => `<option value="${c}" ${pk.choice === c ? "selected" : ""}>${cap(c)}</option>`).join("")}</select>` : `<span style="color:var(--dim)">${esc(ev.line)}</span>`}
+            ${repeatable ? `<button type="button" data-drop="${pk.i}" title="remove this one">−</button>` : ""}
+          </div>`).join("")}
+          ${on && repeatable ? `<div class="times"><button type="button" data-add="${ev.id}">+ another</button></div>` : ""}
+          ${on && ev.not_yet ? `<small style="margin-top:4px">not yet: ${esc(ev.not_yet.replace("$choice", takes[0].choice || "…"))}</small>` : ""}
         </div>`; }).join("")}</div>`).join("")}`;
   drawSummary();
 }
@@ -245,7 +255,7 @@ function drawSummary() {
   const lines = [];
   D.evolutions.forEach(e => {
     const ev = CAT.evolutions.find(x => x.id === e.id);
-    if (ev) lines.push(ev.line.replace("$choice", e.choice || "…") + (e.times > 1 ? ` (x${e.times})` : ""));
+    if (ev) lines.push(ev.line.replace("$choice", e.choice || "…"));
   });
   const opt = CAT.ability_options.find(o => o.id === D.option);
   const mods = D.option === "fixed"
@@ -287,7 +297,7 @@ document.addEventListener("change", e => {
   }
   const choice = e.target.closest("[data-evochoice]");
   if (choice) {
-    const pick = D.evolutions.find(x => x.id === choice.dataset.evochoice);
+    const pick = D.evolutions[Number(choice.dataset.evochoice)];
     if (pick) pick.choice = choice.value;
     draw(); return;
   }
@@ -299,13 +309,10 @@ document.addEventListener("click", async e => {
   if (opt) { D.option = opt.dataset.option; draw(); return; }
   const b = e.target.closest("[data-budget]");
   if (b) { D.budget[b.dataset.budget] = D.budget[b.dataset.budget] ? 0 : 1; draw(); return; }
-  const times = e.target.closest("[data-times]");
-  if (times) {
-    const pick = D.evolutions.find(x => x.id === times.dataset.times);
-    const ev = CAT.evolutions.find(x => x.id === times.dataset.times);
-    if (pick && ev) pick.times = Math.max(1, Math.min(ev.takes, pick.times + Number(times.dataset.dir)));
-    draw(); return;
-  }
+  const add = e.target.closest("[data-add]");
+  if (add) { D.evolutions.push({ id: add.dataset.add, choice: "", times: 1 }); draw(); return; }
+  const drop = e.target.closest("[data-drop]");
+  if (drop) { D.evolutions.splice(Number(drop.dataset.drop), 1); draw(); return; }
 });
 
 function fillPicker() {

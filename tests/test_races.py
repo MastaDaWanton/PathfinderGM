@@ -374,3 +374,23 @@ def test_every_shipped_world_race_validates_and_names_its_world():
     assert len(fantasia) == 12
     # Outside its world a world's race is not offered; inside, it is.
     assert "khyzhi" not in {r["id"] for r in options("")["races"]}
+
+
+def test_a_repeatable_evolution_has_no_ceiling_and_each_take_keeps_its_own_pick():
+    """"in every case that I can choose the evolution again it needs to be the full
+    picking. I should be able to have as many arms and legs as I want." Four pairs of
+    legs validate and add forty feet; three resistances to three energies are three
+    picks; a once-only evolution taken twice is still refused."""
+    doc = {"name": "Many", "choose": list(races.STANDARD_CHOOSE),
+           "evolutions": [{"id": "limbs-legs"}] * 4
+                         + [{"id": "resistance", "choice": "fire"}, {"id": "resistance", "choice": "cold"},
+                            {"id": "resistance", "choice": "acid"}, {"id": "skilled", "choice": "stealth"},
+                            {"id": "skilled", "choice": "perception"}]}
+    assert races.validate(doc) == []
+    d = races.derive(doc)
+    assert d["speed"] == 70
+    assert {"resist.fire.5", "resist.cold.5", "resist.acid.5"} <= set(d["tags"])
+    assert [m["target"] for m in d["modifiers"] if m["type"] == "skill_mod"] == ["stealth", "perception"]
+    twice = races.validate({"name": "x", "evolutions": [{"id": "gills"}, {"id": "gills"}]})
+    assert any("once" in p for p in twice)
+    assert "unarmed strike" in races.catalogue()["attacks"]
