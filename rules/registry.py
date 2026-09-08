@@ -172,8 +172,18 @@ KINDS: dict[str, Kind] = {
     ),
     "npcs": Kind(
         id="npcs", label="NPCs", folder="npcs", key="npcs",
+        # The NPC codex (docs/npc-codex.md): one file per world character, written by
+        # the scheme chooser the first time that person is put on the board and read
+        # every time after, so the same person has the same numbers. The file's id is
+        # the world entity's id; correcting `creature` here is how a table overrules
+        # the chooser.
         fields=_named() + [
-            Field("creature", "Stat block", help="A creature id this NPC uses."),
+            Field("creature", "Stat block",
+                  help="A creature id this NPC plays as — the codex chooser's pick, or "
+                       "yours."),
+            Field("world_entity_id", "World entity",
+                  help="The id of the person in the world export; the file is named by it."),
+            Field("role", "Role", help="What the block was chosen as, in words."),
             Field("wants", "What they want", type="textarea"),
             Field("knows", "Who they know", type="textarea"),
             # `biomes`, not `environment`, so it means the same thing here as it does on a
