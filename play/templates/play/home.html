@@ -1193,7 +1193,7 @@ function paneRules() {
     <div class="cards tight">${RULES.tiers.map(t => `
       <button class="card pick ${r.point_buy === t.points ? "on" : ""}"
               data-hbtier="${t.points}">
-        <h3>${t.points ? `${t.points} points` : "Unlimited"}</h3>
+        <h3>${t.points ? `${t.points} points` : "Unlimited points"}</h3>
         <em>${esc(t.name)}${t.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
 
@@ -1216,7 +1216,7 @@ function paneRules() {
       seven are offered beside a world's own peoples at all.</p>
     <div class="cards tight">${(RULES.race_tiers || []).map(t => `
       <button class="card pick ${r.race_rp === t.rp ? "on" : ""}" data-hbracerp="${t.rp}">
-        <h3>${t.rp ? `${t.rp} RP` : "Unlimited"}</h3>
+        <h3>${t.rp ? `${t.rp} RP` : "Unlimited RP"}</h3>
         <em>${esc(t.name)} · ${esc(t.note || "")}</em>
       </button>`).join("")}</div>
     <button class="card pick ${r.core_races === false ? "" : "on"}" data-hbcore="1"
@@ -1633,7 +1633,7 @@ function paneForge() {
       }).join("")}</div>` : ""}
 
     <h2 class="sect">Abilities</h2>
-    <p class="note">Point buy, ${opts.point_budget ? `${opts.point_budget} points` : "unlimited"}. The race lands after.
+    <p class="note">Point buy, ${opts.point_budget ? `${opts.point_budget} points — the Rulesets bench under Homebrew sets the tier, Unlimited included` : "unlimited"}. The race lands after.
       ${opts.ability_cap
         ? `No score above ${opts.ability_cap} before race.`
         : `No ceiling on a single score — the budget is the only wall.`}</p>
