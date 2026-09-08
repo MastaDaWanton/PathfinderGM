@@ -20,6 +20,7 @@ from django.conf import settings
 
 from rules import feats as feats_mod
 from rules import ingredients, registry, spells, worldclass
+from rules import npcs as npcs_mod
 from rules import races as races_mod
 from rules import schemes as schemes_mod
 from rules import bestiary
@@ -200,9 +201,19 @@ def benches() -> list[Bench]:
                   "docs/homebrew-rules.md.",
         ),
         Bench(
-            id="npcs", name="NPCs", dir="npcs", ready=False, shipped=0,
-            blurb="A creature plus the world-facing facts: who they are, what they want, "
-                  "who they know. Authored here, placed in a world.",
+            id="npcs", name="NPCs", dir="npcs",
+            # Collapsed people, not raw blocks: 3,515 humanoid rungs fold into 3,063
+            # once the Society subtiers and the iconics' levels are one ladder each.
+            shipped=npcs_mod.humanoid_count(),
+            shipped_label="people in the codex to choose from",
+            blurb="The NPC codex: which stat block a person from the world plays as. A "
+                  "scheme that needs a guard officer or a merchant asks the chooser "
+                  "for a block by role words near the party's level, and a cast "
+                  "member's pick is written here so they have the same numbers next "
+                  "time. Correct the creature id to overrule it. docs/npc-codex.md.",
+            waiting="Entries appear as the world's people are put on the board; nothing "
+                    "is written until a scheme casts someone. Only humanoid blocks of "
+                    "small or medium size are offered as people.",
         ),
         Bench(
             id="spells", name="Spells", dir="spells",
@@ -334,6 +345,21 @@ def rows_for(bench_id: str) -> list[dict]:
                          "note": (f"{len(d.get('steps') or [])} steps · "
                                   f"{len(d.get('slots') or {})} slots · "
                                   + (f"refused: {problems[0]}" if problems else "validates"))})
+    elif bench_id == "npcs":
+        # The generic loop above listed the codex files by name with the file name as
+        # the note; the note that matters here is which block, as what, for whom — and
+        # whether the block still exists, since a homebrew creature can be deleted out
+        # from under an entry and the chooser will silently pick again.
+        for row in rows:
+            e = npcs_mod.recall(row["id"])
+            if not e:
+                continue
+            block = bestiary.details(str(e.get("creature") or ""))
+            row["kind"] = "codex"
+            row["note"] = (f"plays as {e.get('creature')}"
+                           + (f" (CR {block.get('cr', '?')})" if block else " — no such creature")
+                           + (f" · {e['role']}" if e.get("role") else "")
+                           + f" · world entity {e.get('world_entity_id', '')}")
     elif bench_id == "worldclasses":
         rows += [{"name": t.name, "kind": "track", "mine": False, "id": k,
                   "note": f"{t.max_level} levels · "

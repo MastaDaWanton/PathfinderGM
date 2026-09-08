@@ -259,12 +259,19 @@ def validate(doc: dict) -> list[str]:
 
 # --- slot filling -----------------------------------------------------------------------------
 
+# Two readers. The cast is matched by substring, in any order; the codex chooser
+# (`rules/npcs.py`) weighs them in THIS order, first word heaviest, so "someone of
+# standing" is a noble before a sail master. A relationship is not a job — no codex
+# has a block called "sister" that means one — so the kin words end in what the kin of
+# a villager most often is, and the person's own name and world id still come from the
+# cast; only the numbers come from the block.
 _ROLE_WORDS = {
     "trader": ("trader", "merchant", "shopkeeper", "stallholder", "dealer", "seller"),
     "fixer": ("fixer", "broker", "factor", "agent"),
-    "kin": ("kin", "sibling", "cousin", "son", "daughter", "brother", "sister"),
-    "guard officer": ("captain", "sergeant", "guard", "watch"),
-    "standing": ("elder", "noble", "councillor", "master", "chief", "lord", "lady", "priest"),
+    "kin": ("kin", "sibling", "cousin", "son", "daughter", "brother", "sister",
+            "farmer", "villager", "commoner"),
+    "guard officer": ("guard", "captain", "sergeant", "watch", "officer", "constable"),
+    "standing": ("elder", "noble", "councillor", "lord", "lady", "chief", "priest", "master"),
     "companion": ("companion",),
 }
 
@@ -309,24 +316,39 @@ def _cast_candidates(engine) -> list[dict]:
 
 def _role_for(engine, name: str, spec: dict, filled: dict, taken: set) -> dict | None:
     """A person for the role: a cast member of this place when there is one (grounded,
-    their own name), else the townsfolk floor with a name from the world's naming
-    (phase 3 brings the codex chooser). Placed where the slot says."""
+    their own name and world id), else nobody in particular named by the role. Either
+    way the numbers come from the codex chooser — a stat block by the role's words
+    near the party's level, docs/npc-codex.md — and a cast member's block is remembered
+    in `homebrew/npcs/` so they have the same numbers next time. Placed where the slot
+    says."""
+    from . import npcs
     from .bestiary import instantiate
 
     scene = engine.scene
-    words = _ROLE_WORDS.get(str(spec.get("role") or ""), (str(spec.get("role") or ""),))
+    role = str(spec.get("role") or "")
+    words = _ROLE_WORDS.get(role, (role,))
     cast = [c for c in _cast_candidates(engine) if c.get("id") not in taken]
     pick = next((c for c in cast if any(w in str(c.get("role", "")).lower() for w in words)), None)
     if pick is None and cast:
         # Deterministic: the cast in its own order, so the same world fills the same slot.
         pick = cast[len(taken) % len(cast)]
-    template = "guildhand" if spec.get("role") != "guard officer" else "watchman"
+    pc = scene.pc()
+    level = int(getattr(pc, "level", 1) or 1)
+    # A slot may say `"named": true` for a person who should not be "Guard" — a rival
+    # with a story block's numbers, name stripped, story left behind.
+    named = bool(spec.get("named"))
     if pick is not None:
+        template = npcs.block_for(str(pick["id"]), words, level, str(pick["name"]),
+                                  prefer_named=named)
         actor = instantiate(template, scene=scene, name=str(pick["name"]),
                             world_entity_id=str(pick["id"]))
         taken.add(str(pick["id"]))
     else:
-        actor = instantiate(template, scene=scene)
+        # Named by the role asked for, not by the block: a Game Mastery Guide "Guard"
+        # is a fine name in any world and an Inner Sea "Thrune Agent" is not.
+        got = npcs.choose(words, level, prefer_named=named) or {}
+        actor = instantiate(str(got.get("id") or "guildhand"), scene=scene,
+                            name=role or str(got.get("role") or "someone"))
     scene.add(actor)
     where = spec.get("at")
     if where and where.startswith("$") and where[1:] in filled and filled[where[1:]].get("id"):
