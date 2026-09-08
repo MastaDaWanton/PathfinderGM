@@ -55,6 +55,39 @@ INERT_FACTOR = 0.25
 # usual half, which is where a haggle has room to move.
 SHOP_BUYS_AT = 0.5
 
+# What the counter charges somebody the watch is looking for — THIS APP'S rule, not the
+# book's. The Core Rulebook prices goods and never asks who is buying; Ultimate
+# Campaign's Reputation and Fame runs from -100 to 100 and spends prestige for favours
+# without touching a price. The video-game traditions split: Skyrim keeps a bounty per
+# hold and never moves a merchant's prices, Fallout: New Vegas has merchants refuse the
+# Vilified outright and charges nothing extra in between. Neither gives a "suspected"
+# any teeth, and this app needs a lesser state that bites without shutting a door.
+#
+# So a markup, stated once here. Half again for a wanted character — the price of a
+# stallholder's silence, and enough that a fugitive feels it on every jar without being
+# unable to buy bread — and a quarter for the merely suspected. The counter's own
+# refusal (`play/views.py`, the trade panel) is the harder answer for the wanted, and
+# the markup is what the narrated road pays when nobody refuses. Applied to what a shop
+# charges AND to what it pays: a fence pays a wanted man less for the same reason it
+# charges him more.
+WANTED_MARKUP = 1.5
+SUSPECTED_MARKUP = 1.25
+
+
+def markup_for(buyer, town) -> float:
+    """What the counter multiplies by for this person, in this town. 1.0 for anybody
+    the watch has nothing on. Asks the vocabulary through `states.standing_with_the_law`
+    — never a tag spelled here — so the name cleared by one `remove_effects(source=...)`
+    is a name cleared at every counter."""
+    from . import states
+
+    law = states.standing_with_the_law(buyer, town)
+    if law == "wanted":
+        return WANTED_MARKUP
+    if law == "suspected":
+        return SUSPECTED_MARKUP
+    return 1.0
+
 
 def _tier_base(tier: str) -> float:
     """Anything untiered is common. The only safe direction: a thing with no rarity
@@ -89,13 +122,21 @@ def _field(item, name, default=None):
     return getattr(item, name, default)
 
 
-def worth(item) -> float:
+def worth(item, *, buyer=None, town="") -> float:
     """What one of these is worth on an open counter, in gold.
 
     An authored price wins outright. `price_gp` is a fact somebody wrote down about a
     real material — quicklime is 1gp because the catalogue says so — and a formula that
     overrode it would be guessing over the top of an answer it already had.
+
+    `buyer` and `town` are who is asking and where: the counter marks a wanted or a
+    suspected character up (`markup_for`). Left out, the answer is the open price —
+    what the shelf is drawn against and what a catalogue prints.
     """
+    return round(_open_worth(item) * markup_for(buyer, town), 2)
+
+
+def _open_worth(item) -> float:
     authored = _field(item, "price_gp")
     if authored not in (None, "", 0):
         try:
@@ -111,9 +152,11 @@ def worth(item) -> float:
     return round(price, 2)
 
 
-def what_a_shop_pays(item) -> float:
-    """What a stallholder offers for it. Half, and a haggle moves from there."""
-    return round(worth(item) * SHOP_BUYS_AT, 2)
+def what_a_shop_pays(item, *, seller=None, town="") -> float:
+    """What a stallholder offers for it. Half, and a haggle moves from there — and
+    less again from somebody the watch wants, by the same factor the shelf charges
+    them more."""
+    return round(_open_worth(item) * SHOP_BUYS_AT / markup_for(seller, town), 2)
 
 
 def coin(gold: float) -> dict[str, int]:

@@ -71,6 +71,46 @@ from __future__ import annotations
 # A card that puts a state on a person does it as an ActiveEffect through the one
 # applicator, source `card:<id>`, so `has_state("situation")` on an actor answers for
 # every card-granted tag the way it answers for a condition.
+#
+# The law's opinion of a person, per town (docs/wanted.md, docs/quest-schemes-plan.md
+# §6.6):
+#
+#   state.wanted.<town>     the watch has a name and a warrant: the gate is shut to
+#                           them, the counter charges them for silence or refuses,
+#                           and a guard who sees a fight start takes the other side
+#   state.suspected.<town>  the lesser: a name on the watch's lips. Prices up, a
+#                           warning at the gate, and nothing refused
+#
+# `<town>` is `town_tag(location_id)` — the world's durable id for the settlement,
+# lowered and made safe for a tag path — and never the town's name: two towns can share
+# a name and one town can be renamed, and either would make a warrant land on the
+# wrong ground. Skyrim keeps its bounty per hold for the same reason (a Falkreath crime
+# is nothing to a Winterhold guard) and it is the shape a scheme wants: "A Small Favour"
+# makes you wanted where the favour went wrong, not everywhere.
+#
+# Not in TAGS and not in the condition table, on purpose. A condition key is one fixed
+# state with one fixed set of tags; these are a FAMILY with the town in the leaf, so
+# there is no row to write. They exist only as an `ActiveEffect` through the one
+# applicator (kind `situation`, `until-dismissed`, tags `("state.wanted.<town>",)`),
+# with a source that says who said so — `scheme:<id>/<outcome>` or `rule:<id>` — and
+# `Actor.remove_effects(source=...)` is how a name gets cleared: the one record goes
+# and every bite evaporates, which `tests/test_wanted.py` proves. `wanted_tag` and
+# `suspected_tag` are the only writers of the tag text, so a grant and a reader cannot
+# spell the town differently.
+#
+# Under `state.*` because it IS a state of the actor that readers refuse on — the gate
+# is a refusal with the fix named — but deliberately outside `state.down`,
+# `state.unable` and every `recovery.*` family: a warrant does not stop an action, and
+# a night's sleep must not clear it. `test_a_warrant_is_not_slept_off` holds that line.
+#
+#   role.guard   whoever keeps the law here — the watchman template carries it by
+#                kind, and a document or the GM may grant it to a named person. The
+#                reader is `Engine._law_joins`: a fight that starts in the town where
+#                the player is wanted brings every guard in on the other side.
+WANTED = "state.wanted"
+SUSPECTED = "state.suspected"
+GUARD = "role.guard"
+
 TAGS: dict[str, tuple[str, ...]] = {
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
     "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
@@ -155,6 +195,44 @@ def attitude_of(actor, default: str = "") -> str:
         if actor is not None and actor.has_state(f"attitude.{step}"):
             return step
     return default
+
+
+def town_tag(location_id) -> str:
+    """The tag leaf for a settlement: its durable id, lowered, with anything that is
+    not a letter, a digit or a hyphen folded to a hyphen. A dot in particular must go —
+    it is the boundary `matches` splits on, so an id carrying one would read as two
+    levels of family."""
+    text = str(location_id or "").strip().lower()
+    out = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in text).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out
+
+
+def wanted_tag(location_id) -> str:
+    """`state.wanted.<town>` — the one spelling, for granters and readers alike."""
+    return f"{WANTED}.{town_tag(location_id)}"
+
+
+def suspected_tag(location_id) -> str:
+    return f"{SUSPECTED}.{town_tag(location_id)}"
+
+
+def standing_with_the_law(actor, location_id) -> str:
+    """"wanted", "suspected" or "" — what this town's watch holds against this person.
+
+    One reader for one question, the same rule `attitude_of` lives under, so no gate,
+    counter or guard ever spells the tag itself. A warrant in another town answers
+    nothing here: the query carries the town, and `has_state` is a prefix match at a
+    dot boundary, so `state.wanted.abc` does not answer for `state.wanted.abcd`.
+    """
+    if actor is None or not town_tag(location_id):
+        return ""
+    if actor.has_state(wanted_tag(location_id)):
+        return "wanted"
+    if actor.has_state(suspected_tag(location_id)):
+        return "suspected"
+    return ""
 
 
 def tags_for(key: str) -> tuple[str, ...]:

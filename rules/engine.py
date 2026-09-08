@@ -2516,6 +2516,7 @@ class Engine:
         self._lay_battlefield(sides)
         if target:
             self.rally(target)
+        self._law_joins()
         return True
 
     # Templates whose people fight for each other. A guard comes to a guard's aid; a
@@ -2574,6 +2575,43 @@ class Engine:
             same_kind = kind and b.from_template == kind
             if (same_name or same_kind) and self.join_fight(other, side):
                 joined.append(other)
+        return joined
+
+    def _law_joins(self) -> list[str]:
+        """The guards who come in against a wanted player when a fight starts in the
+        town that wants them (docs/wanted.md, reader three).
+
+        Through `join_fight`, the one door — the same one `rally` uses — so a guard
+        joining arrives with an initiative roll, a side and a square like anybody else.
+        Who counts as the law is the vocabulary's answer, `role.guard`, or the watchman
+        template by kind; a merchant watching from the stall does not draw. The town is
+        read off the ground the fight is on, so a warrant in the last town brings no
+        guard in here, and only a bystander joins: a guard already on the player's side
+        (an escort the GM sided) is left where they were put.
+
+        Called from `_ensure_encounter`, the door a first swing opens the fight by. A
+        fight the GM declares through `begin_encounter` names its own sides and is not
+        second-guessed here — noted as open in docs/wanted.md.
+        """
+        from . import places as places_mod
+
+        if not self.scene.in_encounter:
+            return []
+        town = places_mod.location_of(self.scene.at) or self.scene.location_id
+        hunted = [r for r, a in self.scene.actors.items()
+                  if a.is_pc and states.standing_with_the_law(a, town) == "wanted"]
+        if not hunted:
+            return []
+        pc_side = next((s for s, refs in self.scene.sides.items()
+                        if any(r in refs for r in hunted)), None)
+        against = next((s for s in self.scene.sides if s != pc_side), "them")
+        joined = []
+        for ref, b in list(self.scene.actors.items()):
+            if b.is_pc or b.is_down:
+                continue
+            is_law = b.has_state(states.GUARD) or b.from_template == "watchman"
+            if is_law and self.join_fight(ref, against):
+                joined.append(ref)
         return joined
 
     def _has_acted(self, ref: str) -> bool:
@@ -3422,6 +3460,46 @@ class Engine:
         was_place = self.scene.at
         was_ground = here.terrain
         moved = going_to.id != was_place
+
+        # The gate reads the warrant (docs/wanted.md, reader one). The town is the one
+        # whose ground the party is standing on — read off the place id, and off the
+        # scene's location only when the id cannot say — so a warrant from the last
+        # town does not shut this one's gate. Two ways out are watched: the gate
+        # itself, by name, and the open road, which is a travel by BIOME off urban
+        # ground. A travel by place to somewhere already made outside the walls — the
+        # cave the party ventured into yesterday — is not watched; nor is `venture`,
+        # which has its own op. That is the "another way" the refusal names, and the
+        # only reason the refusal can be honest about a way out existing.
+        #
+        # A refusal, printed: the player may not know the warrant reached the gate,
+        # and the fix is named — the founded and ventured ground, or clear the name.
+        # Suspected is a line in the tell, never a refusal: the watch looks twice and
+        # lets you through, which is the difference between the two states.
+        law_line = ""
+        if moved and pc is not None:
+            town = places_mod.location_of(was_place) or self.scene.location_id
+            law = states.standing_with_the_law(pc, town)
+            at_gate = " ".join(going_to.name.split()).lower().removeprefix("the ") == "gate"
+            open_road = bool(want) and was_ground == places_mod.URBAN \
+                and going_to.terrain != places_mod.URBAN
+            if law and (at_gate or open_road):
+                found = self.world.get(self.scene.location_id) if self.world else None
+                town_name = str(getattr(found, "name", "") or "the town")
+                if law == "wanted":
+                    other_ways = [p.name for p in known
+                                  if p.origin and not p.described_only
+                                  and p.terrain != places_mod.URBAN]
+                    how = (f"Leave by another way — {', '.join(other_ways)} — or "
+                           f"clear your name."
+                           if other_ways else
+                           "Leave by another way — ground you have founded or "
+                           "ventured into outside the walls — or clear your name.")
+                    return self._refuse(
+                        intent, f"{pc.name} is wanted in {town_name}, and the gate is "
+                                f"where the watch stands: they would take you at the "
+                                f"arch. {how}")
+                law_line = (f"Your name is on the watch's lips in {town_name}: the "
+                            f"guards at the gate look twice, and let you through.")
         left: list[str] = []
         stayed_down: list[str] = []
         fight_ended = False
@@ -3476,6 +3554,8 @@ class Engine:
         bits.extend(dying_tells)
         if left:
             bits.append(f"Left behind: {', '.join(left)}.")
+        if law_line:
+            bits.append(law_line)
         if note:
             bits.append(note)
         return Outcome(

@@ -1709,6 +1709,30 @@ def _merchant_here(scene):
     return None
 
 
+def _counter_refusal(c, pc):
+    """The merchant's answer to a wanted character: no, with the reason named. Else
+    None (docs/wanted.md, reader two).
+
+    The panel's half of the price reader. Prices for the suspected go up through
+    `pricing.markup_for` and nobody refuses them; for the wanted the stallholder will
+    not be seen trading — Fallout: New Vegas's merchants do the same to the Vilified —
+    and says so, so the player knows which town's name to clear. Both doors of the
+    counter ask this one helper, for the reason `_cannot_act` gives: a rule with two
+    homes drifts. Asked through the vocabulary, so the one `remove_effects(source=...)`
+    that clears the name reopens the counter with nothing else touched.
+    """
+    from rules import states
+
+    merchant = _merchant_here(c.scene)
+    town = str(c.scene.location_id or "")
+    if merchant is None or states.standing_with_the_law(pc, town) != "wanted":
+        return None
+    return JsonResponse({"error": (
+        f"{merchant.name} looks at {pc.name} and then at the door. {pc.name} is "
+        f"wanted here, and nobody keeping a counter will be seen trading with them. "
+        f"Clear your name, or trade somewhere the watch is not looking.")}, status=409)
+
+
 def _stall_of(c) -> tuple[str, str, int]:
     """Which shop, on which day. Read the same way `craft_views` reads it, so a stall's
     money and its stock agree about where and when this is.
@@ -1741,7 +1765,7 @@ def _row(item, price: float, count: int = 1) -> dict:
 @require_POST
 def trade(request):
     """Both sides of a counter: what you are carrying, and what they have."""
-    from rules import goods, market, pricing
+    from rules import goods, market, pricing, states
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1753,6 +1777,9 @@ def trade(request):
             "There is nobody here to trade with. Find a stall and speak to whoever "
             "keeps it — or simply say what you sell or buy, and the scene handles "
             "it.")}, status=409)
+    refusal = _counter_refusal(c, pc)
+    if refusal:
+        return refusal
 
     body = read_body(request)
     place, stall, day = _stall_of(c)
@@ -1770,11 +1797,16 @@ def trade(request):
         "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
         # Yours, at what a shop would pay — which is the number that matters when the
         # question is what you can get for it, not what it is worth.
+        # Priced for THIS buyer in THIS town: a suspected character sees the markup
+        # (`pricing.markup_for`) on both columns, which is the whole of what
+        # "suspected" costs at a counter that does not refuse them.
         "mine": sorted(
-            (_row(s, pricing.what_a_shop_pays(s), s.count) for s in pc.stock.values()),
+            (_row(s, pricing.what_a_shop_pays(s, seller=pc, town=place), s.count)
+             for s in pc.stock.values()),
             key=lambda r: -r["gp"]),
-        "theirs": sorted((_row(m, pricing.worth(m)) for m in counter),
+        "theirs": sorted((_row(m, pricing.worth(m, buyer=pc, town=place)) for m in counter),
                          key=lambda r: -r["gp"]),
+        "law": states.standing_with_the_law(pc, place),
     })
 
 
@@ -1798,6 +1830,9 @@ def trade_do(request):
     if _merchant_here(c.scene) is None:
         return JsonResponse({"error": "There is nobody here to trade with."},
                             status=409)
+    refusal = _counter_refusal(c, pc)
+    if refusal:
+        return refusal
 
     body = read_body(request)
     op = str(body.get("op", "")).strip().lower()
