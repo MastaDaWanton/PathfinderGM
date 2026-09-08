@@ -232,6 +232,10 @@ class Scene:
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
     # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
     founded: list[dict] = field(default_factory=list)
+    # The schemes running in this campaign (rules/schemes.py): one instance per opened
+    # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
+    # like `founded`, because play made it; read back through the one ticker.
+    schemes: list[dict] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -1739,7 +1743,26 @@ class Engine:
         # resume continues the same declared turn — a battle joined before the player
         # was handed a die is still the battle this batch joined.
         self._battle_joined = False
-        return self._drive([i.as_dict() for i in intents], [], {})
+        return self._tick_schemes(self._drive([i.as_dict() for i in intents], [], {}))
+
+    def _tick_schemes(self, resolution: "Resolution") -> "Resolution":
+        """After a batch resolves, the world's schemes get their tick (rules/schemes.py):
+        the steps whose criteria now hold are candidates, the most specific fires, and
+        a step the player could witness comes back as an outcome with a tell — a step
+        they could not stays silent, on the log and the secret card only. Skipped
+        while a roll is waiting: the batch is not over."""
+        if resolution.awaiting:
+            return resolution
+        from . import schemes as schemes_mod
+
+        try:
+            extra = schemes_mod.tick(self, resolution.outcomes)
+        except Exception as exc:  # noqa: BLE001 — a scheme must never take the turn down
+            extra = [Outcome(intent_id="", op="scheme", effects=[{"kind": "scheme_error",
+                                                                   "error": str(exc)}],
+                             tell="", because="")]
+        resolution.outcomes.extend(extra)
+        return resolution
 
     def resume(self, face: int) -> Resolution:
         """Continue a suspended list with the face the player rolled."""
@@ -1753,7 +1776,7 @@ class Engine:
         self.scene.pending_intents = []
         self.scene.pending_outcomes = []
         self.scene.pending_partial = {}
-        return self._drive(remaining, done, partial)
+        return self._tick_schemes(self._drive(remaining, done, partial))
 
     def _drive(self, remaining: list[dict], done: list[dict], partial: dict) -> Resolution:
         outcomes = [_rehydrate(o) for o in done]

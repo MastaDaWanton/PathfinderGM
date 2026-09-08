@@ -80,6 +80,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from play import opening_prose
 
     monkeypatch.setattr(opening_prose, "ENABLED", False)
+    # And the quest schemes, for the same reason: "The lost thing" opens at any
+    # market, which a test about hit points did not ask for. tests/test_schemes.py
+    # turns it back on.
+    from rules import schemes as schemes_mod
+
+    monkeypatch.setattr(schemes_mod, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

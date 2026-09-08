@@ -62,7 +62,10 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             "core_races": True,
             # How strong a race the forge accepts, in the Advanced Race Guide's race
             # points: 10 is the Race Builder's standard tier, the Core seven's own.
-            "race_rp": 10}
+            "race_rp": 10,
+            # The table's own debugging view of the quest schemes running — what fired
+            # and why. Off by default: it shows the GM's secrets, and is never the brief.
+            "gm_view": False}
 
 # What the character forge offers everybody. Two, because that is what the table asked
 # for: "male and female should be the only options default".
@@ -112,6 +115,7 @@ def active() -> dict:
         except (TypeError, ValueError):
             pass
         out["core_races"] = bool(raw.get("core_races", DEFAULTS["core_races"]))
+        out["gm_view"] = bool(raw.get("gm_view", False))
         # Re-read the same way it is written. `set_active` validated these on the way in,
         # and a key this function does not name is silently dropped — which is the point
         # of the whitelist and was why a saved set came back as the defaults.
@@ -142,6 +146,8 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
         current["magic_stacking"] = bool(updates["magic_stacking"])
     if "core_races" in updates:
         current["core_races"] = bool(updates["core_races"])
+    if "gm_view" in updates:
+        current["gm_view"] = bool(updates["gm_view"])
     if "race_rp" in updates:
         from . import races as races_mod
 
@@ -194,6 +200,10 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
     if not problems:
         _path().write_text(json.dumps(current, indent=2), encoding="utf-8")
     return active(), problems
+
+
+def gm_view() -> bool:
+    return bool(active().get("gm_view", False))
 
 
 def core_races() -> bool:

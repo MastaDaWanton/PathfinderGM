@@ -138,7 +138,7 @@ def test_the_rules_endpoint_round_trips(client):
                           "ability_cap": 18, "pronoun_sets": [],
                           # The Core seven offered beside a world's races, and the
                           # Race Builder's standard tier as the forge's ceiling.
-                          "core_races": True, "race_rp": 10}
+                          "core_races": True, "race_rp": 10, "gm_view": False}
     assert d["tiers"][-1]["points"] == 100
     assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40]
 
@@ -148,7 +148,7 @@ def test_the_rules_endpoint_round_trips(client):
     assert r.status_code == 200
     assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True,
                                  "ability_cap": 18, "pronoun_sets": [],
-                                 "core_races": True, "race_rp": 10}
+                                 "core_races": True, "race_rp": 10, "gm_view": False}
 
     # The race tier and the Core-seven switch come back too. Measured 2026-09-07: the
     # 20 and 40 RP buttons on the Rulesets bench could be pressed and never held,

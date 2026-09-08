@@ -131,6 +131,8 @@ def _state(c) -> dict:
     pc = c.scene.pc()
     from rules import cards as cards_mod
     from rules import goods as goods_mod
+    from rules import houserules as houserules_mod
+    from rules import schemes as schemes_mod
 
     coins = goods_mod.coinage(c.world, c.location)
     return {
@@ -144,6 +146,9 @@ def _state(c) -> dict:
         # The quest log: the tasks taken up, their objectives ticked or not, and the
         # ones finished — read off the situation cards of kind quest.
         "quests": cards_mod.quest_log(c.scene),
+        # The schemes running, for the table's own eyes only when the house rule says
+        # so — what fired, what was skipped and why, what news is on its way.
+        "schemes": (schemes_mod.gm_view(c.scene) if houserules_mod.gm_view() else None),
         # Whether the trade panel would open, decided here so the button and the
         # endpoint cannot disagree — the rule lives in `_merchant_here` and nowhere else.
         "merchant": (_merchant_here(c.scene).name if _merchant_here(c.scene) else ""),

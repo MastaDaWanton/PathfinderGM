@@ -35,6 +35,7 @@ CONTENT_DIRS = [
     "feats",
     "rules",       # stage 8d: the hazard rows GM fiat cites (content/rules/hazards.json)
     "races",       # the Core seven as documents (content/races/core.json, rules/races.py)
+    "schemes",     # authored quest schemes (content/schemes, rules/schemes.py)
     "ingredients",
     "materials",
     "spells",

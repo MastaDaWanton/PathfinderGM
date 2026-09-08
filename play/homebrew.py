@@ -21,6 +21,7 @@ from django.conf import settings
 from rules import feats as feats_mod
 from rules import ingredients, registry, spells, worldclass
 from rules import races as races_mod
+from rules import schemes as schemes_mod
 from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
@@ -182,6 +183,16 @@ def benches() -> list[Bench]:
                   "forge offers them in that world.",
         ),
         Bench(
+            id="schemes", name="Quest schemes", dir="schemes",
+            shipped=len(schemes_mod.shipped()), shipped_label="shipped",
+            blurb="Authored, world-agnostic stories the world does to the player: slots "
+                  "filled from the world's own people and places, steps that fire on "
+                  "what the engine can measure, outcomes that are effects. "
+                  "docs/quest-schemes-plan.md is the design.",
+            waiting="Listed and validated here; the editor of pickers is still to come. "
+                    "A file in this folder is read on the next turn.",
+        ),
+        Bench(
             id="feats", name="Feats", dir="feats",
             shipped=len(feats_mod.documents()), shipped_label="with a mechanics document",
             blurb="Named modifiers the sheet applies. A feat that grants a permission "
@@ -316,6 +327,13 @@ def rows_for(bench_id: str) -> list[dict]:
                  for k, d in sorted(((k, races_mod.derive(v))
                                      for k, v in races_mod.shipped().items()),
                                     key=lambda kv: kv[1]["name"])]
+    elif bench_id == "schemes":
+        for k, d in sorted(schemes_mod.shipped().items()):
+            problems = schemes_mod.validate(d)
+            rows.append({"name": d.get("title", k), "kind": "shipped", "mine": False, "id": k,
+                         "note": (f"{len(d.get('steps') or [])} steps · "
+                                  f"{len(d.get('slots') or {})} slots · "
+                                  + (f"refused: {problems[0]}" if problems else "validates"))})
     elif bench_id == "worldclasses":
         rows += [{"name": t.name, "kind": "track", "mine": False, "id": k,
                   "note": f"{t.max_level} levels · "
