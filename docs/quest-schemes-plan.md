@@ -514,3 +514,137 @@ arriving next tick.
 Measured on the way: the give op's effect names the taker as `ref` under kind `give`,
 not the shape the first reader guessed; news with no delay arrived on the same tick
 as the step that made it, which read as one event, so word now takes at least a beat.
+
+---
+
+## 8. "A Small Favour", as authored (2026-09-08)
+
+Written against the §6 grammar as it shipped in §7, by the author agent of §6.10 phase
+3, with `rules/schemes.py` untouched. Five linked schemes in
+`content/schemes/a-small-favour.json`, checked as documents and played in
+`tests/test_a_small_favour.py`, linted by `tools/scheme_lint.py`. Each scheme opens on
+a tag the one before it granted, so the line is five storylets that interlock rather
+than one script, and a later scheme can open on any path that grants its tag.
+
+**Q1 `a-small-favour` — the errand.** Opens at the market after a day of the campaign
+(the first draft opened on `at($market)` alone, which put a second quest card on the
+table in the first tick of every lost-thing test; the day is also a fair pacing: the
+favour is asked of a face the market has seen). Slots: giver (trader, at the market),
+victim (standing, at the market), witness (companion, at the market), captain (guard
+officer, at the gate), patron (a faction from the conflicts), market, lodging, gate,
+road, wild (three hours), errand (an ingredient of the wild ground's biome). The visible
+card is the errand in three objectives; the secret card is the giver's plan. The unease
+is granted at open. Steps: the witness's aside names the victim on the open tick where
+the player stands (perceptible; it is the second fairness tag); the giver shuts the
+stall and hides at the lodging once the player has left the market and an hour has
+passed (silent); reaching and gathering tick the objectives (perceptible); with the
+giver hidden three hours and the player not at the lodging, the victim is brought
+there and killed off-stage, a fact goes to the secret card and gossip is queued for the
+town two hours on (silent); a player who walks into the lodging after that finds the
+body (perceptible, no twist); back at the market holding the errand with the victim
+dead, the captain comes up from the gate with two guards, the errand card fails with
+the guards' words on it and `betrayed` grants `state.suspected` and `knows.betrayed`
+— gated on `knows.giver-uneasy` and `knows.victim-named` being held; reaching the
+lodging while the giver is hidden and the victim alive is `exposed`: the giver bolts for
+the road, the victim's regard rises, `knows.giver-to-find` opens Q3 early. Back within
+the hour, nothing fires: measured in the test, the fired set is the witness's aside
+alone and the giver is at the stall unhidden.
+
+**Q2 `wanted`.** Opens on `knows.betrayed`; grants `state.wanted` at open. Two visible
+cards at once: clear your name (three clues, any two) and leave by the road. The notice
+at the market and the shut gate are perceptible where the player stands. The witness's
+word is a teller at the lodging; the ledger is in the giver's empty room; the coin is
+on the body laid out at the temple. "Any two of three" is three steps, one per pair,
+all firing the one outcome `two-clues`, which grants `knows.giver-to-find`. The witness
+also offers the way past the gate (a fourth criterion, so by salience it fires the tick
+after the word, before the ledger — measured); going out by the road with it is `fled`,
+which costs the captain's regard.
+
+**Q3 `the-one-who-paid`.** Opens on `knows.giver-to-find` from either Q1's `exposed` or
+Q2's `two-clues` (an OR the grammar cannot write, done by having both grant the same
+tag). The giver is at the wild place: found, then named (the patron), then — still alive
+and in your keeping an hour on — `taken`, with `attitude.friendly` on the giver and
+`holds.debt.giver` on the pc; dead at the wild place after being found, `loose-end`.
+
+**Q4 `the-patron`.** Opens on `knows.patron-named`. The faction's house is the guildhall;
+an envoy speaks for it, the captain is at the market, the victim's kin beside. Books,
+then the proof (a fact and `knows.proof-held`), then `justice` at the market with the
+captain present (story award, captain helpful, kin friendly, `knows.name-cleared`,
+`knows.patron-ended`, `holds.place.kin-house`), or `bargain` by handing the envoy
+anything (`event:give($envoy)`; suspected, captain unfriendly), or `failure` when the
+proof has sat three days or five days pass without it (silent; `knows.patron-unbeaten`).
+
+**Q5 `the-price-on-your-head`.** Opens on `knows.patron-unbeaten`. Two waves of hunters
+brought in where the player stands, away from the market and the gate, at two days and
+then three more, each wave broken by `knows.name-cleared` or `knows.patron-ended`;
+outcomes `cleared`, `ended`, and `gone` (fled the town and a week away from its places).
+
+**What the lint found.** On the line: nothing, after two rounds. On the way there: the
+validator's twist heuristic matched `kin` inside "looking" and `lie` inside "lies dead"
+and refused two innocent tells as unforeshadowed twists (reworded; the heuristic wants
+a word boundary). On "The lost thing": `$market` and `$wild` are filled and never named
+in a tell, which the lint reports (the file is not this author's to edit). The lint's
+authoring rules beyond the validator: fairness tags supplied by the open, an earlier
+step, or another scheme in the set; every slot named in a tell; every outcome fired by a
+step; every non-secret card touched by a step or an outcome; `since(<step>)` naming a
+real step; a scheme that opens on a `has(pc, …)` tag nothing in the set grants.
+
+### 8.1 Grammar gaps, for the engine agent
+
+What the plan asked for, what the grammar could not say, and what was written instead.
+
+1. **Slug-bearing tags.** The plan wants `state.wanted.<town>` and
+   `state.suspected.<town>`; a grant's tag is refused if it carries `$town` and no slot
+   kind yields a settlement slug. Written: the family roots `state.wanted` and
+   `state.suspected`. The *query* side is not a gap — `has(pc, state.wanted)` matches
+   any `state.wanted.<x>` by dot-boundary prefix (`states.matches`), so Q2 may keep
+   opening on the family once the grant is fixed. Needed: a `$town` (or `$here`)
+   placeholder in grant tags resolved at fill time to the settlement id, or a `place:
+   settlement` slot whose id is usable in a tag. xfail: `test_the_suspected_state_names_the_town`.
+2. **No removal action.** Nothing in the vocabulary lifts an effect, so `justice`
+   cannot remove `state.wanted`, `bargain` cannot soften it to suspected, and Q5's
+   "until the name is cleared" is a tag (`knows.name-cleared`) rather than the effect
+   going. Needed: `{"do": "ungrant", "to": "pc", "tags": [...]}` through the one
+   applicator (remove by tag, any source). xfail: `test_justice_lifts_the_wanted_state`.
+3. **Slots are per instance.** Q2's giver, victim, witness and captain are filled fresh,
+   not Q1's people: the ledger names a stranger, the body at the temple is a living cast
+   member stood there, the captain who arrested you is not the one you clear your name
+   with. Needed: a slot spec `{"from": "a-small-favour.giver"}` that copies the earlier
+   instance's filled slot (and refuses to open if that instance does not exist). xfail:
+   `test_the_later_schemes_share_the_errands_people`.
+4. **`opens` is a conjunction.** Q3 opens on Q1 `exposed` *or* Q2 `two-clues`; written
+   by both outcomes granting one tag. Fine as a convention; note it in the bench.
+5. **`road` fills to the gate.** `PLACE_KINDS["road"]` is `("the gate",)`, so `$road`
+   and `$gate` are one place, Q2's "leave by the road" fires at the gate, and Q5's
+   "not at the gate" also means "not on the road". Needed: a road place of its own,
+   or the first place of the region set.
+6. **No "since the player left".** `since(open|step)` only; the honest path "return
+   within the hour" is written as `since(open) >= 1h` on the giver's hiding, and the
+   wild being hours away means any player who does the errand triggers it — which is
+   the plan's intent, but a player who dawdles in town an hour and then leaves also
+   does. Needed: `since(left($place))`, or `left($place)` recording its clock.
+7. **No day unit on `since`.** `since(...) >= 48h`, not `2d` (news `delay` takes `d`).
+8. **No repeat interval.** Q5's waves are two authored steps; a `once: false` step with
+   `since(open)` would fire every tick. Needed: `since(self) >= Nh` for a repeating step.
+9. **`bring_in` has three templates** (watchman, thug, guildhand): a "hunter" is a
+   guildhand. Needed: the codex chooser by role word, biome and level (§6.3).
+10. **Faction fields are not addressable.** `$patron` fills to the name; `wants`,
+    `works_by`, `holds`, `undone_by` are on the filled slot but `fill_text` cannot reach
+    them, so Q4's objectives say "what $patron holds" in general words. Needed:
+    `$patron.holds` in `fill_text`.
+11. **No grant to a faction's people or the town.** `attitude.*` is granted to one slot
+    actor; "regard from the town" and "the Patron's regard rises" are written as the
+    captain's regard and a `knows.patron-owes-you` tag on the pc.
+12. **No founding from a scheme.** "The victim's kin grant a house (founded and held)"
+    is a `holds.place.kin-house` tag; the founding door is not called.
+13. **No companion, talk or surrender event.** "Taken as a companion" is `spared`: the
+    giver alive and in your presence an hour after naming the patron. Needed:
+    `event:talk($slot)` and a `companion($who)` action.
+14. **Cross-scheme cards.** Q3's `loose-end` should close Q2's road card; a scheme
+    can only resolve its own cards.
+15. **Leaving the region** has no criterion; Q5's `gone` is fled-town plus a week away
+    from the town's places.
+16. **`side` names.** The engine's fight sides are `pc` and `them`; the brief said
+    `against`, which would make a third side the fight does not read. Written: `them`.
+17. **The twist heuristic** in the validator substring-matches `kin`, `lie`, `never`;
+    "looking", "lies", "keeping" trip it. A word-boundary match is the fix.
