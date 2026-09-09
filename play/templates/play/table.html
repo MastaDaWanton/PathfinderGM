@@ -2074,14 +2074,19 @@ function showPopup(p) {
   // answer it had before the flag existed.
   if (p.dc != null && p.dc_shown !== false) terms.push({ label: "beat", value: p.dc });
 
-  Dice3D.ask({
+  const shown = {
     title: p.label,
     why: p.because || "",
     sides: hi - lo + 1 === 20 ? 20 : (hi - lo + 1),
     lo: lo, hi: hi, die: die,
     terms: terms,
     note: lo === hi ? "" : `${die} (${lo}–${hi})`,
-  }).then(sendRoll);
+  };
+  // `hold` keeps the mat open when the table is doing the rolling, so the die goes
+  // straight from the wind-up into its throw. It used to close here and reopen on the
+  // far side of the request, which is the blink the player saw as the animation
+  // skipping — two throws with a cut between them.
+  Dice3D.ask(Object.assign({ hold: true }, shown)).then(face => sendRoll(face, shown));
 }
 
 // Everything that can be gone out and got, here, now — one list from every craft.
@@ -2504,12 +2509,28 @@ document.addEventListener("click", async e => {
   if (t.closest("#cb-end")) { commitTurn(true); return; }
 });
 
-async function sendRoll(face) {
+async function sendRoll(face, shown) {
   $("#veil").classList.remove("on");
   busy(true);
-  try { render(await post("/api/roll", {face})); }
+  let state = null;
+  try { state = await post("/api/roll", { face }); }
   catch (e) { $("#err").textContent = e.message; }
   finally { busy(false); }
+
+  // Land the die on what the server rolled. Without this the main roll path asked,
+  // played a decorative throw that ended on an arbitrary face, closed the mat, and
+  // told the player the number in a table — reported 2026-09-09 as "the dice don't
+  // land with the number facing the user", and they never did.
+  if (state && state.rolled != null) {
+    await Dice3D.land({
+      title: shown.title, why: shown.why, die: shown.die,
+      sides: shown.sides, lo: shown.lo, hi: shown.hi,
+      result: state.rolled, terms: shown.terms, note: shown.note,
+    });
+  } else {
+    Dice3D.close();
+  }
+  if (state) render(state);
 }
 
 async function takeTurn(body, clearInput) {

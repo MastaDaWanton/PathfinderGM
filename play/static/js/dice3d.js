@@ -860,31 +860,37 @@
     // current pose (the computed matrix) before throwing, so there is no snap.
     die.style.animation = "d3d-drift 26s linear infinite";
 
+    /* The wind-up. Not a throw: the throw belongs to `land`, which is the only thing
+       that knows what the die has to show.
+
+       This used to BE a throw — up, over and down over 910ms, ending on whatever face
+       happened to be pointing at the camera — and then the mat closed, the request
+       went out, and `land` opened a second mat and threw again. Two throws with a cut
+       between them, and the first of them landing on nothing. Reported 2026-09-09:
+       "the animation skips and the dice don't land with the number facing the user."
+
+       So: freeze the idle drift, lift the die and start it turning, and hand over. If
+       the caller passed `hold`, the mat stays up so `land` continues in it. */
     function cast() {
       var pose = getComputedStyle(die).transform;
       die.style.animation = "none";
       die.style.transform = pose === "none"
         ? "rotateX(-18deg) rotateY(24deg)" : pose;
-      void die.offsetWidth;                     // commit the freeze before the throw
+      void die.offsetWidth;                     // commit the freeze before the lift
       return new Promise(function (r) {
-        // Up, over, and down: a throw reads as a throw because it leaves the table.
-        die.style.transition = "transform .35s cubic-bezier(.3,.7,.6,1)";
-        die.style.transform += " translateY(-46px) rotateX(200deg) rotateY(260deg)";
-        setTimeout(function () {
-          die.style.transition = "transform .55s cubic-bezier(.15,.85,.25,1)";
-          die.style.transform = die.style.transform
-            .replace("translateY(-46px)", "translateY(0)")
-            .replace("rotateX(200deg)", "rotateX(560deg)")
-            .replace("rotateY(260deg)", "rotateY(740deg)");
-          setTimeout(r, 560);
-        }, 350);
+        die.style.transition = "transform .26s cubic-bezier(.3,.7,.4,1)";
+        die.style.transform += " translateY(-52px) rotateX(150deg) rotateY(190deg)";
+        setTimeout(r, 270);
       });
     }
 
     return new Promise(function (done) {
       function close(value) {
         die.style.animation = "";
-        mat.classList.remove("on");
+        // Held open when the caller is about to land a result in this same mat. The
+        // die keeps its lifted pose and the throw picks up from there; without this
+        // the mat blinked shut and open again around the request.
+        if (!opts.hold) { mat.classList.remove("on"); }
         done(value);
       }
       mat.querySelector("#d3d-go").onclick = function () {
@@ -902,9 +908,20 @@
     });
   }
 
+  /* Shut the mat when a held-open ask has nothing to land after all — a failed
+     request, a refused roll. Without it the die would spin over a dead page. */
+  function closeMat() {
+    if (!mat) return;
+    mat.classList.remove("on");
+    mat.querySelector("#d3d-stage").classList.remove("pair");
+    mat.querySelector("#d3d-card").classList.remove("wide");
+    die.style.animation = "";
+  }
+
   window.Dice3D = {
     land: land,
     ask: ask,
+    close: closeMat,
     // Exposed for probes: the d20's numbering and geometry, plus every shape by sides.
     faces: shape(20).faces.length,
     numbers: shape(20).numbers.slice(),

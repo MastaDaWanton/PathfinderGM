@@ -1011,7 +1011,24 @@ def roll(request):
     )
     agent = GMAgent(c.world, engine)
     _arm_cards(agent, c)
-    return _finish(c, agent, resolution, narration, player_input, plan=None)
+    resp = _finish(c, agent, resolution, narration, player_input, plan=None)
+    # The face the die actually showed. Without it the page had no way to land its 3D
+    # die on the result: it asked, played a decorative throw, closed the mat and put
+    # the number in a table. Reported from the table, 2026-09-09 — "the dice don't land
+    # with the number facing the user" — and that is why. The whole roller lands on a
+    # result the server decided, and this is the server saying which.
+    return _with(resp, {"rolled": face})
+
+
+def _with(response, extra: dict):
+    """The same JSON response, plus a field. Cheaper than threading it through
+    `_finish`, which nine other views share and none of the others need it."""
+    try:
+        payload = json.loads(response.content)
+    except (ValueError, TypeError):
+        return response
+    payload.update(extra)
+    return JsonResponse(payload)
 
 
 # `/cheat <wish>`. A slash so it can never be a sentence somebody meant: no ordinary

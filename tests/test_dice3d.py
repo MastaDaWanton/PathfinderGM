@@ -189,3 +189,39 @@ def test_the_roller_can_report_its_own_flatness():
     instrument: every solid's worst out-of-plane distance, which must be zero."""
     assert "_flatness:" in SRC
     assert "worst * 10000" in SRC
+
+def test_the_main_roll_path_actually_lands_the_die():
+    """The one the player kept seeing, and the one the bench never tested.
+
+    `showPopup` asked, `sendRoll` posted the answer and rendered the state, and nothing
+    ever called `land`. So `ask`'s cast — a full 910ms throw of its own — ended on
+    whatever face happened to face the camera, the mat closed, and the number arrived
+    in a table. Reported 2026-09-09: "the animation skips and the dice don't land with
+    the number facing the user." They never did on that path.
+
+    `/api/roll` now answers with the face it used, the mat is held open across the
+    request, and the throw lands on it.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    views = (root / "play" / "views.py").read_text(encoding="utf-8")
+
+    send = table[table.index("async function sendRoll("):][:1400]
+    assert "Dice3D.land(" in send, "the main roll path still never lands the die"
+    assert "state.rolled" in send, "the page is not landing on what the server rolled"
+    assert "Dice3D.close()" in send, "a held-open mat with nothing to land would hang"
+
+    assert '"rolled": face' in views, "the roll endpoint no longer says what it rolled"
+    assert "hold: true" in table, "the mat is no longer held across the request"
+
+
+def test_the_ask_winds_up_and_does_not_throw():
+    """Two throws with a cut between them is what "skips" meant. The wind-up lifts the
+    die and hands over; the throw belongs to `land`, which is the only thing that knows
+    what the die has to show."""
+    cast = _code(_fn("cast"))
+    assert "translateY(-52px)" in cast
+    assert "560" not in cast and "rotateX(560deg)" not in cast,         "the old second throw is back inside the ask"
+    assert cast.count("setTimeout") == 1, "the wind-up grew a second stage again"
