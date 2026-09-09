@@ -366,6 +366,19 @@ def test_the_launcher_falls_back_to_a_free_port():
     """
     import desktop
 
+    # The installed app owns 8917 while it is open, and this test's first assertion is
+    # that a free preferred port is the one taken. Measured 2026-09-08: with the game
+    # running, `first` landed on an OS-chosen 64205 and the suite reported a failure
+    # that was nothing but the player having their own app in front of them. A red that
+    # means "you are playing" teaches people to ignore reds.
+    probe = socket.socket()
+    try:
+        probe.bind((desktop.HOST, desktop.PREFERRED_PORT))
+    except OSError:
+        pytest.skip(f"port {desktop.PREFERRED_PORT} is in use — the app is running")
+    finally:
+        probe.close()
+
     first = desktop._bind(desktop.HOST, desktop.PREFERRED_PORT)
     try:
         assert first.server_address[1] == desktop.PREFERRED_PORT

@@ -2923,7 +2923,42 @@ _NOT_AN_ADJECTIVE = frozenset({
     "every", "few", "many", "most", "several", "such", "what", "how",
 })
 # Heads that name a crowd, not a person to speak to.
+# Words that describe a person without being one. Noting these as cast is what turns a
+# passing phrase into a fixture: `cast_brief` then tells the model, every turn for the
+# next twelve, that this person is present and must be kept consistent — so it keeps
+# writing them in, and eventually writes them into things that are not people at all.
+#
+# Reported at the table, 2026-09-08, with a screenshot: "As for where the shadows do not
+# reach, I speak of the Old the stranger cellar." A place name with a person pasted into
+# it, article and all. Traced: the model said "the stranger" once, `note_cast` filed a
+# person called "stranger", and the brief asserted them for twelve turns.
+#
+# "stranger" got into the model's mouth from our own examples — it is what
+# `prompts.fill_enemy` renders {Current Enemy} as when there is no enemy, and the
+# wall-climbing example used that token for a figure in a doorway who was never an enemy
+# at all. That use is gone. This is the other half: even said once, it is not a person.
+#
+# Kept to words that cannot be anybody in particular. "man" and "woman" are NOT here on
+# purpose — this game's scenes are full of "the man at the far bank" who is a real
+# person the player will meet again.
 _NOBODY_IN_PARTICULAR = frozenset({"people", "folk", "men", "women", "others"})
+
+# Matched against the WHOLE phrase, not its last word: "a tall hooded stranger" is
+# somebody, a bare "someone" is not anybody.
+#
+# "stranger" is deliberately NOT here, and the reason is an older incident pulling the
+# other way. `test_a_noted_person_stands_in_the_scene` records it: a bare stranger in
+# the prose, the player wanting to address him, and the engine not holding anyone — "the
+# ledger knew about him and the engine did not, so he could not be attacked, addressed,
+# or found again". Booking a bare stranger is that fix working.
+#
+# Which leaves the 2026-09-08 report — "the Old the stranger cellar", the word pasted
+# into a place name, constantly — to be fixed at its source instead, and its source was
+# ours: `prompts.fill_enemy` renders {Current Enemy} as "the stranger" when there is no
+# enemy, and the wall-climbing example spent that token on a figure in a doorway who was
+# never an enemy. Every out-of-combat turn showed the model the phrase twice. That is
+# gone; see tests/test_the_stranger.py.
+_A_WORD_NOT_A_PERSON = frozenset({"someone", "somebody", "anyone", "nobody"})
 
 # Where a noted person stands, in the engine's own three words. Reported at the
 # table, 2026-09-06, with the map open: a servant "beside you", a hooded man "at the
@@ -3070,6 +3105,8 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         who = " ".join(words[keep:])
         head = who.split()[-1].lower()
         if head in _NOBODY_IN_PARTICULAR:
+            continue
+        if who.strip().lower() in _A_WORD_NOT_A_PERSON:
             continue
         if head in heads or head in real:
             continue

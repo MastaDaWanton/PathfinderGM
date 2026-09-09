@@ -82,7 +82,7 @@ EXAMPLES = [
                 "the seam of your collar and started working its way down. Above the yard "
                 "the watch-lamp swings out on its chain, drags a wedge of wet light across "
                 "the flagstones, and begins the slow pull back. In the doorway beneath it "
-                "{Current Enemy} shifts weight from one foot to the other and blows into "
+                "the doorman shifts weight from one foot to the other and blows into "
                 "cupped hands; the sap on his belt is loose on its cord, and he has "
                 "not looked up in some while. The wall is eight feet of slick masonry with "
                 "a hand's width of ledge along the top, and the light will be back across "
@@ -91,7 +91,7 @@ EXAMPLES = [
             ),
             "suggestions": [
                 "I go now, while the lamp is away",
-                "I wait for {Current Enemy} to turn away as well",
+                "I wait for the doorman to turn away as well",
                 "I follow the wall along, looking for a darker stretch",
             ],
             "intents": [{
