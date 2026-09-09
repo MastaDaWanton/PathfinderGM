@@ -1,0 +1,58 @@
+<!-- The dice bench: the roller on its own, with nothing else running.
+
+     Kept in the repo rather than thrown away because judging how a die FEELS needs it
+     thrown a hundred times in a row, and doing that inside a campaign means a hundred
+     real turns and a model call each. It loads the live `play/static/js/dice3d.js`, so
+     what you see here is what the game does.
+
+     Serve it — `python -m http.server 8732` at the repo root, or the `dice-bench`
+     entry in .claude/launch.json — and open /tools/dicebench/. A file:// URL will not
+     do: the module needs a real origin for the audio context.
+
+     See docs/dice-feel.md for what each part of the throw is for. -->
+<meta charset="utf-8">
+<title>Dice bench</title>
+<style>
+  body { background:#0d0b09; color:#c9b489; font:14px/1.5 Georgia, serif; margin:0; padding:18px; }
+  button { margin:4px; padding:9px 14px; background:#2a2114; color:#d9c08a;
+           border:1px solid #7a6543; border-radius:2px; cursor:pointer; font:14px Georgia,serif; }
+  #log { margin-top:14px; font:12px/1.6 ui-monospace, Consolas, monospace; color:#8fa398;
+         white-space:pre-wrap; }
+</style>
+<h2>Dice bench</h2>
+<div>
+  <button data-roll="20">d20 = 14</button>
+  <button data-roll="20" data-res="20">d20 = 20 (crit)</button>
+  <button data-roll="6">d6 = 4</button>
+  <button data-roll="100">d100 = 73</button>
+  <button id="ten">roll a d20 ten times, timed</button>
+</div>
+<div id="log"></div>
+<script src="../../play/static/js/dice3d.js"></script>
+<script>
+const log = (s) => { document.getElementById("log").textContent += s + "\n"; };
+document.querySelectorAll("[data-roll]").forEach(b => {
+  b.onclick = async () => {
+    const sides = Number(b.dataset.roll);
+    const res = Number(b.dataset.res || (sides === 100 ? 73 : sides === 6 ? 4 : 14));
+    const t = performance.now();
+    await window.Dice3D.land({
+      sides, result: res, title: "Perception", why: "the crowd is loud",
+      terms: [{ label: "d" + sides, value: res }, { label: "total", value: res + 5, total: true }],
+      verdict: { text: res === 20 ? "A natural twenty" : "Beaten", good: true },
+    });
+    log(`d${sides} landed ${res} — closed after ${Math.round(performance.now() - t)} ms`);
+  };
+});
+document.getElementById("ten").onclick = async () => {
+  for (let i = 0; i < 10; i++) {
+    const res = 1 + Math.floor(Math.random() * 20);
+    const t = performance.now();
+    const p = window.Dice3D.land({ sides: 20, result: res, title: "Again", terms: [] });
+    // Close it as soon as the throw has settled, to time the throw itself.
+    setTimeout(() => document.querySelector("#d3d-go")?.click(), 1400);
+    await p;
+    log(`  roll ${i + 1}: ${res} in ${Math.round(performance.now() - t)} ms`);
+  }
+};
+</script>

@@ -1,8 +1,8 @@
 # Why the dice do not feel good
 
-Research record, 2026-09-08. Three sweeps and an adversarial pass over them; the
-critic verified the load-bearing claim and caught four errors, corrected in place.
-Nothing here is built.
+Research record, 2026-09-08, with what was built from it on 2026-09-09 at the end.
+Three sweeps and an adversarial pass over them; the critic verified the load-bearing
+claim and caught four errors, corrected in place.
 
 ## What we do today, measured
 
@@ -119,6 +119,33 @@ must go on a wrapper, never on the element holding the faces.
 6. Scale flourish with stakes, never duration: a natural twenty gets more.
 7. Honour `prefers-reduced-motion` by shortening to a quick reveal rather than
    removing the feedback, which is what the accessibility guidance actually asks for.
+
+## Built 2026-09-09
+
+The first three, plus two defects the bench turned up while verifying them.
+
+| Change | State |
+|---|---|
+| The throw animates instead of jump-cutting | done, one Web Animations call |
+| A synthesised clack at both contacts | done, no asset, scheduled on the audio clock |
+| Contact shadow, a floor to cast it on, squash on landing | done |
+| The winning number lands the right way up | done, and it never did before |
+| A percentile roll draws both dice | done, and it never did before |
+
+Measured on the bench afterwards: the throw settles in **780 ms** against about 1,500,
+the die and its shadow animate in step for the same 780, and one throw schedules four
+audio nodes — a filtered-noise transient and a body for each of the two contacts, with
+the pitch jittered per throw. Under `prefers-reduced-motion` it settles in about 170 ms
+with one quiet clack and still lands on the result.
+
+Two things the bench found that nobody had reported. The winning number landed any way
+up, because rotating a face normal onto the view axis leaves one degree of freedom and
+nothing was using it — a d20 showing 14 landed with the 14 upside down. And a percentile
+roll had only ever drawn one die: the stylesheet gives the second die `display: none`
+and the code revealed it by clearing the *inline* style, which falls back to the rule.
+
+`tools/dicebench/` is kept. Judging how a die feels needs it thrown a hundred times, and
+doing that inside a campaign means a hundred real turns and a model call each.
 
 ## Corrections the critic made to the sweep
 

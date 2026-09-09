@@ -6,6 +6,13 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["manage.py", "runserver", "8731", "--noreload"],
       "port": 8731
+    },
+    {
+      "name": "dice-bench",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8732"],
+      "port": 8732,
+      "url": "http://localhost:8732"
     }
   ]
 }
