@@ -125,6 +125,10 @@
     to   { opacity: 1; filter: blur(0); transform: none; }
   }
   .beat.player { color: var(--player); font-style: italic; }
+  /* What was said, and what was done. See `said()` below. */
+  .beat q.said { quotes: none; color: var(--saidink, #d8c9a3); font-style: normal; }
+  .beat em.did { color: var(--didink, #9fb4a6); font-style: italic; }
+  .beat.player q.said { font-style: normal; }
   .beat.player::before { content: "❧ "; opacity: .55; font-style: normal; }
   .beat.consequence { color: var(--ink); }
   .beat.setup { color: #d2c7ad; }
@@ -1683,7 +1687,7 @@ function render(s) {
   const seen = window._beatsSeen || 0;
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
-      i >= seen ? " fresh" : ""}">${esc(b.text)}</p>`
+      i >= seen ? " fresh" : ""}">${said(b.text)}</p>`
   ).join("");
   window._beatsSeen = s.transcript.length;
   $("#story").scrollTop = $("#story").scrollHeight;
@@ -3542,6 +3546,18 @@ function purseLine(purse, coinage) {
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Speech and action, told apart on the page. The convention is older than any of this
+// — the IRC emote, the MUSH pose, every roleplay tool since — and it is what the player
+// already knows: *asterisks are what you did*, "quotes are what you said". Presentation
+// only, deliberately: no source could be found claiming it improves what a model
+// writes, and we do not claim it either (docs/speech-vs-action.md). What it does buy is
+// a page you can read at a glance, and a player who marks their own speech is telling
+// the engine where it is — which is exactly what the fight detector needs to leave
+// alone.
+const said = s => esc(s)
+  .replace(/&quot;([^]*?)&quot;/g, '<q class="said">&quot;$1&quot;</q>')
+  .replace(/\*([^*\n]+)\*/g, '<em class="did">$1</em>');
 const sign = n => (n >= 0 ? "+" : "") + n;
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
 

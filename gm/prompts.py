@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 
+from gm import ledger as ledger_mod
 from rules import states
 from rules.intents import AMOUNT_OPS, OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
@@ -89,9 +90,9 @@ EXAMPLES = [
                 "end of its arc now. What do you do?"
             ),
             "suggestions": [
-                "Go now, while the lamp is away",
-                "Wait for {Current Enemy} to turn away as well",
-                "Follow the wall along and look for a darker stretch",
+                "I go now, while the lamp is away",
+                "I wait for {Current Enemy} to turn away as well",
+                "I follow the wall along, looking for a darker stretch",
             ],
             "intents": [{
                 "op": "check",
@@ -124,9 +125,9 @@ EXAMPLES = [
                 "you press him, or let it lie?"
             ),
             "suggestions": [
-                "Press him on who really pays",
-                "Let it go and ask about something else",
-                "Look at whatever he glanced at by the door",
+                "I press him on who really pays",
+                "I let it go and ask about something else",
+                "I look at whatever he glanced at by the door",
             ],
             "intents": [{"op": "narrate_only", "because": "he is only talking"}],
         },
@@ -145,9 +146,9 @@ EXAMPLES = [
                 "yet. How do you come at him?"
             ),
             "suggestions": [
-                "Go straight in before he can set his feet",
-                "Drive him back over the crate",
-                "Give him one last chance to stand down",
+                "I go straight in before he can set his feet",
+                "I drive him back over the crate",
+                'I tell him "stand down and this ends here"',
             ],
             "intents": [
                 {"op": "begin_encounter", "because": "she has drawn on him",
@@ -173,9 +174,9 @@ EXAMPLES = [
                 "committed now. What do you do with the moment?"
             ),
             "suggestions": [
-                "Put him down and step clear",
-                "Ride him to the ground and pin the arm",
-                "Twist away from the swing as he falls",
+                "I put him down and step clear",
+                "I ride him to the ground and pin the arm",
+                "I twist away from the swing as he falls",
             ],
             "intents": [{
                 "op": "attack", "actor": "pc", "target": "c1",
@@ -206,9 +207,9 @@ EXAMPLES = [
                 "a stack of empty barrels at your left shoulder. Which of them do you watch?"
             ),
             "suggestions": [
-                "Watch the quiet one going wide",
-                "Put the barrels between you and the wide man",
-                "Speak first — ask who sent them",
+                "I watch the quiet one going wide",
+                "I put the barrels between me and the wide man",
+                'I speak first: "who sent you?"',
             ],
             "intents": [
                 {"op": "spawn", "because": "trouble like this does not come alone",
@@ -235,9 +236,9 @@ EXAMPLES = [
                 "them, and the better part of an hour with them. Where do you go now?"
             ),
             "suggestions": [
-                "Find somewhere out of the wind and rest",
-                "Double back and see who came looking",
-                "Head for the water while it is still dark",
+                "I find somewhere out of the wind and rest",
+                "I double back to see who came looking",
+                "I head for the water while it is still dark",
             ],
             "intents": [
                 {"op": "end_encounter", "because": "she is away and they have lost her"},
@@ -263,9 +264,9 @@ EXAMPLES = [
                 "nobody found you in the night. What is the first thing you do?"
             ),
             "suggestions": [
-                "Check your gear before you move",
-                "Go straight to the counting house",
-                "Find something to eat and listen to the street",
+                "I check my gear before I move",
+                "I go straight to the counting house",
+                "I find something to eat and listen to the street",
             ],
             "intents": [
                 {"op": "rest", "actor": "pc", "because": "a night out of the weather",
@@ -290,9 +291,9 @@ EXAMPLES = [
                 "is knocking?"
             ),
             "suggestions": [
-                "Move before they reach this door",
-                "Stay still and listen",
-                "Look for another way out of the room",
+                "I move before they reach this door",
+                "I stay still and listen",
+                "I look for another way out of the room",
             ],
             "intents": [
                 {"op": "use_item", "actor": "pc", "because": "the last of the draught",
@@ -327,9 +328,9 @@ EXAMPLES = [
                 "stops. Where do you look first?"
             ),
             "suggestions": [
-                "Dig where the earth is freshest",
-                "Get the door open again before it shuts",
-                "Feel along the wall for what your hand touched",
+                "I dig where the earth is freshest",
+                "I get the door open again before it shuts",
+                "I feel along the wall for what my hand touched",
             ],
             "intents": [{"op": "narrate_only", "because": "nothing has forced a roll yet"}],
         },
@@ -346,9 +347,9 @@ EXAMPLES = [
                          "you have seen before and cannot place. Out in the yard, the "
                          "talking has stopped. How much do you take?",
             "suggestions": [
-                "Take the letters and shut the drawer",
-                "Read the top one where you stand",
-                "Put it all back and get away from the desk",
+                "I take the letters and shut the drawer",
+                "I read the top one where I stand",
+                "I put it all back and get away from the desk",
             ],
             "intents": [{
                 "op": "check", "actor": "pc",
@@ -376,9 +377,9 @@ EXAMPLES = [
                 "you take it?"
             ),
             "suggestions": [
-                "Take the name and the risk with it",
-                "Ask what she wants in return, exactly",
-                "Walk away from this one",
+                "I take the name, and the risk with it",
+                'I ask her "what do you want in return, exactly?"',
+                "I walk away from this one",
             ],
             "intents": [{"op": "narrate_only", "because": "the pressure is hers, not the dice"}],
         },
@@ -408,9 +409,9 @@ EXAMPLES = [
                 "him?"
             ),
             "suggestions": [
-                "Tell him the truth about why you are here",
-                "Ask who the Harrow boys are",
-                "Watch the lanterns and say nothing yet",
+                "I tell him the truth about why I am here",
+                'I ask "who are the Harrow boys?"',
+                "I watch the lanterns and say nothing yet",
             ],
             "intents": [],
         },
@@ -458,9 +459,9 @@ COMBAT_EXAMPLES = [
                          "side, quick for his size. There is a lamp bracket at head height "
                          "between you and him, and it is not fixed to anything much. Which "
                          "of them do you deal with?",
-            "suggestions": ["Finish the one in front of you",
-                            "Bring the bracket down on the other",
-                            "Get the crates between you and both of them"],
+            "suggestions": ["I finish the one in front of me",
+                            "I bring the bracket down on the other",
+                            "I get the crates between me and both of them"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
                          "because": "the sap is the thing that will put her down"}],
         },
@@ -473,9 +474,9 @@ COMBAT_EXAMPLES = [
                          "feet with the blade low, taking the angle away from you a step "
                          "at a time. There is broken crockery underfoot on his side of the "
                          "floor and he has not looked down once. What do you do?",
-            "suggestions": ["Wait for him to step on it",
-                            "Go at him before he sets himself",
-                            "Look for a way along the wall"],
+            "suggestions": ["I wait for him to step on it",
+                            "I go at him before he sets himself",
+                            "I look for a way along the wall"],
             "intents": [{"op": "narrate_only", "because": "she is waiting, not acting"}],
         },
     },
@@ -487,9 +488,9 @@ COMBAT_EXAMPLES = [
                          "thing catches him at the hip, and for a moment he is tangled and "
                          "the doorway behind him is clear. His friend is still coming, and "
                          "closer than he was. Do you take the door?",
-            "suggestions": ["Go through the door while he is tangled",
-                            "Put him down while he cannot move",
-                            "Turn and meet the other one"],
+            "suggestions": ["I go through the door while he is tangled",
+                            "I put him down while he cannot move",
+                            "I turn and meet the other one"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
                          "because": "she wants him off his feet, not dead",
                          "params": {"manoeuvre": "bull rush"}}],
@@ -503,8 +504,8 @@ COMBAT_EXAMPLES = [
                          "you came in by bangs once against its frame — somebody has come "
                          "through it. He sees them before you do, and it puts something "
                          "back into his face. Do you finish him or turn round?",
-            "suggestions": ["Finish him now", "Turn and see who came in",
-                            "Get where you can see both"],
+            "suggestions": ["I finish him now", "I turn to see who came in",
+                            "I get where I can see both"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
                          "because": "she is not giving him the room to recover"}],
         },
@@ -517,9 +518,9 @@ COMBAT_EXAMPLES = [
                          "comes after you rather than letting you go, and he is faster over "
                          "open floor than he was in the press. Below the sill there is a "
                          "cart, or something the shape of a cart, in the dark. Do you go?",
-            "suggestions": ["Go through and take the drop",
-                            "Turn at the sill and meet him",
-                            "Shutter it in his face and find another way"],
+            "suggestions": ["I go through and take the drop",
+                            "I turn at the sill and meet him",
+                            "I shutter it in his face and find another way"],
             "intents": [
                 {"op": "end_encounter", "because": "she is breaking off and going out"},
                 {"op": "check", "actor": "pc", "because": "a drop she has not measured",
@@ -565,6 +566,18 @@ Which of them carries the weight depends on the situation. Some shapes that work
 
 End by giving the player a real choice to make, and offer two or three things they might
 do. They are suggestions, not a menu: the player may do anything they like.
+
+Write each suggestion as the PLAYER'S OWN LINE, in the first person, exactly as they
+would type it: "I press him on who really pays", never "Press him on who really pays".
+Clicking one puts it straight into their box, so a suggestion phrased as advice from
+outside the fiction arrives in the box as advice. Put anything the character SAYS in
+double quotes: I ask him "who sent you?".
+
+When the player's character says something, emit a `say` op carrying their words. It
+rolls nothing and costs nothing, because in these rules speaking is a free action. It is
+not a substitute for a roll: if they are trying to PERSUADE, DECEIVE or THREATEN
+somebody into something, that is a `check` with the skill named — Diplomacy, Bluff or
+Intimidate — and the two go together, the words and the attempt.
 
 Write to the player as "you". Name only the people and places listed below; if you need
 someone new, describe them without a name. The examples show you the shape and the length
@@ -906,9 +919,136 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     return "\n".join(lines)
 
 
+# --- the context budget ---------------------------------------------------------------
+#
+# Every turn is one prompt, and that prompt has to fit. Measured 2026-09-08 on the
+# shipped Pangrella export: the history is an unbounded list that nothing trims, the
+# assembled prompt passes the window at turn 46 out of combat, and from there Ollama
+# drops messages off the front — the worked examples first, all twenty-four of them by
+# turn 57, and one exchange of real play per turn after that. It says nothing to the
+# caller when it does this; the only trace is a debug line in its own server log.
+#
+# Two consequences, in the order the player meets them. The examples go first, so the
+# first symptom of a full window is prose quality falling apart rather than the game
+# forgetting. Only later does it start losing what actually happened.
+#
+# So we do the cutting. `pack` decides what goes, in a stated order, and reports it.
+NUM_CTX = 16384
+# The window holds the prompt AND the answer. `gm/agent.py` asks for up to 1400 tokens
+# of completion, and a prompt that fills the window leaves the model no room to answer:
+# that failure is already recorded in gm/client.py's own comment, where a 4,086-token
+# prompt against a 4,096 window died mid-sentence on every turn of a live scene.
+MAX_COMPLETION_TOKENS = 1400
+# The chat template's own wrapping, plus the error in the ratio below.
+SAFETY_TOKENS = 600
+# Measured by `tools/token_ratio.py` against the configured model, taking the worst
+# case of three real prompts. Shipping a tokeniser is not an option — it would be a
+# third dependency, one per model, in an app that has two — so the budget is counted in
+# characters and converted here. Lower is safer: it under-fills rather than overflows.
+#
+# Measured 2026-09-08 on igorls/gemma-4-12B-it-heretic: 3.82 for the briefing and brief
+# alone, 3.83 for a full turn out of combat, 3.79 in combat. The count comes back from
+# the model's own `prompt_eval_count`, which counts the chat template's wrapping too
+# while we only count message content — so the ratio already absorbs that overhead and
+# errs low. 3.6 keeps a margin under the worst case on top of SAFETY_TOKENS.
+CHARS_PER_TOKEN = 3.6
+PROMPT_BUDGET_CHARS = int(
+    (NUM_CTX - MAX_COMPLETION_TOKENS - SAFETY_TOKENS) * CHARS_PER_TOKEN)
+# The most recent turns are kept ahead of the worked examples, because a model that has
+# lost the thread writes a well-formed wrong scene. Everything older queues behind them.
+KEEP_EXCHANGES = 3
+
+
+def _chars(messages) -> int:
+    return sum(len(m.get("content") or "") for m in messages)
+
+
+def _from_a_user(messages: list[dict]) -> list[dict]:
+    """Drop leading assistant turns so a kept stretch never opens on a reply.
+
+    Ollama counts messages, not exchanges, and will happily cut between a question and
+    its answer — leaving a reply standing with nothing it was replying to. We never do.
+    """
+    i = 0
+    while i < len(messages) and messages[i].get("role") != "user":
+        i += 1
+    return messages[i:]
+
+
+def pack(head: list[dict], examples: list[dict], history: list[dict],
+         tail: list[dict], *, budget: int = PROMPT_BUDGET_CHARS,
+         keep: int = KEEP_EXCHANGES, report: dict | None = None,
+         ledger: list[dict] | None = None) -> list[dict]:
+    """Fit the turn into the budget, deciding what goes rather than letting the server.
+
+    The order is stated and tested: the system message and the player's own line are
+    never cut, then the most recent few exchanges, then the worked examples, then older
+    history newest-first. `report` is filled in with what happened so the caller can
+    log it — a cut that nobody records is the failure this function exists to end.
+    """
+    kept_recent = _from_a_user(history[-(keep * 2):] if keep else [])
+    older = history[:len(history) - len(kept_recent)] if kept_recent else list(history)
+
+    # The ledger's room is reserved before anything competes for it, and rendered
+    # after the history is decided, because what it may say depends on what was cut.
+    # Reserving the cap rather than the rendered size under-fills by whatever the
+    # ledger did not use, which is the safe direction.
+    reserve = ledger_mod.BUDGET_CHARS if ledger else 0
+    room = budget - _chars(head) - _chars(tail) - reserve
+    # A floor this small means the brief itself has outgrown the window; send the turn
+    # anyway. A turn that refuses to be built is worse than a turn built thin.
+    while kept_recent and _chars(kept_recent) > room:
+        kept_recent = _from_a_user(kept_recent[1:])
+    room -= _chars(kept_recent)
+
+    with_examples = _chars(examples) <= room
+    if with_examples:
+        room -= _chars(examples)
+
+    # Older history, newest first, one exchange at a time.
+    front: list[dict] = []
+    older = _from_a_user(older)
+    while older:
+        bite = older[-2:] if len(older) >= 2 else older[-1:]
+        if _chars(bite) > room:
+            break
+        front = bite + front
+        older = older[:-len(bite)]
+        room -= _chars(bite)
+    front = _from_a_user(front)
+
+    kept_history = front + kept_recent
+    dropped = len(history) - len(kept_history)
+
+    # Where the window's edge falls, in the same units the ledger stamps: how many
+    # history messages were cut from the front. When nothing at all is kept verbatim —
+    # which is every prose call, handed `[]` by design — the whole ledger is outside
+    # the window and all of it is fair game.
+    edge = dropped if kept_history else 10 ** 9
+    remembered = ledger_mod.block(ledger, before_hist=edge, budget=reserve) if ledger else ""
+    if remembered and head:
+        # Onto the system message, which is never cut: these are facts the engine
+        # kept, and they rank with the brief rather than with the conversation.
+        head = [{**head[0], "content": head[0]["content"] + "\n\n" + remembered}] + head[1:]
+
+    if report is not None:
+        report.update({
+            "dropped": dropped,
+            "kept": len(kept_history),
+            "examples": with_examples,
+            "budget": budget,
+            "remembered": remembered.count("  * "),
+        })
+    return head + (examples if with_examples else []) + kept_history + tail
+
+
 def call_one_messages(briefing_scene: str, history: list[dict], player_input: str,
                       in_combat: bool = False, enemy: str | None = None,
-                      examples: list[dict] | None = None) -> list[dict]:
+                      examples: list[dict] | None = None,
+                      report: dict | None = None,
+                      extra_briefing: str = "",
+                      player_message: dict | None = None,
+                      ledger: list[dict] | None = None) -> list[dict]:
     """The turn prompt, in one of two modes.
 
     Out of a fight the model is shown long examples and asked to build a scene. In one it
@@ -925,14 +1065,16 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
     if examples is None:
         examples = COMBAT_EXAMPLES if in_combat else EXAMPLES
 
-    messages = [{"role": "system", "content": briefing + "\n\n" + briefing_scene}]
+    system = briefing + "\n\n" + briefing_scene + (("\n" + extra_briefing)
+                                                   if extra_briefing else "")
+    head = [{"role": "system", "content": system}]
+    shown: list[dict] = []
     for ex in examples:
-        messages.append({"role": "user", "content": fill_enemy(ex["player"], enemy)})
-        messages.append({"role": "assistant",
-                         "content": fill_enemy(json.dumps(ex["reply"]), enemy)})
-    messages.extend(history)
-    messages.append({"role": "user", "content": player_input})
-    return messages
+        shown.append({"role": "user", "content": fill_enemy(ex["player"], enemy)})
+        shown.append({"role": "assistant",
+                      "content": fill_enemy(json.dumps(ex["reply"]), enemy)})
+    tail = [player_message or {"role": "user", "content": player_input}]
+    return pack(head, shown, list(history), tail, report=report, ledger=ledger)
 
 
 # --- intents first, prose afterwards -----------------------------------------------------
@@ -962,7 +1104,9 @@ know what actually happened, which you do not. Emit only the intents.
 
 
 def call_one_intents_only(briefing_scene: str, history: list[dict], player_input: str,
-                          in_combat: bool = False, enemy: str | None = None) -> list[dict]:
+                          in_combat: bool = False, enemy: str | None = None,
+                          report: dict | None = None,
+                          ledger: list[dict] | None = None) -> list[dict]:
     """The same turn prompt, with the prose taken out of the examples as well.
 
     The first cut left the examples' narration in place and measured 26.8s a turn against
@@ -977,7 +1121,8 @@ def call_one_intents_only(briefing_scene: str, history: list[dict], player_input
     failure grammar-constrained decoding exists to prevent.
     """
     messages = call_one_messages(briefing_scene, history, player_input,
-                                 in_combat=in_combat, enemy=enemy)
+                                 in_combat=in_combat, enemy=enemy, report=report,
+                                 ledger=ledger)
     messages[0] = {"role": "system",
                    "content": messages[0]["content"] + "\n" + INTENTS_ONLY_EXTRA}
     out = [messages[0]]
@@ -1075,7 +1220,8 @@ EARLIER_CHARS = 1400
 def call_prose_messages(briefing_scene: str, history: list[dict], player_input: str,
                         tells: list[str], in_combat: bool = False,
                         enemy: str | None = None,
-                        earlier: list[str] | None = None) -> list[dict]:
+                        earlier: list[str] | None = None,
+                        ledger: list[dict] | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
 
     The *call-one* briefing and examples, not the consequence ones, because this is being
@@ -1086,12 +1232,6 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     turn was a quiet beat, which still needs writing: a `narrate_only` turn producing no
     prose at all is an empty page, and most town turns are `narrate_only`.
     """
-    messages = call_one_messages(briefing_scene, history, player_input,
-                                 in_combat=in_combat, enemy=enemy,
-                                 examples=(CARRY_ON_EXAMPLES
-                                           if player_input == CARRY_ON else None))
-    messages[0] = {"role": "system",
-                   "content": messages[0]["content"] + "\n" + PROSE_AFTER_EXTRA}
     said = "\n".join(f"- {t}" for t in tells if t)
     # The scene as the player last read it, in front of the model that continues it.
     # This call had NO history at all — `[]` at the call site, and the opening was
@@ -1103,13 +1243,21 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     scene = ("What you narrated just before this — the scene as it stands, which you "
              "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
              if stood else "")
-    messages[-1] = {
+    # Built BEFORE packing, both of them. This function used to call
+    # `call_one_messages` and then rewrite its system message and its last user message
+    # to bigger ones, which meant the prompt grew after the budget had already decided
+    # it fitted — the tells and up to two earlier beats arriving behind the check. The
+    # head and the tail are assembled here and handed to `pack` as what they really are.
+    final = {
         "role": "user",
         "content": (scene + f"The player said: {player_input}\n\n"
                     + (f"What the engine decided:\n{said}" if said
                        else "The engine decided nothing mechanical this turn.")),
     }
-    return messages
+    return call_one_messages(
+        briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,
+        examples=(CARRY_ON_EXAMPLES if player_input == CARRY_ON else None),
+        extra_briefing=PROSE_AFTER_EXTRA, player_message=final, ledger=ledger)
 
 
 CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.

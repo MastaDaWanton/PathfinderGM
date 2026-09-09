@@ -1541,7 +1541,13 @@ def test_a_four_word_beat_cannot_stand(client, settings, tmp_path, monkeypatch):
         encoding="utf-8")
     guard = src[src.index("The floor of last resort"):][:700]
     assert "< 60" in guard and "not outcomes" in guard
-    assert "The moment holds" in guard
+    # The floor itself moved into `_floor` on 2026-09-08, so that a turn where the
+    # player SPOKE gets an answer in the fiction instead of the parser's holding line.
+    # Both floors still exist; the guard now reaches them through one door.
+    assert "_floor(" in guard
+    floor = src[src.index("def _floor("):][:900]
+    assert "The moment holds" in floor
+    assert "unanswered_speech" in floor
 
 
 def test_the_schema_is_not_the_story():

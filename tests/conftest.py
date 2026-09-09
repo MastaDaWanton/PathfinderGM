@@ -89,6 +89,36 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _house_rules_start_at_the_defaults():
+    """Every test begins with the shipped rules, whatever the last one chose.
+
+    `.test-data/` is a real directory that survives between runs, and house rules are
+    a file in it, so a test that sets one leaves it set for every run afterwards.
+    Measured 2026-09-08: an earlier session had left `point_buy: 0` — Unlimited — in
+    that file, and `test_creation.py::test_the_point_budget_is_a_wall` then failed on
+    a clean checkout of the code, because there is no wall when the budget is
+    unlimited. The failure had nothing to do with the change being tested, and
+    `test_houserules.py` asserting the default budget of 20 was one run away from the
+    same fate.
+
+    Same class as `_campaign_dir_never_leaks` below: a real regression cannot be told
+    from a leak, and a suite whose result depends on how the player last set their
+    game is not a gate at all.
+    """
+    from rules import houserules
+
+    def clear():
+        try:
+            houserules._path().unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    clear()
+    yield
+    clear()
+
+
+@pytest.fixture(autouse=True)
 def _campaign_dir_never_leaks():
     """No test may leave CAMPAIGN_DIR pointing somewhere the next one can see.
 

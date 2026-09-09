@@ -15,7 +15,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import judgement, narration as narration_mod, prompts, watcher
+from gm import judgement, ledger as ledger_mod, narration as narration_mod, prompts, watcher
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -1105,6 +1105,7 @@ def _advance(c, agent, narration, plan, player_input):
          "intents": [{"op": i.op, "actor": i.actor, "target": i.target}
                      for i in plan.intents]}
     )})
+    _remember(c, resolution, player_input)
     _log_turn(c, plan, resolution)
 
     if resolution.awaiting:
@@ -1122,6 +1123,9 @@ def _arm_cards(agent, c) -> None:
     recent = [b["text"] for b in c.transcript[-4:] if b.get("text")]
     agent.recent = recent
     agent.turn = len(c.transcript)
+    # And what happened in the turns the context budget has already cut, so the model
+    # is told about them rather than left to notice they are missing.
+    agent.ledger = c.ledger
 
 
 def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True):
@@ -1207,14 +1211,30 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # sentence in the plan; with no tells to dress, this is the one place
             # it can reach the page.
             text = plan.narration
+        # A turn where the player SPOKE gets an answer in the fiction, never the
+        # parser's holding line. Measured on the 2026-09-08 playtest: every line the
+        # player wrote as speech came back as the holding line while actions in the
+        # same session worked. TADS 3 guarantees a lowest-priority catch-all topic for
+        # exactly this, and Façade carries global deflection mix-ins beside its
+        # beat-specific ones; no tradition accepts silence here. See
+        # docs/speech-vs-action.md and gm/narration.unanswered_speech.
+        def _floor(reason: str) -> str:
+            if judgement.was_speech(player_input):
+                repairs.append(f"{reason}: the player spoke, so the answer is theirs")
+                return narration_mod.unanswered_speech(
+                    player_input,
+                    [a.name for a in c.scene.actors.values() if not a.is_pc],
+                    turn=len(c.transcript))
+            repairs.append(f"{reason}: replaced with a holding line")
+            return ("The moment holds — nothing new shows itself just yet. "
+                    "What do you do?")
+
         if not text:
             # A turn may NEVER answer with silence. Measured live: "I talk to
             # the woman" produced no beat at all — the prose call whiffed, there
             # were no tells, no degraded sentence, and the empty string skipped
             # every floor below because they all lived inside `if text`.
-            text = ("The moment holds — nothing new shows itself just yet. "
-                    "What do you do?")
-            repairs.append("empty turn: replaced with a holding line")
+            text = _floor("empty turn")
         if text:
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
             if anchored:
@@ -1240,10 +1260,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # against a 600-character scene floor every earlier gate is supposed
             # to hold. A beat this short with no dice behind it is not a beat.
             if len(text.strip()) < 60 and not outcomes:
-                text = ("The moment holds — nothing new shows itself just yet. "
-                        "What do you do?")
-                repairs.append("beat too short to stand: replaced with a "
-                               "holding line")
+                text = _floor("beat too short to stand")
             # The beat is final; whoever it introduced is on the books now —
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
@@ -1439,7 +1456,10 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 "who": "gm", "kind": "consequence",
                 "text": text or " ".join(plain_tell(o.tell) for o in tells),
             })
-        _log_turn(c, plan, resolution)
+        # An NPC's turn is not the player speaking, so the ledger gets no speech
+        # from it — only whatever the engine decided on their behalf.
+        _remember(c, resolution, "")
+    _log_turn(c, plan, resolution)
 
     # The budget ran out with somebody else holding the turn. Whatever went wrong,
     # the player is not left staring at a panel where every button refuses: the
@@ -1467,6 +1487,31 @@ def _hand_the_turn_back(c, why: str) -> None:
         return
     scene.turn = at
     c.transcript.append({"who": "gm", "text": why, "kind": "consequence"})
+
+
+def _remember(c, resolution, player_input: str) -> None:
+    """One ledger entry for this turn, so it survives the window that will cut it.
+
+    Written here, once, from the engine's own outcomes — never rewritten afterwards.
+    Recursive re-summarisation is the approach that measured worst of every one tried
+    (35.3% against 94.4% for full context), and the cause named is detail lost through
+    repeated re-compression. See gm/ledger.py.
+    """
+    spoke = ""
+    if judgement.was_speech(player_input):
+        here = [a.name for a in c.scene.actors.values() if not a.is_pc]
+        spoke = next(
+            (n for n in here
+             if len(str(n).split()[-1]) > 2
+             and str(n).split()[-1].lower() in (player_input or "").lower()),
+            "someone")
+    ledger_mod.keep(c.ledger, ledger_mod.note(
+        resolution.outcomes,
+        turn=len(c.transcript),
+        hist=len(c.history),
+        spoke_with=spoke,
+        where=getattr(c.location, "name", "") or "",
+        names={r: a.name for r, a in c.scene.actors.items()}))
 
 
 def _log_turn(c, plan, resolution, replace: bool = False):

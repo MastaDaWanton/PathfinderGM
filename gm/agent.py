@@ -113,8 +113,13 @@ class GMAgent:
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
                  else prompts.call_one_messages)
+        # What the budget had to leave out, so the turn log can say it. Ollama would
+        # cut this prompt for us and tell nobody; `prompts.pack` cuts it in a stated
+        # order and reports. A cut nobody records is the failure that ends here.
+        self.packed: dict = {}
         base = build(brief, history, player_input, in_combat=fighting,
-                     enemy=self._current_enemy())
+                     enemy=self._current_enemy(), report=self.packed,
+                     ledger=getattr(self, "ledger", None))
         messages = base
 
         attempts: list[Attempt] = []
@@ -252,6 +257,13 @@ class GMAgent:
                 raw = judgement.inject_fight(raw, player_input, self.engine.scene)
                 raw = judgement.inject_company(raw, player_input,
                                                self.engine.scene)
+                # Speech last, because it competes with nothing: "I tell the smith I
+                # want the axe" is a sale AND a line of dialogue, and both belong in
+                # the turn. Measured on the first live turn after the `say` op landed —
+                # the schema asked for one, the model wrote prose instead, and the turn
+                # resolved with no `say` at all, which is the whole failure the op
+                # exists to end. Detect mechanically, repair with a targeted call.
+                raw = judgement.inject_say(raw, player_input, self.engine.scene)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)
             except IntentError as exc:
@@ -302,7 +314,7 @@ class GMAgent:
             # should have done.
             verdict = judgement.review(player_input, intents, self.engine.scene,
                                         previous=previous_intents)
-            repairs = list(verdict.as_log())
+            repairs = list(verdict.as_log()) + self._context_note()
             if not verdict.ok and n < last:
                 complaint = " ".join(o.message for o in verdict.objections)
                 rejections.append(f"attempt {n + 1} [judgement]: {complaint}")
@@ -516,6 +528,22 @@ class GMAgent:
             f"the GM could not act for {ref} in {max_attempts} attempts:\n"
             + "\n".join(rejections)
         )
+
+    def _context_note(self) -> list[str]:
+        """What the context budget left out this turn, for the log and the GM view.
+
+        Silence here is the whole defect being fixed: before `prompts.pack`, the turn
+        overflowed the window at turn 46 and Ollama cut it — the worked examples first,
+        then one exchange of play per turn — reporting nothing to anyone.
+        """
+        packed = getattr(self, "packed", None) or {}
+        if not packed.get("dropped"):
+            return []
+        note = (f"context budget: dropped the oldest {packed['dropped']} message(s), "
+                f"kept {packed['kept']}")
+        if not packed.get("examples"):
+            note += "; the worked examples did not fit either"
+        return [note]
 
     def _current_enemy(self) -> str | None:
         """Who the worked examples' {Current Enemy} placeholder should become.
@@ -974,9 +1002,13 @@ class GMAgent:
         fighting = self.engine.scene.in_encounter
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
         self.last_suggestions: list[str] = []
+        # This call is handed NO history at all — `[]` — so the ledger is the only
+        # thing standing between it and a campaign with no past. It is cheap and it is
+        # numberless, and the prose call is the one that actually writes the page.
         messages = prompts.call_prose_messages(
             brief, [], player_input, tells, in_combat=fighting,
-            enemy=self._current_enemy(), earlier=earlier)
+            enemy=self._current_enemy(), earlier=earlier,
+            ledger=getattr(self, "ledger", None))
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200)

@@ -27,6 +27,126 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+# --- Speech is not action ---------------------------------------------------------------
+#
+# Everything below this line reads the player's own words looking for a declaration —
+# a swing, a wait, a target. None of it may read what the player's character SAID.
+#
+# Measured 2026-09-08, nine lines through `wants_a_fight`: three opened a fight and all
+# three were speech. `I tell the clerk "I am a monk, I can handle myself in a fight or
+# handle a bunch of others."` conjured guards and rolled initiative, because the scan
+# ran over the whole raw line and the "I" inside the quotation answered the question
+# "who is doing the swinging". Worst of the three: `I tell the guard "put down your
+# sword, I do not want to fight"` — a line refusing a fight, which started one.
+#
+# Every tradition that has run this problem for decades solves it the same way, and
+# none of them solve it with a better keyword list. Inform 7 captures what follows
+# "about" or "that" as a value of the kind `topic` and says outright that it "does not
+# try to understand automatically what that text might mean". LambdaMOO rewrites a
+# leading quote mark into `say` before any verb lookup happens at all, and the rest of
+# the line is then a payload handed to one verb, never re-tokenised. CircleMUD maps
+# the apostrophe straight to its say handler. In none of them can a word inside speech
+# reach the command table. See docs/speech-vs-action.md.
+#
+# So: redact first, detect second. Length-preserving, because the detectors below work
+# in offsets — `_player_is_the_one_swinging` asks who is named in front of the verb.
+
+# Double quotes only, straight or curly. Single quotes are deliberately NOT a delimiter:
+# "I don't" and "the guard's blade" would each open one, and a redactor that swallows
+# the rest of a line on an apostrophe is worse than the bug it fixes.
+_QUOTED = re.compile(r"[\"“”‟]([^\"“”‟]*)"
+                     r"[\"“”‟]?")
+
+# Where a redaction stops. Speech runs to the end of its sentence and no further: "I
+# tell him to move, then I draw my sword" is a line with a real declaration in it, and
+# blanking to the end of the line would lose the sword.
+_SENTENCE_END = re.compile(r"[.!?]|\bthen\b|;")
+
+# "I tell the clerk I am a monk" — verb, addressee, then the message.
+_TOLD = re.compile(
+    r"\b(?:tell|tells|telling|told|warn|warns|warning|warned|assure|assures|assured"
+    r"|promise|promises|promised|remind|reminds|reminded|inform|informs|informed"
+    r"|threaten|threatens|threatened)\s+"
+    r"(?:the\s+|a\s+|an\s+|my\s+|his\s+|her\s+|their\s+)?\w+\s+", re.I)
+
+# "I say to the merchant ..." / "I shout ..." — verb, optional addressee, then it.
+_SAID = re.compile(
+    r"\b(?:say|says|saying|said|shout|shouts|shouted|yell|yells|yelled|whisper"
+    r"|whispers|whispered|reply|replies|replied|answer|answers|answered|declare"
+    r"|declares|declared|announce|announces|announced|insist|insists|insisted"
+    r"|admit|admits|admitted|claim|claims|claimed|boast|boasts|boasted|brag|brags"
+    r"|bragged|swear|swears|swore|vow|vows|vowed|explain|explains|explained)\b"
+    r"(?:\s+to\s+(?:the\s+|a\s+|an\s+|my\s+|his\s+|her\s+|their\s+)?\w+)?[\s:,]*", re.I)
+
+# "I ask the woman if she wants to pay" — the question itself starts at the complementiser.
+_ASKED = re.compile(
+    r"\b(?:ask|asks|asking|asked|beg|begs|begged|plead|pleads|pleaded)\s+"
+    r"(?:the\s+|a\s+|an\s+|my\s+|his\s+|her\s+|their\s+)?\w+\s+"
+    r"(?:if|whether|that|to|for|about)\s+", re.I)
+
+
+def spoken(text: str) -> str:
+    """The words the character said: everything `redact_speech` blanked, joined up.
+
+    The inverse of the redactor rather than a second parser, so the two can never
+    disagree about where the speech was — one rule, read twice.
+    """
+    line = str(text or "")
+    hidden = redact_speech(line)
+    runs, cur = [], []
+    for a, b in zip(line, hidden):
+        if a != b:
+            cur.append(a)
+        elif cur:
+            runs.append("".join(cur).strip())
+            cur = []
+    if cur:
+        runs.append("".join(cur).strip())
+    return " ".join(r for r in runs if r).strip(" ,;:\"“”")
+
+
+def was_speech(text: str) -> bool:
+    """Whether the player's line has their character saying something.
+
+    True when the redactor found anything to blank: a quoted span, or the complement
+    of a speech verb. Used to decide that a turn which produced nothing owes the
+    player an answer in the fiction rather than the parser's holding line.
+    """
+    line = str(text or "")
+    return bool(line.strip()) and redact_speech(line) != line
+
+
+def redact_speech(text: str) -> str:
+    """The line with everything the character SAID blanked out, same length.
+
+    Quoted spans go first, then the complement of a speech verb up to the end of its
+    sentence. What is left is what the player's character DID, which is the only thing
+    the detectors below are entitled to read.
+
+    Asterisks are deliberately untouched. In the convention the player already knows —
+    IRC's emote, the MUSH pose, every roleplay tool since — *asterisks are the action*
+    and quotes are the speech, so an asterisked span is exactly what a declaration
+    detector should be reading.
+    """
+    line = str(text or "")
+    out = list(line)
+
+    def blank(start: int, end: int) -> None:
+        for i in range(max(0, start), min(len(out), end)):
+            if not out[i].isspace():
+                out[i] = " "
+
+    for m in _QUOTED.finditer(line):
+        blank(m.start(1), m.end(1))
+
+    for rx in (_TOLD, _SAID, _ASKED):
+        for m in rx.finditer(line):
+            stop = _SENTENCE_END.search(line, m.end())
+            blank(m.end(), stop.start() if stop else len(line))
+
+    return "".join(out)
+
+
 # --- What the player's words indicate -------------------------------------------------
 
 # Deliberately narrow. A false positive here costs the player a turn, so every cue has to
@@ -119,7 +239,9 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     """Compare what the GM decided against what the player asked for."""
     out = Review()
     text = player_text or ""
-    violent = bool(VIOLENCE.search(text))
+    # Violence is read off the line with the character's own speech blanked; a peaceful
+    # cue is read off the whole line, because saying something IS the peaceful act.
+    violent = bool(VIOLENCE.search(redact_speech(text)))
     peaceful = bool(PEACEFUL.search(text))
 
     # 0. The same turn over again. Measured: the player said "two guild bravos come round
@@ -418,10 +540,25 @@ _NOT_VIOLENCE = re.compile(
     r")\b", re.I)
 
 
+# Violence the player is declining. Found beside the speech bug, 2026-09-08: "I don't
+# want to fight, I look for the door" contains no speech verb and no quotation, so the
+# redactor leaves it whole and correctly so — and the old rule then read "fight", found
+# an "I" in front of it and started one. Kept to the same clause and a short reach, so
+# that "I don't hesitate, I attack the guard" is still a fight.
+_DECLINED = re.compile(
+    r"\b(?:don't|dont|do not|won't|wont|will not|would not|wouldn't|never|no need"
+    r"|rather not|refuse to|instead of|without)\b[^,;.!?]{0,24}$", re.I)
+
+
 def wants_a_fight(player_text: str) -> bool:
-    """Whether the player has just declared violence on somebody."""
-    text = str(player_text or "")
-    if not text or "?" in text:
+    """Whether the player has just declared violence on somebody.
+
+    Reads the line with the character's own speech blanked out. Before that it read
+    the raw line, and three of nine measured speech lines started a fight — see
+    `redact_speech` above for the measurement and the traditions it follows.
+    """
+    text = redact_speech(player_text)
+    if not text.strip() or "?" in text:
         return False
     if _MUSING.search(text) or _NOT_VIOLENCE.search(text):
         return False
@@ -456,6 +593,8 @@ def _player_is_the_one_swinging(text: str) -> bool:
     if not m:
         return False
     before = text[:m.start()]
+    if _DECLINED.search(before):
+        return False
     if _OTHER_SUBJECT.search(before):
         return False
     if _MINE.search(before[-80:]):
@@ -485,7 +624,9 @@ def is_finishing_blow(player_text: str, scene) -> bool:
     downed non-player body for them to be about. The words alone are not enough — "one
     last strike" against a standing foe is a fight like any other.
     """
-    if not _FINISHING.search(player_text or ""):
+    # Speech is not action: the character's own words are blanked before any cue is
+    # looked for here. See `redact_speech`.
+    if not _FINISHING.search(redact_speech(player_text)):
         return False
     return any(not getattr(a, "is_pc", False) and a.has_state("state.down")
                for a in (getattr(scene, "actors", {}) or {}).values())
@@ -510,6 +651,9 @@ def inject_fight(raw_intents, player_text: str, scene):
     """
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
+    # Speech is not action, and everything below reads this line for cues: the
+    # opponent count, the opening range, the template. See `redact_speech`.
+    player_text = redact_speech(player_text)
     if not wants_a_fight(player_text):
         return raw_intents
     # A finishing blow is not a fight being started. Measured live (2026-08-27): "i
@@ -625,7 +769,9 @@ def opponent_count(player_text: str) -> int:
     design (a patron pays for the raising), so the injector owes the player the
     fight they picked, not a safer one.
     """
-    text = player_text or ""
+    # Speech is not action: a number the character SPEAKS is not a head-count. "I say
+    # 'there were four of them last night'" is one opponent, not four.
+    text = redact_speech(player_text)
     # A number with a unit after it is a measurement, not a head-count: "I shoot
     # the wolf at 40 feet" is one wolf, found the day this regex read forty.
     m = re.search(r"\b(\d{1,2})\b(?!\s*(?:-|\s)?\s*(?:feet|foot|ft|paces|yards|"
@@ -657,6 +803,9 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
 
     Returns amended raw intents, or None if this is not that problem.
     """
+    # Speech is not action: the character's own words are blanked before any
+    # cue is looked for here. See `redact_speech`.
+    player_text = redact_speech(player_text)
     known = set(getattr(scene, "actors", {}) or {})
     invented: list[str] = []
     for raw in raw_intents or []:
@@ -924,6 +1073,9 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
     name, template picked from the player's wording — and moves the attack onto them.
     Returns None when there is nothing to do.
     """
+    # Speech is not action: the character's own words are blanked before any
+    # cue is looked for here. See `redact_speech`.
+    player_text = redact_speech(player_text)
     if not isinstance(raw_intents, list) or scene is None or not player_text:
         return None
     aimed = _AIMED_AT.search(player_text)
@@ -1011,6 +1163,9 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
     sleep is not sleeping), a negated sleep does not rest, and a fight in progress lets
     the engine's own legality check say why not.
     """
+    # Speech is not action: the character's own words are blanked before any
+    # cue is looked for here. See `redact_speech`.
+    player_text = redact_speech(player_text)
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text:
@@ -2104,6 +2259,9 @@ _UNIT_HOURS = {"hour": 1, "hours": 1, "day": 10, "days": 10, "morning": 4, "afte
 
 def inject_wait(raw_intents, player_text: str, scene) -> list:
     """Time the player says they pass becomes `advance_time`, in minutes."""
+    # Speech is not action: the character's own words are blanked before any
+    # cue is looked for here. See `redact_speech`.
+    player_text = redact_speech(player_text)
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text:
@@ -2319,6 +2477,11 @@ _DECLARERS = (
     ("ability", lambda raw, text, scene, world: inject_ability(raw, text, scene)),
     ("cast", lambda raw, text, scene, world: inject_cast(raw, text, scene)),
     ("checks", lambda raw, text, scene, world: inject_checks(raw, text, scene)),
+    # Speech last among the declarers, and deliberately: it never competes with any of
+    # them. "I tell the smith I want to buy the axe" is a sale AND a line of dialogue,
+    # and both belong in the turn — unlike the sale-or-handover pair above, where one
+    # sentence must not be read twice.
+    ("say", lambda raw, text, scene, world: inject_say(raw, text, scene)),
     ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
     # After travel, and the ordering is load-bearing: "I go out to the forest to forage"
     # must append travel first, so the intent list executes the move before the forage
@@ -2332,6 +2495,53 @@ _DECLARERS = (
     ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
 )
+
+
+def inject_say(raw_intents, player_text: str, scene) -> list:
+    """A line the player wrote as speech reaches the engine as a `say`.
+
+    Detect mechanically, repair with a targeted call — the only shape of fix that has
+    held here. Measured on the 2026-09-08 playtest: speech had no op among the
+    forty-one, so it could only resolve to `narrate_only`; a narrate_only turn carries
+    no tells; and a prose call with no tells to dress is exactly the turn that came
+    back as "The moment holds". Actions in the same session worked, because every one
+    of them had a door.
+
+    Because this is a declarer, `declared_ops` finds it too, and the sampler then
+    *requires* a `say` in the reply rather than hoping for one.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if any(str((i or {}).get("op", "")) == "say" for i in raw_intents
+           if isinstance(i, dict)):
+        return raw_intents
+    words = spoken(player_text)
+    if not words:
+        return raw_intents
+
+    # Who they addressed, from the people actually here — never a name the engine does
+    # not hold. The addressee is named OUTSIDE the speech ("I tell the clerk ..."), so
+    # the redacted line is the right place to look for them.
+    outside = redact_speech(player_text).lower()
+    to = ""
+    for ref, actor in (getattr(scene, "actors", {}) or {}).items():
+        if getattr(actor, "is_pc", False):
+            continue
+        head = str(getattr(actor, "name", "") or "").strip().split()[-1:] or [""]
+        if len(head[0]) > 2 and head[0].lower() in outside:
+            to = ref
+            break
+    params = {"words": words}
+    if to:
+        params["to"] = to
+    # Whether the player wrote a quotation or reported what they said. The tell reads
+    # differently for each: quoting "she wants to pay for my services" back at the
+    # narrator as though the character had said those words puts the player's own
+    # framing, first person and all, inside somebody's mouth.
+    if any(m.group(1).strip() for m in _QUOTED.finditer(str(player_text or ""))):
+        params["quoted"] = True
+    return list(raw_intents) + [{"op": "say", "because": "the player said it",
+                                 "params": params}]
 
 
 def declared_ops(player_text: str, scene, world=None) -> list[str]:

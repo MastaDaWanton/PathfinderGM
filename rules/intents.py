@@ -253,6 +253,21 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # it hangs off, default here.
     # A task taken up: a quest card with objectives to tick, a giver and a promise.
     # `quest_step` ticks one objective by its number, with what was done as a note.
+    # Talking. There was no op for this at all among the other forty-one, so every line
+    # the player wrote as speech could only land in `narrate_only` — and a turn that
+    # resolves to narrate_only has no tells, which is why the 2026-09-08 playtest kept
+    # answering speech with the holding line while actions in the same session worked.
+    #
+    # It rolls nothing and costs nothing, because Pathfinder 1e already says so: "In
+    # general, speaking is a free action that you can perform even when it isn't your
+    # turn. Speaking more than a few sentences is generally beyond the limit of a free
+    # action." A *directed* social attempt — persuade, deceive, threaten — is a
+    # different thing with a DC and a time cost, and it is a `check`, not this.
+    #
+    # `words` is what the player's character actually said, carried through so the
+    # narrator dresses the line rather than inventing a different one; `to` is who they
+    # said it to, and is absent when they addressed the room.
+    "say": (("words",), ("actor", "to", "quoted"), "hidden"),
     "quest": (("title", "objectives"), ("actor", "giver", "reward", "about"), "player"),
     "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
     "found": (("name",), ("actor", "owner", "parent", "about"), "player"),

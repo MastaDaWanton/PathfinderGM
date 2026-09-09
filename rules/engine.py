@@ -1894,6 +1894,41 @@ class Engine:
         return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                        tell="", because=intent.because)
 
+    # say ---------------------------------------------------------------------------------
+
+    # A free action in 1e, so nothing is rolled and no time passes. What it produces is a
+    # TELL, and that is the whole point: before this op existed, speech resolved to
+    # `narrate_only`, a narrate_only turn carries no tells, and a prose call with no tells
+    # to dress is the turn that came back as the holding line all through the 2026-09-08
+    # session. The words are carried into the tell so the narrator dresses what the player
+    # actually said instead of writing them a different line.
+    _SAID_CAP = 400
+
+    def _op_say(self, intent: Intent, partial: dict) -> Outcome:
+        words = " ".join(str(intent.params.get("words") or "").split())[:self._SAID_CAP]
+        speaker = self.scene.actors.get(intent.actor) or self.scene.pc()
+        who = speaker.name if speaker is not None else "somebody"
+        heard = self.scene.actors.get(str(intent.params.get("to") or ""))
+        if not words:
+            # Nothing was actually said. A tell claiming otherwise would be a mechanic
+            # the engine did not decide.
+            return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
+                           tell="", because=intent.because)
+        at = f" to {heard.name}" if heard is not None else ""
+        # Quoted speech is quoted; reported speech is reported. "I ask her if she
+        # wants to pay for my services" is not a sentence the character said, and a
+        # tell that quotes it hands the narrator the player's own framing to put in
+        # somebody's mouth.
+        said = (f'{who} says{at}: "{words}"' if intent.params.get("quoted")
+                else f"{who} speaks{at}, to the effect that {words}")
+        return Outcome(
+            intent_id=intent.id, op=intent.op, status="resolved",
+            effects=[{"kind": "said", "who": intent.actor or "",
+                      "to": (str(intent.params.get("to") or "") if heard is not None
+                             else ""),
+                      "words": words}],
+            tell=said, because=intent.because)
+
     # check ------------------------------------------------------------------------------
 
     def _op_check(self, intent: Intent, partial: dict) -> Outcome:

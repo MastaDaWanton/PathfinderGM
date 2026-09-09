@@ -707,6 +707,22 @@ _READS_MECHANICS = {
     "gm/judgement.py:note_heat":
         "sets scene.heat, which is world state and not prose — nothing the narrator "
         "reads passes through here.",
+    "gm/ledger.py:_said":
+        "the words on a `say` outcome, which the engine itself wrote into the effect "
+        "from the player's own line. docs/memory-policy.md planned a model call at "
+        "eviction for exactly this — the part the engine does not own — and once "
+        "speech had an op the call became unnecessary, because the words are already "
+        "a fact the engine holds. Reading them here is cheaper, has no latency, and "
+        "cannot invent a promise nobody made.",
+    "gm/ledger.py:_named":
+        "the ledger is the engine reporting to itself what it did in the turns that "
+        "have since fallen out of the context window, and an effect is where the "
+        "engine wrote the ref. What comes out the other side is a numberless English "
+        "sentence — `note` strips every digit before the entry is stored, and "
+        "test_no_number_ever_reaches_the_ledger pins it — which is the definition of a "
+        "tell, not a bypass of one. Building it from tell TEXT instead would mean "
+        "parsing names back out of English in the presentation layer, which is the "
+        "second vocabulary _deaths_from is allowed here to avoid.",
 }
 
 

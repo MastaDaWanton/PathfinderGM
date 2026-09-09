@@ -119,6 +119,10 @@ class Campaign:
     history: list[dict] = field(default_factory=list)   # the GM's own message history
     transcript: list[dict] = field(default_factory=list)  # what the player sees
     turn_log: list[dict] = field(default_factory=list)   # every roll, auditable
+    # What happened in the turns the context budget has since cut. Built from the
+    # engine's own outcomes, written once per turn and never rewritten, and holding
+    # no numbers at all — see gm/ledger.py and docs/memory-policy.md.
+    ledger: list[dict] = field(default_factory=list)
     seed: int | None = None
     # What the GM proposed last turn, so a turn that simply replays the previous
     # one can be spotted. Stored as a signature rather than the intents themselves:
@@ -240,6 +244,7 @@ class Campaign:
             "history": self.history,
             "transcript": self.transcript,
             "turn_log": self.turn_log,
+            "ledger": self.ledger,
             "last_intent_signature": self.last_intent_signature,
             "character_id": self.character_id,
             "recipes": self.recipes,
@@ -353,7 +358,8 @@ class Campaign:
         campaign = cls(
             id=data["id"], world_source=data["world_source"], scene=scene,
             history=data.get("history", []), transcript=data.get("transcript", []),
-            turn_log=data.get("turn_log", []), seed=data.get("seed"),
+            turn_log=data.get("turn_log", []), ledger=data.get("ledger", []),
+            seed=data.get("seed"),
             last_intent_signature=[tuple(t) for t in
                                    data.get("last_intent_signature", [])],
             character_id=data.get("character_id", ""),

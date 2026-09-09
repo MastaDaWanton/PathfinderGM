@@ -16,6 +16,8 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+from gm import prompts
+
 # Reasoning models emit their working before their answer. Qwen3 and its tunes do it by
 # default, and DeepSeek-R1 always does — both are in the user's Ollama already.
 #
@@ -149,8 +151,11 @@ def chat(
         # died done_reason=length on every turn of a live scene, silently, with
         # num_predict=900 ignored because the window was already spent. 16k costs
         # roughly 1.5GB of KV cache at 12B and ends the class.
+        # One window, named once. `gm/prompts.py` budgets the prompt against this exact
+        # number; two copies of it would be the trap CLAUDE.md names, and the failure
+        # would be silent — a prompt built for one window sent to another.
         "options": {"temperature": temperature, "num_predict": num_predict,
-                    "num_ctx": 16384},
+                    "num_ctx": prompts.NUM_CTX},
         # Stay loaded. Ollama's default unloads a model five minutes after its last
         # request, and a player who spends six minutes building a character then
         # waits the whole cold load again — 60 to 100 seconds on this machine — for

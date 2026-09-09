@@ -1898,3 +1898,57 @@ def reintroduces_the_present(text: str, names) -> list[str]:
                      text, re.I):
             found.append(str(name))
     return found
+
+
+# --- when the player spoke and the turn produced nothing ---------------------------
+#
+# The holding line ("The moment holds — nothing new shows itself just yet.") is a
+# parser-error floor. Measured on the 2026-09-08 playtest, it was answering SPEECH:
+# every time the player wrote something their character said, the reply came back as
+# the holding line or as "You have no honest answer to give", while physical actions
+# in the same session worked. The player's note: dialogue "struggles more than if i
+# write actions".
+#
+# No tradition in interactive fiction accepts silence here. TADS 3 asks authors to
+# define a `DefaultAskTellTopic` matched at the lowest possible priority, so a topic
+# nobody anticipated still reaches a designed, in-character non-answer. Façade carries
+# a catch-all discourse act, `DASystemCannotUnderstand`, plus "generic deflection and
+# recovery global mix-ins" that run whatever beat is active. Emily Short's craft
+# writing treats a bare "nothing happens" as a named failure, and names the
+# alternative: a characterful reply that reveals something and admits the attempt
+# happened. See docs/speech-vs-action.md.
+#
+# So this is the floor for a turn where the player spoke: it never claims a mechanic,
+# never invents a fact, and never says nothing. Four shapes rather than one, chosen by
+# the turn number, because ten paragraphs ending the same way is this project's oldest
+# measured smell.
+_UNANSWERED = (
+    "{who} hears you out, and gives you nothing back but a look.",
+    "Your words land on {who}, and sit there a moment without an answer.",
+    "{who} takes that in. Whatever it settles, it is not settled yet.",
+    "You say your piece. {who} lets the quiet do the answering.",
+)
+
+
+def unanswered_speech(player_text: str, names=(), turn: int = 0) -> str:
+    """An in-character non-answer for a turn where the player spoke and nothing came.
+
+    `names` is who is actually in the scene, so the reply can address the person the
+    player addressed and nobody else. Ground every name: if the line names nobody the
+    engine holds, the answer stays with the people who are demonstrably here.
+    """
+    line = str(player_text or "")
+    who = ""
+    for name in names or ():
+        head = str(name or "").strip()
+        if len(head) > 2 and re.search(rf"\b{re.escape(head.split()[-1])}\b", line, re.I):
+            who = head
+            break
+    if not who:
+        who = "whoever is nearest"
+    # Capitalised once, at the front of the finished sentence rather than on the name:
+    # two of the four shapes carry {who} mid-sentence, and "Your words land on The
+    # clerk" is what capitalising the substitution gives you.
+    shape = _UNANSWERED[int(turn) % len(_UNANSWERED)]
+    said = shape.format(who=who)
+    return said[0].upper() + said[1:] + " What do you do?"
