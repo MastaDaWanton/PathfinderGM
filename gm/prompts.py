@@ -1742,6 +1742,41 @@ not a narrate_only.
 Write no narration. The intents are the whole answer."""
 
 
+OUT_OF_CHARACTER = """You are the Game Master, answering the player OUT OF CHARACTER.
+
+This is not a turn and nothing in the world is happening. Do not narrate, do not write
+a scene, do not describe what anybody does. Answer the question, in your own voice, as
+the person running the game would across the table.
+
+Answer in two to five sentences. Plain prose, no headings, no lists.
+
+The rules are Pathfinder 1st edition. If the question is about the rules and you are
+not certain, say which rule you think it falls under and say plainly that you are not
+certain — a confident wrong answer about a rule is worse than "I would have to look
+that up", because the player will act on it.
+
+Below is what the engine actually holds, and it is the truth. Do not contradict it, and
+do not invent a person, a place or an item that is not in it. If the question asks for
+something the engine has not decided, say that it has not been decided yet rather than
+deciding it here: nothing you say in this answer changes the game.
+"""
+
+
+def out_of_character_messages(briefing_scene: str, question: str,
+                              found: str = "") -> list[dict]:
+    """The `/gm` question the engine could not answer from its own books.
+
+    Deliberately given the brief and nothing else — no history, no examples. The
+    examples teach the model to write scenes, which is the one thing this call must not
+    do, and the history is the fiction, which is what the player has stepped out of.
+    """
+    facts = briefing_scene
+    if found:
+        facts += "\n\nWHAT THE BOOKS SAY ABOUT WHAT WAS ASKED:\n" + found
+    return [{"role": "system", "content": OUT_OF_CHARACTER + "\n\n" + facts},
+            {"role": "user", "content": question}]
+
+
 def cheat_messages(briefing_scene: str, wish: str) -> list[dict]:
     """The author's wish, as a request for intents and nothing else.
 

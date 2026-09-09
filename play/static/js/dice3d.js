@@ -76,12 +76,26 @@
      one between them. */
   function trapezohedron() {
     var verts = [], faces = [];
+    // The zigzag and the apex are NOT free to choose independently. A kite face is
+    // four points, and four points are only coplanar at one apex height for a given
+    // zigzag: apex = zigzag * (5 + 2 sqrt 5), from solving the coplanarity condition.
+    //
+    // Shipped for months as zigzag 0.25 with apex 1.15, which is not that height, so
+    // every kite was bent 0.26 out of its own plane on a die of radius 1 — the browser
+    // drew each face flat anyway, the neighbours could not meet, and the d10 came
+    // apart into shards. Reported from the table with a screenshot, 2026-09-09: "these
+    // die are splitting apart."
+    //
+    // The ratio also fixes the die's proportions, so the zigzag is what sets how tall
+    // it is: 0.115 gives an apex of 1.09 against an equator radius of 1, which is
+    // about the shape of a d10 in the hand.
+    var ZIG = 0.115, APEX = ZIG * (5 + 2 * Math.sqrt(5));
     for (var k = 0; k < 10; k++) {
       var ang = Math.PI * 2 * k / 10;
-      verts.push([Math.cos(ang), Math.sin(ang), (k % 2 === 0 ? 0.25 : -0.25)]);
+      verts.push([Math.cos(ang), Math.sin(ang), (k % 2 === 0 ? ZIG : -ZIG)]);
     }
-    verts.push([0, 0, 1.15]);      // 10: top apex
-    verts.push([0, 0, -1.15]);     // 11: bottom apex
+    verts.push([0, 0, APEX]);      // 10: top apex
+    verts.push([0, 0, -APEX]);     // 11: bottom apex
     for (var i = 0; i < 5; i++) {
       faces.push([10, (2 * i) % 10, (2 * i + 1) % 10, (2 * i + 2) % 10]);
       faces.push([11, (2 * i + 1) % 10, (2 * i + 2) % 10, (2 * i + 3) % 10]);
@@ -106,9 +120,47 @@
     return { verts: v, faces: faces };
   }
 
-  /* The dodecahedron's pentagons are found rather than listed: its twelve face
-     directions are the icosahedron's twelve vertices, and each face is the five
-     dodecahedron vertices leaning furthest that way. */
+  /* Faces as SUPPORT PLANES: a plane through three vertices with every other vertex on
+     one side of it is a face of the hull, and the face is everything lying on it.
+
+     Found rather than guessed, because guessing is what was wrong. The dodecahedron
+     used to take its twelve face directions from `icosahedron().verts` and keep the
+     five vertices leaning furthest each way — and those twelve directions are the
+     WRONG cyclic permutation for this vertex set. They point at the dodecahedron's own
+     vertices, not at its faces, so each "face" was five points that were nowhere near
+     coplanar: 1.05 out of plane on a solid of radius 1.7. The d12 was drawn as twelve
+     bent pentagons that could not meet, which is the same "splitting apart" the d10
+     had for a different reason.
+
+     Twenty vertices is 1,140 triples, computed once per shape and cached, so the cost
+     of never guessing again is nothing. */
+  function hullFaces(v) {
+    var faces = [], seen = {};
+    for (var i = 0; i < v.length; i++) {
+      for (var j = i + 1; j < v.length; j++) {
+        for (var k = j + 1; k < v.length; k++) {
+          var n = cross(sub(v[j], v[i]), sub(v[k], v[i]));
+          if (len(n) < 1e-9) continue;
+          n = norm(n);
+          var d = dot(n, v[i]);
+          if (d < 0) { n = [-n[0], -n[1], -n[2]]; d = -d; }
+          var outside = false, on = [];
+          for (var m = 0; m < v.length; m++) {
+            var s = dot(n, v[m]);
+            if (s > d + 1e-9) { outside = true; break; }
+            if (Math.abs(s - d) < 1e-9) on.push(m);
+          }
+          if (outside || on.length < 3) continue;
+          var key = on.join(",");
+          if (seen[key]) continue;
+          seen[key] = 1;
+          faces.push(on);
+        }
+      }
+    }
+    return faces;
+  }
+
   function dodecahedron() {
     var v = [];
     [-1, 1].forEach(function (x) { [-1, 1].forEach(function (y) {
@@ -116,14 +168,7 @@
     [-1, 1].forEach(function (a) { [-1, 1].forEach(function (b) {
       v.push([0, a / PHI, b * PHI], [a / PHI, b * PHI, 0], [a * PHI, 0, b / PHI]);
     }); });
-    var dirs = icosahedron().verts;
-    var faces = dirs.map(function (dir) {
-      var n = norm(dir);
-      return v.map(function (p, i) { return [dot(norm(p), n), i]; })
-        .sort(function (a, b) { return b[0] - a[0]; })
-        .slice(0, 5).map(function (x) { return x[1]; });
-    });
-    return { verts: v, faces: faces };
+    return { verts: v, faces: hullFaces(v) };
   }
 
   /* --- solid preparation ------------------------------------------------------------
@@ -139,7 +184,25 @@
     });
     var faces = raw.faces.map(function (face) {
       var c = centreOf(verts, face);
-      var z = norm(c);
+      // The normal comes from the face's own PLANE, not from the direction of its
+      // centre. Those are the same thing only when a face is symmetric about its
+      // normal — true for every regular solid here, and false for the d10, whose kites
+      // run from a near apex to a far equator point. Taking `norm(c)` tilted all ten
+      // of the d10's faces off their true planes, so the neighbours could not meet:
+      // measured 2026-09-09, 238 of 784 sample points in the middle of a d10 landed on
+      // no face at all, against 0 for the d6, d12 and d20.
+      var z = null;
+      for (var a = 0; a < face.length - 2 && !z; a++) {
+        for (var b = a + 1; b < face.length - 1 && !z; b++) {
+          for (var d = b + 1; d < face.length && !z; d++) {
+            var n = cross(sub(verts[face[b]], verts[face[a]]),
+                          sub(verts[face[d]], verts[face[a]]));
+            if (len(n) > 1e-9) { z = norm(n); }
+          }
+        }
+      }
+      z = z || norm(c);
+      if (dot(z, c) < 0) { z = [-z[0], -z[1], -z[2]]; }
       var y0 = norm(sub(verts[face[0]], c));
       var x0 = norm(cross(y0, z));
       var ordered = face.slice().sort(function (a, b) {
@@ -294,6 +357,9 @@
     "background:linear-gradient(rgba(27,22,17,.96),rgba(18,15,11,.97));",
     "border:1px solid #7a6543;box-shadow:inset 0 0 0 1px rgba(221,196,142,.08),",
     "0 18px 60px rgba(0,0,0,.8);color:#e6dcc6}",
+    // Two dice need a wider table, and widening the card is the one way to give them
+    // one without transforming anything that owns a perspective.
+    "#d3d-card.wide{width:470px}",
     "#d3d-card h3{margin:0 0 2px;color:#d9c08a;text-align:center;letter-spacing:.06em;",
     "font:400 22px/1.2 'Cinzel','Palatino Linotype',Georgia,serif;font-variant:small-caps}",
     "#d3d-why{color:#8e816a;font-style:italic;font-size:13px;text-align:center;margin-bottom:6px}",
@@ -323,11 +389,12 @@
     "#d3d-sh2{display:none}",
     "#d3d-stage.pair #d3d-sh2{display:block}",
     "#d3d-die,#d3d-die2{position:relative;width:0;height:0;transform-style:preserve-3d}",
-    // Two dice at a d20's size, 300px apart, ran off both edges of a 380px card the
-    // moment the ones die became visible at all. Closer together, and the whole stage
-    // scaled rather than the dice — a transform on the die itself would fight the
-    // throw animation for the same property.
-    "#d3d-stage.pair{transform:scale(.8)}",
+    // Two dice at a d20's size ran off both edges of a 380px card the moment the ones
+    // die became visible at all. The first fix scaled the STAGE — and the stage is the
+    // element carrying `perspective`, so scaling it changed the projection out from
+    // under the faces and the solids came apart into loose shards. Reported from the
+    // table with a screenshot, 2026-09-09. The card widens instead; nothing that owns
+    // a perspective gets transformed.
     "#d3d-stage.pair #d3d-die{margin-right:95px}",
     // `landPercentile` clears the inline display to show the second die, and clearing
     // an inline style falls back to THIS rule — so the ones die has been hidden on
@@ -553,6 +620,7 @@
       mat.querySelector("#d3d-go").onclick = function () {
         mat.classList.remove("on");
         mat.querySelector("#d3d-stage").classList.remove("pair");
+        mat.querySelector("#d3d-card").classList.remove("wide");
         die2.style.display = "none";
         done(result);
       };
@@ -722,6 +790,7 @@
     mat || build();
     build();
     mat.querySelector("#d3d-stage").classList.add("pair");
+    mat.querySelector("#d3d-card").classList.add("wide");
     die2.style.display = "";
     var elsA = buildSolid(die, 10), elsB = buildSolid(die2, 10);
     resetMat(opts, "percentile dice");
@@ -841,5 +910,24 @@
     numbers: shape(20).numbers.slice(),
     _centres: shape(20).faces.map(function (f) { return f.centre; }),
     _shape: shape,
+    // How far the worst face of each solid strays from its own plane, as a fraction of
+    // the die's radius. Two shapes were shipping bent faces and the browser drew them
+    // flat anyway, so neighbours could not meet: this is the number that says so.
+    _flatness: function () {
+      var out = {};
+      [4, 6, 8, 10, 12, 20].forEach(function (sides) {
+        var s = shape(sides), worst = 0;
+        s.faces.forEach(function (f) {
+          var p = f.idx.map(function (i) { return s.verts[i]; });
+          if (p.length < 4) return;
+          var n = norm(cross(sub(p[1], p[0]), sub(p[2], p[0])));
+          for (var q = 3; q < p.length; q++) {
+            worst = Math.max(worst, Math.abs(dot(n, sub(p[q], p[0]))));
+          }
+        });
+        out["d" + sides] = Math.round(worst * 10000) / 10000;
+      });
+      return out;
+    },
   };
 })();

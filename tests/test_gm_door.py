@@ -29,14 +29,14 @@ def test_a_question_routes_to_what_it_asked_about():
     assert set(gm_answers.topics_for("")) == set(gm_answers.TOPICS)
 
 
-def test_a_question_it_cannot_answer_names_the_fix():
-    """A refusal whose reason the player could not have known is the failure this
-    project has a standing rule about. Every validator here says what to type next."""
-    lost = gm_answers.answer(None, None, "what is the airspeed of a swallow")
-    assert "Ask it about" in lost
-    for topic in gm_answers.TOPICS:
-        assert topic in lost
-    assert "/gm who is here" in lost
+def test_a_question_the_engine_cannot_answer_goes_to_the_gm():
+    """The player's ruling, 2026-09-09: "I should be able to ask the GM anything,
+    including questions about the world and questions about the system or the rules."
+    Before it, seven topics answered and everything else was refused with a list of the
+    seven, which is a door that answers seven questions and shuts on the eighth."""
+    kind, text = gm_answers.answer(None, None, "what is the airspeed of a swallow")
+    assert kind == "gm"
+    assert text == "", "an unanswerable question should be handed on, not answered here"
 
 
 def test_the_answer_comes_from_the_engine():
@@ -47,13 +47,14 @@ def test_the_answer_comes_from_the_engine():
     eng.run(eng.validate([{"op": "spawn", "because": "the stall",
                            "params": {"template": "guildhand", "count": 1,
                                       "name": "the clerk"}}]))
-    said = gm_answers.answer(c, eng, "who is here")
+    kind, said = gm_answers.answer(c, eng, "who is here")
+    assert kind == "engine"
     assert "the clerk" in said
     # By ref, because a ref is what everything else in the app is keyed on and a
     # question about the game deserves the engine's own vocabulary.
     assert "(c" in said
 
-    said = gm_answers.answer(c, eng, "where am i")
+    _, said = gm_answers.answer(c, eng, "where am i")
     assert eng.here().name in said
 
 

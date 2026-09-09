@@ -15,7 +15,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import judgement, ledger as ledger_mod, narration as narration_mod, prompts, watcher
+from gm import (client, judgement, ledger as ledger_mod,
+                narration as narration_mod, prompts, watcher)
 from gm.agent import GMAgent
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -1035,12 +1036,49 @@ def _gm_answer(c, question: str, shown: str):
     on the next turn. The page gets it; the model never sees it.
     """
     c.transcript.append({"who": "player", "text": shown, "kind": "aside"})
-    c.transcript.append({
-        "who": "gm", "kind": "aside",
-        "text": gm_answers.answer(c, c.engine(), question),
-    })
+    engine = c.engine()
+    kind, text = gm_answers.answer(c, engine, question)
+
+    if kind == "gm":
+        # Nothing in the state and nothing in the books. The player's ruling is that
+        # they should be able to ask anything, so the question goes to the GM — clearly
+        # labelled, because the one thing that must never blur is which answers are
+        # facts and which are somebody's reading of them.
+        text = _ask_the_gm(c, engine, question)
+
+    c.transcript.append({"who": "gm", "kind": "aside", "text": text})
     c.save()
     return JsonResponse(_state(c))
+
+
+def _ask_the_gm(c, engine, question: str) -> str:
+    """The model, grounded in the brief, answering out of character.
+
+    No history and no worked examples, deliberately: the examples teach it to write
+    scenes, which is the one thing this must not do, and the history is the fiction the
+    player has just stepped out of.
+    """
+    agent = GMAgent(c.world, engine)
+    brief = prompts.scene_brief(
+        c.world, c.scene, c.location, _recent_events(c.world, c.location),
+        here=engine.here(), known=engine.places())
+    found = "\n".join(gm_answers.look_up(c, engine, question))
+    try:
+        reply = client.chat(
+            prompts.out_of_character_messages(brief, question, found),
+            agent.prose_model, agent.prose_host, as_json=False, think=False,
+            temperature=0.4, num_predict=320, provider=agent.prose_provider,
+            api_key=agent.prose_key)
+    except ModelUnavailable as exc:
+        return ("The engine has nothing filed under that, and the GM is not answering: "
+                f"{exc}\nIt can always answer these from its own state: "
+                + ", ".join(sorted(gm_answers.TOPICS)) + ".")
+    said = " ".join(str(getattr(reply, "text", "") or "").split())
+    if not said:
+        return ("The engine has nothing filed under that, and the GM had nothing to "
+                "say either. It can always answer these from its own state: "
+                + ", ".join(sorted(gm_answers.TOPICS)) + ".")
+    return "The GM, out of character:\n  " + said
 
 
 def _cheat(c, wish: str, shown: str):

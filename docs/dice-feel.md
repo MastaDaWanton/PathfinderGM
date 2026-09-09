@@ -147,6 +147,42 @@ and the code revealed it by clearing the *inline* style, which falls back to the
 `tools/dicebench/` is kept. Judging how a die feels needs it thrown a hundred times, and
 doing that inside a campaign means a hundred real turns and a model call each.
 
+## Two geometry bugs the table found next, 2026-09-09
+
+Reported with a screenshot: "these die are splitting apart." Both predate all the work
+above, and both were invisible until something measured them.
+
+**The face normal was the direction of the face's centre.** `prepare` took each
+normal as `norm(centre)`, which equals the plane's normal only when a face is
+symmetric about it. That is true of every regular solid here and false of the d10,
+whose kites run from a near apex to a far equator point, so all ten of its faces sat
+tilted off their true planes and could not meet their neighbours. Sampling a grid
+across the middle of each die and asking what lay under each point:
+
+| Die | Holes before | Holes after |
+|---|---|---|
+| d6, d12, d20 | 0 | 0 |
+| d10 | 238 of 784 | 0 of 676 |
+
+The d4 keeps 31, because a tetrahedron's silhouette is a triangle and a square sample
+region overhangs it.
+
+**The d10's apex height was a guess.** A kite is four points, and four points are
+coplanar at exactly one apex height for a given equator zigzag: apex = zigzag times
+5 + 2√5. It shipped as zigzag 0.25 with apex 1.15, which is not that height, so every
+kite was bent 0.26 out of its own plane on a die of radius 1.
+
+**The d12's faces were the wrong five vertices.** It took its twelve face directions
+from `icosahedron().verts` and kept the five vertices leaning furthest each way, and
+that is the wrong cyclic permutation for this vertex set — those directions point at
+the dodecahedron's own vertices. Each "face" was five points 1.05 out of plane. Faces
+now come from support planes of the hull, found rather than guessed, which is the same
+discipline the icosahedron already used.
+
+The roller can now report its own flatness, which is the instrument that would have
+caught all three: `Dice3D._flatness()` returns the worst out-of-plane distance per
+solid, and every one is zero.
+
 ## Corrections the critic made to the sweep
 
 - The impact-feel paper annotated 5,000 comments across **15** games, not 16. The

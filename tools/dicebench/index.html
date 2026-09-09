@@ -21,10 +21,16 @@
 </style>
 <h2>Dice bench</h2>
 <div>
-  <button data-roll="20">d20 = 14</button>
+  <button data-roll="4" data-res="3">d4</button>
+  <button data-roll="6" data-res="4">d6</button>
+  <button data-roll="8" data-res="7">d8</button>
+  <button data-roll="10" data-res="9">d10</button>
+  <button data-roll="12" data-res="11">d12</button>
+  <button data-roll="20" data-res="14">d20</button>
   <button data-roll="20" data-res="20">d20 = 20 (crit)</button>
-  <button data-roll="6">d6 = 4</button>
-  <button data-roll="100">d100 = 73</button>
+  <button data-roll="20" data-res="1">d20 = 1 (fumble)</button>
+  <button data-roll="100" data-res="73">d100 (a pair)</button>
+  <button id="all">every shape in turn</button>
   <button id="ten">roll a d20 ten times, timed</button>
 </div>
 <div id="log"></div>
@@ -34,7 +40,7 @@ const log = (s) => { document.getElementById("log").textContent += s + "\n"; };
 document.querySelectorAll("[data-roll]").forEach(b => {
   b.onclick = async () => {
     const sides = Number(b.dataset.roll);
-    const res = Number(b.dataset.res || (sides === 100 ? 73 : sides === 6 ? 4 : 14));
+    const res = Number(b.dataset.res);
     const t = performance.now();
     await window.Dice3D.land({
       sides, result: res, title: "Perception", why: "the crowd is loud",
@@ -44,6 +50,16 @@ document.querySelectorAll("[data-roll]").forEach(b => {
     log(`d${sides} landed ${res} — closed after ${Math.round(performance.now() - t)} ms`);
   };
 });
+// Every solid, one after another, so a face that comes apart on one shape and not
+// another is visible in a single pass.
+document.getElementById("all").onclick = async () => {
+  for (const [sides, res] of [[4, 3], [6, 4], [8, 7], [10, 9], [12, 11], [20, 14], [100, 73]]) {
+    const p = window.Dice3D.land({ sides, result: res, title: "d" + sides, terms: [] });
+    setTimeout(() => document.querySelector("#d3d-go")?.click(), 1500);
+    await p;
+    log(`d${sides} showed ${res}`);
+  }
+};
 document.getElementById("ten").onclick = async () => {
   for (let i = 0; i < 10; i++) {
     const res = 1 + Math.floor(Math.random() * 20);

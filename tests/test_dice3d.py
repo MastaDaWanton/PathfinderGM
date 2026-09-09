@@ -33,6 +33,17 @@ SRC = (Path(__file__).resolve().parents[1] / "play" / "static" / "js"
        / "dice3d.js").read_text(encoding="utf-8")
 
 
+def _code(text: str) -> str:
+    """Source with the comments stripped.
+
+    Twice now a test has failed on a comment that explains the very number it was
+    checking had gone — the prose is not the bug, and a test that cannot tell them
+    apart is checking the wrong thing.
+    """
+    kept = [l for l in text.splitlines() if not l.strip().startswith("//")]
+    return chr(10).join(kept)
+
+
 def _fn(name: str) -> str:
     """One function's source, from its declaration to the next one at column two."""
     start = SRC.index("function " + name + "(")
@@ -124,3 +135,57 @@ def test_the_bench_is_kept():
     text = bench.read_text(encoding="utf-8")
     assert "../../play/static/js/dice3d.js" in text, \
         "the bench must load the live roller, not a copy"
+
+
+def test_a_face_normal_comes_from_its_own_plane():
+    """The one that made the dice come apart.
+
+    `prepare` took each face's normal as the direction of its CENTRE from the origin.
+    That is the same as the plane's normal only when a face is symmetric about it —
+    true of every regular solid here, and false of the d10, whose kites run from a near
+    apex to a far equator point. All ten of its faces were tilted off their true
+    planes, so neighbours could not meet.
+
+    Measured in the browser, 2026-09-09, sampling a grid across the middle of each die
+    and asking what was under each point:
+
+        d6 0 holes, d12 0, d20 0 — and d10 238 holes of 784.
+
+    After: every one of d6, d8, d10, d12 and d20 at 0 of 676. (The d4 keeps 31, because
+    a tetrahedron's silhouette is a triangle and the sample square overhangs it.)
+    """
+    prep = _fn("prepare")
+    code = _code(prep)
+    assert "cross(sub(verts[face[b]], verts[face[a]])" in code,         "the normal is no longer taken from the face's own plane"
+    assert "z = z || norm(c);" in code, "the degenerate fallback is gone"
+    assert "if (dot(z, c) < 0)" in code, "nothing is orienting the normal outward"
+    assert "var z = norm(c);" not in code, "the old centre-direction normal is back"
+
+
+def test_the_d10_apex_is_derived_rather_than_guessed():
+    """A kite is four points, and four points are coplanar at exactly one apex height
+    for a given zigzag. Shipped as zigzag 0.25 with apex 1.15, which is not it: every
+    kite was bent 0.26 out of plane on a die of radius 1."""
+    trap = _fn("trapezohedron")
+    # The code, not the comment: the comment above it explains the old 1.15 at length,
+    # and the comment is not the bug.
+    code = _code(trap)
+    assert "ZIG * (5 + 2 * Math.sqrt(5))" in code,         "the apex is a magic number again, and the d10's faces will not be flat"
+    assert "1.15" not in code
+
+
+def test_faces_are_found_rather_than_guessed():
+    """The d12 took its twelve face directions from the icosahedron's vertices, and
+    that is the wrong cyclic permutation for this vertex set: those directions point at
+    the dodecahedron's own vertices. Each "face" was five points 1.05 out of plane."""
+    assert "function hullFaces(" in SRC
+    dodeca = _fn("dodecahedron")
+    assert "hullFaces(v)" in dodeca
+    assert "icosahedron().verts" not in dodeca, "the wrong twelve directions are back"
+
+
+def test_the_roller_can_report_its_own_flatness():
+    """Both geometry bugs were invisible until something measured them. This is the
+    instrument: every solid's worst out-of-plane distance, which must be zero."""
+    assert "_flatness:" in SRC
+    assert "worst * 10000" in SRC
