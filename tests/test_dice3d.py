@@ -225,3 +225,25 @@ def test_the_ask_winds_up_and_does_not_throw():
     assert "translateY(-52px)" in cast
     assert "560" not in cast and "rotateX(560deg)" not in cast,         "the old second throw is back inside the ask"
     assert cast.count("setTimeout") == 1, "the wind-up grew a second stage again"
+
+def test_the_die_keeps_rolling_while_the_table_works_it_out():
+    """`/api/roll` narrates the turn, so it can take twenty seconds. Holding the mat
+    open across it left the die frozen in its wind-up pose for all of them.
+
+    Reported 2026-09-09: the die "freezes like this for a while until it snaps to the
+    number it rolled... the snap only seems to happen after i take a screen shot" —
+    which is the window losing focus, script timers throttling, and a pose held by a
+    transition that had already finished.
+
+    A CSS keyframe animation, deliberately: it runs on the compositor and keeps moving
+    when script callbacks are throttled. The file already learned this once, for the
+    idle drift.
+    """
+    assert "@keyframes d3d-cast{" in SRC, "the waiting die has nothing turning it"
+    ask = _code(_fn("ask"))
+    assert "d3d-cast 1.05s linear infinite" in ask,         "the held mat no longer keeps the die rolling"
+    assert "textContent = " in ask
+
+    # And the throw takes over from it rather than fighting it.
+    throw = _code(_fn("tumble"))
+    assert 'el.style.animation = "none";' in throw,         "the waiting animation is never stopped, so the throw competes with it"

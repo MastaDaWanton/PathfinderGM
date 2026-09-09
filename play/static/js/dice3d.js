@@ -349,6 +349,15 @@
     // windows), and it is the cheaper path besides.
     "@keyframes d3d-drift{from{transform:rotateX(-18deg) rotateY(24deg)}",
     "to{transform:rotateX(342deg) rotateY(384deg)}}",
+    // The die keeps rolling while the table works out what it rolled. Also a CSS
+    // keyframe animation, and for the same reason as the drift above: it lives on the
+    // compositor and keeps moving when script timers are throttled. Reported
+    // 2026-09-09 — the die "freezes like this for a while until it snaps to the number
+    // it rolled... the snap only seems to happen after i take a screen shot" — which is
+    // a window losing focus, script throttling, and a frozen pose held by a transition
+    // that had already finished.
+    "@keyframes d3d-cast{from{transform:translateY(-52px) rotateX(0deg) rotateY(0deg)}",
+    "to{transform:translateY(-52px) rotateX(360deg) rotateY(720deg)}}",
     "#d3d-mat{position:fixed;inset:0;z-index:60;display:none;align-items:center;",
     "justify-content:center;background:radial-gradient(60% 50% at 50% 40%,",
     "rgba(10,8,6,.74),rgba(4,3,3,.92));font:15px/1.55 'Palatino Linotype',Palatino,Georgia,serif}",
@@ -689,6 +698,9 @@
 
   function tumble(el, landTransform, slower, shadow) {
     var ms = slower ? THROW_MS + 110 : THROW_MS;
+    // Whatever was turning the die while it waited stops here, and the throw takes
+    // over from the pose it had reached.
+    el.style.animation = "none";
 
     if (reducedMotion()) {
       // Reduce, not remove: the player still needs to see that a roll happened, so
@@ -890,7 +902,18 @@
         // Held open when the caller is about to land a result in this same mat. The
         // die keeps its lifted pose and the throw picks up from there; without this
         // the mat blinked shut and open again around the request.
-        if (!opts.hold) { mat.classList.remove("on"); }
+        if (opts.hold) {
+          // Still rolling, because the answer has not arrived yet. A held mat with a
+          // motionless die reads as the game having hung.
+          die.style.transition = "none";
+          die.style.animation = "d3d-cast 1.05s linear infinite";
+          mat.querySelector("#d3d-go").textContent = "…";
+          mat.querySelector("#d3d-go").disabled = true;
+          mat.querySelector("#d3d-debug").style.display = "none";
+          mat.querySelector("#d3d-own").classList.remove("on");
+        } else {
+          mat.classList.remove("on");
+        }
         done(value);
       }
       mat.querySelector("#d3d-go").onclick = function () {
