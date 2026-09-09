@@ -1240,6 +1240,19 @@ function paneRules() {
         ? "Different sources add together; the same source reapplies."
         : "The best source applies; the rest wait their turn."}</em>
     </button>
+    <h2>Behind the screen</h2>
+    <p>What the machine is doing, on the page beside the fiction. The schemes running
+      and which part of each one fired, what the repairs changed, what the context
+      budget had to leave out. It is also what <code>/gm</code> adds to its answer.
+      Off by default, because it is the seams of the game and most sessions do not
+      want to see them.</p>
+    <button class="card pick ${r.gm_view ? "on" : ""}" data-hbgmview="1"
+            style="max-width:340px">
+      <h3>${r.gm_view ? "GM view — on" : "GM view — off"}</h3>
+      <em>${r.gm_view
+        ? "The seams are showing, which is the point."
+        : "Just the game."}</em>
+    </button>
     <div id="ruleserr"></div>`;
 }
 
@@ -2005,6 +2018,8 @@ document.addEventListener("click", async e => {
   if (racerp) { await setHouseRule({ race_rp: Number(racerp.dataset.hbracerp) }); return; }
   const core = e.target.closest("[data-hbcore]");
   if (core) { await setHouseRule({ core_races: RULES.rules.core_races === false }); return; }
+  const gmv = e.target.closest("[data-hbgmview]");
+  if (gmv) { await setHouseRule({ gm_view: !RULES.rules.gm_view }); return; }
   const imp = e.target.closest("[data-importraces]");
   if (imp) {
     imp.disabled = true;

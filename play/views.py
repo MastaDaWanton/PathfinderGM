@@ -23,7 +23,7 @@ from rules.intents import IntentError
 
 from . import campaign as campaign_mod
 from .apiutil import read_body, read_int
-from . import downed, player_input, roster
+from . import downed, gm_answers, player_input, roster
 
 
 def _recent_events(world, location, limit=4):
@@ -752,6 +752,11 @@ def say(request):
     if not carry_on and _CHEAT.match(text):
         return _cheat(c, _CHEAT.sub("", text, count=1).strip(), shown)
 
+    # Out of character, and before everything else for the same reason the cheat is: a
+    # slash can never be a sentence somebody meant.
+    if not carry_on and _GM.match(text):
+        return _gm_answer(c, _GM.sub("", text, count=1).strip(), shown)
+
     # The player controls one character; the GM controls the world. A turn that declares
     # what the world does is handed back rather than resolved — gently, and without
     # consuming the turn, because the player has not done anything wrong so much as
@@ -1012,6 +1017,30 @@ def roll(request):
 # turn starts with one, and the player who types it has decided to be the author for a
 # line. Trailing space or colon both allowed, because both are what people type.
 _CHEAT = re.compile(r"^\s*/cheat\b[:\s]*", re.I)
+
+# `/gm <question>`. Out of character, answered by the engine, never by a model. Same
+# slash reasoning as the cheat above: no ordinary turn starts with one.
+_GM = re.compile(r"^\s*/gm\b[:\s]*", re.I)
+
+
+def _gm_answer(c, question: str, shown: str):
+    """Answer a question about the game from the engine, and change nothing.
+
+    Not a turn: nothing rolls, the clock does not move, and no NPC acts because the
+    player wanted to check their own hit points.
+
+    And deliberately NOT appended to `c.history`. An out-of-character exchange sitting
+    in the conversation the narrator reads is, as far as the narrator is concerned, a
+    fact about the world — it would write the question and the answer into the fiction
+    on the next turn. The page gets it; the model never sees it.
+    """
+    c.transcript.append({"who": "player", "text": shown, "kind": "aside"})
+    c.transcript.append({
+        "who": "gm", "kind": "aside",
+        "text": gm_answers.answer(c, c.engine(), question),
+    })
+    c.save()
+    return JsonResponse(_state(c))
 
 
 def _cheat(c, wish: str, shown: str):

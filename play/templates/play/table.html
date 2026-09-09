@@ -132,6 +132,26 @@
   .beat.player::before { content: "❧ "; opacity: .55; font-style: normal; }
   .beat.consequence { color: var(--ink); }
   .beat.setup { color: #d2c7ad; }
+  /* Behind the screen. Same monospace register as an out-of-character aside, because
+     it is the same thing: the machine talking, not the narrator. */
+  #gmview .scheme {
+    font: 11.5px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #9db0a6; background: rgba(0,0,0,.24); border-left: 2px solid #3c4b43;
+    padding: 7px 9px; margin: 6px 0; border-radius: 2px;
+  }
+  #gmview .scheme .sub { color: #74847b; font-size: 11px; }
+  /* Out of character: the engine answering a question about itself, never the
+     narrator. Deliberately unlike the prose — monospace, no drop cap, no ink bleed —
+     because the one thing this must never be mistaken for is the fiction. */
+  .beat.aside {
+    white-space: pre-wrap;
+    font: 12.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #9db0a6; background: rgba(0,0,0,.28);
+    border-left: 2px solid #3c4b43; border-radius: 2px;
+    padding: 9px 12px; margin: 10px 0;
+  }
+  .beat.aside::first-letter { font: inherit; float: none; color: inherit; }
+  .beat.player.aside { color: #7f8f86; font-style: normal; }
   /* The illuminated capital: each of the GM's scene passages opens the way a
      grimoire page does. Consequences stay plain — they are the engine's voice. */
   .beat.setup::first-letter {
@@ -1351,7 +1371,12 @@
     </div>
   <div id="abilities"></div>
     <form id="sayform" autocomplete="off">
-      <input type="text" id="input" placeholder="What do you do?" autofocus>
+      <!-- The out-of-character door is discoverable or it does not exist. `title` so
+           the hint is there on hover without taking a line of the page. -->
+      <input type="text" id="input" placeholder="What do you do?" autofocus
+             title="Type what your character does. Put speech in &quot;quotes&quot;.
+/gm asks the engine a question out of character: /gm who is here, /gm what am I carrying, /gm quests.
+/cheat makes something true: /cheat I have 100 gold.">
       <button type="submit" id="send">Say</button>
       <!-- For the turn that stops mid-scene: your character asks a question and
            nobody answers it, and there is nothing to type because you have already
@@ -1403,6 +1428,9 @@
   <div id="mapwrap"></div>
   <h2>In the scene</h2>
   <div id="board"></div>
+  <!-- Filled only when the GM view house rule is on; the server decides, so the seams
+       cannot leak into an ordinary session through a front-end mistake. -->
+  <div id="gmview"></div>
   <h2>Rolls</h2>
   <div id="rolls"></div>
 </aside>
@@ -1796,6 +1824,12 @@ function render(s) {
      <small>${a.hp}/${a.hp_max}${a.conditions.length ? " · " + a.conditions.join(", ") : ""}</small></div>`
   ).join("") + `<div class="sub" style="margin-top:8px">${esc(s.scene.location)}</div>`;
 
+  // Behind the screen. `schemes` arrives on the state only when the GM view house rule
+  // is on — the server decides, so the seams cannot leak into an ordinary session by a
+  // front-end mistake. It had been arriving and going nowhere: the rule had a reader in
+  // `play/views.py` and no renderer anywhere, so turning it on did nothing visible.
+  renderGmView(s);
+
   renderRolls(s.log);
 
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
@@ -1865,6 +1899,31 @@ document.addEventListener("click", async e => {
 // Suggestions, not a menu. Clicking one puts the words in the box rather than sending
 // them, so the player can change their mind or add to it — a chip that fired the turn
 // straight off would quietly turn a nudge into the only three things you can do.
+function renderGmView(s) {
+  const box = $("#gmview");
+  if (!box) { return; }
+  const running = s.schemes;
+  if (!running) { box.innerHTML = ""; return; }
+  if (!running.length) {
+    box.innerHTML = `<h2>Behind the screen</h2><div class="sub">No scheme is running.</div>`;
+    return;
+  }
+  box.innerHTML = `<h2>Behind the screen</h2>` + running.map(x => {
+    const slots = Object.entries(x.slots || {})
+      .map(([k, v]) => `<div class="sub">${esc(k)}: ${esc(v || "unfilled")}</div>`).join("");
+    const fired = Object.keys(x.fired || {});
+    return `<div class="scheme">
+      <div><b>${esc(x.title || x.scheme)}</b></div>
+      ${slots}
+      ${fired.length ? `<div class="sub">fired: ${esc(fired.join(", "))}</div>` : ""}
+      ${(x.skipped || []).length
+        ? `<div class="sub">skipped: ${esc((x.skipped || []).join("; "))}</div>` : ""}
+      ${x.outcome ? `<div class="sub">outcome: ${esc(x.outcome)}</div>` : ""}
+      ${(x.news || []).length ? `<div class="sub">news on its way: ${(x.news || []).length}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
 function renderSuggestions(s) {
   const box = $("#suggestions");
   const offered = (s.suggestions || []);
