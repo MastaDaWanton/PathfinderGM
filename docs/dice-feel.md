@@ -211,3 +211,90 @@ solid, and every one is zero.
   official pages refused fetching.
 - A measured rejection rate for re-rolling a physics die until it matches a target,
   which is moot for us since nobody does it that way.
+
+## The light was on the die, 2026-09-09
+
+Reported from the table: "as it is right now the lighting is assigned to a few faces and
+it spins with those faces, all other faces are darker. can you have the light stay
+consistent and directional?" — and the same message asked for brass, with the numbers
+engraved.
+
+The lighting complaint was exactly right, and the code said so in one line. `buildSolid`
+shaded each face once, at build time, from that face's normal **in the die's own frame**.
+That is a light painted onto the die, so it turned with it. Turning each of the twenty
+faces square-on to the camera in turn — the same `faceToFront` the landing uses, so the
+normal is the identical direction every time — and reading what the browser computed:
+
+| | brightness of the face turned to the camera | spread |
+|---|---|---|
+| before | 0.620–1.147, and **ten of the twenty faces pinned at 0.620**, the unlit floor | 0.527 |
+| after | 0.786, all twenty | **0.000** |
+
+"A few faces" was not an impression. Half the die was at the minimum.
+
+### What the traditions do about it
+
+Nothing, is the short answer: **CSS has no lighting model**, and there is no way to hold
+a light still under a rotating object without recomputing per frame. Every CSS-3D
+implementation that shades faces at all computes it in script from the object's live
+orientation — the draggable-cube demos vary face opacity by angle to the viewport, the
+`qube` library ships "automatic flat shading", and `filter: brightness()` per side is the
+usual instrument. The physics renderers (Dice So Nice) have real lights because they have
+a real renderer. Nothing found offers a static trick; the one article that promises CSS
+lighting turns out to move `perspective-origin` and place a fixed dark copy on the floor,
+which is a shadow, not a light.
+
+So the shape is a per-frame pass, and the only real choice is which way round to carry
+the rotation. Rotating twenty normals out of the die's frame costs twenty transforms per
+frame; carrying the light and the eye **into** that frame costs two, because the rotation
+is orthonormal and its inverse is its transpose. Everything after that is dot products in
+the frame the geometry already lives in.
+
+Two honest limits, both written at the code. On the contact frames the die carries a
+non-uniform `scale3d`, for which the correct normal transform is the inverse transpose
+rather than the rotation, so the shading is slightly wrong for about a tenth of a second.
+And this is script, so it stops when the window is in the background while the compositor
+keeps turning the die — the same throttling that caused the frozen die, running the other
+way. The die is lit again a frame after anyone looks at it.
+
+Measured cost: 60 frames in 1000ms through a real throw, median gap 16.7ms, worst 16.8ms,
+nothing over 20ms, with 100 nodes on the die.
+
+### Brass, and numbers cut into it
+
+A face is now four layers clipped to the same polygon at four insets, which is what a
+cast metal die is: the dark chamfer where two faces meet, the bevel that catches the
+light, a hairline rule that is the ornament, and the flat panel the number is cut into. A
+clip-path cannot be stroked, so the rule is a dark layer showing through between two
+others.
+
+- **The metal.** Brass is anisotropic, and the whole of the CSS "brushed metal" tradition
+  is alternating light and dark stops running along a grain rather than a smooth ramp.
+  The ramp colours are custom properties, so the landed, critical and fumbled states
+  restate the metal in four values instead of restating three background layers.
+- **The sheen** sits where the light is: `--sx`/`--sy` are the light flattened into that
+  face's own plane, so the highlight slides across the brass as the die turns.
+- **The numerals are engraved**, by the letterpress recipe — a dark wall on the side the
+  light comes from and a lit one opposite — with the offsets live rather than authored,
+  so the cut keeps facing the same way while the die turns. They fall to nothing as a
+  face turns to meet the light head-on, which is what a groove seen straight down does.
+- **The bevel is a constant width.** Scaling a face's points toward its centre is one
+  line and is exact for a regular polygon, which every face here is except the d10's
+  kite: on a kite it puts a wide border on the blunt end and pinches it to nothing at the
+  sharp one, and it showed. Each edge is offset along its own inward normal now, mitred,
+  with the mitre clamped the way SVG clamps it.
+
+### The bench walks the joins now
+
+Two buttons were added, because of the instruction written down after the last dice
+build. One runs the sequence the game runs — ask, hold the mat, wait out a six-second
+stand-in for the model call, land — since every dice defect the table has reported lived
+in the joins between those, not inside any one of them. The other measures the light.
+
+The first attempt at that measurement was wrong in a way worth keeping: it sampled
+"whichever face is most square-on" through a spin and reported a spread of 0.920. On a
+d20 the front-most face still wanders about twenty degrees off the view axis, so its own
+normal is moving and the reading moves with it. It measured nothing. Driving each face
+square-on with `faceToFront` measures the thing. And the loop is synchronous, because
+animation frames do not fire in a background tab — a bench that waits for one measures
+nothing unless somebody is watching it, which is the same throttling that froze the die.

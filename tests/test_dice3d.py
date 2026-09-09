@@ -127,6 +127,111 @@ def test_every_solid_is_still_built_from_its_own_vertices(shape):
     assert "function " + shape + "()" in SRC
 
 
+def test_the_light_belongs_to_the_room_and_not_to_the_die():
+    """The one the table could see without knowing the word for it.
+
+    `buildSolid` shaded each face once, at build time, from that face's normal in the
+    DIE's own frame — so the shading was painted onto the die and turned with it.
+    Reported 2026-09-09: "the lighting is assigned to a few faces and it spins with
+    those faces, all other faces are darker."
+
+    Measured on the bench by turning each of the twenty faces square-on to the camera
+    in turn — the same `faceToFront` the landing uses, so the face's normal is the
+    identical direction every time — and reading what the browser computed for it:
+
+        before   brightness 0.620-1.147, spread 0.527, and TEN of the twenty faces
+                 pinned at 0.620, which is the unlit floor. "A few faces" was exact.
+        after    0.786 on all twenty. Spread 0.000.
+
+    So the number the die lands on is now lit the same whichever number it is. The
+    shading has to be recomputed per frame — CSS has no lighting model, and every
+    CSS-3D implementation that shades faces at all does it in script from the object's
+    live orientation — and the die's own matrix is where the orientation comes from.
+    """
+    src = _code(SRC)
+    assert "function shadeOne(" in src, "nothing shades the die as it turns"
+    assert "new DOMMatrix(" in src, "the shading no longer reads the die's live matrix"
+    assert "requestAnimationFrame(shadeLoop)" in src, "the light is not kept up to date"
+    assert "var LIGHT = norm(" in src, "there is no one light for the room"
+    build = _code(_fn("buildSolid"))
+    assert "el.style.filter" not in build, "the light is baked into the faces again"
+    assert "brightness(" not in build, "a face is deciding its own brightness again"
+    # The cheap direction: the light and the eye are carried INTO the die's frame, so a
+    # frame costs two rotations rather than one per face.
+    shade = _code(_fn("shadeOne"))
+    assert "dot(cx, LIGHT)" in shade and "dot(cx, VIEW)" in shade, \
+        "the light is being carried the expensive way round"
+
+
+def test_a_face_that_is_turned_away_is_not_shaded():
+    """Half the faces of a solid point away from the camera at any moment and are
+    hidden by `backface-visibility`. Shading them is twenty writes a frame that nobody
+    can see, and this loop runs every frame of every roll."""
+    shade = _code(_fn("shadeOne"))
+    assert "f.toward <= 0.02" in shade, "hidden faces are being shaded again"
+
+
+def test_the_numbers_are_engraved_rather_than_printed():
+    """A groove shows a dark wall on the side the light comes from and a lit one
+    opposite — the letterpress recipe, with the light direction live instead of
+    authored, so the cut keeps facing the same way while the die turns.
+
+    The offsets are the light flattened into that face's own plane, which is why they
+    fall to nothing as a face turns to meet the light head-on: a groove seen straight
+    down has no visible wall.
+    """
+    src = _code(SRC)
+    assert "text-shadow:calc(var(--ex,0) * 1px)" in src, "the numerals are printed flat"
+    assert "calc(var(--ex,0) * -1.3px)" in src, "the lit wall of the groove is gone"
+    shade = _code(_fn("shadeOne"))
+    assert 'setProperty("--ex"' in shade and 'setProperty("--ey"' in shade, \
+        "nothing tells the engraving which way the light is"
+    assert "dot(L, f.x0)" in shade, "the groove no longer follows the real light"
+
+
+def test_a_face_is_brass_with_an_edge_a_bevel_a_rule_and_a_panel():
+    """Four layers clipped to the same polygon at four insets, which is what a cast
+    metal die is: the dark chamfer where two faces meet, the bevel that catches the
+    light, the hairline rule that is the ornament, and the flat panel the number is cut
+    into. A clip-path cannot be stroked, so the rule is a dark layer showing through."""
+    build = _code(_fn("buildSolid"))
+    for cls, what in [('"b"', "bevel"), ('"g"', "ruled groove"), ('"p"', "panel")]:
+        assert "className = " + cls in build, "the " + what + " is gone"
+    src = _code(SRC)
+    assert "var BEVEL = " in src and "var RULE = " in src
+    assert "linear-gradient(158deg,var(--m1),var(--m2) 40%" in src, \
+        "the brass ramp is no longer a variable, so the landed state cannot restate it"
+    # Metal does not shade like plastic: the ramp alternates light and dark along a
+    # grain rather than running smoothly from one end to the other.
+    assert "repeating-linear-gradient(118deg" in src, "the anisotropic grain is gone"
+
+
+def test_the_bevel_is_a_constant_width_rather_than_a_scaled_copy():
+    """Scaling a face's points toward its centre is one line and is exact for a regular
+    polygon — which every face here is EXCEPT the d10's kite. On a kite it puts a wide
+    border on the blunt end and pinches it to nothing at the sharp one, and that shows
+    on screen. Each edge is offset along its own inward normal instead, with a mitre
+    limit, because at a sharp corner the true mitre runs far outside the face."""
+    src = _code(SRC)
+    assert "function inset(pts, d)" in src
+    assert "var cap = d * 3.2" in src, "the mitre limit is gone; sharp corners will fly"
+    assert "p[0] * k" not in src, "the old centroid scaling is back"
+
+
+def test_the_bench_walks_the_path_the_player_walks():
+    """The instruction written down after the last dice build: the bench verified
+    `land()` while the game called `ask()`, posted to the server and then landed, so
+    every fix was green and the player saw no change. The joins are where the defects
+    were, so the bench has to walk the joins."""
+    bench = (Path(__file__).resolve().parents[1] / "tools" / "dicebench"
+             / "index.html").read_text(encoding="utf-8")
+    assert 'id="real"' in bench, "the bench cannot walk the real path again"
+    assert "Dice3D.ask(Object.assign({ hold: true }" in bench
+    assert "setTimeout(r, 6000)" in bench, "the bench no longer waits out a model call"
+    assert "requestAnimationFrame" not in bench.split('id="light"')[1][:1200], \
+        "the light measurement waits for a frame, and frames stop in a background tab"
+
+
 def test_the_bench_is_kept():
     """Judging how a die feels needs it thrown a hundred times, which inside a campaign
     would mean a hundred real turns and a model call each."""

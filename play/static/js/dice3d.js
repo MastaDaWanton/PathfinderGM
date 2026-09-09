@@ -257,7 +257,51 @@
   }
 
   /* --- rendering one solid into a host element -------------------------------------- */
-  var PX = 60;   // world units to pixels
+  var PX = 60;        // world units to pixels
+  var BEVEL = 3.5;    // the dark edge where two faces meet, in pixels
+  var PANEL = 6;      // the lit bevel ring inside it
+  var RULE = 1.6;     // the hairline groove ruled around the panel
+
+  /* The same polygon with every edge moved `d` pixels inward — a chamfer of constant
+     width, which is what a bevel on a cast die is.
+
+     Scaling the points toward the face's centre instead is one line and is exact for a
+     regular polygon, which every face here is EXCEPT the d10's kite: on a kite it puts
+     a wide border on the blunt end and pinches it to nothing at the sharp one, and that
+     shows. So each edge is offset along its own inward normal and consecutive edges are
+     intersected — a mitre, clamped, because at a sharp corner the true mitre runs away
+     to a point far outside the face. */
+  function inset(pts, d) {
+    var n = pts.length;
+    var cx = 0, cy = 0;
+    pts.forEach(function (p) { cx += p[0] / n; cy += p[1] / n; });
+    var lines = pts.map(function (a, i) {
+      var b = pts[(i + 1) % n];
+      var ex = b[0] - a[0], ey = b[1] - a[1];
+      var l = Math.sqrt(ex * ex + ey * ey) || 1;
+      var nx = -ey / l, ny = ex / l;                       // one of the two normals
+      if (nx * (cx - a[0]) + ny * (cy - a[1]) < 0) { nx = -nx; ny = -ny; }
+      return { nx: nx, ny: ny, c: nx * a[0] + ny * a[1] + d };
+    });
+    return pts.map(function (p, i) {
+      var u = lines[(i + n - 1) % n], v = lines[i];        // the two edges at this point
+      var det = u.nx * v.ny - u.ny * v.nx;
+      if (Math.abs(det) < 1e-6) return [p[0], p[1]];       // parallel: leave it be
+      var x = (u.c * v.ny - v.c * u.ny) / det;
+      var y = (u.nx * v.c - v.nx * u.c) / det;
+      var dx = x - p[0], dy = y - p[1], moved = Math.sqrt(dx * dx + dy * dy);
+      var cap = d * 3.2;                                   // mitre limit, as SVG has
+      if (moved > cap) { x = p[0] + dx * cap / moved; y = p[1] + dy * cap / moved; }
+      return [x, y];
+    });
+  }
+
+  function poly(pts, hw, hh, d) {
+    return "polygon(" + (d ? inset(pts, d) : pts).map(function (p) {
+      return ((p[0] + hw) / (hw * 2) * 100).toFixed(2) + "% " +
+             ((p[1] + hh) / (hh * 2) * 100).toFixed(2) + "%";
+    }).join(",") + ")";
+  }
 
   function buildSolid(host, sides) {
     if (host.dataset.shape === String(sides)) {
@@ -265,7 +309,7 @@
     }
     host.dataset.shape = String(sides);
     host.innerHTML = "";
-    var s = shape(sides), els = [];
+    var s = shape(sides), els = [], shading = [];
     s.faces.forEach(function (f) {
       // The face projected into its own plane gives both the clip-path outline and
       // the element box; the face basis, column by column, is what matrix3d takes.
@@ -284,22 +328,133 @@
       el.style.height = (hh * 2) + "px";
       el.style.left = (-hw) + "px";
       el.style.top = (-hh) + "px";
-      el.style.clipPath = "polygon(" + pts.map(function (p) {
-        return ((p[0] + hw) / (hw * 2) * 100).toFixed(2) + "% " +
-               ((p[1] + hh) / (hh * 2) * 100).toFixed(2) + "%";
-      }).join(",") + ")";
+      el.style.clipPath = poly(pts, hw, hh, 0);
       var t = [f.centre[0] * PX, f.centre[1] * PX, f.centre[2] * PX];
       el.style.transform = "matrix3d(" + [x0[0], x0[1], x0[2], 0,
                                           y0[0], y0[1], y0[2], 0,
                                           z[0], z[1], z[2], 0,
                                           t[0], t[1], t[2], 1].join(",") + ")";
-      // A fixed light, baked per face — what makes flat polygons read as one object.
-      var lit = dot(z, norm([-0.35, -0.75, 0.56]));
-      el.style.filter = "brightness(" + (0.62 + 0.55 * Math.max(0, lit)).toFixed(3) + ")";
+
+      var bevel = document.createElement("i");
+      bevel.className = "b";
+      bevel.style.clipPath = poly(pts, hw, hh, BEVEL);
+      // The rule: a hairline groove following the face, which is the ornament every
+      // engraved metal die carries. It is not drawn — a clip-path cannot be stroked —
+      // it is the dark layer showing through between the bevel and the panel on top.
+      var rule = document.createElement("i");
+      rule.className = "g";
+      rule.style.clipPath = poly(pts, hw, hh, BEVEL + PANEL);
+      var panel = document.createElement("i");
+      panel.className = "p";
+      panel.style.clipPath = poly(pts, hw, hh, BEVEL + PANEL + RULE);
+      var num = document.createElement("b");
+      num.className = "n";
+      // A d20's faces are a third the size of a d6's, and one fixed size was set for
+      // the d20 — so every larger face wore a number too small for it.
+      num.style.fontSize =
+        Math.max(13, Math.min(31, Math.min(hw, hh) * 0.72)).toFixed(1) + "px";
+      el.appendChild(bevel);
+      el.appendChild(rule);
+      el.appendChild(panel);
+      el.appendChild(num);
+      el._num = num;
+
       host.appendChild(el);
       els.push(el);
+      // What the shader needs, in the die's own frame: the face's normal and the two
+      // axes of its plane. The light is carried into this frame rather than these being
+      // carried out of it — two vectors rotated per die per frame instead of sixty.
+      shading.push({ el: el, n: z, x0: x0, y0: y0, toward: 0, lit: "", cut: "" });
     });
+    hosts[host.id] = { host: host, faces: shading };
     return els;
+  }
+
+  /* --- the light ---------------------------------------------------------------------
+     It was baked. `buildSolid` shaded each face once, from that face's normal in the
+     DIE's frame — so the shading was painted onto the die and turned with it. Reported
+     from the table: "the lighting is assigned to a few faces and it spins with those
+     faces, all other faces are darker."
+
+     There is no way around a per-frame pass. CSS has no lighting model, and every
+     CSS-3D implementation that shades faces at all computes it in script from the
+     object's current orientation; the physics renderers (Dice So Nice) have real
+     lights because they have a real renderer. So: read the die's live matrix, and
+     shade against a light that belongs to the room.
+
+     The cheap direction: rotating twenty normals out of the die's frame costs twenty
+     transforms, while carrying the light and the eye INTO that frame costs two — the
+     rotation is orthonormal, so its inverse is the transpose, which is what dotting
+     against the columns is. Everything after that is the same dot products in the
+     frame the geometry is already in.
+
+     Two honest limits. During the squash frames the die carries a non-uniform scale,
+     for which the correct normal transform is the inverse transpose rather than the
+     rotation, so the shading is slightly off for about a tenth of a second on contact.
+     And this loop is script, so it stops when the window is in the background and the
+     compositor keeps turning the die without it — the die is lit again a frame after
+     it is looked at, which is the same trade the drift and cast animations already
+     make in the other direction. */
+  var LIGHT = norm([-0.42, -0.78, 0.47]);   // high, left, and in front. Of the room.
+  var VIEW = [0, 0, 1];
+  var hosts = {}, raf = 0;
+
+  function shadeOne(rec) {
+    var m;
+    try {
+      var t = getComputedStyle(rec.host).transform;
+      m = new DOMMatrix(t === "none" ? "" : t);
+    } catch (e) { return; }
+    // Columns normalised: the die is scaled on contact, and a scale is not a rotation.
+    var cx = norm([m.m11, m.m12, m.m13]);
+    var cy = norm([m.m21, m.m22, m.m23]);
+    var cz = norm([m.m31, m.m32, m.m33]);
+    var L = [dot(cx, LIGHT), dot(cy, LIGHT), dot(cz, LIGHT)];
+    var V = [dot(cx, VIEW), dot(cy, VIEW), dot(cz, VIEW)];
+    var H = norm([L[0] + V[0], L[1] + V[1], L[2] + V[2]]);
+
+    rec.faces.forEach(function (f) {
+      f.toward = dot(f.n, V);
+      if (f.toward <= 0.02) return;    // turned away, and hidden by backface-visibility
+      var diffuse = Math.max(0, dot(f.n, L));
+      var spec = Math.pow(Math.max(0, dot(f.n, H)), 26);   // brass is a tight highlight
+      var lit = (0.46 + 0.66 * diffuse + 0.9 * spec).toFixed(3);
+      if (lit !== f.lit) { f.el.style.setProperty("--lit", lit); f.lit = lit; }
+      // The light flattened into this face's own plane: where the sheen sits, and
+      // which wall of an engraved groove is the dark one. Both go to zero as the face
+      // turns to meet the light head-on, which is what they should do.
+      var lx = dot(L, f.x0), ly = dot(L, f.y0);
+      var cut = lx.toFixed(2) + " " + ly.toFixed(2);
+      if (cut !== f.cut) {
+        f.el.style.setProperty("--sx", lx.toFixed(2));
+        f.el.style.setProperty("--sy", ly.toFixed(2));
+        f.el.style.setProperty("--ex", (lx * 1.5).toFixed(2));
+        f.el.style.setProperty("--ey", (ly * 1.5).toFixed(2));
+        f.cut = cut;
+      }
+    });
+  }
+
+  function shadeAll() {
+    Object.keys(hosts).forEach(function (k) {
+      var rec = hosts[k];
+      // The ones die of a percentile pair is not on screen most of the time, and
+      // shading a hidden die is twenty faces of work nobody sees.
+      if (rec.host === die2 && die2 && die2.style.display === "none") return;
+      shadeOne(rec);
+    });
+  }
+
+  function shadeLoop() {
+    raf = 0;
+    if (!mat || !mat.classList.contains("on")) return;
+    shadeAll();
+    raf = requestAnimationFrame(shadeLoop);
+  }
+
+  function startShading() {
+    shadeAll();                     // lit before the first frame, not one frame late
+    if (!raf) raf = requestAnimationFrame(shadeLoop);
   }
 
   /* Rodrigues, so a vector can be carried through the same rotation the die takes. */
@@ -412,15 +567,44 @@
     // the layout. The pair rule below is what makes clearing it mean "show".
     "#d3d-die2{margin-left:95px;display:none}",
     "#d3d-stage.pair #d3d-die2{display:block}",
+    /* A face is three layers clipped to the same polygon at three insets, which is what
+       a cast metal die actually is: the outer sliver is the dark chamfered edge where
+       two faces meet, the ring inside it is the bevel that catches the light, and the
+       panel is the flat top the number is cut into.
+
+       Brass is the material, and metal does not shade like plastic: a metal gradient is
+       alternating light and dark stops running along a grain (anisotropic), not a
+       smooth ramp — the whole trick behind every CSS "brushed metal" recipe. The ramp
+       colours are variables so the landed, critical and fumbled states can restate the
+       metal without restating the three background layers. */
     "#d3d-die .f,#d3d-die2 .f{position:absolute;",
-    "display:flex;align-items:center;justify-content:center;",
+    "--m1:#9d7c39;--m2:#6a5223;--m3:#87682c;--m4:#43310f;--ink:#3a2a0d;",
+    "background:linear-gradient(158deg,#6b5327,#33260f 55%,#241a09);",
+    "filter:brightness(var(--lit,1));backface-visibility:hidden}",
+    "#d3d-die .f .b,#d3d-die2 .f .b{position:absolute;inset:0;",
+    "background:linear-gradient(158deg,#e3c485,#9c7a38 42%,#c8a75f 58%,#5d4620)}",
+    "#d3d-die .f .g,#d3d-die2 .f .g{position:absolute;inset:0;",
+    "background:linear-gradient(158deg,#2e2109,#160f04)}",
+    // --sx/--sy are the light's own direction within THIS face's plane, so the sheen
+    // slides across the brass as the die turns instead of sitting wherever a gradient
+    // happened to be authored.
+    "#d3d-die .f .p,#d3d-die2 .f .p{position:absolute;inset:0;background:",
+    "radial-gradient(58% 58% at calc(50% + var(--sx,0) * 26%) calc(50% + var(--sy,0) * 26%),",
+    "rgba(255,244,206,.42),rgba(255,244,206,0) 72%),",
+    "repeating-linear-gradient(118deg,rgba(255,238,192,.06) 0 2px,rgba(0,0,0,.05) 2px 5px),",
+    "linear-gradient(158deg,var(--m1),var(--m2) 40%,var(--m3) 58%,var(--m4))}",
+    // Engraved, not printed. A groove shows a dark wall on the side the light comes
+    // from and a lit one on the wall opposite, and both offsets are the live light
+    // direction — so the cut keeps facing the same way while the die turns.
+    "#d3d-die .f .n,#d3d-die2 .f .n{position:absolute;inset:0;display:flex;",
+    "align-items:center;justify-content:center;color:var(--ink);",
     "font:400 26px/1 'Cinzel','Palatino Linotype',Georgia,serif;",
-    "background:linear-gradient(#2c2318,#191309);color:#c9b489;",
-    "backface-visibility:hidden}",
-    "#d3d-die .f.land,#d3d-die2 .f.land{background:linear-gradient(#3a2f1d,#241c10);",
-    "color:#f0dcae}",
-    "#d3d-die .f.land.crit{color:#6fcf8f;background:linear-gradient(#1d3a28,#122117)}",
-    "#d3d-die .f.land.fumble{color:#d9776b;background:linear-gradient(#3a1d1a,#210f0d)}",
+    "text-shadow:calc(var(--ex,0) * 1px) calc(var(--ey,0) * 1px) 0 rgba(18,12,3,.92),",
+    "calc(var(--ex,0) * -1.3px) calc(var(--ey,0) * -1.3px) 1px rgba(255,238,190,.55)}",
+    "#d3d-die .f.land,#d3d-die2 .f.land{",
+    "--m1:#d8ae57;--m2:#96742c;--m3:#bb9440;--m4:#5c441a;--ink:#33240a}",
+    "#d3d-die .f.land.crit{--m1:#8fdfae;--m2:#2f6a48;--m3:#63bd88;--m4:#1b3e2b;--ink:#0e2a1b}",
+    "#d3d-die .f.land.fumble{--m1:#e79a86;--m2:#7d3527;--m3:#c46c58;--m4:#451812;--ink:#2c0d08}",
     "#d3d-terms{background:rgba(0,0,0,.34);border:1px solid #2b2319;border-radius:2px;",
     "padding:10px 12px;margin:6px 0 4px}",
     "#d3d-terms .r{display:flex;justify-content:space-between;font-size:13px;color:#8e816a}",
@@ -607,6 +791,7 @@
       s.style.opacity = "0";
     });
     mat.classList.add("on");
+    startShading();
   }
 
   function fillTerms(terms) {
@@ -664,13 +849,13 @@
         var base = lo + Math.round((span - 1) * (i + 0.5) / n);
         value = Math.max(lo, Math.min(hi, base + (Math.floor(Math.random() * 5) - 2)));
       }
-      els[i].textContent = value;
+      els[i]._num.textContent = value;
       els[i].className = "f";
       if (value === result && landing < 0) landing = i;
     }
     if (landing < 0) {
       landing = Math.floor(Math.random() * n);
-      els[landing].textContent = result;
+      els[landing]._num.textContent = result;
     }
     return landing;
   }
@@ -809,9 +994,9 @@
 
     var s = shape(10), landA = 0, landB = 0;
     for (var i = 0; i < elsA.length; i++) {
-      elsA[i].textContent = ("0" + (s.numbers[i] * 10)).slice(-2);
+      elsA[i]._num.textContent = ("0" + (s.numbers[i] * 10)).slice(-2);
       elsA[i].className = "f";
-      elsB[i].textContent = s.numbers[i];
+      elsB[i]._num.textContent = s.numbers[i];
       elsB[i].className = "f";
       if (s.numbers[i] === tens) landA = i;
       if (s.numbers[i] === ones) landB = i;
@@ -849,7 +1034,7 @@
     var els = buildSolid(die, sides);
     var s = shape(sides);
     for (var i = 0; i < els.length; i++) {
-      els[i].textContent = s.numbers[i];
+      els[i]._num.textContent = s.numbers[i];
       els[i].className = "f";
     }
     die.style.transition = "none";
@@ -950,6 +1135,26 @@
     numbers: shape(20).numbers.slice(),
     _centres: shape(20).faces.map(function (f) { return f.centre; }),
     _shape: shape,
+    _faceToFront: faceToFront,
+    /* The instrument for the light. Every face of the primary die as it stands right
+       now: how squarely it faces the camera, and how bright it is.
+
+       The measurement it exists for: a face turned toward the camera has the same
+       normal in the room whatever the die has been doing, so under a light that
+       belongs to the room its brightness cannot change as the die spins. Under a light
+       baked into the die it changes constantly, which is what "the lighting is assigned
+       to a few faces and spins with them" looks like from the outside. Sample the
+       front-most face through a spin and the spread says which of the two you have. */
+    _lit: function () {
+      var rec = hosts["d3d-die"];
+      if (!rec) return [];
+      shadeOne(rec);
+      return rec.faces.map(function (f) {
+        return { toward: Math.round(f.toward * 1000) / 1000,
+                 lit: parseFloat(f.lit || "0"),
+                 value: f.el._num ? f.el._num.textContent : "" };
+      });
+    },
     // How far the worst face of each solid strays from its own plane, as a fraction of
     // the die's radius. Two shapes were shipping bent faces and the browser drew them
     // flat anyway, so neighbours could not meet: this is the number that says so.

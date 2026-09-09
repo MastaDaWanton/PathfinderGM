@@ -32,6 +32,8 @@
   <button data-roll="100" data-res="73">d100 (a pair)</button>
   <button id="all">every shape in turn</button>
   <button id="ten">roll a d20 ten times, timed</button>
+  <button id="real">the path the player walks (ask → slow request → land)</button>
+  <button id="light">measure the light through a spin</button>
 </div>
 <div id="log"></div>
 <script src="../../play/static/js/dice3d.js"></script>
@@ -60,6 +62,74 @@ document.getElementById("all").onclick = async () => {
     log(`d${sides} showed ${res}`);
   }
 };
+/* The sequence the game actually runs, which for a long time nothing here did: the mat
+   asks, the answer goes to the server, the server narrates the turn — ten to twenty
+   seconds of model — and only then does the die land. Every defect the table reported
+   about the dice lived in the joins between those three, not in any one of them. */
+document.getElementById("real").onclick = async () => {
+  const res = 1 + Math.floor(Math.random() * 20);
+  const shown = { sides: 20, title: "Perception", why: "the crowd is loud", terms: [] };
+  const t = performance.now();
+  const own = await window.Dice3D.ask(Object.assign({ hold: true }, shown));
+  const held = performance.now();
+  const before = getComputedStyle(document.querySelector("#d3d-die")).transform;
+  await new Promise(r => setTimeout(r, 6000));          // stand in for the model call
+  const after = getComputedStyle(document.querySelector("#d3d-die")).transform;
+  log(`  waited 6s with the mat held; die ${before === after ? "FROZE" : "kept turning"}`);
+  await window.Dice3D.land(Object.assign({ result: own ?? res }, shown,
+    { terms: [{ label: "d20", value: own ?? res }] }));
+  log(`the real path: asked at 0ms, held at ${Math.round(held - t)}ms, ` +
+      `closed at ${Math.round(performance.now() - t)}ms`);
+};
+
+/* The light, measured rather than admired.
+
+   A face turned toward the camera has the same normal in the room no matter what the
+   die has been doing, so under a light that belongs to the ROOM its brightness cannot
+   change while the die spins. Under a light baked into the die — which is what shipped
+   — it changes constantly, and that is exactly what "the lighting is assigned to a few
+   faces and it spins with those faces" looks like from the outside.
+
+   Picking "whichever face is most square-on" out of a spin does NOT measure that: on a
+   d20 the front-most face still wanders about twenty degrees off the view axis, so its
+   own normal is moving and the reading moves with it (0.508–1.428 that way, which says
+   nothing). The die has an exact way to do this instead — `faceToFront` is what the
+   landing uses — so drive each of the twenty faces square-on in turn and read what the
+   browser computed for it. Same normal, twenty times; anything but a flat line is a
+   light that is riding on the die.
+
+   Reading `getComputedStyle().filter` rather than the roller's own numbers, so the
+   measurement also holds for the version that had no numbers to ask for. */
+document.getElementById("light").onclick = async () => {
+  window.Dice3D.land({ sides: 20, result: 14, title: "Light", terms: [] });
+  const die = document.querySelector("#d3d-die");
+  const faces = [...die.children];
+  const bright = (el) => {
+    const m = /brightness\(([\d.]+)\)/.exec(getComputedStyle(el).filter || "");
+    return m ? Number(m[1]) : NaN;
+  };
+  const seen = [];
+  for (let i = 0; i < faces.length; i++) {
+    die.getAnimations().forEach(a => a.cancel());
+    die.style.transition = "none";
+    die.style.animation = "none";
+    // Face i square-on to the camera: the same transform the die lands with.
+    die.style.transform = window.Dice3D._faceToFront
+      ? window.Dice3D._faceToFront(20, i) : "";
+    // Shade it here rather than waiting for the next frame. Not tidiness: animation
+    // frames do not fire in a background tab, so a bench that waits for one measures
+    // nothing at all unless somebody is watching it — which is the same throttling
+    // that had the die freezing mid-roll.
+    if (window.Dice3D._lit) window.Dice3D._lit();
+    seen.push(bright(faces[i]));
+  }
+  const lo = Math.min(...seen), hi = Math.max(...seen);
+  log(`each of the 20 faces turned square-on to the camera in turn:`);
+  log(`  brightness ${lo.toFixed(3)}–${hi.toFixed(3)}, spread ${(hi - lo).toFixed(3)}` +
+      `  (a light in the room gives one number; a light on the die gives twenty)`);
+  document.querySelector("#d3d-go")?.click();
+};
+
 document.getElementById("ten").onclick = async () => {
   for (let i = 0; i < 10; i++) {
     const res = 1 + Math.floor(Math.random() * 20);
