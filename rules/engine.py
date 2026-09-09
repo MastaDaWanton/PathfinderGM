@@ -1565,6 +1565,38 @@ class Engine:
                 f"rest ({{\"op\": \"rest\"}}) or by an ability's document "
                 f"(use_ability ability=<name>); spend=true spends one.",
                 "legality", index)
+        # Stage 8's rule, asked of a mind instead of a number.
+        #
+        # Reported from the table 2026-09-09: "I was able to break the game and use
+        # psychic powers to manipulate the people and story in ways that should not be
+        # possible." Reproduced in one intent — `condition` with `condition: helpful`
+        # and `to: c1`, no ability, no spell, no origin — and the merchant went from
+        # indifferent to helpful, tell and all. Nothing on any sheet was consulted,
+        # because nothing asked. The seven amount-ops have been gated on provenance
+        # since stage 8a; an attitude is a bigger lever than a number and had no gate
+        # at all, and `condition` IS offered to the sampler (it is not an amount-op).
+        #
+        # The GAS rule this is: an ability that was never granted cannot be activated.
+        # Here the grant is the document — a spell in the book, a power on the sheet, an
+        # item in the satchel — and `origin` is the engine's record that one was read.
+        # No document, no mind changed.
+        #
+        # Lifting one is NOT gated, and the inversion is the same one `_op_condition`
+        # documents above: gate a removal and a charm can never be broken, exactly as
+        # gating the applicator made 759 undead unkillable.
+        if intent.op == "condition" and not intent.origin \
+                and not intent.params.get("ends"):
+            touched = states.touches_the_mind(
+                str(intent.params.get("condition", "")),
+                intent.params.get("descriptors") or ())
+            if touched:
+                raise IntentError(
+                    f"condition: {touched} is not something anyone can simply decide "
+                    f"on. Name what does it: cast spell=<id> for a spell, use_ability "
+                    f"ability=<name> for a power on the sheet, use_item item=<id> for "
+                    f"an item. To move somebody by ordinary means, talk to them and "
+                    f"roll it: check skill=diplomacy, check skill=intimidate, "
+                    f"check skill=bluff.", "legality", index)
         if intent.op == "travel" and intent.params.get("place"):
             # A destination the scene does not hold is refused HERE, where the plan's
             # repair loop reads the message and names a real one — not in `run`,

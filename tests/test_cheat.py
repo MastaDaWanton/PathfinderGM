@@ -113,9 +113,13 @@ def test_an_attitude_is_a_state_and_not_a_sentence():
     merchant = scene.actors["c1"]
     assert states.attitude_of(merchant) == ""
 
+    # `origin="author:cheat"` is what `/cheat` itself passes (gm/agent.py). Since
+    # 2026-09-09 an attitude is refused without a document behind it — the psychic
+    # exploit came in through this exact op — and the author's console is one of the
+    # documented doors. A bare validate() here would be asserting the exploit is legal.
     engine.run(engine.validate([
         {"op": "condition", "because": "the author says so",
-         "params": {"condition": "helpful", "to": "c1"}}]))
+         "params": {"condition": "helpful", "to": "c1"}}], origin="author:cheat"))
     assert states.attitude_of(merchant) == "helpful"
     assert merchant.has_state("attitude"), "the family is not queryable by prefix"
 
@@ -141,7 +145,7 @@ def test_nobody_is_hostile_and_helpful_at_once():
     for step in ("hostile", "friendly", "helpful"):
         engine.run(engine.validate([
             {"op": "condition", "because": "t",
-             "params": {"condition": step, "to": "c1"}}]))
+             "params": {"condition": step, "to": "c1"}}], origin="author:cheat"))
     merchant = scene.actors["c1"]
     assert states.attitude_of(merchant) == "helpful"
     held = [t for c in merchant.conditions for t in states.tags_for(c.key)
@@ -160,7 +164,8 @@ def test_the_brief_says_how_they_feel_or_the_narrator_cannot_know():
         {"op": "spawn", "because": "the stall",
          "params": {"template": "guildhand", "count": 1, "name": "the merchant"}},
         {"op": "condition", "because": "the author says so",
-         "params": {"condition": "helpful", "to": "c1"}}]))
+         "params": {"condition": "helpful", "to": "c1"}}],
+        origin="author:cheat"))
 
     class _W:
         name, premise, secret = "Fantasia", {}, ""

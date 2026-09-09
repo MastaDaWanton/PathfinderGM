@@ -225,6 +225,11 @@ class GMAgent:
                 # printed refusal, never the model's guess at what it does.
                 raw = judgement.refuse_unknown_ability(raw, player_input,
                                                        self.engine.scene)
+                # And its other complement: a power with no name at all. "I read his
+                # mind" has nothing capitalised to look up, so it used to reach the
+                # narrator as ordinary prose and get written as working.
+                raw = judgement.refuse_unnamed_power(raw, player_input,
+                                                     self.engine.scene)
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.

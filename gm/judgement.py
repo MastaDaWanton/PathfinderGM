@@ -1691,6 +1691,157 @@ def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
                     "params": {"ability": name}}]
 
 
+# --- powers nobody named ------------------------------------------------------------
+#
+# `refuse_unknown_ability` above catches "I use Blood Nova on the merchant" — a power
+# with a NAME. A psychic declaration usually has no name in it at all: "I read his
+# mind", "I bend her will", "I use my psychic powers to make him hand it over". There
+# is nothing capitalised to look up, so that door never opened and the sentence went
+# to the model as ordinary prose, which narrated it as working.
+#
+# The line drawn here is what the declaration REACHES, not how forceful it is.
+# Persuading, threatening, lying, seducing, bribing and pleading are ordinary social
+# play and are left completely alone — they are skill checks and `inject_checks`
+# already routes them. What fires is a declaration that reaches into somebody's mind:
+# reading it, altering it, taking it over, or claiming a faculty that would.
+_A_MIND = (r"(?:his|her|their|its|the\s+[\w'-]+(?:'s)?|[A-Z][\w'-]+(?:'s)?)\s+"
+           r"(?:mind|thoughts|head|memories|memory|will|dreams|feelings)")
+
+_PSYCHIC = re.compile(
+    _DECLARES + r"(?:"
+    # Reaching in to look: "I read his mind", "I probe the merchant's thoughts".
+    r"(?:read|probe|scan|search|sift|rifle|enter|invade|peer\s+into|look\s+into|"
+    r"reach\s+into|slip\s+into|dive\s+into)\s+(?:through\s+)?" + _A_MIND + r"|"
+    # Reaching in to take over. Unambiguous verbs only — every one of these names a
+    # supernatural effect in the rules, and none of them is a way of talking to
+    # somebody. "Persuade", "convince" and "intimidate" are deliberately absent.
+    r"(?:mind[\s-]?control|brainwash|dominate|beguile|bewitch|enthrall|enthral|"
+    r"mesmeri[sz]e|hypnoti[sz]e|geas|befuddle)\b|"
+    # "Charm" carries both meanings in English, and only one of them is the spell.
+    # Charming a snake with a flute, or a room with your manner, is a performance —
+    # it names the instrument it is done with, which the spell never does.
+    r"charm\b(?![^.!?]{0,40}\bwith\s+(?:my\s+|a\s+|the\s+)?"
+    r"(?:flute|pipe|pipes|song|singing|music|voice|lute|harp|drum|words|smile|"
+    r"manner|charm|wit|story|tale))|"
+    # Reaching in to change what is there. The "control of" arm is separate because
+    # "seize control of his mind" puts two words between the verb and the mind.
+    r"(?:bend|break|crush|shatter|overpower|override|seize|possess|invade|"
+    r"take\s+over|control)\s+" + _A_MIND + r"|"
+    # The instrument named outright. "I open the door with my mind" is telekinesis and
+    # "I crush his will with my mind" is the reported sentence; neither has a verb this
+    # pattern could have listed in advance, and both say plainly what they are done
+    # with. "I make up my mind" and "I keep it in mind" have no `with`.
+    r"[^.!?]{0,60}\b(?:with|using|through)\s+(?:my|the\s+power\s+of\s+my)\s+"
+    r"(?:mind|thoughts|will\s*power|psychic\s+\w+)\b|"
+    r"(?:seize|take|assume|wrest)\s+(?:control|possession|command)\s+(?:of|over)\s+"
+    + _A_MIND + r"|"
+    r"(?:erase|wipe|alter|rewrite|implant|plant|insert|push)\s+"
+    r"(?:a\s+|an\s+|the\s+|his\s+|her\s+|their\s+)?"
+    r"(?:suggestion|compulsion|thought|idea|command|memory|memories)\b|"
+    # Claiming the faculty itself, whatever is then done with it.
+    r"(?:use|reach\s+for|call\s+on|focus|channel)\s+(?:my\s+|the\s+)?"
+    r"(?:psychic|psionic|telepathic|mental|mind)\s+"
+    r"(?:powers?|abilit(?:y|ies)|gift|talent|magic|force|energy)\b|"
+    r"(?:telepathically|psychically|telekinetically)\b|"
+    r"(?:speak|talk|whisper|command|order|tell)\s+(?:to\s+)?"
+    r"(?:him|her|them|it)\s+(?:with|through|inside)\s+(?:my\s+|his\s+|her\s+|their\s+)?"
+    r"(?:mind|thoughts|head)\b"
+    r")", re.I)
+
+# What the player called it, for the refusal to name back at them. The engine's door
+# prints "no ability called <X>" and lists what they do have, so this wants to be the
+# player's own words rather than a label we invented.
+_PSYCHIC_NAMES = (
+    (re.compile(r"psionic", re.I), "psionics"),
+    (re.compile(r"telepath", re.I), "telepathy"),
+    (re.compile(r"telekine", re.I), "telekinesis"),
+    (re.compile(r"hypnoti[sz]", re.I), "hypnotism"),
+    (re.compile(r"mesmeri[sz]", re.I), "mesmerism"),
+    (re.compile(r"\bgeas\b", re.I), "a geas"),
+    (re.compile(r"domina|dominate", re.I), "domination"),
+    (re.compile(r"charm|beguile|bewitch|enthral", re.I), "a charm"),
+    (re.compile(r"brainwash|mind-?control|control\s+\w+\s+mind", re.I), "mind control"),
+    (re.compile(r"memor", re.I), "memory-altering"),
+    (re.compile(r"suggestion|compulsion", re.I), "a suggestion"),
+)
+
+
+def _psychic_called(text: str) -> str:
+    for pattern, name in _PSYCHIC_NAMES:
+        if pattern.search(text):
+            return name
+    return "psychic powers"
+
+
+def refuse_unnamed_power(raw_intents, player_text: str, scene) -> list:
+    """Reaching into somebody's mind is an ability or it is nothing.
+
+    Reported from the table 2026-09-09: "I was able to break the game and use psychic
+    powers to manipulate the people and story in ways that should not be possible."
+
+    Two things were wrong and this is the second. The engine now refuses a mind changed
+    with no document behind it (`rules/engine.py`, the `condition` gate), but that only
+    catches the model WRITING an intent. A psychic sentence more often produced no
+    mechanical intent at all — just `narrate_only` — and the narrator obligingly wrote
+    the merchant handing the goods over. Nothing had to be refused, because nothing was
+    ever proposed.
+
+    So the declaration is turned into the one it actually is: "I use <a power>". The PC
+    either has it or does not, and the engine's own door answers — "no ability called
+    telepathy; they can use: …" — which is the same answer, in the same words, that
+    naming a made-up power out loud already got. That is the GAS rule and it is the
+    whole of the fix: an ability that was never granted cannot be activated.
+
+    Speech is redacted first. "I tell the guard I can read minds" is a BOAST, and a
+    character is entitled to lie about what they can do — measured on the same corpus
+    that taught this file the difference between saying a thing and doing it.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    said = redact_speech(str(player_text))
+    if not _PSYCHIC.search(said):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    # A power they really have, already routed by `inject_ability` or named outright,
+    # stands. This is the complement of that door, never a second opinion on it.
+    from rules import leveling
+
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            continue
+        if str(r.get("op", "")).lower() in ("use_ability", "cast"):
+            named = str((r.get("params") or {}).get("ability", "")).strip()
+            if not named:
+                return raw_intents          # a spell, or an ability the door picked
+            _path, found, _fx = leveling.find_ability(pc, named)
+            if found:
+                return raw_intents
+
+    name = _psychic_called(said)
+    # Everything the model guessed is a guess about a power that was never granted.
+    # `refuse_unknown_ability` learned this the expensive way: told to drop only the
+    # fight-makers, the next probe came back with `ability_damage con 1d4` instead and
+    # it landed. What survives is what carries no number and reaches no mind.
+    from rules.intents import AMOUNT_OPS
+
+    kept = []
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            continue
+        op = str(r.get("op", "")).lower()
+        if op in AMOUNT_OPS or op in ("condition", "compel", "spawn", "attack", "save"):
+            continue
+        kept.append(r)
+    return kept + [{"op": "use_ability", "actor": pc.ref,
+                    "because": f"the player reached for {name}",
+                    "params": {"ability": name}}]
+
+
 # "I drink my healing potion", "I quaff the elixir", "I throw the flask at c1",
 # "I apply the salve": a using verb and, somewhere after it, a jar word. The jar itself
 # is matched against the satchel by name; the sentence only has to be about one.

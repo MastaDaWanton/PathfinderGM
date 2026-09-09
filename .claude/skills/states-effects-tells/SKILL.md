@@ -73,7 +73,17 @@ by `classbuilder.validate_feat_documents`, read live by `Actor._feat_mods` insid
 `_buff_mods(kind, target, ctx)` (never stored), `has_state` reading
 `standing_tags()`; **hazards** — `content/rules/hazards.json` rows with a bounded
 slot, the `hazard` op (docs/stage-8-plan.md; ratchets in
-`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`); **the three
+`tests/test_stage8_provenance.py`, `tests/test_feat_documents.py`); **the mind gate**
+— stage 8's rule asked of a mind instead of a number: a `condition` that would land an
+`attitude.*` tag, a `state.fear.*` tag, or anything in the mind-affecting or sleep
+families is refused without an `origin`, so charm person still charms and "I decide he
+likes me" does not (`states.touches_the_mind`, the gate in `Engine._check_legality`);
+bodies are NOT gated (25 of 25 pass) and lifting one is never gated; plain-language
+psychic declarations — "I read his mind", which has no name for
+`refuse_unknown_ability` to look up — are routed to the ability door by
+`judgement.refuse_unnamed_power`, which leaves persuading, threatening, lying and
+bribing alone (32/32 caught, 40/40 spared; docs/states-effects-tells.md "The mind had
+no gate"; ratchet in `tests/test_psychic_powers.py`); **the three
 doors places come in by** — a settlement's own words imply spots (`places.IMPLIED`),
 the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
 as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
@@ -100,7 +110,13 @@ model-writable params (parse pops engine-owned keys silently, so it could not
 join that set); a validate-time source check as the primary defence (the sampler
 enum is; stage 7 measured what a rejection teaches); GM fiat with no rule row.
 
-**Still open after stage 8** (do not read a passing probe as proof): the
+**Still open after stage 8** (do not read a passing probe as proof): **no route from a
+social check to an attitude** — the mind gate closed assertion, and spells, abilities,
+items and schemes still move the track, but `check` takes no target param and no rule
+row turns a Diplomacy or Intimidate success into a step, so talking somebody round is
+narrated and never recorded (`rules/effectspec.py` has said "no check in the app
+consults an attitude yet" since the spell import; the gate's refusal names those checks
+as the ordinary route because they do roll); the
 `_op_use_ability` instant-effects loop records no per-number origin (the outcome
 record carries `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id;
 Point-Blank Shot's `when.range_ft` waits on the attack op passing range into the

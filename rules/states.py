@@ -331,15 +331,27 @@ def blocking(keys, action: str = "any") -> str:
 # they cover; a descriptor is matched against what an EFFECT declares itself to be, so
 # "immune to fear" stops a fear effect that would shake you and leaves the shaken you get
 # from something else alone.
+# Written once and spliced into all four places below that used to repeat it.
+#
+# They repeated it, and the repetition had a hole in every copy: `dominate person` is a
+# mind-affecting compulsion in the Core Rulebook and the word "dominate" appeared in
+# none of them, so 759 creatures with undead traits were immune to charm and wide open
+# to domination. Found 2026-09-09 while gating the same families against being handed
+# out for free — the table was asked what a condition IS and could not answer for the
+# two words a player reaches for first.
+_MIND_AFFECTING: tuple[str, ...] = (
+    "confused", "confusion", "fascinated", "fascinate", "charm", "charmed",
+    "compulsion", "compelled", "dominate", "dominated", "domination",
+    "suggestion", "mind-affecting")
+_SLEEP: tuple[str, ...] = ("sleep", "asleep", "sleeping")
+
 IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
-    "sleep": ("sleep",),
+    "sleep": _SLEEP,
     "paralysis": ("paralyzed", "paralysis"),
     "stun": ("stunned", "stun"),
     "fear": ("shaken", "frightened", "panicked", "cowering", "fear"),
-    "mind-affecting": ("confused", "fascinated", "charm", "compulsion",
-                       "mind-affecting"),
-    "mind affecting": ("confused", "fascinated", "charm", "compulsion",
-                       "mind-affecting"),
+    "mind-affecting": _MIND_AFFECTING,
+    "mind affecting": _MIND_AFFECTING,
     "poison": ("poison", "nauseated", "sickened"),
     "disease": ("disease",),
     "bleed": ("bleed",),
@@ -351,18 +363,82 @@ IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
     "death effects": ("death",),
     "energy drain": ("energy drain",),
     # The Bestiary's own bundle, expanded once here rather than in every consumer.
-    "undead traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+    "undead traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                       "disease", "poison", "fatigued", "exhausted",
-                      "confused", "fascinated", "charm", "compulsion",
-                      "mind-affecting", "bleed", "death", "nauseated", "sickened"),
-    "construct traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+                      *_MIND_AFFECTING, "bleed", "death", "nauseated", "sickened"),
+    "construct traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "disease", "poison", "fatigued", "exhausted",
-                         "confused", "fascinated", "charm", "compulsion",
-                         "mind-affecting", "bleed", "death", "nauseated",
+                         *_MIND_AFFECTING, "bleed", "death", "nauseated",
                          "sickened"),
-    "elemental traits": ("sleep", "paralyzed", "paralysis", "stunned", "stun",
+    "elemental traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "poison", "bleed"),
 }
+
+
+# The families that change a MIND rather than a body, named the way 1e names them.
+#
+# Asked of the same data `IMMUNITY_COVERS` holds, from the other side: that table says
+# what an immunity protects against, and this says what a condition IS. Sharing the
+# table is the point — a homebrew charm that "immune to mind-affecting" would stop is
+# the same charm this refuses to hand out for free, and two lists would drift.
+#
+# Deliberately NOT here: `dazed`, `stunned`, `staggered`, `nauseated`. All four can be
+# mind-affecting in 1e when a spell causes them and all four can equally be a blow to
+# the head, so gating them would refuse ordinary violence for having a mental cousin.
+# The line is drawn at families that can ONLY be somebody's mind being altered.
+MIND_FAMILIES: tuple[str, ...] = ("mind-affecting", "fear", "sleep")
+
+# What each family is called when a refusal has to say what was attempted.
+_MIND_CALLED: dict[str, str] = {
+    "mind-affecting": "a mind-affecting effect",
+    "fear": "a fear effect",
+    "sleep": "a sleep effect",
+}
+
+
+def touches_the_mind(condition_key: str = "", descriptors=()) -> str:
+    """What this condition changes about somebody's mind, or "" if it changes none.
+
+    Three questions, because a mind can be reached three ways in this vocabulary and
+    only the first two are registered anywhere:
+
+      * an `attitude.*` tag — how a creature FEELS about you, which is the one the
+        exploit reached for: nothing on a sheet stops a hostile guard being written
+        helpful.
+      * a `state.fear.*` tag — shaken, frightened, panicked.
+      * the mind-affecting family itself — charm, compulsion, confusion, fascination.
+        Asked by name and not by tag on purpose: `charmed` and `dominated` are not in
+        `TAGS` at all, so they self-tag to `condition.charmed` and a prefix question
+        would sail straight past the two words a player is most likely to use.
+
+    The stem match is the same courtesy `immunity_blocks` extends and for the same
+    reason: "dominated", "domination" and "dominate person" are one idea, and a table
+    that only knew one spelling would be a table with a hole in it.
+    """
+    key = (condition_key or "").strip().lower()
+    said = {str(d).strip().lower() for d in (descriptors or ()) if str(d).strip()}
+
+    for tag in tags_for(key):
+        if matches(tag, "attitude"):
+            return "an attitude"
+        if matches(tag, "state.fear"):
+            return "a fear effect"
+
+    for family in MIND_FAMILIES:
+        covers = IMMUNITY_COVERS.get(family, ())
+        if said & set(covers) or family in said:
+            return _MIND_CALLED[family]
+        for member in covers:
+            if not key:
+                break
+            if key == member:
+                return _MIND_CALLED[family]
+            # "charm" covers "charmed"; "compulsion" covers "compelled" through the
+            # shared stem, the way the immunity table covers "petrification".
+            stem = min(len(key), len(member), 5)
+            if stem >= 4 and key[:stem] == member[:stem]:
+                return _MIND_CALLED[family]
+    return ""
 
 
 def immunity_blocks(immunities, condition_key: str = "",
