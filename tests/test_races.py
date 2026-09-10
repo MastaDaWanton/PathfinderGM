@@ -394,3 +394,89 @@ def test_a_repeatable_evolution_has_no_ceiling_and_each_take_keeps_its_own_pick(
     twice = races.validate({"name": "x", "evolutions": [{"id": "gills"}, {"id": "gills"}]})
     assert any("once" in p for p in twice)
     assert "unarmed strike" in races.catalogue()["attacks"]
+
+
+# --- what a people is good and bad at, in the world's own words ---------------------------
+
+def test_a_card_could_not_say_what_a_race_was_good_at_and_now_can():
+    """The gap the race cards shipped with, measured 2026-09-10 against a live card.
+
+    A World Bible race card could express a size, a speed and twelve possible traits,
+    and nothing else — so every world race got the generic +2 physical / +2 mental /
+    -2 any and differed from every other race in that world only in its senses. Ability
+    modifiers are the most defining mechanical feature of a 1e race and the export had
+    no channel for them.
+
+    Six words carry it now, none of which needs a rules system to say. The Race Builder
+    prices the result itself: a fixed +2/+2/-2 is 0 RP when one bonus is physical and
+    one mental, 1 RP when both sit in the same group, which is the table's own
+    standard/specialised split.
+    """
+    mods, choose = races.array_from_words(["nimble", "perceptive"], "commanding")
+    assert mods == {"dex": 2, "wis": 2, "cha": -2}
+    assert choose == [], "a card that states its array leaves nothing to choose"
+    # Speed 30 on purpose: a fast race costs a race point for the speed, and this is
+    # measuring what the ARRAY costs.
+    doc = races.derive(races.normalise(
+        {"id": "vanara", "name": "Vanara", "size": "medium", "speed": 30,
+         "mods": mods, "choose": choose}))
+    assert races.rp(doc) == 0 and races.power(races.rp(doc)) == "standard"
+    fast = races.derive(races.normalise(
+        {"id": "vanara", "name": "Vanara", "size": "medium", "speed": 40,
+         "mods": mods, "choose": choose}))
+    assert races.rp(fast) == 1, "the extra point is the speed, not the array"
+
+    both_physical, _ = races.array_from_words(["strong", "hardy"], "clever")
+    priced = races.derive(races.normalise(
+        {"id": "x", "name": "X", "size": "medium", "speed": 30,
+         "mods": both_physical, "choose": []}))
+    assert races.rp(priced) == 1, "two physical bonuses is the specialised row, 1 RP"
+
+
+@pytest.mark.parametrize("strengths,weakness,why", [
+    (["nimble"], "commanding", "one strength is half an array"),
+    (["nimble", "perceptive"], "", "no weakness is half an array"),
+    (["nimble", "nimble"], "commanding", "the same strength twice"),
+    (["nimble", "perceptive"], "nimble", "the weakness is also a strength"),
+    (["fast", "wise"], "rude", "words the table does not know"),
+    ([], "", "nothing said at all"),
+])
+def test_half_an_array_is_not_an_array(strengths, weakness, why):
+    """Exactly two strengths and one weakness, or none of it counts.
+
+    The Advanced Race Guide's standard array is +2/+2/-2 as a unit. Accepting half of
+    one would let a card grant a net +4 by leaving the weakness out, which is a power
+    creep bought by saying less — so every malformed case falls back to the generic
+    choose the card would have had anyway, and nothing is priced above standard.
+    """
+    mods, choose = races.array_from_words(strengths, weakness)
+    assert mods == {}, why
+    assert choose == list(races.STANDARD_CHOOSE), why
+
+
+def test_saying_it_wrong_is_recorded_where_the_player_can_see_it():
+    """Silently handing back the generic array would hide the author's mistake from
+    everyone who could fix it. `not_yet` is where this file already says what it could
+    not do."""
+    d = races.draft("Half", ["They climb well."], strengths=["nimble"], weakness="")
+    assert any("two strengths and one weakness" in line for line in d["not_yet"])
+    assert all("commanding" in line for line in d["not_yet"] if "strengths" in line), \
+        "the refusal names the six words, the way every validator here names the fix"
+    quiet = races.draft("Quiet", ["They climb well."])
+    assert not any("strengths" in line for line in quiet["not_yet"]), \
+        "a card that says nothing about it is not nagged about it"
+
+
+def test_a_card_without_the_new_fields_behaves_exactly_as_before():
+    """Additive, so a 1.1 export keeps working unchanged — the fields are read when
+    present and absent otherwise."""
+    class World:
+        play = {"races": [{"id": "korvu", "name": "Korvu", "people_id": "k",
+                           "size": "medium", "speed": "normal",
+                           "body": ["They have broad wings."], "senses": [], "movement": []}]}
+        entities = {}
+        source = "pangrella-campaign.json"
+
+    d = races.from_world(World())[0]
+    assert d["mods"] == {}
+    assert d["choose"] == list(races.STANDARD_CHOOSE)

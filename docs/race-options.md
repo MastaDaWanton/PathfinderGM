@@ -2,7 +2,7 @@
 
 **Generated from `rules/races.py` by `tools/export_race_cues.py`. Do not edit by hand — regenerate it.**
 
-This is the complete list. A race card in a World Bible export can produce **a size, a speed, and up to 12 traits** — the ones below — and nothing else. There is no other channel: any sentence whose words match none of these rows is read by the consumer, matched against every pattern, and discarded.
+This is the complete list. A race card in a World Bible export can produce **a size, a speed, up to 12 traits, and an ability array** — all of them below, and nothing else. There is no other channel: any sentence whose words match none of these rows is read by the consumer, matched against every pattern, and discarded.
 
 **6 of the 12 do something in play today.** The rest are recorded on the sheet and shown to the player, and the engine cannot act on them yet — it has no walls to climb, no water to swim, no air to fly through, and it rolls the weapon in hand rather than a claw. Write them anyway; they are true about the people and they will start working without the card changing.
 
@@ -123,11 +123,32 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 > Direct sunlight dazzles them within moments.
 
-## What a card cannot say
+## What a people is good and bad at
 
-Worth knowing before you try. None of these can be expressed in the card format as it stands, and no wording will reach them:
+Two fields, and six words. This is what makes a race *playable* rather than merely flavourful — without it every race in a world gets the same generic array and differs from its neighbours only in its senses.
 
-- **Ability score modifiers.** Every world race is given the standard +2 physical / +2 mental / -2 any, chosen by the player. This is the single most defining mechanical feature of a Pathfinder race and the card has no channel for it.
+| Field | What to send |
+|---|---|
+| `strengths` | **exactly two** of the words below |
+| `weakness` | **exactly one** of the words below, and not one of the two strengths |
+
+- **`clever`**
+- **`commanding`**
+- **`hardy`**
+- **`nimble`**
+- **`perceptive`**
+- **`strong`**
+
+Not one of those is a rules term. A world can say a people is hardy without knowing what Constitution is; the consumer maps the word and prices the result against the Advanced Race Guide's standard array.
+
+**All three or none.** The standard array is +2/+2/-2 as a unit, so a card giving one strength, or two strengths and no weakness, is ignored entirely and the race keeps the generic array — otherwise leaving the weakness out would buy a net +4 by saying less. When a card gets it wrong the reason is written onto the race where the player can see it.
+
+> `"strengths": ["nimble", "perceptive"], "weakness": "commanding"`
+
+## What a card still cannot say
+
+None of these can be expressed in the card format, and no wording reaches them:
+
 - **Skill bonuses**, save bonuses, and any conditional modifier ("+4 against poison", "+2 on checks made underground").
 - **Creature type.** Every world race is `humanoid`.
 - **Bonus feats or extra skill ranks.**

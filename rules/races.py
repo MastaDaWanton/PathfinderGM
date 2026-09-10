@@ -662,6 +662,50 @@ def validate(entry: dict) -> list[str]:
 
 # --- from a World Bible world -----------------------------------------------------------------
 
+# What a people is good and bad at, in six words no world needs a rules system to say.
+#
+# The gap this closes, measured 2026-09-10: a race card could express a size, a speed and
+# twelve possible traits, and NOTHING ELSE — so every world race was handed the generic
+# +2 physical / +2 mental / −2 any and differed from every other race in the world only
+# in its senses. Ability modifiers are the most defining mechanical feature of a 1e race
+# and the export had no channel for them at all.
+#
+# Words rather than numbers, because the boundary holds in both directions: World Bible
+# writes what is true of a people, this side prices it. "Hardy" is a thing a world knows
+# about its own peoples; Constitution is not.
+#
+# Exactly two strengths and one weakness, or none of it counts — the Advanced Race Guide's
+# standard array is +2/+2/−2 as a unit, and half an array is not one. A partial card
+# keeps the generic choose it has today, and `check_race_cards.py` says so rather than
+# letting it pass unnoticed.
+ABILITY_WORDS: dict[str, str] = {
+    "strong": "str",        # powerful of build
+    "nimble": "dex",        # quick and well-balanced
+    "hardy": "con",         # resilient, hard to wear down
+    "clever": "int",        # quick to learn and reason
+    "perceptive": "wis",    # attentive, hard to surprise
+    "commanding": "cha",    # forceful of personality
+}
+
+
+def array_from_words(strengths, weakness: str = "") -> tuple[dict, list]:
+    """The Race Builder's standard array from a card's own words, or the generic choose.
+
+    Returns `(mods, choose)` ready for a document. `_mods_rp` already prices a fixed
+    +2/+2/−2 at 0 RP when one bonus is physical and one mental and at 1 when both sit in
+    the same group — the Race Builder's own standard/specialised split — so nothing here
+    needs to know what any of it costs.
+    """
+    want = [str(s).strip().lower() for s in (strengths or ()) if str(s).strip()]
+    weak = str(weakness or "").strip().lower()
+    good = [ABILITY_WORDS[w] for w in want if w in ABILITY_WORDS]
+    bad = ABILITY_WORDS.get(weak, "")
+    # Two distinct strengths, one weakness, and the weakness is not also a strength.
+    if len(good) != 2 or len(set(good)) != 2 or not bad or bad in good:
+        return {}, list(STANDARD_CHOOSE)
+    return {good[0]: 2, good[1]: 2, bad: -2}, []
+
+
 # What a people's own words map to. Detect mechanically, price from the table: nothing
 # here reads a number out of prose, and a body the table has no line for becomes a
 # `not_yet` sentence rather than a guess. Each row: a pattern over the anatomy facts,
@@ -717,7 +761,8 @@ def is_species(entity) -> bool:
 
 
 def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
-          about: str = "", origin: str = "", people_id: str = "", world: str = "") -> dict:
+          about: str = "", origin: str = "", people_id: str = "", world: str = "",
+          strengths=(), weakness: str = "") -> dict:
     """One race document from the world's own sentences. The words decide which lines
     of the table apply; the table decides the numbers."""
     text = " ".join(str(p) for p in phrases if str(p).strip())
@@ -745,11 +790,18 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
         40 if _FAST.search(low) and not _SLOW.search(low) else
         20 if _SLOW.search(low) else 30)
     rid = slug(name)
+    mods, choose = array_from_words(strengths, weakness)
+    if not mods and (strengths or weakness):
+        # Said something, and not enough of it. Recorded where the player can see it
+        # rather than silently handing back the generic array.
+        not_yet.append("what this people is good and bad at: a card needs exactly two "
+                       "strengths and one weakness, from " +
+                       ", ".join(sorted(ABILITY_WORDS)))
     return normalise({
         "id": rid, "name": str(name).strip(),
         "description": (about or text)[:400],
         "type": "humanoid", "size": size, "speed": speed,
-        "mods": {}, "choose": list(STANDARD_CHOOSE),
+        "mods": mods, "choose": choose,
         "modifiers": [], "tags": tags, "traits": traits,
         "budget": {}, "languages": [rid] if rid else [],
         "not_yet": not_yet, "origin": origin or "world",
@@ -795,6 +847,8 @@ def from_world(world) -> list[dict]:
             out.append(draft(raw["name"], phrases, size_hint=str(raw.get("size") or ""),
                              speed_hint=str(raw.get("speed") or ""),
                              about=str(raw.get("about") or ""),
+                             strengths=raw.get("strengths") or (),
+                             weakness=str(raw.get("weakness") or ""),
                              origin=f"world:{raw.get('people_id') or raw.get('id') or slug(raw['name'])}",
                              people_id=str(raw.get("people_id") or ""), world=world_id))
         return out

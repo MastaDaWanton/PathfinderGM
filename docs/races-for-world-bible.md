@@ -54,26 +54,29 @@ editor sees an obviously broken record.
 
 This is the important one.
 
-**A race card can express a size, a speed, and up to twelve traits. That is the whole of
-it.** There is no channel for anything else, and no wording reaches one. In particular a
-card cannot say:
+When these files were first written, a race card could express **a size, a speed and up
+to twelve traits, and nothing else.** In particular it could not say **any ability score
+modifier** — the single most defining mechanical feature of a Pathfinder race — so every
+world race was handed the generic +2 physical / +2 mental / −2 any and differed from
+every other race in its world only in its senses.
 
-- **any ability score modifier** — the single most defining mechanical feature of a
-  Pathfinder race. Every world race is currently given the generic
-  +2 physical / +2 mental / −2 any and chooses at the table
-- any skill bonus, save bonus, or conditional modifier
-- creature type — every world race is `humanoid`
-- bonus feats or extra skill ranks
-- languages beyond the people's own
+**That half is now closed.** The Pathfinder GM side has built `strengths[]` and
+`weakness`, six rules-free words that give a race its real array; the consumer reads them
+today and no export sets them yet. See "Built and waiting for you" below — it is the
+highest-value change you can make to a card.
+
+What is still out of reach, with no proposal: skill bonuses, save bonuses, conditional
+modifiers, creature type (every world race is `humanoid`), bonus feats, extra skill
+ranks, and languages beyond the people's own.
 
 And of the twelve traits, **six do nothing in play yet** — fly, swim, climb and burrow
 have no engine to move through, and claws and bite are not rolled because the engine
-rolls the weapon in hand.
+rolls the weapon in hand. Write them anyway: they are true about the people, they are
+shown to the player, and they will start working without the card changing.
 
-So a *perfectly written* card today yields, at best, a size, a speed, and a handful of
-senses. That is a flavourful race and not yet a playable one. Fixing the prose is worth
-doing and will not, on its own, get there. **The format needs one more field** — the
-proposal is at the bottom.
+So a *perfectly written* card, with its array filled in, yields a size, a speed, a real
++2/+2/−2 and a handful of senses. That is a playable race. Without the array it is a
+flavourful one, and no amount of rewriting the prose closes the gap.
 
 ---
 
@@ -236,20 +239,18 @@ of this document.
 
 ---
 
-## The proposal: one more field, and races become playable
+## Built and waiting for you: `strengths[]` and `weakness`
 
-To close reason two without breaking the boundary rule — **World Bible supplies words,
-Pathfinder GM prices them** — the card needs a way to say what a people is *good and bad
-at*, in words a world can honestly know about itself.
+**This is done on the Pathfinder GM side as of 2026-09-10.** The consumer reads both
+fields today; no card in any export sets them yet. Writing them is the single highest
+-value change you can make to a race card.
 
-Add two fields:
+Two fields, six words:
 
-| Field | Meaning |
+| Field | What to send |
 |---|---|
-| `strengths[]` | up to two words from the list below |
-| `weakness` | one word from the same list, or empty |
-
-with a small, fixed, deliberately rules-free vocabulary:
+| `strengths` | **exactly two** of the six words |
+| `weakness` | **exactly one** of the six, and not one of the two strengths |
 
 ```
 strong        powerful of build
@@ -260,31 +261,51 @@ perceptive    attentive, hard to surprise
 commanding    forceful of personality
 ```
 
-Not one of those six words is a Pathfinder term, and any world can say them about its
-peoples without knowing a rules system exists. The consumer maps them onto the Advanced
-Race Guide's standard +2 / +2 / −2 array and prices the result, exactly as it already
-maps "wings" onto a flight speed at 4 race points.
+Not one of those is a rules term. A world can say a people is hardy without knowing what
+Constitution is — the consumer maps the word and prices the result. The boundary holds:
+you write what is true of the people, this side does the arithmetic.
 
-For the Vanara that would be:
+**All three or none.** The Advanced Race Guide's standard array is +2/+2/−2 as a *unit*.
+A card giving two strengths and no weakness would buy a net +4 by saying less, so any
+malformed array is ignored entirely and the race keeps the generic one it has today. The
+reason is written onto the race in `not_yet`, where the player can see it, rather than
+failing silently. `check_race_cards.py` reports each case with the fix named.
+
+For the Vanara:
 
 ```json
 "strengths": ["nimble", "perceptive"],
 "weakness": "commanding"
 ```
 
-which is a recognisable Vanara — and a *playable* one, because the sheet finally differs
-from every other race in the world in the way a Pathfinder race is supposed to differ.
+Measured on that card end to end through the consumer:
 
-**This needs agreeing before it is built**, on both sides: the consumer has to read the
-new fields, and this document should be updated with the outcome. It is additive, so it
-is a MINOR schema bump (1.1 → 1.2) and no existing consumer breaks.
+```
+mods    : {"dex": 2, "wis": 2, "cha": -2}
+choose  : []
+rp      : 1 (standard)   — the extra point is the `fast` speed, not the array
+```
 
-A second, optional field worth discussing at the same time — `knacks[]`, a handful of
-words for what a people are practised at ("climbing", "swimming", "tracking", "trading",
-"stonework") which the consumer maps to skill bonuses. Lower value than `strengths[]`,
-and the same shape of decision.
+The Race Builder prices a fixed +2/+2/−2 at **0 RP** when one bonus is physical and one
+mental, and **1 RP** when both sit in the same group — its own standard/specialised
+split, which the consumer already implemented. So you cannot overspend the budget by
+choosing words, whatever you choose.
 
----
+That is a recognisable Vanara, and a *playable* one: the sheet finally differs from every
+other race in the world in the way a Pathfinder race is supposed to differ.
+
+**Schema.** These fields are additive, so an export carrying them is a MINOR bump —
+1.1 → 1.2. A card without them keeps working exactly as it does now; the consumer's own
+test pins that.
+
+### Still not sayable
+
+`knacks[]` — a few words for what a people are practised at ("climbing", "tracking",
+"stonework") mapping to skill bonuses — was discussed and **not** built. Raise it if you
+want it; it is the same shape of decision and lower value than the array.
+
+Also still out of reach, with no proposal: save bonuses, conditional modifiers, creature
+type, bonus feats, extra skill ranks, and languages beyond the people's own.
 
 ## Summary for whoever picks this up
 

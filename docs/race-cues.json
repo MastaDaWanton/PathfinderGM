@@ -19,6 +19,15 @@
   "fast": "swift, fast, quick, fleet, sprint, outrun, rapid",
   "slow": "slow, lumbering, plodding, ponderous, waddling"
  },
+ "ability_words": {
+  "clever": "int",
+  "commanding": "cha",
+  "hardy": "con",
+  "nimble": "dex",
+  "perceptive": "wis",
+  "strong": "str"
+ },
+ "ability_rule": "exactly two strengths and one weakness, all from ability_words, the weakness not also a strength — otherwise the whole array is ignored and the race keeps the generic +2 physical / +2 mental / -2 any",
  "cues": [
   {
    "grants": [

@@ -139,6 +139,11 @@ def main() -> None:
             "fast": "swift, fast, quick, fleet, sprint, outrun, rapid",
             "slow": "slow, lumbering, plodding, ponderous, waddling",
         },
+        "ability_words": {w: races.ABILITY_WORDS[w] for w in sorted(races.ABILITY_WORDS)},
+        "ability_rule": "exactly two strengths and one weakness, all from ability_words, "
+                        "the weakness not also a strength — otherwise the whole array is "
+                        "ignored and the race keeps the generic +2 physical / +2 mental / "
+                        "-2 any",
         "cues": rows(),
         "cue_count": len(races.CUES),
         "engine_ready_count": sum(1 for r in rows() if r["engine_ready"]),
@@ -160,10 +165,10 @@ def markdown(data: dict) -> str:
          "by hand — regenerate it.**",
          "",
          "This is the complete list. A race card in a World Bible export can produce "
-         f"**a size, a speed, and up to {data['cue_count']} traits** — the ones below — "
-         "and nothing else. There is no other channel: any sentence whose words match "
-         "none of these rows is read by the consumer, matched against every pattern, "
-         "and discarded.",
+         f"**a size, a speed, up to {data['cue_count']} traits, and an ability array** "
+         "— all of them below, and nothing else. There is no other channel: any "
+         "sentence whose words match none of these rows is read by the consumer, "
+         "matched against every pattern, and discarded.",
          "",
          f"**{data['engine_ready_count']} of the {data['cue_count']} do something in "
          "play today.** The rest are recorded on the sheet and shown to the player, and "
@@ -208,15 +213,38 @@ def markdown(data: dict) -> str:
         if c["note"]:
             L.append(f"- *Note:* {c['note']}")
         L += ["", f"> {c['example']}", ""]
-    L += ["## What a card cannot say",
+    L += ["## What a people is good and bad at",
           "",
-          "Worth knowing before you try. None of these can be expressed in the card "
-          "format as it stands, and no wording will reach them:",
+          "Two fields, and six words. This is what makes a race *playable* rather than "
+          "merely flavourful — without it every race in a world gets the same generic "
+          "array and differs from its neighbours only in its senses.",
           "",
-          "- **Ability score modifiers.** Every world race is given the standard "
-          "+2 physical / +2 mental / -2 any, chosen by the player. This is the single "
-          "most defining mechanical feature of a Pathfinder race and the card has no "
-          "channel for it.",
+          "| Field | What to send |",
+          "|---|---|",
+          "| `strengths` | **exactly two** of the words below |",
+          "| `weakness` | **exactly one** of the words below, and not one of the two "
+          "strengths |",
+          ""]
+    for word, ability in data["ability_words"].items():
+        L.append(f"- **`{word}`**")
+    L += ["",
+          "Not one of those is a rules term. A world can say a people is hardy without "
+          "knowing what Constitution is; the consumer maps the word and prices the "
+          "result against the Advanced Race Guide's standard array.",
+          "",
+          "**All three or none.** The standard array is +2/+2/-2 as a unit, so a card "
+          "giving one strength, or two strengths and no weakness, is ignored entirely "
+          "and the race keeps the generic array — otherwise leaving the weakness out "
+          "would buy a net +4 by saying less. When a card gets it wrong the reason is "
+          "written onto the race where the player can see it.",
+          "",
+          "> `\"strengths\": [\"nimble\", \"perceptive\"], \"weakness\": \"commanding\"`",
+          "",
+          "## What a card still cannot say",
+          "",
+          "None of these can be expressed in the card format, and no wording reaches "
+          "them:",
+          "",
           "- **Skill bonuses**, save bonuses, and any conditional modifier "
           "(\"+4 against poison\", \"+2 on checks made underground\").",
           "- **Creature type.** Every world race is `humanoid`.",

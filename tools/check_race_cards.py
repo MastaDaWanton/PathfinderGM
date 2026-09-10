@@ -122,6 +122,30 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
         if text.count(".") > 1 and not text.rstrip().endswith("."):
             notes.append(f"{field} line looks like more than one sentence")
 
+    # What the people is good and bad at. All three or none: the Advanced Race Guide's
+    # standard array is +2/+2/-2 as a unit, and a card giving two strengths and no
+    # weakness would buy a net +4 by saying less.
+    words = set(cues.get("ability_words") or {})
+    good = [str(x).strip().lower() for x in (race.get("strengths") or []) if str(x).strip()]
+    weak = str(race.get("weakness") or "").strip().lower()
+    if not good and not weak:
+        notes.append("no strengths or weakness — this race gets the same generic "
+                     "+2 physical / +2 mental / -2 any as every other race in the world")
+    else:
+        unknown = [w for w in good + ([weak] if weak else []) if w not in words]
+        if unknown:
+            problems.append(f"not ability words: {', '.join(sorted(set(unknown)))} — "
+                            f"use two of {', '.join(sorted(words))} as strengths and one "
+                            f"as the weakness")
+        elif len(good) != 2 or len(set(good)) != 2:
+            problems.append(f"{len(set(good))} strength(s); it takes exactly two "
+                            f"different ones or the whole array is ignored")
+        elif not weak:
+            problems.append("strengths with no weakness; the array is +2/+2/-2 as a "
+                            "unit and half of one is ignored")
+        elif weak in good:
+            problems.append(f"{weak!r} is both a strength and the weakness")
+
     about = str(race.get("about") or "").strip()
     if not about:
         notes.append("no about paragraph — the character-creation screen will be blank")
@@ -160,8 +184,11 @@ def main() -> int:
         ready = [c for c in hits if c["engine_ready"]]
         head = f"  {name}"
         print(head)
+        array = "+2/+2/-2 as written" if not [p for p in problems if "strength" in p
+                or "ability words" in p or "weakness" in p] and (race.get("strengths")
+                or race.get("weakness")) else "generic (player chooses)"
         print(f"    builds: size {race.get('size')}, speed {race.get('speed')}, "
-              f"{len(hits)} trait(s), {len(ready)} usable in play")
+              f"abilities {array}, {len(hits)} trait(s), {len(ready)} usable in play")
         for c in hits:
             mark = "ok  " if c["engine_ready"] else "wait"
             print(f"      [{mark}] {c['shows']}")
