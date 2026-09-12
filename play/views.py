@@ -521,6 +521,79 @@ def slots(request):
 
 
 @require_GET
+def manual(request):
+    """The manual, for the person who installed the exe rather than the repository.
+
+    Served from inside the app for the same reason the licence is: this ships as a single
+    executable, and a document sitting in a GitHub repository the player never opens is
+    not a manual they have. It is the only copy — a second one in the repo would drift
+    from this within a month, which is CLAUDE.md's "grep for every copy of it" applied
+    before there is a second copy to grep for. `README.md` links here rather than
+    repeating any of it.
+
+    **Every count on the page is read from the catalogue that holds it.** The README this
+    was written alongside had claimed for months that character creation, combat, attacks
+    of opportunity, the world-state agent and packaging were "deliberately not built yet",
+    long after all five shipped. A manual that lists features from memory is the first
+    document in a project to become a lie, so this one cannot: if a class is added the
+    number moves, and if the spells fail to load the page fails loudly rather than
+    quoting a number nobody checked.
+    """
+    from pathlib import Path
+
+    from django.conf import settings as dj_settings
+
+    from pathfindergm import version
+    from rules import bestiary, classes, feats, races, spells
+
+    from . import library, preflight
+    from .craft_views import DISCIPLINES
+
+    wanted = preflight.needs()
+    shipped = [w.name for w in library.worlds() if w.shipped]
+    return render(request, "play/manual.html", {
+        "build": version.build(),
+        "models": [{
+            "model": n.model,
+            "size": preflight.gb(n.bytes_estimate),
+            # The jobs in the words the settings page uses for them, not the role ids.
+            "roles": ", ".join(_ROLE_WORDS.get(r, r) for r in n.roles),
+            "required": n.required,
+        } for n in wanted],
+        "total_download": preflight.gb(sum(n.bytes_estimate for n in wanted)),
+        "disk_wanted": preflight.gb(sum(n.bytes_estimate for n in wanted)
+                                    + preflight.DISK_HEADROOM),
+        "shipped_worlds": _and_list(shipped),
+        # The verb agrees with however many worlds the build actually ships, which is
+        # one today and is a number, not a constant.
+        "shipped_verb": "ships" if len(shipped) == 1 else "ship",
+        "classes": len(classes.all_classes()),
+        "races": len(races.all_races()),
+        "feats": f"{len(feats.all_feats()):,}",
+        "spells": f"{len(spells.all_spells()):,}",
+        "creatures": f"{len(bestiary.everything()):,}",
+        "disciplines": _and_list([d["name"] for d in DISCIPLINES]),
+        "data_dir": Path(dj_settings.CAMPAIGN_DIR).parent,
+    })
+
+
+# The four jobs, in the words a player would use. `modelcfg.ROLES` carries the long
+# explanation for the settings page; the manual wants the short name.
+_ROLE_WORDS = {"narrator": "writes the scene", "prose": "says what the dice did",
+               "watcher": "watches the world", "fallback": "backup narrator"}
+
+
+def _and_list(names: list[str]) -> str:
+    """"a", "a and b", "a, b and c" — so the prose reads whatever the catalogue holds."""
+    names = [str(n) for n in names if n]
+    if not names:
+        return "nothing"
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+@require_GET
 def licence(request):
     """The Open Game Licence, verbatim.
 

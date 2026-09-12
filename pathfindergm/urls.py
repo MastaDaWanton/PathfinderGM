@@ -19,6 +19,9 @@ urlpatterns = [
     path("api/level-up", views.level_up, name="level_up"),
     path("api/feats", views.feat_search, name="feat_search"),
     path("licence", views.licence, name="licence"),
+    # The manual, served from inside the app because that is where the player is: this
+    # ships as one executable and a document in a repository is not a manual they have.
+    path("manual", views.manual, name="manual"),
     path("api/characters", views.characters, name="characters"),
     path("api/character/new", views.new_character, name="new_character"),
     path("api/character/switch", views.switch_character, name="switch_character"),

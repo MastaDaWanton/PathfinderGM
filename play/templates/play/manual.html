@@ -1,0 +1,327 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pathfinder GM — the manual</title>
+<style>
+  /* Every number on this page comes from the catalogues themselves — see
+     `play.views.manual`. A manual that lists features from memory is the first
+     document in a project to become a lie, and this one had a README to learn from. */
+  @font-face {
+    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
+  }
+  :root {
+    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, Georgia, serif;
+    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --bg: #0f0d0b; --panel: #17130f; --ink: #e6dcc6; --dim: #8e816a;
+    --gold: #d9c08a; --gold-dim: #7a6543; --alarm: #a8443a; --sunk: #0c0a08;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink); font: 16px/1.7 var(--body);
+    /* Tiled and scrolling, where every other page in the app uses `cover ... fixed`.
+       Those pages never scroll their own body — they are a fixed frame with a
+       scrolling pane inside, so a fixed background is free. This is a long document
+       that scrolls the body itself, and a fixed background over ~4,700px of page left
+       large black bands mid-scroll where the browser had not repainted it. Seen in the
+       running app; `leather-tile.jpg` ships for exactly this and repeats. */
+    /* A flat two-stop gradient, not a fading one: over a 4,700px body a real gradient
+       would run light at the top and dark at the bottom. This is a uniform wash, and it
+       sits on `body` so the margins either side of the text column are darkened too —
+       with it on the content column alone, `leather-tile.jpg` showed through the
+       margins as the pale grey it actually is. */
+    background:
+      linear-gradient(rgba(10,8,6,.72), rgba(10,8,6,.72)),
+      url("{% static 'img/leather-tile.jpg' %}") repeat var(--bg);
+  }
+  header {
+    border-bottom: 1px solid var(--gold-dim); padding: 18px 30px 14px;
+    background: linear-gradient(#1b1510, #120e0a);
+    display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font: 400 26px/1 var(--display); color: var(--gold);
+               letter-spacing: .04em; }
+  header a { color: var(--dim); font-size: 13.5px; text-decoration: none;
+             border-bottom: 1px solid #3a2f22; }
+  header a:hover { color: var(--gold); }
+  main { max-width: 860px; margin: 0 auto; padding: 26px 30px 90px; }
+  h2 { margin: 40px 0 12px; color: var(--gold); font: 400 19px/1.2 var(--display);
+       letter-spacing: .10em; font-variant: small-caps;
+       border-bottom: 1px solid #2b2319; padding-bottom: 7px; }
+  h3 { margin: 24px 0 6px; color: var(--ink); font: 400 16px/1.3 var(--display);
+       letter-spacing: .04em; }
+  p, li { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+         background: var(--sunk); border: 1px solid #2e251a; border-radius: 2px;
+         padding: 1px 5px; color: var(--gold); }
+  a { color: var(--gold); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0 18px;
+          display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid #241d15;
+           font-size: 14.5px; vertical-align: top; }
+  /* "7.4 GB" broke across two lines in the running app. A size is one token.
+     Scoped to the models table: the other two tables on this page carry whole
+     paragraphs in their second column and must wrap. */
+  table.models td:nth-child(2) { white-space: nowrap; }
+  th { color: var(--dim); font-weight: 400; font-variant: small-caps;
+       letter-spacing: .06em; }
+  .lede { font-size: 17px; color: var(--ink); }
+  .aside { border-left: 3px solid var(--gold-dim); background: rgba(201,168,106,.06);
+           padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { border-left-color: var(--alarm); background: rgba(110,31,31,.12); }
+  .dim { color: var(--dim); }
+  nav.toc { margin: 18px 0 6px; font-size: 14px; }
+  nav.toc a { display: inline-block; margin: 0 14px 6px 0; color: var(--dim);
+              text-decoration: none; border-bottom: 1px solid #3a2f22; }
+  nav.toc a:hover { color: var(--gold); }
+  footer { color: var(--dim); font-size: 13px; border-top: 1px solid #241d15;
+           margin-top: 44px; padding-top: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pathfinder GM</h1>
+  <a href="/">← back to the shelf</a>
+  <span class="dim" style="font-size:12px">build {{ build }}</span>
+</header>
+
+<main>
+
+<p class="lede">A Pathfinder 1st Edition game you play like a story. A language model on
+your own machine narrates and plays everyone who is not you; a rules engine owns every
+number, every condition and every die. Nothing leaves your computer.</p>
+
+<nav class="toc">
+  <a href="#need">What you need</a>
+  <a href="#first">First run</a>
+  <a href="#worlds">Worlds</a>
+  <a href="#character">Your character</a>
+  <a href="#playing">Playing</a>
+  <a href="#combat">Fights</a>
+  <a href="#aside">Asking and cheating</a>
+  <a href="#benches">Benches</a>
+  <a href="#files">Your files</a>
+  <a href="#wrong">When it goes wrong</a>
+</nav>
+
+<h2 id="need">What you need</h2>
+
+<p><b>Windows, and <a href="https://ollama.com/download" target="_blank"
+rel="noopener">Ollama</a>.</b> Ollama is the program that runs the language model. It is
+free, it installs into your own account without asking for an administrator, and this app
+does not bundle it — partly because the models are far too large to ship inside an
+installer, and partly because if you already have Ollama you should keep using the one
+you have.</p>
+
+<p>Then the models themselves. The app fetches these for you; you never type a command.</p>
+
+<table class="models">
+  <tr><th>Model</th><th>Size</th><th>What it does</th></tr>
+  {% for m in models %}
+  <tr>
+    <td><code>{{ m.model }}</code></td>
+    <td>{{ m.size }}</td>
+    <td>{{ m.roles }}{% if not m.required %} <span class="dim">— optional</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<p>{{ total_download }} in total, downloaded once and kept. The second one is optional: it
+is a smaller, faster model that takes over on the rare turn the main one cannot produce a
+usable answer, and you can play perfectly well without it.</p>
+
+<h3>Will it run well on my machine?</h3>
+
+<p>The narrator is a 12-billion-parameter model. It wants roughly <b>8 GB of video
+memory</b> to be comfortable. With less than that Ollama will fall back to your processor
+and main memory, which works and is slow — minutes per turn rather than seconds. You will
+also want about {{ disk_wanted }} free on whichever drive Ollama keeps its models on.</p>
+
+<div class="aside">
+<p><b>How fast is a turn, honestly?</b> On a machine with a recent graphics card, roughly
+<b>fifteen seconds</b> — sometimes forty when the turn is complicated. The <i>first</i>
+turn after you start the app is slower, often close to a minute, because the model has to
+be read into memory once; after that it stays loaded.</p>
+<p>This is the price of the whole thing running locally, with no account, no subscription
+and nothing sent anywhere. It is a real cost and it was chosen deliberately. Most of a
+turn involves no model at all — every roll, every modifier and every condition is decided
+by code, instantly — so the wait is the writing, not the rules.</p>
+</div>
+
+<p>If you would rather not run a model locally, <b>Settings</b> lets you point any of the
+four jobs at a hosted provider with an API key instead. Local is the default and always
+will be; it is not compulsory.</p>
+
+<h2 id="first">The first run</h2>
+
+<ol>
+  <li>Install Ollama and start it.</li>
+  <li>Open Pathfinder GM and go to <b>Settings</b>. The top section says what is missing.</li>
+  <li>Press <b>Download</b> beside the model it names, and wait. There is a progress bar;
+      you can leave the page open and come back.</li>
+  <li>When it finishes, the warning disappears and you can start a game.</li>
+</ol>
+
+<p>Until that is done the app will not open the table — it would only be able to show you
+an error where the story should be. Everything that does <i>not</i> need a model stays
+open the whole time: making a character, the crafting benches, and all the homebrew
+editors.</p>
+
+<h2 id="worlds">Worlds</h2>
+
+<p>This app does not invent the world. It plays inside one written by
+<a href="https://github.com/MastaDaWanton/World-Bible" target="_blank" rel="noopener">World
+Bible</a>, a separate program that generates a complete setting — its peoples, its towns,
+its factions, its history — and exports it as a single file.</p>
+
+<p>{{ shipped_worlds }} {{ shipped_verb }} with the app, so you can play straight away. To add your own,
+export one from World Bible and press <b>Import a world</b> on the shelf. The file is read
+and checked as it lands, so a world this build cannot play is refused there and then rather
+than halfway through a session.</p>
+
+<p>The world file is never written to. Everything your game changes — a dead merchant, a
+burned bridge, a warrant out for your arrest — lives in your campaign save instead, so the
+same world can host several campaigns and re-exporting it never damages one.</p>
+
+<h2 id="character">Your character</h2>
+
+<p>Full 1st Edition character creation, with the rules enforced as you go:
+{{ classes }} classes, {{ races }} races, {{ feats }} feats and a point-buy spread that
+the app checks rather than trusts. Press <b>Create a character</b>.</p>
+
+<p>Or take one of the ready-made characters on the shelf if you would rather start
+playing than start building.</p>
+
+<p>After the build comes <b>outfitting</b>: your starting gold, spent on real equipment at
+real prices, before anybody opens a door. You level up from the sheet when you have the
+experience, all the way to 20th.</p>
+
+<div class="aside">
+<p>You play <b>one character</b>. Everyone else in the world — allies, hirelings, enemies,
+the person behind the counter — belongs to the GM. The dice popup only ever asks you for
+your own rolls.</p>
+</div>
+
+<h2 id="playing">Playing</h2>
+
+<p>Type what you do, in your own words, into the box at the bottom. "I ask the stallholder
+who owns the mill." "I follow the road north." "I look behind the curtain." The GM answers
+in prose and the engine resolves anything mechanical inside it.</p>
+
+<p>Above the box there are usually two or three <b>suggestions</b> — things you could
+plausibly do next. They are a shortcut, never a menu: anything you can type is allowed,
+and the suggestions are only there so you are never staring at an empty box.</p>
+
+<h3>The dice</h3>
+
+<p>When something you did needs a roll, a die appears and <b>you roll it</b>. Every
+modifier that went into the total is itemised beside it, so you can always see why the
+number is the number. Rolls that are not yours — an enemy's attack, a guard's Perception,
+a hidden check — are made by the engine and never shown to the GM before they happen.</p>
+
+<p>This is the arrangement the whole app is built around: <b>the GM proposes and the
+engine disposes.</b> The narrator can say a blow is struck; only the rules decide whether
+it landed and for how much. It cannot talk the game out of its own rules, because it is
+never asked.</p>
+
+<h3>Time, food and rest</h3>
+
+<p>Your sheet tracks thirst, hunger and rest, and the world's clock runs whether you are
+watching or not. Resting, eating and travelling all take real time, and the people around
+you get on with their own business in it.</p>
+
+<h2 id="combat">Fights</h2>
+
+<p>When a fight starts you get initiative, a turn order, and a panel of what you can
+actually do this turn: <b>Strike</b>, <b>Full attack</b>, <b>Ability</b>, <b>Cast</b>, a
+swift action, a free action. Pick a target and commit the turn.</p>
+
+<p>Some scenes also carry a <b>map</b> — a five-foot grid you can move on by clicking a
+square. Where there is one, reach, cover, charge lanes and attacks of opportunity are
+measured from real distance rather than asserted. Where there is not, the same three
+ranges — engaged, near, far — are tracked without one.</p>
+
+<p>Conditions, buffs, durations, iterative attacks, manoeuvres, damage reduction,
+resistances and stacking rules are the engine's business and are applied whether or not
+anybody mentions them. {{ spells }} spells and {{ creatures }} creature stat blocks are
+loaded and available to it.</p>
+
+<h2 id="aside">Asking questions, and cheating</h2>
+
+<p>Two things you can type that are not your character speaking. Both start with a slash,
+so no ordinary sentence can be mistaken for one.</p>
+
+<table>
+  <tr><th>What you type</th><th>What happens</th></tr>
+  <tr><td><code>/gm who runs this town?</code></td>
+      <td>Answered out of character, from the world's own material and the state of your
+          game — not made up. Answers read off the engine or the books are labelled
+          differently from answers the model had to reason its way to, so you can always
+          tell a fact from an opinion.</td></tr>
+  <tr><td><code>/cheat I have 1000 gold</code></td>
+      <td>You become the author for one line. Use it to fix something that went wrong, or
+          to skip past something you do not want to play out.</td></tr>
+</table>
+
+<p>Neither goes into the story. The narrator never sees the question or the answer, so it
+cannot quietly turn one into a fact about the world on the next turn.</p>
+
+<h2 id="benches">The benches</h2>
+
+<p><b>Crafting.</b> {{ disciplines }} — each with its own materials, recipes, and the
+gathering that feeds it. Reachable from the shelf or from the table.</p>
+
+<p><b>Homebrew.</b> Editors for classes, races, spells, effects and consumables, plus
+house rules — point buy, ability ceilings, magic stacking, whether the Core races are
+offered at all. Anything you build here plays exactly like the shipped content, because
+it is the same kind of document underneath.</p>
+
+<h2 id="files">Where your things are kept</h2>
+
+<p>Everything the app saves lives in one folder on your machine:</p>
+
+<p><code>{{ data_dir }}</code></p>
+
+<p>Campaigns and characters are plain JSON files — readable, copyable, and backed up by
+copying the folder. There is no database and nothing to migrate. Deleting the app does not
+touch them.</p>
+
+<h2 id="wrong">When something goes wrong</h2>
+
+<table>
+  <tr><th>What you see</th><th>What it means</th></tr>
+  <tr><td>A warning on the front page about Ollama</td>
+      <td>Exactly what it says. Open Settings, where the fix is a button.</td></tr>
+  <tr><td>"The GM could not produce a turn"</td>
+      <td>The model failed every attempt at a valid turn and the app told you rather than
+          inventing one. Try again, or rephrase what you typed. Roughly one turn in
+          twenty needs a retry; failing outright is rarer.</td></tr>
+  <tr><td>A turn is taking minutes</td>
+      <td>Either the first turn after opening the app, or the model is running on your
+          processor rather than your graphics card.</td></tr>
+  <tr><td>The GM refuses something you tried</td>
+      <td>Usually correct. You cannot use an ability your character does not have, or
+          change somebody's mind by announcing that you have. Persuading, threatening,
+          lying and bribing are all ordinary play and do work — they are skill checks.</td></tr>
+</table>
+
+<footer>
+  <p>The Pathfinder rules this app runs on — spells, creatures, feats, weapons and the
+  tables behind them — are Open Game Content under the
+  <a href="/licence" target="_blank" rel="noopener">Open Game Licence v1.0a</a>, which
+  requires that the licence travel with it. Not published by, endorsed by, or affiliated
+  with Paizo Inc.</p>
+</footer>
+
+</main>
+
+<!-- The heartbeat that lets the packaged exe tell an open window from a closed one.
+     Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% static 'js/keepalive.js' %}"></script>
+</body>
+</html>

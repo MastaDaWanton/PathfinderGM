@@ -328,6 +328,15 @@
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
   .madebanner b { color: var(--gold); }
+  /* The tab row fills the header, so this always wraps to a line of its own. Pushed
+     right it reads as a top-right utility link, which is the convention; left, under
+     the title, it reads as something that fell off. Tried both in the running app. */
+  .manuallink { margin-left: auto; align-self: center; margin-bottom: 9px;
+                color: var(--dim);
+                text-decoration: none; font-size: 13px; letter-spacing: .08em;
+                font-variant: small-caps; border-bottom: 1px solid #3a2f22;
+                padding-bottom: 2px; }
+  .manuallink:hover { color: var(--gold); border-color: var(--gold-dim); }
 
   /* First run. The alarm border rather than the gold one: this is the single thing
      standing between the player and a game, and it should not read as a footnote. */
@@ -672,6 +681,10 @@
 <header>
   <h1>Pathfinder GM<small>a world by World Bible, played here</small></h1>
   <nav id="tabs"></nav>
+  <!-- In the header rather than a tab: the person who most needs it is the one who has
+       just opened the app for the first time, and they do not yet know what any of the
+       tabs are. -->
+  <a href="/manual" class="manuallink">Manual</a>
 </header>
 
 <main><div class="wrap" id="pane"></div></main>
