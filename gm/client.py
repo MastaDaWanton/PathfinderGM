@@ -296,8 +296,58 @@ def _hosted(messages, model, host, provider, api_key, as_json,
 
 
 def available(host: str = "http://localhost:11434", timeout: int = 3) -> list[str]:
+    """Every model Ollama has pulled, or an empty list for any reason at all.
+
+    Kept as it was — the settings page's datalist genuinely does not care why the list
+    is empty. `probe` is for callers that do.
+    """
+    return list(probe(host, timeout).installed)
+
+
+# The three answers `/api/tags` can give, which `available` flattened to one.
+#
+# It returned `[]` for "Ollama is not installed", for "installed but not running", for
+# "running but you have pulled nothing", and for "the host you typed is a typo" — four
+# situations with four different fixes, and the settings page could only ever offer the
+# same empty datalist to all of them. A first run needs to tell them apart to say
+# anything useful, which is what `play/preflight.py` is built on.
+#
+# `refused` is the one that carries real information: nothing is listening on the port.
+# Whether that means "not installed" or "installed but not started" is a question about
+# the filesystem, not the socket, and is answered in preflight where the platform
+# knowledge already lives.
+@dataclass
+class Probe:
+    reachable: bool
+    installed: tuple[str, ...] = ()
+    refused: bool = False
+    why: str = ""
+
+
+def probe(host: str = "http://localhost:11434", timeout: int = 3) -> Probe:
+    """Ask Ollama what it has, and report *how* it failed when it did."""
+    url = f"{host.rstrip('/')}/api/tags"
     try:
-        with urllib.request.urlopen(f"{host.rstrip('/')}/api/tags", timeout=timeout) as r:
-            return [m["name"] for m in json.loads(r.read().decode("utf-8")).get("models", [])]
-    except Exception:
-        return []
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            got = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return Probe(False, why=f"{host} answered {exc.code}. That is not Ollama.")
+    except urllib.error.URLError as exc:
+        # ConnectionRefusedError is WinError 10061 on Windows and ECONNREFUSED
+        # everywhere else; urllib wraps whichever in `.reason`. A refusal means the
+        # port is free, which is a different situation from a host that cannot be
+        # found or one that never answers, and the fix offered differs for each.
+        refused = isinstance(exc.reason, ConnectionRefusedError)
+        return Probe(False, refused=refused,
+                     why=(f"nothing is listening on {host}." if refused
+                          else f"cannot reach {host}: {exc.reason}"))
+    except (TimeoutError, OSError) as exc:
+        return Probe(False, why=f"cannot reach {host}: {exc}")
+    except ValueError as exc:
+        return Probe(False, why=f"{host} did not answer with JSON: {exc}")
+
+    models = got.get("models") if isinstance(got, dict) else None
+    names = tuple(m["name"] for m in models
+                  if isinstance(m, dict) and isinstance(m.get("name"), str)
+                  ) if isinstance(models, list) else ()
+    return Probe(True, installed=names)

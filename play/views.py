@@ -11,7 +11,7 @@ import re
 
 from django.conf import settings
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
@@ -432,7 +432,21 @@ def table(request):
     `document.cookie` to sign its POSTs, and Django only sets that cookie when something
     asks it to. Without this decorator the page renders perfectly and then every single
     turn 403s — found by driving the real HTTP path, not by any test.
+
+    **The model gate lives here, not only on the two API doors that lead here.**
+    `/api/start` and `/api/resume` were gated first, and driving the real UI showed
+    that a returning player reaches none of them: the front page's Continue is a plain
+    `<a href="/play/">`, because the campaign is already current and there is nothing to
+    switch to. So the commonest path into play walked straight past both checks. This is
+    the one door every path goes through — the two links, a bookmark, and the redirect
+    after either API call — and it is the reason the check is at the destination rather
+    than at the approaches. `/craft/` is deliberately not gated: the benches need no
+    model and refusing them would be refusing work the app can do.
     """
+    from . import preflight
+
+    if not preflight.check().ok:
+        return redirect("/?setup=1")
     c = campaign_mod.current(reset=request.GET.get("new") == "1")
     return render(request, "play/table.html", {
         "state_json": json.dumps(_state(c)),

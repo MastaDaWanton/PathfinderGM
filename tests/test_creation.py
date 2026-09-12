@@ -361,7 +361,11 @@ def test_the_forge_sends_you_where_the_new_character_is():
 
     page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
     assert 'window.location.href = `/?made=${encodeURIComponent(d.id)}`' in page
-    assert 'let TAB = MADE ? "characters" : "worlds"' in page
+    # The tab the page opens on. Asserted as the branch rather than the whole line: the
+    # first-run redirect (`?setup=1`) took a turn in front of this one, and the string
+    # match broke on a change that left the behaviour exactly as it was. What matters
+    # is that a freshly forged character still lands on the roster.
+    assert 'MADE ? "characters" : "worlds"' in page
     assert "madebanner" in page
 
 

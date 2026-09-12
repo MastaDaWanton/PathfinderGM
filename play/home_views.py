@@ -113,6 +113,48 @@ def import_world(request):
     return JsonResponse({"ok": True, "world": card.as_dict()})
 
 
+def _model_gate():
+    """Refuse the two doors into play when no model can answer, or None.
+
+    Both doors lead to a table whose very first act is a model call, so without this the
+    failure lands one page later as a red error over a scene that never arrived — and
+    the player has no way to tell "I have not downloaded the narrator yet" from "the app
+    is broken". Checked at the door instead, where the answer is a button.
+
+    Not a middleware and not on every endpoint: the sheet, the forge, the benches and
+    the whole homebrew side work perfectly well with no model at all, and gating them
+    would be refusing work the app can do.
+    """
+    from . import preflight
+
+    report = preflight.check()
+    if report.ok:
+        return None
+    return JsonResponse({"error": _gate_words(report), "setup": report.as_dict()},
+                        status=409)
+
+
+def _gate_words(report) -> str:
+    """The refusal, in the words for this particular cause."""
+    from . import preflight
+
+    if report.state == "not-installed":
+        return ("Pathfinder GM needs Ollama to run the GM, and it is not installed on "
+                "this machine. Open Settings to install it.")
+    if report.state == "not-running":
+        return ("Ollama is installed but not running. Start it, then try again — "
+                "Settings has the details.")
+    if report.state == "unreachable":
+        return f"The GM's model cannot be reached: {report.why} Check Settings."
+    missing = [n for n in report.needs if not n.present and n.required]
+    if missing:
+        size = sum(n.bytes_estimate for n in missing)
+        return (f"The GM's model is not downloaded yet "
+                f"({', '.join(n.model for n in missing)}, about "
+                f"{preflight.gb(size)}). Open Settings to fetch it.")
+    return report.why or "The GM has no model to answer with. Check Settings."
+
+
 @require_POST
 def start_in_world(request):
     """Begin a sandbox in a world, with a character.
@@ -141,6 +183,11 @@ def start_in_world(request):
         return JsonResponse({"error": str(exc)}, status=404)
     if character is None:
         return JsonResponse({"error": "Pick who is playing."}, status=400)
+    # Last, deliberately: a player who picked the wrong world should hear about the
+    # world, and one HTTP call to Ollama should not stand in front of that.
+    refusal = _model_gate()
+    if refusal is not None:
+        return refusal
 
     campaign_mod.begin_with(character, world_source=card.source)
     return JsonResponse({"ok": True})
@@ -149,6 +196,9 @@ def start_in_world(request):
 @require_POST
 def resume(request):
     """Put a character back in the chair and go to the table."""
+    refusal = _model_gate()
+    if refusal is not None:
+        return refusal
     body = read_body(request)
     try:
         campaign_mod.switch_to(str(body.get("id", "")).strip())
