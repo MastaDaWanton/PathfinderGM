@@ -214,7 +214,58 @@ def check_the_pull_refuses_a_model_nobody_asked_for(http: Http) -> None:
     note("the pull refuses a model no role asked for", faults)
 
 
-def check_the_model_gate_holds_in_the_frozen_build(exe: Path) -> None:
+def check_the_debug_page_does_not_ship(http: Http) -> None:
+    """`DEBUG` is off in the packaged build, proved by what a 404 looks like.
+
+    Asked of the artifact rather than of `settings.py`, because `DEBUG = not is_frozen()`
+    is a claim about freezing and the only way to know it holds is to freeze it. Under
+    DEBUG Django answers an unknown URL with its whole URLconf — every route in the app,
+    the settings module's name, and on a 500 the source and local variables of every
+    frame. Off, it is a few plain lines.
+
+    A 404 rather than a 500 on purpose: it needs no endpoint to be broken, so this check
+    cannot itself become the reason something looks broken.
+    """
+    s, raw = http.get("/no-such-page-at-all")
+    body = raw.decode("utf-8", "replace")
+    faults = [] if s == 404 else [f"an unknown URL answered {s}, not 404"]
+    for leak in ("Using the URLconf", "Django tried these URL patterns",
+                 "Traceback", "settings module"):
+        if leak in body:
+            faults.append(f"the 404 page carries {leak!r} — DEBUG is on in this build")
+    if len(body) > 2000:
+        faults.append(f"the 404 page is {len(body)} bytes; a production one is a few "
+                      f"hundred, so this is very likely the debug page")
+    note("no debug page ships", faults)
+
+
+def check_the_secret_key_is_this_installations_own(a: Path, b: Path) -> None:
+    """Two installs, two keys, and neither of them the literal in `settings.py`.
+
+    Free: both directories are left behind by launches this prover has already made, so
+    nothing starts here. The comment in `settings.py` used to claim the key was
+    "regenerated per install" while the literal shipped in every copy of the exe — a
+    claim that reads exactly like a fix and was not one. This is what makes it a fact.
+    """
+    faults = []
+    keys = []
+    for label, data in (("first", a), ("second", b)):
+        path = data / "secret.key"
+        if not path.exists():
+            faults.append(f"the {label} install wrote no secret.key")
+            continue
+        text = path.read_text(encoding="utf-8").strip()
+        keys.append(text)
+        if len(text) < 50:
+            faults.append(f"the {label} key is {len(text)} characters")
+        if text.startswith("django-insecure"):
+            faults.append(f"the {label} install shipped the development literal")
+    if len(keys) == 2 and keys[0] == keys[1]:
+        faults.append("two installs share one key, so it is baked in rather than made")
+    note("each install signs with its own secret key", faults)
+
+
+def check_the_model_gate_holds_in_the_frozen_build(exe: Path) -> Path:
     """The table refuses to open when no model can answer — proved frozen.
 
     Its own launch, with a `models.json` seeded into a throwaway data directory
@@ -275,6 +326,9 @@ def check_the_model_gate_holds_in_the_frozen_build(exe: Path) -> None:
         except subprocess.TimeoutExpired:
             proc.kill()
     note("the model gate holds in the frozen build", faults)
+    # Handed back so the secret-key check can compare two installs without launching a
+    # third time: this directory is a second install, and that is what it needs.
+    return data
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -667,18 +721,36 @@ def main() -> None:
         except subprocess.TimeoutExpired:
             p.kill()
 
+    started = time.monotonic()
     proc = launch()
     try:
         # Discover the server through the same handshake the Electron shell will use —
         # the portfile IS the contract, so the prover dogfoods it instead of assuming
         # the preferred port.
+        #
+        # Timed at quarter seconds rather than whole ones because this loop is now the
+        # startup measurement as well as the handshake, and a one-second tick cannot
+        # tell three seconds from four.
         portfile = data / "server.json"
-        for _ in range(120):
+        for _ in range(480):
             if portfile.exists():
                 break
-            time.sleep(1)
+            time.sleep(0.25)
         else:
             print("no server.json handshake ever appeared"); sys.exit(2)
+        cold = time.monotonic() - started
+        # Reported, with a ceiling rather than a target. "A few seconds by observation,
+        # never timed" is what docs/packaging.md said about this for a month; a number
+        # printed every run is what stops that being true again.
+        #
+        # 60s is not a performance bar, it is the signature of a known pathology: a
+        # one-file build unpacks ~39 MB to %TEMP% on every launch, and force-killed
+        # runs leak those directories. Enough of them left behind and a launch that
+        # takes nine seconds takes two minutes.
+        note(f"cold start to the portfile handshake ({cold:.1f}s)",
+             [] if cold < 60 else [
+                 f"{cold:.1f}s to answer. Check %TEMP% for leftover _MEI* directories "
+                 f"from force-killed runs before reading this as a code regression"])
         hand = json.loads(portfile.read_text(encoding="utf-8"))
         faults = []
         # The portfile pid is the PyInstaller CHILD — the process actually holding
@@ -712,6 +784,7 @@ def main() -> None:
             print("the exe never answered at its own portfile url"); sys.exit(2)
 
         run_checks(http, repo)
+        check_the_debug_page_does_not_ship(http)
         check_the_manual_ships_and_counts_for_itself(http)
         check_the_first_run_check_answers(http)
         check_the_pull_refuses_a_model_nobody_asked_for(http)
@@ -769,7 +842,8 @@ def main() -> None:
     # Two that each need a launch of their own, for opposite reasons: the gate needs a
     # data directory whose models.json points nowhere, and the reaper needs a run in
     # which nothing has been sending a heartbeat.
-    check_the_model_gate_holds_in_the_frozen_build(exe)
+    second_install = check_the_model_gate_holds_in_the_frozen_build(exe)
+    check_the_secret_key_is_this_installations_own(data, second_install)
     check_the_game_stops_when_its_last_window_does(exe)
 
     print(f"\n{'ALL CLEAN' if not FAULTS else f'{len(FAULTS)} FAULT(S)'}")

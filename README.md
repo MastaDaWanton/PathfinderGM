@@ -106,9 +106,17 @@ installer.
 
 ## Before this is 1.0
 
-`docs/packaging.md` keeps the list. The short version: the app has never been installed on
-a clean Windows machine with no Python, the executable and installer are unsigned, and
-`DEBUG` is still on in the packaged build.
+`docs/packaging.md` keeps the list, and `tools/prove_build.py` asserts what has been
+closed against the built artifact rather than against the source. The short version:
+**the app has never been installed on a clean Windows machine with no Python**, and the
+executable and installer are **unsigned**, so SmartScreen will warn on any machine that
+did not build them. Both need a machine or a certificate rather than a commit.
+
+What the exe is already proved to do, every run of the prover: a per-install
+`SECRET_KEY`, `DEBUG` off with no debug page, the first-run model check answering from
+inside the bundle, the model gate holding, and a cold start timed rather than estimated.
+(No count here on purpose — a number in prose is a number nothing checks, which is the
+mistake this file is still recovering from.)
 
 ## Licence
 

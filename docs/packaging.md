@@ -361,19 +361,37 @@ marks the exit as the clean one rather than an axe.
   user could send back. Turning it off needs a log file under the user data directory
   first — and note that the moment such a file exists, it is a derived file outside the
   install directory and the `CACHE_VERSION` question above stops being theoretical.
-- **`DEBUG = True` in the packaged build.** Tracebacks are rendered into the browser. For a
-  process bound to `127.0.0.1` with no untrusted client this is a diagnostic aid rather
-  than a hole, but it is a decision nobody has explicitly taken for the shipped artifact.
-  The static route already carries `insecure=True` so it will survive `DEBUG` being turned
-  off; nothing else has been checked against that.
-- **`SECRET_KEY`.** The comment in `settings.py` says it "is regenerated per install in the
-  packaged build". It is not — the literal ships. Sessions are signed cookies, so the
-  consequence is that every install shares a signing key. Out of scope for this task, named
-  here because the comment currently claims otherwise.
-- **No Ollama in the loop.** Every check above is the rules engine and the content layer.
-  The GM agent talks to `localhost:11434`; whether the frozen build's `urllib` reaches it,
-  and what it does when nothing is listening, is untested.
-- **Startup cost not measured properly.** A one-file build unpacks 36 MB to a temp
-  directory on every launch. It was a few seconds by observation, never timed.
 - **Cross-platform.** Windows only. `paths.py` has macOS and Linux branches; neither has
   been run, let alone packaged.
+
+## Closed, and how (2026-09-12)
+
+Four entries stood on the list above after they had been fixed, which is worse than
+never having listed them: a stale "unproven" reads exactly like an open one, and this
+list is what anybody checks before deciding what is left to do. Each is now asserted by
+`tools/prove_build.py` against the artifact, so it cannot rot back into a claim.
+
+- **`DEBUG = True` in the packaged build.** ~~Tracebacks are rendered into the
+  browser.~~ `settings.DEBUG` is `not is_frozen()`, so it is off in the exe. Proved by
+  what a 404 looks like: 179 bytes, no URLconf listing, no traceback, no settings module
+  name. Asked of a 404 rather than a 500 so the check needs nothing to be broken.
+- **`SECRET_KEY`.** ~~The literal ships.~~ `paths.secret_key()` writes 86 characters to
+  `secret.key` in the user data directory on first run and reads it back after. Proved
+  across two installs from two throwaway data directories: both present, neither the
+  development literal, and the two differ.
+- **No Ollama in the loop.** ~~Whether the frozen build's `urllib` reaches
+  `localhost:11434` is untested.~~ It reaches it. `/api/setup` answers from inside the
+  exe with its model list and sizes intact, the model gate refuses `/play/` with a 302
+  when nothing is listening, and the pull endpoint refuses a model no role asked for.
+  See `docs/first-run.md`.
+- **Startup cost not measured properly.** ~~A few seconds by observation, never
+  timed.~~ **7.3s, 8.6s and 9.0s** cold across three fresh installs, from process start
+  to the `server.json` handshake, with `%TEMP%` cleared of `_MEI*` leftovers first. So
+  call it seven to nine seconds to unpack ~39 MB and answer, and note that three runs on
+  one machine is a reading rather than a benchmark. The prover prints it every run now
+  and faults above 60s — not as a performance bar but because 60s is the signature of
+  the leftover-`_MEI*` pathology rather than of any code change.
+
+Still true, and left where they are: the clean-machine install, the signatures,
+`console=True`, the unseen Electron window, and cross-platform. Those need a machine or
+a certificate rather than a commit.
