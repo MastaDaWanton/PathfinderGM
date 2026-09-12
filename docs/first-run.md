@@ -170,19 +170,40 @@ Against the real dev server and the real Ollama on this machine:
 `not-installed` is covered by tests only — it needs a machine with no Ollama on it,
 which is the same machine the packaging work still needs and does not have.
 
+## Proved in the packaged build (2026-09-12)
+
+The two items that led this list have been closed. `dist/PathfinderGM.exe` was rebuilt
+at stamp `4a205e6` and `tools/prove_build.py` gained four checks, all of which need no
+Ollama:
+
+- **`/api/setup` answers from inside the exe**, with its model list and sizes intact.
+  Whether the frozen build's `urllib` could reach `localhost:11434` at all was the
+  largest untested thing in `docs/packaging.md`; it can.
+- **The model gate holds frozen.** Its own launch, with a `models.json` seeded into a
+  throwaway data directory pointing every role at a dead port: `/play/` answers 302 to
+  `/?setup=1`. That also proves the frozen build reads the override from the right
+  place — it is a `CAMPAIGN_DIR` path, the kind that behaves differently under
+  PyInstaller. It cannot be proved on the ordinary launch, because a machine with
+  Ollama running opens the gate for real reasons and proves nothing.
+- **The pull refuses a model no role asked for**, so the download button is not an
+  arbitrary-download button on an open port.
+- **The manual ships and its counts survive the bundle.** Not a page check: every
+  number on that page is rendered by walking a catalogue, so it is a load-bearing test
+  of whether `content/` reached the bundle and can be parsed from inside it.
+
+25 checks, all clean.
+
+**What the streaming pull still lacks** is a frozen run that actually streams. The
+refusal is proved; a real `/api/setup/pull` through `ThreadedWSGIServer` is not, because
+the only honest version of that check downloads several gigabytes. wsgiref flushes per
+write and that server is what `runserver` wraps, so it should behave identically —
+should, not does.
+
 ## Still open
 
-- **Nothing here has run in the packaged build.** The frozen app reaching
-  `localhost:11434` was already the largest untested thing in `docs/packaging.md`, and
-  this adds a streaming response to it. `ThreadedWSGIServer` is what `runserver` wraps
-  and wsgiref flushes per write, so streaming should behave identically — should,
-  not does.
 - **The one machine that matters is the one with no Ollama**, and it is the same clean
-  Windows box `docs/packaging.md` has been asking for.
+  Windows box `docs/packaging.md` has been asking for. `not-installed` is still covered
+  by tests only.
 - **`KNOWN_SIZES` is hand-maintained.** `test_every_shipped_default_has_a_size_to_quote`
   fails when a default model changes without its size, which makes it noisy rather than
   silent — the right failure, but still a hand edit.
-- **The manual does not exist yet.** The latency sentence on the setup page (first turn
-  a minute, later turns ~15s) is the only place the app says this out loud, and it
-  should also be in a manual that says what the machine needs before somebody downloads
-  7.4 GB onto a laptop that cannot run it.

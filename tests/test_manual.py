@@ -162,3 +162,71 @@ def test_the_licence_travels_with_it(page):
     assert "/licence" in page
     assert "Open Game Licence" in page
     assert "Paizo" in page, "the disclaimer is not on the page"
+
+
+# --- The README's own numbers ----------------------------------------------------------
+
+def test_the_readme_counts_what_ships_and_not_what_this_machine_has(tmp_path, settings):
+    """Caught by `tools/prove_build.py` against the frozen exe, 2026-09-12.
+
+    The packaged build reported 12 classes and 25 races; the README said 13 and 26. Both
+    were true. The README's figures had been read off a development machine whose
+    homebrew directory holds `storm lord.json` and `asura.json`, and `all_classes` and
+    `all_races` merge homebrew over the shipped catalogue by design — so the numbers
+    described that one installation and not the product.
+
+    That is the same drift the README rewrite was meant to end, reintroduced in the act
+    of ending it, and it was invisible to every test because they all run with whatever
+    homebrew is lying about. This one points CAMPAIGN_DIR at an empty directory, which
+    is what a fresh install actually is.
+    """
+    import re
+
+    from rules import classes, races
+
+    # `rules.classes._homebrew` reads `CAMPAIGN_DIR.parent / "homebrew"`, so the parent
+    # is what has to be empty — pointing CAMPAIGN_DIR straight at `tmp_path` would leave
+    # homebrew resolving to pytest's shared tmp root and pass for the wrong reason.
+    fresh = tmp_path / "campaigns"
+    fresh.mkdir()
+    settings.CAMPAIGN_DIR = str(fresh)             # a fresh install: no homebrew at all
+    shipped_classes = len(classes.all_classes())
+    shipped_races = len(races.all_races())
+
+    readme = (Path(settings.BASE_DIR) / "README.md").read_text(encoding="utf-8")
+    claimed_classes = re.search(r"\*\*(\d+) classes\*\*", readme)
+    claimed_races = re.search(r"\*\*(\d+) races\*\*", readme)
+    assert claimed_classes and claimed_races, (
+        "README.md no longer states the shipped class and race counts in the form this "
+        "test reads; update both together or the number goes back to being unchecked")
+    assert int(claimed_classes.group(1)) == shipped_classes, (
+        f"README says {claimed_classes.group(1)} classes ship; a fresh install gets "
+        f"{shipped_classes}")
+    assert int(claimed_races.group(1)) == shipped_races, (
+        f"README says {claimed_races.group(1)} races ship; a fresh install gets "
+        f"{shipped_races}")
+
+
+def test_the_manual_counts_this_installation_including_homebrew(tmp_path, settings):
+    """The opposite rule, and it is deliberate.
+
+    The README describes the product, so it counts what ships. The manual is read by
+    somebody sitting in front of *their* copy, so it counts what their copy has — a
+    player who built a class should see it in the total. Pinned so the two do not get
+    "corrected" into agreeing with each other.
+    """
+    from rules import classes
+
+    home = tmp_path / "homebrew" / "classes"
+    home.mkdir(parents=True)
+    (home / "prover.json").write_text(
+        '{"id": "prover", "name": "Prover", "hit_die": "d8", '
+        '"bab": "three_quarter", "skill_ranks": 4, '
+        '"saves": {"fort": "good", "ref": "poor", "will": "poor"}}', encoding="utf-8")
+    campaigns = tmp_path / "campaigns"
+    campaigns.mkdir()
+    settings.CAMPAIGN_DIR = str(campaigns)
+
+    assert "prover" in classes.all_classes(), (
+        "homebrew no longer merges into the catalogue, so the manual would under-report "
+        "what this installation can actually build")

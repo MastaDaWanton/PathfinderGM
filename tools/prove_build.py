@@ -132,6 +132,159 @@ def check_the_laws_hold(http: Http) -> None:
     note("a worn effect reaches its number and names itself", faults)
 
 
+def check_the_manual_ships_and_counts_for_itself(http: Http) -> None:
+    """The manual, frozen, with its numbers read out of the bundled catalogues.
+
+    Not a page check. Every count on that page is rendered by walking a catalogue —
+    spells, creatures, feats, classes, races — so the page is a load-bearing test of
+    whether `content/` actually reached the bundle and can be parsed from inside it.
+    A directory missing from the spec's `datas` does not raise on import; it raises
+    the first time something opens it, which here is a player reading the manual.
+
+    Checked as an inequality, not an exact number: this prover deliberately imports
+    nothing from the app, so it cannot know what the real counts are. What it can say
+    is that nothing rendered as zero, which is what an empty or unreadable catalogue
+    would produce.
+    """
+    s, raw = http.get("/manual")
+    faults = [] if s == 200 else [f"/manual answered {s}"]
+    body = raw.decode("utf-8", "replace")
+    for wanted in ("What you need", "Open Game Licence", "video memory"):
+        if wanted not in body.replace("\n", " ").replace("  ", " "):
+            faults.append(f"the manual does not mention {wanted!r}")
+    # A catalogue that failed to load renders as 0, and "0 spells" reads as a sentence
+    # rather than as an error.
+    #
+    # The lookbehind is load-bearing and was not there first time: a plain substring
+    # search for "0 spells" matches "3,040 spells", so the very first run of this check
+    # reported a fault against a build whose catalogues had all loaded perfectly. A
+    # check that cries wolf on a healthy build is worse than no check, because the next
+    # real fault is the one nobody believes.
+    import re as _re
+
+    for zero in ("spells", "classes", "races", "feats", "creature"):
+        if _re.search(r"(?<![\d,])0 " + zero, body):
+            faults.append(f"the manual says '0 {zero}' — a catalogue did not load")
+    if "js/keepalive.js" not in body:
+        faults.append("the manual sends no heartbeat, so a window left open on it "
+                      "cannot tell the exe it exists")
+    note("the manual ships and its counts survive the bundle", faults)
+
+
+def check_the_first_run_check_answers(http: Http) -> None:
+    """`/api/setup` inside the frozen build, reaching a real socket.
+
+    The single largest untested thing in `docs/packaging.md` was whether the frozen
+    app's `urllib` can reach Ollama at all. This does not need Ollama to be running —
+    either answer proves the call was made and handled rather than raising out of a
+    view — but it does prove the probe, the model list and the size table survive
+    freezing.
+    """
+    s, raw = http.get("/api/setup")
+    faults = [] if s == 200 else [f"/api/setup answered {s}: {raw[:120]}"]
+    got = j(raw)
+    if got.get("state") not in ("ready", "missing-models", "not-running",
+                               "not-installed", "unreachable"):
+        faults.append(f"unknown state {got.get('state')!r}")
+    needs = got.get("needs") or []
+    if not needs:
+        faults.append("the frozen build wants no models at all, so settings.MODELS "
+                      "did not survive the bundle")
+    for need in needs:
+        if not need.get("bytes"):
+            faults.append(f"{need.get('model')} has no size to quote — "
+                          f"preflight.KNOWN_SIZES did not survive")
+    if not str(got.get("download", "")).startswith("https://"):
+        faults.append("no download link for somebody with no Ollama")
+    note("the first-run check answers from inside the exe", faults)
+
+
+def check_the_pull_refuses_a_model_nobody_asked_for(http: Http) -> None:
+    """The download button is not an arbitrary-download button.
+
+    Anything that can reach this port could otherwise spend the player's disk on any
+    model in the registry. Proved frozen because the check reads `settings.MODELS`
+    through `modelcfg`, which is a file read out of the *data* directory — exactly the
+    kind of path that behaves differently under PyInstaller.
+    """
+    s, raw = http.post("/api/setup/pull", {"model": "evil/enormous-thing"})
+    faults = [] if s == 400 else [f"an unasked-for model answered {s}, not 400"]
+    if s == 400 and "not a model any role" not in j(raw).get("error", ""):
+        faults.append(f"refused, but not for the right reason: {j(raw).get('error')}")
+    note("the pull refuses a model no role asked for", faults)
+
+
+def check_the_model_gate_holds_in_the_frozen_build(exe: Path) -> None:
+    """The table refuses to open when no model can answer — proved frozen.
+
+    Its own launch, with a `models.json` seeded into a throwaway data directory
+    pointing every role at a dead port. That file is how a player's own model settings
+    reach the app, and reading it is a `CAMPAIGN_DIR` path; if the frozen build read it
+    from the wrong place the override would be silently ignored and the gate would open
+    on a machine that cannot play.
+
+    It cannot be proved on the main launch: this machine has Ollama running with the
+    models pulled, so the gate opens there for real reasons and proves nothing.
+    """
+    data = Path(tempfile.mkdtemp(prefix="pfgm-gate-"))
+    (data / "models.json").write_text(json.dumps({"roles": {
+        role: {"provider": "ollama", "model": "nothing/at-all:latest",
+               "host": "http://127.0.0.1:11999"}
+        for role in ("narrator", "prose", "watcher", "fallback")}, "keys": {}}),
+        encoding="utf-8")
+
+    env = dict(os.environ, PATHFINDER_GM_DATA=str(data))
+    proc = subprocess.Popen([str(exe), "--no-browser"], env=env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    faults: list[str] = []
+    try:
+        portfile = data / "server.json"
+        for _ in range(120):
+            if portfile.exists():
+                break
+            time.sleep(1)
+        else:
+            note("the model gate holds in the frozen build",
+                 ["no server.json handshake ever appeared"])
+            return
+        base = f"http://127.0.0.1:{json.loads(portfile.read_text())['port']}"
+
+        # No redirect following: the redirect IS the assertion.
+        opener = urllib.request.build_opener(_NoRedirect())
+        try:
+            with opener.open(base + "/play/", timeout=60) as r:
+                faults.append(f"/play/ answered {r.status} with no model to answer "
+                              f"with; the gate did not hold")
+        except urllib.error.HTTPError as e:
+            if e.code != 302:
+                faults.append(f"/play/ answered {e.code}, not a redirect")
+            elif e.headers.get("Location") != "/?setup=1":
+                faults.append(f"redirected to {e.headers.get('Location')!r} rather "
+                              f"than the page carrying the fix")
+
+        raw = urllib.request.urlopen(base + "/api/setup", timeout=60).read()
+        state = j(raw).get("state")
+        if state not in ("not-running", "not-installed", "unreachable"):
+            faults.append(f"a dead host read as {state!r}, so models.json in the data "
+                          f"directory was not read by the frozen build")
+    finally:
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                       capture_output=True)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    note("the model gate holds in the frozen build", faults)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """urllib follows 302s by default, which would turn the gate's redirect into a
+    perfectly ordinary 200 on the front page and assert nothing at all."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def check_a_feat_names_itself(http: Http) -> None:
     """Stage 8: a feat's bonus reaches its number through the same door a ring does.
 
@@ -559,6 +712,9 @@ def main() -> None:
             print("the exe never answered at its own portfile url"); sys.exit(2)
 
         run_checks(http, repo)
+        check_the_manual_ships_and_counts_for_itself(http)
+        check_the_first_run_check_answers(http)
+        check_the_pull_refuses_a_model_nobody_asked_for(http)
         check_the_laws_hold(http)
         check_a_feat_names_itself(http)
 
@@ -610,8 +766,10 @@ def main() -> None:
     finally:
         stop(proc)
 
-    # Last, and on a launch of its own: everything above ran for minutes without sending
-    # a heartbeat, which is the half of this that cannot be asserted.
+    # Two that each need a launch of their own, for opposite reasons: the gate needs a
+    # data directory whose models.json points nowhere, and the reaper needs a run in
+    # which nothing has been sending a heartbeat.
+    check_the_model_gate_holds_in_the_frozen_build(exe)
     check_the_game_stops_when_its_last_window_does(exe)
 
     print(f"\n{'ALL CLEAN' if not FAULTS else f'{len(FAULTS)} FAULT(S)'}")

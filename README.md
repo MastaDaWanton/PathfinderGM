@@ -65,8 +65,11 @@ reduction and resistances, nonlethal damage, dying and death. An optional five-f
 per scene, where reach, cover and charge lanes are measured rather than asserted; the
 same engaged/near/far ranges work without one.
 
-**Characters.** Full guided 1e creation with legality enforced, 13 classes, 26 races,
-1,474 feats, point buy, outfitting from starting gold, and levelling to 20th.
+**Characters.** Full guided 1e creation with legality enforced, 1,474 feats, point buy,
+outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
+(the Core eleven plus Blood Bending) and **25 races**; both catalogues merge anything in
+your homebrew directory on top, so the app's own count on a given machine is usually
+higher than this one.
 
 **Content.** 3,040 spells (every one carrying a mechanics document; the workhorses
 execute, the rest resolve as prose), 7,136 creature stat blocks, 459 weapons, magic items,
