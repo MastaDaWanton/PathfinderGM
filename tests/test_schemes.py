@@ -277,3 +277,168 @@ def test_an_action_outside_the_vocabulary_and_an_unknown_slot_are_refused():
     problems = schemes.validate(d)
     assert any("teleport" in p for p in problems)
     assert any("$castle" in p for p in problems)
+
+
+# --- deferred cards, and the action that opens them ------------------------------------
+#
+# `open_card` was in `ACTIONS` and accepted by the validator from the day the vocabulary
+# was written, and had no branch in `_do` at all. A scheme that authored it passed every
+# check and did nothing — the worst shape a feature can have, because nothing anywhere
+# says no. Found 2026-09-13 by counting which of the thirteen actions the shipped
+# schemes use; it and `remove` were the two at zero.
+
+def _deferred_doc():
+    """The shipped scheme, with its secret card held back until a step opens it."""
+    d = _doc()
+    truth = next(c for c in d["cards"] if c["key"] == "truth")
+    truth["deferred"] = True
+    d["steps"][0]["also"] = list(d["steps"][0].get("also") or []) + [
+        {"do": "open_card", "card": "truth"}]
+    return d
+
+
+def test_a_deferred_card_is_not_on_the_board_when_the_scheme_opens():
+    """The whole point: a card a scheme knows about from the start but the player
+    should not see until something happens."""
+    assert not schemes.validate(_deferred_doc())
+    scene, engine, _pc = _table()
+    schemes.open_scheme(engine, _deferred_doc(), turn=1)
+    inst = _instance(scene)
+    assert "errand" in inst["cards"], "the ordinary card still opens at open"
+    assert "truth" not in inst["cards"], "a deferred card must not be on the board yet"
+
+
+@pytest.fixture
+def deferred_is_the_only_scheme(monkeypatch):
+    """The catalogue, replaced by one document, so the shipped copy of the same id does
+    not open alongside it. `tick` reads `all_schemes()`, which is the door to patch."""
+    doc = _deferred_doc()
+    monkeypatch.setattr(schemes, "all_schemes", lambda: {"the-lost-thing": doc})
+    return doc
+
+
+def test_the_step_puts_it_on_the_board(deferred_is_the_only_scheme):
+    s, e, _pc = _table()
+    _wait(e, 1)
+    inst = _instance(s)
+    assert "truth" not in inst["cards"], "deferred, so not yet"
+    _out(e, inst)
+
+    assert "truth" in inst["cards"], "the step fired but the card never opened"
+    card = cards.find(s, inst["cards"]["truth"])
+    assert card is not None and card.secret, "it opens with the secrecy it was authored with"
+
+
+def test_it_opens_once_however_often_the_step_fires(deferred_is_the_only_scheme):
+    """A card opened on every tick stacks identical quests on the board until the
+    player stops moving."""
+    deferred_is_the_only_scheme["steps"][0]["once"] = False
+    s, e, _pc = _table()
+    _wait(e, 1)
+    inst = _instance(s)
+    _out(e, inst)
+    for _ in range(4):
+        _wait(e, 1)
+
+    made = [c for c in cards.load(s) if "truth" in c.id]
+    assert len(made) == 1, f"{len(made)} copies of one card"
+
+
+def test_opening_a_card_that_was_never_deferred_is_refused():
+    """Otherwise it is a no-op that reads like a feature: the card is already on the
+    board from the scheme's own open."""
+    d = _doc()
+    d["steps"][0]["also"] = [{"do": "open_card", "card": "truth"}]
+    problems = schemes.validate(d)
+    assert any("already on the board" in p and "deferred" in p for p in problems), problems
+
+
+def test_a_deferred_card_no_step_opens_is_refused():
+    """A card held back and never opened does not exist, and the scheme reads as
+    though it does."""
+    d = _doc()
+    next(c for c in d["cards"] if c["key"] == "truth")["deferred"] = True
+    problems = schemes.validate(d)
+    assert any("deferred, but no step opens it" in p for p in problems), problems
+
+
+# --- how much the world does to you at once ---------------------------------------------
+#
+# Measured 2026-09-13, the day three schemes were added to the two that shipped: five of
+# the nine opened at a market inside the first day, because nothing counted. A player
+# walking in got a fistful of quest cards, and a settlement carries about three cast
+# members — Fantasia gives every town exactly three — so the fourth and fifth schemes
+# filled their roles with visitors from elsewhere in the world. Adding content made the
+# game worse, which is a missing limit rather than bad content.
+
+def _fresh(sid: str, gate: str = "0h") -> dict:
+    d = _doc()
+    d["id"] = sid
+    d["opens"] = ["at($market)", f"since(campaign) >= {gate}"]
+    return d
+
+
+def test_only_so_many_stories_run_at_once(monkeypatch):
+    many = {f"fresh-{n}": _fresh(f"fresh-{n}") for n in range(5)}
+    monkeypatch.setattr(schemes, "all_schemes", lambda: many)
+    s, e, _pc = _table()
+    _wait(e, 1)
+
+    live = [i for i in s.schemes if not i.get("outcome")]
+    assert len(live) == schemes.MAX_FRESH_OPEN, (
+        f"{len(live)} stories opened at once out of {len(many)} eligible; the cap is "
+        f"{schemes.MAX_FRESH_OPEN}")
+
+
+def test_a_scheme_held_back_opens_when_one_ends(monkeypatch):
+    """Nothing is lost to the cap — `opens` is re-tested every tick."""
+    many = {f"fresh-{n}": _fresh(f"fresh-{n}") for n in range(3)}
+    monkeypatch.setattr(schemes, "all_schemes", lambda: many)
+    s, e, _pc = _table()
+    _wait(e, 1)
+    assert len({i["scheme"] for i in s.schemes}) == 2
+
+    # End one by hand, the way an outcome would.
+    next(i for i in s.schemes if not i.get("outcome"))["outcome"] = "returned"
+    _wait(e, 1)
+    assert len({i["scheme"] for i in s.schemes}) == 3, "the third never got its turn"
+
+
+def test_the_next_chapter_of_a_line_is_never_held_back(monkeypatch):
+    """A continuation waits on `has(pc, knows.…)`, which only another scheme grants.
+    Stopping a line halfway because two other stories are open would be the cap doing
+    real damage — "A Small Favour" is five of these in a row."""
+    chapter = _doc()
+    chapter["id"] = "chapter-two"
+    chapter["opens"] = ["has(pc, knows.rival-has-it)"]
+    assert not schemes._starts_fresh(chapter)
+    assert schemes._starts_fresh(_fresh("anything"))
+
+    many = {f"fresh-{n}": _fresh(f"fresh-{n}") for n in range(2)}
+    many["chapter-two"] = chapter
+    monkeypatch.setattr(schemes, "all_schemes", lambda: many)
+    s, e, pc = _table()
+    _wait(e, 1)
+    assert len([i for i in s.schemes if not i.get("outcome")]) == 2, "the cap is full"
+
+    pc.apply_effect(__import__("rules.activeeffect", fromlist=["ActiveEffect"]).ActiveEffect(
+        name="knew", kind="situation", key="test:knows", source="test", origin="test",
+        duration="until-dismissed", tags=("knows.rival-has-it",)))
+    _wait(e, 1)
+    assert any(i["scheme"] == "chapter-two" for i in s.schemes), (
+        "the cap held back the next chapter of a line the player is already in")
+
+
+def test_every_shipped_scheme_is_reachable_under_the_cap():
+    """A catalogue that cannot all open is a catalogue with content nobody sees. Each
+    ships with its own gate on the calendar so they do not all race for the same two
+    townspeople the moment a slot frees."""
+    gates = {}
+    for sid, doc in schemes.shipped().items():
+        if not schemes._starts_fresh(doc):
+            continue
+        since = [c for c in doc["opens"] if c.startswith("since(campaign)")]
+        assert since, f"{sid} starts fresh with no gate on the calendar at all"
+        gates[sid] = since[0]
+    assert len(set(gates.values())) == len(gates), (
+        f"two fresh schemes open on the same tick and will fight over the cast: {gates}")

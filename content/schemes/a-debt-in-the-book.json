@@ -1,0 +1,270 @@
+{
+  "_about": [
+    "A social scheme with no law in it. Both shipped lines are crimes — 'A Small",
+    "Favour' is five schemes all keyed on state.wanted, and 'The lost thing' is its",
+    "tutorial — so a player who finishes them has seen the app do one kind of story.",
+    "This one is a quarrel about money where nobody is a criminal and both endings",
+    "cost something.",
+    "",
+    "Its `shown` ending lifts a `holds.debt` the player never laid down, which is the",
+    "only place anything but `state.wanted` is removed: the shipped line removes a",
+    "warrant four times and nothing else, ever. (An earlier draft of this note claimed",
+    "it was the only scheme to remove anything at all. It was not, and the claim went",
+    "in without being checked against the other files, which is the exact mistake the",
+    "README had just been rewritten to stop making.)",
+    "",
+    "Two people, deliberately — a settlement supplies about three cast members and a",
+    "scheme that wants more fills the rest with visitors from elsewhere in the world."
+  ],
+  "schemes": [
+    {
+      "id": "a-debt-in-the-book",
+      "title": "A debt in the book",
+      "about": "A lender's debt, a debtor who cannot pay, and a book that has been kept twice.",
+      "opens": [
+        "at($market)",
+        "since(campaign) >= 4d"
+      ],
+      "slots": {
+        "lender": {
+          "role": "fixer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$market"
+        },
+        "debtor": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$lodging"
+        },
+        "market": {
+          "place": "market"
+        },
+        "lodging": {
+          "place": "lodging"
+        },
+        "pledge": {
+          "item": "pledge",
+          "biome": "$wild"
+        },
+        "wild": {
+          "place": "wild",
+          "hours": 2
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Collect what $debtor owes $lender",
+          "objectives": [
+            "Find $debtor",
+            "Settle the debt one way or the other"
+          ],
+          "giver": "$lender",
+          "reward": "a cut of what comes back, and $lender's ear afterwards"
+        },
+        {
+          "key": "book",
+          "secret": true,
+          "title": "What $lender's book actually says",
+          "facts": [
+            "$debtor paid this debt once already, in $pledge, and $lender wrote it down as a deposit rather than a payment.",
+            "$lender is not a thief and would say so: the book is kept the way $lender was taught to keep it."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.lender-was-quick-to-name-a-total"
+          ],
+          "say": "$lender named the total without opening the book to check it"
+        }
+      ],
+      "steps": [
+        {
+          "id": "met",
+          "criteria": [
+            "at($lodging)",
+            "present($debtor)",
+            "alive($debtor)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.debtor-cannot-pay"
+              ]
+            },
+            {
+              "do": "reveal_objective",
+              "card": "errand",
+              "text": "Decide what the debt is worth"
+            }
+          ],
+          "tell": {
+            "perceptible": "$debtor is at $lodging, and has nothing to pay with."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($lodging)",
+            "present($debtor)",
+            "has(pc, knows.debtor-cannot-pay)"
+          ],
+          "fairness": [
+            "knows.lender-was-quick-to-name-a-total"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$debtor says the debt was paid once already, in $pledge, and that $lender wrote it down wrong."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.book-was-kept-twice"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$debtor says it was paid once already, and that $lender never struck it out."
+          }
+        },
+        {
+          "id": "collected",
+          "criteria": [
+            "at($market)",
+            "present($lender)",
+            "holds(pc, $pledge)",
+            "has(pc, knows.debtor-cannot-pay)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "collected"
+            }
+          ],
+          "tell": {
+            "perceptible": "At $market, $lender takes the $pledge and strikes the line out."
+          }
+        },
+        {
+          "id": "shown-the-book",
+          "criteria": [
+            "at($market)",
+            "present($lender)",
+            "has(pc, knows.book-was-kept-twice)",
+            "not holds(pc, $pledge)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "shown"
+            }
+          ],
+          "tell": {
+            "perceptible": "$lender opens the book, goes back a page, and stops talking."
+          }
+        },
+        {
+          "id": "walked-away",
+          "criteria": [
+            "left($market)",
+            "not at($market)",
+            "not at($lodging)",
+            "since(met) >= 2d",
+            "has(pc, knows.debtor-cannot-pay)"
+          ],
+          "action": {
+            "do": "outcome",
+            "name": "let-it-lie"
+          },
+          "tell": {
+            "silent": "Whoever was asking about $debtor went out past $wild and did not come back to $lender; the line is still in the book."
+          }
+        }
+      ],
+      "outcomes": {
+        "collected": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$lender",
+              "tags": [
+                "attitude.friendly"
+              ]
+            },
+            {
+              "to": "$debtor",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        },
+        "shown": {
+          "resolve": "errand",
+          "award": "new",
+          "removes": [
+            {
+              "to": "$debtor",
+              "tags": [
+                "holds.debt"
+              ]
+            }
+          ],
+          "grants": [
+            {
+              "to": "$debtor",
+              "tags": [
+                "attitude.friendly"
+              ]
+            },
+            {
+              "to": "$lender",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        },
+        "let-it-lie": {
+          "resolve": "errand",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$lender",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

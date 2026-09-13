@@ -76,6 +76,25 @@ _PLAYER_CHANGEABLE = ("at", "left", "arrived", "event")
 # player with no hit-point change — so the families are listed, with the fix named.
 GRANTABLE = ("knows.", "state.wanted", "state.suspected", "state.hidden", "attitude.",
              "role.", "holds.")
+
+# How many unfinished stories the world will have going at once before it stops
+# starting new ones.
+#
+# There was no cap while two lines shipped, and none was needed: "The lost thing" and
+# "A Small Favour" were the whole catalogue. Three more schemes were written on
+# 2026-09-13 and the absence became the bug — five of the nine open at a market inside
+# the first day, so a player who walked in got a fistful of quest cards at once, and a
+# settlement carries about three cast members (Fantasia gives every town exactly three)
+# so the fourth and fifth schemes filled their roles with visitors from elsewhere in the
+# world. Adding content made the game worse, which is the signature of a missing limit
+# rather than of bad content.
+#
+# Counted over *fresh starts* only. A scheme that opens on `has(pc, knows.…)` is the
+# next chapter of something the player is already in — "A Small Favour" is five of them
+# — and stopping a line halfway because two other stories are open would be the cap
+# doing real damage. Nothing is ever lost to this: `opens` is re-tested every tick, so a
+# scheme held back here starts the moment one of the others ends.
+MAX_FRESH_OPEN = 2
 _DIGIT = re.compile(r"\d")
 _SLOT = re.compile(r"\$(\w+)")
 
@@ -258,6 +277,15 @@ def validate(doc: dict) -> list[str]:
                     and act.get("card") not in keys:
                 problems.append(f"{at}: action names card {act.get('card')!r}, which is not "
                                 f"one of this scheme's cards ({', '.join(sorted(k for k in keys if k))}).")
+            if act["do"] == "open_card":
+                card = next((c for c in doc.get("cards") or []
+                             if isinstance(c, dict) and c.get("key") == act.get("card")),
+                            None)
+                if card is not None and not card.get("deferred"):
+                    problems.append(
+                        f"{at}: opens card {act.get('card')!r}, which is already on the "
+                        f"board from the scheme's own open — mark it "
+                        f"\"deferred\": true, or drop this action.")
             if act["do"] == "news":
                 if act.get("carrier") not in CARRIERS:
                     problems.append(f"{at}: news carrier is one of {', '.join(CARRIERS)}.")
@@ -322,6 +350,18 @@ def validate(doc: dict) -> list[str]:
                 elif not str(tag).startswith(GRANTABLE):
                     problems.append(f"outcomes.{name}: a scheme may grant or remove "
                                     f"{', '.join(GRANTABLE)} — not {tag!r}.")
+    # The other half of `deferred`: a card held back and never opened is a card that
+    # simply does not exist, and the scheme reads as though it does.
+    opened_by_step = {a.get("card") for st in steps if isinstance(st, dict)
+                      for a in [st.get("action")] + list(st.get("also") or [])
+                      if isinstance(a, dict) and a.get("do") == "open_card"}
+    for card in doc.get("cards") or []:
+        if isinstance(card, dict) and card.get("deferred") \
+                and card.get("key") not in opened_by_step:
+            problems.append(
+                f"cards.{card.get('key')}: deferred, but no step opens it — add "
+                f"{{\"do\": \"open_card\", \"card\": \"{card.get('key')}\"}} to a step, "
+                f"or drop \"deferred\".")
     return problems
 
 
@@ -366,6 +406,51 @@ def _place_for(engine, kind: str, spec: dict) -> dict | None:
         if p.id != scene.at:
             return {"kind": "place", "id": p.id, "name": p.name, "terrain": p.terrain}
     return None
+
+
+def _template_for(engine, role: str) -> str:
+    """The stat block `bring_in` should put on the board for a role word.
+
+    This used to be three hand-written names and nothing else:
+
+        "watchman" if "guard" in role or "watch" in role
+        else "thug" if "thug" in role else "guildhand"
+
+    — so every role that was not a guard or a thug arrived as a guildhand. Named in
+    docs/quest-schemes-plan.md §10 as still open, and measured on 2026-09-13 when a
+    scheme about something eating a herd wrote `bring_in` with role "beast" and the
+    thing that walked out of the scrub was a Commoner 1 who is "not paid enough to
+    fight". The codex has seven thousand stat blocks and this asked it for none of them.
+
+    The three originals stay as the floor rather than as the answer: `npcs.choose`
+    already falls back to watchman for guard-shaped words, thug for thug-shaped ones and
+    guildhand for everything else, so the wanted line's guards arrive exactly as before
+    — `tests/test_wanted.py` and `test_a_small_favour.py` pin that — and anything else
+    now gets a real creature near the party's level.
+    """
+    from . import npcs
+
+    pc = engine.scene.pc()
+    level = int(getattr(pc, "level", 1) or 1)
+    got = npcs.choose(re.split(r"[\s,/]+", role.strip().lower()), level) or {}
+    return str(got.get("id") or "guildhand")
+
+
+def _starts_fresh(doc: dict) -> bool:
+    """Whether this scheme begins a story rather than continuing one.
+
+    A continuation is recognised by what it waits for: `has(pc, knows.…)` is knowledge
+    only another scheme could have granted.
+    """
+    return not any(re.match(r"^\s*has\(pc,\s*knows\.", str(c))
+                   for c in doc.get("opens") or [])
+
+
+def _unfinished_fresh(scene, docs: dict) -> int:
+    """Open instances of fresh-start schemes that have not reached an outcome."""
+    return sum(1 for inst in scene.schemes
+               if not inst.get("outcome")
+               and _starts_fresh(docs.get(inst.get("scheme"), {})))
 
 
 def _cast_candidates(engine, anywhere: bool = False) -> list[dict]:
@@ -522,25 +607,13 @@ def open_scheme(engine, doc: dict, turn: int = 0) -> dict:
             "cards": {}, "outcome": "", "news": [], "visited": [], "last_at": scene.at}
     pc = scene.pc()
     for card in doc.get("cards") or []:
-        if card.get("kind") == "quest":
-            giver = filled.get(str(card.get("giver", "")).lstrip("$"), {}).get("ref", "")
-            made = cards_mod.open_quest(
-                scene, title=fill_text(card["title"], filled),
-                objectives=[fill_text(o, filled) for o in card.get("objectives") or []],
-                giver=giver, reward=fill_text(card.get("reward", ""), filled),
-                facts=[fill_text(f, filled) for f in card.get("facts") or []],
-                people=[giver] if giver else [], place=str(scene.at or ""),
-                origin=f"scheme:{doc['id']}", turn=turn)
-        else:
-            n = sum(1 for c in cards_mod.load(scene) if c.id.startswith(f"scheme-{doc['id']}")) + 1
-            made = cards_mod.open_card(scene, cards_mod.Card(
-                id=f"scheme-{doc['id']}-{card['key']}-{n}", title=fill_text(card["title"], filled),
-                facts=[fill_text(f, filled) for f in card.get("facts") or []],
-                tags=(cards_mod.TAG_PLAY, "situation.scheme"),
-                people=[s["ref"] for s in filled.values() if s.get("kind") == "actor"],
-                place=str(scene.at or ""), origin=f"scheme:{doc['id']}",
-                secret=bool(card.get("secret")), always_on=True), turn=turn)
-        inst["cards"][card["key"]] = made.id
+        # A deferred card is declared here and opened later, by a step's `open_card`.
+        # Everything a scheme knows at open used to arrive at open, which meant a line
+        # could not hand the player a second quest partway through — the card had to be
+        # on the board from the first turn, spoiling whatever it was about.
+        if card.get("deferred"):
+            continue
+        _open_one_card(engine, inst, doc, card, filled, turn)
     inst["town"] = str(scene.location_id or "")
     for g in doc.get("grants_on_open") or []:
         _grant(scene, filled, g, f"scheme:{doc['id']}/open", inst)
@@ -557,6 +630,38 @@ def open_scheme(engine, doc: dict, turn: int = 0) -> dict:
         inst["fired"]["open"] = {"clock": int(scene.clock_minutes), "turn": turn,
                                  "silent": True, "tell": "", "actions": done}
     return inst
+
+
+def _open_one_card(engine, inst: dict, doc: dict, card: dict, filled: dict,
+                   turn: int) -> None:
+    """Put one of a scheme's declared cards on the board.
+
+    Its own function because two callers need it now and they must not drift: the open,
+    and a step's `open_card`. `open_card` was in `ACTIONS` and accepted by the validator
+    from the day the vocabulary was written and had no branch in `_do` at all, so a
+    scheme that authored it passed every check and silently did nothing — the worst
+    shape a feature can have, because nothing anywhere says no.
+    """
+    scene = engine.scene
+    if card.get("kind") == "quest":
+        giver = filled.get(str(card.get("giver", "")).lstrip("$"), {}).get("ref", "")
+        made = cards_mod.open_quest(
+                scene, title=fill_text(card["title"], filled),
+                objectives=[fill_text(o, filled) for o in card.get("objectives") or []],
+                giver=giver, reward=fill_text(card.get("reward", ""), filled),
+                facts=[fill_text(f, filled) for f in card.get("facts") or []],
+            people=[giver] if giver else [], place=str(scene.at or ""),
+            origin=f"scheme:{doc['id']}", turn=turn)
+    else:
+        n = sum(1 for c in cards_mod.load(scene) if c.id.startswith(f"scheme-{doc['id']}")) + 1
+        made = cards_mod.open_card(scene, cards_mod.Card(
+            id=f"scheme-{doc['id']}-{card['key']}-{n}", title=fill_text(card["title"], filled),
+            facts=[fill_text(f, filled) for f in card.get("facts") or []],
+            tags=(cards_mod.TAG_PLAY, "situation.scheme"),
+            people=[s["ref"] for s in filled.values() if s.get("kind") == "actor"],
+            place=str(scene.at or ""), origin=f"scheme:{doc['id']}",
+            secret=bool(card.get("secret")), always_on=True), turn=turn)
+    inst["cards"][card["key"]] = made.id
 
 
 def _who(scene, filled: dict, ref: str):
@@ -783,7 +888,7 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
             who.apply_hp_state()
     elif what == "bring_in":
         role = str(act.get("role") or "watchman")
-        template = "watchman" if "guard" in role or "watch" in role else "thug" if "thug" in role else "guildhand"
+        template = _template_for(engine, role)
         born = engine._bring_in(template, count=int(act.get("count", 1) or 1), side=str(act.get("side") or ""))
         inst.setdefault("brought", []).extend(b["ref"] for b in born)
         if "guard" in role or "watch" in role:
@@ -817,6 +922,14 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
         _grant(scene, filled, act, source, inst)
     elif what == "remove":
         _remove(scene, filled, act, inst)
+    elif what == "open_card":
+        key = str(act.get("card") or "")
+        # Never twice. A step may be authored `once: false`, and a card opened on every
+        # tick would stack identical quests on the board until the player stopped moving.
+        if key and key not in inst["cards"]:
+            card = next((c for c in doc.get("cards") or [] if c.get("key") == key), None)
+            if card is not None:
+                _open_one_card(engine, inst, doc, card, filled, turn)
     elif what == "news":
         inst["news"].append({"carrier": act.get("carrier"), "reach": act.get("reach"),
                              "delay": _hours(act.get("delay")), "says": fill_text(act.get("says", ""), filled),
@@ -903,8 +1016,15 @@ def tick(engine, outcomes) -> list:
                 if got:
                     trial[name] = got
         probe["slots"] = trial
-        if all(_criterion_holds(engine, probe, doc, c, events) for c in doc.get("opens") or []):
-            open_scheme(engine, doc, turn=turn)
+        if not all(_criterion_holds(engine, probe, doc, c, events)
+                   for c in doc.get("opens") or []):
+            continue
+        if _starts_fresh(doc) and _unfinished_fresh(scene, docs) >= MAX_FRESH_OPEN:
+            # The town is already doing enough to this player. Nothing is lost: the
+            # criteria are re-tested every tick, so this opens the moment one of the
+            # others ends.
+            continue
+        open_scheme(engine, doc, turn=turn)
 
     # Stepping: one step per instance per tick, the most specific.
     for inst in list(scene.schemes):

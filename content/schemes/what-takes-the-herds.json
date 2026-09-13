@@ -1,0 +1,220 @@
+{
+  "_about": [
+    "The first scheme with a fight in it. Seven thousand creature stat blocks ship and",
+    "no quest had ever put one in front of the player: every shipped scheme resolves",
+    "in conversation, travel or an item changing hands.",
+    "",
+    "It is the only user of two criteria the grammar has always had — `arrived($slot)`,",
+    "which fires on getting somewhere rather than on being there, and",
+    "`event:fight_ended`, which is how a scheme learns the encounter closed without",
+    "asking who won. What it reads instead is who is still alive, because a fight the",
+    "player ran away from also ends.",
+    "",
+    "The threat is not a slot. `bring_in` takes a role word and a count and asks the",
+    "codex for something near the party's level, so this works at first level and at",
+    "The threat is not a slot. `bring_in` takes role words and asks the codex for",
+    "something near the party's level, so this is a bandit at first level, a poacher",
+    "around sixth and a bandit lord in the teens without authoring any of them.",
+    "",
+    "It is men and not a beast because the codex is a codex of people: asking it for",
+    "'beast' returns a troglodyte beast-speaker, and 'wolf' a ghost wolf warrior, both",
+    "matched on the word in a humanoid's name. That turned out to be the better story —",
+    "tracks wrong for a wolf because nothing with paws made them.",
+    "item slot resolves to an ingredient from the forage catalogue whatever the slot is",
+    "called, so the tell came out as 'there is Chasmyre Leaf on the ground here, and the",
+    "spacing is wrong for a wolf'. Found by opening the scheme against both shipped",
+    "worlds rather than by the lint, which has no opinion about whether a sentence means",
+    "anything."
+  ],
+  "schemes": [
+    {
+      "id": "what-takes-the-herds",
+      "title": "What takes the herds",
+      "about": "Something out past the edge is taking animals, and the tracks are wrong for a wolf.",
+      "opens": [
+        "at($market)",
+        "since(campaign) >= 6d"
+      ],
+      "slots": {
+        "elder": {
+          "role": "standing",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$market"
+        },
+        "market": {
+          "place": "market"
+        },
+        "wild": {
+          "place": "wild",
+          "hours": 3
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Find what is taking $elder's animals",
+          "objectives": [
+            "Get out to $wild and look",
+            "Deal with whatever is doing it"
+          ],
+          "giver": "$elder",
+          "reward": "the pick of what is left of the herd, and $elder's word at $market"
+        },
+        {
+          "key": "tracks",
+          "secret": true,
+          "title": "What the tracks actually say",
+          "facts": [
+            "It is not a wolf and $elder half knows it: the spacing is wrong, and so is the depth.",
+            "They are men, working the same ground long enough to have a camp out at $wild, and they drive the animals off rather than bring them down."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.elder-called-it-a-wolf-twice"
+          ],
+          "say": "$elder said wolf twice, and did not look at you either time"
+        }
+      ],
+      "steps": [
+        {
+          "id": "sign",
+          "criteria": [
+            "arrived($wild)",
+            "not has(pc, knows.the-tracks-are-wrong)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.the-tracks-are-wrong"
+              ]
+            },
+            {
+              "do": "fact",
+              "card": "errand",
+              "text": "The tracks at $wild are not a wolf's, whatever $elder wanted them to be."
+            }
+          ],
+          "tell": {
+            "perceptible": "There are tracks on the ground here at $wild, and the spacing is wrong for a wolf."
+          }
+        },
+        {
+          "id": "lie-up",
+          "criteria": [
+            "at($wild)",
+            "has(pc, knows.the-tracks-are-wrong)",
+            "since(sign) >= 1h"
+          ],
+          "fairness": [
+            "knows.elder-called-it-a-wolf-twice"
+          ],
+          "action": {
+            "do": "bring_in",
+            "role": "rustler bandit poacher",
+            "count": 1,
+            "side": "foe"
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.it-found-you-first"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "They have been camped here, and they are between you and the way back."
+          }
+        },
+        {
+          "id": "dealt-with",
+          "criteria": [
+            "event:fight_ended",
+            "at($wild)",
+            "has(pc, knows.it-found-you-first)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "dealt-with"
+            }
+          ],
+          "tell": {
+            "perceptible": "It is over, out at $wild."
+          }
+        },
+        {
+          "id": "left-it-out-there",
+          "criteria": [
+            "left($wild)",
+            "not at($wild)",
+            "has(pc, knows.it-found-you-first)",
+            "since(lie-up) >= 6h"
+          ],
+          "action": {
+            "do": "outcome",
+            "name": "still-out-there"
+          },
+          "also": [
+            {
+              "do": "news",
+              "carrier": "crier",
+              "reach": "town",
+              "delay": "1d",
+              "says": "$elder has lost more animals out past $wild and is asking after anyone who went to look."
+            }
+          ],
+          "tell": {
+            "silent": "They are still out at $wild, and $elder is telling it at $market as a wolf again."
+          }
+        }
+      ],
+      "outcomes": {
+        "dealt-with": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$elder",
+              "tags": [
+                "attitude.helpful"
+              ]
+            }
+          ]
+        },
+        "still-out-there": {
+          "resolve": "errand",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$elder",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
