@@ -1,0 +1,250 @@
+{
+  "_about": [
+    "The last two verbs. `hide` had one use in the whole catalogue and `remove` had",
+    "none as a step action — the shipped line only ever removes a warrant at an",
+    "ending. Here they are a pair and they are the story: somebody goes to ground when",
+    "the scheme opens, and finding them is what lifts it.",
+    "",
+    "It opens at the temple, which no scheme had used as anything but a place to walk",
+    "through. Every settlement in both shipped worlds answers for `temple`; where there",
+    "is genuinely none — Syravioniaa in Fantasia — the place kind falls back to the",
+    "market rather than failing, so the scheme still opens somewhere a person can be.",
+    "",
+    "Nobody dies in this one and nobody is robbed. Both endings turn on whether the",
+    "player hands over a name.",
+    "",
+    "`remove` takes `to`, where `hide`, `move` and `kill` take `who`. This was authored",
+    "with `who` first, which validated clean and would have lifted the tag off the",
+    "*player* — `_remove` defaults `to` to pc. The validator refuses that spelling now."
+  ],
+  "schemes": [
+    {
+      "id": "gone-to-ground",
+      "title": "Gone to ground",
+      "about": "Somebody has stopped being where they live, and the person asking after them is not family.",
+      "opens": [
+        "at($temple)",
+        "since(campaign) >= 10d"
+      ],
+      "slots": {
+        "asker": {
+          "role": "fixer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$temple"
+        },
+        "hidden": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$lodging"
+        },
+        "temple": {
+          "place": "temple"
+        },
+        "lodging": {
+          "place": "lodging"
+        },
+        "market": {
+          "place": "market"
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Find where $hidden has got to",
+          "objectives": [
+            "Ask after $hidden around town",
+            "Decide what $asker gets told"
+          ],
+          "giver": "$asker",
+          "reward": "coin now, and $asker's custom afterwards"
+        },
+        {
+          "key": "why",
+          "secret": true,
+          "title": "What $hidden is hiding from",
+          "facts": [
+            "$hidden is at $lodging and has not left it, because $asker is not owed anything and both of them know it.",
+            "$asker wants a place rather than a person, and has asked at $temple first because that is where people are kind."
+          ]
+        }
+      ],
+      "on_open": [
+        {
+          "do": "hide",
+          "who": "$hidden"
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.asker-would-not-give-a-name"
+          ],
+          "say": "$asker described $hidden at length and never once said the name"
+        }
+      ],
+      "steps": [
+        {
+          "id": "asked-around",
+          "criteria": [
+            "at($market)",
+            "not has(pc, knows.where-they-are)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.where-they-are"
+              ]
+            },
+            {
+              "do": "reveal_objective",
+              "card": "errand",
+              "text": "Talk to $hidden at $lodging before answering $asker"
+            }
+          ],
+          "tell": {
+            "perceptible": "Nobody at $market will say it out loud, but $hidden has not left $lodging in days."
+          }
+        },
+        {
+          "id": "found-them",
+          "criteria": [
+            "at($lodging)",
+            "has(pc, knows.where-they-are)",
+            "alive($hidden)"
+          ],
+          "action": {
+            "do": "remove",
+            "to": "$hidden",
+            "tags": [
+              "state.hidden"
+            ]
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.what-they-are-owed"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$hidden is here at $lodging, and stops pretending otherwise."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($lodging)",
+            "present($hidden)",
+            "has(pc, knows.what-they-are-owed)"
+          ],
+          "fairness": [
+            "knows.asker-would-not-give-a-name"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$hidden says the debt runs the other way, and that $asker has never used the name in front of anyone who would know it."
+          },
+          "tell": {
+            "perceptible": "$hidden says $asker is owed nothing, and asks what you were told the name was."
+          }
+        },
+        {
+          "id": "gave-the-name",
+          "criteria": [
+            "at($temple)",
+            "present($asker)",
+            "has(pc, knows.where-they-are)",
+            "not has(pc, knows.what-they-are-owed)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "told"
+            }
+          ],
+          "tell": {
+            "perceptible": "At $temple, $asker writes down where $hidden is and stops being friendly."
+          }
+        },
+        {
+          "id": "kept-it",
+          "criteria": [
+            "at($temple)",
+            "present($asker)",
+            "has(pc, knows.what-they-are-owed)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "kept"
+            }
+          ],
+          "tell": {
+            "perceptible": "$asker waits at $temple for an answer about $hidden and does not get one."
+          }
+        }
+      ],
+      "outcomes": {
+        "told": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$asker",
+              "tags": [
+                "attitude.friendly"
+              ]
+            },
+            {
+              "to": "$hidden",
+              "tags": [
+                "attitude.hostile"
+              ]
+            }
+          ]
+        },
+        "kept": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$hidden",
+              "tags": [
+                "attitude.helpful"
+              ]
+            },
+            {
+              "to": "$asker",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

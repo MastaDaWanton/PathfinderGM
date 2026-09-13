@@ -1,0 +1,259 @@
+{
+  "_about": [
+    "The first scheme that reaches the crafting side of the app. Five disciplines,",
+    "an ingredient catalogue and a forage table all ship, and no quest had ever asked",
+    "the player to go and get something and bring it back as a *material* rather than",
+    "as a keepsake.",
+    "",
+    "It is also the first use of a deferred card. The second quest — which herb, and",
+    "where — does not exist until somebody who knows looks at the patient, which is",
+    "the shape the story actually has. `open_card` was in the vocabulary from the",
+    "beginning and had no implementation until 2026-09-13; this is what it was for.",
+    "",
+    "A clock with teeth: the patient dies if nobody comes back in time. `too-late` is",
+    "an ending, not a failure — the scheme resolves either way and says what happened."
+  ],
+  "schemes": [
+    {
+      "id": "the-sickness",
+      "title": "A sickness in the house",
+      "about": "Somebody is ill, somebody knows what would help, and it grows in the wild.",
+      "opens": [
+        "at($market)",
+        "since(campaign) >= 2d"
+      ],
+      "slots": {
+        "healer": {
+          "role": "healer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$market"
+        },
+        "sick": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$lodging"
+        },
+        "market": {
+          "place": "market"
+        },
+        "lodging": {
+          "place": "lodging"
+        },
+        "wild": {
+          "place": "wild",
+          "hours": 3
+        },
+        "herb": {
+          "item": "remedy",
+          "biome": "$wild"
+        }
+      },
+      "cards": [
+        {
+          "key": "visit",
+          "kind": "quest",
+          "title": "See what ails $sick",
+          "objectives": [
+            "Ask $healer what is wrong",
+            "Look in on $sick at $lodging"
+          ],
+          "giver": "$healer",
+          "reward": "$healer's goodwill, and what $healer knows about the ground hereabouts"
+        },
+        {
+          "key": "remedy",
+          "kind": "quest",
+          "deferred": true,
+          "title": "Bring $healer the $herb",
+          "objectives": [
+            "Find $herb out at $wild",
+            "Get it back to $sick before the fever turns"
+          ],
+          "giver": "$healer",
+          "reward": "$sick's household owes you one, and says so"
+        },
+        {
+          "key": "prognosis",
+          "secret": true,
+          "title": "What $healer is not saying to $sick",
+          "facts": [
+            "$healer has seen this before and knows how fast it goes: the $herb is worth having within days, not weeks.",
+            "$healer will not say so in front of $sick, and says the careful version instead."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.healer-is-in-a-hurry"
+          ],
+          "say": "$healer asked twice how fast you travel before saying what was wrong"
+        }
+      ],
+      "steps": [
+        {
+          "id": "named",
+          "criteria": [
+            "at($market)",
+            "present($healer)",
+            "alive($healer)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "visit",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "open_card",
+              "card": "remedy"
+            },
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.what-the-herb-is"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$healer names the $herb, and where it grows out past $wild."
+          }
+        },
+        {
+          "id": "seen",
+          "criteria": [
+            "at($lodging)",
+            "present($sick)",
+            "alive($sick)",
+            "has(pc, knows.what-the-herb-is)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "visit",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.how-bad-it-is"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$sick is worse than $healer said at $market."
+          }
+        },
+        {
+          "id": "gathered",
+          "criteria": [
+            "at($wild)",
+            "holds(pc, $herb)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "remedy",
+            "n": 1
+          },
+          "tell": {
+            "perceptible": "The $herb is in hand, out at $wild."
+          }
+        },
+        {
+          "id": "in-time",
+          "criteria": [
+            "at($lodging)",
+            "present($sick)",
+            "alive($sick)",
+            "holds(pc, $herb)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "remedy",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "in-time"
+            }
+          ],
+          "tell": {
+            "perceptible": "The $herb gets to $lodging while $sick can still take it."
+          }
+        },
+        {
+          "id": "turned",
+          "criteria": [
+            "has(pc, knows.what-the-herb-is)",
+            "not holds(pc, $herb)",
+            "since(named) >= 4d",
+            "alive($sick)"
+          ],
+          "action": {
+            "do": "kill",
+            "who": "$sick"
+          },
+          "also": [
+            {
+              "do": "fact",
+              "card": "remedy",
+              "text": "The fever turned before the $herb came back to $lodging."
+            },
+            {
+              "do": "news",
+              "carrier": "crier",
+              "reach": "town",
+              "delay": "0h",
+              "says": "There is a death in the house at $lodging, and the household is not receiving."
+            },
+            {
+              "do": "outcome",
+              "name": "too-late"
+            }
+          ],
+          "tell": {
+            "silent": "$sick dies at $lodging, with $healer there and nothing to give."
+          }
+        }
+      ],
+      "outcomes": {
+        "in-time": {
+          "resolve": "remedy",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$healer",
+              "tags": [
+                "attitude.helpful"
+              ]
+            },
+            {
+              "to": "$sick",
+              "tags": [
+                "attitude.helpful"
+              ]
+            }
+          ]
+        },
+        "too-late": {
+          "resolve": "remedy",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$healer",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

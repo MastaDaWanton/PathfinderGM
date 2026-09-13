@@ -1,0 +1,228 @@
+{
+  "_about": [
+    "The first scheme whose inciting event happens where the player is not, and the",
+    "first that does not open at the market. `docs/architecture.md` promises that the",
+    "world clock ticks on its own and that a rival advances while you were elsewhere —",
+    "'this is where hooks come from for free' — and nothing shipped had ever shown it.",
+    "",
+    "News is the whole mechanism. A courier carries word out of the region on a day's",
+    "delay, and the tag it grants is `knows.news.<step id>`, which is what the later",
+    "steps wait on. Until that word arrives there is nothing to do and nothing is asked.",
+    "",
+    "Both endings are endings. The one that fires when the player never goes is not a",
+    "failure state: it kills somebody out of sight, says so through the log and the",
+    "secret card, and resolves. A quest that can only be abandoned sits on the board",
+    "forever, which the fairness critic caught in the shipped line."
+  ],
+  "schemes": [
+    {
+      "id": "word-from-the-road",
+      "title": "Word from the road",
+      "about": "A party is overdue, the word comes late, and they did not want finding.",
+      "opens": [
+        "at($lodging)",
+        "since(campaign) >= 8d"
+      ],
+      "slots": {
+        "factor": {
+          "role": "fixer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$lodging"
+        },
+        "overdue": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$wild"
+        },
+        "lodging": {
+          "place": "lodging"
+        },
+        "wild": {
+          "place": "wild",
+          "hours": 4
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Find out what happened to $factor's people",
+          "objectives": [
+            "Wait for word, or go and look",
+            "Bring $factor an answer"
+          ],
+          "giver": "$factor",
+          "reward": "what the wagons were carrying, less what $factor is owed"
+        },
+        {
+          "key": "tally",
+          "secret": true,
+          "title": "Why $overdue is not coming back",
+          "facts": [
+            "$overdue is out past $wild and in no trouble at all: the wagons went the other way on purpose.",
+            "$factor's tally has been short for long enough that $overdue stopped expecting it to be honest."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.factor-changed-the-tally"
+          ],
+          "say": "$factor read the tally out twice and the two readings were not the same"
+        }
+      ],
+      "steps": [
+        {
+          "id": "word",
+          "criteria": [
+            "at($lodging)",
+            "since(open) >= 1d",
+            "not has(pc, knows.news.word)"
+          ],
+          "action": {
+            "do": "news",
+            "carrier": "courier",
+            "reach": "region",
+            "delay": "1d",
+            "says": "A rider out of the country past $wild says the wagons went by and did not stop."
+          },
+          "tell": {
+            "silent": "A rider is on the way to $lodging with word about $overdue."
+          }
+        },
+        {
+          "id": "found",
+          "criteria": [
+            "at($wild)",
+            "present($overdue)",
+            "alive($overdue)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.they-are-not-lost"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$overdue is out here past $wild, unhurt, and not surprised to be found."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($wild)",
+            "present($overdue)",
+            "has(pc, knows.they-are-not-lost)"
+          ],
+          "fairness": [
+            "knows.factor-changed-the-tally"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$overdue went the other way on purpose, because $factor's tally was never going to come right."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.why-they-went"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$overdue says the tally was short every season, and stopped waiting for $factor to notice."
+          }
+        },
+        {
+          "id": "answered",
+          "criteria": [
+            "at($lodging)",
+            "present($factor)",
+            "has(pc, knows.they-are-not-lost)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "answered"
+            }
+          ],
+          "tell": {
+            "perceptible": "$factor gets the answer at $lodging, and does not ask a second question."
+          }
+        },
+        {
+          "id": "never-went",
+          "criteria": [
+            "not at($wild)",
+            "has(pc, knows.news.word)",
+            "since(word) >= 5d",
+            "alive($overdue)"
+          ],
+          "action": {
+            "do": "kill",
+            "who": "$overdue"
+          },
+          "also": [
+            {
+              "do": "fact",
+              "card": "errand",
+              "text": "Whatever was out past $wild found $overdue before anybody went to look."
+            },
+            {
+              "do": "outcome",
+              "name": "nobody-went"
+            }
+          ],
+          "tell": {
+            "silent": "$overdue does not come back, and $factor stops asking at $lodging."
+          }
+        }
+      ],
+      "outcomes": {
+        "answered": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$overdue",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        },
+        "nobody-went": {
+          "resolve": "errand",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$factor",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
