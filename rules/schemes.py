@@ -277,6 +277,17 @@ def validate(doc: dict) -> list[str]:
                     and act.get("card") not in keys:
                 problems.append(f"{at}: action names card {act.get('card')!r}, which is not "
                                 f"one of this scheme's cards ({', '.join(sorted(k for k in keys if k))}).")
+            # Two spellings for the same idea, and the wrong one is silent. `move`,
+            # `hide` and `kill` name their subject `who`; `grant` and `remove` name it
+            # `to`, and `_grant`/`_remove` default it to the player. So a `remove`
+            # authored with `who` validates, reads correctly to a person, and takes the
+            # tag off the PC instead. Caught the first time `remove` was ever used as a
+            # step action, 2026-09-13.
+            if act["do"] in ("grant", "remove") and "who" in act and "to" not in act:
+                problems.append(
+                    f"{at}: {act['do']} names its subject with \"to\", not \"who\" — as "
+                    f"written this would act on the player. Use "
+                    f"{{\"do\": \"{act['do']}\", \"to\": {act.get('who')!r}, ...}}.")
             if act["do"] == "open_card":
                 card = next((c for c in doc.get("cards") or []
                              if isinstance(c, dict) and c.get("key") == act.get("card")),

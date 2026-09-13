@@ -1,0 +1,225 @@
+{
+  "_about": [
+    "The first scheme built on a faction. `play.conflicts` gives every world five of",
+    "them with a `wants`, a `works_by`, a `holds` and an `undone_by`, and only the",
+    "shipped line's patron had ever used one — as a paymaster, off-stage, never named",
+    "to the player. Here the guild is the thing the quest is about, and its own",
+    "`undone_by` is what is inside the letter.",
+    "",
+    "It opens at the guildhall, which no scheme had used for anything, and it is the",
+    "only scheme where the player is never asked to fight, steal, or find anybody. The",
+    "whole decision is whether to carry a sealed thing to the person it is addressed to",
+    "after finding out what it does.",
+    "",
+    "The faction slot is text and nothing else. It has no `ref` — it is a row out of the",
+    "export, not a body on the board — so it can be named in a card or a tell and can",
+    "never be granted an attitude, moved, or killed."
+  ],
+  "schemes": [
+    {
+      "id": "the-sealed-letter",
+      "title": "The sealed letter",
+      "about": "A guild pays well for a fast pair of legs, and does not say what is in the packet.",
+      "opens": [
+        "at($guildhall)",
+        "since(campaign) >= 12d"
+      ],
+      "slots": {
+        "clerk": {
+          "role": "fixer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$guildhall"
+        },
+        "reader": {
+          "role": "standing",
+          "level": "pc",
+          "at": "$road"
+        },
+        "guild": {
+          "faction": "conflict"
+        },
+        "guildhall": {
+          "place": "guildhall"
+        },
+        "gate": {
+          "place": "gate"
+        },
+        "road": {
+          "place": "road",
+          "hours": 3
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "Carry $clerk's packet out to $reader",
+          "objectives": [
+            "Take the packet past $gate",
+            "Put it in $reader's hands"
+          ],
+          "giver": "$clerk",
+          "reward": "paid at $guildhall on your word that it arrived"
+        },
+        {
+          "key": "seal",
+          "secret": true,
+          "title": "What is inside $clerk's packet",
+          "facts": [
+            "It is the thing that undoes $guild, written out plainly, and $reader is the one person who would act on it.",
+            "$clerk is not betraying anybody: $clerk was told to send it and was not told what it was."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.clerk-watched-you-take-it"
+          ],
+          "say": "$clerk watched your hands until the packet was out of sight, and then stopped watching"
+        }
+      ],
+      "steps": [
+        {
+          "id": "posted",
+          "criteria": [
+            "at($guildhall)",
+            "present($clerk)",
+            "not has(pc, knows.news.posted)"
+          ],
+          "action": {
+            "do": "news",
+            "carrier": "notice",
+            "reach": "town",
+            "says": "$guild is paying at $guildhall for a fast pair of legs and asking no questions about them."
+          },
+          "tell": {
+            "perceptible": "The notice is up at $guildhall, in $guild's own hand."
+          }
+        },
+        {
+          "id": "past-the-gate",
+          "criteria": [
+            "arrived($gate)",
+            "has(pc, knows.clerk-watched-you-take-it)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "tell": {
+            "perceptible": "Nobody at $gate asks what is in the packet."
+          }
+        },
+        {
+          "id": "opened-it",
+          "criteria": [
+            "at($road)",
+            "has(pc, knows.clerk-watched-you-take-it)",
+            "not has(pc, knows.what-it-says)"
+          ],
+          "fairness": [
+            "knows.clerk-watched-you-take-it"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "The packet is not a bill of lading. It is the one thing that would undo $guild, and $reader is who it is addressed to."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.what-it-says"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "Out on $road the seal has already gone soft, and what is written inside is not freight."
+          }
+        },
+        {
+          "id": "delivered",
+          "criteria": [
+            "at($road)",
+            "present($reader)",
+            "has(pc, knows.what-it-says)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "delivered"
+            }
+          ],
+          "tell": {
+            "perceptible": "$reader takes it, reads it twice, and asks who else has seen it."
+          }
+        },
+        {
+          "id": "took-it-back",
+          "criteria": [
+            "at($guildhall)",
+            "present($clerk)",
+            "has(pc, knows.what-it-says)",
+            "not has(pc, knows.it-is-delivered)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "carried-back"
+            }
+          ],
+          "tell": {
+            "perceptible": "$clerk takes the packet back at $guildhall and does not look at it."
+          }
+        }
+      ],
+      "outcomes": {
+        "delivered": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$reader",
+              "tags": [
+                "attitude.helpful"
+              ]
+            },
+            {
+              "to": "pc",
+              "tags": [
+                "knows.it-is-delivered"
+              ]
+            }
+          ]
+        },
+        "carried-back": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$clerk",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

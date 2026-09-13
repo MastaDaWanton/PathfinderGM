@@ -1,4 +1,4 @@
-"""The three schemes written on 2026-09-13, driven to their endings.
+"""The six schemes written on 2026-09-13, driven to their endings.
 
 Validating is not playing. `docs/quest-schemes-plan.md` §11 records a playtest agent
 reporting "A Small Favour" as "not playable as shipped" after every validator and lint
@@ -17,6 +17,8 @@ caught while being written, none of which the lint has any opinion about:
     the mud came out as "there is Chasmyre Leaf on the ground here".
   * Five of the nine schemes opened at one market inside the first day, because nothing
     counted how many stories the world had going at once.
+  * `remove` names its subject `to` where `hide` and `kill` name it `who`, and the wrong
+    spelling validates and takes the tag off the player.
 """
 from __future__ import annotations
 
@@ -192,3 +194,137 @@ def test_each_grounds_every_slot_from_the_world(monkeypatch, sid):
         assert slot.get("name"), f"{sid}.{name} filled with something nameless"
         if slot.get("kind") == "actor":
             assert s.people[slot["ref"]].name
+
+
+# --- word from the road --------------------------------------------------------------
+#
+# The first scheme whose inciting event happens where the player is not, and the first
+# that does not open at the market.
+
+def _news_tags(pc):
+    return [t for x in pc.effects for t in x.tags if t.startswith("knows.news.")]
+
+
+def test_the_word_arrives_by_courier_and_nothing_is_asked_before_it(monkeypatch):
+    s, e, pc, inst = _alone(monkeypatch, "word-from-the-road")
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    assert not _news_tags(pc), "the player knows before anybody told them"
+
+    _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
+    assert [n["carrier"] for n in inst["news"]] == ["courier"], inst["news"]
+    _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
+    # The tag is named for the step that sent it, which is what later steps wait on.
+    assert "knows.news.word" in _news_tags(pc)
+
+
+def test_going_to_look_finds_them_and_the_reason(monkeypatch):
+    s, e, pc, inst = _alone(monkeypatch, "word-from-the-road")
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
+    _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
+    _run(e, "travel", {"biome": inst["slots"]["wild"]["terrain"]})
+    for _ in range(3):
+        _wait(e)
+    assert "twist" in inst["fired"], "the reason never surfaced"
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    for _ in range(2):
+        _wait(e)
+    assert inst.get("outcome") == "answered", inst["fired"]
+
+
+def test_never_going_is_an_ending_with_a_body_in_it(monkeypatch):
+    """Not a failure state and not a dangling card: it resolves, out of sight, and the
+    log and the secret card carry what happened."""
+    s, e, pc, inst = _alone(monkeypatch, "word-from-the-road")
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    for _ in range(9):
+        _run(e, "advance_time", {"amount": 24 * 60, "unit": "minutes"})
+
+    assert inst.get("outcome") == "nobody-went", inst["fired"]
+    overdue = s.people[inst["slots"]["overdue"]["ref"]]
+    assert overdue.hp <= 0, "the clock ran out and nothing happened"
+    assert inst["fired"]["never-went"]["silent"], "the player was told about it somehow"
+
+
+# --- gone to ground -------------------------------------------------------------------
+
+def test_hiding_and_being_found_are_the_same_tag(monkeypatch):
+    """`hide` on the open and `remove` on the finding — the only paired use of either.
+    The assertion that matters is the third one: `remove` names its subject `to`, and
+    authored as `who` it validates and lifts the tag off the *player* instead."""
+    s, e, pc, inst = _alone(monkeypatch, "gone-to-ground")
+    hidden = s.people[inst["slots"]["hidden"]["ref"]]
+    assert hidden.has_state("state.hidden"), "nobody went to ground"
+
+    _run(e, "travel", {"place": inst["slots"]["market"]["name"]})
+    _wait(e)
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    _wait(e)
+    assert not hidden.has_state("state.hidden"), "found, and still hiding"
+    assert not pc.has_state("state.hidden"), "the tag came off the player"
+
+
+def test_keeping_the_name_and_giving_it_up_are_both_endings(monkeypatch):
+    s, e, pc, inst = _alone(monkeypatch, "gone-to-ground")
+    _run(e, "travel", {"place": inst["slots"]["market"]["name"]})
+    _wait(e)
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    for _ in range(2):
+        _wait(e)
+    assert pc.has_state("knows.what-they-are-owed"), "the twist never landed"
+    _run(e, "travel", {"place": inst["slots"]["temple"]["name"]})
+    _wait(e)
+    assert inst.get("outcome") == "kept", inst["fired"]
+    hidden = s.people[inst["slots"]["hidden"]["ref"]]
+    assert hidden.has_state("attitude.helpful")
+
+
+# --- the sealed letter ----------------------------------------------------------------
+
+def test_the_guild_is_a_row_from_the_export_and_not_a_body(monkeypatch):
+    """The faction slot has no `ref`: it is text for a card and a tell, and nothing
+    else. Naming it anywhere that needs a person would be a silent no-op."""
+    _s, _e, _pc, inst = _alone(monkeypatch, "the-sealed-letter")
+    guild = inst["slots"]["guild"]
+    assert guild["kind"] == "faction" and guild["name"]
+    assert "ref" not in guild
+
+
+def test_the_letter_reaches_the_person_it_is_addressed_to(monkeypatch):
+    """The road is `the edge`, and travelling by ground lands at the approach instead —
+    the §11 shape, where a card named a place ordinary travel could not reach. It is
+    reachable by its name, which is what the prose gives the player."""
+    s, e, pc, inst = _alone(monkeypatch, "the-sealed-letter")
+    _run(e, "travel", {"place": inst["slots"]["guildhall"]["name"]})
+    _wait(e)
+    _run(e, "travel", {"place": inst["slots"]["gate"]["name"]})
+    _wait(e)
+    r = _run(e, "travel", {"place": inst["slots"]["road"]["name"]})
+    assert s.at == inst["slots"]["road"]["id"], (
+        f"the road is unreachable by the name the prose uses: {s.at}")
+    for _ in range(4):
+        _wait(e)
+    assert inst.get("outcome") == "delivered", inst["fired"]
+    assert pc.has_state("knows.what-it-says"), "delivered it without ever opening it"
+
+
+@pytest.mark.parametrize("sid", ["word-from-the-road", "gone-to-ground",
+                                 "the-sealed-letter"])
+def test_each_of_the_second_three_grounds_too(monkeypatch, sid):
+    s, _e, _pc, inst = _alone(monkeypatch, sid)
+    doc = schemes.all_schemes()[sid]
+    missing = [n for n in doc["slots"] if n not in inst["slots"]]
+    assert not missing, f"{sid} left {missing} unfilled"
+    for name, slot in inst["slots"].items():
+        assert slot.get("name"), f"{sid}.{name} filled with something nameless"
+
+
+def test_no_two_schemes_open_on_the_same_day():
+    """Twelve of them now. Two sharing a gate would fight over the same townspeople the
+    moment the cap frees a slot."""
+    gates = {}
+    for sid, doc in schemes.shipped().items():
+        if not schemes._starts_fresh(doc):
+            continue
+        gates[sid] = next(c for c in doc["opens"] if c.startswith("since(campaign)"))
+    assert len(set(gates.values())) == len(gates), gates
