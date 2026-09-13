@@ -89,6 +89,31 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _the_model_gate_is_open_unless_a_test_shuts_it(monkeypatch):
+    """`/api/start` and `/api/resume` ask Ollama whether it can answer before they let
+    anybody through. Left live, that makes the suite's result depend on whether Ollama
+    happens to be running on the machine — 166 tests start a campaign, and every one of
+    them would pass at a desk with the daemon up and fail in a fresh checkout, which is
+    the worst shape a test failure can have.
+
+    The probe is stubbed rather than the gate, so the *gate itself* still runs on every
+    one of those tests: a mistake in `_model_gate` that refuses a healthy machine is
+    still caught here. `tests/test_preflight.py` and `test_home.py` shut it deliberately
+    to check the refusals."""
+    from gm import client as gm_client
+    from play import preflight
+
+    def answers_with_whatever_is_configured(*_a, **_kw):
+        # Computed per call, not once at setup. A test that overrides CAMPAIGN_DIR and
+        # writes its own model settings changes what `needs()` asks for, and a list
+        # captured at fixture time would then read as "the model is missing" and refuse
+        # a door the test was not testing.
+        return gm_client.Probe(True, installed=tuple(n.model for n in preflight.needs()))
+
+    monkeypatch.setattr(gm_client, "probe", answers_with_whatever_is_configured)
+
+
+@pytest.fixture(autouse=True)
 def _house_rules_start_at_the_defaults():
     """Every test begins with the shipped rules, whatever the last one chose.
 

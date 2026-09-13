@@ -2,7 +2,8 @@ from django.conf import settings
 from django.contrib.staticfiles.views import serve as static_serve
 from django.urls import path, re_path
 
-from play import class_views, outfit_views, race_views, spell_views, craft_views, home_views, views
+from play import (class_views, outfit_views, race_views, setup_views, spell_views,
+                  craft_views, home_views, views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -18,6 +19,9 @@ urlpatterns = [
     path("api/level-up", views.level_up, name="level_up"),
     path("api/feats", views.feat_search, name="feat_search"),
     path("licence", views.licence, name="licence"),
+    # The manual, served from inside the app because that is where the player is: this
+    # ships as one executable and a document in a repository is not a manual they have.
+    path("manual", views.manual, name="manual"),
     path("api/characters", views.characters, name="characters"),
     path("api/character/new", views.new_character, name="new_character"),
     path("api/character/switch", views.switch_character, name="switch_character"),
@@ -42,6 +46,11 @@ urlpatterns = [
          name="delete_character"),
     path("api/settings/models", home_views.model_settings,
          name="model_settings"),
+    # First run: what is missing before a turn can be attempted, and the pull that
+    # closes the gap. See `play/preflight.py` for why this is a per-launch check
+    # rather than a step in the installer.
+    path("api/setup", setup_views.setup_state, name="setup_state"),
+    path("api/setup/pull", setup_views.setup_pull, name="setup_pull"),
     path("api/homebrew/rules", home_views.house_rules, name="house_rules"),
     path("api/homebrew/races/import", home_views.import_races, name="import_races"),
     path("api/effects/catalogue", home_views.effect_catalogue, name="effect_catalogue"),

@@ -328,6 +328,37 @@
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
   .madebanner b { color: var(--gold); }
+  /* The tab row fills the header, so this always wraps to a line of its own. Pushed
+     right it reads as a top-right utility link, which is the convention; left, under
+     the title, it reads as something that fell off. Tried both in the running app. */
+  .manuallink { margin-left: auto; align-self: center; margin-bottom: 9px;
+                color: var(--dim);
+                text-decoration: none; font-size: 13px; letter-spacing: .08em;
+                font-variant: small-caps; border-bottom: 1px solid #3a2f22;
+                padding-bottom: 2px; }
+  .manuallink:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+  /* First run. The alarm border rather than the gold one: this is the single thing
+     standing between the player and a game, and it should not read as a footnote. */
+  .setupbanner { border: 1px solid #4a2620; border-left: 3px solid var(--alarm);
+                 background: rgba(110,31,31,.12); border-radius: 2px;
+                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px;
+                 display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .setupbanner .grow { flex: 1 1 320px; }
+  .modelrow { border: 1px solid rgba(201,168,106,.22); border-radius: 2px;
+              padding: 12px 15px; margin-bottom: 10px; }
+  .modelrow .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .modelrow code { font-size: 12.5px; color: var(--ink); word-break: break-all;
+                   flex: 1 1 260px; }
+  /* A bar and a line of words. The words carry the layer Ollama is on and the
+     megabytes; the bar carries the only thing a person watching actually wants. */
+  .bar { height: 7px; border-radius: 2px; margin-top: 10px; overflow: hidden;
+         background: var(--sunk); border: 1px solid #2e251a; }
+  .bar i { display: block; height: 100%; width: 0;
+           background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+           transition: width .25s linear; }
+  .barword { font: 12px/1.5 var(--body); color: var(--dim); margin-top: 5px;
+             font-variant-numeric: tabular-nums; }
   .madebanner em { color: var(--ink); font-style: italic; }
   .card.justmade { border-color: rgba(201,168,106,.5); }
   .featlist { max-height: 300px; overflow-y: auto; margin-top: 8px;
@@ -650,6 +681,10 @@
 <header>
   <h1>Pathfinder GM<small>a world by World Bible, played here</small></h1>
   <nav id="tabs"></nav>
+  <!-- In the header rather than a tab: the person who most needs it is the one who has
+       just opened the app for the first time, and they do not yet know what any of the
+       tabs are. -->
+  <a href="/manual" class="manuallink">Manual</a>
 </header>
 
 <main><div class="wrap" id="pane"></div></main>
@@ -660,7 +695,20 @@ const STATE = {{ state_json|safe }};
 // the shelf, so the character that was made is the thing on screen.
 const MADE = new URLSearchParams(location.search).get("made") || "";
 let SETTINGS = null;   // { roles, providers, keys, installed } once opened
-let TAB = MADE ? "characters" : "worlds";
+let SETUP = null;      // /api/setup: whether a turn can be attempted at all
+let PULLING = "";      // the model being downloaded, if any — one at a time
+// Why the last download stopped. Held in state rather than written into the pane,
+// because the pane is rebuilt the moment the pull ends: the first version wrote the
+// message into `#setuperr` and then called `refreshSetup()`, whose `render()` threw it
+// away in the same tick. Measured in the running app against a model Ollama does not
+// have — the button said "Downloading…", returned to "Download", and said nothing at
+// all, which is CLAUDE.md's "a button that does nothing and says nothing" exactly.
+let SETUP_ERR = "";
+// `/play/` bounces here with `?setup=1` when the table cannot be shown for want of a
+// model. Landing on the shelf would leave the player looking at the page they just came
+// from with no idea why, so the redirect names where the fix is and this opens it.
+const SENT_TO_SETUP = new URLSearchParams(location.search).get("setup") === "1";
+let TAB = SENT_TO_SETUP ? "settings" : (MADE ? "characters" : "worlds");
 let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
@@ -1272,12 +1320,213 @@ async function setHouseRule(patch) {
     `<div class="problems">${(d.problems || []).map(p => `<div>${esc(p)}</div>`).join("")}</div>`;
 }
 
+// --- First run ------------------------------------------------------------------
+//
+// Three failures with three different fixes, which `available()` used to flatten into
+// one empty list: no Ollama, Ollama not started, and Ollama running with nothing
+// pulled. A player told only "no models" for all three has no way to know which of a
+// download, a double-click and a 7.4 GB fetch they are looking at.
+const SETUP_WORDS = {
+  "not-installed": [
+    "Pathfinder GM needs Ollama",
+    `The GM runs on a model on your own machine — nothing is sent anywhere and there
+     is nothing to pay for. Ollama is what runs it, and it is not installed yet. It
+     installs into your own account and never asks for an administrator.`],
+  "not-running": [
+    "Ollama is installed, but not running",
+    `Start Ollama and this page will notice. On Windows it usually sits in the system
+     tray; if it is not there, open it from the Start menu.`],
+  "unreachable": [
+    "The model cannot be reached",
+    `The host below answered nothing. If you pointed a role at another machine, check
+     that address; otherwise set it back to http://localhost:11434.`],
+  "missing-models": [
+    "One download, and you can play",
+    `Ollama is running. The model the GM writes with has not been downloaded yet —
+     this is a one-off, and it stays on your machine afterwards.`],
+};
+
+function gbWord(n) {
+  return n ? (n / 1e9).toFixed(1) + " GB" : "size unknown";
+}
+
+function setupBanner() {
+  if (!SETUP || SETUP.ok) return "";
+  const [title] = SETUP_WORDS[SETUP.state] || ["Setup is not finished"];
+  return `<div class="setupbanner">
+    <span class="grow"><b>${esc(title)}.</b> The GM cannot write a scene until this is
+      sorted.</span>
+    ${TAB === "settings" ? "" : `<button class="go" data-go="settings">Open Settings</button>`}
+  </div>`;
+}
+
+function setupPanel() {
+  if (!SETUP) return `<p class="note">Checking what this machine can run…</p>`;
+  if (SETUP.ok && !SETUP.needs.length) {
+    return `<p class="note">Every role is pointed at a hosted provider, so there is
+      nothing to download. Local models stay the default and always will.</p>`;
+  }
+  const [title, why] = SETUP_WORDS[SETUP.state] ||
+    ["Ready", "Ollama is running and the GM's model is downloaded."];
+
+  // The install step, when there is one. A link rather than a download this app runs
+  // itself: an unsigned app that fetches and executes a second installer is the exact
+  // shape SmartScreen and every antivirus heuristic is built to stop, and being
+  // quarantined on the first screen is a worse first run than one extra click.
+  const install = (SETUP.state === "not-installed" || SETUP.state === "not-running")
+    ? `<div class="modelrow">
+         <div class="top">
+           <code>${esc(SETUP.host)}</code>
+           ${SETUP.state === "not-installed"
+             ? `<a class="go" href="${esc(SETUP.download)}" target="_blank"
+                  rel="noopener noreferrer">Get Ollama</a>`
+             : ""}
+           <button class="quiet" data-setup="recheck">Check again</button>
+         </div>
+         <div class="barword">${esc(SETUP.why || "")}</div>
+       </div>`
+    : "";
+
+  const rows = (SETUP.needs || []).map(n => {
+    const busy = PULLING === n.model;
+    const label = n.roles.join(", ");
+    return `<div class="modelrow" data-row="${esc(n.model)}">
+      <div class="top">
+        <code>${esc(n.model)}</code>
+        <span class="pill ${n.present ? "now" : ""}">${n.present ? "downloaded" : gbWord(n.bytes)}</span>
+        <span class="pill">${esc(label)}</span>
+        ${n.required ? "" : `<span class="pill soon">optional</span>`}
+        ${n.present || SETUP.state !== "missing-models" ? "" :
+          `<button class="go" data-pull="${esc(n.model)}" ${busy ? "disabled" : ""}>
+             ${busy ? "Downloading…" : "Download"}</button>`}
+      </div>
+      ${busy ? `<div class="bar"><i id="bar-fill"></i></div>
+                <div class="barword" id="bar-word">starting…</div>` : ""}
+    </div>`;
+  }).join("");
+
+  const room = SETUP.room
+    ? `<div class="problems"><div>${esc(SETUP.room)}</div></div>` : "";
+  const failed = SETUP_ERR
+    ? `<div class="problems"><div>That download stopped: ${esc(SETUP_ERR)}</div></div>`
+    : "";
+
+  return `
+    <p class="note"><b style="color:var(--gold)">${esc(title)}.</b>
+      ${esc(why.replace(/\s+/g, " ").trim())}</p>
+    ${room}
+    ${failed}
+    ${install}
+    ${rows}
+    ${(SETUP.needs || []).some(n => !n.present && n.required)
+      ? `<p class="note">The first turn after a download is slower than the rest —
+          the weights have to be read into memory once, which can take a minute.
+          Turns after that take roughly fifteen seconds.</p>` : ""}`;
+}
+
+// A refusal from the model gate, turned into the screen that fixes it. Returns whether
+// it handled the error, so the caller still reports everything else the ordinary way —
+// "pick who is playing" must not send anybody to Settings.
+function blockedByModel(err) {
+  const report = err && err.data && err.data.setup;
+  if (!report) return false;
+  SETUP = report;
+  TAB = "settings"; WORLD = null; BENCH = null; FORGE = null;
+  render();
+  if (!SETTINGS) {
+    fetch("/api/settings/models").then(r => r.json()).then(d => { SETTINGS = d; render(); });
+  }
+  // The report the gate attached has no `room` line — that is computed by the setup
+  // endpoint — so ask for the full one, which repaints with the disk warning if there
+  // is one to give.
+  refreshSetup();
+  return true;
+}
+
+async function refreshSetup() {
+  try {
+    const r = await fetch("/api/setup");
+    SETUP = await r.json();
+  } catch (err) {
+    SETUP = null;
+  }
+  render();
+}
+
+// Ollama's own progress, streamed through the app. NDJSON, one object per line, so a
+// 7.4 GB wait has a moving bar in front of it rather than a spinner and a guess.
+//
+// The bar is written straight to the DOM rather than through `render()`: a repaint per
+// frame would throw away the bar element mid-transition and land several times a
+// second, which is both jerkier and more expensive than setting one width.
+async function pullModel(model) {
+  if (PULLING) return;
+  PULLING = model;
+  SETUP_ERR = "";
+  render();
+  const fill = () => document.querySelector("#bar-fill");
+  const word = () => document.querySelector("#bar-word");
+  const say = t => { const w = word(); if (w) w.textContent = t; };
+  try {
+    const r = await fetch("/api/setup/pull", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+      },
+      body: JSON.stringify({ model }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.error || ("HTTP " + r.status));
+    }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let failed = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      // A chunk boundary lands anywhere, including the middle of a line. Whatever
+      // follows the last newline is a partial object and waits for the next chunk.
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let f;
+        try { f = JSON.parse(line); } catch (e) { continue; }
+        if (f.error) { failed = f.error; continue; }
+        if (f.total && f.completed != null) {
+          const pct = Math.max(0, Math.min(100, (f.completed / f.total) * 100));
+          const bar = fill();
+          if (bar) bar.style.width = pct.toFixed(1) + "%";
+          say(`${esc(f.status || "downloading")} — ${pct.toFixed(0)}% of ${gbWord(f.total)}`);
+        } else if (f.status) {
+          say(esc(f.status));
+        }
+      }
+    }
+    if (failed) throw new Error(failed);
+  } catch (err) {
+    SETUP_ERR = err.message;
+  } finally {
+    PULLING = "";
+    // `refreshSetup` repaints, which is what shows `SETUP_ERR` — and also what would
+    // have erased it had it been written to the DOM instead.
+    await refreshSetup();
+  }
+}
+
 function paneSettings() {
   if (!SETTINGS) return `<p class="note">Reading the model settings…</p>`;
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
   return `
+    <h2 class="sect">Before you can play</h2>
+    ${setupPanel()}
+
     <h2 class="sect">Who does which job</h2>
-    <p class="note">Three jobs, and they are genuinely different work. Everything ships
+    <p class="note">Four jobs, and they are genuinely different work. Everything ships
       pointed at Ollama on this machine, which needs no key and sends nothing anywhere;
       a hosted provider needs a key below.</p>
     ${SETTINGS.roles.map(r => `
@@ -1759,12 +2008,15 @@ function render() {
   tabs();
   // The forge wins over the tab: it is reachable from the shelf, from a world and
   // from the roster, and wherever it was opened is where closing it returns you.
-  $("#pane").innerHTML =
+  // The setup banner rides above every tab, not just Settings: the player's first
+  // move is Available worlds, and a warning only visible behind a tab they have no
+  // reason to open would be found after the refusal rather than before it.
+  $("#pane").innerHTML = setupBanner() + (
     FORGE ? paneForge()
     : TAB === "worlds" ? paneWorlds()
     : TAB === "settings" ? paneSettings()
     : TAB === "homebrew" ? paneHomebrew()
-    : paneCharacters();
+    : paneCharacters());
 }
 
 document.addEventListener("input", e => {
@@ -1870,6 +2122,21 @@ document.addEventListener("click", async e => {
     }
     render(); return;
   }
+
+  // First run. Handled before everything else because the banner sits above every
+  // pane, so its button can be clicked from any tab.
+  const go = e.target.closest("[data-go]");
+  if (go) {
+    TAB = go.dataset.go; WORLD = null; BENCH = null; FORGE = null;
+    if (TAB === "settings" && !SETTINGS) {
+      render();
+      SETTINGS = await (await fetch("/api/settings/models")).json();
+    }
+    render(); return;
+  }
+  if (e.target.closest('[data-setup="recheck"]')) { await refreshSetup(); return; }
+  const pull = e.target.closest("[data-pull]");
+  if (pull) { await pullModel(pull.dataset.pull); return; }
 
   if (e.target.closest("[data-import]")) {
     // The button opens the hidden input; the input's own change event does the work.
@@ -1982,7 +2249,7 @@ document.addEventListener("click", async e => {
     try {
       await post("/api/start", { world: start.dataset.start, source: PICKED });
       location.href = "/play/";
-    } catch (err) { $("#err").textContent = err.message; }
+    } catch (err) { if (!blockedByModel(err)) $("#err").textContent = err.message; }
     return;
   }
 
@@ -1991,7 +2258,9 @@ document.addEventListener("click", async e => {
     try {
       await post("/api/resume", { id: resume.dataset.resume });
       location.href = "/play/";
-    } catch (err) { const el = $("#err"); if (el) el.textContent = err.message; }
+    } catch (err) {
+      if (!blockedByModel(err)) { const el = $("#err"); if (el) el.textContent = err.message; }
+    }
     return;
   }
 
@@ -2236,11 +2505,28 @@ async function post(url, body) {
     body: JSON.stringify(body),
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  if (!r.ok) {
+    const err = new Error(data.error || ("HTTP " + r.status));
+    // The whole body, not just its message. The model gate refuses with the setup
+    // report attached so the caller can put the player in front of the fix rather
+    // than in front of a sentence describing it.
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 
 render();
+// Asked on every load, never cached: Ollama can be stopped, a model deleted and a role
+// repointed between one visit to this page and the next, and a cached "ready" would
+// send the player to a table that cannot write them a scene. One HTTP call.
+refreshSetup();
+// Settings is rendered from SETTINGS, which is otherwise only fetched when the tab is
+// clicked. Arriving on it by redirect skips that click, and the pane would sit on
+// "Reading the model settings…" forever.
+if (SENT_TO_SETUP && !SETTINGS) {
+  fetch("/api/settings/models").then(r => r.json()).then(d => { SETTINGS = d; render(); });
+}
 </script>
 <!-- The build the player is actually running, so a finding is never filed
      against a version that no longer exists. Stamped at package time. -->

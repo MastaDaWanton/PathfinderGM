@@ -7,6 +7,10 @@ machine.
 Not narration with dice bolted on. **A rules engine with two agents attached** — the GM
 proposes, the engine disposes, and the engine owns every piece of state and every die.
 
+**Playing it rather than building it?** The manual is inside the app, at `/manual` — the
+link is in the header. It covers what you need installed, how long a turn takes and why,
+and everything below this line is for people working on the code.
+
 ## Where to start reading
 
 | | |
@@ -15,15 +19,21 @@ proposes, the engine disposes, and the engine owns every piece of state and ever
 | `docs/product-brief.md` | What this is and why 1e specifically |
 | `docs/architecture.md` | The settled decisions |
 | `docs/intent-protocol.md` | **The core interface.** How the GM declares intent and how it resolves |
+| `docs/states-effects-tells.md` | The three laws every mechanic obeys |
 | `docs/campaign-format.md` | The World Bible data contract |
-| `docs/from-world-bible.md` | Where the world comes from, and its known gaps |
+| `docs/from-world-bible.md` | What the export hands over today |
+| `docs/for-world-bible.md` | What it does not hand over yet, easiest first |
+| `docs/first-run.md` | Why Ollama is detected rather than bundled |
+| `docs/packaging.md` | Every frozen-path trap paid for, and what is still unproven |
 
-## Running it
+## Running it from source
 
-Needs Python 3.13 and [Ollama](https://ollama.com) with `llama3.1:8b` pulled.
+Needs Python 3.13 and [Ollama](https://ollama.com). The app will tell you which models it
+wants and download them for you on its Settings page — about 9.9 GB, mostly the 12B
+narrator.
 
 ```bash
-python -m pip install django pytest
+python -m pip install -r requirements.txt
 ```
 
 ```bash
@@ -33,33 +43,86 @@ python manage.py runserver 8000
 Then open http://localhost:8000. There is no database and nothing to migrate — the
 campaign is a JSON file under your user data directory, and the world export is read-only.
 
-Run the tests with:
-
 ```bash
 python -m pytest
 ```
 
-## What works today
+3,375 tests, about five minutes. Run the whole suite, not the file you touched.
 
-A vertical slice, verified in the running app against the real local model:
+To build the packaged app:
 
-- Loads the shipped Pangrella export (74 entities, 111 events) with the documented schema
-  check, and survives its real irregularities.
-- A rules-correct level 1 PC (`fixtures/pc-kesst.json`), legality enforced at load.
-- One scene in Pangrella: the GM narrates, declares structured intent, and the engine
-  resolves it — the player's own roll on a dice popup with every modifier itemised, and
-  the opposing roll made hidden and never shown to the GM.
+```bash
+cd electron && npm run dist
+```
 
-## What is deliberately not built yet
+## What is built
 
-Full 1e character creation, combat beyond single attacks, readied actions and attacks of
-opportunity, the world-state agent, the SRD content import, and Electron packaging. The
-protocol doc's §7 says why for the mechanical ones.
+A complete single-player game, verified in the running app against the real local model.
+
+**The engine.** Initiative, turn order, iterative attacks, attacks of opportunity and
+reactions, manoeuvres, conditions with durations, typed-bonus stacking, damage
+reduction and resistances, nonlethal damage, dying and death. An optional five-foot grid
+per scene, where reach, cover and charge lanes are measured rather than asserted; the
+same engaged/near/far ranges work without one.
+
+**Characters.** Full guided 1e creation with legality enforced, 1,474 feats, point buy,
+outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
+(the Core eleven plus Blood Bending) and **25 races**; both catalogues merge anything in
+your homebrew directory on top, so the app's own count on a given machine is usually
+higher than this one.
+
+**Content.** 3,040 spells (every one carrying a mechanics document; the workhorses
+execute, the rest resolve as prose), 7,136 creature stat blocks, 459 weapons, magic items,
+and five crafting disciplines with their own materials and gathering.
+
+**The world.** World Bible exports load read-only and the campaign is an overlay keyed by
+durable ids. A world-state watcher runs off-turn. Quest schemes, situation cards, an NPC
+codex, and a per-town wanted state with gates, counters and guards that read it.
+
+**The GM.** Per-turn schemas built from the situation, declaration detection, a grooming
+pipeline over every prose door, and a context ledger that decides what to drop rather than
+letting the server drop it silently. Measured at 95% clean turns over 60 distinct turns —
+see `docs/narrator-reliability.md` for how that is measured and what it does not cover.
+
+**Packaging.** One-file PyInstaller executable inside an Electron shell, with an NSIS
+installer.
+
+## What is not built
+
+- **Multiclassing, archetypes and prestige classes.** The biggest remaining rules gap.
+- **Three conditions**: `broken`, `energy drained`, `incorporeal` — a deliberate ledger in
+  `tests/test_reference.py`, not an oversight.
+- **Nine effect types the engine records but cannot execute** — `permission`, `sense`,
+  `speed`, `situational_mod` and others. Each says so in `rules/effectspec.py`, and
+  `docs/compliance-plan.md` names this as the honest gap: the engine is lawful and much of
+  the corpus is still inert.
+- **Moving an attitude by talking.** Diplomacy, Intimidate and Bluff roll, but nothing yet
+  converts a success into a step along the attitude track.
+- **Readied actions.** There is no readied-action step, which is why countering and
+  absorbing a spell are handed to the GM rather than resolved — `rules/engine.py` says so
+  where it happens instead of shrugging.
+- **Authored campaigns.** Play is a sandbox; two scheme lines ship.
+- **macOS and Linux.** `paths.py` has the branches; neither has been run.
+
+## Before this is 1.0
+
+`docs/packaging.md` keeps the list, and `tools/prove_build.py` asserts what has been
+closed against the built artifact rather than against the source. The short version:
+**the app has never been installed on a clean Windows machine with no Python**, and the
+executable and installer are **unsigned**, so SmartScreen will warn on any machine that
+did not build them. Both need a machine or a certificate rather than a commit.
+
+What the exe is already proved to do, every run of the prover: a per-install
+`SECRET_KEY`, `DEBUG` off with no debug page, the first-run model check answering from
+inside the bundle, the model gate holding, and a cold start timed rather than estimated.
+(No count here on purpose — a number in prose is a number nothing checks, which is the
+mistake this file is still recovering from.)
 
 ## Licence
 
-Pathfinder 1e rules content is Open Game Content under the OGL 1.0a. **Read
-`OGL-NOTICE.md` before building or distributing** — the verbatim licence still has to be
-added, and it must travel with the content.
+Pathfinder 1e rules content is Open Game Content under the OGL 1.0a. The verbatim licence
+ships as `OGL.txt` and is served at `/licence` from inside the app, as section 10
+requires. **Read `OGL-NOTICE.md` before distributing** — it records which files are Open
+Game Content and which are not.
 
 Not affiliated with or endorsed by Paizo Inc.
