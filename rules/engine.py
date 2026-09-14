@@ -368,6 +368,40 @@ class Scene:
     def position(self, ref: str) -> tuple[int, int] | None:
         return self.positions.get(ref)
 
+    def settle_levels(self) -> None:
+        """Put everybody at the height of the ground they are standing on.
+
+        The heightmap was inert without this, and inert in the way this whole run of work
+        keeps finding: a dais was drawn, saved and measured, and a creature standing on it
+        was still at level zero, so it got no higher ground and nothing could tell it was
+        up there. A raised square nobody is raised by is scenery.
+
+        The rule is that **a creature which is not flying or climbing is on the floor** —
+        not "keeps whatever level it was given" — because that avoids having to tell an
+        explicit level 0 from an absent one, which is the empty-versus-absent trap and is
+        how a creature would end up standing inside a dais.
+
+        A flier keeps its own height, and never less than the ground beneath it.
+        """
+        if self.grid is None:
+            return
+        for ref, spot in list(self.positions.items()):
+            actor = self.actors.get(ref)
+            if actor is None:
+                continue
+            ground = self.grid.ground(spot)
+            if actor.can_move_vertically():
+                now = max(spot[2] if len(spot) > 2 else 0, ground)
+            else:
+                now = ground
+            # A two-tuple when the answer is the ground, because that is what a
+            # two-tuple has meant since the third axis was added and it is what every
+            # save on disk and every test in the suite is written in. Stamping
+            # `(x, y, 0)` on everybody says the same thing in a way nothing else agrees
+            # with.
+            self.positions[ref] = ((spot[0], spot[1]) if not now
+                                   else (spot[0], spot[1], now))
+
     def occupied(self, ignore: str = "", level: int | None = None) -> set[tuple[int, int]]:
         """Every square something is standing on, for movement to route around.
 
@@ -5587,6 +5621,7 @@ class Engine:
             if refusal:
                 return self._refuse(intent, refusal)
             self.scene.positions[ref] = tuple(square)
+            self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
             # said "near"; if the square it also gave is forty feet away, the square wins.
             self.scene.resync_zones()
@@ -5986,6 +6021,9 @@ class Engine:
                       and not any(r in refs for refs in sides.values())]
         if bystanders:
             self.scene.place_by_zone(bystanders)
+        # The plan has raised ground in it, and until this everybody stood at level zero
+        # on top of a dais they were not on.
+        self.scene.settle_levels()
         self.scene.resync_zones()
 
     def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:

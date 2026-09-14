@@ -258,6 +258,15 @@ class Grid:
     # Levels of headroom above the floor, or None for open sky. A cellar at 2 is ten feet
     # of air: something can stand, and a flier can get one square up and no further.
     ceiling: int | None = None
+    # Low obstacles, by the absolute level of their top: a balustrade, a parapet, a
+    # counter, a cart's side. 1e has this exactly — "a low obstacle (such as a wall no
+    # higher than half your height) provides cover" — and the reason it is not just a
+    # `blocked` square is what a balustrade does to a fight on two levels. Blocked is
+    # solid at every height, so a gallery rail between an archer above and a man below
+    # reads as a wall and the engine calls it TOTAL cover in both directions, which is
+    # the opposite of what a rail is for. A parapet stops a line that passes at or under
+    # its top and lets everything over it through.
+    parapet: dict[Point, int] = field(default_factory=dict)
 
     def inside(self, p: Point) -> bool:
         return 0 <= p[0] < self.width and 0 <= p[1] < self.height
@@ -322,29 +331,71 @@ class Grid:
         `total` when no line gets through at all — the target cannot be attacked, which
         the engine turns into a refusal rather than a penalty.
 
+        **Height is part of it.** The levels of the two positions decide how high the line
+        runs where it crosses each square, so a parapet stops what passes under its top
+        and lets what clears it through. Written after a foyer was measured: an archer on
+        a landing and a man on the floor below, with a balustrade between them, came back
+        as TOTAL cover in both directions — the rail read as a wall because `blocked` is
+        solid at every height, and neither could attack the other at all.
+
+        A parapet can never give total cover. A rail is something to shoot over.
+
         Soft cover, the +4 a creature in the way grants, is not here: this module has no
-        opinion about who is standing where, and `rules/position.py` reads the scene for
-        that. Nor is height — a line drawn between two levels is a longer problem than
-        this one, and until a room has a floor plan to be blocked by there is nothing on
-        the vertical for it to cross.
+        opinion about who is standing where, and `rules/position.py` reads the scene.
         """
         here, there = footprint(a, a_size), footprint(b, b_size)
         ignore = tuple(here) + tuple(there)
-        best = "total"
+        a_level = a[2] if len(a) > 2 else 0
+        b_level = b[2] if len(b) > 2 else 0
+        # 1e's quantifier, and it is easy to lose: the attacker CHOOSES a corner, and
+        # from that corner the target has cover if ANY line to it is obstructed. So cover
+        # applies only when every corner the attacker could pick has something in the way
+        # — one clean corner and there is no cover at all.
+        anything_through = False
         for corner in {c for p in here for c in _corners(p)}:
-            blocked = False
-            reached = False
+            hard = rail = through = False
             for target in {c for p in there for c in _corners(p)}:
                 if self._crosses_opaque(corner, target, ignore=ignore):
-                    blocked = True
-                else:
-                    reached = True
-            if not reached:
+                    hard = True
+                    continue
+                through = True
+                if self._crosses_parapet(corner, a_level, target, b_level,
+                                         ignore=ignore):
+                    rail = True
+            if not through:
                 continue                      # this corner sees nothing; try another
-            best = "cover" if blocked else "none"
-            if best == "none":
-                return "none"
-        return best
+            anything_through = True
+            if not hard and not rail:
+                return "none"                 # a corner with a clean shot from it
+        # Nothing got through from anywhere: solid. A parapet can never reach here,
+        # because it never sets `hard` — a balustrade is a thing to shoot over, and
+        # calling it total cover is how a gallery fight becomes two people who cannot
+        # touch each other.
+        return "cover" if anything_through else "total"
+
+    def _crosses_parapet(self, a: tuple[float, float], a_level: int,
+                         b: tuple[float, float], b_level: int,
+                         ignore: tuple[Point, ...] = ()) -> bool:
+        """Whether a low obstacle stands in this line, at the height the line is at.
+
+        The one place the third dimension enters the cover geometry. Sampled like
+        `_crosses_opaque`, but carrying the level along the segment: a rail whose top is
+        level 2 stops a line running at 1 and does nothing to one running at 3.
+        """
+        if not self.parapet:
+            return False
+        steps = max(1, int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) * 8) + 1)
+        for i in range(steps + 1):
+            t = i / steps
+            x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+            at = a_level + (b_level - a_level) * t
+            for square in _squares_at(x, y):
+                if square in ignore:
+                    continue
+                top = self.parapet.get(square)
+                if top is not None and at <= top:
+                    return True
+        return False
 
     def _crosses_opaque(self, a: tuple[float, float], b: tuple[float, float],
                         ignore: tuple[Point, ...] = ()) -> bool:

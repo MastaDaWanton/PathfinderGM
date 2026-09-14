@@ -192,7 +192,12 @@ def test_coming_down_needs_no_permission():
     s, e, man, _spider = _scene_with_a_map()
     s.positions[man.ref] = (5, 5, 3)
     _move(e, man.ref, (5, 5, 0))
-    assert s.positions[man.ref] == (5, 5, 0)
+    # The level, not the shape of the tuple: a position on the ground is written as a
+    # two-tuple, because that is what a two-tuple has meant since the third axis was
+    # added and it is what every save on disk is written in.
+    landed = s.positions[man.ref]
+    assert (landed[0], landed[1]) == (5, 5)
+    assert (landed[2] if len(landed) > 2 else 0) == 0
 
 
 def test_the_climb_is_charged_for():

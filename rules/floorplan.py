@@ -67,6 +67,17 @@ class Shape:
     rough: int = 0
     rise: int = 0
     rise_to: int = 1
+    # How this place is shaped upward. The default is `ledge` on purpose: a room with
+    # something to stand on and shoot from is a more interesting fight than a floor, and
+    # most real places have one — a gallery, a landing, a wall-walk, a stack of crates.
+    # Places where height would be silly say so, and `none` is the exception that has to
+    # be written down.
+    #
+    #   ledge    a raised band along one side, with a rail at its lip to shoot over
+    #   slope    ground that climbs across the map
+    #   scatter  isolated raised things, no rail — crates, rubble, a cart
+    #   none     flat, and meant to be
+    vertical: str = "ledge"
     about: str = ""
 
 
@@ -78,7 +89,7 @@ LOW, HALL = 2, 4
 # tables it mirrors are closed and short.
 BY_SPOT: dict[str, Shape] = {
     "the-market": Shape(16, 16, None, clumps=7, clump_max=2, rise=2,
-                        about="stalls and awnings, and a cart to climb on"),
+                        vertical="scatter", about="stalls and awnings, and a cart to climb on"),
     "the-tavern": Shape(12, 10, LOW, clumps=6, clump_max=2,
                         about="tables, benches and a hearth"),
     "the-temple": Shape(14, 12, HALL, clumps=6, clump_max=1, rise=3, rise_to=1,
@@ -86,28 +97,48 @@ BY_SPOT: dict[str, Shape] = {
     "the-gate": Shape(14, 10, None, clumps=4, clump_max=3, rise=4, rise_to=2,
                       about="the gatehouse either side, and the wall-walk over it"),
     "the-back-streets": Shape(10, 16, None, clumps=8, clump_max=3, rough=6,
-                              about="walls close on both sides, and what is left in them"),
+                              vertical="none", about="walls close on both sides, and what is left in them"),
     "the-workshops": Shape(12, 12, LOW, clumps=7, clump_max=2,
                            about="benches, a forge and the work stacked around them"),
     "the-guildhall": Shape(14, 12, HALL, clumps=4, clump_max=1, rise=2,
                            about="a long room with a table down it"),
     "the-high-ground": Shape(16, 16, None, clumps=3, clump_max=2, rise=14, rise_to=3,
-                             about="ground that climbs, and something to stand behind"),
+                             vertical="slope", about="ground that climbs, and something to stand behind"),
     "the-approach": Shape(18, 14, None, clumps=3, clump_max=2,
-                          about="the way in, and little to hide behind"),
+                          vertical="slope", about="the way in, and little to hide behind"),
     "the-heart-of-it": Shape(14, 14, None, clumps=9, clump_max=2, rough=8,
-                             about="close, and hard going"),
+                             vertical="scatter", about="close, and hard going"),
     "the-edge": Shape(18, 16, None, clumps=4, clump_max=2, rough=4,
-                      about="where it thins out"),
+                      vertical="none", about="where it thins out"),
     # Underground, and every one of them lower than a house.
     "the-sump": Shape(10, 10, LOW, clumps=3, clump_max=2, rough=10,
-                      about="as low as it goes, and wet"),
+                      vertical="none", about="as low as it goes, and wet"),
     "the-vaults": Shape(12, 10, LOW, clumps=5, clump_max=1,
-                        about="pillars, and what is kept between them"),
+                        vertical="scatter", about="pillars, and what is kept between them"),
     "the-deep-chamber": Shape(14, 12, HALL, clumps=5, clump_max=2, rough=4,
                               about="it opens out down here"),
     "the-gallery": Shape(16, 8, LOW, clumps=4, clump_max=2, rough=6,
                          about="a long cut, propped where it needed it"),
+    # The places a world implies — `places.IMPLIED` mints these when a settlement's own
+    # words ask for them, and most of them are vertical by their nature. A library has
+    # galleries because that is where the upper shelves are; a keep has a wall-walk
+    # because that is what a keep is.
+    "the-library": Shape(16, 14, HALL, clumps=10, clump_max=3,
+                         about="stacks to the ceiling, and a gallery round them"),
+    "the-keep": Shape(16, 14, HALL, clumps=5, clump_max=2,
+                      about="a hall, and the walk above it"),
+    "the-docks": Shape(18, 14, None, clumps=6, clump_max=3, rough=6,
+                       about="a quay above the water, and what is stacked on it"),
+    "the-bridge": Shape(20, 8, None, clumps=2, clump_max=2,
+                        about="a span, and a long drop either side"),
+    "the-mine-head": Shape(14, 12, None, clumps=6, clump_max=2, rough=6,
+                           about="the headframe, and the spoil heaped under it"),
+    "the-shrine": Shape(12, 10, HALL, clumps=4, clump_max=1,
+                        about="a quiet room with a step up to the altar"),
+    "the-well": Shape(12, 12, None, clumps=3, clump_max=2, vertical="scatter",
+                      about="a wellhead, and the ground worn round it"),
+    "the-workshop-loft": Shape(10, 10, LOW, clumps=5, clump_max=2,
+                               about="a loft over the work"),
 }
 
 # Everything else, by the ground it stands on.
@@ -115,27 +146,27 @@ BY_TERRAIN: dict[str, Shape] = {
     "urban": Shape(16, 14, None, clumps=6, clump_max=2,
                    about="walls, and the things people leave against them"),
     "forest": Shape(18, 18, None, clumps=12, clump_max=2, rough=10,
-                    about="trunks, and undergrowth between them"),
+                    vertical="scatter", about="trunks, and undergrowth between them"),
     "jungle": Shape(16, 16, None, clumps=14, clump_max=2, rough=18,
-                    about="it is hard to move and harder to see"),
+                    vertical="scatter", about="it is hard to move and harder to see"),
     "swamp": Shape(18, 18, None, clumps=4, clump_max=2, rough=22,
-                   about="standing water and the roots under it"),
+                   vertical="scatter", about="standing water and the roots under it"),
     "hills": Shape(18, 18, None, clumps=4, clump_max=2, rise=16, rise_to=2,
-                   about="ground that rises and falls"),
+                   vertical="slope", about="ground that rises and falls"),
     "mountain": Shape(16, 16, None, clumps=9, clump_max=3, rough=8, rise=14, rise_to=3,
-                      about="rock, and a way up it"),
+                      vertical="slope", about="rock, and a way up it"),
     "ruins": Shape(16, 16, None, clumps=10, clump_max=3, rough=12, rise=4, rise_to=1,
                    about="broken walls, and rubble where they fell"),
     "underground": Shape(14, 12, LOW, clumps=6, clump_max=2, rough=6,
-                         about="close stone, and not much air"),
+                         vertical="scatter", about="close stone, and not much air"),
     "farmland": Shape(20, 18, None, clumps=3, clump_max=2, rough=4,
-                      about="open, with a wall or a hedge to it"),
+                      vertical="none", about="open, with a wall or a hedge to it"),
     "grassland": Shape(20, 20, None, clumps=1, clump_max=2,
-                       about="open ground"),
+                       vertical="none", about="open ground"),
     "desert": Shape(20, 20, None, clumps=2, clump_max=2, rough=8, rise=6, rise_to=1,
-                    about="sand that moves under you"),
+                    vertical="slope", about="sand that moves under you"),
     "tundra": Shape(20, 20, None, clumps=2, clump_max=2, rough=8,
-                    about="open, and hard going"),
+                    vertical="none", about="open, and hard going"),
     "coast": Shape(18, 16, None, clumps=5, clump_max=2, rough=8, rise=4, rise_to=1,
                    about="rocks, and the tide line"),
 }
@@ -251,12 +282,65 @@ def for_place(place_id: str, terrain: str = "") -> Grid:
         if p not in grid.blocked:
             grid.difficult.add(p)
 
-    for _ in range(shape.rise):
-        p = somewhere()
+    _raise(grid, shape, r)
+    return grid
+
+
+# How high a ledge stands and how high its rail comes. Two squares is ten feet — a storey
+# — so a gallery is a floor above a floor, and the rail tops out level with the walkway,
+# which is what lets somebody on it shoot over and somebody under it shoot back.
+LEDGE_AT = 2
+
+
+def _raise(grid: Grid, shape: Shape, r: "_Rolls") -> None:
+    """Put the height into a plan, in the shape that place is meant to have."""
+    kind = shape.vertical
+    inner_w, inner_h = max(1, shape.width - 2), max(1, shape.height - 2)
+
+    if kind == "none":
+        return
+
+    if kind == "ledge":
+        # A band along one side, with its rail on the inside edge. The side is chosen
+        # from the seed, so a given room has its gallery in the same place for ever.
+        side = r.next(4)
+        depth = 2 if min(shape.width, shape.height) >= 10 else 1
+        for step in range(depth):
+            for along in range(1, (shape.width if side < 2 else shape.height) - 1):
+                if side == 0:
+                    walk, lip = (along, 1 + step), (along, 1 + depth)
+                elif side == 1:
+                    walk, lip = (along, shape.height - 2 - step), (along, shape.height - 2 - depth)
+                elif side == 2:
+                    walk, lip = (1 + step, along), (1 + depth, along)
+                else:
+                    walk, lip = (shape.width - 2 - step, along), (shape.width - 2 - depth, along)
+                if not grid.inside(walk) or not grid.inside(lip):
+                    continue
+                grid.blocked.discard(walk)
+                grid.floor[walk] = LEDGE_AT
+                if step == depth - 1 and grid.inside(lip) and lip not in grid.floor:
+                    grid.parapet[lip] = LEDGE_AT
+        return
+
+    if kind == "slope":
+        # Ground that climbs one way across the map, in bands, so a fight on it has an
+        # uphill side and a downhill one rather than a scatter of steps.
+        steps = max(1, shape.rise_to)
+        across = shape.width if r.next(2) else shape.height
+        band = max(1, across // (steps + 1))
+        for x in range(1, shape.width - 1):
+            for y in range(1, shape.height - 1):
+                along = x if across == shape.width else y
+                height = min(steps, along // band)
+                if height:
+                    grid.floor[(x, y)] = height
+        return
+
+    for _ in range(max(shape.rise, 3)):
+        p = (1 + r.next(inner_w), 1 + r.next(inner_h))
         if p not in grid.blocked:
             grid.floor[p] = 1 + r.next(shape.rise_to)
-
-    return grid
 
 
 def describe(place_id: str, terrain: str = "") -> str:

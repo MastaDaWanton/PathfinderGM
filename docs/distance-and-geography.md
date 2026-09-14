@@ -40,8 +40,8 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 3b | The situational-modifier pipeline — flanking, higher ground, cover | **done** |
 | 4 | The floor under the fight — height per square, and a plan derived from the place id | **done** |
 | 5 | Storeys as places, joined by stairs | **done** |
-| 5b | Height-aware cover, and interiors that are open between floors | next |
-| 6 | Lengths on the trade edges; a journey costs time | |
+| 5b | Height-aware cover, and interiors that are open between floors | **done** |
+| 6 | Lengths on the trade edges; a journey costs time | next |
 | 7 | The map view — level selector, then an axonometric toggle | |
 
 Stage 2 settled one thing the rules do not: **there is no vertical distance rule in PF1e**,
@@ -79,6 +79,18 @@ against an empty field; the save carried neither the heightmap nor the ceiling, 
 campaign put down mid-fight came back with a flier's air unlimited; and the generator's own
 scatter was a stripe, because it drew from the **low** bits of a linear congruential
 sequence and those cycle with a period of eight.
+
+Stage 5b came out of a question rather than the plan — a fight in a foyer with enemies
+shooting down from the landing, and a library attacked from the gallery. Measured on that
+foyer before anything changed, it was **total cover in both directions**: `blocked` is
+solid at every height, so a balustrade read as a wall and neither party could attack the
+other. `Grid.parapet` is 1e's low obstacle, the cover geometry carries the height of the
+line along it, and `Scene.settle_levels` finally makes raised ground raise the person on
+it — until then a dais was drawn, saved, measured and worth nothing.
+
+It also set the generator's bias, as asked: `Shape.vertical` defaults to a **ledge**, so
+a room with a gallery, a landing or a wall-walk is the normal case and flatness is what
+has to be written down. Thirty of the thirty-six shapes have height in them.
 
 Stage 1 is deliberately the smallest thing that stops the game claiming something untrue,
 and it is independent of every stage after it. The guard that holds it —

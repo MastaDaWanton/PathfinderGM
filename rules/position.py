@@ -136,8 +136,11 @@ def cover_of(scene, actor, defender) -> str:
     if here is None or there is None:
         return ""
 
-    hard = grid.cover_between(tuple(here[:2]), actor.size,
-                              tuple(there[:2]), defender.size)
+    # Full positions, levels and all. These were truncated to two dimensions when this
+    # was written, which was harmless while cover was flat and became the thing that
+    # silently defeated height-aware cover the day it landed: the geometry grew a third
+    # axis and the caller went on handing it squares.
+    hard = grid.cover_between(tuple(here), actor.size, tuple(there), defender.size)
     if hard == "total":
         return "total"
     if hard == "cover":
@@ -187,8 +190,8 @@ def reflex_mods(scene, source_at, defender) -> list[Modifier]:
     there = scene.positions.get(defender.ref) if grid is not None else None
     if grid is None or there is None or source_at is None:
         return []
-    if grid.cover_between(tuple(source_at[:2]), "medium",
-                          tuple(there[:2]), defender.size) == "cover":
+    if grid.cover_between(tuple(source_at), "medium",
+                          tuple(there), defender.size) == "cover":
         return [Modifier(COVER_REFLEX, "cover", "cover")]
     return []
 

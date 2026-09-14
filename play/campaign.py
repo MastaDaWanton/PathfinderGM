@@ -64,6 +64,8 @@ def _grid(raw: dict | None):
         floor={tuple(int(n) for n in k.split(",")): int(v)
                for k, v in (raw.get("floor") or {}).items()},
         ceiling=raw.get("ceiling"),
+        parapet={tuple(int(n) for n in k.split(",")): int(v)
+                 for k, v in (raw.get("parapet") or {}).items()},
     )
 
 def _portable_world_source(source: str | Path) -> str:
@@ -206,6 +208,8 @@ class Campaign:
                     # on reload and quietly took away everybody's higher ground.
                     "floor": {f"{x},{y}": v for (x, y), v in self.scene.grid.floor.items()},
                     "ceiling": self.scene.grid.ceiling,
+                    "parapet": {f"{x},{y}": v
+                                for (x, y), v in self.scene.grid.parapet.items()},
                 },
                 "positions": {r: list(p) for r, p in self.scene.positions.items()},
                 # Saved because a fight can be put down mid-round. Losing it would hand
