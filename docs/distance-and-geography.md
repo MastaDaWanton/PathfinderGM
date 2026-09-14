@@ -35,12 +35,18 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | | stage | state |
 |---|---|---|
 | 1 | Say what is not delivered: a `not_yet` on every movement evolution | **done** |
-| 2 | A creature is a box — vertical extent on `SPACE_AND_REACH`, `volume()`, 3D distance | next |
-| 3 | Elevation on actors; the engine reads movement modes; **the stage-1 caveats come off** | |
+| 2 | A creature is a box — vertical extent on `SPACE_AND_REACH`, `volume()`, 3D distance | **done** |
+| 3 | Elevation on actors; the engine reads movement modes; **the stage-1 caveats come off** | next |
 | 4 | The floor under the fight — height per square, and a plan derived from the place id | |
 | 5 | Storeys as places, joined by stairs | |
 | 6 | Lengths on the trade edges; a journey costs time | |
 | 7 | The map view — level selector, then an axonometric toggle | |
+
+Stage 2 settled one thing the rules do not: **there is no vertical distance rule in PF1e**,
+so `grid.distance` now carries a house rule in its docstring — a step is diagonal if it
+moves on more than one axis, and the count of diagonals is the second-largest delta. It
+reduces to the old two-dimensional answer exactly, which is why it replaced the old body
+rather than sitting beside it.
 
 Stage 1 is deliberately the smallest thing that stops the game claiming something untrue,
 and it is independent of every stage after it. The guard that holds it —

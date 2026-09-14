@@ -28,6 +28,10 @@ from heapq import heappop, heappush
 from .tables import SPACE_AND_REACH
 
 Point = tuple[int, int]
+# A square plus the level it is on, five feet apiece. `Point` stays two-dimensional
+# because the map is drawn flat and most of the app has no vertical in it; anything
+# that reads a third coordinate accepts either and treats a missing one as ground.
+Cell = tuple[int, int, int]
 
 # One square, in feet. Named rather than spelled 5 everywhere, because "5" appears in this
 # file as a distance, as a reach and as a speed, and only one of those is this.
@@ -40,7 +44,18 @@ DIRECTIONS: dict[str, Point] = {
 }
 
 
-def distance(a: Point, b: Point) -> int:
+def _xyz(p) -> tuple[int, int, int]:
+    """A point as three coordinates, with a missing third reading as ground level.
+
+    Every position in the app was `(col, row)` before height existed, and most still are:
+    a scene with no vertical in it should not have to say `z=0` on every call, and a save
+    written last week must load without a migration. So two-tuples keep working and mean
+    exactly what they meant.
+    """
+    return (p[0], p[1], p[2] if len(p) > 2 else 0)
+
+
+def distance(a, b) -> int:
     """Distance in feet, counting diagonals the way 1e counts them.
 
     "The first diagonal counts as 5 feet, the second counts as 10 feet, the third as 5,
@@ -48,9 +63,35 @@ def distance(a: Point, b: Point) -> int:
     diagonal retreat free, and the naive Pythagoras makes every distance a fraction.
 
     Areas count the same way, which is why there is one function here and not two.
+
+    **The third axis is a house rule, and this is the one place it is decided.**
+    Pathfinder does not have one: Movement, Position and Distance and Measuring Distance
+    both define the five-foot square and the 5-10-5 diagonal and contain no vertical
+    clause at all (checked against aonprd.com/Rules.aspx?ID=173 and ID=175 on 2026-09-14).
+    Nothing official says whether climbing a square while stepping sideways costs one
+    diagonal or two.
+
+    What is chosen here is the reading that adds no second rule to learn: a step is
+    diagonal if it moves on more than one axis, and **the number of diagonal steps is the
+    second-largest of the three deltas**. Sort them and the shape falls out — the smallest
+    is how many steps move on all three axes, the middle is how many move on at least two,
+    and the largest is the total number of steps.
+
+    It reduces to the existing two-dimensional answer exactly when the heights match
+    (`dz == 0` sorts to the front and the middle delta becomes `min(dx, dy)`), which is
+    why this could replace the old body rather than sit beside it. Straight up three
+    squares is fifteen feet; one step up and one step over is five, like any other first
+    diagonal.
     """
-    dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
-    diagonals, straights = min(dx, dy), max(dx, dy) - min(dx, dy)
+    ax, ay, az = _xyz(a)
+    bx, by, bz = _xyz(b)
+    return _count(abs(bx - ax), abs(by - ay), abs(bz - az))
+
+
+def _count(dx: int, dy: int, dz: int = 0) -> int:
+    """Feet for a separation of so many squares on each axis. See `distance`."""
+    d = sorted((dx, dy, dz))
+    diagonals, straights = d[1], d[2] - d[1]
     return SQUARE_FT * (straights + diagonals + diagonals // 2)
 
 
@@ -71,15 +112,86 @@ def natural_reach(size: str = "medium", shape: str = "tall") -> int:
     return row["reach_long" if shape == "long" else "reach_tall"]
 
 
-def distance_between(a: Point, a_size: str, b: Point, b_size: str) -> int:
-    """Distance between two creatures — the shortest gap between their footprints.
+def height_ft(size: str = "medium", shape: str = "tall",
+              override: float | None = None) -> float:
+    """How far up a creature of this size reaches when it stands, in feet.
+
+    `override` wins, because the source of these bands says they are typical and that
+    exceptions exist — so a document that knows its creature is nine feet of Medium says
+    so, and this table stops guessing for it.
+
+    A `long` creature wears its size band horizontally rather than vertically (a horse is
+    Large and is not sixteen feet tall), so it gets its space instead: about as tall as it
+    is wide, which is the only other measurement the rules hand us.
+    """
+    if override is not None:
+        return max(0.0, float(override))
+    row = SPACE_AND_REACH.get(size.lower(), SPACE_AND_REACH["medium"])
+    return float(row["space"] if shape == "long" else row["tall_ft"])
+
+
+def height_squares(size: str = "medium", shape: str = "tall",
+                   override: float | None = None) -> int:
+    """How many squares of vertical a creature of this size fills, at least one.
+
+    Rounded up, because the question this answers is "what has to clear it" — eight feet
+    of Medium needs two squares of headroom, and a two-foot Tiny still needs one.
+    """
+    ft = height_ft(size, shape, override)
+    return max(1, -(-int(ft * 100) // (SQUARE_FT * 100)))
+
+
+def volume(anchor: Point, size: str = "medium", level: int = 0,
+           shape: str = "tall", height: float | None = None) -> list[Cell]:
+    """Every cell a creature fills — its footprint, stacked as high as it stands.
+
+    The three-dimensional `footprint`, and anchored the same way: top-left of the
+    footprint, and `level` is the square its feet are in. A spider clinging to a ceiling
+    twenty feet up is `level=4`; a flier is wherever it climbed to.
+    """
+    tall = height_squares(size, shape, height)
+    return [(x, y, level + dz)
+            for (x, y) in footprint(anchor, size) for dz in range(tall)]
+
+
+def _span(lo: int, n: int) -> tuple[int, int]:
+    return lo, lo + n - 1
+
+
+def distance_between(a: Point, a_size: str, b: Point, b_size: str,
+                     a_shape: str = "tall", b_shape: str = "tall",
+                     a_height: float | None = None,
+                     b_height: float | None = None) -> int:
+    """Distance between two creatures — the shortest gap between the space they fill.
 
     Measuring anchor to anchor makes a Colossal dragon impossible to reach: its anchor is
     up to six squares from the edge a character is standing against, and every reach check
     would fail while the two were nose to nose.
+
+    Either position may carry a third coordinate. With both on the ground this is the
+    same number it always was, because two creatures standing on the same floor overlap
+    on the vertical axis and the gap there is zero.
+
+    Computed from the gap on each axis rather than by comparing every cell to every cell.
+    Both answers are identical — `test_the_box_gap_agrees_with_comparing_every_cell`
+    proves it across sizes and offsets — and the enumeration is not affordable once
+    creatures have height: a Colossal creature is 6x6 squares and thirteen of them tall,
+    so a pair of them is 468 cells against 468, and the old loop would ask 219,024
+    questions to answer one reach check.
     """
-    here, there = footprint(a, a_size), footprint(b, b_size)
-    return min(distance(p, q) for p in here for q in there)
+    ax, ay, az = _xyz(a)
+    bx, by, bz = _xyz(b)
+    an, bn = size_squares(a_size), size_squares(b_size)
+    ah = height_squares(a_size, a_shape, a_height)
+    bh = height_squares(b_size, b_shape, b_height)
+
+    gaps = []
+    for (lo1, n1), (lo2, n2) in (((ax, an), (bx, bn)), ((ay, an), (by, bn)),
+                                 ((az, ah), (bz, bh))):
+        a_lo, a_hi = _span(lo1, n1)
+        b_lo, b_hi = _span(lo2, n2)
+        gaps.append(max(0, a_lo - b_hi, b_lo - a_hi))
+    return _count(*gaps)
 
 
 def threatened_squares(anchor: Point, size: str = "medium", reach: int = 0,
@@ -430,7 +542,8 @@ def size_squares(size: str) -> int:
 
 
 __all__ = [
-    "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "distance",
+    "Cell", "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "distance",
     "distance_between", "flanking", "footprint", "is_adjacent", "line", "natural_reach",
-    "size_squares", "threatened_squares", "zone_between",
+    "height_ft", "height_squares", "size_squares", "threatened_squares",
+    "volume", "zone_between",
 ]
