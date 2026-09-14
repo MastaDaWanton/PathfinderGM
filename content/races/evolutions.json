@@ -14,7 +14,13 @@
     "no natural attack could be declared at all: `rules.weapons.has('bite')` is False, and",
     "both the intent gate and the engine's legality check asked only that table, so a race",
     "could take Bite for 1 RP and the player could never bite anything. Pull and push have",
-    "a reader too and move a body only on a scene with a map."
+    "a reader too and move a body only on a scene with a map.",
+    "2026-09-14: the four movement evolutions gained a `not_yet`. Nothing in the engine",
+    "reads a movement mode — `races.speeds()` has three call sites and all three only",
+    "describe — so a fly speed reaches the sheet, prices exactly at 4 RP, and moves",
+    "nobody. The world-derived path in `rules/races.py` CUES has always said so (\"a fly",
+    "speed: the engine moves on the ground only\"); the evolution a player picks said",
+    "nothing, so the two doors to the same tag disagreed about what it delivers."
   ],
   "evolutions": [
     {
@@ -459,7 +465,8 @@
       "line": "climb speed equal to base speed",
       "tags": [
         "move.climb.base"
-      ]
+      ],
+      "not_yet": "a climb speed waits on the grid gaining height: the engine has no walls to climb"
     },
     {
       "id": "swim",
@@ -470,7 +477,8 @@
       "line": "swim speed equal to base speed",
       "tags": [
         "move.swim.base"
-      ]
+      ],
+      "not_yet": "a swim speed waits on the engine having water to swim in"
     },
     {
       "id": "flight",
@@ -481,7 +489,8 @@
       "line": "fly speed equal to base speed (wings)",
       "tags": [
         "move.fly.base"
-      ]
+      ],
+      "not_yet": "a fly speed waits on the grid gaining height: the engine moves on the ground only"
     },
     {
       "id": "burrow",
@@ -492,7 +501,8 @@
       "line": "burrow speed of half base speed",
       "tags": [
         "move.burrow.half"
-      ]
+      ],
+      "not_yet": "a burrow speed waits on the engine having earth to move through"
     },
     {
       "id": "limbs-legs",
