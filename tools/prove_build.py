@@ -547,6 +547,45 @@ def check_the_game_stops_when_its_last_window_does(exe: Path) -> None:
                        capture_output=True)
 
 
+def static_assets(http: Http, repo: Path) -> list[str]:
+    """Fetch every `{% static %}` asset the templates name, from the packaged exe.
+
+    Added 2026-09-10, after `/static/fonts/Cinzel-Regular.woff2` had 404'd on every page
+    load of every styled page for weeks. The 2026-08-24 run of this prover recorded that
+    404 in its browser log and its note called it "honest" — which it was — and then
+    nothing failed, so it stayed. A 404 nobody's exit code cares about is a 404 that
+    ships.
+
+    The reference list is read from the templates rather than hardcoded here, because a
+    hardcoded list goes stale in exactly the direction that hides the bug: an asset added
+    to a page and forgotten here would never be asked for. This is the one place the
+    prover reads the repository, and it reads it as *data* — no import, so it still
+    shares none of the app's code.
+
+    Byte counts matter as much as the status. Django's static handler will happily serve
+    a zero-length file, and a font that arrives empty renders exactly like one that 404s.
+    """
+    import re
+
+    tag = re.compile(r"\{%\s*static\s+['\"]([^'\"]+)['\"]\s*%\}")
+    referenced: set[str] = set()
+    for template in (repo / "play" / "templates").rglob("*.html"):
+        referenced |= set(tag.findall(template.read_text(encoding="utf-8")))
+    if not referenced:
+        return ["no {% static %} references found — the pattern has gone stale"]
+
+    faults = []
+    for name in sorted(referenced):
+        s, body = http.get(f"/static/{name}")
+        if s != 200:
+            faults.append(f"/static/{name} -> {s}")
+        elif len(body) < 100:
+            faults.append(f"/static/{name} served {len(body)}b")
+    if not faults:
+        print(f"         ({len(referenced)} assets, all 200)")
+    return faults
+
+
 def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
@@ -566,6 +605,11 @@ def run_checks(http: Http, repo: Path) -> None:
 
     s, body = http.get("/licence")
     note("licence ships", [] if s == 200 and b"Open Game License" in body else [f"{s}"])
+
+    note("every asset the templates ask for is served", static_assets(http, repo))
+    s, body = http.get("/static/fonts/OFL.txt")
+    note("the font licence ships too",
+         [] if s == 200 and b"SIL OPEN FONT LICENSE" in body else [f"{s}"])
 
     # --- the boundary runs before the model, so no Ollama is needed -------------------
     s, body = http.post("/api/character/create", {

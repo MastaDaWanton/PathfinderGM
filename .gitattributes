@@ -1,0 +1,19 @@
+# Binary assets, declared rather than detected.
+#
+# `core.autocrlf=true` is normal on Windows checkouts of this repo, and git's own
+# heuristic — a file containing a NUL byte is binary — does keep these intact; that was
+# measured before this file was written, by comparing each font's sha256 on disk against
+# the blob git produced for it. This file exists so the answer does not depend on a
+# heuristic and on whatever `core.autocrlf` a future contributor happens to have.
+#
+# The failure it prevents is silent in the worst way: a woff2 with its 0x0A bytes rewritten
+# to 0x0D0A still has a `wOF2` signature, still has a plausible size, still passes
+# `is_file()`, and simply fails to decode in the browser — which falls back to Palatino
+# without a word, exactly the way the missing font did for weeks before it was noticed.
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
