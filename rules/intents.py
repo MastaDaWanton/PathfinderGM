@@ -16,6 +16,7 @@ failed and kept failing.
 from __future__ import annotations
 
 import difflib
+import functools
 import re
 from dataclasses import dataclass, field
 
@@ -154,7 +155,36 @@ def _known_weapon(name) -> bool:
     # armament is actually formed is the engine's legality check, with a better error.
     if str(name).strip().lower() in ("armed punch", "armed punches", "blood gauntlets"):
         return True
+    # A natural weapon is the same shape of thing and was not getting the same courtesy.
+    # `Actor.weapon` has always resolved bite, claws, gore and the rest through
+    # `natural_weapon` off the race document — but the 456-weapon table holds none of
+    # them, so this gate refused the name before the engine was ever asked, and **no
+    # racial natural attack could be declared at all**. A race could take Bite and the
+    # player could never bite anything; the whole attack group of the evolution pool was
+    # unreachable, not merely the fifteen entries that admit to a `not_yet`.
+    #
+    # Measured 2026-09-14: bite, claws, claw, gore, slam, pincers, sting, tail slap,
+    # tentacle and wing buffet — every one `has()` == False.
+    #
+    # Let through here and refused by the engine, exactly as the armament is: validation
+    # cannot see the actor, and "you have no bite" is a better sentence than "no such
+    # weapon, did you mean bardiche".
+    if str(name).strip().lower() in natural_weapon_names():
+        return True
     return has(str(name))
+
+
+@functools.lru_cache(maxsize=1)
+def natural_weapon_names() -> frozenset[str]:
+    """Every name a natural attack answers to, read from the evolution pool.
+
+    Read rather than listed, because a list here would go stale in the direction that
+    hides the bug: an evolution added with a new weapon would be refused by this gate
+    and nobody would think to look in `intents.py` for the reason.
+    """
+    from .races import natural_weapon_aliases
+
+    return natural_weapon_aliases()
 
 
 def _suggest(name: str, candidates) -> str:

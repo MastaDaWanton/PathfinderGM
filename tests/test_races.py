@@ -480,3 +480,72 @@ def test_a_card_without_the_new_fields_behaves_exactly_as_before():
     d = races.from_world(World())[0]
     assert d["mods"] == {}
     assert d["choose"] == list(races.STANDARD_CHOOSE)
+
+
+# --- pricing a tag the table has never seen ---------------------------------------------
+#
+# Measured 2026-09-13, asking what happens when World Bible describes a people this app
+# has not seen before. `TAG_RP` was twenty-one exact strings with the magnitude baked
+# into the key, and every miss fell through `TAG_RP.get(t, (0, ""))[0]` and cost nothing.
+# So `move.fly.30` was 4 RP and `move.fly.40` was free, and the forge reported a race as
+# cheaper than it is with no sign anything had been skipped.
+#
+# Two readers of the same tag already disagreed about this: `speeds()` and `senses()`
+# pull the number out with a regex and handle any value, while the price list handled
+# twenty-one. The half that generalises was the half that was right.
+
+def test_a_speed_the_table_never_listed_is_not_free():
+    from rules.races import price_tag
+
+    assert price_tag("move.fly.30")[0] == 4, "the anchor must not move"
+    faster, _words, how = price_tag("move.fly.40")
+    assert faster > 4, "flying further cost nothing"
+    assert how == "derived"
+
+
+def test_every_anchor_keeps_the_price_the_book_gave_it():
+    """The scaling must not quietly re-price the rows the Advanced Race Guide actually
+    has. Those are the ones the shipped races are built from."""
+    from rules.races import TAG_RP, price_tag
+
+    for tag, (cost, _words) in TAG_RP.items():
+        got, _w, how = price_tag(tag)
+        assert (got, how) == (cost, "exact"), f"{tag} moved: {cost} -> {got}"
+
+
+def test_no_shipped_race_changed_price():
+    """The whole change should bite only on values the table never had."""
+    from rules import races
+
+    for rid, doc in races.all_races().items():
+        d = races.normalise(doc)
+        old = sum(races.TAG_RP.get(t, (0, ""))[0] for t in d["tags"])
+        new = sum(races.price_tag(t)[0] for t in d["tags"])
+        assert old == new, f"{rid}: {old} -> {new}"
+
+
+def test_a_family_nobody_has_priced_is_named_rather_than_silently_free():
+    """It still costs nothing — inventing a number would be worse — but it is on the
+    card as unpriced instead of being indistinguishable from a trait that is free."""
+    from rules.races import derive, price_tag
+
+    cost, _words, how = price_tag("glows.faintly")
+    assert (cost, how) == (0, "unknown")
+
+    # `derive` is what the forge renders a race card from; `normalise` is the raw
+    # document underneath it and carries neither list.
+    d = derive({"id": "lamplit", "name": "Lamplit", "size": "medium", "speed": 30,
+                   "tags": ["glows.faintly", "move.fly.40"]})
+    assert "glows.faintly" in d["unpriced"], d["unpriced"]
+    # A speed the table can scale is NOT unpriced — that lumping is what hid the bug.
+    assert "move.fly.40" not in d["unpriced"]
+    assert any("move.fly.40" in line for line in d["derived_prices"]), d["derived_prices"]
+
+
+def test_the_scaled_price_is_shown_as_scaled():
+    """A derived number must not present itself as the book's. The forge says which."""
+    from rules.races import derive
+
+    d = derive({"id": "deepseer", "name": "Deepseer", "size": "medium", "speed": 30,
+                   "tags": ["sense.darkvision.90"]})
+    assert d["derived_prices"] and "scaled" in d["derived_prices"][0]
