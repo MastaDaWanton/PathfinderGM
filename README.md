@@ -47,7 +47,7 @@ campaign is a JSON file under your user data directory, and the world export is 
 python -m pytest
 ```
 
-3,375 tests, about five minutes. Run the whole suite, not the file you touched.
+3,455 tests, about five minutes. Run the whole suite, not the file you touched.
 
 To build the packaged app:
 
@@ -69,7 +69,9 @@ same engaged/near/far ranges work without one.
 outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
 (the Core eleven plus Blood Bending) and **25 races**; both catalogues merge anything in
 your homebrew directory on top, so the app's own count on a given machine is usually
-higher than this one.
+higher than this one. **14 backgrounds** give a character a past in the world they are
+about to walk into — the trader you were apprenticed to is somebody that world has, named
+in the first paragraph you read.
 
 **Content.** 3,040 spells (every one carrying a mechanics document; the workhorses
 execute, the rest resolve as prose), 7,136 creature stat blocks, 459 weapons, magic items,
@@ -101,7 +103,9 @@ installer.
 - **Readied actions.** There is no readied-action step, which is why countering and
   absorbing a spell are handed to the GM rather than resolved — `rules/engine.py` says so
   where it happens instead of shrugging.
-- **Authored campaigns.** Play is a sandbox; two scheme lines ship.
+- **Authored campaigns.** Play is a sandbox. **14 quest schemes** ship and open themselves
+  where they fit, but none of them is a campaign with an arc, and nothing joins one to the
+  next.
 - **macOS and Linux.** `paths.py` has the branches; neither has been run.
 
 ## Before this is 1.0

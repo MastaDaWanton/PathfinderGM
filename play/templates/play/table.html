@@ -3394,6 +3394,18 @@ function tabBackground(s) {
         carries both. ${esc(i.heritage || "This people")} is who
         ${esc(i.name)} is in the world; ${esc(i.race)} is what the rules use.
       </div>
+
+      ${b.past ? `
+      <h3 style="margin-top:16px">Before this</h3>
+      <div class="terms">
+        <div class="t"><span>Background</span><b>${esc(b.past.name)}</b></div>
+      </div>
+      ${b.past.line ? `<div class="why" style="margin-top:6px">${esc(b.past.line)}</div>` : ""}
+      ${b.past.ties.length
+        ? b.past.ties.map(t => `<div style="margin-top:10px">${esc(t)}</div>`).join("")
+        : `<div class="empty" style="margin-top:10px">Chosen, but this world has not
+             filled it in yet — the names arrive when the campaign begins.</div>`}
+      ` : ""}
     </div>
     <div class="card">
       <h3>Notes</h3>

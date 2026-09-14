@@ -544,7 +544,7 @@ def manual(request):
     from django.conf import settings as dj_settings
 
     from pathfindergm import version
-    from rules import bestiary, classes, feats, races, spells
+    from rules import backgrounds, bestiary, classes, feats, races, schemes, spells
 
     from . import library, preflight
     from .craft_views import DISCIPLINES
@@ -569,6 +569,8 @@ def manual(request):
         "shipped_verb": "ships" if len(shipped) == 1 else "ship",
         "classes": len(classes.all_classes()),
         "races": len(races.all_races()),
+        "backgrounds": len(backgrounds.catalogue()),
+        "quests": len(schemes.all_schemes()),
         "feats": f"{len(feats.all_feats()):,}",
         "spells": f"{len(spells.all_spells()):,}",
         "creatures": f"{len(bestiary.everything()):,}",

@@ -69,13 +69,19 @@ def test_it_is_the_only_copy():
 
 def test_the_counts_are_the_real_catalogues_and_not_typed_in(page):
     """The check the README never had. If a class is added, this number moves."""
-    from rules import bestiary, classes, feats, races, spells
+    from rules import backgrounds, bestiary, classes, feats, races, schemes, spells
 
     for label, n in [("classes", len(classes.all_classes())),
                      ("races", len(races.all_races())),
                      ("feats", len(feats.all_feats())),
                      ("spells", len(spells.all_spells())),
-                     ("creatures", len(bestiary.everything()))]:
+                     ("creatures", len(bestiary.everything())),
+                     # Both added for 0.1.1, and both for the same reason: they are the
+                     # release's two headline features, and a manual that describes them
+                     # without saying how many there are invites somebody to type the
+                     # number in later.
+                     ("backgrounds", len(backgrounds.catalogue())),
+                     ("quest schemes", len(schemes.all_schemes()))]:
         assert f"{n:,}" in page or str(n) in page, (
             f"the manual does not show the real {label} count ({n:,}) — it has either "
             f"drifted or gone back to a typed-in number")
@@ -205,6 +211,37 @@ def test_the_readme_counts_what_ships_and_not_what_this_machine_has(tmp_path, se
     assert int(claimed_races.group(1)) == shipped_races, (
         f"README says {claimed_races.group(1)} races ship; a fresh install gets "
         f"{shipped_races}")
+
+
+def test_the_readme_states_how_much_of_the_world_is_authored(tmp_path, settings):
+    """Added for 0.1.1, against a sentence that had gone stale exactly the way this file
+    exists to prevent: "Play is a sandbox; two scheme lines ship" was written when two
+    did, and was still there at fourteen.
+
+    The claim matters more than most. It sits under "What is not built", where a reader
+    is deciding whether the world does anything on its own, and understating it by a
+    factor of seven answers that question wrongly.
+    """
+    import re
+
+    from rules import backgrounds, schemes
+
+    # Both catalogues merge homebrew on top, so the count has to be taken against an
+    # empty directory for the same reason the class and race counts above are — a
+    # README that describes the product must not be reading this machine's overlay.
+    fresh = tmp_path / "campaigns"
+    fresh.mkdir()
+    settings.CAMPAIGN_DIR = str(fresh)
+
+    readme = (Path(settings.BASE_DIR) / "README.md").read_text(encoding="utf-8")
+    for label, real, pattern in [
+            ("quest schemes", len(schemes.shipped()), r"\*\*(\d+) quest schemes\*\*"),
+            ("backgrounds", len(backgrounds.catalogue()), r"\*\*(\d+) backgrounds\*\*")]:
+        found = re.search(pattern, readme)
+        assert found, (
+            f"README.md no longer states the {label} count in the form this test reads")
+        assert int(found.group(1)) == real, (
+            f"README says {found.group(1)} {label} ship; there are {real}")
 
 
 def test_the_manual_counts_this_installation_including_homebrew(tmp_path, settings):

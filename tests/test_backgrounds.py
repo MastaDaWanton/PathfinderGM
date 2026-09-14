@@ -185,6 +185,56 @@ def test_an_unknown_background_is_refused_with_the_list():
     assert any("is not a background" in p for p in problems), problems
 
 
+def test_the_sheet_shows_the_past_it_was_given():
+    """Added for 0.1.1. The ties were readable in exactly two places — the opening
+    paragraph, which scrolls away, and the model's brief, which no player sees — so a
+    character could be apprenticed to a named trader and have nowhere to look it up.
+
+    The two skill points were never the problem; they are itemised with every other
+    modifier. The sentences are the half only this pane can show."""
+    from rules.sheet import full_sheet
+
+    pc = _pc("apprenticed")
+    _s, e = _table(pc)
+    pc.background_ties = [b["says"] for b in backgrounds.bind(e, pc)]
+
+    past = full_sheet(pc)["background"]["past"]
+    assert past["name"] == "Apprenticed"
+    assert past["bound"] is True
+    assert past["ties"] == pc.background_ties
+    assert "$" not in " ".join(past["ties"]), "a slot reached the sheet unfilled"
+
+
+def test_a_character_with_no_past_says_so_rather_than_showing_an_empty_one():
+    """None, not `{}`: "they came from nowhere in particular" is a real answer in the
+    forge, and the pane has to tell it from a background whose document went missing."""
+    from rules.sheet import full_sheet
+
+    assert full_sheet(_pc(""))["background"]["past"] is None
+
+
+def test_a_past_chosen_but_not_yet_bound_is_marked_unfilled():
+    """Between the forge and the first turn the background is a choice with no names in
+    it. Showing an empty list there would read as "this background says nothing"."""
+    from rules.sheet import full_sheet
+
+    past = full_sheet(_pc("gate-watch"))["background"]["past"]
+    assert past and past["bound"] is False and past["ties"] == []
+
+
+def test_the_sheet_pane_draws_it():
+    """The same failure the picker fixed, one pane along: an API field nothing renders.
+    Checked in the template, the way `test_manual.py` checks the manual's wiring."""
+    from pathlib import Path
+
+    from django.conf import settings
+
+    page = Path(settings.BASE_DIR, "play", "templates", "play", "table.html").read_text(
+        encoding="utf-8")
+    assert "b.past" in page, "the sheet's background pane does not draw the chosen past"
+    assert "b.past.ties" in page, "the ties — the whole point — are not on the pane"
+
+
 # --- the narrator -------------------------------------------------------------------------
 
 def test_the_history_reaches_the_brief():

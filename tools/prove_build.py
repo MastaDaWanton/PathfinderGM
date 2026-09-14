@@ -162,7 +162,8 @@ def check_the_manual_ships_and_counts_for_itself(http: Http) -> None:
     # real fault is the one nobody believes.
     import re as _re
 
-    for zero in ("spells", "classes", "races", "feats", "creature"):
+    for zero in ("spells", "classes", "races", "feats", "creature", "backgrounds",
+                 "quest"):
         if _re.search(r"(?<![\d,])0 " + zero, body):
             faults.append(f"the manual says '0 {zero}' — a catalogue did not load")
     if "js/keepalive.js" not in body:
@@ -590,6 +591,10 @@ def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
     note("home page", [] if s == 200 and len(body) > 50_000 else [f"{s}, {len(body)}b"])
+    note("the forge draws the background picker",
+         [] if b"data-crbackground" in body
+         else ["the picker is not on the frozen page, so the backgrounds below are "
+               "reachable only by POSTing JSON"])
     note("csrf cookie set", [] if http._token() else ["no csrftoken cookie"])
 
     s, body = http.get("/api/create/options")
@@ -599,6 +604,16 @@ def run_checks(http: Http, repo: Path) -> None:
          and len(d.get("classes", [])) >= 12
          else [f"{s}: races={len(d.get('races', []))} "
                f"classes={len(d.get('classes', []))}"])
+
+    # `content/backgrounds` is the newest directory in the spec's `datas`, and a content
+    # directory missing from the bundle presents as an empty catalogue rather than as an
+    # error — which here would be a forge that quietly offers no past at all.
+    faults = []
+    if len(d.get("backgrounds", [])) < 12:
+        faults.append(f"{len(d.get('backgrounds', []))} backgrounds in the bundle")
+    if not d.get("background_groups"):
+        faults.append("no groups, so the picker would draw one undifferentiated wall")
+    note("the forge has a past to offer", faults)
 
     s, body = http.get("/api/spells?q=fireball")
     note("spell search", [] if s == 200 else [f"{s}"])
@@ -619,9 +634,31 @@ def run_checks(http: Http, repo: Path) -> None:
                       "cha": 8},
         "skills": ["climb", "survival"],
         "feats": ["power attack", {"id": "weapon-focus", "target": "longsword"}],
+        # Made with a past, so the whole of it is proved in the build: the document is
+        # read, its skill bonus is applied live, and the tie is filled from the world
+        # that shipped in the same bundle.
+        "background": "apprenticed",
         "begin": True, "world": ""})
     note("character created and campaign begun",
          [] if s == 200 else [f"{s}: {j(body)}"])
+
+    s, body = http.get("/api/sheet")
+    past = (j(body).get("background") or {}).get("past") or {}
+    faults = []
+    if s != 200:
+        faults.append(f"{s}")
+    elif not past:
+        faults.append("the sheet carries no past, so the background was not read")
+    else:
+        if not past.get("name"):
+            faults.append("the background has no name in the bundle")
+        # A slot that reached the sheet unfilled is the one failure mode that looks like
+        # working software from every other angle: the game would tell a player they were
+        # apprenticed to "$who".
+        for tie in past.get("ties") or []:
+            if "$" in tie:
+                faults.append(f"an unfilled slot reached the sheet: {tie!r}")
+    note("a past was chosen, read and shown on the sheet", faults)
 
     s, body = http.get("/api/state")
     d = j(body)

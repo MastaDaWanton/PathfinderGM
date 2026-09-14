@@ -3211,10 +3211,45 @@ def full_sheet(actor: Actor) -> dict:
         "background": {
             "heritage": actor.heritage,
             "notes": actor.notes.strip(),
+            # The past chosen in the forge, and the sentences this world filled into it.
+            # Read off the document rather than stored, for the same reason the skill
+            # bonus is: a background edited on the bench must not leave every character
+            # who has it showing the old words.
+            "past": _background_sheet(actor),
         },
         # None rather than an empty structure for a fighter, so the page can tell "does
         # not cast" from "casts nothing today" — they look identical and are not.
         "spells": _spell_sheet(actor),
+    }
+
+
+def _background_sheet(actor: Actor) -> dict | None:
+    """What the sheet shows about where this character was before turn one.
+
+    None rather than an empty dict for somebody who chose no past, so the pane can tell
+    "came from nowhere in particular" — a real answer in the forge — from "has a
+    background whose document has gone missing", which is a fault.
+
+    The ties are the half worth showing. The two skill points are already itemised with
+    every other modifier; the sentences are the only place a player can read back the
+    name of the person their character used to work for, and until this they existed
+    only in the opening paragraph and in the model's brief.
+    """
+    if not actor.background:
+        return None
+
+    from . import backgrounds as backgrounds_mod
+
+    doc = backgrounds_mod.get(actor.background) or {}
+    return {
+        "id": actor.background,
+        "name": doc.get("name") or actor.background,
+        "summary": doc.get("summary", ""),
+        "line": backgrounds_mod.line(doc) if doc else "",
+        "ties": backgrounds_mod.remembered(actor),
+        # A character made before the campaign began has chosen a past that nothing has
+        # filled yet. The pane says so rather than showing an empty list.
+        "bound": bool(backgrounds_mod.remembered(actor)),
     }
 
 
