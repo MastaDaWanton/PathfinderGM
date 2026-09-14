@@ -190,3 +190,59 @@ def test_the_rail_survives_a_save():
     after = _grid(raw)
     assert after.parapet == before.parapet
     assert after.floor == before.floor
+
+
+# --- and the page can finally see it ------------------------------------------------------
+
+def test_the_map_payload_carries_everything_the_rooms_have():
+    """Stage 7. Rooms gained raised ground, roofs and rails in stages 4 and 5b, and every
+    one of them stopped at `_grid_state` — a gallery was generated on the server, saved,
+    measured and fought over, and the page was sent a flat floor.
+
+    Shaped as sorted lists of small integer tuples, like the terrain sets, because that
+    shape is renderer-agnostic on purpose: the three-dimensional view this is groundwork
+    for reads exactly this payload, and it is the flat map that is the special case.
+    """
+    from play.views import _grid_state
+
+    g = floorplan.for_place(LIBRARY, "urban")
+    s = Scene(location_id="5bbd0c40345f")
+    s.at = LIBRARY
+    you = instantiate("guildhand", scene=s, name="You")
+    you.kind = "pc"
+    s.add(you, at=(1, 1))
+    s.grid = g
+    Engine(s, Dice(seed=1), world=None)
+    s.settle_levels()
+
+    out = _grid_state(s)
+    assert out["floor"], "the gallery is not in the payload"
+    assert out["parapet"], "the rail is not in the payload"
+    assert out["ceiling"] == g.ceiling
+    assert out["levels"] == sorted({0} | {v for _c, _r, v in out["floor"]})
+
+
+def test_a_destination_carries_the_level_it_lands_you_on():
+    """A square is only half of where somebody ends up: walking onto a dais is walking up
+    onto it. The map turns these into `data-sq="c,r,level"`, the combat builder passes
+    that straight through, and `intents._square` has taken three numbers since stage 3 —
+    so picking a cell rather than a square needed nothing new at either end."""
+    from play.views import _grid_state
+
+    g = floorplan.for_place(LIBRARY, "urban")
+    gallery = sorted(p for p, v in g.floor.items() if v)
+    s = Scene(location_id="5bbd0c40345f")
+    s.at = LIBRARY
+    you = instantiate("guildhand", scene=s, name="You")
+    you.kind = "pc"
+    # Stand next to the gallery so some of it is within a move.
+    s.add(you, at=(gallery[0][0] - 1, gallery[0][1]))
+    s.grid = g
+    Engine(s, Dice(seed=1), world=None)
+    s.settle_levels()
+
+    out = _grid_state(s)
+    assert out["reachable"], "nowhere to go"
+    assert all(len(entry) == 4 for entry in out["reachable"])
+    raised = [e for e in out["reachable"] if e[3]]
+    assert raised, "no reachable square is on the gallery, so the level is untested"

@@ -55,13 +55,34 @@ def _grid_state(scene) -> dict | None:
         "width": g.width, "height": g.height,
         "difficult": sorted(g.difficult), "blocked": sorted(g.blocked),
         "obscuring": sorted(g.obscuring),
+        # The vertical, which the page could not see at all until now: stages 4 and 5b
+        # gave rooms raised ground, roofs and rails, and every one of them stopped at
+        # this function. A gallery was drawn on the server, saved, measured and fought
+        # over, and the map showed a flat floor.
+        #
+        # Sent in the same shape as the terrain sets — sorted lists of small integer
+        # tuples — because that shape is renderer-agnostic on purpose. A three-
+        # dimensional view reads exactly this; it is the flat map that is the special
+        # case, not the other way round.
+        "floor": [[c, r, v] for (c, r), v in sorted(g.floor.items())],
+        "parapet": [[c, r, v] for (c, r), v in sorted(g.parapet.items())],
+        "ceiling": g.ceiling,
+        # Every level anything is actually on, so the view can offer exactly those and
+        # not a spinner from zero to the sky. Ground is always in it: a room with a
+        # gallery still has a floor.
+        "levels": sorted({0} | set(g.floor.values())
+                         | {p[2] for p in scene.positions.values() if len(p) > 2}),
         "reachable": [],
     }
     pc = scene.pc()
     if pc is not None and pc.ref in scene.positions and pc.can_act():
         routes = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,
                              occupied=scene.occupied(ignore=pc.ref))
-        out["reachable"] = [[c, r, cost] for (c, r), cost in sorted(routes.items())]
+        # The level each destination stands at, carried alongside the cost, because a
+        # square is only half of where somebody would end up — walking onto a dais is
+        # walking up onto it, and the map has to be able to say which squares those are.
+        out["reachable"] = [[c, r, cost, g.ground((c, r))]
+                            for (c, r), cost in sorted(routes.items())]
         out["speed"] = pc.speed_feet
     return out
 

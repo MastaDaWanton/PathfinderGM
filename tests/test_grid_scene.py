@@ -335,7 +335,10 @@ def test_the_state_carries_where_the_character_can_actually_go():
     out = _grid_state(s)
     assert out["speed"] == 30
     assert out["reachable"]
-    costs = {(c, r): cost for c, r, cost in out["reachable"]}
+    # Four elements since stage 7: the level a destination lands you on rides with the
+    # cost, because a square is only half of where somebody ends up — walking onto a
+    # dais is walking up onto it, and the map has to be able to say which those are.
+    costs = {(c, r): cost for c, r, cost, _level in out["reachable"]}
     assert costs[(5, 4)] == 5
     assert max(costs.values()) <= 30
 
@@ -367,3 +370,38 @@ def test_actors_carry_their_square_and_their_size():
 
     assert size_squares(s.actors["c1"].size) == 2
     assert s.positions["c1"] == (9, 5)
+
+
+def test_the_state_carries_the_vertical_it_has_been_drawing_since_stage_four():
+    """Measured 2026-09-14: rooms gained raised ground, roofs and rails, and every one of
+    them stopped at `_grid_state`. A gallery was generated on the server, saved, measured
+    and fought over, and the page was sent a flat floor.
+
+    Sent in the same shape as the terrain sets — sorted lists of small integer tuples —
+    deliberately, because that shape is renderer-agnostic. The 3D viewport this is
+    groundwork for reads exactly this; the flat map is the special case.
+    """
+    from play.views import _grid_state
+
+    s = scene_with_map()
+    s.grid.floor[(3, 3)] = 2
+    s.grid.parapet[(3, 4)] = 2
+    s.grid.ceiling = 4
+
+    out = _grid_state(s)
+    assert [3, 3, 2] in out["floor"]
+    assert [3, 4, 2] in out["parapet"]
+    assert out["ceiling"] == 4
+    # Only the levels something is actually on, so the view offers those and not a
+    # spinner from zero to the sky. Ground is always among them.
+    assert out["levels"] == [0, 2], out["levels"]
+
+
+def test_a_flat_room_offers_no_levels_to_choose_between():
+    """A level picker over a flat market is a control that does nothing, and the first
+    thing a player learns from one is that it does not matter."""
+    from play.views import _grid_state
+
+    out = _grid_state(scene_with_map())
+    assert out["levels"] == [0]
+    assert out["floor"] == [] and out["parapet"] == []

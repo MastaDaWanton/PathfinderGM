@@ -42,7 +42,7 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 5 | Storeys as places, joined by stairs | **done** |
 | 5b | Height-aware cover, and interiors that are open between floors | **done** |
 | 6 | Lengths on the trade edges; a journey costs time | **done** |
-| 7 | The geometry payload, and the map view — level selector first | next |
+| 7 | The geometry payload, and the map view — level selector first | **done** |
 
 Stage 2 settled one thing the rules do not: **there is no vertical distance rule in PF1e**,
 so `grid.distance` now carries a house rule in its docstring — a step is diagonal if it
@@ -91,6 +91,21 @@ it — until then a dais was drawn, saved, measured and worth nothing.
 It also set the generator's bias, as asked: `Shape.vertical` defaults to a **ledge**, so
 a room with a gallery, a landing or a wall-walk is the normal case and flatness is what
 has to be written down. Thirty of the thirty-six shapes have height in them.
+
+Stage 7 closed the last place the vertical stopped: `_grid_state`. Rooms had gained raised
+ground, roofs and rails, and none of it reached the page — a gallery was generated on the
+server, saved, measured and fought over, and the map drew a flat floor. The payload carries
+it now, in the same sorted-tuple shape as the terrain sets, **deliberately renderer-agnostic**:
+the three-dimensional viewport this is groundwork for reads exactly this, and it is the flat
+map that is the special case.
+
+The map gained a level to look at rather than a third dimension to draw. Raised ground is
+lighter stone, a rail is an edge and not a fill (a filled square would read as a wall, which
+is the mistake the engine itself was making), and somebody on another floor is **faded, not
+hidden** — hiding them is how a player is surprised by an archer who was on the map the
+whole time. A destination now carries the level it lands you on, so the combat builder
+queues a move to a **cell**; `intents._square` has taken three numbers since stage 3, so
+picking a cell rather than a square needed nothing new at either end.
 
 Stage 1 is deliberately the smallest thing that stops the game claiming something untrue,
 and it is independent of every stage after it. The guard that holds it —
