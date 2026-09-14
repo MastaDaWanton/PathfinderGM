@@ -328,3 +328,88 @@ def test_no_two_schemes_open_on_the_same_day():
             continue
         gates[sid] = next(c for c in doc["opens"] if c.startswith("since(campaign)"))
     assert len(set(gates.values())) == len(gates), gates
+
+
+# --- the toll, and an invitation --------------------------------------------------------
+#
+# The last two openings nothing used: the gate, which the wanted line only ever refused
+# people through, and the road, which no scheme had opened on at all. Between them they
+# take the news carriers from four of seven to six.
+
+def test_the_toll_can_be_put_on_paper(monkeypatch):
+    """Three endings and no villain: the gatekeeper's wage stopped, which is a thing the
+    player can find out and then decide about."""
+    s, e, pc, inst = _alone(monkeypatch, "the-toll")
+    _run(e, "travel", {"place": inst["slots"]["gate"]["name"]})
+    _wait(e)
+    assert "asked" in inst["fired"]
+    _wait(e)
+    assert "twist" in inst["fired"], "the reason never surfaced"
+    assert pc.has_state("knows.the-wage-stopped")
+
+    _run(e, "travel", {"place": inst["slots"]["guildhall"]["name"]})
+    _wait(e)
+    assert inst.get("outcome") == "on-paper", inst["fired"]
+    keeper = s.people[inst["slots"]["keeper"]["ref"]]
+    assert keeper.has_state("attitude.helpful"), "the keeper was helped and resents it"
+
+
+def test_reporting_without_asking_why_is_a_different_ending(monkeypatch):
+    """The player who goes straight to the guildhall never learns about the wage, and
+    the keeper pays for it. Both are endings; neither is the failure."""
+    s, e, pc, inst = _alone(monkeypatch, "the-toll")
+    # No second tick at the gate: arriving is itself a tick and fires `asked`, and one
+    # more there would fire the twist, which is the other ending's path.
+    _run(e, "travel", {"place": inst["slots"]["gate"]["name"]})
+    assert "asked" in inst["fired"] and "twist" not in inst["fired"]
+    _run(e, "travel", {"place": inst["slots"]["guildhall"]["name"]})
+    _wait(e)
+    assert inst.get("outcome") == "reported", inst["fired"]
+    assert not pc.has_state("knows.the-wage-stopped")
+
+
+def test_an_invitation_is_addressed_and_waits_for_an_answer(monkeypatch):
+    """The `invitation` carrier, and the only scheme opening on the road. It reaches the
+    player rather than a place, which is what separates it from a crier."""
+    s, e, pc, inst = _alone(monkeypatch, "an-invitation")
+    _run(e, "travel", {"place": inst["slots"]["road"]["name"]})
+    _wait(e)
+    assert [n["carrier"] for n in inst["news"]] == ["invitation"], inst["news"]
+    for _ in range(3):
+        _run(e, "advance_time", {"amount": 24 * 60, "unit": "minutes"})
+    # An invitation is addressed but still has to find you somewhere it can be handed
+    # over; out on the road there is nobody to hand it to.
+    _run(e, "travel", {"place": inst["slots"]["market"]["name"]})
+    _wait(e)
+    assert "knows.news.word" in _news_tags(pc), "the invitation never arrived"
+
+
+def test_saying_it_and_staying_out_of_it_are_both_endings(monkeypatch):
+    """The only scheme with no antagonist. Refusing to take a side is not a shrug — the
+    household closes ranks and thinks better of you for it."""
+    s, e, pc, inst = _alone(monkeypatch, "an-invitation")
+    _run(e, "travel", {"place": inst["slots"]["road"]["name"]})
+    _wait(e)
+    for _ in range(3):
+        _run(e, "advance_time", {"amount": 24 * 60, "unit": "minutes"})
+    _run(e, "travel", {"place": inst["slots"]["market"]["name"]})
+    _wait(e)
+    assert pc.has_state("knows.the-heir-does-not-want-it")
+    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    for _ in range(3):
+        _wait(e)
+    assert inst.get("outcome") == "spoke", inst["fired"]
+    heir = s.people[inst["slots"]["heir"]["ref"]]
+    assert heir.has_state("attitude.helpful")
+
+
+def test_every_place_kind_is_now_somebodys_opening():
+    """Twelve schemes opened at the market and nowhere else when this began. A place
+    kind nothing opens at is a room the player only ever passes through."""
+    openings = set()
+    for doc in schemes.shipped().values():
+        for c in doc.get("opens") or []:
+            if c.startswith("at($"):
+                openings.add(c)
+    assert len(openings) >= 5, openings
+    assert "at($gate)" in openings and "at($road)" in openings

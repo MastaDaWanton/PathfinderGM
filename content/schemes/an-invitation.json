@@ -1,0 +1,239 @@
+{
+  "_about": [
+    "The first scheme that opens on the road rather than in a town, and the only use of",
+    "the `invitation` and `kin` carriers — the two that reach a person rather than a",
+    "place. An invitation is the one piece of news in the vocabulary that is *addressed*",
+    "to the player and expects an answer, which is why it took a scheme about being",
+    "asked to somebody's house to use it.",
+    "",
+    "It is also the only scheme with no antagonist at all. Nothing here is a crime, a",
+    "debt, a beast or a lie; it is a family deciding something and a stranger being",
+    "asked to say what they think. Eleven of the twelve schemes before it turn on",
+    "somebody wanting something they should not have.",
+    "",
+    "Both endings are kind. The scheme's whole question is whether the player takes a",
+    "side in a house that is not theirs, and it is the rare one where refusing is not",
+    "a failure and not a shrug — the household closes ranks and thinks better of you."
+  ],
+  "schemes": [
+    {
+      "id": "an-invitation",
+      "title": "An invitation",
+      "about": "A household asks a stranger to a gathering, because a stranger owes nobody there anything.",
+      "opens": [
+        "at($road)",
+        "since(campaign) >= 16d"
+      ],
+      "slots": {
+        "elder": {
+          "role": "standing",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$lodging"
+        },
+        "heir": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$market"
+        },
+        "road": {
+          "place": "road",
+          "hours": 2
+        },
+        "lodging": {
+          "place": "lodging"
+        },
+        "market": {
+          "place": "market"
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "$elder's gathering at $lodging",
+          "objectives": [
+            "Go to $lodging when the day comes",
+            "Say what you think, or do not"
+          ],
+          "giver": "$elder",
+          "reward": "a seat at the table, and whatever that turns out to be worth"
+        },
+        {
+          "key": "house",
+          "secret": true,
+          "title": "What $elder is really asking",
+          "facts": [
+            "$elder means to pass the house to $heir and knows the rest of the household will not have it said by anyone who lives in it.",
+            "$heir does not want it and has not found a way to say so in front of $elder."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.the-invitation-named-no-occasion"
+          ],
+          "say": "the invitation named a day and a house and no occasion at all"
+        }
+      ],
+      "steps": [
+        {
+          "id": "word",
+          "criteria": [
+            "at($road)",
+            "not has(pc, knows.news.word)"
+          ],
+          "action": {
+            "do": "news",
+            "carrier": "invitation",
+            "reach": "kin",
+            "delay": "1d",
+            "says": "$elder asks you to $lodging on a named day, and does not say what for."
+          },
+          "tell": {
+            "silent": "The invitation from $elder is on its way out to $road."
+          }
+        },
+        {
+          "id": "the-heir",
+          "criteria": [
+            "at($market)",
+            "present($heir)",
+            "has(pc, knows.news.word)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.the-heir-does-not-want-it"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$heir is at $market and would rather talk about anything but $elder's house."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($lodging)",
+            "present($elder)",
+            "has(pc, knows.the-heir-does-not-want-it)"
+          ],
+          "fairness": [
+            "knows.the-invitation-named-no-occasion"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$elder wants it said out loud by somebody the household owes nothing to, which is why the invitation went to a stranger on $road."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.why-they-asked-a-stranger"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$elder wanted a stranger to say it, and says so without embarrassment."
+          }
+        },
+        {
+          "id": "said-it",
+          "criteria": [
+            "at($lodging)",
+            "present($elder)",
+            "has(pc, knows.why-they-asked-a-stranger)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "news",
+              "carrier": "kin",
+              "reach": "town",
+              "delay": "0h",
+              "says": "$elder's household has settled what it was going to argue about, and a stranger was there for it."
+            },
+            {
+              "do": "outcome",
+              "name": "spoke"
+            }
+          ],
+          "tell": {
+            "perceptible": "It gets said at $lodging, and the room takes it better from you than it would have from $heir."
+          }
+        },
+        {
+          "id": "kept-out-of-it",
+          "criteria": [
+            "at($lodging)",
+            "present($elder)",
+            "has(pc, knows.news.word)",
+            "not has(pc, knows.the-heir-does-not-want-it)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "kept-out"
+            }
+          ],
+          "tell": {
+            "perceptible": "You eat at $elder's table and say nothing about the house, and nobody presses."
+          }
+        }
+      ],
+      "outcomes": {
+        "spoke": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$heir",
+              "tags": [
+                "attitude.helpful"
+              ]
+            },
+            {
+              "to": "$elder",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        },
+        "kept-out": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$elder",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
