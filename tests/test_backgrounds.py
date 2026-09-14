@@ -209,3 +209,22 @@ def test_the_forge_offers_them():
     one = opts["backgrounds"][0]
     for key in ("id", "name", "summary", "line", "group", "ties"):
         assert key in one, key
+
+
+def test_the_forge_page_renders_the_picker():
+    """The API served backgrounds for a while before anything drew them, which is a
+    feature only reachable by curl. Checked in the template rather than by driving a
+    browser, the way `test_creation.py` checks the forge's other wiring."""
+    from pathlib import Path
+
+    from django.conf import settings
+
+    page = Path(settings.BASE_DIR, "play", "templates", "play", "home.html").read_text(
+        encoding="utf-8")
+    assert "data-crbackground" in page, "nothing in the forge picks a background"
+    assert "background_groups" in page, "the groups are not drawn, so it is one long wall"
+    # The empty-valued button is how "no background" is chosen, and the handler must
+    # read it with `hasAttribute` rather than truthiness or it can never be clicked.
+    assert 'data-crbackground=""' in page
+    assert "bg.dataset.crbackground" in page
+    assert "background: \"\"," in page, "the form has no background field to fill"
