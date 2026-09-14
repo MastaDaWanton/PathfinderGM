@@ -1550,7 +1550,11 @@ class Engine:
                 "refs", index,
             )
         to = intent.params.get("to")
-        if to and not self._known(to, extra):
+        # `journey` is the one op whose `to` names a place rather than a body — a
+        # settlement the world wrote a road to. `_op_journey` resolves it against that
+        # road list and refuses an unknown one by naming the ones that exist, which is
+        # the same courtesy `travel` extends to a place.
+        if to and intent.op != "journey" and not self._known(to, extra):
             raise IntentError(
                 f"{intent.op}: unknown ref {to!r} in params.to", "refs", index
             )
@@ -3528,6 +3532,162 @@ class Engine:
         for a in self.scene.people.values():
             if not a.at:
                 a.at = target.id
+
+    def _march(self, pc, hours: int, biome: str) -> tuple[bool, str]:
+        """Walk a journey, eight hours a day with a camp between, and say what it cost.
+
+        The first version of this spent the whole journey in one `pass_hours` call, and
+        it was wrong in a way that only showed up when it was driven: a five-day road is
+        forty hours, and forty hours *continuously* is a man marching without sleep. Both
+        a four-hit-point traveller and a sixty-hit-point one collapsed at exactly the same
+        hour, because what stopped them was the twenty-four-hour wakefulness grace and not
+        anything about their bodies. A journey is not a forced march; it is days.
+
+        So each day is `HOURS_PER_DAY` of walking, charged to the body, then a camp. The
+        camp feeds, waters and sleeps the traveller — which is what this game models
+        provisioning as everywhere else, since `_op_eat` resets the hunger clock and
+        consumes nothing. Being stricter on the road than in a tavern would be a rule this
+        one op invented for itself.
+
+        Returns whether the far end was reached, and the tell for what the road took.
+        """
+        from . import journey as journey_mod
+
+        if pc is None or not hours:
+            if hours:
+                self.scene.advance(hours * survival.MINUTES_PER_HOUR)
+            return True, ""
+
+        day = journey_mod.HOURS_PER_DAY
+        told: list[str] = []
+        left_to_walk = hours
+        while left_to_walk > 0:
+            today = min(day, left_to_walk)
+            toll = survival.pass_hours(pc, today, self.dice, biome=biome)
+            walked = max(1, toll.hours)
+            self.scene.advance(walked * survival.MINUTES_PER_HOUR, charge_body=False)
+            if toll.checks:
+                told.append(survival_note(toll))
+            if walked < today:
+                # The body gave out with road still to go. They do not arrive — a journey
+                # that ran out of traveller did not happen, and arriving anyway is what
+                # makes the clock decorative on exactly the trip that should test it.
+                return False, "; ".join(told)
+            left_to_walk -= today
+            if left_to_walk > 0:
+                # Camp. The rest of the day passes and the traveller takes it.
+                survival.eat(pc)
+                survival.drink(pc)
+                survival.sleep(pc)
+                self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
+                                   charge_body=False)
+        return True, "; ".join(told)
+
+    def _op_journey(self, intent: Intent, partial: dict) -> Outcome:
+        """Leave the town, for another one, and pay the road for it.
+
+        The op `Scene.location_id` waited for. It was written once at campaign creation
+        and never again, so a world shipping twelve settlements could be played in one —
+        `travel` moves the ground underfoot *inside* a settlement and has no way out.
+
+        Everything about the arithmetic lives in `rules/journey.py`; everything about the
+        consequences is here, and it is the same shape as `_op_venture`: roll the body's
+        checks for the hours, then move the world's clock by what they actually cost.
+        Travel that costs nothing is why a three-day march used to be free on a clock
+        that meters thirst in hours.
+        """
+        from . import journey as journey_mod, places as places_mod
+
+        pc = self.scene.pc()
+        want = " ".join(str(intent.params.get("to") or "").split())
+        legs = journey_mod.legs_from(self.world, self.scene.location_id)
+        if not legs:
+            return self._refuse(
+                intent, "There is no road out of here that this world has written down.")
+        leg = journey_mod.find(legs, want)
+        if leg is None:
+            return self._refuse(
+                intent, f"There is no road from here to {want or 'there'}. From here you "
+                        f"can reach {', '.join(x.to_name for x in legs)}.")
+
+        # The warrant reads the road, exactly as it reads the gate. Leaving town by the
+        # highway is the most public way out there is, and `_op_travel` already refuses
+        # the open road to somebody who is wanted — this is that rule, one scale up.
+        if pc is not None:
+            law = states.standing_with_the_law(
+                pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
+            if law == "wanted" and not pc.has_state("knows.way-past-gate"):
+                found = self.world.get(self.scene.location_id) if self.world else None
+                return self._refuse(
+                    intent,
+                    f"{pc.name} is wanted in {getattr(found, 'name', 'this town')}, and "
+                    f"the road out is watched: they would be taken before the first "
+                    f"milestone. Clear your name, or find another way past the watch.")
+
+        speed = pc.speed_feet if pc is not None else 30
+        hours, measured, how = journey_mod.hours_for(leg, speed)
+
+        # The fight does not come with you, and neither does anybody who is not.
+        fight_ended = bool(self.scene.initiative)
+        if fight_ended:
+            self.scene.end_encounter()
+        escorts = [str(w) for w in (intent.params.get("with") or [])
+                   if str(w) in self.scene.actors]
+        keeping = {pc.ref if pc is not None else "", *escorts}
+        left = [a.name for ref, a in list(self.scene.actors.items())
+                if ref not in keeping and not a.is_pc]
+        for ref in list(self.scene.actors):
+            if ref not in keeping and not self.scene.actors[ref].is_pc:
+                self.scene.depart(ref)
+
+        # The road, charged to the body first and the world's clock second — the order
+        # `_op_venture` uses, because `pass_hours` can stop early and only it knows how
+        # many hours were actually survived.
+        toll_note = ""
+        arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
+        if walked:
+            toll_note = f" The road cost them: {walked}"
+
+        if arrived:
+            self.scene.location_id = leg.to_id
+        self.place_party()
+
+        if not arrived:
+            bits = [f"The road to {leg.to_name} was longer than {pc.name if pc else 'the party'} "
+                    f"could walk: they turned back before it was done."]
+            if toll_note:
+                bits.append(toll_note.strip())
+            return Outcome(
+                intent_id=intent.id, op="journey", status="prevented",
+                effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
+                          "hours": hours, "arrived": False, "how": how, "left": left}],
+                tell=" ".join(bits),
+                because=intent.because,
+            )
+
+        bits = [f"{journey_mod.describe(leg, hours).capitalize()}, and {leg.to_name} "
+                f"is ahead of you."]
+        if how == "derived":
+            # Never a mileage the world did not state. The tell says how long it took,
+            # which is true, and not how far it was, which nobody wrote down.
+            bits.append("How far it is, nobody has written down.")
+        if fight_ended:
+            bits.append("The fight is left behind.")
+        if left:
+            bits.append(f"Left behind: {', '.join(left)}.")
+        if toll_note:
+            bits.append(toll_note.strip())
+        note = str(intent.params.get("note") or "").strip()
+        if note:
+            bits.append(note)
+        return Outcome(
+            intent_id=intent.id, op="journey",
+            effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
+                      "hours": hours, "measured": measured, "how": how,
+                      "left": left, "fight_ended": fight_ended}],
+            tell=" ".join(bits),
+            because=intent.because,
+        )
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.

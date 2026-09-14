@@ -617,16 +617,93 @@ end in two different worlds.
 
 ---
 
+## 6. `play.travel[].miles` — how far apart two settlements are
+
+**The one ask that adds a number to the `play` layer, and the reasoning for the exception
+is below. Small, entirely optional, and the app already works without it.**
+
+### Why
+
+Pathfinder GM can now leave a town. Until 2026-09-14 it could not: `Scene.location_id` was
+written once when a campaign began and never again, so a world shipping twelve settlements
+was played in exactly one of them. There is a `journey` op now, and it charges the road to
+the clock — days pass, the body gets thirsty, effects expire, the world moves on.
+
+What it cannot do is know how long the road is. A route in the export carries `carrying`
+and `friction`, both prose. So the app answers in one of two ways:
+
+- **exact** — the world said how many miles, and Pathfinder 1e's overland table does the
+  arithmetic against the traveller's speed and the ground;
+- **derived** — it did not, and the time comes from how far apart the two settlements sit
+  in the world's own containment tree. That answer is reported to the player in **days on
+  the road and never in miles**, because a mileage nobody wrote down would be this app
+  inventing a fact about your world.
+
+Derived is perfectly playable. Exact is better, and it is three optional fields.
+
+### Shape
+
+Additive to the entries already in `play.travel[]`:
+
+| Field | Meaning |
+|---|---|
+| `miles` | integer, the length of the road. Crow-flight or road, whichever you mean — say which once, in the contract, not per record |
+| `road` | one of `highway`, `road`, `trail`, `none`. This is the column Pathfinder's overland table needs and neither program has |
+| `crosses[]` | the terrain the route passes through, in your own words — `forest`, `hills`, `swamp`. The consumer maps them to its own and says so when it cannot |
+
+```json
+{"from_id": "58b90a214ada", "to_id": "5bbd0c40345f",
+ "from": "Zhilgoroth", "to": "Pangrella",
+ "carrying": "Resonant crystal; high-quality winged livestock",
+ "friction": "...",
+ "miles": 90, "road": "road", "crosses": ["hills", "forest"]}
+```
+
+### Why this is allowed to be a number, when rule 1 says not to write numbers
+
+Rule 1 in "What not to do" forbids numbers in the `play` layer, and every example it gives
+is a **rules** quantity — sizes as modifiers, speeds in feet, clocks in rounds, prices,
+DCs, rarity as a percentage. A distance between two towns is not one of those. It is the
+same kind of fact as a settlement's `scale` or its terrain: true regardless of which game
+reads it, and expressible without a word of Pathfinder vocabulary.
+
+Rule 2 is untouched. Every conversion — miles to hours, terrain to a multiplier, an extra
+hour of marching to a Constitution check — happens on Pathfinder GM's side of the file.
+**Do not ship hours or days.** Those depend on who is walking, which is the consumer's
+business and not yours.
+
+### What not to do
+
+- **Do not add coordinates.** `agent_engine/world_map.py` is a containment diagram — ring
+  radius encodes depth in the tree, and the module says so itself: "a claim about
+  structure, not about latitude". Exporting those x/y as geography would produce confident,
+  precise, wrong distances, and nothing downstream would look wrong.
+- **Do not guess a length.** An absent `miles` is handled honestly. A made-up one is not
+  recoverable, because the consumer cannot tell it from a real one.
+- **Do not weight the edges inside a town.** The town map's "adjacency only, and the save
+  refuses a distance" rule stays exactly as it is. Which room you are in is a discrete
+  fact; how far the market is from the gate in feet is not a number the world file needs.
+
+### Done when
+
+An export carries `miles` on at least one route, Pathfinder GM reports that journey as
+`exact`, and the tell names the distance instead of only the days.
+
+---
+
 # Known gaps — not asks yet, but on the list
 
 These are documented in `docs/from-world-bible.md` and Pathfinder GM codes defensively
 around them. None is urgent. All would be welcome.
 
 - **No maps, coordinates or distances.** Places relate by containment and trade, not
-  geometry. Travel time is invented by the consumer, and encounter maps are generated
-  rather than imported. This is a real architectural decision on our side, not a
-  complaint — but if geometry ever appears, say so before shipping it, because "distance
-  exists now" changes how travel and encounters work.
+  geometry. Encounter maps are generated rather than imported, and that stays true — a
+  place's floor plan is derived from its own durable id, so the same room is the same room
+  in every session without a byte of it crossing the file.
+  **Travel time is no longer invented in the dark**: ask 6 above asks for `miles` on the
+  routes you already write, and until it arrives a journey is timed from the containment
+  tree and reported in days rather than miles. If full geometry ever appears, say so before
+  shipping it — "distance exists now" changes how travel and encounters work.
 - **`entity_id` can be `null`** on a chronology figure or a trade-route endpoint: named,
   never written up. Collected in `unwritten`, which Pathfinder GM turns into secret cards
   — so this gap is currently *useful*, and closing it entirely would remove a source of

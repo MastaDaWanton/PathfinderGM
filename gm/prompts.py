@@ -641,6 +641,12 @@ is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
 market"}}. The engine makes the ground (the same ground next time), charges the hours
 the way there costs, moves the party in, and decides whether anything lives there —
 never invent a destination and never travel to a place the list above does not name.
+Leaving the town ALTOGETHER, for another settlement, is a different thing from travel and
+takes days: {"op": "journey", "actor": "pc", "params": {"to": "Zhilgoroth"}}. Only
+settlements the world has a road to can be named, the engine works out how long the road
+takes and charges the days to the clock and the body, and anybody not named in "with" is
+left behind. Say that they set out; do not say how far it is or how long it took — the
+engine answers both.
 When somebody gives the party a task and the player takes it on, it is a quest:
 {"op": "quest", "params": {"title": "Find the missing salt", "objectives": ["Ask the
 harbourmaster where the salt went", "Bring word back to Marra"], "giver": "c2",
@@ -764,6 +770,20 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                          f"{', '.join(p.name for p in known)}. To move between them use "
                          f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
                          f"Anything else is refused.")
+        # And the roads out. Named for the same reason the places are: a model told only
+        # about the room it is in reconstructs the rest of the world from earlier beats,
+        # and "we set out for Zhilgoroth" is refused if Zhilgoroth has no road. The
+        # engine is the one that says how long it takes; this only says where is
+        # reachable at all.
+        if world is not None:
+            from rules import journey as _journey
+
+            out = _journey.legs_from(world, getattr(location, "id", "") or "")
+            if out:
+                lines.append(
+                    f"  ROADS OUT OF {location.name.upper()} (the only settlements that "
+                    f"can be reached, and only by journey, which takes days): "
+                    f"{', '.join(leg.to_name for leg in out)}.")
         for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
                     "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
             if location.fact(key):

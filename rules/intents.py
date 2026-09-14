@@ -286,6 +286,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # is the scene transition. Before it shed anybody, a gatekeeper wounded in the city
     # followed the player to the forest and took an NPC turn forever.
     "travel": ((), ("biome", "place", "note", "with"), "hidden"),
+    # Leaving the town altogether, which `travel` has never been able to do: it moves the
+    # ground underfoot inside one settlement, and `Scene.location_id` was written once at
+    # campaign creation and never again. A separate op rather than another `travel` param
+    # because they are different scales doing different work — one costs a move, the
+    # other costs days — and because a model that says "we set out for Zhilgoroth" should
+    # not be able to reach it by naming a biome.
+    "journey": (("to",), ("note", "with", "pace"), "hidden"),
     # Doors two and three of rules/places.py. `found`: the player makes a place from
     # where they stand — a base at a friend's house, the alley behind the market —
     # with an owner the engine knows; the engine mints the id, the narrator never

@@ -41,8 +41,8 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 4 | The floor under the fight — height per square, and a plan derived from the place id | **done** |
 | 5 | Storeys as places, joined by stairs | **done** |
 | 5b | Height-aware cover, and interiors that are open between floors | **done** |
-| 6 | Lengths on the trade edges; a journey costs time | next |
-| 7 | The map view — level selector, then an axonometric toggle | |
+| 6 | Lengths on the trade edges; a journey costs time | **done** |
+| 7 | The geometry payload, and the map view — level selector first | next |
 
 Stage 2 settled one thing the rules do not: **there is no vertical distance rule in PF1e**,
 so `grid.distance` now carries a house rule in its docstring — a step is diagonal if it
