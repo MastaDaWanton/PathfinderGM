@@ -5606,6 +5606,41 @@ class Engine:
             because=intent.because,
         )
 
+    def _clear_square(self, wanted: tuple[int, int], size: str = "medium") -> tuple[int, int]:
+        """`wanted`, or the nearest square that is not a wall and not somebody else.
+
+        Needed the moment places gained a shape: the battlefield is laid out by zone and
+        row, and those rows were computed against an empty field. Against a market with
+        stalls in it, the arithmetic will cheerfully stand a guard inside one — and a
+        creature in a blocked square cannot be routed to, cannot be left, and is a bug
+        that looks like a rules problem.
+
+        Spirals outward, so the answer stays as close to the intended spot as the ground
+        allows and a line of people laid along a row stays a line.
+        """
+        from .grid import footprint
+
+        grid = self.scene.grid
+        if grid is None:
+            return wanted
+        taken = self.scene.occupied()
+
+        def free(p) -> bool:
+            return all(grid.passable(q) and q not in taken
+                       for q in footprint(p, size))
+
+        if free(wanted):
+            return wanted
+        for ring in range(1, max(grid.width, grid.height)):
+            for dx in range(-ring, ring + 1):
+                for dy in range(-ring, ring + 1):
+                    if max(abs(dx), abs(dy)) != ring:
+                        continue
+                    p = (wanted[0] + dx, wanted[1] + dy)
+                    if grid.inside(p) and free(p):
+                        return p
+        return wanted
+
     def _cannot_leave_the_ground(self, actor, start, end) -> str:
         """Why this creature may not move to that level, or "".
 
@@ -5624,6 +5659,11 @@ class Engine:
             return ""
         if level < 0:
             return f"{actor.name} cannot go below the floor."
+        grid = self.scene.grid
+        roof = grid.headroom(end) if grid is not None else None
+        if roof is not None and level > roof:
+            return (f"There is not that much air above {actor.name}: the ceiling is "
+                    f"in the way.")
         how = actor.can_move_vertically()
         if how:
             return ""
@@ -5855,9 +5895,14 @@ class Engine:
         `begin_encounter`, and the swing that auto-starts one."""
         if self.scene.grid is not None:
             return
-        from .grid import Grid
+        from . import floorplan, places as places_mod
 
-        self.scene.grid = Grid()
+        # The ground the party is standing on, not a blank field. Derived from the place
+        # id, so the market has the same stalls every time anybody fights in it and none
+        # of it is saved. A place nobody has a shape for falls through to its terrain and
+        # then to open ground, which is what every fight used to get.
+        self.scene.grid = floorplan.for_place(
+            self.scene.at, places_mod.terrain_of(self.scene.at))
         mid = self.scene.grid.height // 2
         pc_side, foe_row = 4, 0
         for side, refs in sides.items():
@@ -5880,7 +5925,8 @@ class Engine:
                 if pc_side + away >= self.scene.grid.width:
                     self.scene.grid.width = pc_side + away + 2
                 if has_pc:
-                    self.scene.positions[ref] = (pc_side, mid + i)
+                    self.scene.positions[ref] = self._clear_square(
+                        (pc_side, mid + i), self.scene.actors[ref].size)
                 else:
                     # Fanned out from the middle row rather than stacked downward:
                     # five people at one distance were laid as a column of five,
@@ -5891,9 +5937,10 @@ class Engine:
                     # the player's, so a crowd is a crowd and not a wall.
                     fan = (0, 1, -1, 2, -2, 3, -3, 4, -4)
                     row = mid + fan[foe_row % len(fan)] + (foe_row // len(fan))
-                    self.scene.positions[ref] = (
-                        min(self.scene.grid.width - 1, pc_side + away),
-                        max(0, min(self.scene.grid.height - 1, row)))
+                    self.scene.positions[ref] = self._clear_square(
+                        (min(self.scene.grid.width - 1, pc_side + away),
+                         max(0, min(self.scene.grid.height - 1, row))),
+                        self.scene.actors[ref].size)
                     foe_row += 1
         # The bystanders — in the room, in no side — go on the board too, at their
         # own zones, so the map shows the room the prose described and not only the

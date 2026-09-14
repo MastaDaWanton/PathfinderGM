@@ -38,8 +38,8 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 2 | A creature is a box — vertical extent on `SPACE_AND_REACH`, `volume()`, 3D distance | **done** |
 | 3 | Elevation on actors; the engine reads movement modes; **the stage-1 caveats come off** | **done** |
 | 3b | The situational-modifier pipeline — flanking, higher ground, cover | **done** |
-| 4 | The floor under the fight — height per square, and a plan derived from the place id | next |
-| 5 | Storeys as places, joined by stairs | |
+| 4 | The floor under the fight — height per square, and a plan derived from the place id | **done** |
+| 5 | Storeys as places, joined by stairs | next |
 | 6 | Lengths on the trade edges; a journey costs time | |
 | 7 | The map view — level selector, then an axonometric toggle | |
 
@@ -69,6 +69,15 @@ all three depend on where *both* creatures are and the sheet knows only its own 
 Still outstanding from stage 3's list: the Fly skill's DCs, and a climber's loss of Dex to
 AC — the second of which has no reachable state yet, because a creature without a climb
 speed is refused the wall in the first place. Climb checks are what would create it.
+
+Stage 4 gave a place a shape — `rules/floorplan.py`, keyed off the spot where the spot is
+one this app generates and off the terrain otherwise, and derived from the place id so the
+market has the same stalls for ever without a byte in the save. It found three things: the
+battlefield layout stood people inside the new walls, because its arithmetic was written
+against an empty field; the save carried neither the heightmap nor the ceiling, so a
+campaign put down mid-fight came back with a flier's air unlimited; and the generator's own
+scatter was a stripe, because it drew from the **low** bits of a linear congruential
+sequence and those cycle with a period of eight.
 
 Stage 1 is deliberately the smallest thing that stops the game claiming something untrue,
 and it is independent of every stage after it. The guard that holds it —

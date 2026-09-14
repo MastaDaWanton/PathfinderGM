@@ -244,12 +244,41 @@ class Grid:
     blocked: set[Point] = field(default_factory=set)
     # Blocks sight without blocking movement — smoke, fog, a blood mist.
     obscuring: set[Point] = field(default_factory=set)
+    # How high the floor stands in a square, in levels, where it is not zero. A dais, a
+    # cart bed, a wall-walk, the slope of a hill. Sparse for the same reason the terrain
+    # sets are: a battlefield is mostly flat as well as mostly ordinary, and the squares
+    # worth naming are few.
+    #
+    # This is the heightmap and not a voxel field, which is the shape Final Fantasy Tactics
+    # settled on for the same job: one number per square buys rooftops, daises and "you
+    # cannot get up there", and it cannot express an overhang — nothing is ever *under* a
+    # walkable square in the same column. Storeys are places joined by stairs instead,
+    # which is where the place graph already was.
+    floor: dict[Point, int] = field(default_factory=dict)
+    # Levels of headroom above the floor, or None for open sky. A cellar at 2 is ten feet
+    # of air: something can stand, and a flier can get one square up and no further.
+    ceiling: int | None = None
 
     def inside(self, p: Point) -> bool:
         return 0 <= p[0] < self.width and 0 <= p[1] < self.height
 
     def passable(self, p: Point) -> bool:
         return self.inside(p) and p not in self.blocked
+
+    def ground(self, p: Point) -> int:
+        """The level the floor stands at in this square. Zero unless it says otherwise."""
+        return int(self.floor.get(tuple(p[:2]), 0))
+
+    def headroom(self, p: Point) -> int | None:
+        """The highest level a body may occupy over this square, or None under open sky.
+
+        Measured from the square's own floor, so a dais in a cellar has less air above it
+        than the flagstones beside it — which is the whole reason the two are separate
+        numbers rather than one.
+        """
+        if self.ceiling is None:
+            return None
+        return self.ground(p) + self.ceiling - 1
 
     def enter_cost(self, p: Point) -> int:
         """Feet to enter this square, before diagonals are accounted for."""
