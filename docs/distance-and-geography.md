@@ -39,7 +39,8 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 3 | Elevation on actors; the engine reads movement modes; **the stage-1 caveats come off** | **done** |
 | 3b | The situational-modifier pipeline — flanking, higher ground, cover | **done** |
 | 4 | The floor under the fight — height per square, and a plan derived from the place id | **done** |
-| 5 | Storeys as places, joined by stairs | next |
+| 5 | Storeys as places, joined by stairs | **done** |
+| 5b | Height-aware cover, and interiors that are open between floors | next |
 | 6 | Lengths on the trade edges; a journey costs time | |
 | 7 | The map view — level selector, then an axonometric toggle | |
 

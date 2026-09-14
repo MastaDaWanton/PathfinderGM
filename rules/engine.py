@@ -3569,6 +3569,9 @@ class Engine:
             if going_to.described_only:
                 return self._refuse(
                     intent, f"{going_to.name} can be seen from here but not reached.")
+            stair = self._not_by_the_stairs(here, going_to)
+            if stair:
+                return self._refuse(intent, stair)
         elif biome == here.terrain:
             # The ground already underfoot. This used to compare the stored biome and
             # do nothing; without the field the same answer has to be said, or a party
@@ -5605,6 +5608,39 @@ class Engine:
             tell=f"{actor.name} moves from {was} to {zone}.",
             because=intent.because,
         )
+
+    def _not_by_the_stairs(self, here, going_to) -> str:
+        """Why this floor cannot be reached from where the party is standing, or "".
+
+        The place graph inside a settlement is deliberately a clique — "a settlement is
+        not a maze, and a graph the player has to solve is a different game from the one
+        this is" — and `_op_travel` has always resolved a destination by *name* among the
+        places within reach rather than by walking exits. That was harmless while every
+        exit list held everything.
+
+        Storeys broke it. Measured the day they landed: standing in the market, the party
+        could name "the top floor of the temple" and simply be there, having passed
+        through neither the temple nor its stairs. So floors — and only floors — are
+        checked against the exits that carry them, which is what the exit list was for.
+
+        Ground level is left exactly as it was. The clique is a decision, not an
+        oversight, and a stair is the one edge in this graph that means something.
+        """
+        from . import places as places_mod
+
+        there = places_mod.storey_of(going_to.id)
+        mine = places_mod.storey_of(here.id)
+        if there == mine and places_mod.base_of(going_to.id) == places_mod.base_of(here.id):
+            return ""
+        if there == 0 and mine == 0:
+            return ""                      # the town's own ground floor: as it always was
+        if going_to.id in places_mod.stairs_from(here.id, here.terrain):
+            return ""
+        # One floor of a building, named from somewhere that is not the floor below it.
+        building = places_mod.base_of(going_to.id)
+        door = next((p.name for p in self.places() if p.id == building), "the way in")
+        return (f"{going_to.name} is not reached from here: the stairs to it are inside "
+                f"{door}.")
 
     def _clear_square(self, wanted: tuple[int, int], size: str = "medium") -> tuple[int, int]:
         """`wanted`, or the nearest square that is not a wall and not somebody else.

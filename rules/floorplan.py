@@ -12,10 +12,12 @@ restart"; the same trick one level down gives the same room the same pillars in 
 session, on every machine, for ever, without a byte in the save. That is the arrangement
 the spot list has always used, and it is why this can be a pure function.
 
-**A place is one room, not a building.** The house is the place graph — `places.mint`
-already makes a cellar a child place of the house above it — so nothing here generates
-corridors or storeys. It answers one question: what is underfoot, and what is in the way,
-where the party is standing right now.
+**A place is one room, not a building.** The house is the place graph — `places.mint` has
+always made a cellar a child place of the house above it, and `places.storeys` puts floors
+over it the same way — so nothing here generates corridors or a building's plan. It answers
+one question: what is underfoot, and what is in the way, where the party is standing. A
+storey is read as a floor OF the building it belongs to, which is how an upstairs room keeps
+the roof it obviously has.
 
 What a plan may contain is deliberately small, and every part of it is something the engine
 already knows how to read:
@@ -42,6 +44,11 @@ import hashlib
 from dataclasses import dataclass, field
 
 from .grid import Grid, Point
+
+# The separator `rules/places.py` puts a storey behind. Imported as a constant
+# rather than importing the module, because `places` asks `floorplan` whether a
+# place is indoors and the two would import each other.
+STOREY = "^"
 
 
 @dataclass(frozen=True)
@@ -168,11 +175,52 @@ class _Rolls:
 
 
 def shape_for(place_id: str, terrain: str = "") -> Shape:
-    """Which shape this place takes: its own spot first, then its ground, then open."""
-    spot = str(place_id or "").rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
-    if spot in BY_SPOT:
-        return BY_SPOT[spot]
-    return BY_TERRAIN.get(str(terrain or "").strip().lower(), OPEN)
+    """Which shape this place takes: its own spot first, then its ground, then open.
+
+    A storey is read as the building it is a floor of. Without that, `the-tavern^1` matches
+    no spot, falls through to `urban`, and an upstairs room comes out **with no roof on it**
+    — which would let a flier leave through a bedroom ceiling and is the sort of wrong that
+    only shows up when somebody tries it.
+    """
+    bare = str(place_id or "").rsplit(STOREY, 1)[0]
+    spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
+    found = BY_SPOT.get(spot) or BY_TERRAIN.get(
+        str(terrain or "").strip().lower(), OPEN)
+    level = _storey(place_id)
+    if not level or found.ceiling is None:
+        return found
+    return _upstairs(found, level)
+
+
+def _storey(place_id: str) -> int:
+    tail = str(place_id or "").rsplit(STOREY, 1)
+    if len(tail) < 2:
+        return 0
+    try:
+        return int(tail[1])
+    except ValueError:
+        return 0
+
+
+def _upstairs(ground: Shape, level: int) -> Shape:
+    """A floor of the same building: the same footprint, divided up more.
+
+    Upper rooms are smaller and more partitioned than the hall you walk into, and an
+    undercroft is smaller still and worse going. Derived from the ground floor's own shape
+    rather than authored per building, so a change to the tavern reaches its bedrooms.
+    """
+    if level < 0:
+        return Shape(max(6, ground.width - 4), max(6, ground.height - 4), LOW,
+                     clumps=ground.clumps, clump_max=2,
+                     rough=max(4, ground.rough + 4),
+                     about="low, and stacked with what nobody wants upstairs")
+    if level >= 2:
+        return Shape(max(6, ground.width - 4), max(6, ground.height - 4), LOW,
+                     clumps=ground.clumps + 1, clump_max=2, rough=ground.rough,
+                     about="under the beams, and low enough to mind your head")
+    return Shape(max(6, ground.width - 2), max(6, ground.height - 2), LOW,
+                 clumps=ground.clumps + 3, clump_max=2, rough=ground.rough,
+                 about="partitioned, and lower than the room below")
 
 
 def for_place(place_id: str, terrain: str = "") -> Grid:
