@@ -428,8 +428,97 @@ def derive(entry: dict) -> dict:
     if d["budget"].get("ranks") and not any("skill rank" in s for s in shown):
         shown.append("+1 skill rank per level")
     d["trait_lines"] = shown
-    d["unpriced"] = [t for t in d["tags"] if t not in TAG_RP and not t.startswith("race.")]
+    # Split by how the price was arrived at, not merely by whether the table had a row.
+    # `unpriced` used to mean "not one of twenty-one strings", which lumped a flight
+    # speed the table can scale perfectly well in with a family nobody has ever costed.
+    d["unpriced"] = [t for t in d["tags"]
+                     if not t.startswith("race.") and price_tag(t)[2] == "unknown"]
+    d["derived_prices"] = [f"{t} ({price_tag(t)[0]} RP, scaled)" for t in d["tags"]
+                           if price_tag(t)[2] == "derived"]
     return d
+
+
+# --- pricing a tag the table has never seen ---------------------------------------------
+#
+# `TAG_RP` is twenty-one exact strings, and the magnitude is baked into the key:
+# `move.fly.30` is priced and `move.fly.40` is not, `sense.darkvision.60` and `.120` are
+# priced and `.90` is not, `natural.armor.1` is priced and `.2` is not. Every miss fell
+# through `TAG_RP.get(t, (0, ""))[0]` and cost **nothing**, so a world that described a
+# people as flying forty feet got flight for free and the forge said the race was cheaper
+# than it is.
+#
+# That matters more than a normal rounding error because of where the tags come from.
+# Two readers of the same tag already disagreed about how robust they were: `speeds()`
+# and `senses()` pull the number out with a regex and handle any value at all, while the
+# price list handles twenty-one. World Bible writes worlds this app has never seen, and
+# `docs/for-world-bible.md` invites it to describe a people in its own words — so the
+# half that generalises is the half that was right.
+#
+# These derive from the shipped anchors rather than from the book directly: the Advanced
+# Race Guide prices the *rows it has*, and it does not have a row for every speed. Where
+# a value sits on an anchor the answer is the anchor's, unchanged. Where it sits between
+# or beyond them it is scaled from the nearest, and the result is marked `derived` so the
+# forge can say so rather than present a guess as a price.
+_PER_TEN_FEET = {
+    # rp per ten feet beyond the anchor, from the ARG's own step for that mode
+    "fly": 1, "burrow": 1, "climb": 1, "swim": 1,
+}
+_MOVE_ANCHOR = {"fly": (30, 4), "climb": (20, 2), "swim": (30, 2), "burrow": (20, 3)}
+_SENSE_ANCHOR = {
+    # feet -> rp, in order; a value between two takes the lower one's price plus the step
+    "darkvision": ((60, 2), (120, 3)),
+    "blindsense": ((30, 4),),
+    "blindsight": ((30, 6),),
+    "tremorsense": ((30, 4),),
+}
+
+
+def price_tag(tag: str) -> tuple[int, str, str]:
+    """What a tag costs, what it reads as, and how sure we are: exact, derived, unknown.
+
+    The third field is the point. An unknown tag used to be indistinguishable from a free
+    one, and the only trace was a list nothing acted on.
+    """
+    tag = str(tag or "").strip().lower()
+    if tag in TAG_RP:
+        cost, words = TAG_RP[tag]
+        return cost, words, "exact"
+
+    m = re.match(r"^move\.(fly|climb|swim|burrow)\.(\d+)$", tag)
+    if m:
+        mode, feet = m.group(1), int(m.group(2))
+        base_ft, base_rp = _MOVE_ANCHOR[mode]
+        step = _PER_TEN_FEET[mode] * ((feet - base_ft) // 10)
+        return max(1, base_rp + step), f"{mode} {feet} ft", "derived"
+
+    m = re.match(r"^sense\.([a-z-]+)\.(\d+)$", tag)
+    if m and m.group(1) in _SENSE_ANCHOR:
+        kind, feet = m.group(1), int(m.group(2))
+        anchors = _SENSE_ANCHOR[kind]
+        best = anchors[0]
+        for ft, cost in anchors:
+            if feet >= ft:
+                best = (ft, cost)
+        extra = 1 if feet > best[0] else 0
+        return best[1] + extra, f"{kind} {feet} ft", "derived"
+
+    m = re.match(r"^natural\.armor\.(\d+)$", tag)
+    if m:
+        n = int(m.group(1))
+        # ARG: +1 natural armour is 2 RP and each further point is 1.
+        return 2 + max(0, n - 1), f"+{n} natural armour", "derived"
+
+    m = re.match(r"^resist\.([a-z-]+)\.(\d+)$", tag)
+    if m:
+        return 1 + int(m.group(2)) // 5, f"resist {m.group(1)} {m.group(2)}", "derived"
+
+    if tag.startswith("immune."):
+        return 2, "immune to " + tag.split(".", 1)[1].replace(".", " "), "derived"
+
+    # A family nobody has priced. Zero, as before — but said out loud, because the forge
+    # showing a total that quietly excludes a trait is worse than one that says it cannot
+    # price it.
+    return 0, "", "unknown"
 
 
 def rp(doc: dict) -> int:
@@ -443,7 +532,7 @@ def rp(doc: dict) -> int:
     total += -1 if speed < 30 else (speed - 30) // 10
     total += _mods_rp(d["mods"], d["choose"])
     for t in d["tags"]:
-        total += TAG_RP.get(t, (0, ""))[0]
+        total += price_tag(t)[0]
     for k, v in d["budget"].items():
         total += BUDGET_RP[k] * max(0, int(v))
     for m in d["modifiers"]:
