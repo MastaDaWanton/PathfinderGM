@@ -1,0 +1,464 @@
+{
+  "_about": [
+    "Fourteen backgrounds in five groups. Each grants at most two points of skill in the",
+    "`background` bonus type - so two backgrounds cannot stack and a trait can still be",
+    "taken beside one - and each carries at least one *tie*, which is the point of the",
+    "whole thing: a slot filled from this world at creation, so the history names",
+    "somebody who exists.",
+    "",
+    "No background grants a combat number. 1e has no background system, and the moment",
+    "one gives an attack or a save bonus it is competing with feats, which are priced.",
+    "What these grant instead is standing: people who know you, places you can walk",
+    "into, and things you are assumed to know - every one of them a `knows.*` tag the",
+    "narrator's brief may state as true and a quest scheme can open on."
+  ],
+  "backgrounds": [
+    {
+      "id": "apprenticed",
+      "name": "Apprenticed",
+      "group": "trade",
+      "summary": "You were bound to a craft before you were bound to anything else.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "craft",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.apprenticed",
+        "knows.a-trade"
+      ],
+      "traits": [
+        "You can tell good work from work that was hurried.",
+        "Somebody taught you, and has opinions about how you turned out."
+      ],
+      "ties": [
+        {
+          "role": "trader",
+          "place": "market",
+          "says": "You were apprenticed to $who at $where, and left on terms you can live with."
+        }
+      ]
+    },
+    {
+      "id": "stallholder",
+      "name": "Stallholder",
+      "group": "trade",
+      "summary": "You have stood behind a table and sold things to people who did not want them.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "appraise",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "sense motive",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.stallholder",
+        "knows.the-going-rate"
+      ],
+      "traits": [
+        "You know what a thing is worth and what it can be got for, which are two numbers.",
+        "You have been cheated exactly once."
+      ],
+      "ties": [
+        {
+          "place": "market",
+          "says": "You kept a pitch at $where and the neighbours still nod."
+        }
+      ]
+    },
+    {
+      "id": "caravan-hand",
+      "name": "Caravan hand",
+      "group": "trade",
+      "summary": "You walked beside other people's goods for a living.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "survival",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "handle animal",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.caravan-hand",
+        "knows.the-road-out"
+      ],
+      "traits": [
+        "You know which roads are worth the tolls and which are worth the risk.",
+        "You have slept rough more nights than not."
+      ],
+      "ties": [
+        {
+          "place": "road",
+          "says": "You have come and gone by $where more times than you can count."
+        }
+      ]
+    },
+    {
+      "id": "gate-watch",
+      "name": "Gate watch",
+      "group": "law",
+      "summary": "You stood at a gate and decided who came in.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.gate-watch",
+        "role.guard",
+        "knows.how-the-watch-works"
+      ],
+      "traits": [
+        "You know what the watch will and will not do about a thing.",
+        "You have turned somebody away who should have been let in."
+      ],
+      "ties": [
+        {
+          "role": "guard officer",
+          "place": "gate",
+          "says": "You stood the watch at $where under $who, who remembers you."
+        }
+      ]
+    },
+    {
+      "id": "thief-taker",
+      "name": "Thief-taker",
+      "group": "law",
+      "summary": "You were paid per body, and the pay was never the point.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "sense motive",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.thief-taker",
+        "knows.who-to-ask"
+      ],
+      "traits": [
+        "You know how a person moves when they are about to run.",
+        "Somebody you brought in is out again."
+      ],
+      "ties": [
+        {
+          "role": "fixer",
+          "says": "$who used to pay you by the name, and has not stopped asking."
+        }
+      ]
+    },
+    {
+      "id": "exile",
+      "name": "Exile",
+      "group": "road",
+      "summary": "You are not from here and cannot go back to where you are from.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "stealth",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "bluff",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.exile",
+        "knows.how-to-be-new"
+      ],
+      "traits": [
+        "You have learned how to arrive somewhere and not be a problem.",
+        "There is a place you will not talk about."
+      ],
+      "ties": [
+        {
+          "place": "gate",
+          "says": "You came in by $where with what you could carry."
+        }
+      ],
+      "languages": [
+        "one more language"
+      ]
+    },
+    {
+      "id": "pilgrim",
+      "name": "Pilgrim",
+      "group": "road",
+      "summary": "You set out for a reason and have not finished with it.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "knowledge (religion)",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.pilgrim",
+        "knows.the-temple-here"
+      ],
+      "traits": [
+        "You are owed hospitality in places you have never been.",
+        "You can tell whether a shrine is tended or only swept."
+      ],
+      "ties": [
+        {
+          "place": "temple",
+          "role": "standing",
+          "says": "You were given a bed at $where by $who, and it was not charity."
+        }
+      ]
+    },
+    {
+      "id": "forager",
+      "name": "Forager",
+      "group": "road",
+      "summary": "You have fed yourself off ground nobody owns.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "survival",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.forager",
+        "knows.what-grows-here"
+      ],
+      "traits": [
+        "You know which of a thing is the part worth taking.",
+        "You have eaten something you should not have, once."
+      ],
+      "ties": [
+        {
+          "place": "wild",
+          "says": "You have worked the ground out past $where since you were small."
+        }
+      ]
+    },
+    {
+      "id": "household",
+      "name": "In service",
+      "group": "house",
+      "summary": "You worked in somebody else's house and heard everything said in it.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "diplomacy",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "perception",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.household",
+        "knows.who-owes-who"
+      ],
+      "traits": [
+        "You know how a household actually runs, which is never how it says it does.",
+        "You left, and it was not entirely your idea."
+      ],
+      "ties": [
+        {
+          "role": "standing",
+          "place": "lodging",
+          "says": "You were in the service of $who, and $where is where they put you."
+        }
+      ]
+    },
+    {
+      "id": "guild-clerk",
+      "name": "Guild clerk",
+      "group": "house",
+      "summary": "You kept somebody's books and know what was in them.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "appraise",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "linguistics",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.guild-clerk",
+        "knows.the-guild-here"
+      ],
+      "traits": [
+        "You can read a ledger for what it is not saying.",
+        "There is an entry you did not query and should have."
+      ],
+      "ties": [
+        {
+          "place": "guildhall",
+          "role": "fixer",
+          "says": "You wrote for $who at $where, and the hand is still recognisable."
+        }
+      ],
+      "languages": [
+        "one more language"
+      ]
+    },
+    {
+      "id": "innkeepers-child",
+      "name": "Innkeeper's child",
+      "group": "house",
+      "summary": "You grew up where everyone passing through had to stop.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "diplomacy",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "sense motive",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.innkeepers-child",
+        "knows.every-face-here"
+      ],
+      "traits": [
+        "You are good at names and better at knowing who not to seat together.",
+        "You have heard more than you have ever repeated."
+      ],
+      "ties": [
+        {
+          "place": "lodging",
+          "says": "You grew up at $where and the room still quietens when you come in."
+        }
+      ]
+    },
+    {
+      "id": "bonesetter",
+      "name": "Bonesetter",
+      "group": "body",
+      "summary": "People come to you broken and you do what can be done.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "heal",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.bonesetter",
+        "knows.who-is-ailing"
+      ],
+      "traits": [
+        "You know what a wound will do before it does it.",
+        "You have lost somebody you should have been able to keep."
+      ],
+      "ties": [
+        {
+          "role": "healer",
+          "says": "You learned it from $who, and were better at it than expected."
+        }
+      ]
+    },
+    {
+      "id": "pit-fighter",
+      "name": "Pit fighter",
+      "group": "body",
+      "summary": "You were paid to be hit in front of people.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "intimidate",
+          "amount": 2,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.pit-fighter",
+        "knows.who-takes-the-bets"
+      ],
+      "traits": [
+        "You know how a crowd turns and how long you have before it does.",
+        "Your name is known to people who have never met you."
+      ],
+      "ties": [
+        {
+          "place": "market",
+          "role": "fixer",
+          "says": "You fought where $who took the bets, near $where, and drew a crowd."
+        }
+      ]
+    },
+    {
+      "id": "ferryman",
+      "name": "Ferryman",
+      "group": "body",
+      "summary": "You moved people across something that would have killed them.",
+      "modifiers": [
+        {
+          "type": "skill_mod",
+          "target": "swim",
+          "amount": 1,
+          "bonus_type": "background"
+        },
+        {
+          "type": "skill_mod",
+          "target": "profession",
+          "amount": 1,
+          "bonus_type": "background"
+        }
+      ],
+      "tags": [
+        "background.ferryman",
+        "knows.the-crossing"
+      ],
+      "traits": [
+        "You know the water here and what it does in each season.",
+        "You have pulled somebody out, and not pulled somebody else out."
+      ],
+      "ties": [
+        {
+          "place": "wild",
+          "says": "You worked the crossing out past $where and know its moods."
+        }
+      ]
+    }
+  ]
+}

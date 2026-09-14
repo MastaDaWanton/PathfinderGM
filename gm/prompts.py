@@ -861,11 +861,19 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # never saw. A grant's `say` becomes the effect's name and lands here.
             noticed = actor.noticed()
             seen = (" What they have noticed: " + "; ".join(noticed) + ".") if noticed else ""
+            # Where they were before the first turn, with the world's own people and
+            # places in it. This is the half of a background that matters: the sheet's
+            # two skill points are arithmetic the engine handles, and these sentences
+            # are the part the narrator can use — somebody who already knows the
+            # character, a door they can walk through without explaining themselves.
+            # Stated as fact the narrator may rely on, like the body line above it.
+            past = getattr(actor, "background_ties", None) or []
+            history = (" Before this: " + " ".join(str(p) for p in past)) if past else ""
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
                 f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
-                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}{seen}"
+                f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}{history}{seen}"
             )
             # The jars, by id. `use_item` takes the id and nothing else in the brief
             # named one, so the model had no way to say it and wrote `heal 1d8+1`

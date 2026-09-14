@@ -699,6 +699,24 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     return c
 
 
+def _bind_background(c) -> None:
+    """Fill the PC's background ties from the world, once, at the start of a campaign.
+
+    Wrapped because a background that cannot bind must never stop a game beginning: the
+    people come from the world's own cast, and a settlement with nobody in it is a
+    perfectly ordinary thing for a world to contain.
+    """
+    from rules import backgrounds
+
+    pc = c.scene.pc()
+    if pc is None or not getattr(pc, "background", ""):
+        return
+    try:
+        pc.background_ties = [b["says"] for b in backgrounds.bind(c.engine(), pc)]
+    except Exception:
+        pc.background_ties = []
+
+
 def begin_with(character, world_source=None) -> Campaign:
     """Start a campaign for a new character.
 
@@ -734,6 +752,10 @@ def begin_with(character, world_source=None) -> Campaign:
     # anywhere wrote the choice down.
     entry.world_source = str(c.world_source or "")
     roster.save(entry)
+    # Before the opening is written, because the opening reads what this produces: a
+    # background is a set of slots until a world fills them, and the first paragraph is
+    # where "you were apprenticed to somebody" has to become a name.
+    _bind_background(c)
     _open_with(c, opening_text(c))
     c.save()
     _LIVE[entry.id] = c

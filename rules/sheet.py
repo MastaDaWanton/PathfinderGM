@@ -406,6 +406,12 @@ class Actor:
     world_entity_id: str | None = None
     world_people_id: str | None = None
     heritage: str = ""
+    # Where this character was before the first turn. The id alone; the
+    # modifiers, tags and ties are read live off the document.
+    background: str = ""
+    # The bound ties, as sentences, once the campaign has begun and the world has
+    # supplied the people and places the background only had slots for.
+    background_ties: list = field(default_factory=list)
     # Which branch of the class this character follows. A list because a class
     # may let you take more than one — Blood Bending declares four and the
     # player may follow one or several. Empty for every class that has none.
@@ -2411,6 +2417,35 @@ class Actor:
                                     _bonus_type(spec.get("bonus_type"))))
         return out
 
+    def _background_mods(self, kind: str, target: str) -> list["Modifier"]:
+        """Skill bonuses from the background document, read live.
+
+        Live rather than baked into `ranks` at creation for the reason the race's are:
+        a number written onto the sheet cannot be taken off again, and a background
+        edited on the bench would leave every character who has it carrying the old
+        one. `background` is its own bonus type, so two of them could never stack and a
+        campaign trait can still be taken beside it.
+        """
+        if not self.background or kind != "skill_mod":
+            return []
+        from . import backgrounds as backgrounds_mod
+
+        doc = backgrounds_mod.get(self.background)
+        if not doc:
+            return []
+        want = str(target).lower()
+        out: list[Modifier] = []
+        for spec in doc.get("modifiers") or ():
+            if not isinstance(spec, dict) or spec.get("type") != "skill_mod":
+                continue
+            if str(spec.get("target", "")).lower() != want:
+                continue
+            amount = int(spec.get("amount", 0) or 0)
+            if amount:
+                out.append(Modifier(amount, doc.get("name", self.background),
+                                    _bonus_type(spec.get("bonus_type"))))
+        return out
+
     def _roll_context(self, weapon_key: str | None = None, **extra) -> dict:
         """What a scoped or conditional feat term is evaluated against."""
         w = self.weapon(weapon_key)
@@ -2533,7 +2568,7 @@ class Actor:
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
         out += self._standing_mods(kind, target) + self._feat_mods(kind, target, ctx) \
-            + self._race_mods(kind, target, ctx)
+            + self._race_mods(kind, target, ctx) + self._background_mods(kind, target)
         # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
         # four shipped dodge feats had no reader for that clause, and nothing on the
         # sheet asked it of buffs either; one generic rule here, not one per feat.
@@ -3394,6 +3429,8 @@ def to_dict(actor: Actor) -> dict:
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "at": actor.at,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
+        "background": actor.background,
+        "background_ties": list(actor.background_ties or []),
         "gender": actor.gender,
         "paths": list(actor.paths),
         "flat_skills": actor.flat_skills, "flat_saves": actor.flat_saves,
@@ -3736,6 +3773,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         # heal for saves that predate the field would have fired on all of them.
         at=str(data.get("at") or ""),
         heritage=data.get("heritage", ""),
+        background=data.get("background", ""),
+        background_ties=list(data.get("background_ties") or []),
         race=data.get("race", "human"),
         paths=[str(p) for p in (data.get("paths") or [])],
         pronouns=data.get("pronouns", "they/them"),
