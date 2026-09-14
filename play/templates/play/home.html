@@ -328,6 +328,11 @@
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
   .madebanner b { color: var(--gold); }
+  /* The background groups. A heading rather than four separate sections, because
+     fourteen cards in one undifferentiated wall is a list nobody reads to the end. */
+  .bggroup { margin-bottom: 14px; }
+  .bghead { color: var(--dim); font-size: 11.5px; letter-spacing: .14em;
+            font-variant: small-caps; margin: 10px 0 4px; }
   /* The tab row fills the header, so this always wraps to a line of its own. Pushed
      right it reads as a top-right utility link, which is the convention; left, under
      the title, it reads as something that fell off. Tried both in the running app. */
@@ -1699,6 +1704,9 @@ const PRONOUNS_FOR = { woman: "she/her", man: "he/him" };
 function forgeDefaults(opts) {
   return {
     name: "", race: "", choices: [], heritage: "", pronouns: "", gender: "",
+    // Where they were before the first turn. Empty is a real answer — every character
+    // made before backgrounds existed has none, and the forge must still build one.
+    background: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     skills: [], feats: [], spellbook: [], paths: [],
   };
@@ -1850,6 +1858,30 @@ function paneForge() {
         <button class="quiet" data-crheritage="${esc(h.name)}" style="${
           f.heritage === h.name ? "border-color:var(--accent);color:#f0dcae" : ""
         }" title="${esc(h.summary || "")}">${esc(h.name)}</button>`).join(" ")}</div>` : ""}
+
+    <h2 class="sect">Before this</h2>
+    <p class="note">Where they were before the first turn. Optional, and worth taking:
+      a background is worth at most two points of skill, and what it really gives is
+      somebody in this world who already knows you. The names below fill in from the
+      world when the game begins.</p>
+    ${(opts.background_groups || []).map(g => `
+      <div class="bggroup">
+        <div class="bghead">${esc(g)}</div>
+        <div class="cards tight">${(opts.backgrounds || []).filter(b => b.group === g).map(b => `
+          <button class="card pick ${f.background === b.id ? "on" : ""}"
+                  data-crbackground="${esc(b.id)}">
+            <h3>${esc(b.name)}</h3>
+            <div class="stat">${esc(b.line)}</div>
+            <div class="traits clip">${(b.ties || []).map(t =>
+              esc(t.says.replace(/\$who/g, "someone").replace(/\$where/g, "somewhere"))
+            ).join(" · ")}</div>
+          </button>`).join("")}</div>
+      </div>`).join("")}
+    <div style="margin-top:10px">
+      <button class="quiet" data-crbackground=""
+              style="${f.background ? "" : "border-color:var(--accent);color:#f0dcae"}">
+        No background — they came from nowhere in particular</button>
+    </div>
 
     <h2 class="sect">Class</h2>
     <div class="cards">${opts.classes.map(c => `
@@ -2180,6 +2212,11 @@ document.addEventListener("click", async e => {
       f.heritage = f.heritage === heritage.dataset.crheritage ? "" : heritage.dataset.crheritage;
       render(); return;
     }
+    // `hasAttribute`, not truthiness: "no background" is a real choice and its button
+    // carries an empty value, which `closest("[data-crbackground]").dataset` reads as
+    // "" — indistinguishable from no match if this asked whether the value was set.
+    const bg = e.target.closest("[data-crbackground]");
+    if (bg) { f.background = bg.dataset.crbackground || ""; render(); return; }
     const cls = e.target.closest("[data-crclass]");
     // Paths belong to the class that offers them, so changing class drops them.
     if (cls) { f.class = cls.dataset.crclass; f.paths = []; render(); return; }

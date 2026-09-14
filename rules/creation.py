@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 
+from . import backgrounds as backgrounds_mod
 from . import casting, classes as classes_mod, dice, feats as feats_mod, houserules
 from . import races as races_mod
 from . import leveling
@@ -285,6 +286,10 @@ def options(world_id: str = "") -> dict:
         # — a forge opened from a world's page offers what that world ships.
         "races": list(_races_for(world_id).values()),
         "race_rp": houserules.race_rp(),
+        # Where the character was before the first turn. Optional: a character with no
+        # background is exactly what every character was before this existed.
+        "backgrounds": backgrounds_mod.catalogue(),
+        "background_groups": backgrounds_mod.groups(),
         "heritages": _heritages_for(world_id),
         "classes": [{"id": cid, "name": c.get("name", cid.title()),
                      # A homebrew class may declare notation rather than a number, so
@@ -339,6 +344,17 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     name = str(payload.get("name", "")).strip()
     if not name:
         problems.append("A character needs a name.")
+
+    # Optional on purpose. Every character made before backgrounds existed has none, and
+    # a forge that refused to load them would be a migration nobody asked for.
+    from . import backgrounds as backgrounds_mod
+
+    background_id = str(payload.get("background", "")).strip().lower()
+    if background_id and backgrounds_mod.get(background_id) is None:
+        problems.append(
+            f"{background_id!r} is not a background: "
+            f"{', '.join(sorted(backgrounds_mod.all_backgrounds()))}.")
+        background_id = ""
 
     offered = _races_for(str(payload.get("world", "")).strip())
     race = offered.get(races_mod.slug(str(payload.get("race", ""))))
@@ -566,6 +582,11 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         # The people of the world this body belongs to, when it is a world's race.
         "world_people_id": race.get("people_id") or None,
         "heritage": str(payload.get("heritage", "")).strip(),
+        # Where they were before the first turn. Stored as the id alone: the modifiers,
+        # tags and traits are read live off the document the way a race's are, so a
+        # background edited on the bench changes every character who has it and removing
+        # one removes its arithmetic.
+        "background": background_id,
         "pronouns": said_pronouns, "gender": said_gender,
         "size": race["size"], "speed": race["speed"],
         "abilities": abilities,

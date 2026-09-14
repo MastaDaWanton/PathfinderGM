@@ -1,0 +1,253 @@
+{
+  "_about": [
+    "The first scheme that opens at the gate, which until now was only a place the",
+    "wanted line refused to let anybody through. A gate is where a town meets everyone",
+    "who is not from it, so it is the right ground for a story about who gets to decide",
+    "that — and it is the one place a player passes without choosing to.",
+    "",
+    "The only use of the `letter` carrier. A letter differs from gossip and a crier in",
+    "that it is addressed: it reaches the player wherever they are, on a delay, because",
+    "somebody sat down and wrote it. That is the shape of a complaint going over",
+    "somebody's head.",
+    "",
+    "Nobody is a villain. The gatekeeper is taking a cut because the wage stopped",
+    "coming, which is a thing the player can find out and then decide what to do about."
+  ],
+  "schemes": [
+    {
+      "id": "the-toll",
+      "title": "The toll",
+      "about": "A gatekeeper charging a fee nobody wrote down, and a reason nobody asked for.",
+      "opens": [
+        "at($gate)",
+        "since(campaign) >= 14d"
+      ],
+      "slots": {
+        "keeper": {
+          "role": "guard officer",
+          "level": "pc",
+          "prefer": "cast",
+          "at": "$gate"
+        },
+        "traveller": {
+          "role": "kin",
+          "level": "pc",
+          "at": "$gate"
+        },
+        "gate": {
+          "place": "gate"
+        },
+        "guildhall": {
+          "place": "guildhall"
+        },
+        "road": {
+          "place": "road",
+          "hours": 2
+        }
+      },
+      "cards": [
+        {
+          "key": "errand",
+          "kind": "quest",
+          "title": "The fee $keeper is charging at $gate",
+          "objectives": [
+            "Find out what the fee is for",
+            "Settle it one way or another"
+          ],
+          "giver": "$traveller",
+          "reward": "$traveller's thanks, and a name to use on the road"
+        },
+        {
+          "key": "wage",
+          "secret": true,
+          "title": "Why $keeper started charging",
+          "facts": [
+            "$keeper's wage stopped coming out of $guildhall two seasons ago and nobody at $guildhall will say who stopped it.",
+            "$keeper takes the same small cut from everybody and has never once taken more from somebody who could not pay."
+          ]
+        }
+      ],
+      "grants_on_open": [
+        {
+          "to": "pc",
+          "tags": [
+            "knows.the-fee-has-no-paper"
+          ],
+          "say": "$keeper named a fee and could not produce anything with it written down"
+        }
+      ],
+      "steps": [
+        {
+          "id": "asked",
+          "criteria": [
+            "at($gate)",
+            "present($traveller)",
+            "alive($traveller)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 1
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.everyone-pays-it"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$traveller has paid it too, at $gate, and says everybody does."
+          }
+        },
+        {
+          "id": "twist",
+          "criteria": [
+            "at($gate)",
+            "present($keeper)",
+            "has(pc, knows.everyone-pays-it)"
+          ],
+          "fairness": [
+            "knows.the-fee-has-no-paper"
+          ],
+          "action": {
+            "do": "fact",
+            "card": "errand",
+            "text": "$keeper says the wage stopped coming out of $guildhall two seasons back, and that nobody there will say who stopped it."
+          },
+          "also": [
+            {
+              "do": "grant",
+              "to": "pc",
+              "tags": [
+                "knows.the-wage-stopped"
+              ]
+            }
+          ],
+          "tell": {
+            "perceptible": "$keeper says it plainly: the wage stopped, and the fee started."
+          }
+        },
+        {
+          "id": "written-down",
+          "criteria": [
+            "at($guildhall)",
+            "has(pc, knows.the-wage-stopped)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "news",
+              "carrier": "letter",
+              "reach": "town",
+              "delay": "1d",
+              "says": "The fee at $gate is on paper now, and so is whose wage went missing."
+            },
+            {
+              "do": "outcome",
+              "name": "on-paper"
+            }
+          ],
+          "tell": {
+            "perceptible": "At $guildhall somebody writes it down, which is all it needed."
+          }
+        },
+        {
+          "id": "reported",
+          "criteria": [
+            "at($guildhall)",
+            "has(pc, knows.everyone-pays-it)",
+            "not has(pc, knows.the-wage-stopped)"
+          ],
+          "action": {
+            "do": "objective",
+            "card": "errand",
+            "n": 2
+          },
+          "also": [
+            {
+              "do": "outcome",
+              "name": "reported"
+            }
+          ],
+          "tell": {
+            "perceptible": "$guildhall takes the complaint about $keeper and asks no further questions."
+          }
+        },
+        {
+          "id": "went-around",
+          "criteria": [
+            "left($gate)",
+            "at($road)",
+            "has(pc, knows.everyone-pays-it)",
+            "since(asked) >= 2d"
+          ],
+          "action": {
+            "do": "outcome",
+            "name": "went-around"
+          },
+          "tell": {
+            "silent": "Whoever was asking took the long way out by $road instead, and $keeper is still taking the fee at $gate."
+          }
+        }
+      ],
+      "outcomes": {
+        "on-paper": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$keeper",
+              "tags": [
+                "attitude.helpful"
+              ]
+            },
+            {
+              "to": "$traveller",
+              "tags": [
+                "attitude.friendly"
+              ]
+            }
+          ]
+        },
+        "reported": {
+          "resolve": "errand",
+          "award": "new",
+          "grants": [
+            {
+              "to": "$traveller",
+              "tags": [
+                "attitude.friendly"
+              ]
+            },
+            {
+              "to": "$keeper",
+              "tags": [
+                "attitude.hostile"
+              ]
+            }
+          ]
+        },
+        "went-around": {
+          "resolve": "errand",
+          "how": "dropped",
+          "award": "advance",
+          "grants": [
+            {
+              "to": "$traveller",
+              "tags": [
+                "attitude.unfriendly"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
