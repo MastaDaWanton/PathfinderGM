@@ -342,7 +342,13 @@ class Scene:
         self.people[actor.ref] = actor
         self.zones[actor.ref] = zone
         if at is not None:
-            self.positions[actor.ref] = (int(at[0]), int(at[1]))
+            # The level comes along when one is given. Truncating to two here is what
+            # kept the scene flat: every other hop — the save, `resync_zones`,
+            # `grid.distance` — has taken a third coordinate since stage 2, and this
+            # was the one place it was thrown away.
+            self.positions[actor.ref] = (
+                (int(at[0]), int(at[1])) if len(at) < 3
+                else (int(at[0]), int(at[1]), int(at[2])))
         # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
         # come through here, so a save from before the mark existed heals itself to the
         # highest ref it holds on the first load.
@@ -362,17 +368,31 @@ class Scene:
     def position(self, ref: str) -> tuple[int, int] | None:
         return self.positions.get(ref)
 
-    def occupied(self, ignore: str = "") -> set[tuple[int, int]]:
-        """Every square something is standing on, for movement to route around."""
-        from .grid import footprint
+    def occupied(self, ignore: str = "", level: int | None = None) -> set[tuple[int, int]]:
+        """Every square something is standing on, for movement to route around.
+
+        `level` filters to the creatures whose own body reaches that level, because a
+        body only blocks the ground it is actually on: a spider clinging to a ceiling
+        twenty feet up does not stop anybody walking underneath it, and before this it
+        did — it held the square beneath it against every route on the floor.
+
+        Overlap rather than equality, so a Large creature standing on the floor still
+        blocks the level above its feet, which is where its chest is.
+        """
+        from .grid import footprint, height_squares
 
         out: set[tuple[int, int]] = set()
         for ref, anchor in self.positions.items():
             if ref == ignore or ref not in self.actors:
                 continue
-            if self.actors[ref].has_condition("dead"):
+            actor = self.actors[ref]
+            if actor.has_condition("dead"):
                 continue
-            out.update(footprint(anchor, self.actors[ref].size))
+            if level is not None:
+                lo = anchor[2] if len(anchor) > 2 else 0
+                if not lo <= level <= lo + height_squares(actor.size) - 1:
+                    continue
+            out.update(footprint(anchor, actor.size))
         return out
 
     def distance_between(self, a: str, b: str) -> int | None:
@@ -5539,6 +5559,9 @@ class Engine:
 
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
+            refusal = self._cannot_leave_the_ground(actor, from_square, tuple(square))
+            if refusal:
+                return self._refuse(intent, refusal)
             self.scene.positions[ref] = tuple(square)
             # The zone is now measured rather than taken on trust. The GM may still have
             # said "near"; if the square it also gave is forty feet away, the square wins.
@@ -5562,8 +5585,35 @@ class Engine:
             because=intent.because,
         )
 
-    def _move_cost(self, ref: str, start: tuple[int, int] | None,
-                   end: tuple[int, int]) -> int | None:
+    def _cannot_leave_the_ground(self, actor, start, end) -> str:
+        """Why this creature may not move to that level, or "".
+
+        The engine disposing of what the GM proposed, in the one place a creature's
+        height can change. A model that narrates a spider scuttling up a wall is right
+        and gets it; one that walks a man up the same wall is refused with the reason,
+        which is a sentence it can act on rather than a silent correction.
+
+        Only the *destination* level is asked about, not the route. A climber that has to
+        cross a gap to reach its wall is a pathing question, and this is a permission
+        question; `_move_cost` already answers "there is no route" with `None`.
+        """
+        level = end[2] if len(end) > 2 else 0
+        was = start[2] if start is not None and len(start) > 2 else 0
+        if level == was:
+            return ""
+        if level < 0:
+            return f"{actor.name} cannot go below the floor."
+        how = actor.can_move_vertically()
+        if how:
+            return ""
+        # Coming back down is always allowed — that is falling, and everybody can fall.
+        if level < was:
+            return ""
+        return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
+                f"nothing here to climb.")
+
+    def _move_cost(self, ref: str, start: tuple[int, ...] | None,
+                   end: tuple[int, ...]) -> int | None:
         """What the move actually cost, routed around terrain and other creatures.
 
         `None` when there is no route — which is not the same as free, and is why this
@@ -5572,10 +5622,32 @@ class Engine:
         """
         if start is None or self.scene.grid is None:
             return None
-        reach = self.scene.grid.reachable(
-            start, 10_000, size=self.scene.actors[ref].size,
-            occupied=self.scene.occupied(ignore=ref))
-        return reach.get(end)
+        # The route is solved on the floor the creature is arriving at, and the climb or
+        # the flight is added to it. Two reasons not to path in three dimensions here:
+        # the grid's terrain — difficult, blocked, obscuring — is stated per square with
+        # no notion of height, so there is nothing for a vertical A* to route around; and
+        # the thing a player is owed is the total feet, which is the same either way for
+        # every shape of route this engine can currently describe.
+        from .grid import SQUARE_FT
+
+        here, there = tuple(start[:2]), tuple(end[:2])
+        was = start[2] if len(start) > 2 else 0
+        now = end[2] if len(end) > 2 else 0
+        if there == here:
+            # Straight up or straight down, without crossing the floor at all — which is
+            # the commonest move a climber makes and the one `reachable` cannot answer:
+            # it returns every square you can get TO and deliberately omits the one you
+            # are standing on, so asking it about your own column gives `None` and reads
+            # as "there is no route" for a spider going up its own wall.
+            flat = 0
+        else:
+            reach = self.scene.grid.reachable(
+                here, 10_000, size=self.scene.actors[ref].size,
+                occupied=self.scene.occupied(ignore=ref, level=now))
+            flat = reach.get(there)
+            if flat is None:
+                return None
+        return flat + abs(now - was) * SQUARE_FT
 
     def _op_advance_time(self, intent: Intent, partial: dict) -> Outcome:
         amount, unit = intent.params["amount"], intent.params["unit"]

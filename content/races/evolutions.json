@@ -20,7 +20,11 @@
     "describe — so a fly speed reaches the sheet, prices exactly at 4 RP, and moves",
     "nobody. The world-derived path in `rules/races.py` CUES has always said so (\"a fly",
     "speed: the engine moves on the ground only\"); the evolution a player picks said",
-    "nothing, so the two doors to the same tag disagreed about what it delivers."
+    "nothing, so the two doors to the same tag disagreed about what it delivers.",
+    "2026-09-14, later the same day: stage 3 gave the engine a level to move to, so the",
+    "caveats came off flight and climb. `Engine._cannot_leave_the_ground` refuses a level",
+    "change to anything with neither speed, and `_move_cost` charges for the climb. Swim",
+    "and burrow keep theirs — the grid has no water and no earth in it."
   ],
   "evolutions": [
     {
@@ -465,8 +469,7 @@
       "line": "climb speed equal to base speed",
       "tags": [
         "move.climb.base"
-      ],
-      "not_yet": "a climb speed waits on the grid gaining height: the engine has no walls to climb"
+      ]
     },
     {
       "id": "swim",
@@ -489,8 +492,7 @@
       "line": "fly speed equal to base speed (wings)",
       "tags": [
         "move.fly.base"
-      ],
-      "not_yet": "a fly speed waits on the grid gaining height: the engine moves on the ground only"
+      ]
     },
     {
       "id": "burrow",
