@@ -276,6 +276,47 @@ class Grid:
                     return True
         return False
 
+    def cover_between(self, a: Point, a_size: str, b: Point, b_size: str) -> str:
+        """`"none"`, `"cover"` or `"total"` — what the terrain gives the target.
+
+        1e's test, and it is the mirror image of `line_of_sight`: *"choose a corner of
+        your square. If any line from this corner to any corner of the target's square
+        passes through a square or border that blocks line of effect, the target has
+        cover."* The attacker picks the corner that suits them, so a target has cover
+        only when **every** corner the attacker could shoot from leaves at least one
+        blocked line.
+
+        Sight asks whether ANY line gets through; cover asks whether ALL of them do. Two
+        questions of the same geometry with opposite quantifiers, which is why they are
+        neighbours here and why neither is written in terms of the other.
+
+        `total` when no line gets through at all — the target cannot be attacked, which
+        the engine turns into a refusal rather than a penalty.
+
+        Soft cover, the +4 a creature in the way grants, is not here: this module has no
+        opinion about who is standing where, and `rules/position.py` reads the scene for
+        that. Nor is height — a line drawn between two levels is a longer problem than
+        this one, and until a room has a floor plan to be blocked by there is nothing on
+        the vertical for it to cross.
+        """
+        here, there = footprint(a, a_size), footprint(b, b_size)
+        ignore = tuple(here) + tuple(there)
+        best = "total"
+        for corner in {c for p in here for c in _corners(p)}:
+            blocked = False
+            reached = False
+            for target in {c for p in there for c in _corners(p)}:
+                if self._crosses_opaque(corner, target, ignore=ignore):
+                    blocked = True
+                else:
+                    reached = True
+            if not reached:
+                continue                      # this corner sees nothing; try another
+            best = "cover" if blocked else "none"
+            if best == "none":
+                return "none"
+        return best
+
     def _crosses_opaque(self, a: tuple[float, float], b: tuple[float, float],
                         ignore: tuple[Point, ...] = ()) -> bool:
         """Walk the segment and ask, at each point, whether it is inside anything solid.

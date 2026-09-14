@@ -2250,6 +2250,22 @@ class Engine:
         target_ac = defender.ac(against=weapon["category"], flat_footed=flat_footed)
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
 
+        # What the board is worth to the defender. Added to the number being rolled
+        # against rather than taken off the attack roll: the two are the same arithmetic
+        # for whether a blow lands and are not the same fact, and everything that reads
+        # an AC — the panel, the tell, a spell that cares — should see the real one.
+        from . import position as position_mod
+
+        if position_mod.cover_of(self.scene, actor, defender) == "total":
+            return self._refuse(
+                intent,
+                f"{defender.name} is behind total cover: there is no line to them from "
+                f"where {actor.name} is standing.")
+        cover_mods = position_mod.ac_mods(self.scene, actor, defender)
+        if cover_mods:
+            target_ac += sum(m.value for m in cover_mods)
+            ac_note += " with " + ", ".join(m.source for m in cover_mods)
+
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
         sequence = actor.attack_sequence(weapon_key, full)
@@ -2302,6 +2318,11 @@ class Engine:
             # penalty depends on *who is being attacked*, which the sheet does not know.
             # It penalises and never prohibits: see the header of rules/compulsion.py.
             atk_mods = atk_mods + compulsion.penalty_against(actor, defender.ref)
+            # And the board, for the same reason one step further out: flanking and
+            # higher ground depend on where BOTH of them are standing, which the sheet
+            # knows even less about than it knows the target. `rules/position.py`.
+            atk_mods = atk_mods + position_mod.attack_mods(
+                self.scene, actor, defender, weapon)
 
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(

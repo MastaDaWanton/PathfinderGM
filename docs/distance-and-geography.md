@@ -37,6 +37,7 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 1 | Say what is not delivered: a `not_yet` on every movement evolution | **done** |
 | 2 | A creature is a box — vertical extent on `SPACE_AND_REACH`, `volume()`, 3D distance | **done** |
 | 3 | Elevation on actors; the engine reads movement modes; **the stage-1 caveats come off** | **done** |
+| 3b | The situational-modifier pipeline — flanking, higher ground, cover | **done** |
 | 4 | The floor under the fight — height per square, and a plan derived from the place id | next |
 | 5 | Storeys as places, joined by stairs | |
 | 6 | Lengths on the trade edges; a journey costs time | |
@@ -58,11 +59,16 @@ the engine learned to fly; the engine learned, and the test passed, because it w
 the words "elevation" and "fly_speed" and the code said `can_move_vertically`. It asks about
 behaviour now.
 
-**What stage 3 deliberately did not do**, because it needs a pipeline the engine has never
-had: higher ground's +1, a climber's loss of Dex to AC, and the Fly skill's DCs. There is no
-route by which a *position* becomes an *attack modifier* — `grid.flanking` has been written
-and uncalled the whole time, and cover is the same. That is one piece of work for all four,
-and it should be its own stage rather than smuggled into this one.
+**Stage 3b built the pipeline stage 3 said it needed.** There was no route by which a
+*position* became an *attack modifier*: `grid.flanking` had been written, tested and never
+called by anything outside its own tests, and the word "cover" appeared nowhere in
+`rules/engine.py`. `rules/position.py` is that route — flanking, higher ground and cover
+arriving as ordinary `Modifier`s the way `compulsion.penalty_against` already does, because
+all three depend on where *both* creatures are and the sheet knows only its own body.
+
+Still outstanding from stage 3's list: the Fly skill's DCs, and a climber's loss of Dex to
+AC — the second of which has no reachable state yet, because a creature without a climb
+speed is refused the wall in the first place. Climb checks are what would create it.
 
 Stage 1 is deliberately the smallest thing that stops the game claiming something untrue,
 and it is independent of every stage after it. The guard that holds it —
