@@ -473,6 +473,30 @@ _SENSE_ANCHOR = {
 }
 
 
+def natural_weapon_aliases() -> frozenset[str]:
+    """Every name a natural attack answers to, off the evolution pool itself.
+
+    `rules.intents` asks this so its weapon gate can let a bite through: the 456-weapon
+    table holds no natural attacks, and until 2026-09-14 the gate refused every one of
+    them before the engine could say "you have no bite".
+
+    The singular and plural of each key and name are both accepted, the same courtesy
+    `Actor.natural_weapon` extends, so "claw", "claws" and "talons" all reach the entry.
+    """
+    out: set[str] = set()
+    for ev in evolutions().values():
+        for w in ev.get("weapons") or []:
+            for word in (w.get("key"), w.get("name")):
+                word = " ".join(str(word or "").split()).lower()
+                if not word:
+                    continue
+                out.add(word)
+                out.add(word + "s" if not word.endswith("s") else word[:-1])
+    # Aliases the sheet already honours that no document spells out.
+    out |= {"talon", "talons", "fangs", "horn", "horns"}
+    return frozenset(out)
+
+
 def price_tag(tag: str) -> tuple[int, str, str]:
     """What a tag costs, what it reads as, and how sure we are: exact, derived, unknown.
 

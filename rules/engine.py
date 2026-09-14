@@ -1732,6 +1732,14 @@ class Engine:
                     raise IntentError(
                         f"attack: the {granted['key']} is not formed. Use "
                         f"{granted['ability']} to form it first.", "legality", index)
+            elif actor.natural_weapon(key) is not None:
+                # The body's own weapon. Checked before the table, because the table
+                # holds none of them: `weapons_mod.has("bite")` is False for every
+                # natural attack in the evolution pool, so a race that grants a bite
+                # was refused here even once `intents._known_weapon` let the name
+                # through. Asking the actor is the only question worth asking — it is
+                # their race document that says whether they have jaws.
+                pass
             elif not weapons_mod.has(key):
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
@@ -2392,6 +2400,12 @@ class Engine:
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
                 # by a miss is a dose nobody got.
                 for extra in self._deliver_coating(actor, defender, weapon_key):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
+                # What the body itself does past the wound: a jaw that holds on, a tail
+                # that sweeps the legs. The race's own tags, read here because this is
+                # where a hit is known to have landed.
+                for extra in self._natural_riders(actor, defender, weapon_key):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # Thorns, wasps, holy fire: whatever the defender is wearing that
@@ -4369,6 +4383,100 @@ class Engine:
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
         )
+
+    # What a natural weapon does past its damage. The rider tags a race grants —
+    # `natural.trip`, `natural.grab.bite`, `natural.poison.sting` — and the intent each
+    # one becomes. The weapon may be named in the tag's last segment or left off, in
+    # which case the rider belongs to every natural attack the body has.
+    #
+    # Each is a save the defender may make, not a thing that simply happens. 1e resolves
+    # grab, trip, pull and push as combat manoeuvres, and the honest reading is that this
+    # is not that: a manoeuvre is CMB against CMD and suspends for the player's own d20,
+    # mid-way through an attack that has already suspended twice. What is here instead is
+    # the same *fork* — a roll the defender makes, at a DC off the attacker — and it is
+    # marked as a simplification in docs/races.md rather than presented as the book's
+    # rule. The alternative was leaving five evolutions inert, which is what they were.
+    _NATURAL_RIDERS = {
+        "trip":   ("ref", "prone", "is knocked off their feet"),
+        "grab":   ("ref", "grappled", "is caught and held"),
+        "pull":   ("ref", "", "is dragged in a step"),
+        "push":   ("ref", "", "is driven back a step"),
+    }
+
+    def _rider_dc(self, actor: Actor) -> int:
+        """10 + half the attacker's hit dice + Strength modifier — the shape 1e uses for
+        a monster's special-attack DCs, so a rider scales with the body that has it."""
+        level = max(1, int(getattr(actor, "level", 1) or 1))
+        return 10 + level // 2 + actor.ability_mod("str")
+
+    def _natural_riders(self, actor: Actor, defender: Actor,
+                        weapon_key: str) -> list[dict]:
+        """Fire the race's on-hit riders for the weapon that just landed.
+
+        Built as intents and run through `validate`/`run` like everything else, for the
+        reason `_deliver_coating` above does it: the one applicator, with provenance, so
+        a grapple that arrived this way is removable exactly like any other and says
+        where it came from. Nothing here touches a number directly.
+        """
+        if defender.hp <= 0:
+            # A rider on a corpse. The damage already landed; dragging it a step is
+            # noise, and `grappled` on the dead was the shape that once made 759
+            # undead unkillable.
+            return []
+        out: list[dict] = []
+        for rider, (_who, condition, words) in self._NATURAL_RIDERS.items():
+            if not (actor.has_state(f"natural.{rider}.{weapon_key}")
+                    or actor.has_state(f"natural.{rider}")):
+                continue
+            dc = self._rider_dc(actor)
+            if condition:
+                intents = [{
+                    "op": "save", "actor": defender.ref, "visibility": "hidden",
+                    "because": f"{actor.name}'s {weapon_key} {words}",
+                    "params": {"save": "ref", "dc": dc,
+                               "on_failure": {"condition": condition}},
+                }]
+                res = self.run(self.validate(intents, origin=f"race:natural.{rider}",
+                                             origin_name=rider))
+                for o in res.outcomes:
+                    out.extend({"effect": e, "tell": o.tell} for e in (o.effects or [])
+                               if e.get("kind") == "condition")
+                    if not o.effects:
+                        out.append({"effect": {"ref": defender.ref,
+                                               "kind": "rider_resisted", "rider": rider},
+                                    "tell": o.tell})
+            else:
+                # Pull and push move a body rather than condition it. The grid owns
+                # where anybody is, so this asks it and says so when there is no grid
+                # to ask — a scene without one is not a bug, it is the zone game.
+                moved = self._shove(actor, defender, toward=(rider == "pull"))
+                out.append({"effect": {"ref": defender.ref, "kind": "rider",
+                                       "rider": rider, "moved": moved},
+                            "tell": f"{defender.name} {words}."
+                                    if moved else
+                                    f"{actor.name} tries to {rider} {defender.name} "
+                                    f"and cannot move them."})
+        return out
+
+    def _shove(self, actor: Actor, defender: Actor, toward: bool) -> bool:
+        """One five-foot step of the defender, towards the attacker or away. False when
+        there is no grid, no room, or the square is taken."""
+        grid = getattr(self.scene, "grid", None)
+        pos = getattr(self.scene, "positions", None)
+        if not grid or not pos:
+            return False
+        here, there = pos.get(defender.ref), pos.get(actor.ref)
+        if not here or not there:
+            return False
+        step = []
+        for a, b in zip(here, there):
+            step.append(a + (1 if b > a else -1 if b < a else 0) * (1 if toward else -1))
+        target = tuple(step)
+        if target in pos.values() or not grid.passable(target) or not grid.inside(target):
+            return False
+        pos[defender.ref] = target
+        self.scene.resync_zones()
+        return True
 
     def _deliver_coating(self, actor: Actor, defender: Actor, weapon_key: str) -> list[dict]:
         """Everything a coated weapon does to the thing it just cut.
