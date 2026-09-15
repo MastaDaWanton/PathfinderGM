@@ -873,7 +873,12 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
 
                 line = races_mod.body_line(race_doc)
                 if line:
-                    bodily = f" A {race_doc.get('name', actor.race)}: {line}."
+                    named = str(race_doc.get("name", actor.race) or "")
+                    # "A Asura" was reaching the brief. The narrator copies the register
+                    # of what it is given, so the article matters more here than it would
+                    # in a log line.
+                    article = "An" if named[:1].lower() in "aeiou" else "A"
+                    bodily = f" {article} {named}: {line}."
             # What the character has noticed: the `knows.*` situation effects a
             # scheme or a card granted, by the name each carries. Measured missing by
             # the fairness critic: a tag alone put nothing in front of the player, so

@@ -245,9 +245,31 @@ def senses(doc: dict) -> list[str]:
     return out
 
 
+# What a body LOOKS like, as against what it costs. Anyone standing in the room can see
+# these, so the narrator has to know them — and nothing else in the race grammar says so.
+#
+# Measured 2026-09-15, from play: a player asked the nearest person to count their arms and
+# was told "Two. You have two arms, master." The character was an asura with `limbs.arms`
+# on its sheet and "an extra pair of arms" in its own trait list. The narrator had never
+# been told, because `body_line` selected its extra clauses by asking whether a tag was in
+# `TAG_RP` — the RACE POINT PRICE TABLE. Whether a servant could see your arms depended on
+# whether the Advanced Race Guide charges for them, and `limbs.arms` and `tail` are free.
+#
+# So this is its own list, and it is short on purpose: the visible body, in a player's
+# words, with no number and no rule in it. Everything else the price table knows — damage
+# reduction, spell resistance, immunities — is mechanics, and mechanics reach the narrator
+# as tells or not at all.
+VISIBLE_BODY: dict[str, str] = {
+    "limbs.arms": "an extra pair of arms — four in all",
+    "limbs.legs": "an extra pair of legs",
+    "tail": "a tail",
+    "amphibious": "gills",
+}
+
+
 def body_line(doc: dict) -> str:
-    """One sentence for the narrator's brief: how this body moves, senses and fights.
-    A tell about the body, not a rule — the narrator dresses it."""
+    """One sentence for the narrator's brief: how this body moves, senses, looks and
+    fights. A tell about the body, not a rule — the narrator dresses it."""
     parts = []
     sp = speeds(doc)
     moves = [f"{k} {v} ft" for k, v in sp.items() if k != "land"]
@@ -259,7 +281,12 @@ def body_line(doc: dict) -> str:
     naturals = [str(w.get("name") or w.get("key")) for w in doc.get("weapons") or []]
     if naturals:
         parts.append("natural weapons: " + ", ".join(naturals))
-    extra = [TAG_RP[t][1] for t in doc.get("tags") or [] if t in TAG_RP
+    tags = list(doc.get("tags") or [])
+    # The visible body first, because it is the half a person in the room can check.
+    seen = [VISIBLE_BODY[t] for t in tags if t in VISIBLE_BODY]
+    if seen:
+        parts.append("plainly: " + ", ".join(seen))
+    extra = [TAG_RP[t][1] for t in tags if t in TAG_RP and t not in VISIBLE_BODY
              and not t.startswith(("sense.", "move.", "natural."))]
     if extra:
         parts.append("; ".join(extra))

@@ -605,7 +605,7 @@ def switch_to(character_id: str) -> Campaign:
         c = new_campaign(campaign_id, character=entry.actor,
                          world_source=entry.world_source or None)
         c.character_id = character_id
-        _open_with(c, opening_text(c))
+        open_the_story(c)
         c.save()
         _LIVE[campaign_id] = c
         if not entry.campaign_id:
@@ -654,6 +654,7 @@ def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
         # `_resume(...) or _begin(...)` turned every load failure into a new character
         # written over the campaign that failed to load.
         c = _resume(campaign_id) or _begin(campaign_id)
+        _heal_background(c)
         _LIVE[campaign_id] = c
     return _LIVE[campaign_id]
 
@@ -709,9 +710,65 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     c = new_campaign(campaign_id, character=character)
     entry = roster.enrol(c.scene.pc(), campaign_id)
     c.character_id = entry.id
-    _open_with(c, opening_text(c, written=False))
+    open_the_story(c, written=False)
     c.save()
     return c
+
+
+def _heal_background(c) -> None:
+    """Bind a past that was chosen and never filled, on the next load.
+
+    Every campaign begun through the two doors that did not bind is on disk with a
+    background on the sheet and an empty `background_ties` beside it — the character the
+    bug was reported from is one of them. Fixing the doors helps the next character and
+    does nothing for that one, and a player is not going to reroll because the plumbing
+    was wrong.
+
+    Only ever fills an empty list. A campaign whose ties bound normally is left alone, and
+    so is a character who chose no past — `bind` is meant to happen once, and a second run
+    would re-cast the people it names.
+
+    The same shape as the other healings this loader does: the mark that "only ever rises",
+    the save from before actors had a place being stood with the party. A save is a thing
+    you meet as you find it.
+
+    **It does not write.** The first version called `c.save()` so the fix would persist,
+    and that made loading a campaign a thing that writes to disk — which promptly leaked
+    between tests and failed `test_foraging_fills_the_satchel` on the full run while it
+    passed alone. The campaign saves after every turn anyway, so the ties persist with the
+    first thing the player does; a loader that saves is a surprise nobody asked for.
+    """
+    pc = c.scene.pc() if c is not None else None
+    if pc is None or not getattr(pc, "background", ""):
+        return
+    if getattr(pc, "background_ties", None):
+        return
+    _bind_background(c)
+
+
+def open_the_story(c, written: bool = True) -> None:
+    """Bind the character's past, then write the opening that can use it.
+
+    **One door, because there were three and only one of them bound.** A campaign is
+    opened from `begin_with`, from the "enrolled but never played" branch of `resume`,
+    and from `_begin` — and `_bind_background` was called from the first of those only.
+    A character forged with a background and then played through either of the other two
+    got the stranger's opening: "a long way from anyone who knows you", which is the
+    template `play/opening.py` falls back to when nobody knows them.
+
+    Reported from real play on 2026-09-15, with `background: 'pit-fighter'` on the sheet
+    and `background_ties: []` beside it. The bind itself was never broken — run against
+    that save it produces "You fought where Xylaraezys took the bets, near the market" —
+    it simply was not reached.
+
+    The order is load-bearing and is why this is one function rather than two calls: the
+    ties have to exist BEFORE `opening_text` is evaluated, because the first paragraph is
+    exactly where "you were apprenticed to somebody" has to become a name. Two statements
+    at a call site can be put in the wrong order; an argument cannot be evaluated after
+    the call it is an argument to.
+    """
+    _bind_background(c)
+    _open_with(c, opening_text(c, written=written))
 
 
 def _bind_background(c) -> None:
@@ -770,8 +827,7 @@ def begin_with(character, world_source=None) -> Campaign:
     # Before the opening is written, because the opening reads what this produces: a
     # background is a set of slots until a world fills them, and the first paragraph is
     # where "you were apprenticed to somebody" has to become a name.
-    _bind_background(c)
-    _open_with(c, opening_text(c))
+    open_the_story(c)
     c.save()
     _LIVE[entry.id] = c
     set_active(entry.id)
