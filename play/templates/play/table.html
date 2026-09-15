@@ -311,6 +311,30 @@
      plainly not who you are looking at. */
   #map .token.offlevel { opacity: .32; }
   #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point
+     is to be able to read the board at a glance, and shading exists only to tell one
+     face of a box from another. The two visible sides are stepped darker so a cube
+     reads as a cube without an outline round it. */
+  #view3d { width: 100%; height: auto; display: block; background: #14110e;
+            border: 1px solid #241d15; border-radius: 3px; }
+  #view3d polygon { stroke: #14110e; stroke-width: .4; }
+  #view3d .tile.face-top, #view3d .tile { fill: #241f18; }
+  #view3d .tile.raised.face-top, #view3d .tile.raised { fill: #3d3527; }
+  #view3d .rough { fill: #2a2416; }
+  #view3d .murk { fill: #23262b; }
+  #view3d .solid { fill: #3a3128; }
+  #view3d .face-a { filter: brightness(.72); }
+  #view3d .face-b { filter: brightness(.55); }
+  #view3d .lit.face-top { fill: #4a4026; cursor: pointer; }
+  #view3d .lit.face-top:hover { fill: var(--gold); }
+  #view3d .rail3 { fill: #7a6a44; stroke: none; opacity: .92; }
+  #view3d .fig { fill: #6b4a3a; }
+  #view3d .fig.pc { fill: var(--gold); }
+  #view3d .fig.ally { fill: #8ea56b; }
+  #view3d .fig.foe { fill: #a33; }
+  #view3d .fig.bystander { fill: #cfc4ad; }
+  #view3d .fig.down { opacity: .45; }
+  #view3d .fig.offlevel { opacity: .35; }
   .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
   .levelpick button { padding: 1px 8px; font-size: 11px; }
   .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
@@ -1346,6 +1370,7 @@
   }
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
+<script src="{% static 'js/scene3d.js' %}"></script>
 </head>
 <body>
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -1969,6 +1994,10 @@ document.addEventListener("click", e => {
 // at the board, not a fact about it, and putting it in the server's payload would make
 // the server responsible for where the player's attention is.
 let MAP_LEVEL = 0;
+// Which way the board is being looked at, and whether it is being looked at flat. Both
+// are ways of looking rather than facts about the scene, so neither belongs in STATE —
+// the server is not responsible for where the player's attention is.
+let MAP_TURN = 0, MAP_3D = false;
 
 function renderMap(s) {
   const g = s.scene.grid;
@@ -2061,7 +2090,14 @@ function renderMap(s) {
       (r + n / 2) * CELL + 4}">${esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
 
-  const svg = `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
+  // The same board, drawn two ways. Both read the one geometry payload and both write
+  // `data-sq`, so the combat builder cannot tell them apart — which is the whole reason
+  // the flat one was built first.
+  const svg = MAP_3D
+    ? Scene3D.render(g, s.scene.actors || [],
+                     { turn: MAP_TURN, level: MAP_LEVEL,
+                       reach: !!(STATE.scene && STATE.scene.in_encounter) })
+    : `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
          preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
   const picker = levels.length > 1
@@ -2070,7 +2106,12 @@ function renderMap(s) {
           v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}${
         g.ceiling ? `<span class="sub">ceiling ${g.ceiling * 5} ft</span>` : ""}</div>`
     : "";
-  const legend = `${picker}${g.speed ? `<div class="sub maplegend">${
+  const view = `<div class="levelpick"><button data-mapview="${MAP_3D ? "flat" : "3d"}">${
+      MAP_3D ? "Flat" : "3D"}</button>${MAP_3D
+      ? `<button data-mapturn="-1" title="Turn the board left">&#8630;</button>`
+        + `<button data-mapturn="1" title="Turn the board right">&#8631;</button>`
+      : ""}</div>`;
+  const legend = `${view}${picker}${g.speed ? `<div class="sub maplegend">${
       reach.size} squares within ${g.speed} ft</div>` : ""}${
       pools ? `<div class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</div>` : ""}`;
@@ -2452,6 +2493,11 @@ document.addEventListener("click", async e => {
   }
   const lvl = t.closest("[data-maplevel]");
   if (lvl) { MAP_LEVEL = Number(lvl.dataset.maplevel); renderMap(STATE); return; }
+  const vw = t.closest("[data-mapview]");
+  if (vw) { MAP_3D = vw.dataset.mapview === "3d"; renderMap(STATE); return; }
+  const trn = t.closest("[data-mapturn]");
+  if (trn) { MAP_TURN = (MAP_TURN + Number(trn.dataset.mapturn) + 4) % 4;
+             renderMap(STATE); return; }
   const sq = t.closest("[data-sq]");
   if (sq && STATE.scene && STATE.scene.in_encounter) {
     COMBAT.move = sq.dataset.sq.split(",").map(Number);

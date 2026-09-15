@@ -44,6 +44,7 @@ Agreed 2026-09-14. §5 is the reasoning for stages 6–7, §6 for stages 1–5.
 | 6 | Lengths on the trade edges; a journey costs time | **done** |
 | 7 | The geometry payload, and the map view — level selector first | **done** |
 | 8 | Areas in three dimensions — a spread is a sphere | **done** |
+| 9 | The viewport — an axonometric board you can turn | **done** |
 
 Stage 2 settled one thing the rules do not: **there is no vertical distance rule in PF1e**,
 so `grid.distance` now carries a house rule in its docstring — a step is diagonal if it
