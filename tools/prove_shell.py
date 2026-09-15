@@ -55,7 +55,12 @@ def main() -> None:
     args = ap.parse_args()
 
     data = Path(tempfile.mkdtemp(prefix="pfgm-shell-"))
-    env = dict(os.environ, PATHFINDER_GM_DATA=str(data))
+    # The shell checks for an update once the game is on screen. This prover is watching
+    # a lifecycle, not a release feed: a network call to GitHub adds a timeout this can
+    # hang on, and a run whose result depends on whether a newer version happens to exist
+    # is not a proof of anything. `main.js` reads this.
+    env = dict(os.environ, PATHFINDER_GM_DATA=str(data),
+               PATHFINDER_GM_NO_UPDATE="1")
 
     if args.packaged:
         exe = REPO / "electron" / "release" / "win-unpacked" / "Pathfinder GM.exe"

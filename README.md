@@ -48,7 +48,7 @@ campaign is a JSON file under your user data directory, and the world export is 
 python -m pytest
 ```
 
-3,681 tests, about six minutes. Run the whole suite, not the file you touched.
+3,694 tests, about six minutes. Run the whole suite, not the file you touched.
 
 To build the packaged app:
 
