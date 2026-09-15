@@ -345,7 +345,14 @@ def test_fog_cloud_writes_real_squares_onto_the_map():
 
     assert len(scene.manifests) == 1
     made = scene.manifests[0]
-    assert made.terrain == "obscuring" and len(made.squares) == 61
+    # Sixty-one SQUARES of ground, as it always was — but the fog is a sphere of cells
+    # now, because Aiming a Spell defines a spread as extending "in all directions" and
+    # this engine used to fill a disc. The ground it covers is the number a player
+    # pictures; the cells are what decides who is standing in it, including anybody on a
+    # gallery above the floor.
+    assert made.terrain == "obscuring"
+    assert len({(s[0], s[1]) for s in made.squares}) == 61
+    assert all(len(s) == 3 and s[2] >= 0 for s in made.squares), "fog below the floor"
     assert scene.grid.obscuring, "the fog never reached the map"
     assert scene.grid.line_of_sight((5, 5), (12, 5)) is False, "sight went through the fog"
     assert "bank of fog" in out.tell

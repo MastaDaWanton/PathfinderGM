@@ -500,16 +500,59 @@ class Grid:
 # --- areas of effect ---------------------------------------------------------------------
 
 def burst(centre: Point, radius_ft: int) -> set[Point]:
-    """A spread or burst: every square within the radius, sight permitting.
+    """A spread or burst: everything within the radius, sight permitting.
 
     Sight does not permit here — `Grid.line_of_sight` is applied by the caller when the
     effect is a spread rather than a burst, because the two differ on exactly that and
     nothing else.
+
+    **A sphere when the centre says which level it is on**, and this is the rules and not
+    an embellishment: Aiming a Spell defines a spread as extending "in all directions" and
+    prints fireball's area as a *20-ft.-radius spread*. So a fireball has always been
+    three-dimensional on paper and was a flat disc here.
+
+    Measured before this was written, and the defect was the opposite way round from the
+    obvious guess: a disc did not *miss* things above it, it caught **everything** above
+    them. `Manifestation.covers` treats a stored square as "any level" — which is the
+    right reading of a save that predates the vertical — so a fireball on the floor
+    reached a creature flying a hundred feet over it. A disc was an infinite column. A
+    sphere has a top.
+
+    A two-element centre still answers in squares, and means what it always meant: a
+    scene with nothing off the ground has no use for the extra axis, and every save and
+    every caller written before levels existed keeps working untouched.
     """
     r = radius_ft // SQUARE_FT + 1
-    return {(centre[0] + dx, centre[1] + dy)
+    if len(centre) < 3:
+        return {(centre[0] + dx, centre[1] + dy)
+                for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+                if distance(centre, (centre[0] + dx, centre[1] + dy)) <= radius_ft}
+    cx, cy, cz = centre
+    return {(cx + dx, cy + dy, cz + dz)
+            for dz in range(-r, r + 1)
             for dy in range(-r, r + 1) for dx in range(-r, r + 1)
-            if distance(centre, (centre[0] + dx, centre[1] + dy)) <= radius_ft}
+            if distance(centre, (cx + dx, cy + dy, cz + dz)) <= radius_ft}
+
+
+def cylinder(centre: Point, radius_ft: int, height_ft: int = 0) -> set[Cell]:
+    """A cylinder: a horizontal circle, and everything under it.
+
+    The one area shape whose vertical extent the rules state outright. Aiming a Spell:
+    the point of origin is the centre of a horizontal circle, "the spell shoots down from
+    the circle, filling a cylinder", and it "ignores any obstructions within its area" —
+    which is why nothing here asks the grid about walls.
+
+    `height_ft` of 0 means all the way down, which is the shape as printed; a spell that
+    states a height gets one.
+    """
+    cx, cy, cz = _xyz(centre)
+    r = radius_ft // SQUARE_FT + 1
+    disc = {(cx + dx, cy + dy)
+            for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+            if distance((cx, cy), (cx + dx, cy + dy)) <= radius_ft}
+    depth = max(1, (height_ft or 0) // SQUARE_FT) if height_ft else cz + 1
+    return {(x, y, cz - dz) for (x, y) in disc for dz in range(depth)
+            if cz - dz >= 0}
 
 
 def line(origin: Point, towards: Point, length_ft: int) -> set[Point]:
@@ -519,15 +562,28 @@ def line(origin: Point, towards: Point, length_ft: int) -> set[Point]:
     rather than slipping between them, which is how a lightning bolt ends up missing
     somebody it visibly passes through.
     """
-    if origin == towards:
+    if tuple(origin[:2]) == tuple(towards[:2]) and _xyz(origin)[2] == _xyz(towards)[2]:
         return {origin}
-    dx, dy = towards[0] - origin[0], towards[1] - origin[1]
-    span = max(abs(dx), abs(dy))
+    ox, oy, oz = _xyz(origin)
+    tx, ty, tz = _xyz(towards)
+    dx, dy = tx - ox, ty - oy
+    span = max(abs(dx), abs(dy)) or 1
     reach = length_ft // SQUARE_FT + 1
-    far = (origin[0] + round(dx / span * reach), origin[1] + round(dy / span * reach))
-    out = {p for p in _squares_on_segment(_centre(origin), _centre(far))
-           if distance(origin, p) <= length_ft}
-    out.add(origin)
+    far = (ox + round(dx / span * reach), oy + round(dy / span * reach))
+    flat = {p for p in _squares_on_segment(_centre((ox, oy)), _centre(far))
+            if distance((ox, oy), p) <= length_ft}
+    flat.add((ox, oy))
+    if len(origin) < 3 and len(towards) < 3:
+        return flat
+    # A bolt aimed upward or downward climbs as it travels. The level at each square is
+    # interpolated along the ray, which is the same thing `_crosses_parapet` does for a
+    # line of sight — one way of carrying height along a line, not two.
+    rise = tz - oz
+    out = set()
+    for square in flat:
+        along = distance((ox, oy), square)
+        far_ft = max(1, distance((ox, oy), far))
+        out.add((square[0], square[1], oz + round(rise * min(1.0, along / far_ft))))
     return out
 
 
@@ -663,8 +719,8 @@ def size_squares(size: str) -> int:
 
 
 __all__ = [
-    "Cell", "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "distance",
-    "distance_between", "flanking", "footprint", "is_adjacent", "line", "natural_reach",
-    "height_ft", "height_squares", "size_squares", "threatened_squares",
-    "volume", "zone_between",
+    "Cell", "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "cylinder",
+    "distance", "distance_between", "flanking", "footprint", "height_ft",
+    "height_squares", "is_adjacent", "line", "natural_reach", "size_squares",
+    "threatened_squares", "volume", "zone_between",
 ]

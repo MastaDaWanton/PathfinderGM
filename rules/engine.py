@@ -683,7 +683,17 @@ class Scene:
         made.id = made.id or f"m{len(self.manifests) + 1}"
         if self.grid is not None and made.terrain in ("obscuring", "blocked", "difficult"):
             already = getattr(self.grid, made.terrain)
-            made.added = [s for s in made.squares
+            # The GROUND it covers, not the cells it fills. An area knows its own height
+            # — a fog cloud is a sphere, and that is what decides who is standing in it —
+            # but the grid's terrain sets are flat, because sight and movement in this
+            # engine are: a square is opaque or it is not, at every level.
+            #
+            # Writing cells in here was silent and total: `line_of_sight` compares
+            # two-element squares, no three-element cell ever matched one, and sight went
+            # straight through a bank of fog that was drawn on the map. The manifest keeps
+            # the cells; the map gets the footprint.
+            footprint = {(s[0], s[1]) for s in made.squares}
+            made.added = [s for s in sorted(footprint)
                           if self.grid.inside(s) and s not in already]
             already.update(made.added)
         self.manifests.append(made)
@@ -1243,8 +1253,29 @@ class Manifestation:
     id: str = ""
 
     def covers(self, squares) -> bool:
+        """Whether this manifestation is in any of these cells.
+
+        A stored entry with only two numbers means the whole column — that is what every
+        manifestation written before areas had a third axis meant, and reading it as
+        "level 0 only" would quietly let an old fog cloud stop catching the people
+        standing in it.
+        """
         mine = {tuple(s) for s in self.squares}
-        return any(tuple(s) in mine for s in squares)
+        ground = {(s[0], s[1]) for s in mine}
+        flat = {(s[0], s[1]) for s in mine if len(s) < 3}
+        for s in squares:
+            cell = tuple(s)
+            here = (cell[0], cell[1])
+            if cell in mine:
+                return True
+            # A missing level on EITHER side means "any level", and both directions
+            # happen. A manifestation written before areas had a third axis stores
+            # squares; a caller asking "is this creature in the cloud" may hand over a
+            # footprint rather than a volume. Answering only one of those was how an
+            # incendiary cloud came to stand over somebody and do nothing.
+            if here in flat or (len(cell) < 3 and here in ground):
+                return True
+        return False
 
     def as_dict(self) -> dict:
         return {"what": self.what, "terrain": self.terrain,
@@ -5374,7 +5405,8 @@ class Engine:
                 save=ctx.get("save", ""), dc=int(ctx.get("dc", 0) or 0),
                 save_effect=ctx.get("save_effect", ""), manifest_id=made.id,
             ))
-        where = (f" over {len(made.squares)} squares" if made.squares else "")
+        where = (f" over {len({(s[0], s[1]) for s in made.squares})} squares"
+                 if made.squares else "")
         # Said when the thing wanted squares and there was nowhere to put them. The first
         # version tested `not made.squares`, which is true in exactly the case the note is
         # for — so the note never appeared on a mapless scene and always would have on a
@@ -5384,19 +5416,32 @@ class Engine:
         return ([{"kind": "manifest", **made.as_dict()}],
                 [f"{made.what[:1].upper()}{made.what[1:]}{where}{note}."])
 
-    def _squares_for(self, spec: dict, ctx: dict) -> list[tuple[int, int]]:
-        """The squares a manifestation covers, from the grid's own area functions.
+    def _squares_for(self, spec: dict, ctx: dict) -> list[tuple[int, ...]]:
+        """The cells a manifestation covers, from the grid's own area functions.
 
         `rules/grid.py` already draws a burst, a line and a cone for spell areas, so a
         fog cloud is `burst(centre, 20)` and nothing here has to know what a radius is.
         A scene with no map gets an empty list and the thing still exists — a
         manifestation without squares is fiction, not a bug.
+
+        **Cells, not squares, since the areas gained a third axis.** A spread is defined
+        by Aiming a Spell as extending "in all directions", and fireball's printed area is
+        a 20-ft.-radius spread — so it has always been a sphere on paper and was a flat
+        disc here. Measured: that disc was really an infinite column, because a stored
+        square matches at any level, so a fireball on the floor caught a creature flying a
+        hundred feet above it. A sphere has a top and a bottom.
+
+        The centre is normalised to a cell first, using the ground under it when the
+        caster named only a square, because an area that is a sphere only when somebody
+        happens to be flying is two rules wearing one name.
         """
         if not self.scene.has_grid:
             return []
         centre = ctx.get("square")
         if centre is None:
             return []
+        centre = tuple(centre) if len(tuple(centre)) > 2 else (
+            centre[0], centre[1], self.scene.grid.ground(centre))
         size = int(spec.get("size") or 0)
         shape = str(spec.get("shape") or "radius")
         if not size or shape == "point":
@@ -5411,7 +5456,10 @@ class Engine:
             return [(centre[0] + dx, centre[1]) for dx in range(span)] if shape == "wall" \
                 else [(centre[0] + dx, centre[1] + dy)
                       for dy in range(span) for dx in range(span)]
-        return sorted(gridmod.burst(tuple(centre), size))
+        # Nothing below the floor. A sphere centred on the ground reaches down as far as
+        # it reaches up, and there is no level under level zero to fill — the first run
+        # of this put a bank of fog in the cellar of a room that has no cellar.
+        return sorted(c for c in gridmod.burst(tuple(centre), size) if c[2] >= 0)
 
     def _summon(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Bring a creature in through the same door everything else arrives by."""
