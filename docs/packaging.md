@@ -15,7 +15,7 @@ pip install pyinstaller
 python -m PyInstaller --noconfirm --clean pathfindergm.spec
 ```
 
-Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.4, one file, no installer, no side
+Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.5, one file, no installer, no side
 directory. A build takes about 100 seconds after the first one (the first is ~145s
 while PyInstaller caches its analysis). `build/` and `dist/` are both gitignored; `pathfindergm.spec` is
 not — `.gitignore` excludes `*.spec` and then re-includes this one by name, because the
@@ -282,7 +282,7 @@ before any JavaScript existed:
 portfile appears with a live pid → the URL answers → kill the shell's tree → **no
 backend survives**. Green in both dev mode (`electron .` over this machine's Python)
 and against the electron-builder output. `npm run dist` in `electron/` builds
-`release/Pathfinder GM Setup 0.1.4.exe` (115 MB NSIS installer, backend exe bundled as
+`release/Pathfinder GM Setup 0.1.5.exe` (115 MB NSIS installer, backend exe bundled as
 an extraResource).
 
 ## The server outlived the browser by four hours (2026-09-01)
