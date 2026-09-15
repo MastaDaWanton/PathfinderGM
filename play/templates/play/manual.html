@@ -106,6 +106,7 @@ number, every condition and every die. Nothing leaves your computer.</p>
   <a href="#aside">Asking and cheating</a>
   <a href="#benches">Benches</a>
   <a href="#files">Your files</a>
+  <a href="#updates">New versions</a>
   <a href="#wrong">When it goes wrong</a>
 </nav>
 
@@ -117,6 +118,14 @@ free, it installs into your own account without asking for an administrator, and
 does not bundle it — partly because the models are far too large to ship inside an
 installer, and partly because if you already have Ollama you should keep using the one
 you have.</p>
+
+<p><b>You do not have to go and find it.</b> If Ollama is not on this machine, Settings has
+an <b>Install Ollama</b> button that fetches it and opens it for you, with a progress bar,
+so there is no download page to hunt through. It checks the file before it runs anything:
+Windows itself has to vouch for the signature, and it has to say Ollama. Then Ollama's own
+installer appears and you agree to it — nothing is installed quietly. The link is still
+there beside the button if you would rather do it yourself, and on a Mac or on Linux the
+link is the way.</p>
 
 <p>Then the models themselves. The app fetches these for you; you never type a command.</p>
 
@@ -374,6 +383,23 @@ it is the same kind of document underneath.</p>
 <p>Campaigns and characters are plain JSON files — readable, copyable, and backed up by
 copying the folder. There is no database and nothing to migrate. Deleting the app does not
 touch them.</p>
+
+<h2 id="updates">New versions</h2>
+
+<p>When a new version is out, the app says so shortly after you open it, and then waits.
+<b>Nothing downloads and nothing installs unless you press something</b> — you are asked
+once before the download starts, and again before the game closes to install it. If you
+would rather not, say so and it will not ask again until the next version.</p>
+
+<p>Your characters, campaigns, worlds and homebrew are not touched by an update. They live
+in your own data folder, which is named on the console window behind the game, and a new
+version reads the same files the old one wrote.</p>
+
+<p>One thing to expect, because it is better to know than to wonder: <b>Windows will warn
+you</b> when you run the installer, and it will warn you again on the next version. The app
+is not signed with a paid certificate, and Windows treats every unsigned file as a stranger
+until enough people have run that exact file. The warning is about who paid for a
+certificate, not about what the program does.</p>
 
 <h2 id="wrong">When something goes wrong</h2>
 
