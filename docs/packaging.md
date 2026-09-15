@@ -15,7 +15,7 @@ pip install pyinstaller
 python -m PyInstaller --noconfirm --clean pathfindergm.spec
 ```
 
-Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.1, one file, no installer, no side
+Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.3, one file, no installer, no side
 directory. A build takes about 100 seconds after the first one (the first is ~145s
 while PyInstaller caches its analysis). `build/` and `dist/` are both gitignored; `pathfindergm.spec` is
 not — `.gitignore` excludes `*.spec` and then re-includes this one by name, because the
@@ -282,7 +282,7 @@ before any JavaScript existed:
 portfile appears with a live pid → the URL answers → kill the shell's tree → **no
 backend survives**. Green in both dev mode (`electron .` over this machine's Python)
 and against the electron-builder output. `npm run dist` in `electron/` builds
-`release/Pathfinder GM Setup 0.1.1.exe` (115 MB NSIS installer, backend exe bundled as
+`release/Pathfinder GM Setup 0.1.3.exe` (115 MB NSIS installer, backend exe bundled as
 an extraResource).
 
 ## The server outlived the browser by four hours (2026-09-01)
@@ -394,7 +394,10 @@ list is what anybody checks before deciding what is left to do. Each is now asse
   call it seven to nine seconds to unpack ~39 MB and answer, and note that three runs on
   one machine is a reading rather than a benchmark. The prover prints it every run now
   and faults above 60s — not as a performance bar but because 60s is the signature of
-  the leftover-`_MEI*` pathology rather than of any code change.
+  the leftover-`_MEI*` pathology rather than of any code change. At 0.1.3 the first run
+  after a build read **13.1s** and the next read **8.6s** on the same artifact: time the
+  cold start on a second run, or you are timing the machine still digesting a 37 MB
+  write rather than the exe.
 
 Still true, and left where they are: the clean-machine install, the signatures,
 `console=True`, the unseen Electron window, and cross-platform. Those need a machine or
