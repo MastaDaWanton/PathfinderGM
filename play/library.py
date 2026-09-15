@@ -263,7 +263,7 @@ def recent_characters(limit: int = 12) -> list[dict]:
         summary = entry.summary()
         summary["world"] = where.get(entry.id, "")
         summary["active"] = entry.campaign_id == active
-        summary["playable"] = entry.status != roster.DEAD
+        summary["playable"] = entry.playable()
         out.append(summary)
     out.sort(key=lambda e: (not e["active"], not e["playable"], -e["turns_played"]))
     return out[:limit]

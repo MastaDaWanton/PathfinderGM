@@ -1628,12 +1628,17 @@ function paneCharacters() {
     <div class="cards">${STATE.recent.map(c => `
       <div class="card ${c.id === MADE ? "justmade" : ""}">
         <h3>${esc(c.name)}</h3>
-        <em>${esc(c.line)}${c.world ? ` · ${esc(c.world)}` : ""}</em>
+        <em class="${c.unreadable ? "line bad" : ""}">${esc(c.line)}${
+          c.world && !c.unreadable ? ` · ${esc(c.world)}` : ""}</em>
         <div class="stat">${esc(c.hp)} hp · <b>${c.turns_played}</b> turns played</div>
         <div style="margin-top:9px">
           ${c.active ? `<span class="pill now">in play</span>` : ""}
           ${c.status === "dead" ? `<span class="pill dead">died${
             c.epitaph ? " — " + esc(c.epitaph) : ""}</span>` : ""}
+          <!-- A character whose sheet no longer validates. The card says so and offers
+               no way to play them, rather than the whole page being a 500 — which is
+               what one of these used to do to every other character on the roster. -->
+          ${c.unreadable ? `<span class="pill dead">the sheet cannot be read</span>` : ""}
           ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}">${
             c.active ? "Go to the table" : "Play as " + esc(c.name)
           }</button>` : ""}

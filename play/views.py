@@ -400,7 +400,7 @@ def characters(request):
     return JsonResponse({
         "playing": c.character_id,
         "ended": c.ended,
-        "roster": [{**e.summary(), "playable": e.status != roster.DEAD,
+        "roster": [{**e.summary(), "playable": e.playable(),
                     "current": e.id == c.character_id}
                    for e in roster.everyone()],
         "choices": roster.pregens(),
