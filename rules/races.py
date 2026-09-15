@@ -162,13 +162,21 @@ def _fill(value, choice: str):
     return value
 
 
+# Limbs that come in pairs, and how many of them a body has before it buys any. The
+# count is resolved into the tag by `expand` — `limbs.arms.6` is six arms — because the
+# tag list is the only part of the document that reaches play, and a set cannot hold "how
+# many". See `VISIBLE_BODY` for the words a person in the room gets.
+PAIRED_LIMBS: dict[str, int] = {"limbs.arms": 2, "limbs.legs": 2}
+
+
 def expand(doc: dict) -> dict:
     """What the document's evolutions grant, folded into the document's own fields.
 
     The stored document keeps `evolutions` as picked; the tags, modifiers, weapons,
     speed and size they imply are computed here every time, so correcting an
     evolution in the catalogue corrects every race that took it. `move.*.base` and
-    `move.*.half` are resolved against the race's own speed once that is known.
+    `move.*.half` are resolved against the race's own speed once that is known, and a
+    paired limb taken more than once resolves to how many there are.
     """
     d = dict(doc)
     cat = evolutions()
@@ -180,6 +188,13 @@ def expand(doc: dict) -> dict:
     not_yet = list(d.get("not_yet") or [])
     speed = int(d.get("speed") or 30)
     size = str(d.get("size") or "medium")
+    # How many times each tag was granted and each trait line earned. A repeatable
+    # evolution reaches here two ways — one pick saying `times: 3`, or three picks saying
+    # `times: 1` — and the bench writes the second. Counting `times` alone therefore
+    # undercounts, and a `tags` list cannot count at all: measured 2026-09-15, a race with
+    # `limbs-arms` picked twice (six arms) described itself with four.
+    granted: dict[str, int] = {}
+    earned: dict[str, int] = {}
     for pick in d.get("evolutions") or []:
         if not isinstance(pick, dict):
             continue
@@ -190,6 +205,7 @@ def expand(doc: dict) -> dict:
         times = max(1, int(pick.get("times", 1) or 1))
         for _ in range(times):
             for tg in _fill(ev.get("tags") or [], choice):
+                granted[tg] = granted.get(tg, 0) + 1
                 if tg not in tags:
                     tags.append(tg)
             for m in _fill(ev.get("modifiers") or [], choice):
@@ -205,18 +221,29 @@ def expand(doc: dict) -> dict:
             if ev.get("size"):
                 size = str(ev["size"])
         line = _fill(str(ev.get("line") or ev.get("name") or ""), choice or "—")
-        if line and line not in traits:
-            traits.append(line if times == 1 else f"{line} (x{times})")
+        if line:
+            earned[line] = earned.get(line, 0) + times
+            if line not in traits:
+                traits.append(line)
         waits = _fill(str(ev.get("not_yet") or ""), choice or "—")
         if waits and waits not in not_yet:
             not_yet.append(waits)
-    # Speeds that are "equal to base" or "half base" are numbers now.
+    # The count goes on at the end, so three separate picks of one read the same as one
+    # pick of three. Lines the document wrote itself are not in `earned` and keep theirs.
+    traits = [f"{ln} (x{earned[ln]})" if earned.get(ln, 1) > 1 else ln for ln in traits]
+    # Speeds that are "equal to base" or "half base" are numbers now, and so are limbs.
     resolved = []
     for tg in tags:
         if tg.endswith(".base"):
             tg = tg[:-5] + f".{speed}"
         elif tg.endswith(".half"):
             tg = tg[:-5] + f".{max(5, speed // 2 // 5 * 5)}"
+        elif tg in PAIRED_LIMBS:
+            # `max(1, …)`: a document may carry the bare tag with no evolution behind it
+            # — a world's race written from cue words — and the tag being there at all
+            # means one extra pair. Already-counted tags (`limbs.arms.6`) fall through
+            # untouched, so expanding twice is the same as expanding once.
+            tg = f"{tg}.{PAIRED_LIMBS[tg] + 2 * max(1, granted.get(tg, 0))}"
         if tg not in resolved:
             resolved.append(tg)
     d.update({"tags": resolved, "mods": {k: v for k, v in mods.items() if v},
@@ -259,12 +286,46 @@ def senses(doc: dict) -> list[str]:
 # words, with no number and no rule in it. Everything else the price table knows — damage
 # reduction, spell resistance, immunities — is mechanics, and mechanics reach the narrator
 # as tells or not at all.
+#
+# The two limb entries are the wording for ONE extra pair; `_limb_phrase` produces them
+# and every larger count, because a race may buy as many pairs as it likes ("I should be
+# able to have as many arms and legs as I want", 2026-09-08) and the reporter's asura had
+# bought two — "four in all" was as wrong as "two".
 VISIBLE_BODY: dict[str, str] = {
     "limbs.arms": "an extra pair of arms — four in all",
-    "limbs.legs": "an extra pair of legs",
+    "limbs.legs": "an extra pair of legs — four in all",
     "tail": "a tail",
     "amphibious": "gills",
 }
+
+# Small numbers read as words; past that a numeral is less silly than "seventeen".
+_COUNT_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight",
+                "nine", "ten", "eleven", "twelve")
+
+
+def _words(n: int) -> str:
+    return _COUNT_WORDS[n] if 0 <= n < len(_COUNT_WORDS) else str(n)
+
+
+def _limb_phrase(base: str, total: int) -> str:
+    """"two extra pairs of arms — six in all". Both halves are said because a person
+    counting sees the total and a player who bought the pairs recognises the pairs."""
+    kind = base.rpartition(".")[2]
+    pairs = max(1, (total - PAIRED_LIMBS[base]) // 2)
+    many = "an extra pair" if pairs == 1 else f"{_words(pairs)} extra pairs"
+    return f"{many} of {kind} — {_words(total)} in all"
+
+
+def visible_body(tag: str) -> str | None:
+    """What this tag looks like to somebody standing in front of it, or None if it is
+    not something they can see. Asked of the tag rather than looked up in it, because a
+    counted limb is `limbs.arms.6` and no dictionary has a key for every number."""
+    base, _, count = tag.rpartition(".")
+    if base in PAIRED_LIMBS and count.isdigit():
+        return _limb_phrase(base, int(count))
+    if tag in PAIRED_LIMBS:                 # bare: one extra pair, un-expanded
+        return _limb_phrase(tag, PAIRED_LIMBS[tag] + 2)
+    return VISIBLE_BODY.get(tag)
 
 
 def body_line(doc: dict) -> str:
@@ -283,7 +344,7 @@ def body_line(doc: dict) -> str:
         parts.append("natural weapons: " + ", ".join(naturals))
     tags = list(doc.get("tags") or [])
     # The visible body first, because it is the half a person in the room can check.
-    seen = [VISIBLE_BODY[t] for t in tags if t in VISIBLE_BODY]
+    seen = [w for w in (visible_body(t) for t in tags) if w]
     if seen:
         parts.append("plainly: " + ", ".join(seen))
     extra = [TAG_RP[t][1] for t in tags if t in TAG_RP and t not in VISIBLE_BODY

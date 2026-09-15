@@ -1,4 +1,7 @@
-"""Two things reported from a real session on 2026-09-15, and what was actually wrong.
+"""Things reported from a real session on 2026-09-15, and what was actually wrong.
+
+Two at first, then a third when the fix for the second reached the table — the arms were
+described, and described as four. See the last section.
 
 > "chose my background but still got a generic opener. then I asked a person how many arms
 > i have and they said two, I am playing as an asura race I have more than 2 arms."
@@ -152,3 +155,85 @@ def test_a_past_that_was_never_filled_is_filled_on_the_next_load():
     # Only ever fills an empty list: binding twice would re-cast the people it names.
     assert "return" in heal.split("getattr(pc, \"background_ties\", None)")[1][:80]
     assert "_heal_background(c)" in inspect.getsource(campaign), "nothing calls it"
+
+
+# --- and how many pairs of them ----------------------------------------------------------
+
+# Reported the same day, once the first fix reached the table: "the asura has multiple
+# pairs of extra arms." It did — `limbs-arms` is picked FOUR times in that document, which
+# is ten arms — and the brief said "an extra pair of arms — four in all", a fixed string.
+#
+# The count was lost twice over. `expand` collects tags into a list and skips one it
+# already has, so four picks left one `limbs.arms`; and it appended the trait line only
+# `if line not in traits`, so the second, third and fourth picks wrote nothing at all —
+# the `(x{times})` it already had only ever counted `times` WITHIN one pick, and the bench
+# writes repeats as separate picks of one. The sheet and the narrator agreed with each
+# other and both were wrong.
+#
+# `takes` on the evolution is deliberately not a ceiling: "I should be able to have as
+# many arms and legs as I want" (2026-09-08). So this cannot be a dictionary of phrases.
+
+
+def _picked(evolution: str, times: int) -> dict:
+    return {"id": "x", "name": "X", "speed": 30, "size": "medium",
+            "evolutions": [{"id": evolution, "choice": "", "times": 1}] * times}
+
+
+def test_four_pairs_of_arms_are_ten_arms():
+    """The report. Counted in the tag, because the tag list is the only part of a race
+    document that reaches play — `limbs.arms.10` the way a speed is `move.fly.40`."""
+    doc = races.expand(races.normalise(_picked("limbs-arms", 4)))
+    assert "limbs.arms.10" in doc["tags"], doc["tags"]
+    line = races.body_line(doc)
+    assert "ten in all" in line, line
+    assert "four extra pairs" in line, line
+
+
+def test_repeats_count_the_same_written_either_way():
+    """The undercount's actual mechanism. A repeatable evolution reaches `expand` as one
+    pick saying `times: 3` or as three picks saying `times: 1`; the bench writes the
+    second, and the code only read the first."""
+    spread = races.expand(races.normalise(_picked("limbs-arms", 3)))
+    together = races.expand(races.normalise(
+        {"id": "x", "name": "X", "speed": 30,
+         "evolutions": [{"id": "limbs-arms", "choice": "", "times": 3}]}))
+    assert spread["tags"] == together["tags"] == ["race.x", "limbs.arms.8"]
+    assert spread["traits"] == together["traits"] == ["an extra pair of arms (x3)"]
+
+
+def test_the_sheet_counts_repeats_too_and_not_only_limbs():
+    """The same defect, on the line the player reads. Three picks of improved natural
+    armour stacked their +2s correctly and described themselves once."""
+    doc = races.expand(races.normalise(_picked("improved-natural-armor", 3)))
+    assert any("(x3)" in t for t in doc["traits"]), doc["traits"]
+
+
+def test_one_pair_still_reads_as_one_pair():
+    """The common case has to stay plain English: nobody says "one extra pair"."""
+    doc = races.expand(races.normalise(_picked("limbs-arms", 1)))
+    assert races.VISIBLE_BODY["limbs.arms"] in races.body_line(doc)
+    assert "an extra pair of arms" in races.body_line(doc)
+
+
+def test_a_bare_limb_tag_written_by_hand_is_one_extra_pair():
+    """A world's race is written from cue words and carries the tag with no evolution
+    behind it. The tag being there at all means a pair — the alternative reading, two
+    arms, is the body everyone already has and would not be worth a tag."""
+    assert "four in all" in races.body_line(
+        {"id": "x", "name": "X", "speed": 30, "tags": ["limbs.arms"]})
+
+
+def test_expanding_twice_is_the_same_as_expanding_once():
+    """`derive` is called on whatever the bench hands it, and a counted tag must not be
+    counted again — `limbs.arms.10` would otherwise grow every time it was read."""
+    once = races.expand(races.normalise(_picked("limbs-arms", 4)))
+    assert races.expand(once)["tags"] == once["tags"]
+
+
+def test_legs_are_counted_the_same_way_and_still_pay_their_speed():
+    """Legs are the other paired limb, and the one with mechanics attached: each pair is
+    +10 ft, which stacked correctly all along because speed is a number and not a tag."""
+    doc = races.expand(races.normalise(_picked("limbs-legs", 2)))
+    assert "limbs.legs.6" in doc["tags"]
+    assert doc["speed"] == 50, doc["speed"]
+    assert "six in all" in races.body_line(doc)
