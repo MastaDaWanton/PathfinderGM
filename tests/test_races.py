@@ -148,8 +148,14 @@ def test_a_people_with_a_body_is_a_race_and_one_without_is_a_heritage(monkeypatc
     assert korvu["choose"] == list(races.STANDARD_CHOOSE)
     assert korvu["converted"] and korvu["origin"].startswith("world:")
     assert korvu["people_id"] == "fd4449bc9a64"
-    # Said, not dropped: the engine has no fly speed yet.
-    assert any("fly speed" in n for n in korvu["not_yet"])
+    # The fly speed used to carry "the engine moves on the ground only" here, and this
+    # asserted it was said rather than dropped. Stage 3 (2026-09-14) gave the engine a
+    # level to move to, so the caveat came off — and the assertion flipped rather than
+    # being deleted, because the thing worth pinning is that the Korvu's wings and the
+    # Flight evolution agree about what they deliver. `tests/test_movement_modes.py`
+    # holds both doors to that.
+    assert not any("fly speed" in n for n in korvu["not_yet"]), korvu["not_yet"]
+    assert races.speeds(korvu)["fly"] == 30
     heritages = [h["name"] for h in races.heritages_from_world(WORLD)]
     assert "Nahyrin" in heritages and "Korvu" not in heritages
 

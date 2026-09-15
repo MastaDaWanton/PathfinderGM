@@ -117,17 +117,25 @@ def normalise_dc(spec, op: str, index: int) -> dict:
     )
 
 
-def _square(raw, op: str, index: int) -> tuple[int, int]:
+def _square(raw, op: str, index: int) -> tuple[int, ...]:
     """A grid square, however the GM wrote it.
 
     A model asked for coordinates returns `[4, 7]` or `{"col": 4, "row": 7}` or `"4,7"`
     depending on the phase of the moon, and all three mean the same square. Normalising
     here rather than in the engine keeps every op that grows a position later reading one
     shape — and gives one error message instead of three.
+
+    An optional third number is the **level**, five feet apiece, added 2026-09-14 — so
+    `[5, 5, 4]` is the square twenty feet above `[5, 5]`, where a spider on a ceiling
+    lives. Two numbers still mean the ground and are still what almost everything sends;
+    the engine is what decides whether the creature may go up, not this.
     """
     if isinstance(raw, dict):
         try:
-            return (int(raw["col"]), int(raw["row"]))
+            got = (int(raw["col"]), int(raw["row"]))
+            if raw.get("level") is not None:
+                got += (int(raw["level"]),)
+            return got
         except (KeyError, TypeError, ValueError):
             raise IntentError(
                 f"{op}: square must have integer col and row, got {raw!r}",
@@ -136,13 +144,16 @@ def _square(raw, op: str, index: int) -> tuple[int, int]:
     if isinstance(raw, str):
         raw = [bit for bit in raw.replace("(", "").replace(")", "").split(",") if bit.strip()]
     try:
-        col, row = raw
-        return (int(col), int(row))
+        bits = tuple(int(n) for n in raw)
     except (TypeError, ValueError):
-        raise IntentError(
-            f"{op}: square must be a square like [col, row], got {raw!r}",
-            "schema", index
-        ) from None
+        bits = ()
+    if len(bits) in (2, 3):
+        return bits
+    raise IntentError(
+        f"{op}: square must be a square like [col, row], or [col, row, level] for one "
+        f"off the ground, got {raw!r}",
+        "schema", index
+    )
 
 
 def _known_weapon(name) -> bool:
@@ -275,6 +286,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # is the scene transition. Before it shed anybody, a gatekeeper wounded in the city
     # followed the player to the forest and took an NPC turn forever.
     "travel": ((), ("biome", "place", "note", "with"), "hidden"),
+    # Leaving the town altogether, which `travel` has never been able to do: it moves the
+    # ground underfoot inside one settlement, and `Scene.location_id` was written once at
+    # campaign creation and never again. A separate op rather than another `travel` param
+    # because they are different scales doing different work — one costs a move, the
+    # other costs days — and because a model that says "we set out for Zhilgoroth" should
+    # not be able to reach it by naming a biome.
+    "journey": (("to",), ("note", "with", "pace"), "hidden"),
     # Doors two and three of rules/places.py. `found`: the player makes a place from
     # where they stand — a base at a friend's house, the alley behind the market —
     # with an owner the engine knows; the engine mints the id, the narrator never

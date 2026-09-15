@@ -228,6 +228,123 @@ def location_of(place_id: str) -> str:
     return head.rsplit(SEP, 1)[0] if SEP in head else head
 
 
+# --- storeys ---------------------------------------------------------------------------
+#
+# A building's floors are PLACES, joined by stairs, and not a third dimension of the
+# tactical grid. That is the shape every system that keeps verticality and stays legible
+# settled on — Foundry's Levels, Caves of Qud's strata, Dwarf Fortress's z-levels are all
+# stacked flat maps with a transition between them — and it is also the shape this app was
+# already in: `mint` has had a branch for "a different ground under the same roof: the
+# sewers under a town" since places were written. A storey is that, pointing up.
+#
+# The storey lives in the id, like the ground does, because the id is the one spatial
+# authority and a second field would be the fifth one `docs/places-plan.md` refused. `^` is
+# safe as the separator: `_slug` strips everything but `[a-z0-9 ]`, a location id is twelve
+# hex characters, and a terrain is a single lower-case word, so nothing else can ever
+# contain it.
+STOREY = "^"
+
+# What a floor is called, by how far it is from the ground one. "The undercroft" rather
+# than "the cellar" deliberately: `VENTURES` already offers "the cellars" as somewhere you
+# venture into from a town, and two places a player can reach by typing almost the same
+# words is a way to pick the wrong one.
+_STOREY_NAMES: dict[int, tuple[str, str]] = {
+    2: ("the top floor", "as high as the stairs go"),
+    1: ("the upper floor", "one flight up"),
+    -1: ("the undercroft", "under the boards"),
+}
+
+
+def storey_of(place_id: str) -> int:
+    """Which floor this id names, zero being the one you walk in on.
+
+    Parsed, never stored — the same arrangement as `terrain_of`, so a deep-copied Scene
+    can answer it and a save written before storeys existed answers 0, which is true.
+    """
+    tail = str(place_id or "").rsplit(STOREY, 1)
+    if len(tail) < 2:
+        return 0
+    try:
+        return int(tail[1])
+    except ValueError:
+        return 0
+
+
+def base_of(place_id: str) -> str:
+    """The building, with the floor taken off."""
+    text = str(place_id or "")
+    return text.rsplit(STOREY, 1)[0] if STOREY in text else text
+
+
+def storey_id(place_id: str, level: int) -> str:
+    """The id of a given floor of whatever building this id is in."""
+    base = base_of(place_id)
+    return base if not level else f"{base}{STOREY}{int(level)}"
+
+
+def is_indoors(place_id: str, terrain: str = "") -> bool:
+    """Whether this place has a roof on it.
+
+    Asked of `floorplan`, which already answers it: a shape with a `ceiling` is a room and
+    one without is under the sky. One source, so a tavern cannot be indoors for the
+    purposes of stairs and outdoors for the purposes of flying over it.
+    """
+    from . import floorplan
+
+    return floorplan.shape_for(place_id, terrain).ceiling is not None
+
+
+def storeys(place_id: str, terrain: str = "") -> tuple[int, ...]:
+    """Every floor this building has, in order, ground floor included.
+
+    Deterministic off the building's own id, like everything else about a place: the same
+    tavern has the same number of floors for ever, and none of it is saved. Outdoors is
+    always the single floor you are standing on — a market has no upstairs.
+    """
+    if not is_indoors(place_id, terrain):
+        return (0,)
+    n = _seed(base_of(place_id))
+    up = n % 3                 # nothing, one floor, or two
+    down = (n >> 5) % 2        # and an undercroft, or not
+    return tuple(range(-down, up + 1))
+
+
+def storey_set(place: "Place") -> tuple["Place", ...]:
+    """The floors above and below this one, as places, wired to the stairs.
+
+    The ground floor is `place` itself and is not repeated. Each floor keeps the
+    building's ground and parent — an upper room is still `urban` — because the terrain is
+    about what the ground is made of and not about how far up it is.
+    """
+    levels = storeys(place.id, place.terrain)
+    out: list[Place] = []
+    for level in levels:
+        if level == 0 or level not in _STOREY_NAMES:
+            continue
+        label, about = _STOREY_NAMES[level]
+        reachable = [storey_id(place.id, other) for other in levels
+                     if abs(other - level) == 1]
+        out.append(Place(
+            id=storey_id(place.id, level),
+            name=f"{label} of {place.name}" if place.name else label,
+            about=about, terrain=place.terrain, exits=tuple(reachable),
+            parent=place.id, origin="storey"))
+    return tuple(out)
+
+
+def stairs_from(place_id: str, terrain: str = "") -> tuple[str, ...]:
+    """The ids one flight up and one flight down, where those floors exist.
+
+    Only adjacent floors: you cannot step from the undercroft to the top of the house
+    without passing the room between, which is the whole reason these are places joined by
+    stairs rather than a coordinate anybody can name.
+    """
+    here = storey_of(place_id)
+    return tuple(storey_id(place_id, other)
+                 for other in storeys(place_id, terrain)
+                 if abs(other - here) == 1)
+
+
 # --- the sets ----------------------------------------------------------------------------
 
 def _seed(location_id: str) -> int:
@@ -381,7 +498,32 @@ def for_scene(location, at: str, terrain_hint: str = "",
         base = region_set(location_of(at), ground)
     else:
         base = home + region_set(location_of(at), ground)
-    return with_founded(base, founded, at)
+    return with_founded(with_storeys(base), founded, at)
+
+
+def with_storeys(base: tuple["Place", ...]) -> tuple["Place", ...]:
+    """Every place in `base`, plus the floors of any of them that has floors.
+
+    The ground floor gains its stairs as exits so the move vocabulary IS the exit list,
+    which is the one thing every tradition surveyed agreed on. Added here rather than in
+    `home_set` because a storey is reachable from where the party stands and `for_scene`
+    is the one derivation of that — the same reasoning that put founded places here.
+    """
+    out = list(base)
+    for place in base:
+        if storey_of(place.id):
+            continue                       # already a floor; do not stack floors on it
+        upstairs = storey_set(place)
+        if not upstairs:
+            continue
+        out[out.index(place)] = Place(
+            id=place.id, name=place.name, about=place.about, terrain=place.terrain,
+            exits=tuple(place.exits) + tuple(p.id for p in upstairs
+                                             if abs(storey_of(p.id)) == 1),
+            described_only=place.described_only, parent=place.parent,
+            owner=place.owner, origin=place.origin)
+        out.extend(upstairs)
+    return tuple(out)
 
 
 def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place, ...]:

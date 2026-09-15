@@ -342,7 +342,13 @@ class Scene:
         self.people[actor.ref] = actor
         self.zones[actor.ref] = zone
         if at is not None:
-            self.positions[actor.ref] = (int(at[0]), int(at[1]))
+            # The level comes along when one is given. Truncating to two here is what
+            # kept the scene flat: every other hop — the save, `resync_zones`,
+            # `grid.distance` — has taken a third coordinate since stage 2, and this
+            # was the one place it was thrown away.
+            self.positions[actor.ref] = (
+                (int(at[0]), int(at[1])) if len(at) < 3
+                else (int(at[0]), int(at[1]), int(at[2])))
         # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
         # come through here, so a save from before the mark existed heals itself to the
         # highest ref it holds on the first load.
@@ -362,17 +368,65 @@ class Scene:
     def position(self, ref: str) -> tuple[int, int] | None:
         return self.positions.get(ref)
 
-    def occupied(self, ignore: str = "") -> set[tuple[int, int]]:
-        """Every square something is standing on, for movement to route around."""
-        from .grid import footprint
+    def settle_levels(self) -> None:
+        """Put everybody at the height of the ground they are standing on.
+
+        The heightmap was inert without this, and inert in the way this whole run of work
+        keeps finding: a dais was drawn, saved and measured, and a creature standing on it
+        was still at level zero, so it got no higher ground and nothing could tell it was
+        up there. A raised square nobody is raised by is scenery.
+
+        The rule is that **a creature which is not flying or climbing is on the floor** —
+        not "keeps whatever level it was given" — because that avoids having to tell an
+        explicit level 0 from an absent one, which is the empty-versus-absent trap and is
+        how a creature would end up standing inside a dais.
+
+        A flier keeps its own height, and never less than the ground beneath it.
+        """
+        if self.grid is None:
+            return
+        for ref, spot in list(self.positions.items()):
+            actor = self.actors.get(ref)
+            if actor is None:
+                continue
+            ground = self.grid.ground(spot)
+            if actor.can_move_vertically():
+                now = max(spot[2] if len(spot) > 2 else 0, ground)
+            else:
+                now = ground
+            # A two-tuple when the answer is the ground, because that is what a
+            # two-tuple has meant since the third axis was added and it is what every
+            # save on disk and every test in the suite is written in. Stamping
+            # `(x, y, 0)` on everybody says the same thing in a way nothing else agrees
+            # with.
+            self.positions[ref] = ((spot[0], spot[1]) if not now
+                                   else (spot[0], spot[1], now))
+
+    def occupied(self, ignore: str = "", level: int | None = None) -> set[tuple[int, int]]:
+        """Every square something is standing on, for movement to route around.
+
+        `level` filters to the creatures whose own body reaches that level, because a
+        body only blocks the ground it is actually on: a spider clinging to a ceiling
+        twenty feet up does not stop anybody walking underneath it, and before this it
+        did — it held the square beneath it against every route on the floor.
+
+        Overlap rather than equality, so a Large creature standing on the floor still
+        blocks the level above its feet, which is where its chest is.
+        """
+        from .grid import footprint, height_squares
 
         out: set[tuple[int, int]] = set()
         for ref, anchor in self.positions.items():
             if ref == ignore or ref not in self.actors:
                 continue
-            if self.actors[ref].has_condition("dead"):
+            actor = self.actors[ref]
+            if actor.has_condition("dead"):
                 continue
-            out.update(footprint(anchor, self.actors[ref].size))
+            if level is not None:
+                lo = anchor[2] if len(anchor) > 2 else 0
+                if not lo <= level <= lo + height_squares(actor.size) - 1:
+                    continue
+            out.update(footprint(anchor, actor.size))
         return out
 
     def distance_between(self, a: str, b: str) -> int | None:
@@ -629,7 +683,17 @@ class Scene:
         made.id = made.id or f"m{len(self.manifests) + 1}"
         if self.grid is not None and made.terrain in ("obscuring", "blocked", "difficult"):
             already = getattr(self.grid, made.terrain)
-            made.added = [s for s in made.squares
+            # The GROUND it covers, not the cells it fills. An area knows its own height
+            # — a fog cloud is a sphere, and that is what decides who is standing in it —
+            # but the grid's terrain sets are flat, because sight and movement in this
+            # engine are: a square is opaque or it is not, at every level.
+            #
+            # Writing cells in here was silent and total: `line_of_sight` compares
+            # two-element squares, no three-element cell ever matched one, and sight went
+            # straight through a bank of fog that was drawn on the map. The manifest keeps
+            # the cells; the map gets the footprint.
+            footprint = {(s[0], s[1]) for s in made.squares}
+            made.added = [s for s in sorted(footprint)
                           if self.grid.inside(s) and s not in already]
             already.update(made.added)
         self.manifests.append(made)
@@ -1189,8 +1253,29 @@ class Manifestation:
     id: str = ""
 
     def covers(self, squares) -> bool:
+        """Whether this manifestation is in any of these cells.
+
+        A stored entry with only two numbers means the whole column — that is what every
+        manifestation written before areas had a third axis meant, and reading it as
+        "level 0 only" would quietly let an old fog cloud stop catching the people
+        standing in it.
+        """
         mine = {tuple(s) for s in self.squares}
-        return any(tuple(s) in mine for s in squares)
+        ground = {(s[0], s[1]) for s in mine}
+        flat = {(s[0], s[1]) for s in mine if len(s) < 3}
+        for s in squares:
+            cell = tuple(s)
+            here = (cell[0], cell[1])
+            if cell in mine:
+                return True
+            # A missing level on EITHER side means "any level", and both directions
+            # happen. A manifestation written before areas had a third axis stores
+            # squares; a caller asking "is this creature in the cloud" may hand over a
+            # footprint rather than a volume. Answering only one of those was how an
+            # incendiary cloud came to stand over somebody and do nothing.
+            if here in flat or (len(cell) < 3 and here in ground):
+                return True
+        return False
 
     def as_dict(self) -> dict:
         return {"what": self.what, "terrain": self.terrain,
@@ -1496,7 +1581,11 @@ class Engine:
                 "refs", index,
             )
         to = intent.params.get("to")
-        if to and not self._known(to, extra):
+        # `journey` is the one op whose `to` names a place rather than a body — a
+        # settlement the world wrote a road to. `_op_journey` resolves it against that
+        # road list and refuses an unknown one by naming the ones that exist, which is
+        # the same courtesy `travel` extends to a place.
+        if to and intent.op != "journey" and not self._known(to, extra):
             raise IntentError(
                 f"{intent.op}: unknown ref {to!r} in params.to", "refs", index
             )
@@ -2230,6 +2319,22 @@ class Engine:
         target_ac = defender.ac(against=weapon["category"], flat_footed=flat_footed)
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
 
+        # What the board is worth to the defender. Added to the number being rolled
+        # against rather than taken off the attack roll: the two are the same arithmetic
+        # for whether a blow lands and are not the same fact, and everything that reads
+        # an AC — the panel, the tell, a spell that cares — should see the real one.
+        from . import position as position_mod
+
+        if position_mod.cover_of(self.scene, actor, defender) == "total":
+            return self._refuse(
+                intent,
+                f"{defender.name} is behind total cover: there is no line to them from "
+                f"where {actor.name} is standing.")
+        cover_mods = position_mod.ac_mods(self.scene, actor, defender)
+        if cover_mods:
+            target_ac += sum(m.value for m in cover_mods)
+            ac_note += " with " + ", ".join(m.source for m in cover_mods)
+
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
         sequence = actor.attack_sequence(weapon_key, full)
@@ -2282,6 +2387,11 @@ class Engine:
             # penalty depends on *who is being attacked*, which the sheet does not know.
             # It penalises and never prohibits: see the header of rules/compulsion.py.
             atk_mods = atk_mods + compulsion.penalty_against(actor, defender.ref)
+            # And the board, for the same reason one step further out: flanking and
+            # higher ground depend on where BOTH of them are standing, which the sheet
+            # knows even less about than it knows the target. `rules/position.py`.
+            atk_mods = atk_mods + position_mod.attack_mods(
+                self.scene, actor, defender, weapon)
 
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(
@@ -3454,6 +3564,162 @@ class Engine:
             if not a.at:
                 a.at = target.id
 
+    def _march(self, pc, hours: int, biome: str) -> tuple[bool, str]:
+        """Walk a journey, eight hours a day with a camp between, and say what it cost.
+
+        The first version of this spent the whole journey in one `pass_hours` call, and
+        it was wrong in a way that only showed up when it was driven: a five-day road is
+        forty hours, and forty hours *continuously* is a man marching without sleep. Both
+        a four-hit-point traveller and a sixty-hit-point one collapsed at exactly the same
+        hour, because what stopped them was the twenty-four-hour wakefulness grace and not
+        anything about their bodies. A journey is not a forced march; it is days.
+
+        So each day is `HOURS_PER_DAY` of walking, charged to the body, then a camp. The
+        camp feeds, waters and sleeps the traveller — which is what this game models
+        provisioning as everywhere else, since `_op_eat` resets the hunger clock and
+        consumes nothing. Being stricter on the road than in a tavern would be a rule this
+        one op invented for itself.
+
+        Returns whether the far end was reached, and the tell for what the road took.
+        """
+        from . import journey as journey_mod
+
+        if pc is None or not hours:
+            if hours:
+                self.scene.advance(hours * survival.MINUTES_PER_HOUR)
+            return True, ""
+
+        day = journey_mod.HOURS_PER_DAY
+        told: list[str] = []
+        left_to_walk = hours
+        while left_to_walk > 0:
+            today = min(day, left_to_walk)
+            toll = survival.pass_hours(pc, today, self.dice, biome=biome)
+            walked = max(1, toll.hours)
+            self.scene.advance(walked * survival.MINUTES_PER_HOUR, charge_body=False)
+            if toll.checks:
+                told.append(survival_note(toll))
+            if walked < today:
+                # The body gave out with road still to go. They do not arrive — a journey
+                # that ran out of traveller did not happen, and arriving anyway is what
+                # makes the clock decorative on exactly the trip that should test it.
+                return False, "; ".join(told)
+            left_to_walk -= today
+            if left_to_walk > 0:
+                # Camp. The rest of the day passes and the traveller takes it.
+                survival.eat(pc)
+                survival.drink(pc)
+                survival.sleep(pc)
+                self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
+                                   charge_body=False)
+        return True, "; ".join(told)
+
+    def _op_journey(self, intent: Intent, partial: dict) -> Outcome:
+        """Leave the town, for another one, and pay the road for it.
+
+        The op `Scene.location_id` waited for. It was written once at campaign creation
+        and never again, so a world shipping twelve settlements could be played in one —
+        `travel` moves the ground underfoot *inside* a settlement and has no way out.
+
+        Everything about the arithmetic lives in `rules/journey.py`; everything about the
+        consequences is here, and it is the same shape as `_op_venture`: roll the body's
+        checks for the hours, then move the world's clock by what they actually cost.
+        Travel that costs nothing is why a three-day march used to be free on a clock
+        that meters thirst in hours.
+        """
+        from . import journey as journey_mod, places as places_mod
+
+        pc = self.scene.pc()
+        want = " ".join(str(intent.params.get("to") or "").split())
+        legs = journey_mod.legs_from(self.world, self.scene.location_id)
+        if not legs:
+            return self._refuse(
+                intent, "There is no road out of here that this world has written down.")
+        leg = journey_mod.find(legs, want)
+        if leg is None:
+            return self._refuse(
+                intent, f"There is no road from here to {want or 'there'}. From here you "
+                        f"can reach {', '.join(x.to_name for x in legs)}.")
+
+        # The warrant reads the road, exactly as it reads the gate. Leaving town by the
+        # highway is the most public way out there is, and `_op_travel` already refuses
+        # the open road to somebody who is wanted — this is that rule, one scale up.
+        if pc is not None:
+            law = states.standing_with_the_law(
+                pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
+            if law == "wanted" and not pc.has_state("knows.way-past-gate"):
+                found = self.world.get(self.scene.location_id) if self.world else None
+                return self._refuse(
+                    intent,
+                    f"{pc.name} is wanted in {getattr(found, 'name', 'this town')}, and "
+                    f"the road out is watched: they would be taken before the first "
+                    f"milestone. Clear your name, or find another way past the watch.")
+
+        speed = pc.speed_feet if pc is not None else 30
+        hours, measured, how = journey_mod.hours_for(leg, speed)
+
+        # The fight does not come with you, and neither does anybody who is not.
+        fight_ended = bool(self.scene.initiative)
+        if fight_ended:
+            self.scene.end_encounter()
+        escorts = [str(w) for w in (intent.params.get("with") or [])
+                   if str(w) in self.scene.actors]
+        keeping = {pc.ref if pc is not None else "", *escorts}
+        left = [a.name for ref, a in list(self.scene.actors.items())
+                if ref not in keeping and not a.is_pc]
+        for ref in list(self.scene.actors):
+            if ref not in keeping and not self.scene.actors[ref].is_pc:
+                self.scene.depart(ref)
+
+        # The road, charged to the body first and the world's clock second — the order
+        # `_op_venture` uses, because `pass_hours` can stop early and only it knows how
+        # many hours were actually survived.
+        toll_note = ""
+        arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
+        if walked:
+            toll_note = f" The road cost them: {walked}"
+
+        if arrived:
+            self.scene.location_id = leg.to_id
+        self.place_party()
+
+        if not arrived:
+            bits = [f"The road to {leg.to_name} was longer than {pc.name if pc else 'the party'} "
+                    f"could walk: they turned back before it was done."]
+            if toll_note:
+                bits.append(toll_note.strip())
+            return Outcome(
+                intent_id=intent.id, op="journey", status="prevented",
+                effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
+                          "hours": hours, "arrived": False, "how": how, "left": left}],
+                tell=" ".join(bits),
+                because=intent.because,
+            )
+
+        bits = [f"{journey_mod.describe(leg, hours).capitalize()}, and {leg.to_name} "
+                f"is ahead of you."]
+        if how == "derived":
+            # Never a mileage the world did not state. The tell says how long it took,
+            # which is true, and not how far it was, which nobody wrote down.
+            bits.append("How far it is, nobody has written down.")
+        if fight_ended:
+            bits.append("The fight is left behind.")
+        if left:
+            bits.append(f"Left behind: {', '.join(left)}.")
+        if toll_note:
+            bits.append(toll_note.strip())
+        note = str(intent.params.get("note") or "").strip()
+        if note:
+            bits.append(note)
+        return Outcome(
+            intent_id=intent.id, op="journey",
+            effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
+                      "hours": hours, "measured": measured, "how": how,
+                      "left": left, "fight_ended": fight_ended}],
+            tell=" ".join(bits),
+            because=intent.because,
+        )
+
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
 
@@ -3528,6 +3794,9 @@ class Engine:
             if going_to.described_only:
                 return self._refuse(
                     intent, f"{going_to.name} can be seen from here but not reached.")
+            stair = self._not_by_the_stairs(here, going_to)
+            if stair:
+                return self._refuse(intent, stair)
         elif biome == here.terrain:
             # The ground already underfoot. This used to compare the stored biome and
             # do nothing; without the field the same answer has to be said, or a party
@@ -5136,7 +5405,8 @@ class Engine:
                 save=ctx.get("save", ""), dc=int(ctx.get("dc", 0) or 0),
                 save_effect=ctx.get("save_effect", ""), manifest_id=made.id,
             ))
-        where = (f" over {len(made.squares)} squares" if made.squares else "")
+        where = (f" over {len({(s[0], s[1]) for s in made.squares})} squares"
+                 if made.squares else "")
         # Said when the thing wanted squares and there was nowhere to put them. The first
         # version tested `not made.squares`, which is true in exactly the case the note is
         # for — so the note never appeared on a mapless scene and always would have on a
@@ -5146,19 +5416,32 @@ class Engine:
         return ([{"kind": "manifest", **made.as_dict()}],
                 [f"{made.what[:1].upper()}{made.what[1:]}{where}{note}."])
 
-    def _squares_for(self, spec: dict, ctx: dict) -> list[tuple[int, int]]:
-        """The squares a manifestation covers, from the grid's own area functions.
+    def _squares_for(self, spec: dict, ctx: dict) -> list[tuple[int, ...]]:
+        """The cells a manifestation covers, from the grid's own area functions.
 
         `rules/grid.py` already draws a burst, a line and a cone for spell areas, so a
         fog cloud is `burst(centre, 20)` and nothing here has to know what a radius is.
         A scene with no map gets an empty list and the thing still exists — a
         manifestation without squares is fiction, not a bug.
+
+        **Cells, not squares, since the areas gained a third axis.** A spread is defined
+        by Aiming a Spell as extending "in all directions", and fireball's printed area is
+        a 20-ft.-radius spread — so it has always been a sphere on paper and was a flat
+        disc here. Measured: that disc was really an infinite column, because a stored
+        square matches at any level, so a fireball on the floor caught a creature flying a
+        hundred feet above it. A sphere has a top and a bottom.
+
+        The centre is normalised to a cell first, using the ground under it when the
+        caster named only a square, because an area that is a sphere only when somebody
+        happens to be flying is two rules wearing one name.
         """
         if not self.scene.has_grid:
             return []
         centre = ctx.get("square")
         if centre is None:
             return []
+        centre = tuple(centre) if len(tuple(centre)) > 2 else (
+            centre[0], centre[1], self.scene.grid.ground(centre))
         size = int(spec.get("size") or 0)
         shape = str(spec.get("shape") or "radius")
         if not size or shape == "point":
@@ -5173,7 +5456,10 @@ class Engine:
             return [(centre[0] + dx, centre[1]) for dx in range(span)] if shape == "wall" \
                 else [(centre[0] + dx, centre[1] + dy)
                       for dy in range(span) for dx in range(span)]
-        return sorted(gridmod.burst(tuple(centre), size))
+        # Nothing below the floor. A sphere centred on the ground reaches down as far as
+        # it reaches up, and there is no level under level zero to fill — the first run
+        # of this put a bank of fog in the cellar of a room that has no cellar.
+        return sorted(c for c in gridmod.burst(tuple(centre), size) if c[2] >= 0)
 
     def _summon(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Bring a creature in through the same door everything else arrives by."""
@@ -5539,7 +5825,11 @@ class Engine:
 
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
+            refusal = self._cannot_leave_the_ground(actor, from_square, tuple(square))
+            if refusal:
+                return self._refuse(intent, refusal)
             self.scene.positions[ref] = tuple(square)
+            self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
             # said "near"; if the square it also gave is forty feet away, the square wins.
             self.scene.resync_zones()
@@ -5562,8 +5852,108 @@ class Engine:
             because=intent.because,
         )
 
-    def _move_cost(self, ref: str, start: tuple[int, int] | None,
-                   end: tuple[int, int]) -> int | None:
+    def _not_by_the_stairs(self, here, going_to) -> str:
+        """Why this floor cannot be reached from where the party is standing, or "".
+
+        The place graph inside a settlement is deliberately a clique — "a settlement is
+        not a maze, and a graph the player has to solve is a different game from the one
+        this is" — and `_op_travel` has always resolved a destination by *name* among the
+        places within reach rather than by walking exits. That was harmless while every
+        exit list held everything.
+
+        Storeys broke it. Measured the day they landed: standing in the market, the party
+        could name "the top floor of the temple" and simply be there, having passed
+        through neither the temple nor its stairs. So floors — and only floors — are
+        checked against the exits that carry them, which is what the exit list was for.
+
+        Ground level is left exactly as it was. The clique is a decision, not an
+        oversight, and a stair is the one edge in this graph that means something.
+        """
+        from . import places as places_mod
+
+        there = places_mod.storey_of(going_to.id)
+        mine = places_mod.storey_of(here.id)
+        if there == mine and places_mod.base_of(going_to.id) == places_mod.base_of(here.id):
+            return ""
+        if there == 0 and mine == 0:
+            return ""                      # the town's own ground floor: as it always was
+        if going_to.id in places_mod.stairs_from(here.id, here.terrain):
+            return ""
+        # One floor of a building, named from somewhere that is not the floor below it.
+        building = places_mod.base_of(going_to.id)
+        door = next((p.name for p in self.places() if p.id == building), "the way in")
+        return (f"{going_to.name} is not reached from here: the stairs to it are inside "
+                f"{door}.")
+
+    def _clear_square(self, wanted: tuple[int, int], size: str = "medium") -> tuple[int, int]:
+        """`wanted`, or the nearest square that is not a wall and not somebody else.
+
+        Needed the moment places gained a shape: the battlefield is laid out by zone and
+        row, and those rows were computed against an empty field. Against a market with
+        stalls in it, the arithmetic will cheerfully stand a guard inside one — and a
+        creature in a blocked square cannot be routed to, cannot be left, and is a bug
+        that looks like a rules problem.
+
+        Spirals outward, so the answer stays as close to the intended spot as the ground
+        allows and a line of people laid along a row stays a line.
+        """
+        from .grid import footprint
+
+        grid = self.scene.grid
+        if grid is None:
+            return wanted
+        taken = self.scene.occupied()
+
+        def free(p) -> bool:
+            return all(grid.passable(q) and q not in taken
+                       for q in footprint(p, size))
+
+        if free(wanted):
+            return wanted
+        for ring in range(1, max(grid.width, grid.height)):
+            for dx in range(-ring, ring + 1):
+                for dy in range(-ring, ring + 1):
+                    if max(abs(dx), abs(dy)) != ring:
+                        continue
+                    p = (wanted[0] + dx, wanted[1] + dy)
+                    if grid.inside(p) and free(p):
+                        return p
+        return wanted
+
+    def _cannot_leave_the_ground(self, actor, start, end) -> str:
+        """Why this creature may not move to that level, or "".
+
+        The engine disposing of what the GM proposed, in the one place a creature's
+        height can change. A model that narrates a spider scuttling up a wall is right
+        and gets it; one that walks a man up the same wall is refused with the reason,
+        which is a sentence it can act on rather than a silent correction.
+
+        Only the *destination* level is asked about, not the route. A climber that has to
+        cross a gap to reach its wall is a pathing question, and this is a permission
+        question; `_move_cost` already answers "there is no route" with `None`.
+        """
+        level = end[2] if len(end) > 2 else 0
+        was = start[2] if start is not None and len(start) > 2 else 0
+        if level == was:
+            return ""
+        if level < 0:
+            return f"{actor.name} cannot go below the floor."
+        grid = self.scene.grid
+        roof = grid.headroom(end) if grid is not None else None
+        if roof is not None and level > roof:
+            return (f"There is not that much air above {actor.name}: the ceiling is "
+                    f"in the way.")
+        how = actor.can_move_vertically()
+        if how:
+            return ""
+        # Coming back down is always allowed — that is falling, and everybody can fall.
+        if level < was:
+            return ""
+        return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
+                f"nothing here to climb.")
+
+    def _move_cost(self, ref: str, start: tuple[int, ...] | None,
+                   end: tuple[int, ...]) -> int | None:
         """What the move actually cost, routed around terrain and other creatures.
 
         `None` when there is no route — which is not the same as free, and is why this
@@ -5572,10 +5962,32 @@ class Engine:
         """
         if start is None or self.scene.grid is None:
             return None
-        reach = self.scene.grid.reachable(
-            start, 10_000, size=self.scene.actors[ref].size,
-            occupied=self.scene.occupied(ignore=ref))
-        return reach.get(end)
+        # The route is solved on the floor the creature is arriving at, and the climb or
+        # the flight is added to it. Two reasons not to path in three dimensions here:
+        # the grid's terrain — difficult, blocked, obscuring — is stated per square with
+        # no notion of height, so there is nothing for a vertical A* to route around; and
+        # the thing a player is owed is the total feet, which is the same either way for
+        # every shape of route this engine can currently describe.
+        from .grid import SQUARE_FT
+
+        here, there = tuple(start[:2]), tuple(end[:2])
+        was = start[2] if len(start) > 2 else 0
+        now = end[2] if len(end) > 2 else 0
+        if there == here:
+            # Straight up or straight down, without crossing the floor at all — which is
+            # the commonest move a climber makes and the one `reachable` cannot answer:
+            # it returns every square you can get TO and deliberately omits the one you
+            # are standing on, so asking it about your own column gives `None` and reads
+            # as "there is no route" for a spider going up its own wall.
+            flat = 0
+        else:
+            reach = self.scene.grid.reachable(
+                here, 10_000, size=self.scene.actors[ref].size,
+                occupied=self.scene.occupied(ignore=ref, level=now))
+            flat = reach.get(there)
+            if flat is None:
+                return None
+        return flat + abs(now - was) * SQUARE_FT
 
     def _op_advance_time(self, intent: Intent, partial: dict) -> Outcome:
         amount, unit = intent.params["amount"], intent.params["unit"]
@@ -5762,9 +6174,14 @@ class Engine:
         `begin_encounter`, and the swing that auto-starts one."""
         if self.scene.grid is not None:
             return
-        from .grid import Grid
+        from . import floorplan, places as places_mod
 
-        self.scene.grid = Grid()
+        # The ground the party is standing on, not a blank field. Derived from the place
+        # id, so the market has the same stalls every time anybody fights in it and none
+        # of it is saved. A place nobody has a shape for falls through to its terrain and
+        # then to open ground, which is what every fight used to get.
+        self.scene.grid = floorplan.for_place(
+            self.scene.at, places_mod.terrain_of(self.scene.at))
         mid = self.scene.grid.height // 2
         pc_side, foe_row = 4, 0
         for side, refs in sides.items():
@@ -5787,7 +6204,8 @@ class Engine:
                 if pc_side + away >= self.scene.grid.width:
                     self.scene.grid.width = pc_side + away + 2
                 if has_pc:
-                    self.scene.positions[ref] = (pc_side, mid + i)
+                    self.scene.positions[ref] = self._clear_square(
+                        (pc_side, mid + i), self.scene.actors[ref].size)
                 else:
                     # Fanned out from the middle row rather than stacked downward:
                     # five people at one distance were laid as a column of five,
@@ -5798,9 +6216,10 @@ class Engine:
                     # the player's, so a crowd is a crowd and not a wall.
                     fan = (0, 1, -1, 2, -2, 3, -3, 4, -4)
                     row = mid + fan[foe_row % len(fan)] + (foe_row // len(fan))
-                    self.scene.positions[ref] = (
-                        min(self.scene.grid.width - 1, pc_side + away),
-                        max(0, min(self.scene.grid.height - 1, row)))
+                    self.scene.positions[ref] = self._clear_square(
+                        (min(self.scene.grid.width - 1, pc_side + away),
+                         max(0, min(self.scene.grid.height - 1, row))),
+                        self.scene.actors[ref].size)
                     foe_row += 1
         # The bystanders — in the room, in no side — go on the board too, at their
         # own zones, so the map shows the room the prose described and not only the
@@ -5810,6 +6229,9 @@ class Engine:
                       and not any(r in refs for refs in sides.values())]
         if bystanders:
             self.scene.place_by_zone(bystanders)
+        # The plan has raised ground in it, and until this everybody stood at level zero
+        # on top of a dais they were not on.
+        self.scene.settle_levels()
         self.scene.resync_zones()
 
     def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:

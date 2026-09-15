@@ -825,7 +825,7 @@ def array_from_words(strengths, weakness: str = "") -> tuple[dict, list]:
 # the tags it grants, the trait line it shows, and what still waits on the engine.
 CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
     (r"\b(wings?|winged|fly|flight|glide|soar|airborne)\b", ("move.fly.30",),
-     "fly 30 ft (clumsy)", "a fly speed: the engine moves on the ground only"),
+     "fly 30 ft (clumsy)", ""),
     (r"\b(echolocat\w*|blindsense|sonar)\b", ("sense.blindsense.30",),
      "blindsense 30 ft", ""),
     (r"\b(see|sight|vision|eyes)\b[^.]{0,40}\b(dark|darkness|night|lightless|pitch)\b|"
@@ -837,8 +837,7 @@ CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
     (r"\b(gills?|amphibious|breathe\w*\s+(under)?water|aquatic)\b",
      ("amphibious", "move.swim.30"), "amphibious; swim 30 ft",
      "a swim speed: the engine has no water"),
-    (r"\b(climb\w*|arboreal|tree-?dwell\w*)\b", ("move.climb.20",), "climb 20 ft",
-     "a climb speed: the engine has no walls"),
+    (r"\b(climb\w*|arboreal|tree-?dwell\w*)\b", ("move.climb.20",), "climb 20 ft", ""),
     (r"\b(burrow\w*|tunnel\w*|dig\w*)\b", ("move.burrow.20",), "burrow 20 ft",
      "a burrow speed: the engine has no earth"),
     (r"\b(talons?|claws?|clawed)\b", ("natural.claws",), "claws",

@@ -299,6 +299,21 @@
   #map .difficult { fill: #2a2416; }
   #map .obscuring { fill: #23262b; }
   #map .reach { fill: var(--gold); opacity: .12; }
+  /* The vertical. Raised ground reads as lighter stone the higher it goes, and a rail
+     is drawn as an edge rather than a fill, because it is a thing you shoot over and a
+     filled square would read as a wall — which is exactly the mistake the engine was
+     making before stage 5b. */
+  #map .up1 { fill: #3d3527; }
+  #map .up2 { fill: #4a4130; }
+  #map .up3 { fill: #585039; }
+  #map .rail { stroke: #7a6a44; stroke-width: 2.5; stroke-linecap: round; }
+  /* Somebody on another floor of the same room: still there, still worth seeing, and
+     plainly not who you are looking at. */
+  #map .token.offlevel { opacity: .32; }
+  #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
+  .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
+  .levelpick button { padding: 1px 8px; font-size: 11px; }
+  .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
   #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1;
                 transition: cx .4s ease, cy .4s ease; }
   #map .token.pc { fill: var(--gold); }
@@ -1950,6 +1965,11 @@ document.addEventListener("click", e => {
 // The reachable squares are computed by the engine and sent down, never worked out here.
 // Two implementations of the alternating diagonal rule would eventually disagree, and the
 // one on screen is the one the player would believe.
+// Which floor of the room the map is showing. Not part of STATE: it is a way of looking
+// at the board, not a fact about it, and putting it in the server's payload would make
+// the server responsible for where the player's attention is.
+let MAP_LEVEL = 0;
+
 function renderMap(s) {
   const g = s.scene.grid;
   if (!g) {
@@ -1966,9 +1986,28 @@ function renderMap(s) {
   const reach = new Map((g.reachable || []).map(([c, r, cost]) => [`${c},${r}`, cost]));
   const parts = [];
 
+  // Which floor is being looked at. A room with only one is not asked about — a level
+  // picker over a flat market is a control that does nothing, and the first thing a
+  // player learns from it is that it does not matter.
+  const levels = (g.levels && g.levels.length > 1) ? g.levels : [0];
+  if (!levels.includes(MAP_LEVEL)) MAP_LEVEL = levels[0];
+  const ground = new Map((g.floor || []).map(([c, r, v]) => [`${c},${r}`, v]));
+  const at = (c, r) => ground.get(`${c},${r}`) || 0;
+
   for (const [c, r] of g.difficult) parts.push(cell(c, r, "difficult"));
   for (const [c, r] of g.obscuring) parts.push(cell(c, r, "obscuring"));
   for (const [c, r] of g.blocked) parts.push(cell(c, r, "blocked"));
+  // Raised ground, lighter the higher it stands, drawn under everything else so a token
+  // on a dais still reads as a token on a dais.
+  for (const [c, r, v] of (g.floor || []))
+    parts.push(cell(c, r, `up${Math.min(3, v)}`,
+      `<title>${v * 5} ft above the floor</title>`));
+  // Rails as edges, not fills. A parapet is a thing to shoot over; a filled square
+  // would read as a wall, which is the very mistake the engine was making.
+  for (const [c, r, v] of (g.parapet || []))
+    parts.push(`<line class="rail" x1="${c * CELL + 2}" y1="${(r + .5) * CELL}" x2="${
+      (c + 1) * CELL - 2}" y2="${(r + .5) * CELL}"><title>a rail, ${
+      v * 5} ft up</title></line>`);
   for (const [key, cost] of reach) {
     const [c, r] = key.split(",").map(Number);
     // data-sq is what makes the square a *destination* — the combat builder queues a
@@ -1976,8 +2015,13 @@ function renderMap(s) {
     // data-sq is what makes the square a destination for the combat builder. The
     // first cut replaced on 'class="cell reach"', which cell() never writes — the
     // legend counted 35 lit squares while zero of them were clickable.
-    parts.push(cell(c, r, "reach", `<title>${cost} ft</title>`)
-      .replace('class="reach"', `class="reach" data-sq="${c},${r}"`));
+    // A destination carries the level it lands you on, so the combat builder queues a
+    // move to a CELL and not merely a square. Walking onto a dais is walking up onto it.
+    const lvl = at(c, r);
+    parts.push(cell(c, r, "reach", `<title>${cost} ft${
+        lvl ? ` · ${lvl * 5} ft up` : ""}</title>`)
+      .replace('class="reach"', `class="reach" data-sq="${c},${r}${
+        lvl ? "," + lvl : ""}"`));
   }
 
   // Grid lines last of the terrain, so they sit over the fills and under the tokens.
@@ -2003,10 +2047,16 @@ function renderMap(s) {
     const down = a.hp <= 0;
     const side = a.is_pc ? " pc" : a.side ? (a.side === "pc" || a.side === "you" ? " ally" : " foe")
       : (s.scene.in_encounter ? " bystander" : "");
-    parts.push(`<rect class="token${side}${down ? " down" : ""}"
+    // Somebody on another floor of the same room is faded, not hidden. Hiding them is
+    // how a player is surprised by an archer who was on the map the whole time; this is
+    // the level selector saying "not who you are looking at" rather than "not there".
+    const mine = (a.at.length > 2 ? a.at[2] : 0) === MAP_LEVEL;
+    const ghost = mine ? "" : " offlevel";
+    parts.push(`<rect class="token${side}${down ? " down" : ""}${ghost}"
       x="${c * CELL + 2}" y="${r * CELL + 2}"
       width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
-      <title>${esc(a.name)} — ${a.hp}/${a.hp_max}</title></rect>`);
+      <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
+        a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></rect>`);
     parts.push(`<text class="tok" x="${(c + n / 2) * CELL}" y="${
       (r + n / 2) * CELL + 4}">${esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
@@ -2014,7 +2064,13 @@ function renderMap(s) {
   const svg = `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
          preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
-  const legend = `${g.speed ? `<div class="sub maplegend">${
+  const picker = levels.length > 1
+    ? `<div class="levelpick"><span class="sub">Looking at</span>${levels.map(v =>
+        `<button data-maplevel="${v}" class="${v === MAP_LEVEL ? "on" : ""}">${
+          v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}${
+        g.ceiling ? `<span class="sub">ceiling ${g.ceiling * 5} ft</span>` : ""}</div>`
+    : "";
+  const legend = `${picker}${g.speed ? `<div class="sub maplegend">${
       reach.size} squares within ${g.speed} ft</div>` : ""}${
       pools ? `<div class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</div>` : ""}`;
@@ -2394,6 +2450,8 @@ document.addEventListener("click", async e => {
     else if (what.startsWith("free:")) COMBAT.frees.splice(Number(what.slice(5)), 1);
     renderPlan(); return;
   }
+  const lvl = t.closest("[data-maplevel]");
+  if (lvl) { MAP_LEVEL = Number(lvl.dataset.maplevel); renderMap(STATE); return; }
   const sq = t.closest("[data-sq]");
   if (sq && STATE.scene && STATE.scene.in_encounter) {
     COMBAT.move = sq.dataset.sq.split(",").map(Number);

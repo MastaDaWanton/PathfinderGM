@@ -28,6 +28,10 @@ from heapq import heappop, heappush
 from .tables import SPACE_AND_REACH
 
 Point = tuple[int, int]
+# A square plus the level it is on, five feet apiece. `Point` stays two-dimensional
+# because the map is drawn flat and most of the app has no vertical in it; anything
+# that reads a third coordinate accepts either and treats a missing one as ground.
+Cell = tuple[int, int, int]
 
 # One square, in feet. Named rather than spelled 5 everywhere, because "5" appears in this
 # file as a distance, as a reach and as a speed, and only one of those is this.
@@ -40,7 +44,18 @@ DIRECTIONS: dict[str, Point] = {
 }
 
 
-def distance(a: Point, b: Point) -> int:
+def _xyz(p) -> tuple[int, int, int]:
+    """A point as three coordinates, with a missing third reading as ground level.
+
+    Every position in the app was `(col, row)` before height existed, and most still are:
+    a scene with no vertical in it should not have to say `z=0` on every call, and a save
+    written last week must load without a migration. So two-tuples keep working and mean
+    exactly what they meant.
+    """
+    return (p[0], p[1], p[2] if len(p) > 2 else 0)
+
+
+def distance(a, b) -> int:
     """Distance in feet, counting diagonals the way 1e counts them.
 
     "The first diagonal counts as 5 feet, the second counts as 10 feet, the third as 5,
@@ -48,9 +63,35 @@ def distance(a: Point, b: Point) -> int:
     diagonal retreat free, and the naive Pythagoras makes every distance a fraction.
 
     Areas count the same way, which is why there is one function here and not two.
+
+    **The third axis is a house rule, and this is the one place it is decided.**
+    Pathfinder does not have one: Movement, Position and Distance and Measuring Distance
+    both define the five-foot square and the 5-10-5 diagonal and contain no vertical
+    clause at all (checked against aonprd.com/Rules.aspx?ID=173 and ID=175 on 2026-09-14).
+    Nothing official says whether climbing a square while stepping sideways costs one
+    diagonal or two.
+
+    What is chosen here is the reading that adds no second rule to learn: a step is
+    diagonal if it moves on more than one axis, and **the number of diagonal steps is the
+    second-largest of the three deltas**. Sort them and the shape falls out — the smallest
+    is how many steps move on all three axes, the middle is how many move on at least two,
+    and the largest is the total number of steps.
+
+    It reduces to the existing two-dimensional answer exactly when the heights match
+    (`dz == 0` sorts to the front and the middle delta becomes `min(dx, dy)`), which is
+    why this could replace the old body rather than sit beside it. Straight up three
+    squares is fifteen feet; one step up and one step over is five, like any other first
+    diagonal.
     """
-    dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
-    diagonals, straights = min(dx, dy), max(dx, dy) - min(dx, dy)
+    ax, ay, az = _xyz(a)
+    bx, by, bz = _xyz(b)
+    return _count(abs(bx - ax), abs(by - ay), abs(bz - az))
+
+
+def _count(dx: int, dy: int, dz: int = 0) -> int:
+    """Feet for a separation of so many squares on each axis. See `distance`."""
+    d = sorted((dx, dy, dz))
+    diagonals, straights = d[1], d[2] - d[1]
     return SQUARE_FT * (straights + diagonals + diagonals // 2)
 
 
@@ -71,15 +112,86 @@ def natural_reach(size: str = "medium", shape: str = "tall") -> int:
     return row["reach_long" if shape == "long" else "reach_tall"]
 
 
-def distance_between(a: Point, a_size: str, b: Point, b_size: str) -> int:
-    """Distance between two creatures — the shortest gap between their footprints.
+def height_ft(size: str = "medium", shape: str = "tall",
+              override: float | None = None) -> float:
+    """How far up a creature of this size reaches when it stands, in feet.
+
+    `override` wins, because the source of these bands says they are typical and that
+    exceptions exist — so a document that knows its creature is nine feet of Medium says
+    so, and this table stops guessing for it.
+
+    A `long` creature wears its size band horizontally rather than vertically (a horse is
+    Large and is not sixteen feet tall), so it gets its space instead: about as tall as it
+    is wide, which is the only other measurement the rules hand us.
+    """
+    if override is not None:
+        return max(0.0, float(override))
+    row = SPACE_AND_REACH.get(size.lower(), SPACE_AND_REACH["medium"])
+    return float(row["space"] if shape == "long" else row["tall_ft"])
+
+
+def height_squares(size: str = "medium", shape: str = "tall",
+                   override: float | None = None) -> int:
+    """How many squares of vertical a creature of this size fills, at least one.
+
+    Rounded up, because the question this answers is "what has to clear it" — eight feet
+    of Medium needs two squares of headroom, and a two-foot Tiny still needs one.
+    """
+    ft = height_ft(size, shape, override)
+    return max(1, -(-int(ft * 100) // (SQUARE_FT * 100)))
+
+
+def volume(anchor: Point, size: str = "medium", level: int = 0,
+           shape: str = "tall", height: float | None = None) -> list[Cell]:
+    """Every cell a creature fills — its footprint, stacked as high as it stands.
+
+    The three-dimensional `footprint`, and anchored the same way: top-left of the
+    footprint, and `level` is the square its feet are in. A spider clinging to a ceiling
+    twenty feet up is `level=4`; a flier is wherever it climbed to.
+    """
+    tall = height_squares(size, shape, height)
+    return [(x, y, level + dz)
+            for (x, y) in footprint(anchor, size) for dz in range(tall)]
+
+
+def _span(lo: int, n: int) -> tuple[int, int]:
+    return lo, lo + n - 1
+
+
+def distance_between(a: Point, a_size: str, b: Point, b_size: str,
+                     a_shape: str = "tall", b_shape: str = "tall",
+                     a_height: float | None = None,
+                     b_height: float | None = None) -> int:
+    """Distance between two creatures — the shortest gap between the space they fill.
 
     Measuring anchor to anchor makes a Colossal dragon impossible to reach: its anchor is
     up to six squares from the edge a character is standing against, and every reach check
     would fail while the two were nose to nose.
+
+    Either position may carry a third coordinate. With both on the ground this is the
+    same number it always was, because two creatures standing on the same floor overlap
+    on the vertical axis and the gap there is zero.
+
+    Computed from the gap on each axis rather than by comparing every cell to every cell.
+    Both answers are identical — `test_the_box_gap_agrees_with_comparing_every_cell`
+    proves it across sizes and offsets — and the enumeration is not affordable once
+    creatures have height: a Colossal creature is 6x6 squares and thirteen of them tall,
+    so a pair of them is 468 cells against 468, and the old loop would ask 219,024
+    questions to answer one reach check.
     """
-    here, there = footprint(a, a_size), footprint(b, b_size)
-    return min(distance(p, q) for p in here for q in there)
+    ax, ay, az = _xyz(a)
+    bx, by, bz = _xyz(b)
+    an, bn = size_squares(a_size), size_squares(b_size)
+    ah = height_squares(a_size, a_shape, a_height)
+    bh = height_squares(b_size, b_shape, b_height)
+
+    gaps = []
+    for (lo1, n1), (lo2, n2) in (((ax, an), (bx, bn)), ((ay, an), (by, bn)),
+                                 ((az, ah), (bz, bh))):
+        a_lo, a_hi = _span(lo1, n1)
+        b_lo, b_hi = _span(lo2, n2)
+        gaps.append(max(0, a_lo - b_hi, b_lo - a_hi))
+    return _count(*gaps)
 
 
 def threatened_squares(anchor: Point, size: str = "medium", reach: int = 0,
@@ -132,12 +244,50 @@ class Grid:
     blocked: set[Point] = field(default_factory=set)
     # Blocks sight without blocking movement — smoke, fog, a blood mist.
     obscuring: set[Point] = field(default_factory=set)
+    # How high the floor stands in a square, in levels, where it is not zero. A dais, a
+    # cart bed, a wall-walk, the slope of a hill. Sparse for the same reason the terrain
+    # sets are: a battlefield is mostly flat as well as mostly ordinary, and the squares
+    # worth naming are few.
+    #
+    # This is the heightmap and not a voxel field, which is the shape Final Fantasy Tactics
+    # settled on for the same job: one number per square buys rooftops, daises and "you
+    # cannot get up there", and it cannot express an overhang — nothing is ever *under* a
+    # walkable square in the same column. Storeys are places joined by stairs instead,
+    # which is where the place graph already was.
+    floor: dict[Point, int] = field(default_factory=dict)
+    # Levels of headroom above the floor, or None for open sky. A cellar at 2 is ten feet
+    # of air: something can stand, and a flier can get one square up and no further.
+    ceiling: int | None = None
+    # Low obstacles, by the absolute level of their top: a balustrade, a parapet, a
+    # counter, a cart's side. 1e has this exactly — "a low obstacle (such as a wall no
+    # higher than half your height) provides cover" — and the reason it is not just a
+    # `blocked` square is what a balustrade does to a fight on two levels. Blocked is
+    # solid at every height, so a gallery rail between an archer above and a man below
+    # reads as a wall and the engine calls it TOTAL cover in both directions, which is
+    # the opposite of what a rail is for. A parapet stops a line that passes at or under
+    # its top and lets everything over it through.
+    parapet: dict[Point, int] = field(default_factory=dict)
 
     def inside(self, p: Point) -> bool:
         return 0 <= p[0] < self.width and 0 <= p[1] < self.height
 
     def passable(self, p: Point) -> bool:
         return self.inside(p) and p not in self.blocked
+
+    def ground(self, p: Point) -> int:
+        """The level the floor stands at in this square. Zero unless it says otherwise."""
+        return int(self.floor.get(tuple(p[:2]), 0))
+
+    def headroom(self, p: Point) -> int | None:
+        """The highest level a body may occupy over this square, or None under open sky.
+
+        Measured from the square's own floor, so a dais in a cellar has less air above it
+        than the flagstones beside it — which is the whole reason the two are separate
+        numbers rather than one.
+        """
+        if self.ceiling is None:
+            return None
+        return self.ground(p) + self.ceiling - 1
 
     def enter_cost(self, p: Point) -> int:
         """Feet to enter this square, before diagonals are accounted for."""
@@ -161,6 +311,89 @@ class Grid:
         for ca in _corners(a):
             for cb in _corners(b):
                 if not self._crosses_opaque(ca, cb, ignore=(a, b)):
+                    return True
+        return False
+
+    def cover_between(self, a: Point, a_size: str, b: Point, b_size: str) -> str:
+        """`"none"`, `"cover"` or `"total"` — what the terrain gives the target.
+
+        1e's test, and it is the mirror image of `line_of_sight`: *"choose a corner of
+        your square. If any line from this corner to any corner of the target's square
+        passes through a square or border that blocks line of effect, the target has
+        cover."* The attacker picks the corner that suits them, so a target has cover
+        only when **every** corner the attacker could shoot from leaves at least one
+        blocked line.
+
+        Sight asks whether ANY line gets through; cover asks whether ALL of them do. Two
+        questions of the same geometry with opposite quantifiers, which is why they are
+        neighbours here and why neither is written in terms of the other.
+
+        `total` when no line gets through at all — the target cannot be attacked, which
+        the engine turns into a refusal rather than a penalty.
+
+        **Height is part of it.** The levels of the two positions decide how high the line
+        runs where it crosses each square, so a parapet stops what passes under its top
+        and lets what clears it through. Written after a foyer was measured: an archer on
+        a landing and a man on the floor below, with a balustrade between them, came back
+        as TOTAL cover in both directions — the rail read as a wall because `blocked` is
+        solid at every height, and neither could attack the other at all.
+
+        A parapet can never give total cover. A rail is something to shoot over.
+
+        Soft cover, the +4 a creature in the way grants, is not here: this module has no
+        opinion about who is standing where, and `rules/position.py` reads the scene.
+        """
+        here, there = footprint(a, a_size), footprint(b, b_size)
+        ignore = tuple(here) + tuple(there)
+        a_level = a[2] if len(a) > 2 else 0
+        b_level = b[2] if len(b) > 2 else 0
+        # 1e's quantifier, and it is easy to lose: the attacker CHOOSES a corner, and
+        # from that corner the target has cover if ANY line to it is obstructed. So cover
+        # applies only when every corner the attacker could pick has something in the way
+        # — one clean corner and there is no cover at all.
+        anything_through = False
+        for corner in {c for p in here for c in _corners(p)}:
+            hard = rail = through = False
+            for target in {c for p in there for c in _corners(p)}:
+                if self._crosses_opaque(corner, target, ignore=ignore):
+                    hard = True
+                    continue
+                through = True
+                if self._crosses_parapet(corner, a_level, target, b_level,
+                                         ignore=ignore):
+                    rail = True
+            if not through:
+                continue                      # this corner sees nothing; try another
+            anything_through = True
+            if not hard and not rail:
+                return "none"                 # a corner with a clean shot from it
+        # Nothing got through from anywhere: solid. A parapet can never reach here,
+        # because it never sets `hard` — a balustrade is a thing to shoot over, and
+        # calling it total cover is how a gallery fight becomes two people who cannot
+        # touch each other.
+        return "cover" if anything_through else "total"
+
+    def _crosses_parapet(self, a: tuple[float, float], a_level: int,
+                         b: tuple[float, float], b_level: int,
+                         ignore: tuple[Point, ...] = ()) -> bool:
+        """Whether a low obstacle stands in this line, at the height the line is at.
+
+        The one place the third dimension enters the cover geometry. Sampled like
+        `_crosses_opaque`, but carrying the level along the segment: a rail whose top is
+        level 2 stops a line running at 1 and does nothing to one running at 3.
+        """
+        if not self.parapet:
+            return False
+        steps = max(1, int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) * 8) + 1)
+        for i in range(steps + 1):
+            t = i / steps
+            x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+            at = a_level + (b_level - a_level) * t
+            for square in _squares_at(x, y):
+                if square in ignore:
+                    continue
+                top = self.parapet.get(square)
+                if top is not None and at <= top:
                     return True
         return False
 
@@ -267,16 +500,59 @@ class Grid:
 # --- areas of effect ---------------------------------------------------------------------
 
 def burst(centre: Point, radius_ft: int) -> set[Point]:
-    """A spread or burst: every square within the radius, sight permitting.
+    """A spread or burst: everything within the radius, sight permitting.
 
     Sight does not permit here — `Grid.line_of_sight` is applied by the caller when the
     effect is a spread rather than a burst, because the two differ on exactly that and
     nothing else.
+
+    **A sphere when the centre says which level it is on**, and this is the rules and not
+    an embellishment: Aiming a Spell defines a spread as extending "in all directions" and
+    prints fireball's area as a *20-ft.-radius spread*. So a fireball has always been
+    three-dimensional on paper and was a flat disc here.
+
+    Measured before this was written, and the defect was the opposite way round from the
+    obvious guess: a disc did not *miss* things above it, it caught **everything** above
+    them. `Manifestation.covers` treats a stored square as "any level" — which is the
+    right reading of a save that predates the vertical — so a fireball on the floor
+    reached a creature flying a hundred feet over it. A disc was an infinite column. A
+    sphere has a top.
+
+    A two-element centre still answers in squares, and means what it always meant: a
+    scene with nothing off the ground has no use for the extra axis, and every save and
+    every caller written before levels existed keeps working untouched.
     """
     r = radius_ft // SQUARE_FT + 1
-    return {(centre[0] + dx, centre[1] + dy)
+    if len(centre) < 3:
+        return {(centre[0] + dx, centre[1] + dy)
+                for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+                if distance(centre, (centre[0] + dx, centre[1] + dy)) <= radius_ft}
+    cx, cy, cz = centre
+    return {(cx + dx, cy + dy, cz + dz)
+            for dz in range(-r, r + 1)
             for dy in range(-r, r + 1) for dx in range(-r, r + 1)
-            if distance(centre, (centre[0] + dx, centre[1] + dy)) <= radius_ft}
+            if distance(centre, (cx + dx, cy + dy, cz + dz)) <= radius_ft}
+
+
+def cylinder(centre: Point, radius_ft: int, height_ft: int = 0) -> set[Cell]:
+    """A cylinder: a horizontal circle, and everything under it.
+
+    The one area shape whose vertical extent the rules state outright. Aiming a Spell:
+    the point of origin is the centre of a horizontal circle, "the spell shoots down from
+    the circle, filling a cylinder", and it "ignores any obstructions within its area" —
+    which is why nothing here asks the grid about walls.
+
+    `height_ft` of 0 means all the way down, which is the shape as printed; a spell that
+    states a height gets one.
+    """
+    cx, cy, cz = _xyz(centre)
+    r = radius_ft // SQUARE_FT + 1
+    disc = {(cx + dx, cy + dy)
+            for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+            if distance((cx, cy), (cx + dx, cy + dy)) <= radius_ft}
+    depth = max(1, (height_ft or 0) // SQUARE_FT) if height_ft else cz + 1
+    return {(x, y, cz - dz) for (x, y) in disc for dz in range(depth)
+            if cz - dz >= 0}
 
 
 def line(origin: Point, towards: Point, length_ft: int) -> set[Point]:
@@ -286,15 +562,28 @@ def line(origin: Point, towards: Point, length_ft: int) -> set[Point]:
     rather than slipping between them, which is how a lightning bolt ends up missing
     somebody it visibly passes through.
     """
-    if origin == towards:
+    if tuple(origin[:2]) == tuple(towards[:2]) and _xyz(origin)[2] == _xyz(towards)[2]:
         return {origin}
-    dx, dy = towards[0] - origin[0], towards[1] - origin[1]
-    span = max(abs(dx), abs(dy))
+    ox, oy, oz = _xyz(origin)
+    tx, ty, tz = _xyz(towards)
+    dx, dy = tx - ox, ty - oy
+    span = max(abs(dx), abs(dy)) or 1
     reach = length_ft // SQUARE_FT + 1
-    far = (origin[0] + round(dx / span * reach), origin[1] + round(dy / span * reach))
-    out = {p for p in _squares_on_segment(_centre(origin), _centre(far))
-           if distance(origin, p) <= length_ft}
-    out.add(origin)
+    far = (ox + round(dx / span * reach), oy + round(dy / span * reach))
+    flat = {p for p in _squares_on_segment(_centre((ox, oy)), _centre(far))
+            if distance((ox, oy), p) <= length_ft}
+    flat.add((ox, oy))
+    if len(origin) < 3 and len(towards) < 3:
+        return flat
+    # A bolt aimed upward or downward climbs as it travels. The level at each square is
+    # interpolated along the ray, which is the same thing `_crosses_parapet` does for a
+    # line of sight — one way of carrying height along a line, not two.
+    rise = tz - oz
+    out = set()
+    for square in flat:
+        along = distance((ox, oy), square)
+        far_ft = max(1, distance((ox, oy), far))
+        out.add((square[0], square[1], oz + round(rise * min(1.0, along / far_ft))))
     return out
 
 
@@ -430,7 +719,8 @@ def size_squares(size: str) -> int:
 
 
 __all__ = [
-    "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "distance",
-    "distance_between", "flanking", "footprint", "is_adjacent", "line", "natural_reach",
-    "size_squares", "threatened_squares", "zone_between",
+    "Cell", "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "cylinder",
+    "distance", "distance_between", "flanking", "footprint", "height_ft",
+    "height_squares", "is_adjacent", "line", "natural_reach", "size_squares",
+    "threatened_squares", "volume", "zone_between",
 ]

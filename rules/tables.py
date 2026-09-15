@@ -690,14 +690,47 @@ SIZES: dict[str, dict] = {
 # Reach comes in two shapes, and the distinction is real: a Large *tall* creature (an ogre)
 # threatens 10 feet, a Large *long* one (a horse) threatens 5. Getting this wrong changes
 # who can be attacked without moving, which is most of what a grid is for.
+# `tall_ft` is how far up a creature of this size reaches when it stands — the TOP of the
+# Core Rulebook's "typical height/length" band, which is the number a ceiling has to clear.
+# Medium is 4-8 ft, so a Medium creature is two squares of vertical: eight feet of person
+# inside ten feet of space. That was the shape asked for on 2026-09-14, and it checks out.
+#
+# Sourced carefully, because the obvious place does not have it: **Table 8-4 carries no
+# height column at all** — only Space and Natural Reach (verified against
+# aonprd.com/Rules.aspx?ID=179). The bands come from the Creature Sizes table at
+# d20pfsrd.com/gamemastering/combat/space-reach-threatened-area-templates/, which prints
+# them beside the same space and reach values, and which says in its own words: "These
+# values are TYPICAL for creatures of the indicated size. Some exceptions exist."
+#
+# So this column is a default, not a law, and `height_ft` takes an override for the
+# creature that is an exception — a nine-foot-tall Medium giant-kin is legal in a way a
+# Medium creature with a 10-ft space is not.
+#
+# `tall_ft` is the band top for a creature built upright; a LONG creature of the same size
+# wears that band horizontally — Large (tall) and Large (long) are both "8 to 16 ft" in the
+# source, and the difference is whether that dimension stands up. A horse is not sixteen
+# feet tall, so `height_ft(size, "long")` answers with the creature's space instead: about
+# as tall as it is wide, which is the only other dimension the rules give us.
 SPACE_AND_REACH: dict[str, dict] = {
-    "fine":       {"space": 0.5, "squares": 1, "reach_tall": 0,  "reach_long": 0},
-    "diminutive": {"space": 1,   "squares": 1, "reach_tall": 0,  "reach_long": 0},
-    "tiny":       {"space": 2.5, "squares": 1, "reach_tall": 0,  "reach_long": 0},
-    "small":      {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5},
-    "medium":     {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5},
-    "large":      {"space": 10,  "squares": 2, "reach_tall": 10, "reach_long": 5},
-    "huge":       {"space": 15,  "squares": 3, "reach_tall": 15, "reach_long": 10},
-    "gargantuan": {"space": 20,  "squares": 4, "reach_tall": 20, "reach_long": 15},
-    "colossal":   {"space": 30,  "squares": 6, "reach_tall": 30, "reach_long": 20},
+    "fine":       {"space": 0.5, "squares": 1, "reach_tall": 0,  "reach_long": 0,
+                   "tall_ft": 0.5},
+    "diminutive": {"space": 1,   "squares": 1, "reach_tall": 0,  "reach_long": 0,
+                   "tall_ft": 1},
+    "tiny":       {"space": 2.5, "squares": 1, "reach_tall": 0,  "reach_long": 0,
+                   "tall_ft": 2},
+    "small":      {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5,
+                   "tall_ft": 4},
+    "medium":     {"space": 5,   "squares": 1, "reach_tall": 5,  "reach_long": 5,
+                   "tall_ft": 8},
+    "large":      {"space": 10,  "squares": 2, "reach_tall": 10, "reach_long": 5,
+                   "tall_ft": 16},
+    "huge":       {"space": 15,  "squares": 3, "reach_tall": 15, "reach_long": 10,
+                   "tall_ft": 32},
+    "gargantuan": {"space": 20,  "squares": 4, "reach_tall": 20, "reach_long": 15,
+                   "tall_ft": 64},
+    # "64 ft. or more" has no top. The band's own floor is the honest reading of a row
+    # with no ceiling: a Colossal creature is at least this tall, and a document that
+    # knows better says so with an override rather than this table guessing higher.
+    "colossal":   {"space": 30,  "squares": 6, "reach_tall": 30, "reach_long": 20,
+                   "tall_ft": 64},
 }

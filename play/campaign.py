@@ -61,6 +61,11 @@ def _grid(raw: dict | None):
         difficult={tuple(p) for p in raw.get("difficult", [])},
         blocked={tuple(p) for p in raw.get("blocked", [])},
         obscuring={tuple(p) for p in raw.get("obscuring", [])},
+        floor={tuple(int(n) for n in k.split(",")): int(v)
+               for k, v in (raw.get("floor") or {}).items()},
+        ceiling=raw.get("ceiling"),
+        parapet={tuple(int(n) for n in k.split(",")): int(v)
+                 for k, v in (raw.get("parapet") or {}).items()},
     )
 
 def _portable_world_source(source: str | Path) -> str:
@@ -195,6 +200,16 @@ class Campaign:
                     "difficult": sorted(self.scene.grid.difficult),
                     "blocked": sorted(self.scene.grid.blocked),
                     "obscuring": sorted(self.scene.grid.obscuring),
+                    # The heightmap and the roof. Sparse like the terrain sets, and
+                    # saved rather than re-derived: `floorplan` laid the room, but a
+                    # spell can raise ground and a fight can knock a roof in, so what
+                    # is on the board at the end of a round is not always what the
+                    # plan said. A save that dropped these gave a flier unlimited air
+                    # on reload and quietly took away everybody's higher ground.
+                    "floor": {f"{x},{y}": v for (x, y), v in self.scene.grid.floor.items()},
+                    "ceiling": self.scene.grid.ceiling,
+                    "parapet": {f"{x},{y}": v
+                                for (x, y), v in self.scene.grid.parapet.items()},
                 },
                 "positions": {r: list(p) for r, p in self.scene.positions.items()},
                 # Saved because a fight can be put down mid-round. Losing it would hand

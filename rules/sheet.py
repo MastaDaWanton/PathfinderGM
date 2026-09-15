@@ -2388,6 +2388,73 @@ class Actor:
             return None
         return races_mod.document(self.race)
 
+    def _creature_doc(self) -> dict | None:
+        """The stat block this creature was instantiated from, read live.
+
+        The same arrangement `_race_doc` uses, and for the same reason: `from_template`
+        is the store, the document is the truth, and correcting a creature on the bench
+        corrects every one already standing in a scene. Nothing of the stat block is
+        copied onto the actor, so there is no saved field to migrate.
+        """
+        key = str(getattr(self, "from_template", "") or "").strip()
+        if not key:
+            return None
+        from . import bestiary as bestiary_mod
+
+        # `raw`, not `lookup`: the creature's own words, before the sheet-shaped trim
+        # that drops `speed_note` — which is the only place a climb speed is written.
+        return bestiary_mod.raw(key)
+
+    def movement_modes(self) -> dict[str, int]:
+        """Every way this body can move, in feet, keyed by mode.
+
+        `land` is always present and is `speed_feet` — armour and conditions already
+        applied. The rest are the ways this creature is not walking, and they come from
+        whichever document describes it:
+
+          a race    `move.fly.30` tags, through `races.speeds`
+          a monster "40 ft., climb 20 ft." prose, through `bestiary.speeds`
+
+        Both doors, because the same fact is written two ways and reading only one is how
+        the movement evolutions came to promise a fly speed the engine never asked about.
+        A character who is both — a PC built from a race — gets the better of the two for
+        any mode they disagree on, which is the same rule `races.speeds` uses within tags.
+
+        Read live on every call rather than cached onto the sheet: a fly speed written
+        into a save could not be taken away by an effect, and this is the modifier
+        funnel's own argument applied to movement.
+        """
+        out = {"land": self.speed_feet}
+        doc = self._creature_doc()
+        if doc:
+            from . import bestiary as bestiary_mod
+
+            for mode, feet in bestiary_mod.speeds(doc).items():
+                out[mode] = max(out.get(mode, 0), int(feet))
+        race = self._race_doc()
+        if race:
+            from . import races as races_mod
+
+            for mode, feet in races_mod.speeds(race).items():
+                if mode == "land":
+                    continue
+                out[mode] = max(out.get(mode, 0), int(feet))
+        return {m: f for m, f in out.items() if f > 0 or m == "land"}
+
+    def can_move_vertically(self) -> str:
+        """How this creature gets off the ground, or "" if it cannot.
+
+        Flight first: a creature that can do both does not need a wall. The answer is a
+        mode name so the tell can say *why* — "climbs" and "flies" read differently to a
+        player, and a refusal that says which one is missing is actionable.
+        """
+        modes = self.movement_modes()
+        if modes.get("fly"):
+            return "fly"
+        if modes.get("climb"):
+            return "climb"
+        return ""
+
     def _race_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Modifiers from the race document, through the same reader feats use, so a
         `when` clause or a `scope` behaves the same on a dwarf's CMD as on a feat."""

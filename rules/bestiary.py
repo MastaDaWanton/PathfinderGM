@@ -133,6 +133,59 @@ _COLLECTIVE_COUNTS = {"pair": 2, "couple": 2, "duo": 2, "two": 2, "trio": 3,
                       "three": 3, "four": 4, "five": 5, "six": 6}
 
 
+# The four ways a body moves that this engine has a vocabulary for. Deliberately the same
+# four `rules.races.speeds` reads off `move.<mode>.<ft>` tags, so a flying race and a flying
+# monster are the same fact arriving by two doors — the lesson of the movement evolutions,
+# where the two doors to a fly speed disagreed about whether it worked.
+#
+# A closed list rather than "whatever word precedes a number": the 6,404 shipped speed notes
+# also contain `jet`, `base`, `mounted`, `glide`, `firewalk`, `downhill` and one bare `or`,
+# and a parser that believed all of them would hand the engine a `firewalk` speed it has no
+# rule for. What is not understood is left alone rather than guessed at.
+MOVE_MODES = ("fly", "climb", "swim", "burrow")
+
+_SPEED_MODE = re.compile(
+    r"\b(fly|climb|swim|burrow)\s+(\d+)\s*(?:ft|feet)", re.I)
+# "fly 30 ft. (good)" — the manoeuvrability grade, which in 1e is worth a number on the
+# Fly check and nothing else (clumsy -8 through perfect +8). Captured here because it is
+# free to read and impossible to recover later.
+_FLY_GRADE = re.compile(
+    r"\bfly\s+\d+\s*(?:ft|feet)\.?\s*\((clumsy|poor|average|good|perfect)\)", re.I)
+
+
+def speeds(doc: dict) -> dict[str, int]:
+    """Every way this creature moves, in feet, off its stat block.
+
+    The sibling of `rules.races.speeds`, and it exists because the same fact was written
+    down in two different shapes: a race says it in tags the engine can index, and a
+    creature says it in **prose** — `speed_note: "40 ft., climb 20 ft."` — which nothing
+    had ever read. Measured 2026-09-14: 6,404 of the 7,136 shipped creatures carry one,
+    and between them they describe 852 fliers, 478 swimmers, 371 climbers and 102
+    burrowers, every one of which moved like a man on the ground.
+
+    The leading bare number is the land speed and is already on the sheet as `speed`, so
+    it is not repeated here; this returns only the modes that are not walking.
+    """
+    note = str((doc or {}).get("speed_note") or "")
+    if not note:
+        return {}
+    out: dict[str, int] = {}
+    for m in _SPEED_MODE.finditer(note):
+        mode, feet = m.group(1).lower(), int(m.group(2))
+        out[mode] = max(out.get(mode, 0), feet)
+    return out
+
+
+def fly_grade(doc: dict) -> str:
+    """The manoeuvrability written beside a fly speed, or "" — "average" when a creature
+    flies and does not say, which is the Bestiary's own default."""
+    note = str((doc or {}).get("speed_note") or "")
+    found = _FLY_GRADE.search(note)
+    if found:
+        return found.group(1).lower()
+    return "average" if _SPEED_MODE.search(note) and "fly" in note.lower() else ""
+
+
 def split_collective_name(name: str) -> tuple[int, str]:
     """"pair of guards" is two guards, not one creature with a plural name.
 
@@ -300,7 +353,14 @@ _INDEX: list[str] = []
 _NOT_ON_THE_SHEET = (
     "cr", "cr_value", "xp", "creature_type", "subtype", "alignment", "hit_dice",
     "ac_note", "melee", "ranged", "ranged_attack", "ranged_damage", "cmb",
-    "base_attack", "speed", "speed_note", "immune", "resist", "sr", "weaknesses",
+    # `speed` came off this list on 2026-09-14. It had been stripped beside `speed_note`,
+    # which is prose the sheet has no field for — but `speed` is a plain integer and
+    # `Actor.speed` has always existed, so the strip meant every imported creature fell
+    # back to the default and **walked at 30 feet**. The stat blocks disagree for 3,272 of
+    # the 7,136: 1,408 move 20, 894 move 40, 290 move 50, 178 move 60, 169 move 10. A
+    # giant slug and a hunting cat crossed the same ground in a round.
+    # All 7,112 stated speeds are integers and the 24 absent ones fall back as before.
+    "base_attack", "speed_note", "immune", "resist", "sr", "weaknesses",
     "senses", "languages", "special_attacks", "special_abilities", "spell_like",
     "environment", "organization", "treasure", "source", "playable", "id", "feats",
     "biomes", "climates", "biomes_any", "biomes_inferred", "biomes_from",
@@ -352,6 +412,22 @@ def everything() -> dict[str, dict]:
     out = {k: {"id": k, **v} for k, v in TEMPLATES.items()}
     out.update(imported())
     return out
+
+
+def raw(key: str) -> dict | None:
+    """The stat block as it was written, before `lookup` trims it to fit a sheet.
+
+    `lookup` exists to produce something `Actor.from_dict` can swallow, so it drops every
+    field the sheet has no home for — `speed_note` among them. Anything that wants to read
+    the creature's own words has to come here instead.
+
+    Goes at the two stores directly rather than through `everything()`, which rebuilds a
+    7,136-entry dict on every call. `imported()` is cached, so this is a lookup.
+    """
+    key = (key or "").strip().lower()
+    if key in TEMPLATES:
+        return TEMPLATES[key]
+    return imported().get(key) or imported().get(key.replace(" ", "-"))
 
 
 def lookup(key: str) -> dict | None:
