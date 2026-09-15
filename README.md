@@ -23,6 +23,7 @@ and everything below this line is for people working on the code.
 | `docs/campaign-format.md` | The World Bible data contract |
 | `docs/from-world-bible.md` | What the export hands over today |
 | `docs/for-world-bible.md` | What it does not hand over yet, easiest first |
+| `docs/places-and-races-for-world-bible.md` | The two it must generate, in the shape the engine can read |
 | `docs/first-run.md` | Why Ollama is detected rather than bundled |
 | `docs/packaging.md` | Every frozen-path trap paid for, and what is still unproven |
 
@@ -47,7 +48,7 @@ campaign is a JSON file under your user data directory, and the world export is 
 python -m pytest
 ```
 
-3,590 tests, about six minutes. Run the whole suite, not the file you touched.
+3,602 tests, about six minutes. Run the whole suite, not the file you touched.
 
 To build the packaged app:
 

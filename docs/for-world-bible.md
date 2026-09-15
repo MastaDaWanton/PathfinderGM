@@ -384,6 +384,13 @@ no chronology event does, and no settlement but the starting one.
 
 ## 3. `play.places[]` — the places inside a town
 
+> **Superseded in detail by `docs/places-and-races-for-world-bible.md` (2026-09-15).**
+> That document is what to build from: it carries the corrected id grammar, the room's
+> shape and height, and the three tiers to ship in. What follows is the original ask, kept
+> because the reasoning is still the reasoning. Two things in it have since changed —
+> the id format below gained the `~terrain` segment it is shown with here, and a place now
+> also carries how big it is, how high, and how it is shaped upward.
+
 **The first ask with no written contract yet, and the first that needs real generation
 rather than projection. Propose the schema below or something close to it; the consumer's
 existing `Place` shape is what it has to fit.**
@@ -417,7 +424,7 @@ somewhere nobody authored. That is why the schema below carries an `origin` fiel
 
 | Field | Meaning |
 |---|---|
-| `id` | durable and unique within the export. Prefix with the settlement id so two towns may both have a market: `5bbd0c40345f:the-market` |
+| `id` | durable and unique within the export. Prefix with the settlement id so two towns may both have a market: `5bbd0c40345f~urban:the-market` |
 | `name` | what people call it, lower case, article included: `"the market"`, `"the mine head"` |
 | `about` | one short sentence: what it is for, what it is like. Prose the narrator may use |
 | `parent` | the 12-char entity id of the settlement or region containing it |
@@ -434,16 +441,16 @@ effects rather than a cost table nobody would tune.
 
 ```json
 [
-  {"id": "5bbd0c40345f:the-market", "name": "the market",
+  {"id": "5bbd0c40345f~urban:the-market", "name": "the market",
    "about": "Windcatchers turning over every stall, and ironwork under noble seal.",
    "parent": "5bbd0c40345f", "terrain": "urban",
-   "exits": ["5bbd0c40345f:the-gate", "5bbd0c40345f:the-workshops"],
+   "exits": ["5bbd0c40345f~urban:the-gate", "5bbd0c40345f~urban:the-workshops"],
    "described_only": false, "origin": "world"},
 
-  {"id": "5bbd0c40345f:the-workshops", "name": "the workshops",
+  {"id": "5bbd0c40345f~urban:the-workshops", "name": "the workshops",
    "about": "Where the trades are, and where the castes outnumber the nobility.",
    "parent": "5bbd0c40345f", "terrain": "urban",
-   "exits": ["5bbd0c40345f:the-market"],
+   "exits": ["5bbd0c40345f~urban:the-market"],
    "described_only": false, "origin": "world"}
 ]
 ```
