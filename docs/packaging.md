@@ -394,10 +394,12 @@ list is what anybody checks before deciding what is left to do. Each is now asse
   call it seven to nine seconds to unpack ~39 MB and answer, and note that three runs on
   one machine is a reading rather than a benchmark. The prover prints it every run now
   and faults above 60s — not as a performance bar but because 60s is the signature of
-  the leftover-`_MEI*` pathology rather than of any code change. At 0.1.3 the first run
-  after a build read **13.1s** and the next read **8.6s** on the same artifact: time the
-  cold start on a second run, or you are timing the machine still digesting a 37 MB
-  write rather than the exe.
+  the leftover-`_MEI*` pathology rather than of any code change. One reading of **13.1s**
+  at 0.1.3, taken immediately after a build, did not reproduce: the next run on the same
+  artifact read 8.6s and the first run after the *following* rebuild read **9.1s**. So it
+  was an outlier and not the post-build effect it was first written up as — five readings
+  now sit between 7.3s and 9.1s, and a single high one is worth re-running rather than
+  explaining.
 
 Still true, and left where they are: the clean-machine install, the signatures,
 `console=True`, the unseen Electron window, and cross-platform. Those need a machine or
