@@ -315,26 +315,29 @@
      is to be able to read the board at a glance, and shading exists only to tell one
      face of a box from another. The two visible sides are stepped darker so a cube
      reads as a cube without an outline round it. */
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
+     to read the board at a glance.
+
+     There are no `fill` rules here on purpose, and that is the whole of the rework. Every
+     face's colour is its material multiplied by a light that belongs to the ROOM, worked
+     out in `scene3d.js` from the face's own normal and written onto the polygon — the
+     same expression and the same LIGHT vector `dice3d.js` shades brass with. The version
+     before this shaded by class (`.face-a` .72, `.face-b` .55), which welded a brightness
+     to a geometric side, so turning the board turned the light with it. A `fill` rule in
+     here would overrule the shading and put that back, because a stylesheet rule beats a
+     presentation attribute. Hover is the one deliberate exception. */
   #view3d { width: 100%; height: auto; display: block; background: #14110e;
             border: 1px solid #241d15; border-radius: 3px; }
-  #view3d polygon { stroke: #14110e; stroke-width: .4; }
-  #view3d .tile.face-top, #view3d .tile { fill: #241f18; }
-  #view3d .tile.raised.face-top, #view3d .tile.raised { fill: #3d3527; }
-  #view3d .rough { fill: #2a2416; }
-  #view3d .murk { fill: #23262b; }
-  #view3d .solid { fill: #3a3128; }
-  #view3d .face-a { filter: brightness(.72); }
-  #view3d .face-b { filter: brightness(.55); }
-  #view3d .lit.face-top { fill: #4a4026; cursor: pointer; }
+  #view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
+  #view3d .lit.face-top { cursor: pointer; }
   #view3d .lit.face-top:hover { fill: var(--gold); }
-  #view3d .rail3 { fill: #7a6a44; stroke: none; opacity: .92; }
-  #view3d .fig { fill: #6b4a3a; }
-  #view3d .fig.pc { fill: var(--gold); }
-  #view3d .fig.ally { fill: #8ea56b; }
-  #view3d .fig.foe { fill: #a33; }
-  #view3d .fig.bystander { fill: #cfc4ad; }
-  #view3d .fig.down { opacity: .45; }
-  #view3d .fig.offlevel { opacity: .35; }
+  /* Solid things read as solid: a seam between two faces of one box says "two faces". */
+  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig.offlevel { opacity: .38; }
+  /* A floor over your head — a gallery you are not standing on — and the rail along it.
+     Walls are never in here: a wall is a wall from every level, and drawing one through
+     would tell the player they have a shot they do not have. */
+  #view3d .above { opacity: .45; }
   .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
   .levelpick button { padding: 1px 8px; font-size: 11px; }
   .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
