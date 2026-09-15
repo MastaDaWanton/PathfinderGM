@@ -51,6 +51,7 @@ urlpatterns = [
     # rather than a step in the installer.
     path("api/setup", setup_views.setup_state, name="setup_state"),
     path("api/setup/pull", setup_views.setup_pull, name="setup_pull"),
+    path("api/setup/install", setup_views.setup_install, name="setup_install"),
     path("api/homebrew/rules", home_views.house_rules, name="house_rules"),
     path("api/homebrew/races/import", home_views.import_races, name="import_races"),
     path("api/effects/catalogue", home_views.effect_catalogue, name="effect_catalogue"),

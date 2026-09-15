@@ -357,3 +357,266 @@ def pull(model: str, host: str = "", timeout: int = 60):
         yield {"error": f"lost the connection to {host}: {exc}"}
         return
     yield {"done": True, "model": model}
+
+
+# --- getting Ollama itself, without leaving the app ----------------------------------------
+#
+# Asked for on 2026-09-15: "I want a button that will install Ollama similar to how we pull
+# the models with a button. I dont want the user to have to leave the app to set it up if
+# they dont have the models or Ollama because that can be confusing for people."
+#
+# This reverses one line of `docs/first-run.md`, which had the app link to the download page
+# "rather than fetching and running OllamaSetup.exe itself", because an unsigned app that
+# runs a second installer is a shape antivirus heuristics watch for. That worry is real, and
+# it is answered rather than ignored:
+#
+#   - the URL is a constant here and never comes from a request, so this is not a download
+#     button anything reaching localhost can point somewhere;
+#   - the file is checked before it runs — a PE header, a plausible size, and then Windows'
+#     own WinVerifyTrust, which must find a trusted signature naming Ollama. A tampered or
+#     unsigned download is deleted rather than executed;
+#   - it opens VISIBLY, through the shell, so the player sees Ollama's own signed installer
+#     and agrees to it. An unsigned app installing software silently is the behaviour those
+#     heuristics are actually about;
+#   - and `os.startfile` rather than `subprocess`, so there is no pipe to deadlock on.
+#     `pathfindergm/version.py` records the four hours that cost last time.
+#
+# What does not change: Ollama is still not bundled. Nothing ships in the installer and the
+# weights are still the player's own download. A player who would rather install it
+# themselves still has the link, which is why both are offered.
+INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
+
+# A sanity range, not a checksum. There is no published digest to pin and the installer is
+# rebuilt every release, so the guard that matters is the signature; this only catches a
+# captive-portal login page or a truncated download before we bother verifying a 2 KB
+# "file". Measured 2026-09-15: 1,501 MB.
+SMALLEST_PLAUSIBLE = 200_000_000
+LARGEST_PLAUSIBLE = 4_000_000_000
+
+
+def on_windows() -> bool:
+    """Its own function so a test can answer it differently.
+
+    Patching `os.name` instead reaches every module in the process: `pathlib` reads it to
+    decide what a Path is, so a test that sets it to "posix" gets
+    `cannot instantiate 'PosixPath' on your system` from code that never mentioned it.
+    """
+    return os.name == "nt"
+
+
+def installer_path() -> Path:
+    """Where the download lands: the user's own data directory, beside the campaigns.
+
+    Not `%TEMP%`. A 1.5 GB file a player may want to find, re-run or delete belongs
+    somewhere they have already been told about — the launch banner names this directory —
+    and `%TEMP%` is where a half-finished download goes to be mysterious.
+    """
+    p = Path(settings.CAMPAIGN_DIR).parent / "downloads"
+    p.mkdir(parents=True, exist_ok=True)
+    return p / "OllamaSetup.exe"
+
+
+def _signer_name(path: Path) -> str:
+    """Whose certificate signed it, as the name the file's properties would show.
+
+    Empty when it cannot be read, which the caller treats as unsigned. The store holds one
+    certificate for a singly-signed installer, which is the case this exists for.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    crypt32 = ctypes.WinDLL("crypt32")
+    encoding, content, format_ = wintypes.DWORD(), wintypes.DWORD(), wintypes.DWORD()
+    store, msg = wintypes.HANDLE(), wintypes.HANDLE()
+    ok = crypt32.CryptQueryObject(
+        1,                    # CERT_QUERY_OBJECT_FILE
+        ctypes.c_wchar_p(str(path)),
+        0x400,                # CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED
+        0x2,                  # CERT_QUERY_FORMAT_FLAG_BINARY
+        0, ctypes.byref(encoding), ctypes.byref(content), ctypes.byref(format_),
+        ctypes.byref(store), ctypes.byref(msg), None)
+    if not ok:
+        return ""
+    try:
+        cert = crypt32.CertEnumCertificatesInStore(store, None)
+        if not cert:
+            return ""
+        crypt32.CertGetNameStringW.restype = wintypes.DWORD
+        need = crypt32.CertGetNameStringW(cert, 4, 0, None, None, 0)   # SIMPLE_DISPLAY_TYPE
+        if need <= 1:
+            return ""
+        name = ctypes.create_unicode_buffer(need)
+        crypt32.CertGetNameStringW(cert, 4, 0, None, name, need)
+        return name.value or ""
+    finally:
+        try:
+            crypt32.CertCloseStore(store, 0)
+        except Exception:
+            pass
+
+
+def signature_of(path: Path) -> tuple[bool, str]:
+    """Ask Windows whether it trusts this file, and who it says signed it.
+
+    This is the whole answer to "an unsigned app is about to run a downloaded binary". We
+    cannot sign ourselves from in here, but we can refuse to execute anything the operating
+    system will not vouch for — a stronger check than a digest we would have had to fetch
+    over the same connection we are distrusting.
+
+    (False, "") on anything that is not Windows; the caller turns that into a refusal
+    rather than a silent skip.
+    """
+    if not on_windows() or not path.exists():
+        return False, ""
+    import ctypes
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
+                    ("Data3", wintypes.WORD), ("Data4", ctypes.c_byte * 8)]
+
+    class FileInfo(ctypes.Structure):
+        _fields_ = [("cbStruct", wintypes.DWORD), ("pcwszFilePath", wintypes.LPCWSTR),
+                    ("hFile", wintypes.HANDLE), ("pgKnownSubject", ctypes.c_void_p)]
+
+    class TrustData(ctypes.Structure):
+        _fields_ = [("cbStruct", wintypes.DWORD), ("pPolicyCallbackData", ctypes.c_void_p),
+                    ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", wintypes.DWORD),
+                    ("fdwRevocationChecks", wintypes.DWORD),
+                    ("dwUnionChoice", wintypes.DWORD),
+                    ("pFile", ctypes.POINTER(FileInfo)),
+                    ("dwStateAction", wintypes.DWORD), ("hWVTStateData", wintypes.HANDLE),
+                    ("pwszURLReference", wintypes.LPCWSTR), ("dwProvFlags", wintypes.DWORD),
+                    ("dwUIContext", wintypes.DWORD), ("pSignatureSettings", ctypes.c_void_p)]
+
+    # WINTRUST_ACTION_GENERIC_VERIFY_V2
+    guid = GUID(0x00AAC56B, 0xCD44, 0x11D0,
+                (ctypes.c_byte * 8)(0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE))
+    info = FileInfo(ctypes.sizeof(FileInfo), str(path), None, None)
+    data = TrustData()
+    data.cbStruct = ctypes.sizeof(TrustData)
+    data.dwUIChoice = 2              # WTD_UI_NONE: verify, never draw a dialog
+    data.fdwRevocationChecks = 0     # WTD_REVOKE_NONE: the chain, not a CRL fetch
+    data.dwUnionChoice = 1           # WTD_CHOICE_FILE
+    data.pFile = ctypes.pointer(info)
+    data.dwStateAction = 1           # WTD_STATEACTION_VERIFY
+    try:
+        wintrust = ctypes.WinDLL("wintrust")
+        wintrust.WinVerifyTrust.restype = ctypes.c_long
+        rc = wintrust.WinVerifyTrust(None, ctypes.byref(guid), ctypes.byref(data))
+        data.dwStateAction = 2       # WTD_STATEACTION_CLOSE, always, or the handle leaks
+        wintrust.WinVerifyTrust(None, ctypes.byref(guid), ctypes.byref(data))
+    except Exception:
+        return False, ""
+    if rc != 0:
+        return False, ""
+    return True, _signer_name(path)
+
+
+def fetch_and_run_installer(timeout: int = 60, wait_seconds: int = 600):
+    """Download Ollama's own installer, check it, and hand it to the player.
+
+    Yields the frame shape `pull` yields — `{"status", "total", "completed"}` — so the
+    setup page draws it with the bar it already has, then `{"done": True}` or
+    `{"error": ...}`, so a consumer reaching the end of the stream always knows which.
+
+    It installs nothing itself. It fetches the file, refuses it unless Windows vouches for
+    the signature, opens it, and watches the port until Ollama answers.
+    """
+    import time
+
+    if not on_windows():
+        yield {"error": "This button is Windows-only. Install Ollama from "
+                        f"{DOWNLOAD_PAGE} and this page will notice."}
+        return
+
+    target = installer_path()
+    yield {"status": "asking ollama.com for the installer"}
+    total = done = 0
+    try:
+        req = urllib.request.Request(INSTALLER_URL,
+                                     headers={"User-Agent": "PathfinderGM"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if not str(resp.url).lower().startswith("https://"):
+                yield {"error": "the download was redirected somewhere that is not "
+                                "HTTPS, so nothing was saved."}
+                return
+            total = int(resp.headers.get("Content-Length") or 0)
+            if total and not SMALLEST_PLAUSIBLE <= total <= LARGEST_PLAUSIBLE:
+                yield {"error": f"ollama.com offered a {gb(total)} file, which is not "
+                                f"the shape of the installer. Refused."}
+                return
+            last = 0.0
+            with open(target, "wb") as out:
+                while True:
+                    chunk = resp.read(512 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    done += len(chunk)
+                    # A frame every quarter second. The pull stream is chatty because
+                    # Ollama makes it so; this one is ours, and a frame per 512 KB would
+                    # be three thousand of them.
+                    now = time.monotonic()
+                    if now - last > 0.25:
+                        last = now
+                        yield {"status": "downloading Ollama", "total": total,
+                               "completed": done}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        yield {"error": f"could not download the installer: {exc}"}
+        return
+    yield {"status": "downloading Ollama", "total": total or done, "completed": done}
+
+    size = target.stat().st_size if target.exists() else 0
+    if size < SMALLEST_PLAUSIBLE:
+        target.unlink(missing_ok=True)
+        yield {"error": f"the download stopped at {size / 1_000_000:.0f} MB and nothing "
+                        f"was run. Try again, or install Ollama from {DOWNLOAD_PAGE}."}
+        return
+    # Read the header, THEN decide. The first version called `unlink` from inside the
+    # `with`, and Windows will not delete a file that is still open — so a captive
+    # portal's login page would have been left on disk under the name of an installer,
+    # with the player told only that something failed. Caught by the test below, which
+    # is the whole argument for having one.
+    with open(target, "rb") as fh:
+        head = fh.read(2)
+    if head != b"MZ":
+        target.unlink(missing_ok=True)
+        yield {"error": "what arrived is not a Windows program — a captive portal or a "
+                        "proxy may have answered instead. Nothing was run."}
+        return
+
+    yield {"status": "checking who signed it"}
+    trusted, signer = signature_of(target)
+    if not trusted or "ollama" not in (signer or "").lower():
+        target.unlink(missing_ok=True)
+        said = f" It claims to be signed by {signer}." if signer else ""
+        yield {"error": "Windows would not vouch for that download, so it was deleted "
+                        f"rather than run.{said} Install Ollama yourself from "
+                        f"{DOWNLOAD_PAGE}."}
+        return
+
+    yield {"status": f"signed by {signer} — opening it"}
+    try:
+        # `os.startfile`, not `subprocess`: no pipes, no handles, nothing to deadlock on,
+        # and it goes through the shell exactly as a double-click would, so Windows runs
+        # its own checks before Ollama's installer appears.
+        os.startfile(str(target))                                      # noqa: S606
+    except OSError as exc:
+        yield {"error": f"could not open the installer: {exc}"}
+        return
+
+    yield {"status": "Ollama's installer is open — finish it and this page will notice"}
+    # Ollama's installer is per-user and asks for no administrator, so this is usually
+    # seconds; the ten minutes is for somebody reading the dialog. A frame every couple of
+    # seconds, so the page can say it is still waiting rather than looking hung.
+    deadline = time.monotonic() + wait_seconds
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        report = check(timeout=2)
+        if report.state != "not-installed":
+            yield {"done": True, "state": report.state}
+            return
+        yield {"status": "waiting for the installer to finish"}
+    yield {"error": "Ollama still is not there. If you closed the installer, the download "
+                    f"was kept — you can run it again from {installer_path().parent}."}

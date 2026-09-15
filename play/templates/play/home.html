@@ -89,13 +89,20 @@
     background: linear-gradient(#1f3327, #16241c); border: 1px solid var(--brew-dim);
   }
   a.go:hover, button.go:hover { border-color: var(--brew); color: #b6f0ca; }
-  button.quiet {
+  button.quiet, a.quiet {
     cursor: pointer; font: 400 14px/1 var(--display); letter-spacing: .08em;
     font-variant: small-caps; padding: 10px 18px; border-radius: 2px;
     color: var(--gold); background: linear-gradient(#2a2114, #1a140c);
     border: 1px solid var(--gold-dim);
   }
-  button.quiet:hover:not(:disabled) { border-color: var(--accent); color: #f0dcae; }
+  /* The selector was `button.quiet` alone, so the first `<a class="quiet">` on the page
+     — "or get it yourself", beside the Install Ollama button — rendered as a browser
+     default link, bright blue against the leather. An anchor also needs the two things a
+     button has for free. */
+  a.quiet { text-decoration: none; display: inline-block; }
+  button.quiet:hover:not(:disabled), a.quiet:hover {
+    border-color: var(--accent); color: #f0dcae;
+  }
   button.quiet:disabled { opacity: .35; cursor: not-allowed; }
 
   /* --- cards --- */
@@ -1374,21 +1381,31 @@ function setupPanel() {
   const [title, why] = SETUP_WORDS[SETUP.state] ||
     ["Ready", "Ollama is running and the GM's model is downloaded."];
 
-  // The install step, when there is one. A link rather than a download this app runs
-  // itself: an unsigned app that fetches and executes a second installer is the exact
-  // shape SmartScreen and every antivirus heuristic is built to stop, and being
-  // quarantined on the first screen is a worse first run than one extra click.
+  // The install step, when there is one.
+  //
+  // The button fetches Ollama's own installer and opens it, so nobody has to leave the
+  // app, find a download page and work out which file they want. It does not install
+  // anything quietly: the server checks the signature Windows itself vouches for, and
+  // then Ollama's own installer appears and the player agrees to it. The link stays
+  // beside it for anyone who would rather do it themselves, and for the machines this
+  // button cannot serve — it is Windows-only.
+  const busyInstall = PULLING === INSTALLING;
   const install = (SETUP.state === "not-installed" || SETUP.state === "not-running")
     ? `<div class="modelrow">
          <div class="top">
            <code>${esc(SETUP.host)}</code>
            ${SETUP.state === "not-installed"
-             ? `<a class="go" href="${esc(SETUP.download)}" target="_blank"
-                  rel="noopener noreferrer">Get Ollama</a>`
+             ? `<button class="go" data-install="1" ${busyInstall ? "disabled" : ""}>${
+                  busyInstall ? "Installing…" : "Install Ollama"}</button>
+                <a class="quiet" href="${esc(SETUP.download)}" target="_blank"
+                   rel="noopener noreferrer">or get it yourself</a>`
              : ""}
            <button class="quiet" data-setup="recheck">Check again</button>
          </div>
-         <div class="barword">${esc(SETUP.why || "")}</div>
+         ${busyInstall
+           ? `<div class="bar"><i id="bar-fill"></i></div>
+              <div class="barword" id="bar-word">starting…</div>`
+           : `<div class="barword">${esc(SETUP.why || "")}</div>`}
        </div>`
     : "";
 
@@ -1464,61 +1481,97 @@ async function refreshSetup() {
 // The bar is written straight to the DOM rather than through `render()`: a repaint per
 // frame would throw away the bar element mid-transition and land several times a
 // second, which is both jerkier and more expensive than setting one width.
+// Both downloads on this page read the same stream — a model's 7.4 GB and Ollama's own
+// 1.5 GB installer — so they read it in one place. Written as one function the moment
+// the second caller existed, rather than as a copy with the chunk-boundary rule in it
+// twice: that rule was learned once and a second copy is a second chance to lose it.
+async function streamSetup(url, body) {
+  const fill = () => document.querySelector("#bar-fill");
+  const word = () => document.querySelector("#bar-word");
+  const say = t => { const w = word(); if (w) w.textContent = t; };
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
+    },
+    body: JSON.stringify(body || {}),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || ("HTTP " + r.status));
+  }
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let failed = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    // A chunk boundary lands anywhere, including the middle of a line. Whatever
+    // follows the last newline is a partial object and waits for the next chunk.
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let f;
+      try { f = JSON.parse(line); } catch (e) { continue; }
+      if (f.error) { failed = f.error; continue; }
+      if (f.total && f.completed != null) {
+        const pct = Math.max(0, Math.min(100, (f.completed / f.total) * 100));
+        const bar = fill();
+        if (bar) bar.style.width = pct.toFixed(1) + "%";
+        say(`${esc(f.status || "downloading")} — ${pct.toFixed(0)}% of ${gbWord(f.total)}`);
+      } else if (f.status) {
+        say(esc(f.status));
+      }
+    }
+  }
+  if (failed) throw new Error(failed);
+}
+
+// The bar is written straight to the DOM rather than through `render()`: a repaint per
+// frame would throw away the bar element mid-transition and land several times a second,
+// which is both jerkier and more expensive than setting one width.
 async function pullModel(model) {
   if (PULLING) return;
   PULLING = model;
   SETUP_ERR = "";
   render();
-  const fill = () => document.querySelector("#bar-fill");
-  const word = () => document.querySelector("#bar-word");
-  const say = t => { const w = word(); if (w) w.textContent = t; };
   try {
-    const r = await fetch("/api/setup/pull", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "",
-      },
-      body: JSON.stringify({ model }),
-    });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      throw new Error(d.error || ("HTTP " + r.status));
-    }
-    const reader = r.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    let failed = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      // A chunk boundary lands anywhere, including the middle of a line. Whatever
-      // follows the last newline is a partial object and waits for the next chunk.
-      const lines = buf.split("\n");
-      buf = lines.pop();
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        let f;
-        try { f = JSON.parse(line); } catch (e) { continue; }
-        if (f.error) { failed = f.error; continue; }
-        if (f.total && f.completed != null) {
-          const pct = Math.max(0, Math.min(100, (f.completed / f.total) * 100));
-          const bar = fill();
-          if (bar) bar.style.width = pct.toFixed(1) + "%";
-          say(`${esc(f.status || "downloading")} — ${pct.toFixed(0)}% of ${gbWord(f.total)}`);
-        } else if (f.status) {
-          say(esc(f.status));
-        }
-      }
-    }
-    if (failed) throw new Error(failed);
+    await streamSetup("/api/setup/pull", { model });
   } catch (err) {
     SETUP_ERR = err.message;
   } finally {
     PULLING = "";
     // `refreshSetup` repaints, which is what shows `SETUP_ERR` — and also what would
     // have erased it had it been written to the DOM instead.
+    await refreshSetup();
+  }
+}
+
+// Ollama itself. The same bar and the same stream as a model, because to the player it is
+// the same thing: a big download with something to watch, and no trip to a browser.
+//
+// `PULLING` is what both use to mean "one download at a time", so the installer takes it
+// under a name no model can have — a model is `namespace/name:tag` and never this.
+// Not a space-prefixed name: the first version of this line carried a literal NUL
+// byte where a space was meant, which CLAUDE.md warns about in exactly these words
+// and which `grep` noticed before a human would have. A model id is always
+// `name:tag`, so colons at both ends cannot collide with one.
+const INSTALLING = "::ollama::";
+async function installOllama() {
+  if (PULLING) return;
+  PULLING = INSTALLING;
+  SETUP_ERR = "";
+  render();
+  try {
+    await streamSetup("/api/setup/install", {});
+  } catch (err) {
+    SETUP_ERR = err.message;
+  } finally {
+    PULLING = "";
     await refreshSetup();
   }
 }
@@ -2172,6 +2225,7 @@ document.addEventListener("click", async e => {
     render(); return;
   }
   if (e.target.closest('[data-setup="recheck"]')) { await refreshSetup(); return; }
+  if (e.target.closest("[data-install]")) { await installOllama(); return; }
   const pull = e.target.closest("[data-pull]");
   if (pull) { await pullModel(pull.dataset.pull); return; }
 
