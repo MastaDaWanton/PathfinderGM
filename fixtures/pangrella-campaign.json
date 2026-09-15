@@ -1,10 +1,10 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.3",
   "generated_by": {
     "application": "World Bible",
-    "version": "1.4.0"
+    "version": "1.12.0"
   },
-  "exported_at": "2026-08-19T20:32:10+00:00",
+  "exported_at": "2026-09-15T16:54:30+00:00",
   "world": {
     "name": "Pangrella",
     "premise": {
@@ -192,7 +192,7 @@
         {
           "title": "Anatomy",
           "paragraphs": [
-            "A Korvu female typically gives birth to a single young after a gestation period of approximately 11 months. This longer gestation period allows for a more extended nursing period, during which the mother's milk contains higher concentrations of electrolytes and antioxidants. As a result, Korvu infants develop stronger immune systems, but their mothers are left with reduced fertility and increased risk of complications in subsequent pregnancies. Clans that prioritize rapid population growth often view this as a cost to be managed through selective breeding programs. The extended nursing period also means that Korvu children stay closer to their mothers for longer periods, fostering strong family bonds but potentially stifling independence and self-reliance among the young.",
+            "A Korvu female typically gives birth to twins after a gestation period of approximately 9 months, allowing for a brief interval between births due to limited lactational amenorrhea. This rapid reproductive cycle is an adaptation to the harsh climate and unpredictable resource availability of their nomadic lifestyle, where competition for resources can be intense. Clans that prioritize rapid population growth often rely on selective breeding programs to manage the costs of this reproductive strategy, which can include reduced fertility and increased risk of complications in subsequent pregnancies. The Korvu's emphasis on fertility and resource management has led to a close-knit family structure, where mothers are often responsible for caring for multiple young at once. This intense focus on family bonds can sometimes lead to conflicts over resource allocation and territory, particularly between clans with different reproductive strategies.",
             "Korvu physiology has adapted to their nomadic lifestyle through a series of incremental changes driven by environmental pressures. Their four-limbed bodies have developed strong shoulder muscles and sharp talons, but at the cost of limited dexterity in their hands. This trade-off has forced them to rely on specialized tools crafted from crystalline materials that can channel weak electromagnetic fields. As a result, Korvu craftsmen must constantly maintain and replace these tools, consuming resources that could otherwise be allocated to more pressing needs. The constant wear on these tools also accelerates the depletion of crystal deposits scattered throughout the Ringworld, threatening the long-term sustainability of Korvu pastoralism.",
             "Their echolocation abilities are heightened by a unique crystalline structure within their ears, allowing them to pinpoint water sources and track the movement of grazing herds over vast distances. This reliance on sound has led to an intimate understanding of the Ringworld's subtle vibrations, which they can tap into during rituals to sense shifts in magnetic field lines. However, this sensitivity also makes them vulnerable to geomagnetic storms that disrupt their ability to navigate, forcing clans to adjust their migration routes accordingly. In severe cases, intense auroral activity can leave Korvu with temporary hearing loss, a painful reminder of the world's unpredictable power. As a result, they've developed a deep respect for the Ringworld's electromagnetic rhythms and strive to remain attuned to its ever-changing pulse.",
             "A Korvu female typically gives birth to 2-4 hatchlings after a 9-month gestation period, allowing for a brief interval between births due to limited lactational amenorrhea. This rapid reproductive cycle is likely an adaptation to the harsh climate and unpredictable resource availability of their nomadic lifestyle. As a result, young Korvu are often weaned at around 6-8 months, after which they begin to accompany their mothers on foraging expeditions. This accelerated development allows them to contribute to the clan's survival efforts from a relatively early age. In return, the Korvu's rapid reproduction strategy means that each mother can only devote limited attention and resources to each individual youngling."
@@ -10084,6 +10084,2148 @@
         "works_by": "They recruit skilled winged cartographers through a rigorous apprenticeship program, which includes extensive training in aerodynamics, cartography, and navigation; those who leave the Cooperative often go on to work as freelance cartographers or start their own mapping companies.",
         "holds": "Despite facing opposition from Vedrazhia's isolationist regime, the Aerial Cartographers' Cooperative has managed to maintain a foothold in Pangrella through its partnerships with local winged residents. This alliance has proven crucial to the Cooperative's ability to chart the skies above the city.",
         "undone_by": "Matriarch Elara's strategic dependence on airships for the cooperative's operations would be severely compromised if the airship trade were to collapse or become heavily regulated."
+      }
+    ],
+    "races": [
+      {
+        "id": "korvu",
+        "name": "Korvu",
+        "people_id": "fd4449bc9a64",
+        "size": "medium",
+        "speed": "normal",
+        "body": [
+          "Korvu have four limbs ending in sharp talons."
+        ],
+        "senses": [
+          "Korvu have enhanced echolocation abilities."
+        ],
+        "movement": [
+          "Korvu have avian-like wings and bodies."
+        ],
+        "about": "Their nomadic lifestyle, shaped by orbital dynamics and magnetic field shifts that alter resource availability, forces seasonal migrations between the Kyropticus deserts and Pangrellan grasslands. Korvu society is matrilineal and caste-based, established post-Disaster, with clans ranked by seniority to prioritize experienced families in resource management. Korvu subsistence relies on nomadic pastoralism and gathering, forced by the Ringworld's harsh climate post-Disaster. Korvu are skilled in crafting tools from crystalline materials to channel weak electromagnetic fields, developing a unique understanding of auramancy for tasks like resource tracking.",
+        "strengths": [
+          "perceptive",
+          "clever"
+        ],
+        "weakness": "hardy"
+      }
+    ],
+    "places": [
+      {
+        "id": "5bbd0c40345f~urban:the-market",
+        "name": "the market",
+        "about": "Winged nobility, merchant castes, and artisan guilds.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-gate",
+          "5bbd0c40345f~urban:the-guildhall",
+          "5bbd0c40345f~urban:the-tavern",
+          "5bbd0c40345f~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 100,
+          "depth": 90,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "5bbd0c40345f~urban:the-gate",
+        "name": "the gate",
+        "about": "The way in and the way out, watched by whoever holds the town.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-market",
+          "5bbd0c40345f~urban:the-mine-head"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 40,
+          "depth": 25,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "5bbd0c40345f~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 35,
+          "depth": 35,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "5bbd0c40345f~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence of the Zhilakai minority.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "5bbd0c40345f~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Winged nobility, merchant castes, and artisan guilds.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 50,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "5bbd0c40345f~urban:the-mine-head",
+        "name": "the mine head",
+        "about": "The mouth of the workings, and the winch that serves them.",
+        "parent": "5bbd0c40345f",
+        "terrain": "urban",
+        "exits": [
+          "5bbd0c40345f~urban:the-gate"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 65,
+          "depth": 40,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "bad",
+        "vertical": "slope"
+      },
+      {
+        "id": "7ef5e373c993~urban:the-market",
+        "name": "the market",
+        "about": "Patrilineal clans, Zhilakai nobility, artisan guilds.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-gate",
+          "7ef5e373c993~urban:the-guildhall",
+          "7ef5e373c993~urban:the-tavern",
+          "7ef5e373c993~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 105,
+          "depth": 90,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "7ef5e373c993~urban:the-gate",
+        "name": "the gate",
+        "about": "The way in and the way out, watched by whoever holds the town.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 40,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "7ef5e373c993~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 45,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "7ef5e373c993~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence of merchant guilds and winged nobility.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-library",
+          "7ef5e373c993~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 80,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "7ef5e373c993~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Patrilineal clans, Zhilakai nobility, artisan guilds.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 95,
+          "depth": 65,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "7ef5e373c993~urban:the-library",
+        "name": "the library",
+        "about": "Respected center of artisanship and learning.",
+        "parent": "7ef5e373c993",
+        "terrain": "urban",
+        "exits": [
+          "7ef5e373c993~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 110,
+          "depth": 100,
+          "height": 20
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "d677be869434~urban:the-market",
+        "name": "the market",
+        "about": "Clan-based castes, with winged and flightless populations.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-gate",
+          "d677be869434~urban:the-tavern",
+          "d677be869434~urban:the-temple",
+          "d677be869434~urban:the-workshops"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 120,
+          "depth": 110,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "d677be869434~urban:the-gate",
+        "name": "the gate",
+        "about": "The way in and the way out, watched by whoever holds the town.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 50,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "d677be869434~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-back-streets",
+          "d677be869434~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 40,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "d677be869434~urban:the-temple",
+        "name": "the temple",
+        "about": "Unofficial influence wielded by skilled windmages.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 70,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "d677be869434~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Competition for resources, cultural differences.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-tavern",
+          "d677be869434~urban:the-workshops"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 95,
+          "depth": 45,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "d677be869434~urban:the-workshops",
+        "name": "the workshops",
+        "about": "Wind-resistant dwellings, clan halls, and windcatchers.",
+        "parent": "d677be869434",
+        "terrain": "urban",
+        "exits": [
+          "d677be869434~urban:the-back-streets",
+          "d677be869434~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 55,
+          "height": 15
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-market",
+        "name": "the market",
+        "about": "Clear but unspoken social hierarchy among Winged and Flightless populations.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-gate",
+          "0c6b0e9cf6a6~urban:the-guildhall",
+          "0c6b0e9cf6a6~urban:the-tavern",
+          "0c6b0e9cf6a6~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 100,
+          "depth": 90,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-gate",
+        "name": "the gate",
+        "about": "Caldravyn became a major market center after the Great Shattering; Vedrazhian trade agreements solidified its position.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 45,
+          "depth": 30,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 40,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-temple",
+        "name": "the temple",
+        "about": "Influential elder Winged shape policy through subtle counsel to Clan Chiefs.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-library",
+          "0c6b0e9cf6a6~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Clear but unspoken social hierarchy among Winged and Flightless populations.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 50,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "0c6b0e9cf6a6~urban:the-library",
+        "name": "the library",
+        "about": "Torvathys serves as a model for interspecies coexistence, with both Winged and Flightless seeking to preserve their distinct cultures.",
+        "parent": "0c6b0e9cf6a6",
+        "terrain": "urban",
+        "exits": [
+          "0c6b0e9cf6a6~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 85,
+          "depth": 75,
+          "height": 20
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "1bd0f5816206~urban:the-market",
+        "name": "the market",
+        "about": "Winged nobility, merchant-guilds, and craft-associations.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-gate",
+          "1bd0f5816206~urban:the-guildhall",
+          "1bd0f5816206~urban:the-tavern",
+          "1bd0f5816206~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 85,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "1bd0f5816206~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of winged livestock trade, introduction of auramancy for agriculture.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 45,
+          "depth": 30,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "1bd0f5816206~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-back-streets",
+          "1bd0f5816206~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 35,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "1bd0f5816206~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence of merchant-guilds and craft-associations through patronage.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 55,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "1bd0f5816206~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Winged nobility, merchant-guilds, and craft-associations.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 50,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "1bd0f5816206~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Disputes over territory and resources.",
+        "parent": "1bd0f5816206",
+        "terrain": "urban",
+        "exits": [
+          "1bd0f5816206~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 35,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "58b90a214ada~urban:the-market",
+        "name": "the market",
+        "about": "Winged Zhilakai nobility, artisanal guilds.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-gate",
+          "58b90a214ada~urban:the-guildhall",
+          "58b90a214ada~urban:the-tavern",
+          "58b90a214ada~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 120,
+          "depth": 110,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "58b90a214ada~urban:the-gate",
+        "name": "the gate",
+        "about": "The way in and the way out, watched by whoever holds the town.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 55,
+          "depth": 40,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "58b90a214ada~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-back-streets",
+          "58b90a214ada~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 40,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "58b90a214ada~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence of craft guilds and merchant associations.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 75,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "58b90a214ada~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Winged Zhilakai nobility, artisanal guilds.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 85,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "58b90a214ada~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Competition for influence and resources.",
+        "parent": "58b90a214ada",
+        "terrain": "urban",
+        "exits": [
+          "58b90a214ada~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 95,
+          "depth": 35,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-market",
+        "name": "the market",
+        "about": "Khy'vyr-led clan families, Nirkor merchants, and commoners.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-gate",
+          "02e5ebf1ed76~urban:the-tavern",
+          "02e5ebf1ed76~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 80,
+          "depth": 70,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of the Council of Elders, introduction of silk trade.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-keep",
+          "02e5ebf1ed76~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 55,
+          "depth": 40,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-back-streets",
+          "02e5ebf1ed76~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 35,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence through wealth, reputation, and kinship ties.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 45,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-keep",
+        "name": "the keep",
+        "about": "Council of respected elder women.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-gate"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 2,
+          "down": 1
+        }
+      },
+      {
+        "id": "02e5ebf1ed76~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Trade disputes and clan rivalries.",
+        "parent": "02e5ebf1ed76",
+        "terrain": "urban",
+        "exits": [
+          "02e5ebf1ed76~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 55,
+          "depth": 25,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "6953424c8a82~urban:the-market",
+        "name": "the market",
+        "about": "Khy'vyr-centric clans, Nirkor artisans, and underclass laborers.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-gate",
+          "6953424c8a82~urban:the-guildhall",
+          "6953424c8a82~urban:the-tavern",
+          "6953424c8a82~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 110,
+          "depth": 100,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "6953424c8a82~urban:the-gate",
+        "name": "the gate",
+        "about": "Signed Treaty of Valtorian Forests with Threnniria; exports woven Khy'vyr silk.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-market",
+          "6953424c8a82~urban:the-mine-head"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 65,
+          "depth": 50,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "6953424c8a82~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 45,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "6953424c8a82~urban:the-temple",
+        "name": "the temple",
+        "about": "Khy'vyr clans hold informal influence over trade and agriculture.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 85,
+          "depth": 70,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "6953424c8a82~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Khy'vyr-centric clans, Nirkor artisans, and underclass laborers.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 65,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "6953424c8a82~urban:the-mine-head",
+        "name": "the mine head",
+        "about": "The mouth of the workings, and the winch that serves them.",
+        "parent": "6953424c8a82",
+        "terrain": "urban",
+        "exits": [
+          "6953424c8a82~urban:the-gate"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 80,
+          "depth": 50,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "bad",
+        "vertical": "slope"
+      },
+      {
+        "id": "fc76ff68032e~urban:the-market",
+        "name": "the market",
+        "about": "Clans, merchant guilds, and artisans.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-gate",
+          "fc76ff68032e~urban:the-guildhall",
+          "fc76ff68032e~urban:the-tavern",
+          "fc76ff68032e~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 80,
+          "depth": 70,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "fc76ff68032e~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of the Merchant Guild of Pangrella; construction of the Grand Wing.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 45,
+          "depth": 30,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "fc76ff68032e~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-back-streets",
+          "fc76ff68032e~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 40,
+          "depth": 35,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "fc76ff68032e~urban:the-temple",
+        "name": "the temple",
+        "about": "Militia forces maintained by each clan.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 55,
+          "depth": 40,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "fc76ff68032e~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Clans, merchant guilds, and artisans.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 50,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "fc76ff68032e~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Clans vie for dominance and influence.",
+        "parent": "fc76ff68032e",
+        "terrain": "urban",
+        "exits": [
+          "fc76ff68032e~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 65,
+          "depth": 35,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "ad9201319866~urban:the-market",
+        "name": "the market",
+        "about": "Four castes: Pangrellan nobles, Kelvaxian merchants, Valtorian scholars, and Khra'gixi laborers.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-gate",
+          "ad9201319866~urban:the-guildhall",
+          "ad9201319866~urban:the-tavern",
+          "ad9201319866~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 120,
+          "depth": 110,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "ad9201319866~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of trade routes with Kelvaxia, construction of windcatcher spires.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-market",
+          "ad9201319866~urban:the-mine-head"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 65,
+          "depth": 45,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "ad9201319866~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 60,
+          "depth": 50,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "ad9201319866~urban:the-temple",
+        "name": "the temple",
+        "about": "Kelvaxian merchants wield hidden influence over trade and commerce.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 75,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "ad9201319866~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Four castes: Pangrellan nobles, Kelvaxian merchants, Valtorian scholars, and Khra'gixi laborers.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "ad9201319866~urban:the-mine-head",
+        "name": "the mine head",
+        "about": "The mouth of the workings, and the winch that serves them.",
+        "parent": "ad9201319866",
+        "terrain": "urban",
+        "exits": [
+          "ad9201319866~urban:the-gate"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 50,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "bad",
+        "vertical": "slope"
+      },
+      {
+        "id": "3552520e85a7~urban:the-market",
+        "name": "the market",
+        "about": "Winged nobility, artisanal guilds, and underclass.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-gate",
+          "3552520e85a7~urban:the-guildhall",
+          "3552520e85a7~urban:the-tavern",
+          "3552520e85a7~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 95,
+          "depth": 85,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "3552520e85a7~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of Kelvaxian canals, winged stonework innovations.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 35,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "3552520e85a7~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-back-streets",
+          "3552520e85a7~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 45,
+          "depth": 30,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "3552520e85a7~urban:the-temple",
+        "name": "the temple",
+        "about": "Influence of winged nobility and merchant guilds.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 55,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "3552520e85a7~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Winged nobility, artisanal guilds, and underclass.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "3552520e85a7~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Resource scarcity and disagreements over land use.",
+        "parent": "3552520e85a7",
+        "terrain": "urban",
+        "exits": [
+          "3552520e85a7~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 75,
+          "depth": 35,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      },
+      {
+        "id": "b36e9f16214d~urban:the-market",
+        "name": "the market",
+        "about": "Winged nobility, artisans' guilds, merchant families.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-gate",
+          "b36e9f16214d~urban:the-guildhall",
+          "b36e9f16214d~urban:the-tavern",
+          "b36e9f16214d~urban:the-temple"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 115,
+          "depth": 105,
+          "height": null
+        },
+        "clutter": "dense",
+        "footing": "firm",
+        "vertical": "scatter"
+      },
+      {
+        "id": "b36e9f16214d~urban:the-gate",
+        "name": "the gate",
+        "about": "Establishment of the Khra'gixian clan's leadership; rise of merchant families.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 50,
+          "depth": 30,
+          "height": null
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge"
+      },
+      {
+        "id": "b36e9f16214d~urban:the-tavern",
+        "name": "the tavern",
+        "about": "Beds, a hearth, and whoever is drinking through the afternoon.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-back-streets",
+          "b36e9f16214d~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 55,
+          "depth": 45,
+          "height": 10
+        },
+        "clutter": "cluttered",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "b36e9f16214d~urban:the-temple",
+        "name": "the temple",
+        "about": "Influential merchant families wield significant behind-the-scenes influence.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 70,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "b36e9f16214d~urban:the-guildhall",
+        "name": "the guildhall",
+        "about": "Winged nobility, artisans' guilds, merchant families.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-market"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 70,
+          "depth": 60,
+          "height": 20
+        },
+        "clutter": "some",
+        "footing": "firm",
+        "vertical": "ledge",
+        "storeys": {
+          "up": 1,
+          "down": 0
+        }
+      },
+      {
+        "id": "b36e9f16214d~urban:the-back-streets",
+        "name": "the back streets",
+        "about": "Competition for resources and influence.",
+        "parent": "b36e9f16214d",
+        "terrain": "urban",
+        "exits": [
+          "b36e9f16214d~urban:the-tavern"
+        ],
+        "described_only": false,
+        "origin": "world",
+        "size_ft": {
+          "width": 90,
+          "depth": 40,
+          "height": null
+        },
+        "clutter": "cluttered",
+        "footing": "broken",
+        "vertical": "scatter"
+      }
+    ],
+    "cards": [
+      {
+        "id": "pangrella-strain",
+        "title": "Tensions between winged nobility and merchant castes",
+        "facts": [
+          "Tensions between winged nobility and merchant castes.",
+          "Competition for trade routes and resources.",
+          "Tension status is simmering, with recent Zhilakai-merchant alliances moderating conflicts.",
+          "This creates resentment and power struggles among nobility.",
+          "Volatility is moderate, with frequent power plays costing community trust.",
+          "Specific events like the Zhilakai alliance reduce tensions, but underlying rivalries continue to simmer."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.pangrella"
+        ],
+        "people": [],
+        "place": "5bbd0c40345f",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "mirabalos-strain",
+        "title": "High: competition for power between regional lords, winged nobles",
+        "facts": [
+          "High: competition for power between regional lords, winged nobles.",
+          "Tense calm with frequent minor skirmishes.",
+          "Rivalry over trade routes and resource control.",
+          "Moderate: occasional outbursts of violence, but no open war.",
+          "The competition for control of trade routes and resources has spawned a culture of backroom deals and underhanded maneuvering, with Zhilakai nobles using bribery to further their own interests at the expense of others, sowing discontent among the population and creating an atmosphere ripe for covert sabotage."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.mirabalos"
+        ],
+        "people": [],
+        "place": "7ef5e373c993",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "elyrielle-strain",
+        "title": "Volatility between winged clans and flightless communities",
+        "facts": [
+          "Volatility between winged clans and flightless communities.",
+          "Tense calm with occasional skirmishes.",
+          "Competition for resources, cultural differences.",
+          "Moderate to high, with localized outbreaks.",
+          "Elyrielle maintains a tense calm status, with sporadic outbreaks of violence following disputes over land allocation, enforced by the Council, but this unease persists due to Pangrella's growing influence, creating a volatile environment where alliances shift frequently."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.elyrielle"
+        ],
+        "people": [],
+        "place": "d677be869434",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "torvathys-strain",
+        "title": "Tensions between Winged and Flightless populations simmer beneath surface-level",
+        "facts": [
+          "Tensions between Winged and Flightless populations simmer beneath surface-level harmony.",
+          "Low-grade, long-standing resentment festers among both groups.",
+          "Infrequent but violent outbursts can erupt between Winged and Flightless factions.",
+          "The mechanism involves periodic outbreaks of violence, enforced by Clan guards, costing lives and property.",
+          "This festering is enforced by the Council, costing public investment in infrastructure maintenance.",
+          "This trauma specifically involved the loss of fertile lands, forcing Winged to import food from Vedrazhia, costing Torvathys its regional economic independence.",
+          "The mechanism is informal mob behavior, enforced by minimal Clan guard presence, costing lives and property, and specifically targets vulnerable Flightless groups, benefiting no one but escalating the need for better governance."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.torvathys"
+        ],
+        "people": [],
+        "place": "0c6b0e9cf6a6",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "vylthysia-strain",
+        "title": "Low-key, simmering between Winged clans and merchant-guilds over land rights",
+        "facts": [
+          "Low-key, simmering between Winged clans and merchant-guilds over land rights.",
+          "Disputes over territory and resources.",
+          "Moderate, with potential for escalation during harvest festivals.",
+          "This mechanism involves ongoing conflicts managed by patronage, leading to simmering resentment among the underclass who feel excluded, escalating during events like harvest festivals.",
+          "The balance of power in Vylthysia is delicate, with Winged clans and merchant-guilds maintaining a precarious status quo through mutual interests, but the underclass resents this, risking open conflict if economic disparities widen.",
+          "Vylthysia's social dynamics are moderately volatile, with tensions peaking during harvest festivals when economic pressures heighten, but managed through existing power structures, though this comes at the cost of suppressed dissent."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.vylthysia"
+        ],
+        "people": [],
+        "place": "1bd0f5816206",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "zhilgoroth-strain",
+        "title": "Tensions between noble clans and rising artisanal power",
+        "facts": [
+          "Tensions between noble clans and rising artisanal power.",
+          "Competition for influence and resources.",
+          "High; frequent clashes and vendettas.",
+          "This has resulted in frequent clashes and vendettas that create a volatile climate, where violence is imminent.",
+          "Both vie for control of trade routes, leading to complex web of alliances and betrayals that strain social bonds."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.zhilgoroth"
+        ],
+        "people": [],
+        "place": "58b90a214ada",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "kalimnar-strain",
+        "title": "Economic competition between Khy'vyr clans and Nirkor merchants",
+        "facts": [
+          "Economic competition between Khy'vyr clans and Nirkor merchants.",
+          "Trade disputes and clan rivalries.",
+          "Trade disputes between Khy'vyr clans and Nirkor merchants have plagued Kalimnar since the Great Forging, driven by competition for scarce resources like fertile soil, exacerbated by post-Great Forging caste dynamics, resulting in volatile markets where alliances shift rapidly.",
+          "The balance of power in Kalimnar is precarious due to post-Great Forging caste hierarchies, with Khy'vyr clans and Nirkor merchants competing for control of trade routes, reflected in the city's volatile economy, which strains community cohesion.",
+          "Trade disputes and clan rivalries stem from Pangrellan heritage post-Great Forging, often ignited by resource allocation conflicts in the Council, with mediation committees attempting resolutions but failing to address underlying tensions effectively.",
+          "Kalimnar's economic climate is volatile due to post-Great Forging trade dependencies on silk, with rapid shifts in merchant alliances causing price fluctuations, forcing Khy'vyr farmers to adapt or lose market share."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.kalimnar"
+        ],
+        "people": [],
+        "place": "02e5ebf1ed76",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "zhilvarnia-strain",
+        "title": "Tensions between Khy'vyr and Nirkor populations",
+        "facts": [
+          "Tensions between Khy'vyr and Nirkor populations.",
+          "Elevated, but managed through communal gatherings.",
+          "Competition for land and resources.",
+          "High risk of violence during market disputes.",
+          "Communal gatherings aim to ease these tensions, but underlying resentments persist, with specific incidents like land seizures fueling violence, straining the city's stability.",
+          "This leads to exploitation of Nirkor artisans, with specific conflicts over water rights exacerbating divisions, benefiting the clans while alienating the underclass and increasing volatility."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.zhilvarnia"
+        ],
+        "people": [],
+        "place": "6953424c8a82",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "xylorvotha-strain",
+        "title": "Unstable balance of power between clans",
+        "facts": [
+          "Unstable balance of power between clans.",
+          "Clans vie for dominance and influence.",
+          "High: one misstep can spark violence.",
+          "Xylorvotha's tensions arise from the competition between the five great clans for influence, a direct result of the caste system fixed at birth.",
+          "Each clan, like the Pangrellan nobility, seeks to expand its power through trade and politics, leading to a delicate dance of alliances and betrayals.",
+          "This constant struggle, rooted in the Great Forging's legacy, keeps the city in a state of simmering conflict.",
+          "The status quo in Xylorvotha is a perpetual simmer of tensions, with occasional violent outbreaks stemming from clan rivalries.",
+          "Inhabitants, including the artisans and merchants, live with constant anxiety, knowing that any misstep can lead to being caught in the crossfire, as the militia enforce clan demands with brutal efficiency."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.xylorvotha"
+        ],
+        "people": [],
+        "place": "fc76ff68032e",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "zhilorin-strain",
+        "title": "Tensions simmer between Kelvaxian merchants and Pangrellan nobles over control",
+        "facts": [
+          "Low-grade insurgency with occasional skirmishes between rival factions.",
+          "Moderate, with potential for escalation into full-blown conflict.",
+          "This conflict is managed through the Code of Kaelgoroth, costing occasional skirmishes that threaten the city's stability.",
+          "Zhilorin's moderate volatility arises from the ongoing trade disputes, exacerbated by the Great Forging legacy.",
+          "This conflict costs Zhilorin's ability to innovate, as scholars are forced to divert resources from research and development to mediate between the warring factions."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.zhilorin"
+        ],
+        "people": [],
+        "place": "ad9201319866",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "kalixiri-strain",
+        "title": "High due to competition for wind-harvesting resources",
+        "facts": [
+          "High due to competition for wind-harvesting resources.",
+          "Unstable, with periodic outbreaks of violence.",
+          "Resource scarcity and disagreements over land use.",
+          "Moderate, with occasional clashes between clans.",
+          "This mechanism involves competition for wind-harvesting control, costing the underclass their resources, and benefiting the elite, leading to frequent conflicts.",
+          "Community justice efforts are slow and ineffective, costing the city valuable time and personnel, but the Council is trying to reform, training new mediators.",
+          "This mechanism centralizes power, costing the underclass, and leads to violence, benefiting the elite.",
+          "The city's infrastructure is often damaged during these conflicts, resulting in costly repairs, straining the city's budget."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.kalixiri"
+        ],
+        "people": [],
+        "place": "3552520e85a7",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "khalmorin-strain",
+        "title": "Underlying tensions between winged nobility and rising merchant power",
+        "facts": [
+          "Underlying tensions between winged nobility and rising merchant power.",
+          "Competition for resources and influence.",
+          "Tensions in Khalmorin stem from competition for resources, as winged nobility and merchant power vie for dominance, creating an undercurrent of resentment that could erupt into conflict if not managed.",
+          "The tension in Khalmorin is stable yet volatile, resulting from the delicate balance between winged nobility and merchant power, maintained through diplomacy but remaining a potential flashpoint.",
+          "The competition for resources drives the tension in Khalmorin, with each group seeking to advance its interests, creating an atmosphere of mistrust that poses a risk to social harmony.",
+          "Volatility in Khalmorin is moderate, with low-level conflicts arising from disputes over resources between rival merchant families or the winged nobility, posing a manageable but risky threat to stability."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.khalmorin"
+        ],
+        "people": [],
+        "place": "b36e9f16214d",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-order-of-the-winged-scales",
+        "title": "A secretive organization of skilled craftsmen and traders who specialize in",
+        "facts": [
+          "A secretive organization of skilled craftsmen and traders who specialize in metalworking and airship design, bound together by a shared fascination with the aerodynamics of winged creatures.",
+          "Their expertise has earned them contracts with nations such as Kaldrimia and Vedrazhia, where they have set up workshops and warehouses to supply the military and merchant fleets.",
+          "However, their involvement in the black market trade of rare bird skins and feathers has made them unwelcome in settlements like Mirabalos.",
+          "The Order controls several key workshops and shipyards in Kaldrimia, Vedrazhia, and Elyrielle, with satellite operations in Mirabalos and Torvathys.",
+          "However, they are not welcome in Zhilgoroth, where a rival organization of skilled aeromancers has established itself."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-order-of-the-winged-scales"
+        ],
+        "people": [],
+        "place": "d677be869434",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-order-of-the-winged-scales-secret",
+        "title": "To create a self-sustaining airship fleet that can traverse the Ringworld's",
+        "facts": [
+          "To create a self-sustaining airship fleet that can traverse the Ringworld's skies with ease, carrying goods and passengers between distant nations and establishing themselves as the premier transportation authority.",
+          "They recruit skilled engineers, fitters, and designers from across Pangrella, often targeting orphans and outcasts who possess natural aptitude for metalwork.",
+          "Those who join are expected to adhere to a strict code of conduct and contribute their skills to the organization's projects.",
+          "Departing members are forced to leave behind a portion of their accumulated wealth and knowledge as collateral.",
+          "The Order's reliance on rare and expensive materials has made them vulnerable to economic fluctuations, particularly the recent shortages of bird feathers and scales.",
+          "Kaelin Vyrnys, a former member turned whistleblower, has been secretly gathering evidence of their illicit activities and is rumored to be working with authorities in Vedrazhia to bring down the Order."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-order-of-the-winged-scales",
+          "situation.world.secret"
+        ],
+        "people": [
+          "a0e2e99089ba",
+          "70156118ddcb"
+        ],
+        "place": "d677be869434",
+        "clock": "",
+        "secret": true,
+        "always_on": false
+      },
+      {
+        "id": "the-guild-of-saltmakers-sons",
+        "title": "A fraternal organization of skilled salt harvesters and refiners, bound by",
+        "facts": [
+          "A fraternal organization of skilled salt harvesters and refiners, bound by family ties and a shared understanding of the intricate chemistry involved in extracting salt from Pangrella's underground reservoirs.",
+          "Kaldrimia's reliance on Guild of Saltmakers' Sons for salt has become an economic cornerstone of the nation, reinforcing the guild's influence and straining relationships with Vedrazhian merchants.",
+          "The Guild holds a significant presence in Mirabalos, Kalimnar, and Xylorvotha, but is not welcome in Elyrielle, where the locals have developed their own independent salt harvesting techniques."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-guild-of-saltmakers-sons"
+        ],
+        "people": [],
+        "place": "7ef5e373c993",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-guild-of-saltmakers-sons-secret",
+        "title": "The Guild aims to monopolize the Pangrellan salt trade by establishing a",
+        "facts": [
+          "The Guild aims to monopolize the Pangrellan salt trade by establishing a network of controlled saltworks and securing favorable trade agreements with influential nations.",
+          "They recruit apprentices from low-caste families, offering them a chance at social mobility in exchange for loyalty and hard work.",
+          "Those who prove themselves are integrated into the Guild's inner circle, where they learn the intricacies of salt production and politics.",
+          "The Guild uses its control over access to salt to exert pressure on recalcitrant nations and influence policy decisions.",
+          "Their reliance on rare underground salt deposits makes them vulnerable to disruptions caused by seismic activity or unauthorized mining.",
+          "Matriarch Elara of Kaelinora has long been aware of this weakness and has secretly been working with a group of rebels to exploit it."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-guild-of-saltmakers-sons",
+          "situation.world.secret"
+        ],
+        "people": [
+          "30d89405044b"
+        ],
+        "place": "7ef5e373c993",
+        "clock": "",
+        "secret": true,
+        "always_on": false
+      },
+      {
+        "id": "the-cartographers-conclave",
+        "title": "A network of mapmakers, cartographers, and travelers who share knowledge and",
+        "facts": [
+          "A network of mapmakers, cartographers, and travelers who share knowledge and resources to create the most accurate and comprehensive maps of Pangrella's vast underground reservoirs.",
+          "Their work has led to a surge in salt mining and trade.",
+          "Their influence is felt across Kalimnar, where their maps have enabled the settlement's rapid growth as a major hub for salt trading; and in Eldrida, where they have helped negotiate trade agreements between nations based on their meticulous cartography.",
+          "The Cartographers' Conclave has established itself as a trusted authority in Kalimnar, thanks in part to the influence of their members among the settlement's leadership.",
+          "Nevertheless, Lyraea Flynn's estate remains a place where the Conclave's activities are viewed with suspicion."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-cartographers-conclave"
+        ],
+        "people": [
+          "610257356887"
+        ],
+        "place": "02e5ebf1ed76",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-cartographers-conclave-secret",
+        "title": "To create an exhaustive map of Pangrella's underground reservoirs, revealing",
+        "facts": [
+          "To create an exhaustive map of Pangrella's underground reservoirs, revealing new sources of salt and uncovering hidden pathways for trade and exploration.",
+          "The Conclave recruits skilled explorers, cartographers, and engineers to join their ranks.",
+          "Members are expected to contribute to the creation of new maps and share knowledge freely with one another.",
+          "Those who leave the Conclave often take their expertise to other organizations or nations, but may also be pursued by rival factions seeking to acquire their skills.",
+          "Their greatest weakness lies in their reliance on a small number of highly skilled cartographers who may leave or be co-opted by rival factions.",
+          "Lyriathorn, a young but talented cartographer from Eldrida, has already begun secretly working for a competing organization, threatening to undermine the Conclave's work."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-cartographers-conclave",
+          "situation.world.secret"
+        ],
+        "people": [
+          "b26f1ad43219"
+        ],
+        "place": "02e5ebf1ed76",
+        "clock": "",
+        "secret": true,
+        "always_on": false
+      },
+      {
+        "id": "the-burrowers-guild-of-kaelorien-vyrnys",
+        "title": "The Burrowers' Guild of Kaelorien Vyrnys is a collective of skilled laborers",
+        "facts": [
+          "The Burrowers' Guild of Kaelorien Vyrnys is a collective of skilled laborers who have honed their craft over generations within the subterranean tunnels of Pangrella.",
+          "Kaelorien Vyrnys's social fabric is woven from the threads of Burrower influence, as their operatives have infiltrated every level of society in major settlements like Mirabalos and Torvathys.",
+          "The Guild has a strong foothold in Mirabalos, where they have established a large headquarters and training facility for new recruits.",
+          "However, their presence is not welcomed in Elyrielle, where local leaders fear that the Guild's expansion will disrupt traditional trade routes and economic patterns."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-burrowers-guild-of-kaelorien-vyrnys"
+        ],
+        "people": [
+          "70156118ddcb",
+          "15894cfd6e1f"
+        ],
+        "place": "7ef5e373c993",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-burrowers-guild-of-kaelorien-vyrnys-secret",
+        "title": "Kaelorien Vyrnys's subterranean masterminds are driven by a singular ambition",
+        "facts": [
+          "Kaelorien Vyrnys's subterranean masterminds are driven by a singular ambition: to forge a labyrinthine thoroughfare that spans Pangrella, knitting together the continent's disparate population centers.",
+          "To achieve this goal, the Guild recruits skilled diggers, engineers, and surveyors from across the continent, often luring them with promises of high pay and good working conditions.",
+          "Those who prove themselves valuable are offered membership in the Guild and access to exclusive contracts and opportunities.",
+          "One weakness of the Burrowers' Guild lies in its reliance on rare underground minerals and resources, which are often controlled by rival factions or wealthy individuals.",
+          "The Cartographers' Conclave, led by Aethoniriel, has developed a keen understanding of these resources and is secretly working to undermine the Guild's plans."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-burrowers-guild-of-kaelorien-vyrnys",
+          "situation.world.secret"
+        ],
+        "people": [
+          "3333d40a140a"
+        ],
+        "place": "7ef5e373c993",
+        "clock": "",
+        "secret": true,
+        "always_on": false
+      },
+      {
+        "id": "the-aerial-cartographers-cooperative",
+        "title": "A loose association of skilled winged cartographers who specialize in creating",
+        "facts": [
+          "A loose association of skilled winged cartographers who specialize in creating detailed topographic maps of Pangrella's aerial landscape, utilizing their unique understanding of aerodynamics and geography.",
+          "Their work is widely respected in Kaldrimia, where their maps have improved the efficiency of airship trade routes; however, their presence is also felt in Kaelorien Vyrnys, where they often collaborate with the Burrowers' Guild to plan subterranean tunnel systems.",
+          "Despite facing opposition from Vedrazhia's isolationist regime, the Aerial Cartographers' Cooperative has managed to maintain a foothold in Pangrella through its partnerships with local winged residents.",
+          "This alliance has proven crucial to the Cooperative's ability to chart the skies above the city."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-aerial-cartographers-cooperative"
+        ],
+        "people": [
+          "70156118ddcb",
+          "15894cfd6e1f"
+        ],
+        "place": "5bbd0c40345f",
+        "clock": "",
+        "secret": false,
+        "always_on": false
+      },
+      {
+        "id": "the-aerial-cartographers-cooperative-secret",
+        "title": "To create a comprehensive and accurate map of Pangrella's aerial geography",
+        "facts": [
+          "To create a comprehensive and accurate map of Pangrella's aerial geography, facilitating safer and more efficient air travel across the world.",
+          "They recruit skilled winged cartographers through a rigorous apprenticeship program, which includes extensive training in aerodynamics, cartography, and navigation; those who leave the Cooperative often go on to work as freelance cartographers or start their own mapping companies.",
+          "Matriarch Elara's strategic dependence on airships for the cooperative's operations would be severely compromised if the airship trade were to collapse or become heavily regulated."
+        ],
+        "keys": [],
+        "tags": [
+          "situation.world.faction.the-aerial-cartographers-cooperative",
+          "situation.world.secret"
+        ],
+        "people": [],
+        "place": "5bbd0c40345f",
+        "clock": "",
+        "secret": true,
+        "always_on": false
       }
     ],
     "timeline": [
