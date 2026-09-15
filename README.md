@@ -47,7 +47,7 @@ campaign is a JSON file under your user data directory, and the world export is 
 python -m pytest
 ```
 
-3,455 tests, about five minutes. Run the whole suite, not the file you touched.
+3,568 tests, about five minutes. Run the whole suite, not the file you touched.
 
 To build the packaged app:
 
@@ -65,6 +65,13 @@ reduction and resistances, nonlethal damage, dying and death. An optional five-f
 per scene, where reach, cover and charge lanes are measured rather than asserted; the
 same engaged/near/far ranges work without one.
 
+**The vertical.** The grid has a third axis: a creature is a box of its own height, a
+spider fights from a ceiling, a flier is stopped by a roof, and a spread is a sphere rather
+than a disc. Rooms are generated with height in them — a gallery, a landing, a wall-walk —
+and flanking, higher ground and cover reach the attack roll itself, itemised beside
+Strength. Pathfinder has no vertical distance rule at all, so the one this uses is a house
+rule and `rules/grid.py` says so where it is decided.
+
 **Characters.** Full guided 1e creation with legality enforced, 1,474 feats, point buy,
 outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
 (the Core eleven plus Blood Bending) and **25 races**; both catalogues merge anything in
@@ -79,7 +86,10 @@ and five crafting disciplines with their own materials and gathering.
 
 **The world.** World Bible exports load read-only and the campaign is an overlay keyed by
 durable ids. A world-state watcher runs off-turn. Quest schemes, situation cards, an NPC
-codex, and a per-town wanted state with gates, counters and guards that read it.
+codex, and a per-town wanted state with gates, counters and guards that read it. The party
+can take the road to another settlement, which costs days on the clock — timed from the
+1e overland tables when the world states a distance and from its own containment tree when
+it does not, and reported in days rather than a mileage nobody wrote down.
 
 **The GM.** Per-turn schemas built from the situation, declaration detection, a grooming
 pipeline over every prose door, and a context ledger that decides what to drop rather than
