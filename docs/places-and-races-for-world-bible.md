@@ -9,6 +9,13 @@ already exist and are not replaced by this one:
 | `docs/races-for-world-bible.md` | ask 1 in detail, plus `race-options.md`, `race-cues.json` and `check_race_cards.py` |
 | **this file** | what a session must build **now**, with the places half rewritten for a consumer that measures distance and height — which it did not when ask 3 was written |
 
+Two files travel with it and are meant to be copied into the World Bible repo:
+
+| File | What it is |
+|---|---|
+| `tools/check_places.py` | a standalone checker. Run it on an export before shipping |
+| `docs/place-vocabulary.json` | every word a place list may use, **generated** from the consumer's own tables by `tools/export_place_vocab.py` |
+
 Canonical copy: `H:\coding\PathfinderGM\docs\places-and-races-for-world-bible.md`.
 
 ---
@@ -547,10 +554,22 @@ grounded against a list of people, because there is no list.
 4. **Tier 3 only where the world has an opinion**, and probably not at all in the first
    pass.
 
-There is a checker for race cards (`tools/check_race_cards.py`) and **no equivalent for
-places yet.** One should exist before the first places export ships, and it belongs on the
-Pathfinder GM side for the same reason the race checker does — it has to assert against the
-consumer's own tables rather than against a transcription of them.
+**Run the checker after every step.** `tools/check_places.py` takes an export and tells you
+what the consumer would build from it:
+
+```
+python check_places.py <world>-campaign.json           # tier 1
+python check_places.py <world>-campaign.json --tier 2
+```
+
+Copy it and `docs/place-vocabulary.json` into the World Bible repo; it imports nothing from
+either program and needs only the standard library. It reports per settlement, exits
+non-zero on a problem, and treats a missing docks in a port town as a note rather than a
+refusal. The vocabulary file is **generated** from the consumer's own tables by
+`tools/export_place_vocab.py` — regenerate it when they move, and do not edit it by hand.
+
+It cannot tell you whether a place is *good*. It can tell you whether the list reaches the
+table at all, which is the failure it was written for.
 
 ---
 
