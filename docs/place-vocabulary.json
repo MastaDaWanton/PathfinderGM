@@ -127,19 +127,50 @@
   "town": [
    "the gate",
    "the guardhouse",
-   "the well"
+   "the well",
+   "the guildhall"
   ],
   "city": [
    "the gate",
    "the guardhouse",
    "the barracks",
-   "the well"
+   "the well",
+   "the guildhall"
   ]
  },
  "junctions_by_scale": {
   "village": 0,
   "town": 0,
   "city": 5
+ },
+ "essential_categories": [
+  "trade",
+  "leisure",
+  "faith",
+  "hidden"
+ ],
+ "scheme_place_kinds": {
+  "market": [
+   "the market",
+   "the merchants row"
+  ],
+  "lodging": [
+   "the tavern",
+   "the inn"
+  ],
+  "gate": [
+   "the gate"
+  ],
+  "temple": [
+   "the temple",
+   "the cathedral",
+   "the shrine"
+  ],
+  "guildhall": [
+   "the guildhall",
+   "the moot hall",
+   "the counting house"
+  ]
  },
  "scale_aliases": {
   "metropolis": "city",

@@ -30,7 +30,9 @@ def test_the_shipped_export_loads_with_its_documented_counts(world):
     assert world.name == "Pangrella"
     assert len(world.entities) == 74
     assert len(world.chronology) == 111
-    assert len(world.trade_routes) == 5
+    # 12 at schema 1.5, from 5: the world was re-described when its trade turned out to
+    # be 5-of-5 cross-border — no town had ever bought grain from the next valley.
+    assert len(world.trade_routes) == 12
     assert len(world.factions) == 5
     assert len(world.unwritten) == 6
 

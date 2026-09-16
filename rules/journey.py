@@ -106,6 +106,16 @@ class Leg:
     by_sea: bool = False
     from_port: bool = False
     to_port: bool = False
+    # How the world says this route is travelled: `road`, `sea`, `river`, or "" where it
+    # did not say. Shipped at schema 1.5 and it beats the inference above outright — the
+    # rule this whole exchange keeps returning to is that a thing the world said beats a
+    # thing this app worked out.
+    #
+    # Measured on arrival, and worth recording because it is the happy case: across both
+    # worlds the stated `by` and the continent inference agreed on every single route,
+    # 144 of 144, in both directions. The inference was right; it is still being replaced,
+    # because being right by luck is not the same as being told.
+    by: str = ""
 
 
 def pace(biome: str, road: str = "") -> tuple[float, str, str]:
@@ -145,8 +155,12 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
     if leg.by_sea:
         from . import ships as ships_mod
 
+        # A river is a keelboat's work — shallow draught, thirty feet, no pretensions —
+        # and open sea is a trader's. The vessel table already knows the difference and
+        # this is the first thing to ask it.
+        vessel = "keelboat" if leg.by == "river" else "sailing ship"
         days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
-                                  "sailing ship", leg.days_apart)
+                                  vessel, leg.days_apart)
         # The WHOLE day, not the eight hours a walking day is: a ship keeps watches and
         # makes way through the night, which is most of why the sea is faster than the
         # road at the same speed. The caller must not spend these as marching hours —
@@ -154,15 +168,31 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
         return days * ships_mod.HOURS_AT_SEA, "", "sea"
 
     if leg.miles is not None and leg.source == "exact":
-        worst = 1.0
-        words = ""
+        # The AVERAGE of the ground, not the worst of it — changed 2026-09-16 when the
+        # first export carrying `crosses` arrived and the table turned out not to
+        # discriminate at all: 148 of Aurvantis's 152 road routes came out at exactly the
+        # same multiplier, because `crosses` is a SAMPLE of the ground (one terrain for a
+        # short haul, two for a long one) and the worst of any two samples from a
+        # continent with mountains in it is always harsh.
+        #
+        # Worst-wins would be right if the field meant "the hardest stretch". It does not,
+        # and taking it that way had a bad gradient: the more carefully a supplier
+        # described their world, the slower every journey in it became. A route that
+        # crosses desert and farmland is roughly half each, and the mean says so —
+        # three bands across the same routes rather than one.
+        #
+        # The PHRASE still names the hardest ground, because that is what a traveller
+        # remembers about a road, and the NUMBER averages.
+        rates, words, worst = [], "", 1.0
         for ground in leg.crosses or ():
             got, said, _how = pace(ground, leg.road)
+            rates.append(got)
             if got < worst:
                 worst, words = got, said
         if not leg.crosses:
             _got, words, _how = pace("", leg.road)
-        speed = max(0.1, (max(0, int(speed_ft)) / FEET_PER_MPH) * worst)
+        ground_rate = sum(rates) / len(rates) if rates else 1.0
+        speed = max(0.1, (max(0, int(speed_ft)) / FEET_PER_MPH) * ground_rate)
         hours = max(1, round(leg.miles / speed))
         return hours, f"{leg.miles} miles{', ' + words if words else ''}", "exact"
 
@@ -191,15 +221,22 @@ def continent_of(world, entity_id: str) -> str:
     return ""
 
 
-def crosses_water(world, here: str, there: str, road: str = "") -> bool:
+def crosses_water(world, here: str, there: str, road: str = "", by: str = "") -> bool:
     """Whether getting from one to the other means going over water.
 
     The ruling of 2026-09-16: **continents are separated by water unless otherwise
-    specified.** A stated road is the otherwise — a world that wrote one between two
-    landmasses has said there is a way across, whether that is an isthmus, a bridge or a
-    causeway, and a thing the world said beats a thing this app worked out.
+    specified.** `by` is the specification — schema 1.5 states `road`, `sea` or `river`
+    on every route — and a stated road is a way across whether that is an isthmus, a
+    bridge or a causeway. The continent tree is the fallback for every export at 1.4 and
+    below, which is every world written before this week.
+
+    A river counts as water. It is not an ocean passage and it is not a road either: you
+    are on a boat, and `hours_for` picks a shallow-draught one for it.
     """
-    if str(road or "").strip():
+    said = str(by or "").strip().lower()
+    if said in ("sea", "river"):
+        return True
+    if said == "road" or str(road or "").strip():
         return False
     mine, theirs = continent_of(world, here), continent_of(world, there)
     return bool(mine) and bool(theirs) and mine != theirs
@@ -278,7 +315,9 @@ def legs_from(world, here: str) -> list[Leg]:
             days_apart=_depth_apart(world, here, other),
             source="exact" if isinstance(miles, int) and miles > 0 else "derived",
             friction=str(row.get("friction") or ""),
-            by_sea=crosses_water(world, here, other, str(row.get("road") or "")),
+            by=str(row.get("by") or ""),
+            by_sea=crosses_water(world, here, other, str(row.get("road") or ""),
+                                 str(row.get("by") or "")),
             from_port=is_port(world, here),
             to_port=is_port(world, other),
         ))
@@ -312,8 +351,12 @@ def describe(leg: Leg, hours: int) -> str:
         from . import ships as ships_mod
 
         days = max(1, round(max(1, hours) / ships_mod.HOURS_AT_SEA))
-        aboard = "a day at sea" if days == 1 else f"{days} days at sea"
-        if leg.from_port:
+        # A river is not the sea, and a tell that calls it one is describing something
+        # that did not happen — the one thing a tell may never do. You are on a boat
+        # either way; what is out of the window is different.
+        where = "on the river" if leg.by == "river" else "at sea"
+        aboard = f"a day {where}" if days == 1 else f"{days} days {where}"
+        if leg.from_port or leg.by == "river":
             return aboard
         # Not every place is on the coast. A crossing that starts inland starts on a
         # road, and the tell says so rather than teleporting the party onto a deck.

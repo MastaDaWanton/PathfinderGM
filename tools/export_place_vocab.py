@@ -68,6 +68,16 @@ _FOOTING = {
 }
 
 
+def _scheme_place_kinds() -> dict:
+    """What a quest asks a settlement for. Imported lazily: this exporter runs without
+    Django configured in some environments and `schemes` reaches the content loader."""
+    try:
+        from rules import schemes
+        return dict(schemes.PLACE_KINDS)
+    except Exception:
+        return {}
+
+
 def _shapes() -> list:
     return list(floorplan.BY_SPOT.values()) + list(floorplan.BY_TERRAIN.values())
 
@@ -165,6 +175,25 @@ def build() -> dict:
         # on either side cannot work out what a legal total is without it — and because
         # this app's own checker was counting them and noting every quartered city.
         "junctions_by_scale": dict(places.JUNCTIONS_BY_SCALE),
+        # The four a settlement must have SOMETHING of, whatever else it has and
+        # whatever its size: somewhere to buy, somewhere to sleep, somewhere to be quiet
+        # and somewhere nobody is watching. This app's own generator has guaranteed them
+        # since the table was rebuilt — "a town with no bed in it is a town the player
+        # cannot rest in, and 'the generator did not pick one' is not a reason a player
+        # can act on" — and it was never published, so an authored world had no way to
+        # know. Measured 2026-09-16 on worlds that passed at 0 notes: 25 of Aurvantis's
+        # 64 settlements had nowhere to sleep.
+        "essential_categories": list(places.ESSENTIAL_CATEGORIES),
+        # The place kinds the shipped QUEST CONTENT reaches for, and the room names that
+        # satisfy each. Published 2026-09-16 because the category rule above turned out to
+        # be too coarse to catch what actually breaks: an arena satisfies "leisure", and a
+        # city with an arena and no inn is a city where a scheme that wants somewhere to
+        # sleep puts the meeting at the gatehouse. Watched happen, in a test, on a
+        # 23-room city.
+        #
+        # Derived from `rules/schemes.PLACE_KINDS` rather than listed, so a scheme that
+        # learns a new slot kind publishes the requirement with it.
+        "scheme_place_kinds": {k: list(v) for k, v in _scheme_place_kinds().items() if v},
         # Words from other settlement vocabularies that this app can read, and what it
         # reads them as. Published 2026-09-16 with the ruling that a supplier should send
         # its own six scales rather than flattening them to these three on our behalf:

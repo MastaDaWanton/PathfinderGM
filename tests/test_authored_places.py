@@ -50,12 +50,15 @@ def _place(**over) -> dict:
 # --- an authored list replaces a generated one ------------------------------------------
 
 def test_the_world_s_own_rooms_are_the_ones_the_party_stands_in():
-    """The headline. Pangrella's six places come from its export, not from the table of
-    generic settlement spots — and two of them (`the guildhall`, `the mine head`) are
-    places the generator would only have reached by cue words."""
+    """The headline. Pangrella's rooms come from its export, not from the table of generic
+    settlement spots — and two of them (`the guildhall`, `the mine head`) are places the
+    generator would only have reached by cue words.
+
+    Six at schema 1.3 and nine at 1.5, because the supplier now sizes a settlement by its
+    own scale against this app's published table: a town holds nine."""
     got = places.home_set(WORLD.get(PANGRELLA))
     names = [p.name for p in got]
-    assert len(got) == 6, names
+    assert len(got) == 9, names
     assert "the mine head" in names and "the guildhall" in names, names
     assert all(p.origin == "world" for p in got)
     assert all(p.id.startswith(f"{PANGRELLA}~urban:") for p in got), names

@@ -199,9 +199,20 @@ CATEGORY_CAP = {"hidden": 2, "faith": 3, "utility": 2, "transport": 2}
 # not a garrison, and inventing one would make every village a fort.
 ALWAYS_BY_SCALE = {
     "village": ("the well",),
-    "town": ("the gate", "the guardhouse", "the well"),
-    "city": ("the gate", "the guardhouse", "the barracks", "the well"),
+    "town": ("the gate", "the guardhouse", "the well", "the guildhall"),
+    "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall"),
 }
+# The guildhall joined the list 2026-09-16, and it was this app's own checker that put it
+# there. `the-patron` is a shipped scheme whose `books` step fires `at($hall)`, and a
+# settlement with no hall is one where that step never fires and the quest quietly stalls
+# — the same failure as a `lodging` slot landing at the gatehouse, which was measured the
+# same afternoon.
+#
+# Found by `test_what_this_app_builds_passes_this_app_s_own_checker`, which is the third
+# time this shape of defect has appeared and the first time a test caught it before it
+# was reported to somebody else as THEIR problem: every generated town and eight of forty
+# generated cities had nowhere the trades meet, while the checker was about to start
+# telling World Bible to provide one.
 
 # Roughly how many people live there, for the feel of the place rather than for any rule.
 # "some understanding of a population to help with the feel of the place [50,000+

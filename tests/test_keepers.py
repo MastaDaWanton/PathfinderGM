@@ -345,3 +345,63 @@ def test_no_keeper_is_a_fight_the_party_cannot_have(label):
     got = npcs.choose(list(places.STAFFED[label][2]), 1) or {}
     cr = got.get("cr_value")
     assert cr is None or cr <= npcs.target_cr(1) + npcs.MAX_DISTANCE, (label, got.get("name"), cr)
+
+
+def test_two_keepers_of_one_family_know_they_are_one_family():
+    """Ruled 2026-09-16, correcting something this file had backwards.
+
+    These tests used to defend "every keeper in a town has a different surname" as the
+    property keepers depend on. It is not: **one household can run several shops, and
+    that is more real than three unrelated ones** — provided the shops acknowledge each
+    other. "They should be acknowledged by each other as family run stores and should be
+    friendly, unless there is some family feud."
+
+    The names already clustered — a settlement's keepers are drawn from its own families,
+    so Ashwatch's market and its stables are both kept by Sootspars — and nothing said
+    so, which left the narrator writing two strangers who happen to share a name. A
+    shared surname is only a family if something acknowledges it. Otherwise it is
+    repetition, and repetition is what lazy generation looks like.
+
+    What the engine states is the RELATIONSHIP. Whether they are close or feuding is the
+    narrator's to play and the attitude track's to record — no sentiment is invented here.
+    """
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    # A town whose keepers actually cluster, found rather than assumed: whether two shops
+    # share a household depends on how deep the settlement's name pool is, and the world
+    # decides that. A four-shop village with four families is not a counter-example.
+    for settlement in WORLD.play["settlements"]:
+        scene = Scene(location_id=settlement["id"])
+        scene.add(load_pc("fixtures/pc-kesst.json"))
+        engine = Engine(scene, Dice(seed=3), world=WORLD)
+        for place in places.home_set(WORLD.get(settlement["id"])):
+            engine.place_party(place.id)
+        kept = [a for a in scene.people.values()
+                if keepers.is_keeper(getattr(a, "world_entity_id", "") or "")]
+        families = {}
+        for who in kept:
+            parts = str(who.name).split()
+            if len(parts) > 1:
+                families.setdefault(parts[-1], []).append(who)
+        shared = [group for group in families.values() if len(group) > 1]
+        if shared:
+            break
+    assert shared, "no settlement in this world has two keepers of one family"
+    for group in shared:
+        # The one minted LAST carries the sentence: the first was stood up before the
+        # second existed, and the brief reads both notes, so the narrator learns it
+        # either way. Asymmetric on purpose rather than by accident.
+        said = [a for a in group if "household" in (a.notes or "")]
+        assert said, [a.notes for a in group]
+        for who in said:
+            assert any(other.name in who.notes for other in group if other is not who)
+
+
+def test_a_keeper_alone_in_their_name_claims_no_family():
+    """The other half: a sentence about a household nobody else belongs to would be the
+    engine inventing a relation, which is the thing it exists not to do."""
+    scene, engine = _table(MARKET)
+    who = _keeper(scene, MARKET)
+    assert "household" not in (who.notes or ""), who.notes

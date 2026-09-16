@@ -34,6 +34,25 @@ WORLD = load_cached("fixtures/pangrella-campaign.json")
 PANGRELLA = "5bbd0c40345f"
 
 
+def _a_road() -> tuple[str, str]:
+    """A settlement with a LAND route out, and where that road goes.
+
+    Picked from the export rather than named, because the world's trade graph is
+    regenerated: this file used to walk from Pangrella to Zhilgoroth, and at schema 1.5
+    Pangrella's only route is 216 miles of open sea to Kalixiri. A test that hard-codes a
+    neighbour is a fixture with an expiry date on it, and these tests are about the ROAD —
+    marching, camping, the watch at the gate — so they need one.
+    """
+    for settlement in WORLD.play["settlements"]:
+        for leg in journey.legs_from(WORLD, settlement["id"]):
+            if not leg.by_sea:
+                return settlement["id"], leg.to_name
+    raise AssertionError("the shipped world has no land route left to test with")
+
+
+ROAD_FROM, ROAD_TO = _a_road()
+
+
 # --- the rules' own numbers -------------------------------------------------------------
 
 def test_the_speed_table_is_the_book_s():
@@ -66,17 +85,27 @@ def test_ground_the_table_has_no_row_for_says_so():
 
 # --- what the shipped world can and cannot say ---------------------------------------------
 
-def test_the_shipped_world_states_no_distances():
-    """The measurement behind the whole three-way answer. If this ever fails, a world has
-    gained geometry and `docs/campaign-format.md` needs reading again."""
-    for leg in journey.legs_from(WORLD, PANGRELLA):
-        assert leg.miles is None and leg.source == "derived"
+def test_the_shipped_world_states_distances_now():
+    """This test used to assert the opposite, and its own docstring said what to do when
+    it failed: "if this ever fails, a world has gained geometry and
+    `docs/campaign-format.md` needs reading again."
+
+    It did. Schema 1.5 ships `miles`, `by` and `crosses` on every route — ask 6, composed
+    in days at this app's own 24-a-day and banded so that no detour can beat a direct
+    road. So the three-way answer is unchanged and the world has simply moved from the
+    middle rung to the top one.
+    """
+    legs = [leg for s in WORLD.play["settlements"]
+            for leg in journey.legs_from(WORLD, s["id"])]
+    assert legs and all(leg.miles and leg.source == "exact" for leg in legs)
+    assert min(leg.miles for leg in legs) >= 24, "a road shorter than a day on foot"
 
 
 def test_a_journey_with_no_stated_distance_is_never_reported_in_miles():
-    """The honesty rule. A derived journey knows how long it took and refuses to claim
-    how far it was."""
-    leg = journey.legs_from(WORLD, PANGRELLA)[0]
+    """The honesty rule, and it still has to hold: every export at 1.4 and below states
+    no distance, and a derived journey knows how long it took while refusing to claim how
+    far it was. Built rather than found, now that the shipped worlds all state one."""
+    leg = journey.Leg(to_id="x", to_name="Nowhere", miles=None, days_apart=3)
     hours, measured, how = journey.hours_for(leg, 30)
     assert how == "derived"
     assert measured == "", measured
@@ -104,7 +133,7 @@ def test_rough_ground_makes_the_same_distance_longer():
 
 # --- the op --------------------------------------------------------------------------------
 
-def _party(hp: int = 40, town: str = PANGRELLA):
+def _party(hp: int = 40, town: str = ROAD_FROM):
     s = Scene(location_id=town)
     pc = instantiate("guildhand", scene=s, name="PC")
     pc.kind = "pc"
@@ -124,8 +153,8 @@ def _go(e, pc, where, **params):
 def test_the_party_can_finally_leave_the_town():
     """The gap this file is named for. Twelve settlements ship; one was reachable."""
     s, e, pc = _party()
-    _go(e, pc, "Zhilgoroth")
-    assert s.location_id != PANGRELLA
+    _go(e, pc, ROAD_TO)
+    assert s.location_id != ROAD_FROM
     assert s.at.startswith(s.location_id), "the party is standing somewhere in the new town"
 
 
@@ -134,7 +163,7 @@ def test_a_journey_costs_days_on_the_clock():
     meters thirst in hours."""
     s, e, pc = _party()
     assert s.clock_minutes == 0
-    _go(e, pc, "Zhilgoroth")
+    _go(e, pc, ROAD_TO)
     assert s.clock_minutes > 24 * 60, "a journey between towns took less than a day"
 
 
@@ -143,8 +172,8 @@ def test_a_road_that_does_not_exist_is_refused_with_the_ones_that_do():
     res = _go(e, pc, "Atlantis")
     tell = " ".join(o.tell for o in res.outcomes)
     assert "no road" in tell.lower()
-    assert "Zhilgoroth" in tell, tell
-    assert s.location_id == PANGRELLA
+    assert ROAD_TO in tell, tell
+    assert s.location_id == ROAD_FROM
 
 
 def test_the_fight_and_the_bystanders_do_not_come_along():
@@ -153,7 +182,7 @@ def test_the_fight_and_the_bystanders_do_not_come_along():
     journey sheds harder, because it is days rather than steps."""
     s, e, pc = _party()
     s.add(instantiate("guildhand", scene=s, name="a merchant"))
-    _go(e, pc, "Zhilgoroth")
+    _go(e, pc, ROAD_TO)
     assert "a merchant" not in [a.name for a in s.actors.values()]
 
 
@@ -168,8 +197,8 @@ def test_a_march_is_days_of_walking_and_not_a_sleepless_forced_one():
     walking: five days of road is five eight-hour marches and four nights.
     """
     s, e, pc = _party(hp=4)
-    _go(e, pc, "Zhilgoroth")
-    assert s.location_id != PANGRELLA, "a frail traveller could not make a walked road"
+    _go(e, pc, ROAD_TO)
+    assert s.location_id != ROAD_FROM, "a frail traveller could not make a walked road"
     assert s.clock_minutes > 5 * journey.HOURS_PER_DAY * 60, \
         "the nights between the marches are not on the clock"
 
@@ -179,7 +208,7 @@ def test_somebody_who_cannot_walk_it_does_not_arrive():
     body gives out with road still to go, the journey did not happen."""
     s, e, pc = _party()
     pc.awake_minutes = 40 * 60          # already two days without sleep
-    res = _go(e, pc, "Zhilgoroth")
+    res = _go(e, pc, ROAD_TO)
     if s.location_id == PANGRELLA:
         assert "turned back" in " ".join(o.tell for o in res.outcomes).lower()
 
@@ -194,14 +223,14 @@ def test_a_wanted_traveller_is_stopped_on_the_road():
     s, e, pc = _party()
     # Granted the way a scheme outcome grants it — one effect, one source — which is how
     # `tests/test_wanted.py` does it and the only way the tag is ever meant to arrive.
-    tag = states.wanted_tag(PANGRELLA)
+    tag = states.wanted_tag(ROAD_FROM)
     pc.apply_effect(ActiveEffect(name="wanted", kind="situation", key=f"scheme:{tag}",
                                  source="scheme:test", origin="scheme:test",
                                  duration="until-dismissed", tags=(tag,)))
-    assert states.standing_with_the_law(pc, PANGRELLA) == "wanted"
+    assert states.standing_with_the_law(pc, ROAD_FROM) == "wanted"
 
-    res = _go(e, pc, "Zhilgoroth")
-    assert s.location_id == PANGRELLA, "walked out of a town that wanted them"
+    res = _go(e, pc, ROAD_TO)
+    assert s.location_id == ROAD_FROM, "walked out of a town that wanted them"
     assert "watched" in " ".join(o.tell for o in res.outcomes).lower()
 
 
@@ -212,7 +241,7 @@ def test_a_way_past_the_watch_opens_the_road():
     from rules.activeeffect import ActiveEffect
 
     s, e, pc = _party()
-    tag = states.wanted_tag(PANGRELLA)
+    tag = states.wanted_tag(ROAD_FROM)
     pc.apply_effect(ActiveEffect(name="wanted", kind="situation", key=f"scheme:{tag}",
                                  source="scheme:test", origin="scheme:test",
                                  duration="until-dismissed", tags=(tag,)))
@@ -220,8 +249,8 @@ def test_a_way_past_the_watch_opens_the_road():
                                  source="scheme:test", origin="scheme:test",
                                  duration="until-dismissed",
                                  tags=("knows.way-past-gate",)))
-    _go(e, pc, "Zhilgoroth")
-    assert s.location_id != PANGRELLA
+    _go(e, pc, ROAD_TO)
+    assert s.location_id != ROAD_FROM
 
 
 # --- and the model is told the roads exist -------------------------------------------------
@@ -234,9 +263,10 @@ def test_the_brief_names_the_roads_out():
     from gm import prompts
 
     s, e, pc = _party()
-    brief = prompts.scene_brief(WORLD, s, WORLD.get(PANGRELLA), recent=[], turn=1)
-    assert "ROADS OUT OF PANGRELLA" in brief
-    assert "Zhilgoroth" in brief
+    here = WORLD.get(ROAD_FROM)
+    brief = prompts.scene_brief(WORLD, s, here, recent=[], turn=1)
+    assert f"ROADS OUT OF {here.name.upper()}" in brief
+    assert ROAD_TO in brief
     # And the instruction that tells it the op exists at all, in the briefing every
     # turn is built from.
     assert '"op": "journey"' in prompts.BRIEFING, "the narrator is never told it can"

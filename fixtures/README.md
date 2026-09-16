@@ -2,11 +2,12 @@
 
 `pangrella-campaign.json` and `pangrella-campaign.sqlite3` are a **real** World Bible
 export of the sample world that ships with the app — not mock data. Written by World Bible
-1.9.0, schema `1.3`.
+1.16.0, schema `1.5`.
 
 - 74 entities (1 world, 2 continents, 6 peoples, 6 nations, 12 settlements, 47 characters)
 - 111 chronology events, most with full accounts
-- 5 trade routes with acquisition / demand / conduct / friction
+- 12 trade routes with acquisition / demand / conduct / friction, each carrying `miles`,
+  `by` (road / sea / river) and `crosses` since schema 1.5
 - 5 factions with aim / method / foothold / weakness
 - 6 names in `unwritten` — mentioned but never written up
 

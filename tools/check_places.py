@@ -411,6 +411,52 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
             notes.append(f"no {label} — the consumer builds one into every {scale}: "
                          f"{why.get(label, 'it is one every settlement of this size has')}")
 
+    # --- the four every settlement needs one of --------------------------------------
+    #
+    # Not a name and not a size: a KIND. Somewhere to buy, somewhere to sleep, somewhere
+    # to be quiet, somewhere nobody is watching. The consumer's own generator has
+    # guaranteed these since its table was rebuilt, and an authored list replaces that
+    # generator — so a settlement authored without one has no fallback and the player
+    # simply cannot do the thing. "I want to rest" answered with nowhere is not a
+    # difficulty, it is a dead end.
+    by_name = {row["name"]: row.get("category")
+               for row in (vocab.get("settlement_places") or [])}
+    have_cats = {by_name.get(str(p.get("name") or "").strip().lower())
+                 for p in enterable}
+    for want in (vocab.get("essential_categories") or ()):
+        if want in have_cats:
+            continue
+        examples = [n for n, c in by_name.items() if c == want][:4]
+        notes.append(
+            f"nothing of the {want} kind — every settlement needs somewhere of it, "
+            f"whatever its size. Any of: {', '.join(examples)}")
+
+    # And the sharper version of the same question: can a QUEST find what it asks for
+    # here? The category rule above is too coarse on its own — an arena satisfies
+    # "leisure", and a city with an arena and no inn is a city where a scheme wanting
+    # somewhere to sleep puts the meeting at the gatehouse, which was watched happening
+    # on a 23-room city with a cathedral and a library in it.
+    here_names = {str(p.get("name") or "").strip().lower() for p in enterable}
+    floors = {row["name"]: row.get("smallest") for row in
+              (vocab.get("settlement_places") or [])}
+    order = list(vocab.get("scales") or ())
+    rank = order.index(scale) if scale in order else len(order)
+    for kind, accepts in (vocab.get("scheme_place_kinds") or {}).items():
+        if not accepts or (here_names & set(accepts)):
+            continue
+        # Only where a settlement of THIS size would have one. A village has no gate and
+        # no guildhall on purpose — this app does not build them one either — and a
+        # checker that demands them of a hamlet is measuring its own table rather than
+        # the world.
+        reachable = [n for n in accepts
+                     if n in floors and order.index(floors[n]) <= rank] if order else accepts
+        if not reachable:
+            continue
+        notes.append(
+            f"nowhere a quest's {kind!r} can go — the shipped content asks for one by "
+            f"name and a {scale or 'settlement'} this size would have one of: "
+            f"{', '.join(reachable)}")
+
     # --- the quarters, if there are any ----------------------------------------------
     problems.extend(_check_within(group, by_id, vocab))
 

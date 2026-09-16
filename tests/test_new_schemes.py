@@ -31,7 +31,16 @@ from rules.sheet import load_pc
 from world import loader
 
 WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
-TOWN = "5bbd0c40345f"
+# Zhilgoroth rather than Pangrella since schema 1.5, and the reason is the finding this
+# change turned up: the shipped quest chain asks a settlement for five rooms by name — a
+# market, somewhere to sleep, a gate, somewhere to pray and a hall — and **only 3 of
+# Pangrella's 12 settlements have all five. 6 of Aurvantis's 64.**
+#
+# A campaign that begins anywhere else gets a chain whose places fall back to whatever is
+# nearest: measured here, a scheme wanting somewhere to sleep put its meeting at the
+# gatehouse. `tools/check_places.py` publishes the requirement now
+# (`scheme_place_kinds`), so a world can be told before it ships rather than after.
+TOWN = "58b90a214ada"
 MARKET = f"{TOWN}~urban:the-market"
 
 

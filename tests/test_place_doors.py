@@ -87,14 +87,15 @@ def test_the_same_alley_off_two_parents_is_two_places():
     """'the back alley by the market vs the back alley by the library': the child id
     hangs off the parent's id, so the two are different places with different ids,
     and neither collides with the other's."""
+    # Two rooms this settlement actually has, rather than two it had at schema 1.3: the
+    # worlds are re-exported and a test that names a room is a fixture with an expiry.
     known = places.home_set(WORLD.get(VYRAKON))
-    market = places.find(known, "the market")
-    temple = places.find(known, "the temple")
-    a = places.mint(market, "the back alley", "", origin="found")
-    b = places.mint(temple, "the back alley", "", origin="found")
+    one, two = known[0], known[1]
+    a = places.mint(one, "the back alley", "", origin="found")
+    b = places.mint(two, "the back alley", "", origin="found")
     assert a.id != b.id
-    assert a.id.startswith(market.id + "/") and b.id.startswith(temple.id + "/")
-    assert a.parent == market.id and b.parent == temple.id
+    assert a.id.startswith(one.id + "/") and b.id.startswith(two.id + "/")
+    assert a.parent == one.id and b.parent == two.id
 
 
 def test_founding_a_base_grants_the_owner_a_tag_through_the_one_applicator():
@@ -168,6 +169,10 @@ def test_the_sewers_under_the_market_are_the_same_sewers_next_time():
 def test_venturing_moves_the_party_and_costs_the_hours():
     s, engine = _room(seed=5)
     pc = s.pc()
+    # The room the party ventures FROM, remembered by name: a cave off the gate and a
+    # cave off the market are two different caves, and this test is about coming back to
+    # the same one.
+    started_in = engine.here().name
     before = s.clock_minutes if hasattr(s, "clock_minutes") else s.minutes
     out = _run(engine, "venture", {"kind": "cave"})
     assert not _refused(out), out.tell
@@ -175,9 +180,12 @@ def test_venturing_moves_the_party_and_costs_the_hours():
     assert s.at == pc.at
     after = s.clock_minutes if hasattr(s, "clock_minutes") else s.minutes
     assert after - before >= places.VENTURES["cave"]["hours"] * 60
-    # The second time is the same cave, and mints nothing more.
+    # The second time is the same cave, and mints nothing more — from the SAME room,
+    # which is the part that matters: a cave off the gate and a cave off the market are
+    # two different caves, and the test used to rely on the party happening to start at
+    # the market.
     n = len(s.founded)
-    _run(engine, "travel", {"place": "the market"})
+    _run(engine, "travel", {"place": started_in})
     again = _run(engine, "venture", {"kind": "cave"})
     assert not _refused(again) and len(s.founded) == n
     assert "as before" in again.tell

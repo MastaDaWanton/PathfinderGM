@@ -178,6 +178,52 @@ def keeps_a_counter(actor) -> bool:
     return places_mod.category_of(label_of(place)) == "trade"
 
 
+def kin_note(scene, actor, at: str = "") -> str:
+    """Who else in this town this keeper is related to, as a sentence for the brief.
+
+    The names already cluster — a settlement's keepers are drawn from its own families,
+    so Ashwatch's market and its tavern are both kept by Sootspars — and until now
+    nothing said so, which left the narrator writing two strangers who happen to share a
+    name. A shared surname is only a family if something acknowledges it; otherwise it is
+    repetition, and repetition is what lazy generation looks like.
+
+    Ruled 2026-09-16: "1 household can run multiple shops but they should be acknowledged
+    by each other as family run stores and should be friendly, unless there is some family
+    feud." This is the acknowledgement. Whether they are friendly or feuding is the
+    narrator's to play and the attitude track's to record — the engine states the
+    relationship and does not invent the sentiment.
+    """
+    mine = str(getattr(actor, "name", "") or "").split()
+    if len(mine) < 2:
+        return ""
+    family = mine[-1]
+    # The place is passed in rather than read off the actor: `staff` writes this note
+    # BEFORE `scene.add` stamps `actor.at`, so reading it here found an empty string and
+    # the kinship never fired. Caught by driving a town with two Sootspars in it.
+    here = places_mod.location_of(str(at or getattr(actor, "at", "") or ""))
+    kin = []
+    for other in scene.people.values():
+        if other is actor or not is_keeper(getattr(other, "world_entity_id", "") or ""):
+            continue
+        if places_mod.location_of(place_of(other.world_entity_id)) != here:
+            continue
+        if str(other.name).split()[-1:] == [family]:
+            kin.append(other.name)
+    if not kin:
+        return ""
+    who = _and_list(kin)
+    return (f" One of the {family}s, and so is {who}: the same household keeps both, "
+            f"and they know it.") if len(kin) == 1 else (
+        f" One of the {family}s, along with {who} — one household, several counters.")
+
+
+def _and_list(names) -> str:
+    got = [str(n) for n in names if str(n).strip()]
+    if len(got) <= 1:
+        return got[0] if got else ""
+    return ", ".join(got[:-1]) + " and " + got[-1]
+
+
 def keeper_in(scene, place_id: str):
     """The keeper standing at this place, if one has been stood up and is still here."""
     wanted = entity_id(place_id)
@@ -237,6 +283,7 @@ def staff(engine):
     town = str(getattr(engine.world.get(scene.location_id), "name", "") or "") \
         if engine.world is not None else ""
     actor.notes = (f"{title[:1].upper()}{title[1:]} at {where}"
-                   + (f", in {town}" if town else "") + ".")
+                   + (f", in {town}" if town else "") + "."
+                   + kin_note(scene, actor, at))
     scene.add(actor)
     return actor

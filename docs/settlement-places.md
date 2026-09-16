@@ -166,6 +166,17 @@ the narrator improvised:
   at one — so the smith the party killed this morning is not behind the counter this
   afternoon.
 
+- **kin, when there is kin.** Keepers are drawn from the settlement's own families, so a
+  town of ten shops often has two Sootspars in it — and for a while nothing said so, which
+  left the narrator writing two strangers who happened to share a name. Repetition, and
+  repetition is what lazy generation looks like. Now a keeper who shares a surname with
+  another keeper in the same settlement says whose household they both belong to. The
+  engine states the relation and stops: whether they are close or feuding is the
+  narrator's to play and the attitude track's to record. Ruled 2026-09-16 — *"they should
+  be acknowledged by each other as family run stores"* — which also settled that one
+  household running several shops is more real than three unrelated ones, not a collision
+  to be bred out.
+
 What was deliberately NOT built: a keeper owns nothing, stocks nothing and prices
 nothing. Ultima Online gave its shopkeepers inventory, cash on hand and a supply-and-
 demand simulation, the shopkeepers went broke holding goods nobody wanted, and the

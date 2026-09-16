@@ -378,10 +378,17 @@ def test_a_new_campaign_stands_the_company_beside_the_party(tmp_path):
         standing = [a for a in c.scene.actors.values()
                     if not keepers.is_keeper(a.world_entity_id or "")]
         assert len(standing) == 2, "the opening companion is standing nowhere"
-        # And a third body: the market has a stallholder in it now, which is what
-        # `rules/keepers.py` is for and is worth asserting rather than filtering away
-        # in silence.
-        assert len(c.scene.actors) == 3, "nobody is keeping the market"
+        # And a keeper where the opening room is one somebody keeps. At schema 1.5 the
+        # world's first settlement is a quartered city and a campaign opens in its GREAT
+        # SQUARE, which is a junction rather than a shop — so the count depends on the
+        # room, and the rule is what is worth asserting rather than the number.
+        from rules import places as places_mod
+
+        here = places_mod.find(c.engine().places(), c.scene.at)
+        wants_one = bool(places_mod.keeper_of(here.name)[0]) if here else False
+        kept = [a for a in c.scene.actors.values()
+                if keepers.is_keeper(a.world_entity_id or "")]
+        assert bool(kept) == wants_one, (c.scene.at, [a.name for a in kept])
         assert all(a.at == c.scene.at for a in c.scene.people.values())
         cm._LIVE.clear()
 

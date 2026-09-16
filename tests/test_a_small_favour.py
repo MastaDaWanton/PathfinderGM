@@ -35,9 +35,45 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import scheme_lint  # noqa: E402
 
 WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
-TOWN = "5bbd0c40345f"
+# Zhilgoroth rather than Pangrella since schema 1.5, and the reason is the finding this
+# change turned up: the shipped quest chain asks a settlement for five rooms by name — a
+# market, somewhere to sleep, a gate, somewhere to pray and a hall — and **only 3 of
+# Pangrella's 12 settlements have all five. 6 of Aurvantis's 64.**
+#
+# A campaign that begins anywhere else gets a chain whose places fall back to whatever is
+# nearest: measured here, a scheme wanting somewhere to sleep put its meeting at the
+# gatehouse. `tools/check_places.py` publishes the requirement now
+# (`scheme_place_kinds`), so a world can be told before it ships rather than after.
+TOWN = "58b90a214ada"
 MARKET = f"{TOWN}~urban:the-market"
-LODGING = f"{TOWN}~urban:the-tavern"
+
+
+def _lodging() -> tuple[str, str]:
+    """Where this scheme's `lodging` slot actually lands, and what to call it.
+
+    Read from the scheme's own place table against the world's own rooms rather than
+    named. This file used to hard-code the tavern, and at schema 1.5 Pangrella has no
+    tavern and no inn — so the lodging slot falls through to the first room that is not
+    the market, which is the gate.
+
+    That is not a bug in either side and it is worth knowing: a scheme that wants
+    somewhere to sleep, in a settlement with nowhere to sleep, puts the meeting at the
+    gatehouse. It is why `essential_categories` is published to the checker now — 25 of
+    Aurvantis's 64 settlements have nowhere of the leisure kind — and until a world
+    ships one, this is what the fallback looks like.
+    """
+    from rules import places as _places
+    from rules import schemes as _schemes
+
+    rooms = {p.name: p.id for p in _places.home_set(WORLD.get(TOWN))}
+    for name in _schemes.PLACE_KINDS.get("lodging", ()):
+        if name in rooms:
+            return rooms[name], name
+    spare = next(pid for name, pid in rooms.items() if pid != MARKET)
+    return spare, next(n for n, pid in rooms.items() if pid == spare)
+
+
+LODGING, LODGING_NAME = _lodging()
 LINE = ("a-small-favour", "wanted", "the-one-who-paid", "the-patron", "the-price-on-your-head")
 DAY = 24 * 60
 
@@ -56,6 +92,18 @@ def _table(seed=3):
     e.place_party(MARKET)
     return s, e, pc
 
+
+
+def _named_kind(kind: str) -> str:
+    """A room of the kind a quest asks for, by whatever this town calls it."""
+    from rules import places as _places
+    from rules import schemes as _schemes
+
+    rooms = {p.name for p in _places.home_set(WORLD.get(TOWN))}
+    for name in _schemes.PLACE_KINDS.get(kind, ()):
+        if name in rooms:
+            return name
+    raise AssertionError(f"{TOWN} has nowhere a quest's {kind!r} could go")
 
 def _run(engine, op, params, actor="pc"):
     intents = engine.validate([{"op": op, "actor": actor, "because": "t", "params": params}],
@@ -293,7 +341,7 @@ def test_the_exposed_path_reaching_the_lodging_early_collapses_the_plan():
     _out(e, inst)
     _wait(e, 61)
     assert giver.has_state("state.hidden")
-    res = _travel(e, "the tavern")
+    res = _travel(e, LODGING_NAME)
     assert "exposed" in inst["fired"] and inst["outcome"] == "exposed"
     assert any(giver.name in o.tell for o in res.outcomes if o.op == "scheme")
     assert pc.has_state("knows.giver-lied") and pc.has_state("knows.giver-to-find")
@@ -339,7 +387,7 @@ def _betrayed(e, s, pc):
 def _two_clues(e, s, pc):
     """At the lodging, by salience: the witness's word (three criteria), the way out
     the witness offers (four), the ledger (three), then the two clues together."""
-    _travel(e, "the tavern")
+    _travel(e, LODGING_NAME)
     _wait(e, 1)
     _wait(e, 1)
     _wait(e, 1)
@@ -359,7 +407,7 @@ def test_two_clues_at_the_lodging_open_the_one_who_paid():
     s, e, pc = _table()
     _betrayed(e, s, pc)
     q2 = _instance(s, "wanted")
-    res = _travel(e, "the tavern")
+    res = _travel(e, LODGING_NAME)
     assert "witness-word" in q2["fired"] and pc.has_state("knows.clue.witness")
     assert any("will say so" in o.tell for o in _told(res, "wanted"))
     _wait(e, 1)
@@ -384,7 +432,7 @@ def test_justice_at_the_market_with_the_proof():
     s, e, pc = _table()
     _betrayed(e, s, pc)
     q4 = _named(e, s, pc)
-    _travel(e, "the guildhall")
+    _travel(e, _named_kind("guildhall"))
     assert "books" in q4["fired"]
     _wait(e, 1)
     assert "proof" in q4["fired"] and pc.has_state("knows.proof-held")
@@ -411,7 +459,7 @@ def test_justice_lifts_the_wanted_state():
     s, e, pc = _table()
     _betrayed(e, s, pc)
     q4 = _named(e, s, pc)
-    _travel(e, "the guildhall")
+    _travel(e, _named_kind("guildhall"))
     _wait(e, 1)
     _travel(e, "the market")
     assert q4["outcome"] == "justice"

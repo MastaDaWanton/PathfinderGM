@@ -28,11 +28,34 @@ from rules.sheet import load_pc
 from world import loader
 
 WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
-TOWN = "5bbd0c40345f"
+# Zhilgoroth rather than Pangrella since schema 1.5, and the reason is the finding this
+# change turned up: the shipped quest chain asks a settlement for five rooms by name — a
+# market, somewhere to sleep, a gate, somewhere to pray and a hall — and **only 3 of
+# Pangrella's 12 settlements have all five. 6 of Aurvantis's 64.**
+#
+# A campaign that begins anywhere else gets a chain whose places fall back to whatever is
+# nearest: measured here, a scheme wanting somewhere to sleep put its meeting at the
+# gatehouse. `tools/check_places.py` publishes the requirement now
+# (`scheme_place_kinds`), so a world can be told before it ships rather than after.
+TOWN = "58b90a214ada"
 MARKET = f"{TOWN}~urban:the-market"
 ELSEWHERE = "a1b2c3d4e5f6"
 SOURCE = "scheme:a-small-favour/failure"
 
+
+
+def _named(kind: str) -> str:
+    """A room in this town of the kind a quest would ask for, by whatever it is called
+    here. Elyrielle has a cathedral and no temple; both are somewhere to pray, and
+    `schemes.PLACE_KINDS` is the one table that says so."""
+    from rules import places as _places
+    from rules import schemes as _schemes
+
+    rooms = {p.name for p in _places.home_set(WORLD.get(TOWN))}
+    for name in _schemes.PLACE_KINDS.get(kind, ()):
+        if name in rooms:
+            return name
+    raise AssertionError(f"{TOWN} has nowhere a quest's {kind!r} could go")
 
 def _table(seed=3):
     s = Scene(location_id=TOWN)
@@ -175,7 +198,7 @@ def test_moving_inside_the_walls_is_not_watched():
     """Wanted is not house arrest: the tavern and the temple are still yours."""
     s, e, pc = _table()
     _want(pc)
-    for spot in ("the tavern", "the temple"):
+    for spot in (_named("lodging"), _named("temple")):
         out = _run(e, "travel", {"place": spot})
         assert not _refused(out), out.tell
 
