@@ -781,8 +781,14 @@ def test_a_card_that_states_its_tags_is_not_read_for_them():
     Measured on the shipped Aurvantis export the same day, which is why the rule was
     needed: the Half-Orc card's body said "sometimes visible tusks", the `tusks?` cue
     granted `natural.bite`, and every half-orc a player could roll walked out of the
-    forge with a 1d6 bite. Pathfinder's half-orc has no natural attack. The card is now
-    the authority on what it grants, so prose like that costs nothing.
+    forge with a 1d6 bite.
+
+    The defect is not the bite. Ruled hours later, correcting the first version of this
+    docstring: *"these races are specific to this world even if they are called Orcs, so
+    it's okay if they're different."* A world's half-orcs may bite. The defect is that
+    the world could not say NO — declining the bite meant deleting the word "tusks" from
+    a sentence about their faces. The card is the authority on what it grants now, which
+    makes both answers sayable.
     """
     tusks = ["Human build with orcish ruggedness — a heavier brow, visible tusks."]
     read = races.draft("Half-Orc", tusks)

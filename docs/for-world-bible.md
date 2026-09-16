@@ -313,34 +313,24 @@ should have kept them together is not there.
 **Done when** the two halves are generated from one description of the shape, so a field
 added to one cannot be missing from the other, and `grants` and `by` are in both.
 
-## 11. Three races have a bite attack that Pathfinder does not give them
+## 11. WITHDRAWN — "three races have a bite Pathfinder does not give them"
 
-Content, not shape, and the reason ask 12 below matters.
+Kept as a heading rather than deleted, because the reason it was wrong is worth more than
+the ask was.
 
-Four cards in the shipped Aurvantis export state `natural.bite`. One is right: tengu have
-a bite, it is printed on the race. The other three are Goblin, Half-Orc and Orc, and
-**none of those has a natural attack in Pathfinder at all.** The Orc card also states
-`natural.armor.1`, and Pathfinder's orc has no natural armour either.
+For about an hour on 2026-09-16 this ledger asked the supplier to take the bite off
+Aurvantis's Goblin, Half-Orc and Orc cards, on the grounds that Pathfinder gives those
+races no natural attack. `check_race_cards.py` had a table of the core races to flag it.
 
-This is not cosmetic. Traced end to end on this side: the Half-Orc card's body line reads
-"Human build with orcish ruggedness — a heavier brow, sometimes visible tusks", and every
-half-orc a player can roll in Aurvantis walks out of the forge with a 1d6 bite on the
-sheet. The Goblin card goes further and describes an anatomy to match — "A hooked beak,
-strong enough to break bone" — which is a beak on a goblin, and reads like a description
-written from the tag rather than the tag written from the people.
+> *"These races are specific to this world even if they are called Orcs, so it's okay if
+> they're different."*
 
-The shape of the error says where it came from: **tusks are anatomy and a bite is a
-rule**, and something is treating the first as evidence of the second. This app did
-exactly the same thing until today — its own cue table has `tusks?` granting
-`natural.bite` — which is why the fix is the inversion in ask 12 and not a better word
-list on either side.
+Which is this project's oldest rule — **a thing the world said beats a thing this app
+worked out** — and the check was that rule backwards: measuring a world against a
+rulebook it never agreed to, on the strength of a name. An Aurvantis orc is Aurvantis's.
+The table is gone and the note with it.
 
-`check_race_cards.py` now names it. It is a note and never a problem: a world whose
-half-orcs bite is allowed to say so. What it should not be is a consequence of describing
-their teeth.
-
-**Done when** the three cards state what Pathfinder gives those races, or the world says
-plainly that it means otherwise.
+What survives is not about the bite and is not a table. See ask 12.
 
 ## 12. Write the description from the tags, not the tags from the description
 
@@ -368,11 +358,18 @@ field a person can read instead of buried in a pattern match.
 body, senses and movement sentences to describe what those tags are. Not the other way
 round.
 
-The direction matters because of what running it backwards produces, which ask 11 is:
-"sometimes visible tusks" became a bite attack, and then a goblin was given a hooked beak
-to justify one. A description generated from a tag is always consistent with it. A tag
-inferred from a description is a guess that reads like a fact, and by the time it reaches
-a character sheet there is nothing left that says it was ever a guess.
+The direction matters because of what running it backwards costs, and the cost is not
+that the result is wrong — a world's half-orcs may bite, and Aurvantis's do. The cost is
+that **the world cannot decline.** "Sometimes visible tusks" became a bite attack, and
+the only way to have had no bite was to stop describing their faces. A rule nobody can
+refuse is a rule nobody chose, and by the time it reaches a character sheet there is
+nothing left that says it was ever a guess.
+
+The Goblin card is the tell. It states `natural.bite` and its body reads "A hooked beak,
+strong enough to break bone" — a sentence that exists to justify the tag. Run the other
+way that card would have started from "these goblins bite" and the beak would be a fact
+about goblins rather than a rationalisation. Same output, and only one of them was
+decided by anybody.
 
 **Done when** `grants[]` is chosen before the prose is written, and the checker's two
 cross-cover notes — a tag no sentence describes, a sentence describing a tag that is not

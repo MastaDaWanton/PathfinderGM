@@ -39,25 +39,6 @@ _DIGIT = re.compile(r"\d")
 
 FIELDS = ("body", "senses", "movement")
 
-# Races Pathfinder itself publishes that have NO natural attack, whatever their teeth
-# look like. Not a list of what a race may have — a world is free to say its half-orcs
-# bite — but the one place where "described with tusks" and "has a bite attack" come
-# apart, and they come apart constantly because anatomy is what a card is FOR.
-#
-# Measured 2026-09-16 on the shipped Aurvantis export: four cards state `natural.bite`
-# and three of them are this. A Half-Orc card reading "sometimes visible tusks" put a
-# 1d6 bite on every half-orc a player could roll, end to end, through the forge and onto
-# the sheet. The tengu is the fourth and is correct — tengu DO have a bite — which is why
-# this is a named list and not a rule about tusks.
-#
-# A note and never a PROBLEM. A world that means it outranks this file.
-_NO_NATURAL_ATTACK = {
-    "human", "half-elf", "half-orc", "elf", "dwarf", "halfling", "gnome", "orc",
-    "goblin", "hobgoblin", "halfling", "aasimar", "tiefling", "ifrit", "oread",
-    "sylph", "undine", "dhampir", "changeling", "kitsune", "nagaji", "samsaran",
-    "suli", "svirfneblin", "wayang", "ratfolk",
-}
-_NATURAL = ("natural.bite", "natural.claws")
 
 
 def load_cues(path: Path) -> dict:
@@ -220,15 +201,20 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
             notes.append(f"a sentence describes {said} and grants[] does not state "
                          f"{tag} — the player reads it and the engine will not do it")
 
-    # A natural attack on a race the rulebook gives none. Checked on both paths, because
-    # a 1.4 card reaches the same sheet by the cue table.
-    if name.strip().lower() in _NO_NATURAL_ATTACK:
-        got = set(stated) if stated else {t for c in hits for t in (c.get("grants") or [])}
-        for tag in sorted(got & set(_NATURAL)):
-            notes.append(f"{tag} on a {name}: Pathfinder's {name} has no natural attack, "
-                         f"whatever its teeth look like. Every {name} a player rolls in "
-                         f"this world will have one. Deliberate is fine — say so; "
-                         f"described-and-therefore-granted is the bug this catches")
+    # WHAT IS NOT CHECKED HERE, and was for about an hour on 2026-09-16: whether a card
+    # agrees with the Pathfinder race of the same name. It had a table of the core races
+    # that have no natural attack and flagged an Aurvantis Half-Orc for stating a bite.
+    #
+    # Ruled the same day: *"these races are specific to this world even if they are
+    # called Orcs, so it's okay if they're different."* Which is this project's oldest
+    # rule — a thing the world said beats a thing this app worked out — and the check was
+    # that rule backwards, measuring a world against a rulebook it never agreed to. An
+    # Aurvantis orc is Aurvantis's. The name is not a citation.
+    #
+    # The half of the finding that survived is not about the bite at all and is not
+    # checked by a table: see the two cross-cover notes above. Under prose-reading a world
+    # could not DECLINE a bite without deleting the word "tusks" from its own description,
+    # and that is the defect — not which way it chose.
 
     return problems, notes, hits
 

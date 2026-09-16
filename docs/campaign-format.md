@@ -182,7 +182,12 @@ gets **no** entry: treat it as a heritage of some other body rather than a speci
   write the description from those tags."* What that replaced, measured the same day on
   the shipped Aurvantis export: a Half-Orc card reading "sometimes visible tusks" tripped
   a `tusks?` pattern here and put a 1d6 bite on every half-orc a player could roll.
-  Pathfinder's half-orc has no natural attack.
+
+  Note what the defect is and is not. It is not that half-orcs should not bite — these
+  are **this world's** peoples, and an Aurvantis orc is Aurvantis's whatever the Bestiary
+  says about the name. It is that nobody chose. Under prose-reading the world could not
+  DECLINE the bite without deleting the word "tusks" from a sentence about their faces,
+  and a rule nobody can decline is a rule nobody selected.
 - Each sentence appears in **one** field only, says the thing and stops, and uses the
   world's words, never a rules term.
 
