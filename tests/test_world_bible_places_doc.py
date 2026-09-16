@@ -132,22 +132,26 @@ def test_the_two_ceiling_heights_are_stated_in_feet():
 
 
 def test_the_ceiling_the_doc_states_is_the_one_the_generator_can_reach():
-    """Three numbers, and they were two different sixes until 2026-09-15. The World Bible
-    side found that the engine and the checker disagreed about what six counted; measured
-    here, this app's own generator makes SEVEN places for a settlement its own checker
-    notes as over the limit — no districts, no authored list, nothing minted in play.
+    """Three numbers became a table on 2026-09-15, twice in one day.
 
-    So the number a checker uses and the number a document states are both the one the
-    generator can actually reach, and it is named rather than summed in three places.
+    First: the engine and the checker disagreed about what six counted, and this app's own
+    generator made seven places for a settlement its own checker flagged. Then the six
+    itself went — "there is no town or city that has 2 places. 2 places is a rest stop" —
+    and a settlement holds what its own scale says it holds.
+
+    So what a document may state is the table, not a number, and the largest of it is what
+    a checker compares against because that is the most any settlement may hold.
     """
-    assert places.MOST_IN_A_SETTLEMENT == places.MOST_SPOTS + places.MOST_IMPLIED
+    assert places.MOST_IN_A_SETTLEMENT == max(places.PLACES_BY_SCALE.values())
     doc = _doc()
-    assert f"exceed {_words(places.MOST_IN_A_SETTLEMENT)} places per location" in doc, doc[:0]
-    assert f"caps a location at **{_words(places.MOST_IN_A_SETTLEMENT)}** places" in doc
-
+    for scale, n in places.PLACES_BY_SCALE.items():
+        assert f"{scale} of {_words(n)}" in doc, (
+            f"the document does not say a {scale} holds {n}")
 
 def _words(n: int) -> str:
-    return {6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}.get(n, str(n))
+    return {3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight",
+            9: "nine", 10: "ten", 12: "twelve", 16: "sixteen",
+            18: "eighteen", 20: "twenty", 24: "twenty-four"}.get(n, str(n))
 
 
 def test_the_generator_cannot_exceed_the_ceiling_it_publishes():

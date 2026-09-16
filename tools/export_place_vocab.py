@@ -136,9 +136,24 @@ def build() -> dict:
         # so nobody has to rebuild the sum and get a different answer, which is exactly
         # what happened between this app's generator and its own checker.
         "most_places": places.MOST_IN_A_SETTLEMENT,
+        # What a settlement of each size holds, which is the check that actually means
+        # something: a village of eighteen rooms is as wrong as a city of five, and one
+        # ceiling for both could never say so. The export writes `scale` on every
+        # settlement and has since 1.0.
+        "places_by_scale": dict(places.PLACES_BY_SCALE),
+        "scales": list(places.SCALES),
+        "population_by_scale": {k: list(v) for k, v in places.POPULATION_BY_SCALE.items()},
+        "always_by_scale": {k: list(v) for k, v in places.ALWAYS_BY_SCALE.items()},
         "most_generated": places.MOST_SPOTS,
         "most_implied": places.MOST_IMPLIED,
         "most_children_minted_in_play": places.MOST_CHILDREN,
+        # Every kind of place a settlement may have, what it is for, the smallest
+        # settlement that has one, and whether anything reads it yet.
+        "settlement_places": [
+            {"name": label, "about": about, "smallest": floor, "category": category,
+             "read_by": engine, "staffed": places.STAFFED.get(label, "")}
+            for label, about, floor, category, engine in places.SETTLEMENT_PLACES
+        ],
         "implied": [{"place": spot, "slug": _slug(spot), "about": about,
                      "words": list(words)}
                     for words, (spot, about) in places.IMPLIED],

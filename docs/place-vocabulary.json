@@ -37,11 +37,15 @@
  "flat_by_design": [
   "the-back-streets",
   "the-edge",
+  "the-gaol",
+  "the-green",
+  "the-lane",
+  "the-midden",
   "the-sump"
  ],
  "vertical_balance": {
-  "consumer_tables": "30 of 36",
-  "ratio": 0.833,
+  "consumer_tables": "59 of 69",
+  "ratio": 0.855,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {
@@ -69,16 +73,394 @@
   "why": "a house is enough air to stand in and none to fly in. null means open sky, and the consumer treats the place as outdoors."
  },
  "size_ft": {
-  "width_min": 50,
+  "width_min": 40,
   "width_max": 100,
   "depth_min": 40,
   "depth_max": 100,
   "why": "the range the consumer's own tables cover. Nothing clamps an authored value yet, because nothing reads one."
  },
- "most_places": 8,
+ "most_places": 18,
+ "places_by_scale": {
+  "village": 5,
+  "town": 9,
+  "city": 18
+ },
+ "scales": [
+  "village",
+  "town",
+  "city"
+ ],
+ "population_by_scale": {
+  "village": [
+   200,
+   1200
+  ],
+  "town": [
+   2000,
+   12000
+  ],
+  "city": [
+   50000,
+   250000
+  ]
+ },
+ "always_by_scale": {
+  "village": [
+   "the well"
+  ],
+  "town": [
+   "the gate",
+   "the guardhouse",
+   "the well"
+  ],
+  "city": [
+   "the gate",
+   "the guardhouse",
+   "the barracks",
+   "the well"
+  ]
+ },
  "most_generated": 6,
- "most_implied": 2,
+ "most_implied": 4,
  "most_children_minted_in_play": 6,
+ "settlement_places": [
+  {
+   "name": "the market",
+   "about": "where the stalls are",
+   "smallest": "village",
+   "category": "trade",
+   "read_by": "market",
+   "staffed": "stallholders, and one who runs the pitch"
+  },
+  {
+   "name": "the smithy",
+   "about": "a hearth, an anvil, and the noise of both",
+   "smallest": "village",
+   "category": "trade",
+   "read_by": "crafting",
+   "staffed": "a smith"
+  },
+  {
+   "name": "the mill",
+   "about": "the wheel, and the sacks stacked against it",
+   "smallest": "village",
+   "category": "trade",
+   "read_by": "",
+   "staffed": "a miller"
+  },
+  {
+   "name": "the workshops",
+   "about": "where the trades are",
+   "smallest": "town",
+   "category": "trade",
+   "read_by": "crafting",
+   "staffed": "the trades that work there"
+  },
+  {
+   "name": "the tannery",
+   "about": "the smell reaches the next street",
+   "smallest": "town",
+   "category": "trade",
+   "read_by": "",
+   "staffed": "a tanner"
+  },
+  {
+   "name": "the brewery",
+   "about": "vats, and the heat coming off them",
+   "smallest": "town",
+   "category": "trade",
+   "read_by": "",
+   "staffed": "a brewer"
+  },
+  {
+   "name": "the warehouses",
+   "about": "what the town is holding, and who for",
+   "smallest": "town",
+   "category": "trade",
+   "read_by": "",
+   "staffed": "a warehouseman with a ledger"
+  },
+  {
+   "name": "the mine head",
+   "about": "where the ore comes up",
+   "smallest": "village",
+   "category": "trade",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the counting house",
+   "about": "ledgers, and somebody who knows what you owe",
+   "smallest": "city",
+   "category": "trade",
+   "read_by": "",
+   "staffed": "a clerk, and whoever they answer to"
+  },
+  {
+   "name": "the merchants row",
+   "about": "the expensive street",
+   "smallest": "city",
+   "category": "trade",
+   "read_by": "market",
+   "staffed": "shopkeepers who know what you can afford"
+  },
+  {
+   "name": "the gate",
+   "about": "the way in and out",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "travel",
+   "staffed": ""
+  },
+  {
+   "name": "the guardhouse",
+   "about": "where the watch is, and there are always more of them inside",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "wanted",
+   "staffed": "the watch"
+  },
+  {
+   "name": "the guildhall",
+   "about": "where the trades meet",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "",
+   "staffed": "a clerk of the guild"
+  },
+  {
+   "name": "the library",
+   "about": "where the records are kept",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the keep",
+   "about": "where the soldiers are, and the walls they hold",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the moot hall",
+   "about": "where the arguments are had in public",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the gaol",
+   "about": "a room with a lock on the outside",
+   "smallest": "town",
+   "category": "civic",
+   "read_by": "wanted",
+   "staffed": "a gaoler"
+  },
+  {
+   "name": "the barracks",
+   "about": "where the watch sleeps and drills",
+   "smallest": "city",
+   "category": "civic",
+   "read_by": "wanted",
+   "staffed": "the garrison"
+  },
+  {
+   "name": "the courthouse",
+   "about": "where it is decided, and written down",
+   "smallest": "city",
+   "category": "civic",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the customs house",
+   "about": "what came in, and what was paid on it",
+   "smallest": "city",
+   "category": "civic",
+   "read_by": "",
+   "staffed": "an officer who wants to see your papers"
+  },
+  {
+   "name": "the shrine",
+   "about": "somewhere to be quiet",
+   "smallest": "village",
+   "category": "faith",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the graveyard",
+   "about": "the ones this place has already lost",
+   "smallest": "village",
+   "category": "faith",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the temple",
+   "about": "somewhere to be quiet, with a roof on it",
+   "smallest": "town",
+   "category": "faith",
+   "read_by": "",
+   "staffed": "whoever keeps it"
+  },
+  {
+   "name": "the cathedral",
+   "about": "too large for the town under it",
+   "smallest": "city",
+   "category": "faith",
+   "read_by": "",
+   "staffed": "clergy, and a great many of them"
+  },
+  {
+   "name": "the inn",
+   "about": "a bed, if you can pay for it",
+   "smallest": "village",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "an innkeeper"
+  },
+  {
+   "name": "the green",
+   "about": "the common ground, and what happens on it",
+   "smallest": "village",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the tavern",
+   "about": "somewhere to sit down",
+   "smallest": "town",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "whoever is behind the bar"
+  },
+  {
+   "name": "the bathhouse",
+   "about": "steam, and everybody business in it",
+   "smallest": "city",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "an attendant"
+  },
+  {
+   "name": "the theatre",
+   "about": "where the town watches itself",
+   "smallest": "city",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "a company, and somebody taking the money"
+  },
+  {
+   "name": "the arena",
+   "about": "sand, and a crowd that paid to be there",
+   "smallest": "city",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "a master of the games"
+  },
+  {
+   "name": "the gardens",
+   "about": "kept, and walled, and not for everybody",
+   "smallest": "city",
+   "category": "leisure",
+   "read_by": "",
+   "staffed": "a gardener who would rather you did not"
+  },
+  {
+   "name": "the well",
+   "about": "where the water is",
+   "smallest": "village",
+   "category": "utility",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the granary",
+   "about": "what stands between this winter and the next",
+   "smallest": "town",
+   "category": "utility",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the midden",
+   "about": "where it all ends up",
+   "smallest": "town",
+   "category": "utility",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the cistern",
+   "about": "under the street, and older than it",
+   "smallest": "city",
+   "category": "utility",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the stables",
+   "about": "horses, and the people who know them",
+   "smallest": "village",
+   "category": "transport",
+   "read_by": "",
+   "staffed": "an ostler"
+  },
+  {
+   "name": "the docks",
+   "about": "where the boats come in",
+   "smallest": "town",
+   "category": "transport",
+   "read_by": "",
+   "staffed": "a harbourmaster"
+  },
+  {
+   "name": "the bridge",
+   "about": "over the water",
+   "smallest": "town",
+   "category": "transport",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the carters yard",
+   "about": "what leaves at dawn, and on whose account",
+   "smallest": "city",
+   "category": "transport",
+   "read_by": "",
+   "staffed": "a carter taking bookings"
+  },
+  {
+   "name": "the lane",
+   "about": "round the back, and out of the light",
+   "smallest": "village",
+   "category": "hidden",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the back streets",
+   "about": "where nobody is watching",
+   "smallest": "town",
+   "category": "hidden",
+   "read_by": "",
+   "staffed": ""
+  },
+  {
+   "name": "the warrens",
+   "about": "a street plan nobody drew",
+   "smallest": "city",
+   "category": "hidden",
+   "read_by": "",
+   "staffed": ""
+  }
+ ],
  "implied": [
   {
    "place": "the docks",
@@ -199,26 +581,59 @@
  },
  "known_slugs": [
   "the-approach",
+  "the-arena",
   "the-back-streets",
+  "the-barracks",
+  "the-bathhouse",
+  "the-brewery",
   "the-bridge",
+  "the-carters-yard",
+  "the-cathedral",
+  "the-cistern",
+  "the-counting-house",
+  "the-courthouse",
+  "the-customs-house",
   "the-deep-chamber",
   "the-docks",
+  "the-east-crossing",
   "the-edge",
   "the-gallery",
+  "the-gaol",
+  "the-gardens",
   "the-gate",
+  "the-granary",
+  "the-graveyard",
+  "the-great-square",
+  "the-green",
+  "the-guardhouse",
   "the-guildhall",
   "the-heart-of-it",
   "the-high-ground",
+  "the-inn",
   "the-keep",
+  "the-lane",
   "the-library",
   "the-market",
+  "the-merchants-row",
+  "the-midden",
+  "the-mill",
   "the-mine-head",
+  "the-moot-hall",
+  "the-north-crossing",
   "the-shrine",
+  "the-smithy",
+  "the-south-crossing",
+  "the-stables",
   "the-sump",
+  "the-tannery",
   "the-tavern",
   "the-temple",
+  "the-theatre",
   "the-vaults",
+  "the-warehouses",
+  "the-warrens",
   "the-well",
+  "the-west-crossing",
   "the-workshop-loft",
   "the-workshops"
  ],

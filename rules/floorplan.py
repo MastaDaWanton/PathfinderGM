@@ -139,6 +139,93 @@ BY_SPOT: dict[str, Shape] = {
                       about="a wellhead, and the ground worn round it"),
     "the-workshop-loft": Shape(10, 10, LOW, clumps=5, clump_max=2,
                                about="a loft over the work"),
+
+    # --- the settlement vocabulary (2026-09-15) -------------------------------------
+    # "cities and towns have businesses and entertainment and leisure/recreation and
+    # religious establishments/cultural buildings...the list goes on and on". Thirty-eight
+    # kinds of place now, and a place with no row here falls through to plain `urban` —
+    # a sixteen-by-fourteen room with walls and clutter, which works and is the same room
+    # every time. A tuned row is what makes a bathhouse read differently from a gaol when
+    # a fight starts in one.
+    #
+    # Most are vertical, per the standing instruction, and the flat ones are flat because
+    # a reader would agree they are: a lane between two walls, a midden, a green.
+
+    # buying, selling, making
+    "the-smithy": Shape(10, 10, LOW, clumps=5, clump_max=1, rise=2,
+                        vertical="scatter", about="a hearth, an anvil, and what is stacked round them"),
+    "the-mill": Shape(12, 12, HALL, clumps=5, clump_max=2, rise=3, rise_to=2,
+                      about="the wheel, the sacks, and a floor above them"),
+    "the-tannery": Shape(14, 12, LOW, clumps=7, clump_max=2, rough=10,
+                         vertical="scatter", about="pits and frames, and nowhere clean to stand"),
+    "the-brewery": Shape(14, 12, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                         about="vats to climb between, and a gantry over them"),
+    "the-warehouses": Shape(16, 14, HALL, clumps=10, clump_max=3,
+                            about="stacked to the roof, with a walk round the top"),
+    "the-counting-house": Shape(10, 10, LOW, clumps=4, clump_max=1,
+                                about="a desk, a grille, and a stair to the strongroom"),
+    "the-merchants-row": Shape(18, 8, None, clumps=6, clump_max=2, rise=2,
+                               about="a long street with steps up to every door"),
+    # who is in charge
+    "the-guardhouse": Shape(12, 10, LOW, clumps=4, clump_max=2, rise=2,
+                            about="a rack of arms, a stair to the wall, and always more of them inside"),
+    "the-barracks": Shape(16, 14, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                          about="a yard, a gallery of bunks over it, and a drill square"),
+    "the-moot-hall": Shape(14, 12, HALL, clumps=4, clump_max=1, rise=2,
+                           about="benches round a floor, and a gallery for everyone else"),
+    "the-gaol": Shape(10, 10, LOW, clumps=6, clump_max=1,
+                      vertical="none", about="cells, a passage between them, and one door"),
+    "the-courthouse": Shape(14, 14, HALL, clumps=5, clump_max=1, rise=4, rise_to=2,
+                            about="a bench above the floor, and a gallery above that"),
+    "the-customs-house": Shape(12, 12, LOW, clumps=6, clump_max=2,
+                               about="a counter, a scale, and everything waiting to be opened"),
+    # faith, and the dead
+    "the-graveyard": Shape(16, 14, None, clumps=9, clump_max=1, rough=6, rise=3,
+                           vertical="scatter", about="stones, and the ground uneven between them"),
+    "the-cathedral": Shape(20, 16, HALL, clumps=8, clump_max=2, rise=4, rise_to=2,
+                           about="a nave, a triforium over it, and pillars the width of a cart"),
+    # drinking, watching, resting
+    "the-inn": Shape(12, 10, LOW, clumps=6, clump_max=2,
+                     about="tables, a hearth, and the stair to the rooms"),
+    "the-green": Shape(18, 16, None, clumps=2, clump_max=2,
+                       vertical="none", about="open ground the whole place uses"),
+    "the-bathhouse": Shape(14, 12, HALL, clumps=5, clump_max=2, rough=8,
+                           about="wet stone, a colonnade, and a gallery to look down from"),
+    "the-theatre": Shape(16, 16, HALL, clumps=4, clump_max=2, rise=8, rise_to=3,
+                         vertical="slope", about="a stage, and the seats banked above it"),
+    "the-arena": Shape(20, 18, None, clumps=2, clump_max=2, rough=6, rise=10, rise_to=3,
+                       vertical="slope", about="sand, and the crowd banked all the way round"),
+    "the-gardens": Shape(18, 16, None, clumps=7, clump_max=2, rough=4, rise=3,
+                         vertical="scatter", about="walls, walks, and something to get behind"),
+    # what a place needs to exist
+    "the-granary": Shape(12, 12, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                         about="bins to the roof, and a loading gallery"),
+    "the-midden": Shape(12, 12, None, clumps=4, clump_max=2, rough=14,
+                        vertical="none", about="where it all ends up, and the footing shows it"),
+    "the-cistern": Shape(14, 12, LOW, clumps=5, clump_max=2, rough=10,
+                         vertical="scatter", about="standing water, and the pillars holding the street up"),
+    # getting somewhere else
+    "the-stables": Shape(14, 10, LOW, clumps=6, clump_max=2, rough=4,
+                         about="stalls, a tack room, and a hayloft over both"),
+    "the-carters-yard": Shape(16, 14, None, clumps=7, clump_max=3, rough=4, rise=3,
+                              vertical="scatter", about="carts, crates, and the gaps between them"),
+    # where nobody is watching
+    "the-lane": Shape(8, 16, None, clumps=6, clump_max=3, rough=4,
+                      vertical="none", about="two walls, and whatever is left between them"),
+    "the-warrens": Shape(14, 14, None, clumps=12, clump_max=3, rough=8, rise=3,
+                         vertical="scatter", about="a street plan nobody drew, on three levels"),
+
+    # the shape of a city: a square, and the crossings off it
+    "the-great-square": Shape(20, 18, None, clumps=4, clump_max=2, rise=3,
+                              about="the middle of it, with steps and a plinth to fight from"),
+    "the-north-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                                about="where four streets meet, and the balconies over them"),
+    "the-east-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                               about="where four streets meet, and the balconies over them"),
+    "the-south-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                                about="where four streets meet, and the balconies over them"),
+    "the-west-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                               about="where four streets meet, and the balconies over them"),
 }
 
 # Everything else, by the ground it stands on.

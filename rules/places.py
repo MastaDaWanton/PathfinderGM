@@ -64,17 +64,207 @@ MOST_SPOTS = 6
 # contain (twelve hex characters, measured against the fixture).
 SEP = "~"
 
-# What a settlement is made of, in the order a generated town gets them. Deliberately
-# generic: these are read against the location's own facts below, and a name the world
-# actually uses beats any of them.
-_SETTLEMENT = (
-    ("the market", "where the stalls are"),
-    ("the gate", "the way in and out"),
-    ("the tavern", "somewhere to sit down"),
-    ("the temple", "somewhere to be quiet"),
-    ("the back streets", "where nobody is watching"),
-    ("the workshops", "where the trades are"),
+# --- what a settlement is made of --------------------------------------------------------
+#
+# "there is no town or city that has 2 places. 2 places is a rest stop... cities and towns
+# have businesses and entertainment and leisure/recreation and religious establishments/
+# cultural buildings...the list goes on and on" (2026-09-15).
+#
+# That was right, and the table it replaced was six rows — a market, a gate, a tavern, a
+# temple, the back streets and the workshops — handed to a hamlet and a capital alike. Two
+# things were wrong with it and they compounded:
+#
+#   - it had no trades, no civic life, no leisure, no utilities and no transport, so every
+#     settlement in every world was the same six words;
+#   - it never read `scale`, which the export has carried on every settlement all along.
+#     Aurvantis ships 16 villages, 32 towns and 16 cities, and each of the 64 got six.
+#
+# So: a real vocabulary, each entry knowing the smallest settlement that plausibly has one,
+# and a count that comes from the scale the world already stated.
+#
+# CATEGORY IS LOAD-BEARING, not decoration. Taking N rows off a seeded shuffle gives a town
+# of nine warehouses; the builder takes one category at a time in turn, so a place to
+# drink and a place to pray and a place to buy all arrive before a second tannery does.
+#
+# WHAT HAS NO RULE BEHIND IT YET is marked, because most of these are somewhere to stand
+# and be described and nothing more. `docs/settlement-places.md` is the ledger and
+# `tests/test_settlement_places.py` holds it to this table — the same bargain `not_yet`
+# makes on a race document: said plainly rather than quietly implied.
+
+# Smallest first. A settlement's scale is a word the export writes and these are its
+# values; anything unrecognised reads as a town, which is the middle and the commonest.
+SCALES = ("village", "town", "city")
+
+# How many ROOMS a settlement of each scale holds — the places drawn from the table below,
+# before the junctions a city adds on top. A village is a handful you can see across; a
+# town is a high street; a city is quarters.
+#
+# A village and a town stay flat, everything adjacent to everything, because a settlement
+# you can walk across is what a settlement is and a graph the player has to solve is a
+# different game. That costs a town a wide prompt — nine rooms is eight exits — and that is
+# the trade, taken deliberately.
+#
+# A city cannot take it. Eighteen rooms flat is seventeen exits in one prompt, which is
+# exactly what Fate's two-to-four zones and Inform's "small number of named positions" are
+# about, so a city is quartered instead: eighteen rooms plus a square and four crossings is
+# twenty-three places, and nothing on the board offers more than six ways on.
+PLACES_BY_SCALE = {"village": 5, "town": 9, "city": 18}
+
+# (label, about, smallest scale, category, what reads it)
+#
+# The last field is what consults this place in play today. "" means nothing does — it is a
+# room with a floor plan and a name, which a scene can happen in, and no rule looks at it.
+# That is not a defect by itself; it is a promise, and the ledger keeps it.
+SETTLEMENT_PLACES = (
+    # --- buying, selling, making -----------------------------------------------------
+    ("the market", "where the stalls are", "village", "trade", "market"),
+    ("the smithy", "a hearth, an anvil, and the noise of both", "village", "trade",
+     "crafting"),
+    ("the mill", "the wheel, and the sacks stacked against it", "village", "trade", ""),
+    ("the workshops", "where the trades are", "town", "trade", "crafting"),
+    ("the tannery", "the smell reaches the next street", "town", "trade", ""),
+    ("the brewery", "vats, and the heat coming off them", "town", "trade", ""),
+    ("the warehouses", "what the town is holding, and who for", "town", "trade", ""),
+    ("the mine head", "where the ore comes up", "village", "trade", ""),
+    ("the counting house", "ledgers, and somebody who knows what you owe", "city",
+     "trade", ""),
+    ("the merchants row", "the expensive street", "city", "trade", "market"),
+    # --- who is in charge ------------------------------------------------------------
+    ("the gate", "the way in and out", "town", "civic", "travel"),
+    ("the guardhouse", "where the watch is, and there are always more of them inside",
+     "town", "civic", "wanted"),
+    ("the guildhall", "where the trades meet", "town", "civic", ""),
+    ("the library", "where the records are kept", "town", "civic", ""),
+    ("the keep", "where the soldiers are, and the walls they hold", "town", "civic", ""),
+    ("the moot hall", "where the arguments are had in public", "town", "civic", ""),
+    ("the gaol", "a room with a lock on the outside", "town", "civic", "wanted"),
+    ("the barracks", "where the watch sleeps and drills", "city", "civic", "wanted"),
+    ("the courthouse", "where it is decided, and written down", "city", "civic", ""),
+    ("the customs house", "what came in, and what was paid on it", "city", "civic", ""),
+    # --- faith, and the dead ---------------------------------------------------------
+    ("the shrine", "somewhere to be quiet", "village", "faith", ""),
+    ("the graveyard", "the ones this place has already lost", "village", "faith", ""),
+    ("the temple", "somewhere to be quiet, with a roof on it", "town", "faith", ""),
+    ("the cathedral", "too large for the town under it", "city", "faith", ""),
+    # --- drinking, watching, resting -------------------------------------------------
+    ("the inn", "a bed, if you can pay for it", "village", "leisure", ""),
+    ("the green", "the common ground, and what happens on it", "village", "leisure", ""),
+    ("the tavern", "somewhere to sit down", "town", "leisure", ""),
+    ("the bathhouse", "steam, and everybody business in it", "city", "leisure", ""),
+    ("the theatre", "where the town watches itself", "city", "leisure", ""),
+    ("the arena", "sand, and a crowd that paid to be there", "city", "leisure", ""),
+    ("the gardens", "kept, and walled, and not for everybody", "city", "leisure", ""),
+    # --- the things a place needs in order to exist at all ---------------------------
+    ("the well", "where the water is", "village", "utility", ""),
+    ("the granary", "what stands between this winter and the next", "town", "utility",
+     ""),
+    ("the midden", "where it all ends up", "town", "utility", ""),
+    ("the cistern", "under the street, and older than it", "city", "utility", ""),
+    # --- getting somewhere else ------------------------------------------------------
+    ("the stables", "horses, and the people who know them", "village", "transport", ""),
+    ("the docks", "where the boats come in", "town", "transport", ""),
+    ("the bridge", "over the water", "town", "transport", ""),
+    ("the carters yard", "what leaves at dawn, and on whose account", "city",
+     "transport", ""),
+    # --- where nobody is watching ----------------------------------------------------
+    ("the lane", "round the back, and out of the light", "village", "hidden", ""),
+    ("the back streets", "where nobody is watching", "town", "hidden", ""),
+    ("the warrens", "a street plan nobody drew", "city", "hidden", ""),
 )
+
+# Every settlement has somewhere to buy, somewhere to sleep, somewhere to be quiet and
+# somewhere nobody is watching, whatever else it has and whatever the seed says. A town
+# with no bed in it is a town the player cannot rest in, and "the generator did not pick
+# one" is not a reason a player can act on.
+ESSENTIAL_CATEGORIES = ("trade", "leisure", "faith", "hidden")
+
+# How many a category may contribute, past which the slots go elsewhere. Breadth-first
+# fill keeps returning to whichever category has fewest, and the small ones have only
+# three rows between them — so every city came out with all three hidden places and all
+# three faiths, while the trades and the leisure it grows by went unbuilt. A city has one
+# seedy quarter, not three.
+#
+# Uncapped is the default. Only the categories a settlement does not get more of by being
+# larger are listed: a big city has more trades and more to do in the evening, and exactly
+# as many middens as a small one.
+CATEGORY_CAP = {"hidden": 2, "faith": 3, "utility": 2, "transport": 2}
+
+# And these by name, because a category is not specific enough for them. "every town/city
+# should have a guardhouse/barracks where a large number of guards are stationed at any
+# time" (2026-09-15) — a settlement with nobody keeping order in it is one where the wanted
+# state has nowhere to come from, and the player has nowhere to be arrested to.
+#
+# A village has no guardhouse on purpose: a hamlet of four hundred has a reeve and a horn,
+# not a garrison, and inventing one would make every village a fort.
+ALWAYS_BY_SCALE = {
+    "village": ("the well",),
+    "town": ("the gate", "the guardhouse", "the well"),
+    "city": ("the gate", "the guardhouse", "the barracks", "the well"),
+}
+
+# Roughly how many people live there, for the feel of the place rather than for any rule.
+# "some understanding of a population to help with the feel of the place [50,000+
+# population for a city]" — so a city is 50,000 up, and the other two are scaled beneath
+# it at the usual medieval proportions.
+#
+# Never a number the narrator is handed: the brief says "a city of some fifty thousand",
+# and the third law is that no model is given a figure to do arithmetic on. `population`
+# below turns the band into words.
+POPULATION_BY_SCALE = {
+    "village": (200, 1_200),
+    "town": (2_000, 12_000),
+    "city": (50_000, 250_000),
+}
+
+# Places that sell something or do something for money, and therefore need somebody
+# standing in them. "any place that offers services or merchandise needs an NPC to man it"
+# (2026-09-15).
+#
+# NOT WIRED YET, and `docs/settlement-places.md` says so rather than this quietly implying
+# otherwise: the value is who ought to be there, and nothing generates them. It is the
+# next piece of work on this and it is a real one — a keeper needs a name the world would
+# use, a place in the codex, and to still be there next session.
+STAFFED = {
+    "the market": "stallholders, and one who runs the pitch",
+    "the smithy": "a smith",
+    "the mill": "a miller",
+    "the workshops": "the trades that work there",
+    "the tannery": "a tanner",
+    "the brewery": "a brewer",
+    "the warehouses": "a warehouseman with a ledger",
+    "the counting house": "a clerk, and whoever they answer to",
+    "the merchants row": "shopkeepers who know what you can afford",
+    "the inn": "an innkeeper",
+    "the tavern": "whoever is behind the bar",
+    "the bathhouse": "an attendant",
+    "the theatre": "a company, and somebody taking the money",
+    "the arena": "a master of the games",
+    "the gardens": "a gardener who would rather you did not",
+    "the stables": "an ostler",
+    "the docks": "a harbourmaster",
+    "the carters yard": "a carter taking bookings",
+    "the guardhouse": "the watch",
+    "the barracks": "the garrison",
+    "the gaol": "a gaoler",
+    "the temple": "whoever keeps it",
+    "the cathedral": "clergy, and a great many of them",
+    "the guildhall": "a clerk of the guild",
+    "the customs house": "an officer who wants to see your papers",
+}
+
+
+def population(scale: str) -> str:
+    """How many people live there, in the words a narrator may use.
+
+    A band and never a figure: the third law is that no model authors a number, and
+    "fifty thousand" in a brief is a number the model will start doing arithmetic with.
+    """
+    low, high = POPULATION_BY_SCALE.get(scale, POPULATION_BY_SCALE["town"])
+    if high <= 2_000:
+        return "a few hundred people, and everyone knows everyone"
+    if high <= 20_000:
+        return "some thousands of people"
+    return "tens of thousands of people, most of whom will never see you"
 
 # The same for somewhere nobody lives. A ruin or a stretch of forest still needs more than
 # one place to stand, or "I go deeper in" is unrepresentable.
@@ -125,21 +315,22 @@ IMPLIED = (
 # `mine` went the same way pre-emptively: it is also the possessive pronoun, it had not
 # fired yet in either world, and finding out later costs a place.
 
-# A settlement may carry this many implied spots OVER its generated set — a port town
-# gets its docks even when the table has filled six — and no more.
-MOST_IMPLIED = 2
+# What a settlement's own words may earn it, at most. No longer a number of places added
+# ON TOP of a generated set — `_wanted` folds the earned ones into the scale's own budget,
+# ahead of the generic filler, so a port town spends a slot on its docks rather than
+# growing one. Kept as a cap on how much of a settlement its prose may decide.
+MOST_IMPLIED = 4
 
-# So this is what a settlement may actually hold, and it is the number a checker has to
-# use: the base draw plus what the world's own words earned. Named rather than left as a
-# sum two files each had to remember, because remembering it separately is how they came
-# to disagree.
+# What a settlement may hold, and the number a checker has to use. It was
+# `MOST_SPOTS + MOST_IMPLIED` for about an hour on 2026-09-15, which was already an
+# improvement on two files remembering two different sixes — and then the scale table
+# replaced both: a settlement holds what its own size says it holds, and eight was still
+# a village and a capital getting the same answer.
 #
-# It is also, exactly, what the earned places need. Measured on Aurvantis's 64
-# settlements: 56 earn two or fewer, and the most any one earns is five — so three
-# essentials plus five earned is eight, and at eight not one settlement loses anything it
-# earned. A six that costs four towns their library is a number doing harm for no reason
-# anybody chose.
-MOST_IN_A_SETTLEMENT = MOST_SPOTS + MOST_IMPLIED
+# The largest of the three is what a checker compares against, because it is the most a
+# settlement of ANY size may hold. A village at 18 is as wrong as a city at 5, and that is
+# a different check — `check_places.py` can ask the settlement its scale.
+MOST_IN_A_SETTLEMENT = max(PLACES_BY_SCALE.values())
 
 # --- door three: ground you go into ----------------------------------------------------------
 #
@@ -226,6 +417,18 @@ class Place:
     # Read off the id, never stored beside it. `biome` as a sibling field on the scene
     # is precisely what let "both are urban" defeat the transition.
     terrain: str = ""
+    # Another ROOM in the same settlement that this one hangs off — a quarter's crossing,
+    # or the square a crossing comes off. Empty for a place that hangs off nothing, which
+    # is every place in a village or a town and the square itself in a city.
+    #
+    # Distinct from `parent`, which is the world ENTITY, and the distinction is load
+    # bearing: `parent` is pinned to the entity by the id grammar and by `location_of`,
+    # and three things depend on that. Asked for from the World Bible side on 2026-09-15
+    # for exactly this reason, and generated here before it is authored anywhere.
+    #
+    # It carries no distance and no weight. A room is adjacent to its crossing and that is
+    # all `within` says; the exits say the rest.
+    within: str = ""
     exits: tuple[str, ...] = ()
     # True when the place is named but cannot be entered — Diku's `<room linked>` of -1,
     # "non-functional exits that display descriptions only". It lets the narrator write
@@ -236,7 +439,7 @@ class Place:
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "about": self.about,
                 "terrain": self.terrain, "exits": list(self.exits),
-                "described_only": self.described_only,
+                "described_only": self.described_only, "within": self.within,
                 "parent": self.parent, "owner": self.owner, "origin": self.origin}
 
 
@@ -246,6 +449,7 @@ def from_dict(d: dict) -> Place:
         about=str(d.get("about") or ""), terrain=str(d.get("terrain") or ""),
         exits=tuple(str(x) for x in (d.get("exits") or ())),
         described_only=bool(d.get("described_only")),
+        within=str(d.get("within") or ""),
         parent=str(d.get("parent") or ""), owner=str(d.get("owner") or ""),
         origin=str(d.get("origin") or ""),
     )
@@ -474,8 +678,163 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
         return authored
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
-        return _with_implied(_build(here, URBAN, _SETTLEMENT), location)
+        return _settlement_set(here, scale_of(location), location)
     return _build(here, hint or "grassland", _WILD)
+
+
+def scale_of(location) -> str:
+    """How big the world says this settlement is: village, town or city.
+
+    The export has written this on every settlement since 1.0 and nothing here read it
+    until 2026-09-15 — Aurvantis ships 16 villages, 32 towns and 16 cities, and all 64 of
+    them got the same six places. Anything unrecognised reads as a town, which is the
+    middle and the commonest, and never as a guess dressed up as a village.
+    """
+    said = str(getattr(location, "scale", "") or "").strip().lower()
+    return said if said in PLACES_BY_SCALE else "town"
+
+
+def _wanted(scale: str, earned: tuple[tuple[str, str], ...],
+            seed: int = 0) -> list[tuple]:
+    """Which rows a settlement of this scale gets, in the order it gets them.
+
+    Four passes, and the order is the whole design:
+
+    1. **What this scale always has**, by name — a gate, a guardhouse, a well. A category
+       is not specific enough for these: "civic" does not guarantee anybody keeping order,
+       and a town with nowhere to be arrested to is a town the wanted state cannot reach.
+    2. **What the world's own words earned.** A town whose paragraphs say scribes has a
+       library before it has a second warehouse, because the world said so and the table
+       did not.
+    3. **One of each essential category** — somewhere to buy, to sleep, to be quiet, and
+       where nobody is watching. A settlement missing one of those is missing something a
+       player will reach for, and "the seed did not pick it" is not an answer.
+    4. **Breadth before depth.** Each round takes from the category that has the FEWEST so
+       far, so a town gets a gate and stables and a well before it gets a second tavern.
+       Walking the categories in name order instead — which the first version did — gave a
+       town two hidden places, two faith, no utility and no transport, because `civic` and
+       `faith` sort before `transport` and the budget ran out on the way.
+    """
+    allowed = SCALES[:SCALES.index(scale) + 1]
+    rows = [r for r in SETTLEMENT_PLACES if r[2] in allowed]
+    by_label = {r[0]: r for r in rows}
+    budget = PLACES_BY_SCALE[scale]
+
+    picked: list[tuple] = []
+    seen: set[str] = set()
+    held: dict[str, int] = {}
+
+    def take(row, capped: bool = True):
+        if not row or row[0] in seen or len(picked) >= budget:
+            return
+        # The cap binds the fill pass only. A place this scale ALWAYS has, or one the
+        # world's own words earned, is never refused for being the third of its kind.
+        if capped and held.get(row[3], 0) >= CATEGORY_CAP.get(row[3], budget):
+            return
+        seen.add(row[0])
+        held[row[3]] = held.get(row[3], 0) + 1
+        picked.append(row)
+
+    for label in ALWAYS_BY_SCALE.get(scale, ()):
+        take(by_label.get(label), capped=False)
+    for label, _about in earned[:MOST_IMPLIED]:
+        take(by_label.get(label), capped=False)
+    for category in ESSENTIAL_CATEGORIES:
+        take(next((r for r in rows if r[3] == category and r[0] not in seen), None),
+             capped=False)
+    # Within a category, the biggest thing this settlement is entitled to comes first. A
+    # city that fills its leisure slot with "the inn" and its hidden slot with "the lane"
+    # is a village repeated eighteen times — the first version did exactly that and came
+    # out with three hidden places, no theatre and no baths.
+    #
+    # And WITHIN one floor, rotated by the settlement's own id, or every city in the world
+    # is the same city. The first version had no seed anywhere: all sixteen of Aurvantis's
+    # cities came out with the same eighteen rooms in the same order. The rotation is
+    # inside the floor group so the scale preference still holds — a city varies among
+    # city things, never by dropping down to a village thing.
+    rank = {name: i for i, name in enumerate(SCALES)}
+    ordered: list[tuple] = []
+    for floor in reversed(SCALES):
+        group = sorted((r for r in rows if r[2] == floor), key=lambda r: r[0])
+        if group:
+            turn = seed % len(group)
+            ordered.extend(group[turn:] + group[:turn])
+    rows = ordered
+    categories = sorted({r[3] for r in rows})
+    while len(picked) < budget:
+        thinnest = sorted(categories, key=lambda c: (held.get(c, 0), c))
+        before = len(picked)
+        for category in thinnest:
+            take(next((r for r in rows if r[3] == category and r[0] not in seen), None))
+            if len(picked) >= budget:
+                break
+        if len(picked) == before:
+            break                       # the scale has fewer rows than budget; that is fine
+    return picked
+
+
+def _settlement_set(location_id: str, scale: str, location) -> tuple[Place, ...]:
+    """A settlement's places: as many as its scale says, and quartered if it is a city."""
+    rows = _wanted(scale, implied_spots(location), _seed(location_id))
+    prefix = region_key(location_id, URBAN)
+    made = [(f"{prefix}:{_slug(label)}", label, about) for label, about, *_ in rows]
+    if scale == "city":
+        return _districted(prefix, made)
+    ids = [pid for pid, _l, _a in made]
+    return tuple(
+        Place(id=pid, name=label, about=about, terrain=URBAN,
+              exits=tuple(x for x in ids if x != pid))
+        for pid, label, about in made
+    )
+
+
+# How many quarters a city is cut into, and therefore how wide its prompts get. Four plus a
+# centre keeps every list at or under six: the square sees four crossings, a crossing sees
+# the square and its own handful, a room sees its crossing and its neighbours.
+CITY_QUARTERS = 4
+_QUARTERS = ("the north crossing", "the east crossing", "the south crossing",
+             "the west crossing")
+
+
+def _districted(prefix: str, made: list[tuple[str, str, str]]) -> tuple[Place, ...]:
+    """A city as a centre, four crossings, and the rooms hanging off them.
+
+    Eighteen rooms in one flat list is eighteen exits in one prompt, which is exactly what
+    Fate's two-to-four zones and Inform's "small number of named positions" are about. So a
+    city is not a list, it is a shape: `the great square` at the middle, four crossings off
+    it, and each quarter's rooms off their crossing. Two or three hops from anywhere to
+    anywhere, and nothing ever offers more than six ways on.
+
+    **A crossing is a real room.** It is a street junction you can stand in, be described
+    in and fight in — it has a floor plan like everything else. There is no district
+    object and no new kind of thing, which is what keeps "a place is one room, not a
+    building, and not a district" true.
+
+    `within` is what carries the shape. It is the field World Bible asked for on
+    2026-09-15, generated here first so the design is proved by something that runs before
+    anybody authors to it.
+    """
+    square_id = f"{prefix}:{_slug('the great square')}"
+    crossings = [(f"{prefix}:{_slug(q)}", q) for q in _QUARTERS[:CITY_QUARTERS]]
+    # Round robin, so a quarter is a mix rather than all the trades in one corner.
+    quarters: list[list[tuple[str, str, str]]] = [[] for _ in crossings]
+    for i, row in enumerate(made):
+        quarters[i % len(crossings)].append(row)
+
+    out = [Place(id=square_id, name="the great square",
+                 about="the middle of it, and everything comes through here",
+                 terrain=URBAN, exits=tuple(cid for cid, _q in crossings))]
+    for (cid, label), rooms in zip(crossings, quarters):
+        room_ids = [pid for pid, _l, _a in rooms]
+        out.append(Place(id=cid, name=label,
+                         about="a junction, and the way into this quarter",
+                         terrain=URBAN, within=square_id,
+                         exits=(square_id, *room_ids)))
+        for pid, rlabel, rabout in rooms:
+            out.append(Place(id=pid, name=rlabel, about=rabout, terrain=URBAN,
+                             within=cid,
+                             exits=(cid, *(x for x in room_ids if x != pid))))
+    return tuple(out)
 
 
 def _authored(location) -> tuple[Place, ...]:
@@ -507,6 +866,10 @@ def _authored(location) -> tuple[Place, ...]:
             terrain=ground,
             exits=tuple(str(x) for x in (raw.get("exits") or []) if str(x).strip()),
             described_only=bool(raw.get("described_only")),
+            # A room another room hangs off, when the world says so. Dropped rather than
+            # kept when it names something that is not a place in this settlement: a
+            # `within` pointing nowhere would put a room in a quarter that does not exist.
+            within=str(raw.get("within") or ""),
             parent=str(raw.get("parent") or ""),
             # Everything from the world says so, whatever the file claims: `origin` is
             # provenance, and a export that wrote "found" would otherwise hand the party
@@ -540,28 +903,6 @@ def _cue_fires(cue: str, text: str, words: set) -> bool:
     if " " in cue:
         return _re.search(rf"\b{_re.escape(cue)}\b", text) is not None
     return cue in words
-
-
-def _with_implied(home: tuple[Place, ...], location) -> tuple[Place, ...]:
-    """A settlement's generated set plus the spots its own words imply — the docks
-    for a port town — up to `MOST_IMPLIED`, connected like the rest."""
-    if not home:
-        return home
-    have = {p.name for p in home}
-    extra = [s for s in implied_spots(location) if s[0] not in have][:MOST_IMPLIED]
-    if not extra:
-        return home
-    prefix = region_key(location_of(home[0].id), home[0].terrain)
-    new_ids = [f"{prefix}:{_slug(label)}" for label, _ in extra]
-    all_ids = [p.id for p in home] + new_ids
-    rebuilt = [Place(id=p.id, name=p.name, about=p.about, terrain=p.terrain,
-                     exits=tuple(x for x in all_ids if x != p.id),
-                     described_only=p.described_only, parent=p.parent,
-                     owner=p.owner, origin=p.origin) for p in home]
-    rebuilt += [Place(id=pid, name=label, about=about, terrain=home[0].terrain,
-                      exits=tuple(x for x in all_ids if x != pid), origin="world")
-                for pid, (label, about) in zip(new_ids, extra)]
-    return tuple(rebuilt)
 
 
 def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:

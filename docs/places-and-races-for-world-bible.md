@@ -226,8 +226,10 @@ axis, with no export regenerated.
 - A market is **one place**, however big.
 - A city is **not** a place — it is the settlement entity that places hang off.
 
-The consumer caps a location at **eight** places — six generic, plus up to two its own
-words earned. That ceiling is borrowed: Fate caps a scene at two to four zones and Inform's
+The consumer sizes a settlement by the `scale` the export already writes on it: a
+**village of five**, a **town of nine**, a **city of eighteen** rooms plus the square and
+four crossings that hold a city together. One number for a hamlet and a capital is what
+made every settlement in every world the same six rooms, and it is gone. That ceiling is borrowed: Fate caps a scene at two to four zones and Inform's
 Recipe Book calls for "a small number of named positions". An open-ended list is free text
 wearing a tuple, and every extra place is somewhere a narrator can strand a player with
 nothing to do — which is not an abstraction. Measured on Aurvantis: every settlement in it
@@ -521,18 +523,18 @@ amount of data to keep stable across exports for very little gain.
 - **Do not author encounters, monsters, treasure or NPCs into a place.** Those come from
   the bestiary, the codex and the quest schemes on the consumer's side. A place is ground.
 - **Do not author a place per floor.** Say how many floors; let the consumer name them.
-- **Do not exceed eight places per location** — six generic, plus up to two the
-  settlement's own words earned. The number was six here until 2026-09-15, and that was
-  this app contradicting itself: the generator draws three to six from its base table and
-  then adds up to two implied, so it makes seven or eight for a town whose words earn
-  them, and the checker flagged its own output. Measured on Aurvantis, eight is also
-  exactly what the earned places need — 56 of its 64 settlements earn two or fewer, the
-  most any one earns is five, and three essentials plus five is eight. Not one settlement
-  loses anything it earned.
+- **Size a settlement by its own `scale`** — a village of five rooms, a town of nine, a
+  city of eighteen. One ceiling for every settlement is what this app did until
+  2026-09-15, and it was wrong in the way that matters: Aurvantis ships 16 villages, 32
+  towns and 16 cities and all 64 got the same six rooms, so a capital was a hamlet with a
+  different name.
 
-  It is a note, not a refusal, and there is now a reader: a longer list is accepted and
-  played. The cost of exceeding it is not a validator, it is that every extra room in a
-  settlement with four named people in it is somewhere to strand the player.
+  A city needs its quarters as well — see `within` below — because eighteen rooms in one
+  flat list is seventeen exits in one prompt, which is exactly what the ceiling protects
+  against. A village and a town stay flat and everything in them is adjacent to everything
+  else, because a settlement you can walk across is what a settlement is.
+
+  It is a note, not a refusal. A longer list is accepted and played.
 - **Do not put a digit in `about`.** It is prose the narrator may repeat, and the third law
   is that no model is ever handed a number.
 

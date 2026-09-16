@@ -58,7 +58,10 @@ def test_the_list_is_closed_and_small():
     small number of named positions". An open-ended list is free text wearing a tuple."""
     for loc in (_Loc(), _Loc(id="x", kind="RUIN", scale="site")):
         got = places.spots_for(loc)
-        assert 1 < len(got) <= places.MOST_SPOTS
+        # The ceiling is per SCALE now — a village of five, a town of nine, a city of
+        # eighteen plus its junctions — because one number for a hamlet and a capital was
+        # the thing that made every settlement in every world the same six rooms.
+        assert 1 < len(got) <= places.MOST_IN_A_SETTLEMENT + places.CITY_QUARTERS + 1
         assert len({p.id for p in got}) == len(got), "two places share an id"
 
 
@@ -138,3 +141,30 @@ def test_new_ground_is_a_real_place_and_the_town_is_still_there():
         "the town vanished the moment she stepped outside it"
     assert list(s.actors) == ["pc"], "the merchant followed her into the forest"
     assert s.people["c1"].at == was, "the merchant is not where she left him"
+
+
+def test_every_place_a_settlement_can_earn_is_a_place_it_can_have():
+    """The cue table mints a place by NAME and the settlement table builds it by name, so
+    a row in one and not the other is a place the world can ask for and never receive.
+
+    Measured 2026-09-15, the day the settlement vocabulary was rebuilt: `the mine head`,
+    `the library` and `the keep` were all earnable and none of the three was in the new
+    table, so Vyrakon's own paragraphs asked for a mine head and got a warehouse. Silent,
+    because an unearned place is indistinguishable from one the seed did not pick.
+    """
+    buildable = {label for label, *_rest in places.SETTLEMENT_PLACES}
+    for _words, (spot, _about) in places.IMPLIED:
+        assert spot in buildable, (
+            f"{spot!r} can be earned from a settlement's own words and is not in "
+            f"SETTLEMENT_PLACES, so nothing can build it")
+
+
+def test_every_place_has_somewhere_to_happen():
+    """A place with no tuned shape falls through to plain `urban` — a workable room, and
+    the same room every time. The vocabulary is the thing a player sees; the shape is the
+    thing they fight in, and a bathhouse that fights like a gaol is half a place."""
+    from rules import floorplan
+
+    for label, *_rest in places.SETTLEMENT_PLACES:
+        slug = label.strip().lower().replace(" ", "-")
+        assert slug in floorplan.BY_SPOT, f"{label!r} has no room to happen in"

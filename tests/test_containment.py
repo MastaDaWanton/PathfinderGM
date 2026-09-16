@@ -102,7 +102,11 @@ def test_move_cleans_every_tactical_table_and_no_relational_one():
     s.pools.append(BloodPool(owner="c1", at=(3, 3), place=s.at))
     s.guards.append(Guard(guardian="c1", protects="pc"))
 
-    s.move("c1", "5bbd0c40345f~urban:the-gate")
+    # Somewhere that is not where the party is standing, asked rather than named: this
+    # said `the-gate` until 2026-09-15, and the rebuilt settlement vocabulary made the
+    # gate the FIRST place, which is where `stand_on` puts everybody — so the guard was
+    # moved into the room it was already in and the relation correctly survived.
+    s.move("c1", _other(engine).id)
 
     for table in ("positions", "spawn_feet", "fallen", "acted"):
         assert "c1" not in getattr(s, table), f"{table} still names a creature who left"
