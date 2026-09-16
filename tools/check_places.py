@@ -262,6 +262,55 @@ def _tier3(place: dict) -> list[str]:
 
 # --- a settlement's worth of them ----------------------------------------------------------
 
+def _is_junction(place: dict, by_id: dict) -> bool:
+    """A room other rooms hang off — a crossing, a square. It is a real room like any
+    other and is not counted against the settlement size, because it is structure rather
+    than a thing the settlement has."""
+    pid = str(place.get("id"))
+    return any(str(other.get("within") or "") == pid for other in by_id.values())
+
+
+def _check_within(group: list[dict], by_id: dict, vocab: dict) -> list[str]:
+    """A quarter is a room other rooms hang off, and `within` is what says so.
+
+    Three ways it goes wrong and all three are problems rather than notes: a `within`
+    naming nothing puts a room in a quarter that does not exist, a cycle makes the walk up
+    never finish, and more than the consumer holds under one parent is the wide prompt the
+    whole arrangement exists to avoid.
+    """
+    out: list[str] = []
+    within = {str(p.get("id")): str(p.get("within") or "") for p in group}
+    children: dict[str, int] = {}
+    for pid, parent in within.items():
+        if not parent:
+            continue
+        if parent == pid:
+            out.append(f"{pid} is within itself")
+            continue
+        if parent not in by_id:
+            out.append(f"{pid} is within {parent!r}, which is not a place in this "
+                       f"settlement. `within` names a ROOM; `parent` names the entity")
+            continue
+        children[parent] = children.get(parent, 0) + 1
+    # A walk up from every room has to end.
+    for start in within:
+        seen, at = set(), start
+        while at:
+            if at in seen:
+                out.append(f"{start} is in a within-cycle")
+                break
+            seen.add(at)
+            at = within.get(at, "")
+    cap = vocab.get("most_children_minted_in_play") or 6
+    for parent, n in children.items():
+        if n > cap:
+            name = str(by_id[parent].get("name") or parent)
+            out.append(f"{n} rooms hang off {name!r}; the consumer holds {cap} under one "
+                       f"parent, and the point of quarters is that no prompt is wider "
+                       f"than that")
+    return out
+
+
 def reachable_from(start: str, by_id: dict[str, dict]) -> set[str]:
     """Every place walkable from `start`, following exits forward only.
 
@@ -306,11 +355,49 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
             problems.append(f"two places share the id {pid!r}")
         seen.add(pid)
 
-    kind = str((entity or {}).get("kind") or "").upper()
-    if kind == "CITY" and len(enterable) < 4:
-        notes.append(f"a CITY with {len(enterable)} place(s); four is the floor the "
-                     f"contract asks for, and the consumer's own generator makes three "
-                     f"to {vocab['most_places']}")
+    # --- how many, by the settlement's own scale -----------------------------------
+    #
+    # One ceiling for every settlement was the thing that made a capital a hamlet with a
+    # different name, so the check is against what THIS size holds. The export writes
+    # `scale` on every settlement and has since 1.0.
+    by_scale = vocab.get("places_by_scale") or {}
+    scale = str((entity or {}).get("scale") or "").strip().lower()
+    if by_scale and scale in by_scale:
+        want = by_scale[scale]
+        junctions = [p for p in group if _is_junction(p, by_id)]
+        rooms = [p for p in enterable if p not in junctions]
+        if len(rooms) < max(2, want // 2):
+            notes.append(f"a {scale} with {len(rooms)} room(s); the consumer builds "
+                         f"{want} for one, and a settlement much smaller than its own "
+                         f"scale reads as a different size of place")
+        elif len(rooms) > want + 4:
+            notes.append(f"a {scale} with {len(rooms)} rooms against the consumer's "
+                         f"{want}; every extra one is somewhere a narrator can strand a "
+                         f"player")
+    elif scale:
+        notes.append(f"scale {scale!r} is not one the consumer knows "
+                     f"({', '.join(vocab.get('scales') or [])}); it will be read as a town")
+
+    # --- what a settlement of this size always has ----------------------------------
+    always = (vocab.get("always_by_scale") or {}).get(scale) or ()
+    have = {str(p.get("name") or "").strip().lower() for p in group}
+    # One reason per place. The first version used the guardhouse's wording for all of
+    # them and told a village its missing WELL was why nobody was keeping order.
+    why = {
+        "the guardhouse": "a settlement with nobody keeping order is one the wanted "
+                          "state cannot reach, and the player has nowhere to be "
+                          "arrested to",
+        "the barracks": "a city keeps more than a watch house full of soldiers",
+        "the gate": "somewhere to leave by, which every road out of town arrives at",
+        "the well": "somewhere to draw water, which every settlement is built around",
+    }
+    for label in always:
+        if label.lower() not in have:
+            notes.append(f"no {label} — the consumer builds one into every {scale}: "
+                         f"{why.get(label, 'it is one every settlement of this size has')}")
+
+    # --- the quarters, if there are any ----------------------------------------------
+    problems.extend(_check_within(group, by_id, vocab))
 
     if len(enterable) > vocab["most_places"]:
         notes.append(
