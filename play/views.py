@@ -1062,6 +1062,35 @@ def combat_act(request):
 
 
 @require_POST
+def roll_face(request):
+    """What the pending die shows — and nothing else.
+
+    Reported from the table 2026-09-16: *"as it stands when dice are rolled the last die
+    spins until a reply is sent to the user. I would prefer that the dice land show the
+    number it landed on and then be able to be closed while the user waits."*
+
+    They are describing the shape of `roll` below. The face is known in its first few
+    lines; everything after it — resolution, then the narrator, which is a local model
+    and the slow part of a turn — runs before the number is returned. So the die spun
+    through the whole generation, and the LAST die of a turn spun longest, because the
+    ones before it only had to be handed back for the next prompt.
+
+    Splitting it here rather than streaming one response out of `roll`: nine tests read
+    that endpoint as JSON, a `StreamingHttpResponse` has no `.json()`, and the error
+    paths would have to move from status codes into frames. This adds a request that
+    **mutates nothing at all** — it does not touch `awaiting`, does not remember what it
+    said, and can be called and abandoned. `roll` then receives the face the same way it
+    already receives one from the debug toggle, so no trust boundary moves: the client
+    could always name its own face, and the die is still rolled by `rules.dice`.
+    """
+    c = campaign_mod.current()
+    if not c.scene.awaiting:
+        return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
+    from rules.dice import Dice
+    return JsonResponse({"face": Dice().roll(c.scene.awaiting.get("die", "1d20")).raw})
+
+
+@require_POST
 def roll(request):
     """The player's answer to the dice popup. Resolution resumes from where it stopped."""
     c = campaign_mod.current()

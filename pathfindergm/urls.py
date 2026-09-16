@@ -28,6 +28,9 @@ urlpatterns = [
     path("api/resurrect", views.resurrect, name="resurrect"),
     path("api/say", views.say, name="say"),
     path("api/roll", views.roll, name="roll"),
+    # The face on its own, so the die can land before the narrator has finished. See
+    # `views.roll_face` — it decides a number and changes nothing.
+    path("api/roll/face", views.roll_face, name="roll_face"),
     path("api/combat/act", views.combat_act, name="combat_act"),
     path("api/use", views.use_item, name="use_item"),
     path("api/character/gender", views.set_gender, name="set_gender"),

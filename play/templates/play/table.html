@@ -1747,7 +1747,15 @@ async function post(url, body) {
   return data;
 }
 
-function render(s) {
+/* `hold` defers only the dice popup, not the drawing.
+
+   Since 2026-09-16 the page renders a turn's result while the previous die's mat may
+   still be open — the player closes it when they please, which was the whole point of
+   landing the die early. A turn that asks for ANOTHER roll would then reset that mat
+   under their eyes, mid-read, and replace the number they had just been shown. So the
+   caller that knows a mat is open passes `hold` and opens the next popup itself once
+   the player has closed the last one. */
+function render(s, hold) {
   STATE = s;
   renderCombat(s);
   reflectMerchant(s);
@@ -1875,6 +1883,7 @@ function render(s) {
 
   renderRolls(s.log);
 
+  if (hold) return;
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
 }
 
@@ -2618,9 +2627,41 @@ document.addEventListener("click", async e => {
 
 async function sendRoll(face, shown) {
   $("#veil").classList.remove("on");
+
+  // The number FIRST, on a request of its own.
+  //
+  // Reported 2026-09-16: "when dice are rolled the last die spins until a reply is sent
+  // to the user. I would prefer that the dice land show the number it landed on and
+  // then be able to be closed while the user waits." The whole of `/api/roll` used to
+  // be awaited before the die could land, and the slow part of it is the narrator — so
+  // the die span through the generation, and the LAST die of a turn span longest.
+  //
+  // `/api/roll/face` decides the face and mutates nothing, so an abandoned one costs
+  // nothing. When the player rolled a real die themselves the face is already in hand
+  // and there is nothing to ask.
+  let landed = face;
+  if (landed == null) {
+    // A failure here is not worth showing anybody: it costs the early landing and
+    // nothing else, because `/api/roll` rolls its own face when sent null — which is
+    // exactly what this did before the split.
+    try { landed = (await post("/api/roll/face", {})).face; } catch { landed = null; }
+  }
+
+  // Not awaited. `land` resolves when the player closes the mat, and the point of this
+  // change is that they may close it whenever they like — before the reply, after it,
+  // or not at all. Without the landing we keep the old order and land at the end.
+  let closing = null;
+  if (landed != null) {
+    closing = Dice3D.land({
+      title: shown.title, why: shown.why, die: shown.die,
+      sides: shown.sides, lo: shown.lo, hi: shown.hi,
+      result: landed, terms: shown.terms, note: shown.note,
+    });
+  }
+
   busy(true);
   let state = null;
-  try { state = await post("/api/roll", { face }); }
+  try { state = await post("/api/roll", { face: landed }); }
   catch (e) { $("#err").textContent = e.message; }
   finally { busy(false); }
 
@@ -2628,16 +2669,31 @@ async function sendRoll(face, shown) {
   // played a decorative throw that ended on an arbitrary face, closed the mat, and
   // told the player the number in a table — reported 2026-09-09 as "the dice don't
   // land with the number facing the user", and they never did.
-  if (state && state.rolled != null) {
-    await Dice3D.land({
-      title: shown.title, why: shown.why, die: shown.die,
-      sides: shown.sides, lo: shown.lo, hi: shown.hi,
-      result: state.rolled, terms: shown.terms, note: shown.note,
-    });
-  } else {
-    Dice3D.close();
+  if (closing == null) {
+    if (state && state.rolled != null) {
+      await Dice3D.land({
+        title: shown.title, why: shown.why, die: shown.die,
+        sides: shown.sides, lo: shown.lo, hi: shown.hi,
+        result: state.rolled, terms: shown.terms, note: shown.note,
+      });
+    } else {
+      Dice3D.close();
+    }
   }
-  if (state) render(state);
+  // Drawn behind the mat rather than after it. The mat is an overlay, so a player who
+  // is still reading the terms loses nothing, and one who already closed it is looking
+  // at the page when the reply arrives instead of at a closed mat and a spinner.
+  //
+  // The exception is the next die. A turn can ask for another roll, and opening its
+  // popup now would reset the mat the player is still reading — so the page is drawn
+  // and that one part waits for them to close it.
+  if (state && closing && state.awaiting) {
+    render(state, true);
+    await closing;
+    showPopup(state.awaiting);
+  } else if (state) {
+    render(state);
+  }
 }
 
 async function takeTurn(body, clearInput) {

@@ -313,13 +313,57 @@ def test_the_main_roll_path_actually_lands_the_die():
     table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
     views = (root / "play" / "views.py").read_text(encoding="utf-8")
 
-    send = table[table.index("async function sendRoll("):][:1400]
+    # The WHOLE function, not a fixed slice of it. This read `[:1400]` and went stale on
+    # 2026-09-16 the moment the function grew comments: the call it checks for was still
+    # there, four characters past the cut, and the test reported that the main roll path
+    # never lands the die. A measurement with a magic number in it measures the number.
+    at = table.index("async function sendRoll(")
+    send = table[at:table.index(chr(10) + "}", at) + 2]
     assert "Dice3D.land(" in send, "the main roll path still never lands the die"
     assert "state.rolled" in send, "the page is not landing on what the server rolled"
     assert "Dice3D.close()" in send, "a held-open mat with nothing to land would hang"
 
     assert '"rolled": face' in views, "the roll endpoint no longer says what it rolled"
     assert "hold: true" in table, "the mat is no longer held across the request"
+
+
+def test_the_die_lands_before_the_narrator_has_finished():
+    """Reported from the table 2026-09-16: *"as it stands when dice are rolled the last
+    die spins until a reply is sent to the user. I would prefer that the dice land show
+    the number it landed on and then be able to be closed while the user waits."*
+
+    The cause was the shape of `/api/roll`: it knows the face in its first few lines and
+    returns it after resolution AND the narrator, which is a local model and the slow
+    part of a turn. So the die span for the whole generation — and the last die of a turn
+    span longest, because every earlier one only had to be handed back for the next
+    prompt.
+
+    Three things hold the fix together, and each is one a later edit could quietly undo:
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    views = (root / "play" / "views.py").read_text(encoding="utf-8")
+    urls = (root / "pathfindergm" / "urls.py").read_text(encoding="utf-8")
+
+    # 1. the face is available without doing the turn, and asking for it changes nothing
+    assert "def roll_face(" in views
+    assert "api/roll/face" in urls
+    face = views[views.index("def roll_face("):views.index("def roll(request):")]
+    for mutates in ("engine.resume", "c.save()", "scene.awaiting =", "_finish("):
+        assert mutates not in face, f"roll_face must not {mutates} — it may be abandoned"
+
+    at = table.index("async function sendRoll(")
+    send = table[at:table.index(chr(10) + "}", at) + 2]
+    # 2. the page asks for it and lands WITHOUT waiting for /api/roll
+    assert "/api/roll/face" in send
+    assert send.index("Dice3D.land(") < send.index('post("/api/roll"'),         "the die is still landing after the turn instead of before it"
+    # 3. and does not await the landing, because `land` resolves only when the player
+    #    closes the mat — awaiting it here is exactly the stall being fixed
+    early = send[:send.index('post("/api/roll"')]
+    assert "await Dice3D.land(" not in early, \
+        "awaiting the landing blocks the request on the player closing the mat"
 
 
 def test_the_ask_winds_up_and_does_not_throw():
