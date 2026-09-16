@@ -135,9 +135,30 @@ def test_a_race_over_the_tables_tier_is_refused_with_the_fix_named(tmp_path, mon
 
 def test_a_people_with_a_body_is_a_race_and_one_without_is_a_heritage(monkeypatch):
     """The fixture's six peoples: the Korvu carry Anatomy, Body, Senses and Lifecycle;
-    the other five are ethnic groups with no body of their own. (With nothing written
-    for the world — Pangrella ships its races now, so that is switched off here.)"""
+    the other five are ethnic groups with no body of their own.
+
+    This is the DERIVED path — what the consumer does for a world that ships no race
+    cards — and forcing it took two goes.
+
+    The first version patched `races.written_for`, which `from_world` does not call: it
+    reads `world.play["races"]` itself. So the patch was inert and the test exercised
+    whichever branch the fixture happened to trigger, passing only because the fixture
+    was schema 1.0 and had no `play.races[]` at all. A World Bible export at 1.3 put one
+    there, the written branch ran, the Korvu came back with the ability array from their
+    own card (`perceptive, clever` against `hardy`), and the assertion below about the
+    generic spread failed — correctly, and three versions of the schema late.
+
+    So the emptying is done where the function actually looks. `test_a_world_that_ships
+    _race_cards_is_read_from_them` covers the other branch.
+
+    BOTH are needed, and they are different things with confusingly similar names.
+    `written_for` is the races somebody wrote BY HAND for this world in `content/races`
+    or on the bench; `play["races"]` is the list the EXPORT ships. `heritages_from_world`
+    reads the first and `from_world` reads the second, so silencing one says nothing
+    about the other.
+    """
     monkeypatch.setattr(races, "written_for", lambda w: {})
+    monkeypatch.setattr(WORLD, "play", {**(WORLD.play or {}), "races": []}, raising=False)
     drafted = races.from_world(WORLD)
     assert [d["name"] for d in drafted] == ["Korvu"]
     korvu = drafted[0]
@@ -555,3 +576,44 @@ def test_the_scaled_price_is_shown_as_scaled():
     d = derive({"id": "deepseer", "name": "Deepseer", "size": "medium", "speed": 30,
                    "tags": ["sense.darkvision.90"]})
     assert d["derived_prices"] and "scaled" in d["derived_prices"][0]
+
+
+def test_a_world_that_ships_race_cards_is_read_from_them_not_derived(monkeypatch):
+    """The other branch, which had no test at all until an export exercised it by
+    accident.
+
+    A card carrying `strengths` and `weakness` gives the people a fixed array; the
+    derived path cannot, because a `PEOPLE` entity's anatomy facts say what a body looks
+    like and never what it is good at. So the two branches genuinely differ, and which
+    one runs is decided by whether `play.races[]` is there — not by any patching.
+    """
+    card = {"id": "korvu", "name": "Korvu", "people_id": "fd4449bc9a64",
+            "size": "medium", "speed": "normal",
+            "body": ["Korvu have avian-like wings and bodies."],
+            "senses": ["Korvu have enhanced echolocation abilities."],
+            "movement": ["Korvu have avian-like wings and bodies."],
+            "about": "One paragraph.",
+            "strengths": ["perceptive", "clever"], "weakness": "hardy"}
+    monkeypatch.setattr(WORLD, "play", {**(WORLD.play or {}), "races": [card]},
+                        raising=False)
+    drafted = races.from_world(WORLD)
+    assert [d["name"] for d in drafted] == ["Korvu"]
+    korvu = drafted[0]
+    # perceptive -> wis, clever -> int, hardy -> con. Words in, table out: the export
+    # states what the people is good at and never what that is worth.
+    assert korvu["mods"] == {"wis": 2, "int": 2, "con": -2}
+    assert korvu["choose"] == [], "a stated array and a chosen one are not both given"
+    # And the body still comes from the card's own sentences.
+    assert "move.fly.30" in korvu["tags"]
+
+
+def test_an_incomplete_ability_array_falls_back_rather_than_half_applying():
+    """The contract says all three or none. Half an array priced as a race would be the
+    world's opinion applied and the player's choice taken away in the same move."""
+    for strengths, weakness in ((["perceptive"], "hardy"),      # one strength
+                                (["perceptive", "clever"], ""),  # no weakness
+                                (["clever", "clever"], "hardy"),  # not two distinct
+                                (["clever", "hardy"], "hardy")):  # weakness is a strength
+        mods, choose = races.array_from_words(strengths, weakness)
+        assert mods == {}, (strengths, weakness)
+        assert choose == list(races.STANDARD_CHOOSE), (strengths, weakness)

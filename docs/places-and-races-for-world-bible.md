@@ -320,15 +320,35 @@ settlement's facts today:
 | river, bridge, ferry, crossing | **the bridge** |
 | guild, guilds, guildhall | **the guildhall** |
 | library, archive, archives, scriptorium, scribes | **the library** |
-| walls, fort, fortress, keep, castle, citadel, garrison | **the keep** |
-| mine, mines, mining, quarry, ore | **the mine head** |
+| walls, fort, fortress, `the keep`, `a keep`, castle, citadel, garrison | **the keep** |
+| `the mine`, `a mine`, mines, mining, quarry, ore | **the mine head** |
 | shrine, temple, cathedral, priests, prayers, faith | **the shrine** |
-| well, spring, cistern, fountain | **the well** |
+| `the well`, `a well`, wells, wellhead, cistern, fountain | **the well** |
 
 If your generator authors a place list, **it must cover at least these** — a town whose
 paragraphs say "port access" and then has no docks is the exact complaint that built this
 table ("why did it not make a docks?"). Authoring gives you the chance to do better: a
 name the world actually uses beats any of these generic ones.
+
+**The backticked cues are phrases, and must be written as phrases.** A cue with a space in
+it is matched against the text; a bare word is matched against the settlement's set of
+words. That distinction exists because three of these words are also something else:
+
+```
+"well"  fired in 64 of 64 Aurvantis settlements, every one on "that works well enough in"
+"keep"  fired in 16 of 64, every one on "tax-farmers who keep a cut of"
+```
+
+Not one real well and not one real keep. That is worse than noise — a settlement is capped
+at six places, so a phantom takes a real one's slot. `mine` was narrowed the same way
+before it could do the same thing, since it is also the possessive pronoun.
+
+The cues stay plain strings rather than becoming patterns **because this list is an
+interface**: `docs/place-vocabulary.json` is what the other side reads, and a regular
+expression does not survive that trip legibly. The cost is that a literal cue is literal —
+"a deep well" does not fire, where "the well" and "a well" and "wells" do. Write one of the
+strings above and it works; the vocabulary file is generated from this exact table, so it
+can always be checked rather than guessed at.
 
 ### Done when (tier 1)
 

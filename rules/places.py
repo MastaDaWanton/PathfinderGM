@@ -84,13 +84,32 @@ IMPLIED = (
     (("guild", "guilds", "guildhall"), ("the guildhall", "where the trades meet")),
     (("library", "archive", "archives", "scriptorium", "scribes"),
      ("the library", "where the records are kept")),
-    (("walls", "fort", "fortress", "keep", "castle", "citadel", "garrison"),
+    (("walls", "fort", "fortress", "the keep", "a keep", "castle", "citadel", "garrison"),
      ("the keep", "where the soldiers are")),
-    (("mine", "mines", "mining", "quarry", "ore"), ("the mine head", "where the ore comes up")),
+    (("the mine", "a mine", "mines", "mining", "quarry", "ore"),
+     ("the mine head", "where the ore comes up")),
     (("shrine", "temple", "cathedral", "priests", "prayers", "faith"),
      ("the shrine", "somewhere to be quiet")),
-    (("well", "spring", "cistern", "fountain"), ("the well", "where the water is")),
+    (("the well", "a well", "wells", "wellhead", "cistern", "fountain"),
+     ("the well", "where the water is")),
 )
+# Some cues are phrases, and that is the fix for a word that is also a common verb or
+# adverb. Reported from the World Bible side on 2026-09-15 and then measured here against
+# its 64-settlement export:
+#
+#   "well" fired in 64 of 64 — every one of them on "that works well enough in"
+#   "keep" fired in 16 of 64 — every one of them on "tax-farmers who keep a cut of"
+#
+# Not one real well and not one real keep among them. That is worse than noise: a
+# settlement is capped at `MOST_SPOTS`, so a phantom place takes a real one's slot.
+#
+# The reported fix was to swap the words — `well` to `wells`, and drop `keep` because the
+# row already has `fortress` and `garrison`. That works and costs two real hits: "the
+# well" is how prose names a village's only well, and `keep` is the exact word for the
+# building. So the matcher learned phrases instead, which is four lines and keeps both.
+# `mine` went the same way pre-emptively: it is also the possessive pronoun, it had not
+# fired yet in either world, and finding out later costs a place.
+
 # A settlement may carry this many implied spots over its generated set — a port town
 # gets its docks even when the table has filled six — and no more.
 MOST_IMPLIED = 2
@@ -431,9 +450,22 @@ def implied_spots(location) -> tuple[tuple[str, str], ...]:
     words = set(_WORDS.findall(text))
     out = []
     for cues, spot in IMPLIED:
-        if any(c in words for c in cues):
+        if any(_cue_fires(c, text, words) for c in cues):
             out.append(spot)
     return tuple(out)
+
+
+def _cue_fires(cue: str, text: str, words: set) -> bool:
+    """Whether one cue is in this settlement's words.
+
+    A single word is asked of the word SET, which is what this always did and is why a
+    cue can never match half of a longer word. A cue with a space in it is asked of the
+    text, because a set of single words cannot answer a two-word question — and two-word
+    cues are the whole reason this function exists. See the note under `IMPLIED`.
+    """
+    if " " in cue:
+        return _re.search(rf"\b{_re.escape(cue)}\b", text) is not None
+    return cue in words
 
 
 def _with_implied(home: tuple[Place, ...], location) -> tuple[Place, ...]:

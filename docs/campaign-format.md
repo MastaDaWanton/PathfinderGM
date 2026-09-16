@@ -1,6 +1,6 @@
 # Campaign export format
 
-**Schema version 1.0.** Read this before writing anything that consumes a World Bible
+**Schema version 1.3.** Read this before writing anything that consumes a World Bible
 world.
 
 World Bible writes a reference work for a person to read. This export is the same
@@ -22,7 +22,7 @@ the world already contains.
 ## Read this first
 
 ```json
-{ "schema_version": "1.0" }
+{ "schema_version": "1.3" }
 ```
 
 Check it before anything else. The rule is ordinary semver:
@@ -134,54 +134,145 @@ the consuming application's job.
 | `travel` | `{from_id, to_id, from, to, carrying, friction}` — a route is also a road between two places that demonstrably deal with each other. |
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |
 | `timeline` | `{year, name, summary}`, sorted, undated events last. |
-| `cards` | `{id, title, facts[], keys[], tags[], people[], place, clock, secret, always_on}` — situation cards, see below. **World Bible does not write these yet**; the consumer derives a settlement's strain and each unwritten hook into cards when the list is absent. |
-| `races` | `{id, name, people_id, size, speed, body[], senses[], movement[], about}` — the world's peoples as playable races, see below. **World Bible does not write these yet**; the consumer derives one per `PEOPLE` with an anatomy when the list is absent. |
+| `races` | *(1.1)* The world's peoples as playable races — one per `PEOPLE` that carries an anatomy. See below. |
+| `cards` | *(1.1)* Situation cards: index cards of facts a narrator may state as true. See below. |
+| `places` | *(1.3)* The places inside a settlement — the rooms a party stands in. See below. |
 
-### `play.races[]` — the world's own peoples as playable races
+### `play.races[]` (1.1)
 
-**World Bible does not write these yet.** Until it does, the consumer derives one race per
-`PEOPLE` entity that carries an anatomy (`Anatomy`, `Body`, `Senses`, `Lifecycle` facts —
-the `people_anatomy` section), and offers a `PEOPLE` without one as a *heritage* of some
-other body rather than a race. When the list is present it is used instead. Everything
-in it is words; the consumer's Race Builder table (`rules/races.py`) turns the words into
-a priced document.
+One entry per `PEOPLE` entity that has a `people_anatomy` section. A people without one
+gets **no** entry: treat it as a heritage of some other body rather than a species.
 
-| Field | Meaning |
-|---|---|
-| `id` | durable, unique within the export (`korvu`) |
-| `name` | the people's name as the forge shows it |
-| `people_id` | the `PEOPLE` entity this is the body of |
-| `size` | `small`, `medium` or `large` — a word, not a modifier |
-| `speed` | `slow`, `normal` or `fast` |
-| `body[]` | short sentences about the body plan: limbs, wings, hide, what it cannot do |
-| `senses[]` | short sentences about what they perceive and in what conditions |
-| `movement[]` | short sentences about how they move: climb, swim, fly, burrow |
-| `about` | one paragraph the forge shows |
+```json
+{
+  "id": "korvu",
+  "name": "Korvu",
+  "people_id": "fd4449bc9a64",
+  "size": "medium",
+  "speed": "normal",
+  "body":     ["Korvu have avian-like wings and bodies.", "Korvu have four limbs ending in sharp talons."],
+  "senses":   ["Korvu have enhanced echolocation abilities."],
+  "movement": ["Korvu have avian-like wings and bodies."],
+  "about":    "One paragraph, in the world's own words.",
+  "strengths": ["strong", "perceptive"],
+  "weakness":  "nimble"
+}
+```
 
-The consumer's side is `rules/races.py:from_world` and `docs/races.md`.
+- `size` is `small`, `medium` or `large`; `speed` is `slow`, `normal` or `fast`. **Words,
+  never modifiers** — the consumer's own tables do the arithmetic.
+- `body[]`, `senses[]` and `movement[]` are short sentences lifted from the people's own
+  anatomy, one sentence per entry, **never containing a digit**. A sentence about wings
+  lands in `movement[]` because wings are for moving.
+- `id` is a slug of the name, stable across exports; `people_id` resolves to `entities`.
+- *(1.2)* `strengths` is **exactly two** of `strong`, `nimble`, `hardy`, `clever`,
+  `perceptive`, `commanding`, and `weakness` **exactly one** that is not a strength: what
+  the people is good and bad at, in words, which a consumer prices as its ability array.
+  **All three or none** — an incomplete array is ignored whole.
+- Each sentence appears in **one** field only, says the thing and stops, and uses the
+  world's words, never a rules term.
 
-### `play.cards[]` — situation cards
+### `play.cards[]` (1.1)
 
-A situation card is an index card of facts about one situation in the world, kept
-by the game engine and shown to the narrator whenever the situation is in play.
-Everything on it is the world's own sentence; nothing is a rule or a number.
+An index card of facts about one live situation. One card per settlement with a recorded
+tension; two per faction — a **public** card (what it is, where it reaches, where it
+holds) and a **secret** one (what it wants, how it works, what could undo it).
 
-| Field | Meaning |
-|---|---|
-| `id` | durable, unique within the export (`salt-levy`) |
-| `title` | one line, under 80 characters: "The salt levy is due and nobody can pay it" |
-| `facts[]` | up to eight short sentences the narrator may state as true |
-| `keys[]` | trigger words; optional — the consumer derives them from the title and facts when absent |
-| `tags[]` | hierarchical, dot-separated; the consumer prefixes `situation.world` when none begins with `situation.` |
-| `people[]` | entity ids of the people the situation concerns |
-| `place` | the entity id of the settlement or place it belongs to, or empty for anywhere |
-| `clock` | how many steps it is from changing (default 4) |
-| `secret` | the GM's alone — never stated to the player until play reveals it |
-| `always_on` | in front of the narrator whether or not a key appears |
+```json
+{
+  "id": "pangrella-strain",
+  "title": "Tensions between winged nobility and merchant castes",
+  "facts": ["Tensions between winged nobility and merchant castes.", "..."],
+  "keys": [],
+  "tags": ["situation.world.pangrella"],
+  "people": ["a0e2e99089ba"],
+  "place": "5bbd0c40345f",
+  "clock": "",
+  "secret": false,
+  "always_on": false
+}
+```
 
-The consumer's side of the contract is `rules/cards.py` and `docs/situation-cards.md`.
+- **A fact is one sentence a narrator may state as true.** Never a digit, never a name
+  the export does not contain — every fact is checked against the world's real names and
+  dropped if it fails. Up to eight per card.
+- A settlement card's `id` is keyed to the **settlement**, not the wording, so a
+  regenerated tension keeps the same card.
+- `tags` are hierarchical, dot-separated, lower-case. `keys` is left empty for the
+  consumer to derive. `place` is the entity a card belongs to, or `null` for a faction
+  whose foothold names nowhere the world knows.
+- Nothing is made from `unwritten` — a card naming an entity absent from the export would
+  be refused, and consumers make their own secret cards from that list.
+- `always_on` is always `false` here; which card sits in front of the narrator every turn
+  is the consumer's decision.
 
 ---
+
+### `play.places[]` (1.3)
+
+The places inside a settlement: the ground a party actually stands on, and the ground a
+fight happens on. Up to **six** enterable ones per settlement — the ceiling is
+`rules/places.MOST_SPOTS`, borrowed from Fate's two-to-four zones and Inform's "small
+number of named positions", because every extra place is somewhere a narrator can strand a
+player with nothing to do.
+
+A place is **one room, not a building**. A house with a cellar and an upstairs is three
+places joined by stairs; a market is one place however big; a city is not a place at all.
+
+```json
+{
+  "id": "5bbd0c40345f~urban:the-market",
+  "name": "the market",
+  "about": "Windcatchers turning over every stall, and ironwork under noble seal.",
+  "parent": "5bbd0c40345f",
+  "terrain": "urban",
+  "exits": ["5bbd0c40345f~urban:the-gate", "5bbd0c40345f~urban:the-workshops"],
+  "described_only": false,
+  "origin": "world",
+  "size_ft": { "width": 100, "depth": 90, "height": null },
+  "clutter": "dense",
+  "footing": "firm",
+  "vertical": "scatter",
+  "storeys": { "up": 1, "down": 0 }
+}
+```
+
+**The id carries the ground, and that is load-bearing.**
+`{parent_entity_id}~{terrain}:{slug}`, with `^1` or `^-1` appended for a storey. The
+consumer parses this and never looks anything up, so an id without its `~terrain` segment
+describes a place standing on nothing and gets an empty twenty-by-twenty field instead of a
+room. `terrain` is one of fourteen words and is repeated in its own field so a reader need
+not parse an id.
+
+| Field | Meaning |
+|---|---|
+| `id` | as above. Durable and unique across the export, and stable between exports — everything the campaign remembers about a place is keyed by this string |
+| `name` | what people call it, lower case, article included |
+| `about` | one sentence of prose the narrator may use. **No digits** |
+| `parent` | the settlement or site entity id |
+| `terrain` | the same word that is inside the id |
+| `exits[]` | ids you can walk to. **Adjacency only — no distances, no weights** |
+| `described_only` | `true` for a place named in prose that cannot be entered |
+| `origin` | always `"world"` for anything exported; the consumer writes `"found"` and `"venture"` for its own |
+| `size_ft` | `{width, depth, height}` in **feet**; `height` is `null` for open sky |
+| `clutter` | `bare`, `some`, `cluttered`, `dense` |
+| `footing` | `firm`, `broken`, `bad` |
+| `vertical` | `ledge`, `slope`, `scatter`, `none` — how the place is shaped upward |
+| `storeys` | `{up, down}`, counts of floors. Omit outdoors |
+
+**Feet, never levels.** A room is eighty feet across under any ruleset; a *level* is the
+consumer's own unit, and an export carrying one is silently wrong the day that unit moves.
+Same reason `clutter` and `footing` are words rather than counts: how many pillars make a
+room feel dense is a tuning number belonging to whoever runs the fight.
+
+**Verticality has two halves.** More places should be shaped upward than not — but not all
+of them. The consumer's own tables come out at 30 of 36, and the six it keeps flat are the
+ones a reader would agree are flat: a sump, an alley between two walls, ploughed fields.
+An export where nothing at all is `none` has a generator with no rule for refusing.
+
+`docs/places-and-races-for-world-bible.md` is the full contract, including the three tiers
+this can be shipped in and the cue words that already mint a place from a settlement's own
+prose. `tools/check_places.py` checks an export against it.
 
 ## SQLite
 
@@ -199,7 +290,16 @@ trade_routes(id PK, origin, destination, origin_id, destination_id,
              commodity, sought_as, acquisition, demand, conduct, friction)
 factions(id PK, name, description, reach, aim, method, foothold, weakness)
 unwritten(name, kind, why)
+races(id PK, name, people_id, size, speed, body, senses, movement, about,
+      strengths, weakness)                                                -- 1.1, 1.2
+cards(id PK, title, facts, keys, tags, people, place, clock, secret, always_on)  -- 1.1
+places(id PK, name, about, parent, terrain, exits, described_only, origin,
+       width_ft, depth_ft, height_ft, clutter, footing, vertical,
+       storeys_up, storeys_down)                                                -- 1.3
 ```
+
+In `races` and `cards`, list fields (`body`, `senses`, `movement`, `facts`, `keys`,
+`tags`, `people`) are JSON strings; `secret` and `always_on` are 0/1.
 
 Indexed on `entities.parent_id`, `entities.kind` and `events.year`.
 
@@ -220,6 +320,16 @@ SELECT name, year, summary FROM events
 The export **replaces** the database file each time. It is an export, not a save: the
 world's JSON stays the only source of truth, so keep campaign state — party location,
 what the players have learned, what has changed — in your own file, keyed by these ids.
+
+## Version history
+
+- **1.3** — adds `play.places[]` and the `places` table: the rooms inside a settlement,
+  with the ground in the id and the room's own size, footing and shape. Additive.
+- **1.2** — a race card carries `strengths[]` and `weakness`; the `races` table gains both
+  columns. Additive.
+- **1.1** — adds `play.races[]` and `play.cards[]`, and the `races` and `cards` tables.
+  Additive; a 1.0 consumer keeps working.
+- **1.0** — first version.
 
 ## What is not here
 

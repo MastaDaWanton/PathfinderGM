@@ -34,6 +34,11 @@
   "none": "flat, and meant to be — a sump, an alley between two walls, farmland, open steppe"
  },
  "vertical_default": "ledge",
+ "flat_by_design": [
+  "the-back-streets",
+  "the-edge",
+  "the-sump"
+ ],
  "vertical_balance": {
   "consumer_tables": "30 of 36",
   "ratio": 0.833,
@@ -132,7 +137,8 @@
     "walls",
     "fort",
     "fortress",
-    "keep",
+    "the keep",
+    "a keep",
     "castle",
     "citadel",
     "garrison"
@@ -143,7 +149,8 @@
    "slug": "the-mine-head",
    "about": "where the ore comes up",
    "words": [
-    "mine",
+    "the mine",
+    "a mine",
     "mines",
     "mining",
     "quarry",
@@ -168,8 +175,10 @@
    "slug": "the-well",
    "about": "where the water is",
    "words": [
-    "well",
-    "spring",
+    "the well",
+    "a well",
+    "wells",
+    "wellhead",
     "cistern",
     "fountain"
    ]

@@ -426,10 +426,23 @@ def main() -> int:
         print(f"verticality: {total - flat} of {total} places are shaped upward "
               f"({', '.join(f'{k} {v}' for k, v in sorted(verticals.items()))}). "
               f"The consumer's own tables are {vocab['vertical_balance']['consumer_tables']}.")
+        # Both ends. The instruction has two halves — "more likely to have verticality
+        # than not, but not so much that every place has it even when it is silly" — and
+        # the first version of this only checked the first half, so an export where
+        # NOTHING was flat printed "72 of 72" as though that were the goal. A guard on one
+        # side of a two-sided rule reads as approval of the other.
         if total and (total - flat) / total < 0.5:
             print("  note: more of this world is flat than is not, which is the opposite "
                   "of the standing instruction. Reach for a reason to make a place flat, "
                   "not a reason to make it vertical.")
+        elif total >= 8 and not flat:
+            example = ", ".join(sorted(vocab["flat_by_design"])[:3])
+            print(f"  note: not one place in this world is flat. `none` is a word in the "
+                  f"vocabulary and nothing reached for it — the consumer's own tables are "
+                  f"{vocab['vertical_balance']['consumer_tables']}, and the places it "
+                  f"keeps flat are the ones a reader would agree are flat ({example}). "
+                  f"A generator with no rule for refusing verticality will put a gallery "
+                  f"in an alley.")
     print(f"{len(written)} place(s) in {len(groups)} location(s): {bad} with problems, "
           f"{noted} with notes.")
     return 1 if bad else 0

@@ -103,6 +103,11 @@ def build() -> dict:
         "terrains": sorted(biomes.BIOMES),
         "vertical": _VERTICAL_SAYS,
         "vertical_default": floorplan.Shape().vertical,
+        # The places the consumer itself keeps flat, so a checker can name them when an
+        # export has reached for verticality everywhere. Generated, not listed: a
+        # hand-typed set here would be one more copy of a table to go stale.
+        "flat_by_design": sorted(slug for slug, s in floorplan.BY_SPOT.items()
+                                 if s.vertical == "none"),
         "vertical_balance": {
             "consumer_tables": f"{with_height} of {len(shapes)}",
             "ratio": round(with_height / len(shapes), 3),

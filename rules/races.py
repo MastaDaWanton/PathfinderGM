@@ -1032,8 +1032,14 @@ def written_for(world) -> dict[str, dict]:
 
 def from_world(world) -> list[dict]:
     """The races a world ships with: the ones its author wrote (`play.races[]`, the
-    contract in docs/campaign-format.md — World Bible does not write them yet) and,
-    when that list is absent, one per people whose entry describes a body."""
+    contract in docs/campaign-format.md) and, when that list is absent, one per people
+    whose entry describes a body.
+
+    Both branches are live. World Bible has written race cards since schema 1.1, so the
+    first is the normal path for a current export and the second is what a 1.0 world — or
+    one whose author wrote no cards — still gets. The difference is not cosmetic: a card
+    can carry `strengths`/`weakness` and a derived people cannot, because an anatomy fact
+    says what a body looks like and never what it is good at."""
     out: list[dict] = []
     world_id = world_key(world)
     play = getattr(world, "play", None) or {}
