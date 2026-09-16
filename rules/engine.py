@@ -5907,7 +5907,9 @@ class Engine:
             return ""
         if there == 0 and mine == 0:
             return ""                      # the town's own ground floor: as it always was
-        if going_to.id in places_mod.stairs_from(here.id, here.terrain):
+        if going_to.id in places_mod.stairs_from(here.id, here.terrain,
+                                                 getattr(here, "shape", None),
+                                                 getattr(here, "floors", ())):
             return ""
         # One floor of a building, named from somewhere that is not the floor below it.
         building = places_mod.base_of(going_to.id)
@@ -6210,8 +6212,15 @@ class Engine:
         # id, so the market has the same stalls every time anybody fights in it and none
         # of it is saved. A place nobody has a shape for falls through to its terrain and
         # then to open ground, which is what every fight used to get.
+        # And the world's own dimensions for the room when it wrote them: World Bible
+        # ships width, depth, height, clutter, footing and a vertical kind on every place
+        # it authors, and for two releases a fight in a 125-foot square was fought on
+        # whatever this app's table said a room of that NAME looks like. `here()` carries
+        # the authored shape; a generated or founded place carries None and derives, as
+        # every place did before.
+        authored = getattr(self.here(), "shape", None)
         self.scene.grid = floorplan.for_place(
-            self.scene.at, places_mod.terrain_of(self.scene.at))
+            self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         mid = self.scene.grid.height // 2
         pc_side, foe_row = 4, 0
         for side, refs in sides.items():
@@ -6232,7 +6241,19 @@ class Engine:
                 away = (max(1, stated // FEET_PER_SQUARE) if stated
                         else SQUARES_BY_ZONE.get(zone, 3))
                 if pc_side + away >= self.scene.grid.width:
-                    self.scene.grid.width = pc_side + away + 2
+                    if authored is not None:
+                        # A room the world measured is that size, and the distance gives
+                        # way rather than the walls. Without this the reader would be
+                        # undone by the first archer: a thirty-foot shop grew into a
+                        # seventy-foot hall the moment somebody spawned at `far`, and the
+                        # dimensions the export wrote would have survived exactly until a
+                        # fight started in them.
+                        away = max(1, self.scene.grid.width - pc_side - 2)
+                    else:
+                        # Ground nobody measured has no walls to argue with: a bowshot at
+                        # a hundred and twenty feet is twenty-four squares, and the blank
+                        # field is twenty. It grows.
+                        self.scene.grid.width = pc_side + away + 2
                 if has_pc:
                     self.scene.positions[ref] = self._clear_square(
                         (pc_side, mid + i), self.scene.actors[ref].size)

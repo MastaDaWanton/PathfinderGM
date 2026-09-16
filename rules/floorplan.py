@@ -292,8 +292,110 @@ class _Rolls:
         return (self.n >> 16) % max(1, upper)
 
 
-def shape_for(place_id: str, terrain: str = "") -> Shape:
-    """Which shape this place takes: its own spot first, then its ground, then open.
+# --- what the world said about the ground -------------------------------------------------
+#
+# World Bible has written four things about every place it ships since schema 1.3 —
+# `size_ft`, `clutter`, `footing`, `vertical` — and for two releases nothing read one of
+# them. Measured 2026-09-16 across both fixtures: 456 authored places, every one carrying
+# all four, and every one of them fought on a shape this app made up out of the room's
+# NAME. Ashwatch's market is written 75 by 70 feet and was laid out 16 by 16 squares; a
+# place whose name the table does not know got the twenty-by-twenty blank field, which is
+# what the whole of stages 1 to 7 existed to remove.
+#
+# The mapping below is the whole of the reader: arithmetic and a lookup. It lives HERE
+# rather than in `rules/places.py` because feet, squares and levels are this module's
+# units — `places` holds the id grammar and knows nothing about how wide a square is.
+
+# Five feet to a square, as everywhere else in the game.
+FEET_PER_SQUARE = 5
+
+# What a room may come out as, in squares. The floor is six because a scene smaller than
+# that has nowhere to stand off; the ceiling is twenty-four because the authored range
+# runs to 125 feet (25 squares) and a grid much past twenty-four is a map the player reads
+# badly. Measured range: 25-125 ft wide, 15-110 ft deep.
+MIN_SQUARES, MAX_SQUARES = 6, 24
+
+# How much of the floor each clutter word puts something solid on, as a fraction of the
+# inner squares. Calibrated against the hand-written shapes rather than invented: "some"
+# lands a 14x12 room on six clumps, which is what the tavern and the market were already
+# given by hand, and "dense" lands it on twelve, which is what the warrens have.
+CLUTTER = {"bare": 0.02, "some": 0.05, "cluttered": 0.08, "dense": 0.11}
+
+# And how much of it is bad going. "firm" is not nothing — a floor with no rubble on it
+# anywhere reads as a stage — and the hand-written places sit at two to three per cent.
+FOOTING = {"firm": 0.02, "broken": 0.08, "bad": 0.18}
+
+# A clump runs one to this many squares; the count below is divided by the average.
+CLUMP_MAX = 2
+
+VERTICAL_KINDS = ("ledge", "slope", "scatter", "none")
+
+
+def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
+    """The shape an authored place actually has, or None when the world said nothing.
+
+    The dimensions, the clutter, the footing and the vertical kind are the world's. The
+    `about` phrase is NOT: it is the sentence a tell is built from, written for that
+    purpose and never a number, while the export's own `about` is a line about the
+    settlement's politics ("A merchant oligarchy that outspends the nobility") which would
+    read as nonsense said of a floor. So the ground the table would have given keeps its
+    phrase and loses everything else.
+    """
+    if not isinstance(raw, dict):
+        return None
+    size = raw.get("size_ft") if isinstance(raw.get("size_ft"), dict) else {}
+    clutter = str(raw.get("clutter") or "").strip().lower()
+    footing = str(raw.get("footing") or "").strip().lower()
+    vertical = str(raw.get("vertical") or "").strip().lower()
+    if not (size or clutter or footing or vertical):
+        return None
+    base = ground if ground is not None else OPEN
+    width = _squares(size.get("width"), base.width)
+    height = _squares(size.get("depth"), base.height)
+    # An authored height of null is a place with no roof, which is a fact and not a gap:
+    # 241 of the 456 are written that way and they are the yards, the greens and the
+    # streets. Only a place that wrote nothing at all about its size keeps the table's
+    # ceiling — the empty-is-not-absent trap, and the one field here where it bites.
+    ceiling = base.ceiling if not size else _levels(size.get("height"))
+    inner = max(1, width - 2) * max(1, height - 2)
+    clumps = round(inner * CLUTTER.get(clutter, CLUTTER["some"]) / ((1 + CLUMP_MAX) / 2))
+    rough = round(inner * FOOTING.get(footing, FOOTING["firm"]))
+    kind = vertical if vertical in VERTICAL_KINDS else base.vertical
+    # `rise` and `rise_to` are not authored and are not asked for: they are how many
+    # raised things a SCATTER scatters and how far a SLOPE climbs, which the kind already
+    # implies. A ledge and a flat floor use neither.
+    return Shape(width=width, height=height, ceiling=ceiling,
+                 clumps=max(0, clumps), clump_max=CLUMP_MAX if clumps else 1,
+                 rough=max(0, rough),
+                 rise=max(3, inner // 60) if kind == "scatter" else 0,
+                 rise_to=2 if kind == "slope" else 1,
+                 vertical=kind, about=base.about)
+
+
+def _squares(feet, fallback: int) -> int:
+    try:
+        n = round(float(feet) / FEET_PER_SQUARE)
+    except (TypeError, ValueError):
+        return fallback
+    return max(MIN_SQUARES, min(MAX_SQUARES, n)) if n else fallback
+
+
+def _levels(feet) -> int | None:
+    try:
+        n = round(float(feet) / FEET_PER_SQUARE)
+    except (TypeError, ValueError):
+        return None
+    return max(1, n) if n else None
+
+
+def shape_for(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Shape:
+    """Which shape this place takes: what the world wrote, then its own spot, then its
+    ground, then open.
+
+    `authored` is carried on the `Place` by `places._authored` and handed down, never
+    looked up: this module has no world and must not acquire one. A caller holding only an
+    id gets the derived answer, which is what every place got before World Bible shipped
+    room dimensions.
 
     A storey is read as the building it is a floor of. Without that, `the-tavern^1` matches
     no spot, falls through to `urban`, and an upstairs room comes out **with no roof on it**
@@ -302,7 +404,7 @@ def shape_for(place_id: str, terrain: str = "") -> Shape:
     """
     bare = str(place_id or "").rsplit(STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
-    found = BY_SPOT.get(spot) or BY_TERRAIN.get(
+    found = authored or BY_SPOT.get(spot) or BY_TERRAIN.get(
         str(terrain or "").strip().lower(), OPEN)
     level = _storey(place_id)
     if not level or found.ceiling is None:
@@ -341,13 +443,13 @@ def _upstairs(ground: Shape, level: int) -> Shape:
                  about="partitioned, and lower than the room below")
 
 
-def for_place(place_id: str, terrain: str = "") -> Grid:
+def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Grid:
     """The ground at this place, the same every time it is asked for.
 
     Nothing is placed in the outermost ring, so a plan can never wall a scene in or strand
     a combatant in a corner they cannot leave. Everything in the middle is fair game.
     """
-    shape = shape_for(place_id, terrain)
+    shape = shape_for(place_id, terrain, authored)
     r = _Rolls(_seed(place_id))
     grid = Grid(width=shape.width, height=shape.height, ceiling=shape.ceiling)
 
@@ -430,6 +532,6 @@ def _raise(grid: Grid, shape: Shape, r: "_Rolls") -> None:
             grid.floor[p] = 1 + r.next(shape.rise_to)
 
 
-def describe(place_id: str, terrain: str = "") -> str:
+def describe(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> str:
     """One phrase about the ground, for a tell. Never a number — the third law."""
-    return shape_for(place_id, terrain).about
+    return shape_for(place_id, terrain, authored).about

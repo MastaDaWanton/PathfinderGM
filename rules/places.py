@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from dataclasses import replace as _replace
 
 # Three numbers, and they are three different things. They were two different sixes until
 # 2026-09-15, when the World Bible side noticed the engine and the checker disagreed about
@@ -485,6 +486,24 @@ class Place:
     # all `within` says; the exits say the rest.
     within: str = ""
     exits: tuple[str, ...] = ()
+    # What the world said this room is like underfoot: how big, how cluttered, what the
+    # going is, how it is shaped upward — as a `floorplan.Shape`, built once when the
+    # place is read and handed down to whatever lays the ground. None for a generated or
+    # founded place, which means "derive it", exactly as before.
+    #
+    # NOT in `as_dict`, and that is the rule rather than an omission: an authored place is
+    # re-read from the world every time (`_authored`), so storing its shape in a save
+    # would be a second copy of a fact the export owns — the trap this module's whole
+    # "derived, never stored" arrangement exists to avoid. Founded places, which ARE
+    # stored, have no authored shape to lose.
+    shape: "object | None" = None
+    # How many floors this building has, as the levels themselves: (-1, 0, 1) is an
+    # undercroft, a ground floor and an upstairs. The world writes `{"up": n, "down": n}`
+    # on 177 of the 456 places it ships and this app generated its own answer off a seed
+    # instead — Ashwatch's tavern is authored as one floor up and none down, and the
+    # generator gave it an undercroft, an upper floor and a top floor. Empty derives, as
+    # it always did; not saved, for the reason `shape` is not.
+    floors: tuple[int, ...] = ()
     # True when the place is named but cannot be entered — Diku's `<room linked>` of -1,
     # "non-functional exits that display descriptions only". It lets the narrator write
     # "an alley runs east" without minting a node, and keeps the pressure that would
@@ -589,27 +608,57 @@ def storey_id(place_id: str, level: int) -> str:
     return base if not level else f"{base}{STOREY}{int(level)}"
 
 
-def is_indoors(place_id: str, terrain: str = "") -> bool:
+def _floors(said) -> tuple[int, ...]:
+    """`{"up": 1, "down": 0}` as the levels themselves: (0, 1).
+
+    Fails soft to "nothing said", like everything else that reads an export: a building
+    whose floor count cannot be read is a building this app counts for itself, which is
+    what it did for every building until today. Capped at three each way, because the
+    place graph is what a player walks and a nine-storey tower is a different feature.
+    """
+    if not isinstance(said, dict):
+        return ()
+    try:
+        up = max(0, min(3, int(said.get("up") or 0)))
+        down = max(0, min(3, int(said.get("down") or 0)))
+    except (TypeError, ValueError):
+        return ()
+    return tuple(range(-down, up + 1)) if (up or down) else ()
+
+
+def is_indoors(place_id: str, terrain: str = "", shape=None) -> bool:
     """Whether this place has a roof on it.
 
     Asked of `floorplan`, which already answers it: a shape with a `ceiling` is a room and
     one without is under the sky. One source, so a tavern cannot be indoors for the
-    purposes of stairs and outdoors for the purposes of flying over it.
+    purposes of stairs and outdoors for the purposes of flying over it — which is exactly
+    why the authored shape has to reach here too. A world that wrote `height: null` on its
+    market has said the market has no roof, and a reader that answered from the table
+    while the battlefield answered from the export would be two sources again.
     """
     from . import floorplan
 
-    return floorplan.shape_for(place_id, terrain).ceiling is not None
+    return floorplan.shape_for(place_id, terrain, shape).ceiling is not None
 
 
-def storeys(place_id: str, terrain: str = "") -> tuple[int, ...]:
+def storeys(place_id: str, terrain: str = "", shape=None,
+            floors: tuple[int, ...] = ()) -> tuple[int, ...]:
     """Every floor this building has, in order, ground floor included.
 
-    Deterministic off the building's own id, like everything else about a place: the same
-    tavern has the same number of floors for ever, and none of it is saved. Outdoors is
-    always the single floor you are standing on — a market has no upstairs.
+    What the world said, when it said: `floors` is the export's own `{"up", "down"}`, and
+    a house the author gave one upper floor gets one upper floor. Otherwise deterministic
+    off the building's own id, like everything else about a place — the same tavern has
+    the same number of floors for ever, and none of it is saved.
+
+    Outdoors is always the single floor you are standing on, whatever else was written. A
+    market has no upstairs, and the roof is the older authority of the two: the handoff
+    tells an author that no place may claim storeys and open sky at once, and this is what
+    happens to one that does.
     """
-    if not is_indoors(place_id, terrain):
+    if not is_indoors(place_id, terrain, shape):
         return (0,)
+    if floors:
+        return floors
     n = _seed(base_of(place_id))
     up = n % 3                 # nothing, one floor, or two
     down = (n >> 5) % 2        # and an undercroft, or not
@@ -623,7 +672,8 @@ def storey_set(place: "Place") -> tuple["Place", ...]:
     building's ground and parent — an upper room is still `urban` — because the terrain is
     about what the ground is made of and not about how far up it is.
     """
-    levels = storeys(place.id, place.terrain)
+    levels = storeys(place.id, place.terrain, getattr(place, "shape", None),
+                     getattr(place, "floors", ()))
     out: list[Place] = []
     for level in levels:
         if level == 0 or level not in _STOREY_NAMES:
@@ -635,20 +685,31 @@ def storey_set(place: "Place") -> tuple["Place", ...]:
             id=storey_id(place.id, level),
             name=f"{label} of {place.name}" if place.name else label,
             about=about, terrain=place.terrain, exits=tuple(reachable),
-            parent=place.id, origin="storey"))
+            parent=place.id, origin="storey", floors=levels,
+            # The building's own ground floor, carried up. `floorplan._upstairs` derives
+            # a floor from the shape below it — "the same footprint, divided up more" —
+            # and handed nothing it would derive the upper rooms of a world-measured
+            # tavern from the generic tavern in the table instead.
+            shape=place.shape))
     return tuple(out)
 
 
-def stairs_from(place_id: str, terrain: str = "") -> tuple[str, ...]:
+def stairs_from(place_id: str, terrain: str = "", shape=None,
+                floors: tuple[int, ...] = ()) -> tuple[str, ...]:
     """The ids one flight up and one flight down, where those floors exist.
 
     Only adjacent floors: you cannot step from the undercroft to the top of the house
     without passing the room between, which is the whole reason these are places joined by
     stairs rather than a coordinate anybody can name.
+
+    The authored shape comes along for the same reason it reaches `storey_set`: the two
+    have to agree about whether this building has floors at all. Read from different
+    sources, `with_storeys` would mint an upstairs off the world's roof while this refused
+    to let anybody climb to it.
     """
     here = storey_of(place_id)
     return tuple(storey_id(place_id, other)
-                 for other in storeys(place_id, terrain)
+                 for other in storeys(place_id, terrain, shape, floors)
                  if abs(other - here) == 1)
 
 
@@ -906,6 +967,8 @@ def _authored(location) -> tuple[Place, ...]:
     `tools/check_places.py` reports exactly that before an export ships; this is what
     happens if one gets through anyway, and losing one room beats playing on a blank one.
     """
+    from . import floorplan
+
     out: list[Place] = []
     for raw in getattr(location, "places", None) or ():
         if not isinstance(raw, dict):
@@ -926,6 +989,14 @@ def _authored(location) -> tuple[Place, ...]:
             # `within` pointing nowhere would put a room in a quarter that does not exist.
             within=str(raw.get("within") or ""),
             parent=str(raw.get("parent") or ""),
+            # How big, how cluttered, what the going is, how it is shaped upward — the
+            # world's own answer where it wrote one, read through `floorplan` because
+            # feet and squares are its units. The ground the table would have given is
+            # passed in so the tell's phrase survives: the export's `about` is a line
+            # about the settlement, not about the floor.
+            shape=floorplan.from_world(
+                raw, floorplan.shape_for(pid, ground)),
+            floors=_floors(raw.get("storeys")),
             # Everything from the world says so, whatever the file claims: `origin` is
             # provenance, and a export that wrote "found" would otherwise hand the party
             # a place the engine believes they built themselves.
@@ -1018,12 +1089,15 @@ def with_storeys(base: tuple["Place", ...]) -> tuple["Place", ...]:
         upstairs = storey_set(place)
         if not upstairs:
             continue
-        out[out.index(place)] = Place(
-            id=place.id, name=place.name, about=place.about, terrain=place.terrain,
-            exits=tuple(place.exits) + tuple(p.id for p in upstairs
-                                             if abs(storey_of(p.id)) == 1),
-            described_only=place.described_only, parent=place.parent,
-            owner=place.owner, origin=place.origin)
+        # `replace`, not a fresh `Place` with the fields typed out. Written out by hand
+        # this dropped every field nobody remembered to list: `within` has been lost here
+        # since districts arrived — a roofed room in a city quarter came back out of this
+        # hanging off nothing — and the authored `shape` would have been the next one,
+        # which would have handed an upstairs-having room back to the generic table it
+        # was just read out of. One line that cannot go stale beats six that can.
+        out[out.index(place)] = _replace(
+            place, exits=tuple(place.exits) + tuple(p.id for p in upstairs
+                                                    if abs(storey_of(p.id)) == 1))
         out.extend(upstairs)
     return tuple(out)
 

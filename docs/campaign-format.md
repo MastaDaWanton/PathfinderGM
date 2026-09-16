@@ -260,6 +260,13 @@ not parse an id.
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — how the place is shaped upward |
 | `storeys` | `{up, down}`, counts of floors. Omit outdoors |
 
+All five of the tier-2 fields are **read** as of 2026-09-16 (`rules/floorplan.from_world`,
+`rules/places._authored`): the dimensions become the grid a fight is laid out on at five
+feet to a square, `clutter` and `footing` become what is in the way and what is hard going,
+`vertical` is used as written, and `storeys` is the floors themselves. Nothing about a plan
+is saved — an authored place is re-read from the export every time, which is why changing
+these fields and re-exporting changes the ground under an existing campaign.
+
 **Feet, never levels.** A room is eighty feet across under any ruleset; a *level* is the
 consumer's own unit, and an export carrying one is silently wrong the day that unit moves.
 Same reason `clutter` and `footing` are words rather than counts: how many pillars make a

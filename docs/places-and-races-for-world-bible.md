@@ -370,11 +370,31 @@ can always be checked rather than guessed at.
 This is the new half, and the reason ask 3 needed rewriting.
 
 Every place the consumer knows about gets a **floor plan**: a grid of five-foot squares
-with walls, rough going, raised ground and a ceiling. It is derived today — SHA-256 of the
-place id, so the same tavern has the same pillars for ever on every machine without a byte
-in the save — and what it derives from is a small table of *characters*: a market is
+with walls, rough going, raised ground and a ceiling. It is derived where nothing authored
+it — SHA-256 of the place id, so the same tavern has the same pillars for ever on every
+machine without a byte in the save — from a small table of *characters*: a market is
 sixteen by sixteen with seven knots of stalls and a cart to climb on; a library is stacks
 to the ceiling with a gallery round them.
+
+> **These five fields are READ, since 2026-09-16** (`rules/floorplan.from_world`). They
+> were written and ignored for two releases, which is said plainly here because an author
+> deserves to know which of their work reaches the table. What each one does now:
+>
+> | Field | What it becomes |
+> |---|---|
+> | `size_ft.width` / `.depth` | the grid, at five feet to a square, clamped to 6–24 squares — a 15-foot closet is a room but not a scene, and past 24 is more map than anybody reads |
+> | `size_ft.height` | the ceiling in squares; `null` means no roof, and a place with no roof has no floors above it whatever `storeys` says |
+> | `clutter` | how much of the floor is solid stuff in the way: 2% of squares for `bare`, 11% for `dense` |
+> | `footing` | how much is difficult going: 2% for `firm`, 18% for `bad` |
+> | `vertical` | the shape upward, used as written |
+> | `storeys` | the floors themselves. Ashwatch's tavern is `{"up": 1, "down": 0}` and gets exactly one upper room; before this it was given an undercroft, an upper floor and a top floor off a seed |
+>
+> Two consequences worth knowing before authoring more. **Real rooms are smaller than
+> invented ones**: across the 456 places in the two shipped worlds the median room went
+> from 160 squares to 99 when these were read. And `about` is NOT read as a description of
+> the ground — the consumer keeps its own phrase for that, because `about` on the market
+> of Ashwatch is "A merchant oligarchy that outspends the nobility", which is a fact about
+> the town and nonsense said of a floor.
 
 **What to author is that character, not those squares.** Three measurements and three
 words:
