@@ -148,16 +148,49 @@ def test_the_checker_imports_nothing_from_this_app():
         assert smell not in src, smell
 
 
-def test_the_checker_runs_as_a_script_on_a_real_export(tmp_path):
+def test_the_checker_runs_as_a_script_on_a_real_export():
     """End to end, through `python check_places.py`, because that is how it is used and
-    an `argparse` that will not start is not caught by calling `check_place` directly."""
-    out = subprocess.run(
-        [sys.executable, str(TOOLS / "check_places.py"),
-         str(Path(settings.BASE_DIR, "fixtures", "pangrella-campaign.json")),
-         "--vocab", str(VOCAB)],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    assert out.returncode == 0, out.stderr
-    assert "no play.places[]" in out.stdout, out.stdout
+    an `argparse` that will not start is not caught by calling `check_place` directly.
+
+    This asserted `"no play.places[]" in out.stdout` until 2026-09-15, when a World Bible
+    export at schema 1.3 put 72 of them in the shipped fixture and the assertion became a
+    statement about what the fixture happened to lack. What is worth pinning is that the
+    script runs and passes a real export — so it runs against whichever of the two shipped
+    worlds is there, and says which.
+    """
+    for world in ("pangrella-campaign.json", "aurvantis-campaign.json"):
+        path = Path(settings.BASE_DIR, "fixtures", world)
+        if not path.exists():
+            continue
+        out = subprocess.run(
+            [sys.executable, str(TOOLS / "check_places.py"), str(path),
+             "--vocab", str(VOCAB), "--tier", "2"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
+        assert out.returncode == 0, f"{world}:\n{out.stdout}\n{out.stderr}"
+        assert "0 with problems" in out.stdout, f"{world}:\n{out.stdout}"
+
+
+def test_the_shipped_worlds_pass_their_own_checker():
+    """The two fixtures are what every other test loads, so a place list that does not
+    satisfy the contract would be a bad example baked into everything. Asserted on the
+    library rather than the script, so a failure names the place."""
+    import json
+
+    checker = _load("check_places")
+    vocab = json.loads(VOCAB.read_text(encoding="utf-8"))
+    for world in ("pangrella-campaign.json", "aurvantis-campaign.json"):
+        path = Path(settings.BASE_DIR, "fixtures", world)
+        if not path.exists():
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        places = (data.get("play") or {}).get("places") or []
+        if not places:
+            continue
+        known = {str(p.get("id")) for p in places}
+        entities = {str(e.get("id")) for e in data.get("entities") or []}
+        for place in places:
+            problems, _notes = checker.check_place(place, vocab, known, entities, 2)
+            assert problems == [], f"{world} {place.get('id')}: {problems}"
 
 
 # --- the checks themselves ------------------------------------------------------------------

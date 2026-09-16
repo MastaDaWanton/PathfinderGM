@@ -30,8 +30,13 @@ place seeded off the biome — a loop — and the review found the other way out
 parse. `terrain_of(scene.at)` is the whole derivation, and the eleven readers that want
 the canonical enum string get it from the one coordinate that has one writer.
 
-When World Bible ships towns and the places in them, an authored list replaces a generated
-one at `home_set` and nothing else changes.
+World Bible ships them now (schema 1.3), and that promise is kept literally: an authored
+list replaces a generated one at `home_set` and nothing else changes. Door two (a place the
+player founds) and door three (ground gone into) are untouched, and the implied-spot table
+is not consulted for a town whose author has spoken — six authored rooms are what the town
+has, and adding a docks because the prose says "port" would be the generator arguing with
+them. A world that ships none, which is every export at 1.2 or below, still gets the
+generated set exactly as before.
 """
 from __future__ import annotations
 
@@ -436,10 +441,55 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     name = str(getattr(location, "name", "") or "").strip()
     if not here:
         return (Place(id="here", name=name or "here", about="", terrain="", exits=()),)
+    # The authored list, when the world wrote one. This module has promised since it was
+    # written that "when World Bible ships towns and the places in them, an authored list
+    # replaces a generated one at `home_set` and nothing else changes" — this is that,
+    # and nothing else changes.
+    authored = _authored(location)
+    if authored:
+        return authored
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
         return _with_implied(_build(here, URBAN, _SETTLEMENT), location)
     return _build(here, hint or "grassland", _WILD)
+
+
+def _authored(location) -> tuple[Place, ...]:
+    """The places the world wrote for this location, or () when it wrote none.
+
+    Door one and only door one. Founded and ventured places still join in `for_scene`
+    exactly as they did, and the implied-spot table is not consulted — an author who
+    listed six rooms has said what the town has, and adding a docks to it because the
+    prose says "port" would be the generator arguing with them.
+
+    Fails soft, one place at a time. An id that does not carry its ground is dropped
+    rather than made into a place standing on nothing, because `terrain_of` parses the id
+    and a place with no terrain gets an empty twenty-by-twenty field to fight in.
+    `tools/check_places.py` reports exactly that before an export ships; this is what
+    happens if one gets through anyway, and losing one room beats playing on a blank one.
+    """
+    out: list[Place] = []
+    for raw in getattr(location, "places", None) or ():
+        if not isinstance(raw, dict):
+            continue
+        pid = str(raw.get("id") or "").strip()
+        ground = terrain_of(pid)
+        if not pid or not ground:
+            continue
+        out.append(Place(
+            id=pid,
+            name=str(raw.get("name") or "").strip() or pid.rsplit(":", 1)[-1],
+            about=str(raw.get("about") or "").strip(),
+            terrain=ground,
+            exits=tuple(str(x) for x in (raw.get("exits") or []) if str(x).strip()),
+            described_only=bool(raw.get("described_only")),
+            parent=str(raw.get("parent") or ""),
+            # Everything from the world says so, whatever the file claims: `origin` is
+            # provenance, and a export that wrote "found" would otherwise hand the party
+            # a place the engine believes they built themselves.
+            origin="world",
+        ))
+    return tuple(out)
 
 
 def implied_spots(location) -> tuple[tuple[str, str], ...]:

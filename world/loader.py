@@ -37,6 +37,13 @@ class Entity:
     links: list[str] = field(default_factory=list)
     trade: dict[str, str] = field(default_factory=dict)
     scale: str | None = None
+    # The places inside this settlement, as the export wrote them (`play.places[]`,
+    # schema 1.3). Attached to the entity they belong to rather than left on the world,
+    # because `rules.places.home_set` is handed a LOCATION and never a world — a Scene
+    # holds no world by design, which is the same reason the ground lives inside a place
+    # id. Empty for a world that ships none, and for every export at 1.2 or below, which
+    # is what keeps the generated set working unchanged.
+    places: list[dict] = field(default_factory=list)
 
     @property
     def role(self) -> str:
@@ -232,6 +239,21 @@ def load(path: str | Path) -> World:
             trade=e.get("trade") or {},
             scale=e.get("scale"),
         )
+
+    # `play.places[]` (schema 1.3), filed under the settlement each one names as its
+    # parent. Grouped here rather than searched for later: `home_set` is called on every
+    # scene transition and a linear scan of 384 places per call is a scan nobody needs.
+    #
+    # A place whose `parent` names nothing in this export is dropped rather than kept
+    # against an id that resolves to no settlement — `check_places.py` reports that as a
+    # problem on the World Bible side, and a consumer that silently kept it would be
+    # holding a room in a town that does not exist.
+    for place in (raw.get("play") or {}).get("places") or []:
+        if not isinstance(place, dict):
+            continue
+        parent = entities.get(str(place.get("parent") or ""))
+        if parent is not None:
+            parent.places.append(place)
 
     chronology = [
         Event(
