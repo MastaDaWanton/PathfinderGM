@@ -131,8 +131,14 @@ def build() -> dict:
             "why": "the range the consumer's own tables cover. Nothing clamps an "
                    "authored value yet, because nothing reads one.",
         },
-        "most_places": places.MOST_SPOTS,
+        # What a settlement may hold, which is the base draw plus what its own words
+        # earned. `most_places` is the one a checker compares against; the parts are here
+        # so nobody has to rebuild the sum and get a different answer, which is exactly
+        # what happened between this app's generator and its own checker.
+        "most_places": places.MOST_IN_A_SETTLEMENT,
+        "most_generated": places.MOST_SPOTS,
         "most_implied": places.MOST_IMPLIED,
+        "most_children_minted_in_play": places.MOST_CHILDREN,
         "implied": [{"place": spot, "slug": _slug(spot), "about": about,
                      "words": list(words)}
                     for words, (spot, about) in places.IMPLIED],

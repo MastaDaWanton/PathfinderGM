@@ -226,10 +226,13 @@ axis, with no export regenerated.
 - A market is **one place**, however big.
 - A city is **not** a place — it is the settlement entity that places hang off.
 
-The consumer caps a location at **six** places. That ceiling is borrowed: Fate caps a
-scene at two to four zones and Inform's Recipe Book calls for "a small number of named
-positions". An open-ended list is free text wearing a tuple, and every extra place is
-somewhere a narrator can strand a player with nothing to do.
+The consumer caps a location at **eight** places — six generic, plus up to two its own
+words earned. That ceiling is borrowed: Fate caps a scene at two to four zones and Inform's
+Recipe Book calls for "a small number of named positions". An open-ended list is free text
+wearing a tuple, and every extra place is somewhere a narrator can strand a player with
+nothing to do — which is not an abstraction. Measured on Aurvantis: every settlement in it
+has **four named people and one situation card**. At six places, two rooms already hold
+nobody.
 
 ## B.1 The id grammar — and the bug in ask 3
 
@@ -518,10 +521,18 @@ amount of data to keep stable across exports for very little gain.
 - **Do not author encounters, monsters, treasure or NPCs into a place.** Those come from
   the bestiary, the codex and the quest schemes on the consumer's side. A place is ground.
 - **Do not author a place per floor.** Say how many floors; let the consumer name them.
-- **Do not exceed six places per location.** The generator picks three to six and the
-  ceiling is a design decision rather than a validator — there is no authored-list code
-  path yet, so a list of twelve would be accepted today and would make worse play. Treat
-  the six as binding on you; it will be enforced when the reader is built.
+- **Do not exceed eight places per location** — six generic, plus up to two the
+  settlement's own words earned. The number was six here until 2026-09-15, and that was
+  this app contradicting itself: the generator draws three to six from its base table and
+  then adds up to two implied, so it makes seven or eight for a town whose words earn
+  them, and the checker flagged its own output. Measured on Aurvantis, eight is also
+  exactly what the earned places need — 56 of its 64 settlements earn two or fewer, the
+  most any one earns is five, and three essentials plus five is eight. Not one settlement
+  loses anything it earned.
+
+  It is a note, not a refusal, and there is now a reader: a longer list is accepted and
+  played. The cost of exceeding it is not a validator, it is that every extra room in a
+  settlement with four named people in it is somewhere to strand the player.
 - **Do not put a digit in `about`.** It is prose the narrator may repeat, and the third law
   is that no model is ever handed a number.
 

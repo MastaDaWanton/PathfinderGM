@@ -123,7 +123,12 @@ def test_the_vocabulary_carries_every_word_an_author_may_write():
     assert set(vocab["ventures"]) == set(places.VENTURES)
     assert [row["place"] for row in vocab["implied"]] == [spot for _w, (spot, _a)
                                                           in places.IMPLIED]
-    assert vocab["most_places"] == places.MOST_SPOTS
+    # `most_places` is what a settlement may HOLD, which is the base draw plus what its
+    # own words earned — not the base draw alone. Those were the same number until
+    # 2026-09-15 and should never have been: the generator makes seven for a town that
+    # earns two, and the checker flagged its own output.
+    assert vocab["most_places"] == places.MOST_IN_A_SETTLEMENT
+    assert vocab["most_generated"] == places.MOST_SPOTS
     assert vocab["most_implied"] == places.MOST_IMPLIED
     assert vocab["id_grammar"]["separators"] == {"ground": places.SEP, "spot": ":",
                                                  "storey": places.STOREY}

@@ -75,8 +75,10 @@
   "depth_max": 100,
   "why": "the range the consumer's own tables cover. Nothing clamps an authored value yet, because nothing reads one."
  },
- "most_places": 6,
+ "most_places": 8,
+ "most_generated": 6,
  "most_implied": 2,
+ "most_children_minted_in_play": 6,
  "implied": [
   {
    "place": "the docks",

@@ -313,9 +313,11 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
                      f"to {vocab['most_places']}")
 
     if len(enterable) > vocab["most_places"]:
-        notes.append(f"{len(enterable)} places; the consumer's own ceiling is "
-                     f"{vocab['most_places']} and the extra ones are somewhere a narrator "
-                     f"can strand a player with nothing to do")
+        notes.append(
+            f"{len(enterable)} places; the consumer's own ceiling is "
+            f"{vocab['most_places']} — {vocab.get('most_generated', '?')} generic plus "
+            f"{vocab.get('most_implied', '?')} its own words may earn — and the extra "
+            f"ones are somewhere a narrator can strand a player with nothing to do")
 
     if enterable:
         start = str(enterable[0]["id"])

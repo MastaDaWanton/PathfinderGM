@@ -131,9 +131,62 @@ def test_the_two_ceiling_heights_are_stated_in_feet():
     assert f"{floorplan.HALL * 5} feet is a hall" in doc
 
 
-def test_the_six_place_ceiling_is_the_one_the_generator_keeps():
-    assert places.MOST_SPOTS == 6
-    assert "six places per location" in _doc()
+def test_the_ceiling_the_doc_states_is_the_one_the_generator_can_reach():
+    """Three numbers, and they were two different sixes until 2026-09-15. The World Bible
+    side found that the engine and the checker disagreed about what six counted; measured
+    here, this app's own generator makes SEVEN places for a settlement its own checker
+    notes as over the limit — no districts, no authored list, nothing minted in play.
+
+    So the number a checker uses and the number a document states are both the one the
+    generator can actually reach, and it is named rather than summed in three places.
+    """
+    assert places.MOST_IN_A_SETTLEMENT == places.MOST_SPOTS + places.MOST_IMPLIED
+    doc = _doc()
+    assert f"exceed {_words(places.MOST_IN_A_SETTLEMENT)} places per location" in doc, doc[:0]
+    assert f"caps a location at **{_words(places.MOST_IN_A_SETTLEMENT)}** places" in doc
+
+
+def _words(n: int) -> str:
+    return {6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}.get(n, str(n))
+
+
+def test_the_generator_cannot_exceed_the_ceiling_it_publishes():
+    """The finding itself, as an assertion rather than as a comment. A settlement whose
+    own words earn it two extra places gets the base draw plus both, and that total is
+    what a checker must be told about."""
+    import json
+
+    from django.conf import settings
+
+    vocab = json.loads(Path(settings.BASE_DIR, "docs",
+                            "place-vocabulary.json").read_text(encoding="utf-8"))
+    assert vocab["most_places"] == places.MOST_IN_A_SETTLEMENT
+    assert vocab["most_generated"] == places.MOST_SPOTS
+    assert vocab["most_implied"] == places.MOST_IMPLIED
+    # And the per-minted-parent cap is published as its own thing, because conflating the
+    # two is what started this.
+    assert vocab["most_children_minted_in_play"] == places.MOST_CHILDREN
+
+
+def test_a_generated_town_that_earns_two_extras_is_not_over_its_own_limit():
+    """Measured: settlement id 000000000001, whose words earn a docks and a mine head,
+    came out at seven and was noted by the checker at six."""
+    import json
+
+    from django.conf import settings
+
+    class Loc:
+        id = "000000000001"; name = "Portmine"; kind = "CITY"; scale = "town"
+        facts = {"Trade": "A port town with a quay, and a mine at its back."}
+        prose = ""; places = []
+
+    got = places.home_set(Loc())
+    vocab = json.loads(Path(settings.BASE_DIR, "docs",
+                            "place-vocabulary.json").read_text(encoding="utf-8"))
+    assert len(got) > places.MOST_SPOTS, "the case that found this no longer reproduces"
+    assert len(got) <= vocab["most_places"], (
+        f"the generator makes {len(got)} and publishes a ceiling of "
+        f"{vocab['most_places']}")
 
 
 # --- the stale copy this document was written to replace ----------------------------------

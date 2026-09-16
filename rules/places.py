@@ -43,10 +43,20 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-# How many spots a location gets. Fate caps a conflict at "two to four zones"; Inform's
-# Recipe Book calls for "a small number of named positions". The ceiling is the point —
-# an open-ended list is free text wearing a tuple, and every extra spot is somewhere the
-# narrator can strand the player with nothing to do.
+# Three numbers, and they are three different things. They were two different sixes until
+# 2026-09-15, when the World Bible side noticed the engine and the checker disagreed about
+# what six counted — and the sharper version of that finding is that THIS app's own
+# generator makes seven places for a settlement its own checker notes as over the limit,
+# with no districts, no authored list and nothing minted in play. Measured, on a bare
+# generated town whose words earn it a docks and a mine head.
+#
+# Fate caps a conflict at "two to four zones"; Inform's Recipe Book calls for "a small
+# number of named positions". The ceiling is the point — an open-ended list is free text
+# wearing a tuple, and every extra spot is somewhere the narrator can strand the player
+# with nothing to do. What the ceiling protects is the size of the choice put in front of
+# the player, which is why it is counted per parent and not per world.
+
+# How many generic spots `_build` draws from the base table: three to six.
 MOST_SPOTS = 6
 
 # The character between a location and its ground inside a place id. Never a `:` — that
@@ -115,9 +125,21 @@ IMPLIED = (
 # `mine` went the same way pre-emptively: it is also the possessive pronoun, it had not
 # fired yet in either world, and finding out later costs a place.
 
-# A settlement may carry this many implied spots over its generated set — a port town
+# A settlement may carry this many implied spots OVER its generated set — a port town
 # gets its docks even when the table has filled six — and no more.
 MOST_IMPLIED = 2
+
+# So this is what a settlement may actually hold, and it is the number a checker has to
+# use: the base draw plus what the world's own words earned. Named rather than left as a
+# sum two files each had to remember, because remembering it separately is how they came
+# to disagree.
+#
+# It is also, exactly, what the earned places need. Measured on Aurvantis's 64
+# settlements: 56 earn two or fewer, and the most any one earns is five — so three
+# essentials plus five earned is eight, and at eight not one settlement loses anything it
+# earned. A six that costs four towns their library is a number doing harm for no reason
+# anybody chose.
+MOST_IN_A_SETTLEMENT = MOST_SPOTS + MOST_IMPLIED
 
 # --- door three: ground you go into ----------------------------------------------------------
 #
@@ -159,10 +181,12 @@ VENTURES: dict[str, dict] = {
               "spots": (("the foot", "the way in"),
                         ("the top", "somewhere to see from"))},
 }
-# How many places may hang off one parent, in play. Fate caps a conflict at two to four
-# zones and Inform calls for "a small number of named positions"; the ceiling applies per
-# parent, not to the world — a town of six, an alley of three, a sewer of four — so the
-# model's choice stays small while the world grows.
+# How many places may hang off one parent MINTED IN PLAY — a founded base, a venture's
+# head. Read only against `scene.founded`, and deliberately not the same question as how
+# many rooms a settlement holds: an alley of three and a sewer of four hang off a town of
+# eight and none of those numbers constrains the others. The example in this comment used
+# to read as though it did, which is half of why the checker and the engine ended up
+# counting different things.
 MOST_CHILDREN = 6
 
 # The ground a settlement stands on, by construction. Four predicates used to answer
