@@ -13,6 +13,7 @@
  },
  "terrains": [
   "coast",
+  "deck",
   "desert",
   "farmland",
   "forest",
@@ -46,8 +47,8 @@
   "the-sump"
  ],
  "vertical_balance": {
-  "consumer_tables": "59 of 71",
-  "ratio": 0.831,
+  "consumer_tables": "60 of 72",
+  "ratio": 0.833,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {

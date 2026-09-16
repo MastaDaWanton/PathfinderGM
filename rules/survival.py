@@ -52,6 +52,10 @@ PARCHED_DAMAGE = "1d6"
 BIOME_HARDSHIP = {
     "desert": 4, "tundra": 4, "mountain": 3, "swamp": 3, "jungle": 2, "planar": 2,
     "underground": 1, "coast": 1, "ruins": 1,
+    # A night in open water is the worst there is — you cannot lie down in it, and going
+    # to sleep is going under. A deck is a hard bed in the weather, which is a night in
+    # the open with a roof over part of it.
+    "water": 4, "underwater": 4, "deck": 1,
     "forest": 0, "hills": 0, "grassland": 0, "farmland": 0, "urban": 0,
 }
 

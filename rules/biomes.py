@@ -42,6 +42,11 @@ BIOMES: dict[str, str] = {
     # clock that matters is your own held breath. A place is one or the other, and
     # diving is a move between two places — the same shape a storey is.
     "water": "Open water: river, lake and the sea from above",
+    # Planking, and whatever is bolted to it. Its own ground rather than `water` — a
+    # creature standing on a deck is not swimming, and the underwater table must not
+    # reach them — and not `urban` either, because what lives in a street has no
+    # business in the Atlantic. `rules/ships.py` builds the rooms that stand on it.
+    "deck": "A ship's planking: decks, rigging and the hold below",
     "underwater": "Below the surface, where the air you have is what you brought",
     "underground": "Cave, tunnel and the deep places",
     "ruins": "Barrows, battlefields and cursed ground",
@@ -85,9 +90,12 @@ ALIASES: dict[str, str] = {
     "snow": "tundra", "icy": "tundra", "frozen": "tundra", "northern climate": "tundra",
     "frost": "tundra",
 
+    # The SHORE, and only the shore. `sea`, `ocean` and `reef` used to be listed here
+    # too and were overridden further down by the water block — the same key twice in one
+    # literal, where the first one reads like the rule and the second one is the rule.
+    # A reader who stopped here would have believed the wrong thing.
     "coast": "coast", "shore": "coast", "beach": "coast", "tideline": "coast",
-    "littoral": "coast", "reef": "coast", "estuary": "coast", "sea": "coast",
-    "ocean": "coast", "riverbank": "coast", "bank": "coast",
+    "littoral": "coast", "estuary": "coast", "riverbank": "coast", "bank": "coast",
 
     "cave": "underground", "cavern": "underground", "subterranean": "underground",
     "tunnel": "underground", "underdark": "underground", "underground": "underground",

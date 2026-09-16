@@ -87,6 +87,25 @@ class Leg:
     days_apart: int = 1
     source: str = "derived"          # exact | derived
     friction: str = ""
+    # Whether this journey crosses water, and whether either end can put a ship to sea.
+    #
+    # "Continents should be separated by water unless otherwise specified" (2026-09-16),
+    # and the export already carries what that needs: every settlement's line of ancestors
+    # runs up through a CONTINENT, so two settlements on different ones are across water
+    # from each other and nobody has to author a coastline to say so.
+    #
+    # Measured the day the rule was made, on the two shipped worlds: **48 of Aurvantis's
+    # 48 travel legs cross a continent boundary**, and 2 of Pangrella's 5. Every one of
+    # them was being walked. That is not a defect in the export — those routes are trade
+    # relationships, which is what a trade route is — it is this app having read an
+    # economic edge as a road.
+    #
+    # "Otherwise specified" is the `road` field the contract already has: a world that
+    # states a road between two continents has said there is a way across, and a stated
+    # road beats a derived sea.
+    by_sea: bool = False
+    from_port: bool = False
+    to_port: bool = False
 
 
 def pace(biome: str, road: str = "") -> tuple[float, str, str]:
@@ -118,6 +137,22 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
     Returns whole hours, because the clock this feeds counts in minutes and a journey
     measured to the minute is a precision the inputs do not have.
     """
+    # A crossing goes at the ship's speed and not the walker's, and it goes all day: a
+    # ship has watches and does not camp at dusk. Which ship is the port's business
+    # (`ships.offered_at`), so the leg asks for the commonest deep-water trader rather
+    # than pretending to know — and says `sea` rather than `exact`, because the number is
+    # as good as the miles were and no better.
+    if leg.by_sea:
+        from . import ships as ships_mod
+
+        days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
+                                  "sailing ship", leg.days_apart)
+        # The WHOLE day, not the eight hours a walking day is: a ship keeps watches and
+        # makes way through the night, which is most of why the sea is faster than the
+        # road at the same speed. The caller must not spend these as marching hours —
+        # nobody aboard is marching — and `_op_journey` branches on the `sea` answer.
+        return days * ships_mod.HOURS_AT_SEA, "", "sea"
+
     if leg.miles is not None and leg.source == "exact":
         worst = 1.0
         words = ""
@@ -135,6 +170,58 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
     # sit in its containment tree, and is reported in days — never converted back into a
     # mileage, because that would be this app inventing a fact about somebody's world.
     return max(1, leg.days_apart) * HOURS_PER_DAY, "", "derived"
+
+
+def continent_of(world, entity_id: str) -> str:
+    """The continent a settlement stands on, by id, or "" when the world has no such tier.
+
+    Walks the line of ancestors the export already carries. Nothing is derived from
+    geometry — containment is not geography, which `_depth_apart` says at length — but
+    "these two are on different landmasses" is a fact the tree states outright.
+    """
+    if world is None or not entity_id:
+        return ""
+    found = world.get(entity_id)
+    if found is None:
+        return ""
+    line = [found] + list(world.ancestors(entity_id))
+    for node in line:
+        if str(getattr(node, "kind", "")).upper() == "CONTINENT":
+            return str(node.id)
+    return ""
+
+
+def crosses_water(world, here: str, there: str, road: str = "") -> bool:
+    """Whether getting from one to the other means going over water.
+
+    The ruling of 2026-09-16: **continents are separated by water unless otherwise
+    specified.** A stated road is the otherwise — a world that wrote one between two
+    landmasses has said there is a way across, whether that is an isthmus, a bridge or a
+    causeway, and a thing the world said beats a thing this app worked out.
+    """
+    if str(road or "").strip():
+        return False
+    mine, theirs = continent_of(world, here), continent_of(world, there)
+    return bool(mine) and bool(theirs) and mine != theirs
+
+
+def is_port(world, entity_id: str) -> bool:
+    """Whether a settlement can put a ship to sea.
+
+    A settlement is a port when it has somewhere for a ship to tie up — authored by the
+    world or minted by this app's own cue table, which turns "a port town with a quay"
+    into a docks. Not every place is on the coast, which is the other half of the ruling
+    this file carries: an inland town is inland, and a crossing that starts there starts
+    with a road.
+    """
+    from . import places as places_mod
+    from . import ships as ships_mod
+
+    found = world.get(entity_id) if world is not None else None
+    if found is None:
+        return False
+    names = {str(p.name).strip().lower() for p in places_mod.home_set(found)}
+    return bool(names & set(ships_mod.PORT_PLACES))
 
 
 def _depth_apart(world, here: str, there: str) -> int:
@@ -191,6 +278,9 @@ def legs_from(world, here: str) -> list[Leg]:
             days_apart=_depth_apart(world, here, other),
             source="exact" if isinstance(miles, int) and miles > 0 else "derived",
             friction=str(row.get("friction") or ""),
+            by_sea=crosses_water(world, here, other, str(row.get("road") or "")),
+            from_port=is_port(world, here),
+            to_port=is_port(world, other),
         ))
     return sorted(out, key=lambda leg: leg.to_name.lower())
 
@@ -215,6 +305,20 @@ def describe(leg: Leg, hours: int) -> str:
     Days and half-days, never a mileage the world did not state, and never the hour count
     itself — the third law: the model is fed tells and no numbers it could contradict.
     """
+    # A crossing is counted in whole days of the ship making way, and it is said
+    # differently — "four days on the road" for a sea passage is the tell describing
+    # something that did not happen, which is the one thing a tell may never do.
+    if leg.by_sea:
+        from . import ships as ships_mod
+
+        days = max(1, round(max(1, hours) / ships_mod.HOURS_AT_SEA))
+        aboard = "a day at sea" if days == 1 else f"{days} days at sea"
+        if leg.from_port:
+            return aboard
+        # Not every place is on the coast. A crossing that starts inland starts on a
+        # road, and the tell says so rather than teleporting the party onto a deck.
+        return f"the road to the coast, and then {aboard}"
+
     days, left = divmod(max(1, hours), HOURS_PER_DAY)
     if not days:
         return "most of a day on the road" if left > 4 else "a few hours on the road"

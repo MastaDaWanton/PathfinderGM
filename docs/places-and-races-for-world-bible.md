@@ -273,9 +273,10 @@ to remove. Get the `~terrain` in.
 - `~` separates the location from its ground; `:` separates the ground from the slug; `^`
   introduces a storey. None of the three may appear in a World Bible entity id (checked
   against the fixture: they are twelve hex characters).
-- `terrain` is one of the **sixteen** the consumer knows, and no other word:
-  `coast`, `desert`, `farmland`, `forest`, `grassland`, `hills`, `jungle`, `mountain`,
-  `planar`, `ruins`, `swamp`, `tundra`, `underground`, `underwater`, `urban`, `water`.
+- `terrain` is one of the **seventeen** the consumer knows, and no other word:
+  `coast`, `deck`, `desert`, `farmland`, `forest`, `grassland`, `hills`, `jungle`,
+  `mountain`, `planar`, `ruins`, `swamp`, `tundra`, `underground`, `underwater`, `urban`,
+  `water`.
   A settlement's places are `urban` whatever the continent's facts say.
 - **`water` and `underwater` are new (2026-09-16)** and they are two words on purpose.
   `water` is a surface — a river, a lake, the sea seen from a boat, and somewhere a body
@@ -288,6 +289,12 @@ to remove. Get the `~terrain` in.
   `lake` all resolved to `coast`, which put 468 creatures — every shark and kraken in the
   bestiary — on a beach. If your worlds have coastlines, rivers or lakes that a party
   could go **into** rather than walk beside, these are the words for them.
+- **`deck` is a ship's planking** (2026-09-16), and it is its own ground for a reason
+  worth knowing: a creature standing on a deck is not swimming, so none of the underwater
+  rules reach them — until they go over the rail, which is a move into the `water` place
+  alongside. Author it for a ship that is a fixture of a place: a wreck on a reef, a
+  barge that is somebody's home, a ferry that is always at the same crossing. Ships that
+  come and go are the consumer's own (`rules/ships.py`) and you need not author those.
 - The slug is lower case, hyphenated, and includes the article: `the-market`.
 - **Ids must be stable across exports.** Everything the campaign overlay remembers about a
   place is keyed by this string.

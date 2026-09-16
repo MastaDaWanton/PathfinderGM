@@ -265,6 +265,11 @@ BY_TERRAIN: dict[str, Shape] = {
     # rough going the way scree is — it is a different way of moving altogether, and it
     # is `rules/water.py` that says what that costs, creature by creature. A wave is not
     # a wall.
+    # A ship. Small, crowded, and with a rail: the one piece of ground in the game where
+    # the edge of the map is a real edge and going over it is a different set of rules.
+    "deck": Shape(12, 20, None, clumps=4, clump_max=2, rough=0, rise=2,
+                  vertical="ledge", about="planking, a mast to put between you and them, "
+                                          "and a rail with the sea past it"),
     "water": Shape(20, 20, None, clumps=0, clump_max=1, rough=0,
                    vertical="none", about="open water, and nothing to stand on"),
     "underwater": Shape(20, 20, None, clumps=2, clump_max=2, rough=0,

@@ -77,9 +77,20 @@ def test_the_document_offers_no_terrain_the_engine_would_refuse():
     """The other direction, and the one that actually misleads: a word in the handoff
     that the parser has never heard of produces a place standing on nothing."""
     doc = _doc()
-    line = next(ln for ln in doc.splitlines() if "`coast`, `desert`, `farmland`" in ln)
-    offered = {w.strip(" `,.") for w in line.split() if w.startswith("`")}
-    assert offered <= set(biomes.BIOMES), offered - set(biomes.BIOMES)
+    # The list is two lines long now and was one when this was written, so it is found by
+    # the sentence that introduces it rather than by the first word of it — a test that
+    # breaks when a vocabulary grows past one line is a test that punishes the vocabulary
+    # for growing.
+    lines = doc.splitlines()
+    start = next(i for i, ln in enumerate(lines) if "the consumer knows, and no other" in ln)
+    # From after the introducing sentence, which names the FIELD in backticks and would
+    # otherwise be read as a terrain called "terrain".
+    block = " ".join(lines[start:start + 4]).split("no other word:")[-1]
+    offered = {w.strip(" `,.") for w in block.split()
+               if w.startswith("`") and w.strip(" `,.").isalpha()}
+    unknown = offered - set(biomes.BIOMES)
+    assert not unknown, unknown
+    assert {"water", "underwater", "deck"} <= offered, offered
 
 
 def test_every_vertical_kind_is_described():

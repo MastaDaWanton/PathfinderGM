@@ -3905,7 +3905,17 @@ class Engine:
         # `_op_venture` uses, because `pass_hours` can stop early and only it knows how
         # many hours were actually survived.
         toll_note = ""
-        arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
+        if how == "sea":
+            # A passage is not a march. Nobody aboard is walking eight hours and camping
+            # at dusk — they are fed, watered and slept by the ship, which is exactly what
+            # `_march`'s camp does for a traveller and with none of the walking. So the
+            # clock moves and the body is not charged, and a crossing always completes:
+            # a ship does not turn back because a passenger is tired.
+            arrived, walked = True, ""
+            self.scene.advance(hours * survival.MINUTES_PER_HOUR, charge_body=False)
+        else:
+            arrived, walked = self._march(pc, hours,
+                                          places_mod.terrain_of(self.scene.at))
         if walked:
             toll_note = f" The road cost them: {walked}"
 

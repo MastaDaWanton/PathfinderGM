@@ -200,6 +200,96 @@ sample and read the JSON — it is the same world Pathfinder GM tests against
 
 ---
 
+# THE LEDGER: what is asked, what is delivered, what is next
+
+**Kept current at the top of the file, because an ask list whose statuses are stale is
+worse than none — somebody builds a thing that shipped a month ago.** Last read
+2026-09-16.
+
+| # | Ask | State |
+|---|---|---|
+| 1 | `play.races[]` | **delivered** (schema 1.1, extended 1.2). Read; 16 cards in Aurvantis |
+| 2 | `play.cards[]` | **delivered** (1.1). 22 cards in Pangrella |
+| 3 | `play.places[]` | **delivered** (1.3), tier 1 and tier 2 both read since 2026-09-16 |
+| 4 | Resources, materials, ingredients | **not started.** Still the largest gap |
+| 5 | `play.schemes[]` | **not started, and deliberately last** |
+| 6 | `play.travel[].miles` | **not started.** 0 of 5 legs in Pangrella carry one |
+| 7 | `play.names[]` | **built, and empty.** See below |
+| 8 | **Where the water is** | **new, and now the sharpest.** See below |
+| 9 | A vocabulary for versatile and lucky | **this side's**, listed so it is not lost |
+
+## 7. `play.names[]` — naming material (built; needs back-filling)
+
+The supplier built this the same day it was asked for, in the shape asked for:
+
+```json
+{"home_id": "5bbd0c40345f", "family": ["Sootspar", "Halloran"], "given": ["Bregan"]}
+```
+
+`people_id` for a people, `home_id` for a settlement, ten to twenty of each. **Both
+shipped worlds export `"names": []`** until they are regenerated or back-filled, which
+needs about eighty local model calls on the supplier's side.
+
+Why it matters more than it sounds: this app now puts a keeper in every place that sells
+something — 88 of Pangrella's 192 places, seven per settlement — and names them from the
+world's own stock. The supplier's own measurement is worse than the one that prompted the
+ask: **ten distinct surnames across 256 characters** in Aurvantis. Harvesting the cast was
+never going to work. Until the pools land, a town's shopkeepers share two family names.
+
+## 8. Where the water is
+
+**The ruling (2026-09-16): continents are separated by water unless otherwise specified.**
+This app implements that off the tree the export already carries, so nothing is blocked —
+but two things would make it real rather than inferred.
+
+**8a. Which settlements are on the water.** Nothing in the export says. Measured: Aurvantis
+has 11 ports out of 64, and every one of them is this app's own cue table minting a docks
+out of the settlement's prose ("a port town with a quay"). **Pangrella has none out of
+12** — and the reason is a genuine interaction worth knowing: Pangrella's places are
+authored, an authored list replaces the generated one by design, and so the cue that was
+the only way to spot a port never fires. *Authoring places removed the one signal this app
+had for what is coastal.*
+
+Either shape works and the first is smaller:
+
+```json
+"settlements": [{"id": "...", "coastal": true, "on": "sea"}]
+```
+`on` is one of `sea`, `river`, `lake` — a river port is not a deep-water port — or omit
+the whole key for inland, which is the safe default and what everything reads today.
+
+Or simply **author a docks place** in coastal settlements; this app already knows that
+word and will read it with no change at either end.
+
+**8b. Which routes are sea and which are land.** `play.travel[]` is an edge list of trade
+relationships, and this app had been reading every one as a road. Measured: **48 of
+Aurvantis's 48 legs cross a continent boundary**, and 2 of Pangrella's 5. That is not a
+defect in the export — "Brackgate sells tempered steel to Ashwatch" was never a claim that
+you can walk there — but it means every journey in Aurvantis is currently a sea crossing by
+inference. One optional field settles it per route:
+
+```json
+"travel": [{"from_id": "...", "to_id": "...", "by": "sea"}]
+```
+`by` is `road`, `sea` or `river`. **A stated `road` is already the "otherwise specified"**
+and is read today: a world that writes a road between two landmasses has said there is an
+isthmus or a causeway, and a thing the world says beats a thing this app worked out.
+
+**Not asked for:** coastlines as geometry, sea routes as waypoints, or anything with
+coordinates in it. The boundary holds — the world says which places touch water, and this
+app decides what crossing it costs.
+
+## 9. Versatile and lucky — this side's gap, recorded here so it is not lost
+
+The supplier is right that two of the three race cards this app called content problems are
+not. A Human "physically unremarkable and highly variable" and a Halfling with "unusually
+good luck" produce no usable trait because **this app's cue vocabulary has twelve words and
+none of them means versatile or lucky** — and both are expressible in 1e (a bonus feat and
+a skill rank; a +1 luck bonus on all saves). That is work for this side, not content for
+theirs.
+
+---
+
 # The asks, easiest to hardest
 
 ## 1. `play.races[]` — the world's own peoples as playable races

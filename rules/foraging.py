@@ -148,6 +148,10 @@ FORAGE_DC = {
     "farmland": 10, "grassland": 12, "forest": 12, "hills": 13, "coast": 14,
     "urban": 15, "jungle": 15, "swamp": 16, "ruins": 16, "mountain": 17,
     "underground": 18, "tundra": 19, "desert": 20, "planar": 20,
+    # Fishing, which is foraging with a line rather than with your hands. Harder from a
+    # deck than from a shore only because you cannot wade out to the weed; harder again
+    # below the surface, where what grows is holding on to rock.
+    "water": 15, "deck": 16, "underwater": 17,
 }
 DEFAULT_FORAGE_DC = 15
 
