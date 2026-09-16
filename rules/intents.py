@@ -790,12 +790,25 @@ def _check_params(intent: Intent, index: int) -> None:
                 )
             ob["skill"] = os_
             ob["ref"] = normalise_ref(ob.get("ref"))
-        if not p.get("dc") and not p.get("opposed_by"):
+        # Talking somebody round is the exception, and it is the engine's DC rather than
+        # a missing one: Diplomacy or Intimidate aimed at a named person is resolved
+        # against the Core Rulebook's own table — 25/20/15/10/0 by their attitude plus
+        # their Charisma, or 10 + Hit Dice + Wisdom for a threat (`rules/attitude.py`).
+        # A band named here would be the plan setting the price of changing a mind.
+        social = (p.get("skill") in ("diplomacy", "intimidate")
+                  and intent.targets() and not p.get("opposed_by"))
+        if social and p.get("dc"):
+            raise IntentError(
+                f"check: the DC for {p['skill']} on a named person is the engine's — "
+                f"the book sets it from their attitude and their own scores. Drop the "
+                f"dc and keep the target.", "legality", index)
+        if not p.get("dc") and not p.get("opposed_by") and not social:
             raise IntentError(
                 "check: a check needs something to beat. Add either "
                 '"dc": {"band": "tough"} (one of ' + ", ".join(DC_BANDS) + "), or "
                 '"opposed_by": {"ref": "<a ref in the scene>", "skill": "perception"} '
-                "when someone is actively resisting.",
+                "when someone is actively resisting. To talk somebody round, name them "
+                'with "target" and the engine reads the DC off them.',
                 "schema", index,
             )
 

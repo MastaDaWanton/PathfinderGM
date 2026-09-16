@@ -1973,11 +1973,26 @@ def _counter_refusal(c, pc):
     homes drifts. Asked through the vocabulary, so the one `remove_effects(source=...)`
     that clears the name reopens the counter with nothing else touched.
     """
-    from rules import states
+    from rules import attitude, states
 
     merchant = _merchant_here(c.scene)
     town = str(c.scene.location_id or "")
-    if merchant is None or states.standing_with_the_law(pc, town) != "wanted":
+    if merchant is None:
+        return None
+    # How they feel about you, before what the law thinks of you. 1e gates what a
+    # creature will do for you on their attitude — "once a creature's attitude is
+    # indifferent or better you can make requests" — and buying from somebody is a
+    # request. A shopkeeper who has been given a reason to dislike you does not serve
+    # you, and Diplomacy is the way back in (`rules/attitude.py`). Nobody starts here:
+    # an attitude is only ever set by something that happened, so a counter the player
+    # has not poisoned opens exactly as it always did.
+    mood = attitude.of(merchant, default="")
+    if mood in ("hostile", "unfriendly"):
+        return JsonResponse({"error": (
+            f"{merchant.name} will not trade with {pc.name}. Talk them round first — "
+            f"it takes a minute of it, and the engine rolls your Diplomacy against how "
+            f"they feel about you.")}, status=409)
+    if states.standing_with_the_law(pc, town) != "wanted":
         return None
     return JsonResponse({"error": (
         f"{merchant.name} looks at {pc.name} and then at the door. {pc.name} is "

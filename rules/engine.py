@@ -241,6 +241,12 @@ class Scene:
     # keeper who is dead is swept out of the scene two turns later, and a check for
     # "is anybody standing here" would mint the murdered smith a second time.
     staffed: list[str] = field(default_factory=list)
+    # When each creature was last talked round, by ref, as the world clock's minute.
+    # "You cannot use Diplomacy to influence a given creature's attitude more than once
+    # in a 24 hour period" (Core Rulebook) — the limit is on TRYING, so a failed attempt
+    # spends the day too. Without it the check is free and a player rolls until the dice
+    # agree with them, which is the shape of every social system that stops mattering.
+    swayed: dict[str, int] = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -2100,6 +2106,14 @@ class Engine:
                 )
 
         level = actor.level if actor.is_pc else 1
+        # Talking somebody round is a rule with a table behind it, so the DC is the
+        # engine's and never the plan's (`rules/attitude.py`). A `check` naming a subject
+        # with `target` and a skill that moves the track is the ordinary way to change a
+        # mind — it is what the `condition` refusal has been telling the model to do
+        # since stage 8, while nothing on this side did anything with it.
+        swayed = self._sway_subject(intent, skill)
+        if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
+            return refusal
         if opposed:
             target = opposing_roll.total
             resolved_dc = dc_mod.ResolvedDC(value=target, band=None)
@@ -2107,6 +2121,12 @@ class Engine:
                 c = intent.params["circumstance"]
                 resolved_dc.circumstance = dc_mod.CIRCUMSTANCE[c["value"]]
                 resolved_dc.circumstance_why = c.get("why", "") or c["value"]
+        elif swayed is not None:
+            from . import attitude as attitude_mod
+
+            resolved_dc = dc_mod.ResolvedDC(
+                value=(attitude_mod.influence_dc(swayed) if skill == "diplomacy"
+                       else attitude_mod.intimidate_dc(swayed)), band=None)
         else:
             resolved_dc = dc_mod.resolve(
                 intent.params.get("dc"), level, intent.params.get("circumstance")
@@ -2149,10 +2169,90 @@ class Engine:
             beaten = (opposing_roll.total if opposing_roll else resolved_dc.final)
             tell += self.reward_check(actor, skill, beaten)
 
+        effects: list[dict] = []
+        if swayed is not None:
+            moved_tell, effects = self._sway(actor, swayed, skill, margin,
+                                             intent.because)
+            # The margin has already been said; what the player is told about the person
+            # is how they now feel, which is the only part of this a character could
+            # see. No step count, no DC — the third law.
+            tell = f"{tell} {moved_tell}".strip()
+
         return Outcome(
             intent_id=intent.id, op="check", rolls=rolls, dc=resolved_dc.as_dict(),
-            verdict=verdict, margin=margin, tell=tell, because=intent.because,
+            verdict=verdict, margin=margin, effects=effects, tell=tell,
+            because=intent.because,
         )
+
+    # --- talking somebody round ----------------------------------------------------------
+
+    def _sway_subject(self, intent: Intent, skill: str):
+        """The creature a social check is aimed at, or None if this is not one.
+
+        A `check` with a `target` and a skill that moves the track. Everything else — a
+        Diplomacy check at a band the GM named, a Climb, an opposed Bluff — resolves
+        exactly as it did, which is what keeps this additive.
+        """
+        from . import attitude as attitude_mod
+
+        if skill not in attitude_mod.LEVERS or intent.params.get("opposed_by"):
+            return None
+        refs = [r for r in intent.targets() if r and r != intent.actor]
+        return self.scene.actors.get(refs[0]) if refs else None
+
+    def _sway_refusal(self, intent: Intent, actor, target, skill: str):
+        """Why this attempt does not happen at all, as an outcome. Or None.
+
+        "You cannot use Diplomacy to influence a given creature's attitude more than once
+        in a 24 hour period" — the Core Rulebook's own limit, and the thing that stops a
+        player rolling until the dice agree with them. Intimidate has no such limit in
+        the book and is not given one here; what it has instead is a target who ends up
+        unfriendly, which is the book's own price.
+        """
+        from . import attitude as attitude_mod
+
+        if skill != "diplomacy":
+            return None
+        last = self.scene.swayed.get(target.ref)
+        if last is None or self.scene.clock_minutes - int(last) >= attitude_mod.COOLDOWN_MINUTES:
+            return None
+        return Outcome(
+            intent_id=intent.id, op="check", rolls=[], effects=[],
+            tell=(f"{target.name} has heard {actor.name} out once today and will not "
+                  f"hear it again. Come back tomorrow, or find another way."),
+            because=intent.because)
+
+    def _sway(self, actor, target, skill: str, margin: int, because: str):
+        """Move the target along the track, and say how they now feel.
+
+        The book, and nothing but: Diplomacy shifts one step plus one per 5 over, two at
+        most, and costs a step on a failure by 5 or more; the shift lasts 1d4 hours.
+        Intimidate buys `1d6 x 10` minutes of friendliness on a success and nothing on a
+        failure. Both land through `_set_attitude`, which is the one applicator.
+        """
+        from . import attitude as attitude_mod
+
+        was = attitude_mod.of(target)
+        if skill == "intimidate":
+            if margin < 0:
+                return f"{target.name} does not scare.", []
+            minutes = self.dice.roll(attitude_mod.INTIMIDATE_DICE,
+                                     label="cowed for", visibility="hidden").total * 10
+            now, rounds = "friendly", _to_rounds(minutes, "minute")
+        else:
+            # The attempt is spent whether or not it worked: the limit is on trying.
+            self.scene.swayed[target.ref] = int(self.scene.clock_minutes)
+            steps = attitude_mod.steps_for(margin)
+            now = attitude_mod.moved(was, steps)
+            if not steps or now == was:
+                return attitude_mod.said(target.name, was, was), []
+            hours = self.dice.roll(attitude_mod.SHIFT_DICE, label="for",
+                                   visibility="hidden").total
+            rounds = _to_rounds(hours, "hour")
+        cond = self._set_attitude(target, now, rounds, because or f"{skill} check")
+        return (attitude_mod.said(target.name, was, now),
+                [{"ref": target.ref, "kind": "condition", "condition": now,
+                  "rounds_left": cond.rounds_left}])
 
     # save --------------------------------------------------------------------------------
 
@@ -4672,8 +4772,9 @@ class Engine:
         # Here rather than in `add_condition`, for the reason argued directly above:
         # the applicator is the engine's own hand and this is a rule about the op.
         if key in states.ATTITUDES:
-            target.clear_states("attitude")
-        cond = target.add_condition(key, rounds, source=intent.because)
+            cond = self._set_attitude(target, key, rounds, intent.because)
+        else:
+            cond = target.add_condition(key, rounds, source=intent.because)
         return Outcome(
             intent_id=intent.id, op="condition",
             effects=[{"ref": target.ref, "kind": "condition", "condition": key,
@@ -4682,6 +4783,23 @@ class Engine:
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
         )
+
+    def _set_attitude(self, target, key: str, rounds: int | None, source: str):
+        """Move a creature to one step of the track. The one applicator for an attitude.
+
+        One step at a time: nobody is hostile and helpful at once, and without the clear
+        a charm laid over an old grudge left both standing and `attitude_of` answered
+        with whichever the reversed walk hit first. Here rather than in `add_condition`,
+        because that is the engine's own hand — it writes dead, dying and helpless — and
+        this is a rule about changing somebody's mind, not about recording a fact.
+
+        Two callers, which is exactly why it is a method: `condition` (a spell, a power)
+        and `check` (talking to them). The second arrived 2026-09-16 and would otherwise
+        have been a second copy of the clear-then-add rule — CLAUDE.md's "when you fix a
+        rule, grep for every copy of it", applied before there was a copy to grep for.
+        """
+        target.clear_states("attitude")
+        return target.add_condition(key, rounds, source=source)
 
     # What a natural weapon does past its damage. The rider tags a race grants —
     # `natural.trip`, `natural.grab.bite`, `natural.poison.sting` — and the intent each
@@ -5344,7 +5462,7 @@ class Engine:
     # family. Nothing that used to be narrated silently starts happening.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
-                 "choose_one", "bundle")
+                 "choose_one", "bundle", "attitude")
 
     def _executes(self, spec: dict) -> bool:
         return (str(spec.get("type", "")) in self._EXECUTES
@@ -5383,7 +5501,48 @@ class Engine:
             return self._conceal(spec, ctx)
         if kind == "object_damage":
             return self._object_damage(spec, ctx)
+        if kind == "attitude":
+            return self._attitude(spec, ctx)
         return self._stand_by(spec, ctx)
+
+    def _attitude(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell that changes how somebody feels about you. Charm person, and 32 others.
+
+        The type has existed since the spell import and shipped `engine=False` with the
+        note "no check in the app consults an attitude yet". A check does now
+        (`rules/attitude.py`), so the block came off — and the suite immediately caught
+        that lifting the block is a CLAIM: `test_every_executable_type_has_something_that
+        _executes_it` exists because a type marked executable with no executor is
+        "narrative wearing a costume". This is the executor that makes the claim true.
+
+        Through `_set_attitude`, the same one applicator the `condition` op and a
+        Diplomacy check use, so a charmed guard and a talked-round guard are one kind of
+        thing and one `remove_effects(source=...)` clears either.
+
+        The spec's `towards` field is not honoured and cannot be: an `attitude.*` tag says
+        how a creature feels, full stop, and the app has no per-observer attitudes. Twelve
+        of the thirty-three spells say "towards the caster", which is what the tag already
+        means in practice — the party is who the brief is written for.
+        """
+        from . import attitude as attitude_mod
+
+        key = str(spec.get("target") or "").strip().lower()
+        if key not in states.ATTITUDES:
+            return self._stand_by(spec, ctx)
+        rounds = ctx.get("rounds")
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in ctx.get("targets") or []:
+            who = self.scene.actors.get(str(ref))
+            if who is None:
+                continue
+            was = attitude_mod.of(who)
+            cond = self._set_attitude(who, key, rounds,
+                                      str(ctx.get("source") or "a spell"))
+            effects.append({"ref": who.ref, "kind": "condition", "condition": key,
+                            "rounds_left": cond.rounds_left})
+            tells.append(attitude_mod.said(who.name, was, key))
+        return effects, tells
 
     def _choose(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """One option, or none and a sentence saying so.

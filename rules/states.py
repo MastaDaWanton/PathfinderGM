@@ -166,6 +166,12 @@ TAGS: dict[str, tuple[str, ...]] = {
     # in the app consults an attitude yet", because there was nowhere for the answer
     # to live. Here is the somewhere.
     #
+    # And since 2026-09-16 the checks do consult it: `rules/attitude.py` moves a creature
+    # along this track on a Diplomacy or Intimidate check, by the Core Rulebook's own
+    # tables, and the counter refuses a player the keeper dislikes (docs/attitude.md).
+    # The effect type is `engine=True` now, and that note is gone rather than left to
+    # read as true.
+    #
     # Not under `state.*`: an attitude stops no action and impairs no roll. It is a
     # fact about how somebody feels towards you, and its whole job is to be READ — by
     # the brief, so the narrator writes the merchant as a merchant who likes you, and

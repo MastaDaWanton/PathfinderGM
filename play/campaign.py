@@ -250,6 +250,9 @@ class Campaign:
                 # written before keepers, which reads as none staffed yet — so an old
                 # campaign gains its smith the next time the party stands in the smithy.
                 "staffed": list(self.scene.staffed),
+                # And when each of them was last talked round: a 24-hour limit that
+                # forgot itself on reload would be no limit at all.
+                "swayed": dict(self.scene.swayed),
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -348,6 +351,7 @@ class Campaign:
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
+            swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),

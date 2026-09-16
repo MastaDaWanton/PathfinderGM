@@ -383,10 +383,8 @@ CATEGORIES: list[Category] = [
                 Field("target", "Becomes", "choice", vocab="attitude"),
                 Field("towards", "Towards", "choice", vocab="recipient",
                       required=False, default="caster"),
-            ], engine=False,
-                blocked="Recorded on the creature and shown to the GM. No check in the "
-                        "app consults an attitude yet — Diplomacy is rolled against a DC "
-                        "the GM sets, not against a track."),
+            ], engine=True,
+                blocked=""),
         ]),
 
     Category(
