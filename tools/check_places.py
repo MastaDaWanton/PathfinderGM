@@ -362,10 +362,17 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
     # `scale` on every settlement and has since 1.0.
     by_scale = vocab.get("places_by_scale") or {}
     scale = str((entity or {}).get("scale") or "").strip().lower()
+    # The ROOMS, which is what a settlement has. A crossing and a great square are
+    # structure — the consumer builds them itself and does not count them — and this list
+    # is computed once here because computing it twice is exactly how it went wrong: the
+    # scale check below excluded junctions and the ceiling check at the end of this
+    # function did not, so every quartered city in both shipped worlds was noted as
+    # "23 places; the consumer's own ceiling is 18". Reported from the World Bible side
+    # 2026-09-16 and reproduced against this app's own generator before it was believed.
+    junctions = [p for p in group if _is_junction(p, by_id)]
+    rooms = [p for p in enterable if p not in junctions]
     if by_scale and scale in by_scale:
         want = by_scale[scale]
-        junctions = [p for p in group if _is_junction(p, by_id)]
-        rooms = [p for p in enterable if p not in junctions]
         if len(rooms) < max(2, want // 2):
             notes.append(f"a {scale} with {len(rooms)} room(s); the consumer builds "
                          f"{want} for one, and a settlement much smaller than its own "
@@ -374,9 +381,17 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
             notes.append(f"a {scale} with {len(rooms)} rooms against the consumer's "
                          f"{want}; every extra one is somewhere a narrator can strand a "
                          f"player")
+    elif scale in (vocab.get("scale_aliases") or {}):
+        # Another vocabulary's word for one of these three. Read, not refused: the ruling
+        # of 2026-09-16 is that a supplier sends its own scales and this side maps them,
+        # because narrowing a vocabulary at the boundary destroys a distinction nobody can
+        # get back. Silent on purpose — a correctly-mapped scale is not a finding.
+        pass
     elif scale:
         notes.append(f"scale {scale!r} is not one the consumer knows "
-                     f"({', '.join(vocab.get('scales') or [])}); it will be read as a town")
+                     f"({', '.join(vocab.get('scales') or [])}) and is not one of the "
+                     f"words it maps ({', '.join(sorted(vocab.get('scale_aliases') or {}))}); "
+                     f"it will be read as a town")
 
     # --- what a settlement of this size always has ----------------------------------
     always = (vocab.get("always_by_scale") or {}).get(scale) or ()
@@ -399,12 +414,21 @@ def check_group(pid_parent: str, group: list[dict], entity: dict, vocab: dict,
     # --- the quarters, if there are any ----------------------------------------------
     problems.extend(_check_within(group, by_id, vocab))
 
-    if len(enterable) > vocab["most_places"]:
+    # The blanket ceiling, for a settlement whose scale says nothing — the one above is
+    # the sharper check and has already run when the scale is known. Rooms, not places:
+    # a city is eighteen rooms plus a square and four crossings, and all twenty-three are
+    # legal. The old wording ("6 generic plus 12 its own words may earn") described the
+    # table as it stood before scale rebuilt it, which is the copy-nobody-looked-at trap
+    # one level down: the number was updated and the sentence explaining it was not.
+    if len(rooms) > vocab["most_places"]:
+        biggest = max((vocab.get("places_by_scale") or {"": 0}).items(),
+                      key=lambda kv: kv[1])
         notes.append(
-            f"{len(enterable)} places; the consumer's own ceiling is "
-            f"{vocab['most_places']} — {vocab.get('most_generated', '?')} generic plus "
-            f"{vocab.get('most_implied', '?')} its own words may earn — and the extra "
-            f"ones are somewhere a narrator can strand a player with nothing to do")
+            f"{len(rooms)} rooms; the consumer builds at most {vocab['most_places']}, "
+            f"which is what it gives a {biggest[0] or 'settlement'} — and every extra "
+            f"one is somewhere a narrator can strand a player with nothing to do. "
+            f"Junctions are not counted: a city adds "
+            f"{(vocab.get('junctions_by_scale') or {}).get('city', 0)} on top.")
 
     if enterable:
         start = str(enterable[0]["id"])

@@ -4,7 +4,7 @@
 
 This is the complete list. A race card in a World Bible export can produce **a size, a speed, up to 12 traits, and an ability array** — all of them below, and nothing else. There is no other channel: any sentence whose words match none of these rows is read by the consumer, matched against every pattern, and discarded.
 
-**6 of the 12 do something in play today.** The rest are recorded on the sheet and shown to the player, and the engine cannot act on them yet — it has no walls to climb, no water to swim, no air to fly through, and it rolls the weapon in hand rather than a claw. Write them anyway; they are true about the people and they will start working without the card changing.
+**10 of the 12 do something in play today.** The rest are recorded on the sheet and shown to the player, and the engine cannot act on them yet — it has no walls to climb, no water to swim, no air to fly through, and it rolls the weapon in hand rather than a claw. Write them anyway; they are true about the people and they will start working without the card changing.
 
 ## Size
 
@@ -30,7 +30,7 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 - *Write one of:* wings, winged, fly, flight, glide, soar, airborne
 - *Grants:* `move.fly.30`
-- *Status:* **not yet: a fly speed: the engine moves on the ground only**
+- *Status:* works in play
 
 > They have broad wings and fly between the canopy platforms.
 
@@ -79,7 +79,7 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 - *Write one of:* climb (any ending), arboreal, tree-dwelling
 - *Grants:* `move.climb.20`
-- *Status:* **not yet: a climb speed: the engine has no walls**
+- *Status:* works in play
 
 > They climb sheer trunks without rope.
 
@@ -95,7 +95,7 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 - *Write one of:* talon, talons, claw, claws, clawed
 - *Grants:* `natural.claws`
-- *Status:* **not yet: natural attacks: the engine rolls the weapon in hand**
+- *Status:* works in play
 
 > Each hand ends in heavy claws.
 
@@ -103,7 +103,7 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 - *Write one of:* fang, fangs, bite, tusk, tusks, mandibles, beak
 - *Grants:* `natural.bite`
-- *Status:* **not yet: natural attacks: the engine rolls the weapon in hand**
+- *Status:* works in play
 
 > A hooked beak, strong enough to break bone.
 

@@ -228,6 +228,26 @@ def expand(doc: dict) -> dict:
         waits = _fill(str(ev.get("not_yet") or ""), choice or "—")
         if waits and waits not in not_yet:
             not_yet.append(waits)
+    # A natural attack tag with no evolution behind it still has to be a weapon.
+    #
+    # A world's race card is written from cue words — "heavy fangs" grants `natural.bite`
+    # — and carries the tag with no pick to carry the weapon, so `sheet.natural_weapon`
+    # looked in `doc["weapons"]`, found nothing, and the bite was a sentence in a trait
+    # list. Measured 2026-09-16 on the shipped world: four of Aurvantis's sixteen races
+    # grant claws or a bite and not one of them could swing it, while this app's own
+    # checker told World Bible their cards were "thin". Half of that thinness was here.
+    #
+    # The weapon comes from the evolution that grants the same tag rather than from a
+    # second table — the catalogue already holds a bite's dice by size, and two copies of
+    # that is the trap CLAUDE.md names. Same shape as the `PAIRED_LIMBS` rule below,
+    # which exists for exactly this case one field over.
+    by_tag = {tg: ev for ev in cat.values() if ev.get("weapons")
+              for tg in (ev.get("tags") or [])}
+    for tg in tags:
+        for w in (by_tag.get(tg) or {}).get("weapons") or ():
+            if not any(x.get("key") == w.get("key") for x in weapons):
+                weapons.append(dict(w))
+
     # The count goes on at the end, so three separate picks of one read the same as one
     # pick of three. Lines the document wrote itself are not in `earned` and keep theirs.
     traits = [f"{ln} (x{earned[ln]})" if earned.get(ln, 1) > 1 else ln for ln in traits]
@@ -928,10 +948,16 @@ CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
     (r"\b(climb\w*|arboreal|tree-?dwell\w*)\b", ("move.climb.20",), "climb 20 ft", ""),
     (r"\b(burrow\w*|tunnel\w*|dig\w*)\b", ("move.burrow.20",), "burrow 20 ft",
      "a burrow speed: the engine has no earth"),
-    (r"\b(talons?|claws?|clawed)\b", ("natural.claws",), "claws",
-     "natural attacks: the engine rolls the weapon in hand"),
-    (r"\b(fangs?|bite|tusks?|mandibles?|beak)\b", ("natural.bite",), "bite",
-     "natural attacks: the engine rolls the weapon in hand"),
+    # Both of these were marked as waiting on the engine until 2026-09-16, with the line
+    # "natural attacks: the engine rolls the weapon in hand". That had stopped being
+    # true: the validator knows every natural weapon's name, the sheet builds one at the
+    # right die for the body's size, and `_NATURAL_RIDERS` resolves what a bite does past
+    # its damage. What was actually missing was `expand` turning the TAG into a weapon,
+    # which it does now — measured end to end on the shipped world, where a Catfolk
+    # imported from Aurvantis swings claws for 1d4 slashing. Until today this app's own
+    # checker reported that gap to World Bible as a thin race card.
+    (r"\b(talons?|claws?|clawed)\b", ("natural.claws",), "claws", ""),
+    (r"\b(fangs?|bite|tusks?|mandibles?|beak)\b", ("natural.bite",), "bite", ""),
     (r"\b(carapace|chitin\w*|scales?|scaled|hide|armou?red|plated|shell)\b",
      ("natural.armor.1",), "+1 natural armour", ""),
     (r"\b(light|sun|sunlight|daylight)\b[^.]{0,40}\b(pain\w*|blind\w*|burn\w*|dazzl\w*|hurt\w*|weak\w*)\b",

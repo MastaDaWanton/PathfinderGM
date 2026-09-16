@@ -579,6 +579,29 @@ is a complete and useful export.
 Add to the version history: **1.3 — adds `play.places[]` and the `places` table.
 Additive.**
 
+### Delivered, and the two rulings that came with it (2026-09-16)
+
+World Bible 1.15.0 shipped all of this, and asked two questions back. Both are answered in
+`docs/campaign-format.md`; they are repeated here because this is the document an author
+reads.
+
+**The version is 1.4.** `within` and the scale vocabulary are both additive on the wire, so
+nothing forced a bump — but a version is not only for fields that break a reader. A 1.4
+export *guarantees* that `scale` is a word this consumer publishes and that a city carries
+`within`, and a consumer cannot tell by inspection whether an unrecognised `scale` is a
+word the supplier forgot to translate or a world that genuinely has no such settlement. A
+number answers that where a field cannot.
+
+**Send the six scales raw.** World Bible's generator knows metropolis, city, town, village,
+hamlet and outpost, and 1.15.0 flattened them to this app's three on the way out. Stop: a
+supplier that narrows its vocabulary on a consumer's behalf destroys a distinction nobody
+can recover, and how many rooms a metropolis has is a question about how a scene is built —
+which is this side's business, exactly as `terrain_of` parses an id and never looks
+anything up. `rules/places.SCALE_ALIASES` does the mapping now (the same one, plus thorp,
+small/large town and small/large city), `place-vocabulary.json` publishes it as
+`scale_aliases`, and `tools/check_places.py` accepts those words silently. This side went
+first on purpose: send the six whenever you like and nothing has to be sequenced.
+
 ## B.8 What Pathfinder GM does today without any of it
 
 All three doors stay regardless of what you ship; authored places replace door one only.

@@ -736,8 +736,11 @@ def _settled(location, terrain: str = "") -> bool:
     kind = str(getattr(location, "kind", "") or "").upper()
     scale = str(getattr(location, "scale", "") or "").lower()
     if kind or scale:
+        # Any word this app can read as one of its three sizes means somewhere people
+        # live — including the other vocabulary's words, so a `metropolis` is not taken
+        # for open ground the day the supplier stops translating on our behalf.
         return ("CITY" in kind or "SETTLEMENT" in kind or "TOWN" in kind
-                or scale in ("city", "town", "village", "hamlet", "settlement"))
+                or scale in PLACES_BY_SCALE or scale in SCALE_ALIASES)
     # A bare id with nothing said about its ground is a settlement. Every location a
     # campaign starts in is one (twelve of twelve in the fixture, all CITY), and the
     # alternative — reading the ground the party is CURRENTLY on — is what made a
@@ -798,16 +801,43 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     return _build(here, hint or "grassland", _WILD)
 
 
+# Words other settlement vocabularies use for these three sizes. World Bible's generator
+# knows six — metropolis, city, town, village, hamlet, outpost — and until 1.15.0 it
+# flattened them to this app's three on the way out, so a capital shipped as `city` and
+# the distinction was gone before it arrived.
+#
+# Ruled 2026-09-16: send the six, and this side maps them. A supplier that narrows its
+# vocabulary to fit a consumer destroys something it cannot get back, and how many rooms a
+# metropolis has is a question about how a scene is built — which is this side's business,
+# exactly as `terrain_of` parses an id and never looks anything up. The mapping is the
+# same one they were applying; it has simply moved to the end that can change it later.
+#
+# Everything unrecognised still reads as a town, which is the middle and the commonest,
+# and never as a guess dressed up as a village.
+SCALE_ALIASES = {
+    "metropolis": "city",
+    "hamlet": "village",
+    "outpost": "village",
+    "thorp": "village",
+    "small town": "town",
+    "large town": "town",
+    "small city": "city",
+    "large city": "city",
+    "settlement": "town",
+}
+
+
 def scale_of(location) -> str:
-    """How big the world says this settlement is: village, town or city.
+    """How big the world says this settlement is, in this app's three words.
 
     The export has written this on every settlement since 1.0 and nothing here read it
     until 2026-09-15 — Aurvantis ships 16 villages, 32 towns and 16 cities, and all 64 of
-    them got the same six places. Anything unrecognised reads as a town, which is the
-    middle and the commonest, and never as a guess dressed up as a village.
+    them got the same six places.
     """
     said = str(getattr(location, "scale", "") or "").strip().lower()
-    return said if said in PLACES_BY_SCALE else "town"
+    if said in PLACES_BY_SCALE:
+        return said
+    return SCALE_ALIASES.get(said, "town")
 
 
 def _wanted(scale: str, earned: tuple[tuple[str, str], ...],
@@ -910,6 +940,19 @@ def _settlement_set(location_id: str, scale: str, location) -> tuple[Place, ...]
 CITY_QUARTERS = 4
 _QUARTERS = ("the north crossing", "the east crossing", "the south crossing",
              "the west crossing")
+
+# The junctions a settlement of each scale adds ON TOP of its rooms: the great square and
+# its crossings. Published, because a checker on the other side cannot otherwise work out
+# what a legal total looks like — and because this app's own checker could not either.
+#
+# Measured 2026-09-16, reported by the World Bible side and reproduced here against this
+# app's OWN generator: a generated city is 18 rooms plus these 5, and `check_places.py`
+# compared all 23 against a ceiling of 18 and noted every quartered city in both worlds.
+# Twenty-two notes across two exports, every one of them wrong. The rule was already
+# written down — "a crossing is structure, not something the town has" — and honoured in
+# one of the two places that count places, which is the same two-counts-of-one-thing
+# defect that produced the two different sixes in September.
+JUNCTIONS_BY_SCALE = {"village": 0, "town": 0, "city": 1 + CITY_QUARTERS}
 
 
 def _districted(prefix: str, made: list[tuple[str, str, str]]) -> tuple[Place, ...]:

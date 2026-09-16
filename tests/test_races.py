@@ -617,3 +617,60 @@ def test_an_incomplete_ability_array_falls_back_rather_than_half_applying():
         mods, choose = races.array_from_words(strengths, weakness)
         assert mods == {}, (strengths, weakness)
         assert choose == list(races.STANDARD_CHOOSE), (strengths, weakness)
+
+
+# --- a tag the world grants has to be a thing the character can do --------------------------
+
+def test_a_race_the_world_wrote_can_actually_swing_its_bite():
+    """Measured 2026-09-16, on the shipped world and reported from the World Bible side
+    as thin race cards: four of Aurvantis's sixteen races grant claws or a bite off their
+    own words, and not one of them could use it.
+
+    The machinery was all there — the validator knows every natural weapon's name, the
+    sheet builds one at the right die for the body's size, `_NATURAL_RIDERS` resolves what
+    a bite does past its damage — and the one missing link was `expand` turning the TAG
+    into a weapon. A race card only ever carries tags: it has no evolutions, because
+    nobody picked any. So the weapon comes from the evolution that grants the same tag,
+    which keeps one definition of what a bite is worth.
+
+    This is the half of "thin" that was this app's own, and it was being reported to the
+    supplier as a defect in their content.
+    """
+    card = {"id": "fangfolk", "name": "Fangfolk", "size": "medium", "speed": "normal",
+            "body": ["Fangfolk have heavy fangs and clawed hands."],
+            "senses": [], "movement": [], "about": "One paragraph.",
+            "strengths": ["strong", "hardy"], "weakness": "clever"}
+    doc = races.expand(races.draft(card["name"], card["body"],
+                                   size_hint=card["size"], speed_hint=card["speed"],
+                                   strengths=card["strengths"],
+                                   weakness=card["weakness"]))
+    assert {"natural.bite", "natural.claws"} <= set(doc["tags"]), doc["tags"]
+    keys = {str(w.get("key")) for w in doc.get("weapons") or []}
+    assert {"bite", "claws"} <= keys, keys
+    # The die is the body's, not a constant: one definition of what a bite is worth.
+    bite = next(w for w in doc["weapons"] if w["key"] == "bite")
+    assert bite["damage"]["medium"] == "1d6" and bite["damage"]["small"] == "1d4"
+    # And nothing tells the player it is waiting on the engine any more.
+    assert not any("natural attacks" in line for line in doc.get("not_yet") or [])
+
+
+def test_the_published_cue_list_is_what_the_table_says_today():
+    """`docs/race-cues.json` is what World Bible reads to know which words do something,
+    and it is generated — but generating it is only half. It was published saying 6 of 12
+    cues were engine-ready while the table said 10, so an author was told that four of the
+    traits they write reach nothing. The same guard the place vocabulary already had."""
+    from pathlib import Path
+
+    import importlib.util
+
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR, "tools", "export_race_cues.py")
+    spec = importlib.util.spec_from_file_location("export_race_cues", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    on_disk = json.loads(
+        Path(settings.BASE_DIR, "docs", "race-cues.json").read_text(encoding="utf-8"))
+    assert on_disk == module.build(), (
+        "docs/race-cues.json is stale — run tools/export_race_cues.py")
+    assert on_disk["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)

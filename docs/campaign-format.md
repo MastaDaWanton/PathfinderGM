@@ -1,6 +1,6 @@
 # Campaign export format
 
-**Schema version 1.3.** Read this before writing anything that consumes a World Bible
+**Schema version 1.4.** Read this before writing anything that consumes a World Bible
 world.
 
 World Bible writes a reference work for a person to read. This export is the same
@@ -22,7 +22,7 @@ the world already contains.
 ## Read this first
 
 ```json
-{ "schema_version": "1.3" }
+{ "schema_version": "1.4" }
 ```
 
 Check it before anything else. The rule is ordinary semver:
@@ -330,6 +330,18 @@ what the players have learned, what has changed — in your own file, keyed by t
 
 ## Version history
 
+- **1.4** — two guarantees rather than two new fields, which is why it is a version and
+  not a footnote. A 1.4 export promises that **`scale` is one of the words the consumer
+  publishes** — its own three, or one of the aliases in `place-vocabulary.json`
+  (`metropolis`, `hamlet`, `outpost`, …) — and that **a city carries `within`**, the
+  room-to-room relation that makes a large settlement a square and four crossings rather
+  than eighteen exits in one prompt. Both are additive on the wire: a reader that ignores
+  `within` sees a flat list with correct exits and parents, which is what 1.3 was.
+
+  Ruled 2026-09-16, when the supplier asked whether it was worth a number. It is: a
+  consumer cannot tell by inspection whether a `scale` it does not recognise is a word
+  the supplier forgot to translate or a world that genuinely has no such settlement, and
+  a version answers that where a field cannot.
 - **1.3** — adds `play.places[]` and the `places` table: the rooms inside a settlement,
   with the ground in the id and the room's own size, footing and shape. Additive.
 - **1.2** — a race card carries `strengths[]` and `weakness`; the `races` table gains both

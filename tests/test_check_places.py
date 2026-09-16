@@ -134,13 +134,25 @@ def test_the_vocabulary_carries_every_word_an_author_may_write():
                                                  "storey": places.STOREY}
 
 
-def test_the_proposed_half_says_it_is_proposed():
-    """`clutter` and `footing` have no reader — no code turns "dense" into pillars. A
-    checker that reported them with the same confidence as the terrain list would be
-    claiming the engine enforces something it has never seen."""
+def test_the_half_that_was_only_proposed_says_what_it_is_worth_now():
+    """`clutter` and `footing` were published as `proposed` for two releases with the
+    honest note that no code turned "dense" into pillars. `floorplan.from_world` does
+    since 2026-09-16, so the status is `read` and each word publishes what it actually
+    becomes — a fraction of the floor, so the same word means the same density in a
+    closet and in a market square.
+
+    The status field is the point of the pair of tests: a checker that reported an
+    unread field with the same confidence as the terrain list would be claiming the
+    engine enforces something it has never seen, and one that went on calling a read
+    field "proposed" would be telling an author their work does not arrive."""
+    from rules import floorplan
+
     vocab = json.loads(VOCAB.read_text(encoding="utf-8"))
-    assert vocab["clutter"]["status"] == "proposed"
-    assert vocab["footing"]["status"] == "proposed"
+    for word in ("clutter", "footing"):
+        assert vocab[word]["status"] == "read"
+        assert set(vocab[word]["becomes"]) == set(vocab[word]["words"]), word
+    assert set(vocab["clutter"]["becomes"]) == set(floorplan.CLUTTER)
+    assert set(vocab["footing"]["becomes"]) == set(floorplan.FOOTING)
 
 
 # --- it has to run where Pathfinder GM is not -----------------------------------------------
@@ -196,6 +208,60 @@ def test_the_shipped_worlds_pass_their_own_checker():
         for place in places:
             problems, _notes = checker.check_place(place, vocab, known, entities, 2)
             assert problems == [], f"{world} {place.get('id')}: {problems}"
+
+
+def test_what_this_app_builds_passes_this_app_s_own_checker():
+    """The test that was missing, and the third time its absence cost something.
+
+    A checker is a contract this app publishes to another program, so the first thing it
+    has to be true of is what THIS one generates. It has now failed that twice: in
+    September the generator made seven places for a settlement its own checker noted at
+    six, and on 2026-09-16 the World Bible side reported every quartered city in both
+    shipped worlds noted as "23 places; the consumer's own ceiling is 18" — 22 notes
+    across two exports, all of them wrong, and reproduced here against a city this app
+    generated itself before the report was believed.
+
+    Both were one defect wearing two faces: two counts of "how many places" that did not
+    agree. A crossing is structure rather than something the town has, the scale check
+    excluded junctions, and the ceiling check three hundred lines later did not.
+    """
+    import json
+
+    from rules import places as places_mod
+
+    checker = _load("check_places")
+    vocab = json.loads(VOCAB.read_text(encoding="utf-8"))
+    for scale in places_mod.SCALES:
+        class Loc:
+            id = f"eeee{scale[:4]:4}".replace(" ", "0")
+            name = "Testville"
+            kind = "CITY"
+            facts = {}
+            prose = ""
+            places = []
+        Loc.scale = scale
+        group = [{"id": p.id, "name": p.name, "about": p.about, "parent": Loc.id,
+                  "terrain": p.terrain, "exits": list(p.exits), "within": p.within,
+                  "described_only": p.described_only, "origin": "world"}
+                 for p in places_mod.home_set(Loc())]
+        problems, notes = checker.check_group(
+            Loc.id, group, {"id": Loc.id, "name": "Testville", "scale": scale}, vocab)
+        assert problems == [], f"{scale}: {problems}"
+        assert notes == [], f"{scale}: {notes}"
+
+
+def test_the_junctions_a_city_adds_are_published():
+    """A checker on the other side cannot work out what a legal total looks like without
+    them — eighteen rooms and twenty-three places are both correct for one city — and
+    neither could this one."""
+    import json
+
+    from rules import places as places_mod
+
+    vocab = json.loads(VOCAB.read_text(encoding="utf-8"))
+    assert vocab["junctions_by_scale"] == places_mod.JUNCTIONS_BY_SCALE
+    assert vocab["junctions_by_scale"]["city"] == 5
+    assert vocab["junctions_by_scale"]["town"] == 0
 
 
 # --- the checks themselves ------------------------------------------------------------------

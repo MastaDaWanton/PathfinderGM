@@ -49,20 +49,31 @@
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {
-  "status": "proposed",
+  "status": "read",
   "words": {
    "bare": "almost nothing in the way",
    "some": "a few things to put between you and an arrow",
    "cluttered": "you cannot cross it in a straight line",
    "dense": "stalls, stacks or trunks, and sight lines of a few squares"
+  },
+  "becomes": {
+   "bare": "2% of the floor blocked",
+   "some": "5% of the floor blocked",
+   "cluttered": "8% of the floor blocked",
+   "dense": "11% of the floor blocked"
   }
  },
  "footing": {
-  "status": "proposed",
+  "status": "read",
   "words": {
    "firm": "boards, flagstones, packed earth",
    "broken": "rubble, roots, spoil — slower in patches",
    "bad": "standing water, deep sand, a floor that is mostly not floor"
+  },
+  "becomes": {
+   "firm": "2% of the floor difficult",
+   "broken": "8% of the floor difficult",
+   "bad": "18% of the floor difficult"
   }
  },
  "ceilings_ft": {
@@ -77,7 +88,7 @@
   "width_max": 100,
   "depth_min": 40,
   "depth_max": 100,
-  "why": "the range the consumer's own tables cover. Nothing clamps an authored value yet, because nothing reads one."
+  "why": "the range the consumer's own tables cover. An authored value is read at five feet to a square and clamped to 6-24 squares (30-120 ft): below that is a room with nowhere to stand off, above it is more map than a player reads."
  },
  "most_places": 18,
  "places_by_scale": {
@@ -119,6 +130,22 @@
    "the barracks",
    "the well"
   ]
+ },
+ "junctions_by_scale": {
+  "village": 0,
+  "town": 0,
+  "city": 5
+ },
+ "scale_aliases": {
+  "metropolis": "city",
+  "hamlet": "village",
+  "outpost": "village",
+  "thorp": "village",
+  "small town": "town",
+  "large town": "town",
+  "small city": "city",
+  "large city": "city",
+  "settlement": "town"
  },
  "most_generated": 6,
  "most_implied": 4,

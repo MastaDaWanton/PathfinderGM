@@ -13,12 +13,11 @@ Run it after any change to `places.IMPLIED`, `places.VENTURES`, `places.MOST_SPO
 `places.MOST_IMPLIED`, `biomes.BIOMES`, `floorplan.BY_SPOT`, `floorplan.BY_TERRAIN`,
 `floorplan.LOW` or `floorplan.HALL`, and commit what it writes.
 
-**One part of this is a proposal rather than a table.** `clutter` and `footing` are the
-authoring words from `docs/places-and-races-for-world-bible.md` tier 2, and there is no
-reader for them yet — no code turns "dense" into a count of pillars, because no code reads
-an authored place at all. They are marked `"status": "proposed"` so the checker can say so
-out loud, and they move into the generated half on the day the reader is built. Everything
-else here is read off the tables and asserted below.
+**Tier 2 is read now** (2026-09-16, `floorplan.from_world`). `clutter` and `footing` were
+marked `"status": "proposed"` here for two releases with the note "no code turns 'dense'
+into a count of pillars, because no code reads an authored place at all" — which was true
+when it was written and stopped being true the day the reader landed. They carry what each
+word actually becomes instead. Everything here is read off the tables and asserted below.
 """
 from __future__ import annotations
 
@@ -55,7 +54,7 @@ _VERTICAL_SAYS: dict[str, str] = {
             "farmland, open steppe",
 }
 
-# Tier 2's other two words. PROPOSED: nothing reads them yet. See the module docstring.
+# Tier 2's other two words, and what each one becomes underfoot. Read, not proposed.
 _CLUTTER = {
     "bare": "almost nothing in the way",
     "some": "a few things to put between you and an arrow",
@@ -115,8 +114,14 @@ def build() -> dict:
                    "have verticality than not, without being silly about it. This is what "
                    "the consumer's own tables came out at.",
         },
-        "clutter": {"status": "proposed", "words": _CLUTTER},
-        "footing": {"status": "proposed", "words": _FOOTING},
+        # What each word is worth on the floor: a fraction of the squares, so the same
+        # word means the same density in a closet and in a market square.
+        "clutter": {"status": "read", "words": _CLUTTER,
+                    "becomes": {k: f"{round(v * 100)}% of the floor blocked"
+                                for k, v in floorplan.CLUTTER.items()}},
+        "footing": {"status": "read", "words": _FOOTING,
+                    "becomes": {k: f"{round(v * 100)}% of the floor difficult"
+                                for k, v in floorplan.FOOTING.items()}},
         "ceilings_ft": {
             "house": floorplan.LOW * 5,
             "hall": floorplan.HALL * 5,
@@ -128,8 +133,12 @@ def build() -> dict:
         "size_ft": {
             "width_min": min(widths), "width_max": max(widths),
             "depth_min": min(depths), "depth_max": max(depths),
-            "why": "the range the consumer's own tables cover. Nothing clamps an "
-                   "authored value yet, because nothing reads one.",
+            "why": "the range the consumer's own tables cover. An authored value is "
+                   "read at five feet to a square and clamped to "
+                   f"{floorplan.MIN_SQUARES}-{floorplan.MAX_SQUARES} squares "
+                   f"({floorplan.MIN_SQUARES * 5}-{floorplan.MAX_SQUARES * 5} ft): "
+                   "below that is a room with nowhere to stand off, above it is more "
+                   "map than a player reads.",
         },
         # What a settlement may hold, which is the base draw plus what its own words
         # earned. `most_places` is the one a checker compares against; the parts are here
@@ -144,6 +153,16 @@ def build() -> dict:
         "scales": list(places.SCALES),
         "population_by_scale": {k: list(v) for k, v in places.POPULATION_BY_SCALE.items()},
         "always_by_scale": {k: list(v) for k, v in places.ALWAYS_BY_SCALE.items()},
+        # The great square and its crossings, which a city has ON TOP of its rooms and
+        # which are not counted against its size. Published 2026-09-16 because a checker
+        # on either side cannot work out what a legal total is without it — and because
+        # this app's own checker was counting them and noting every quartered city.
+        "junctions_by_scale": dict(places.JUNCTIONS_BY_SCALE),
+        # Words from other settlement vocabularies that this app can read, and what it
+        # reads them as. Published 2026-09-16 with the ruling that a supplier should send
+        # its own six scales rather than flattening them to these three on our behalf:
+        # the mapping belongs on the side that decides how many rooms a metropolis has.
+        "scale_aliases": dict(places.SCALE_ALIASES),
         "most_generated": places.MOST_SPOTS,
         "most_implied": places.MOST_IMPLIED,
         "most_children_minted_in_play": places.MOST_CHILDREN,
