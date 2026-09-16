@@ -167,6 +167,17 @@ def build() -> dict:
         "cues": rows(),
         "cue_count": len(races.CUES),
         "engine_ready_count": sum(1 for r in rows() if r["engine_ready"]),
+        # The tags themselves, which since schema 1.5 a card may STATE in `grants[]`
+        # instead of leaving this app to read them out of the prose. This is the half of
+        # the vocabulary that matters most now: the cues above are how a card is read
+        # when it says nothing, and this is the contract when it speaks.
+        "grants_rule": "a card may state play.races[].grants[] — exactly these tag "
+                       "names. When it does, the prose is description only and nothing "
+                       "is read out of it; a tag not on this list reaches nothing and "
+                       "is reported to the player as a trait neither side can name.",
+        "grants": {tag: {"shows": line, "engine_ready": not waits,
+                         "waits_on": waits}
+                   for tag, (line, waits) in races.TAG_MEANS.items()},
     }
 
 

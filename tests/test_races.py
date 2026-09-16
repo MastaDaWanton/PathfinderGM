@@ -753,3 +753,89 @@ def test_the_checker_we_ship_reads_the_vocabulary_we_ship():
     assert cues["cue_count"] == len(races.CUES), (
         f"the checker reads {cues['cue_count']} cues and the table has {len(races.CUES)}")
     assert cues["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)
+
+
+# --- the card states its own tags (schema 1.5) -----------------------------------------
+
+def _traits_of(doc) -> list:
+    """A document's tags minus its own identity. `race.half-orc` is what the race IS and
+    every document has one; these tests are about what it GRANTS."""
+    return [t for t in doc["tags"] if not t.startswith("race.")]
+
+def test_every_tag_a_cue_can_grant_has_a_meaning_of_its_own():
+    """`TAG_MEANS` is what a tag shows when a card STATES it rather than describing it.
+
+    A cue row can grant two tags and show one line for both — the gills row grants
+    `amphibious` and `move.swim.30` and shows "amphibious; swim 30 ft". A card stating
+    only one of them would get the other's words, so the line belongs to the tag. This
+    asserts the two tables cannot drift: a cue added without a meaning fails here.
+    """
+    from_cues = {t for _p, granted, _l, _w in races.CUES for t in granted}
+    assert from_cues <= set(races.TAG_MEANS), from_cues - set(races.TAG_MEANS)
+
+
+def test_a_card_that_states_its_tags_is_not_read_for_them():
+    """Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should
+    receive exactly the anatomy as our engine will read it."*
+
+    Measured on the shipped Aurvantis export the same day, which is why the rule was
+    needed: the Half-Orc card's body said "sometimes visible tusks", the `tusks?` cue
+    granted `natural.bite`, and every half-orc a player could roll walked out of the
+    forge with a 1d6 bite. Pathfinder's half-orc has no natural attack. The card is now
+    the authority on what it grants, so prose like that costs nothing.
+    """
+    tusks = ["Human build with orcish ruggedness — a heavier brow, visible tusks."]
+    read = races.draft("Half-Orc", tusks)
+    assert "natural.bite" in read["tags"], "the cue table is what this rule replaces"
+
+    stated = races.draft("Half-Orc", tusks, granted=["sense.darkvision.60"])
+    assert _traits_of(stated) == ["sense.darkvision.60"]
+    assert stated["traits"] == ["darkvision 60 ft"]
+
+
+def test_a_stated_tag_is_granted_even_when_no_word_in_the_card_would_have_found_it():
+    """The other direction, and the one that makes this a contract rather than a filter:
+    a tag the prose gives no hint of is still granted. Otherwise the cue table is still
+    the authority and the card is only allowed to agree with it."""
+    quiet = races.draft("Stoneborn", ["They keep to themselves and say little."],
+                        granted=["move.burrow.20", "sense.darkvision.60"])
+    assert _traits_of(quiet) == ["move.burrow.20", "sense.darkvision.60"]
+    assert "burrow 20 ft" in quiet["traits"]
+    # And a tag the engine cannot use yet still says so, exactly as the prose path does.
+    assert any("no earth" in n for n in quiet["not_yet"]), quiet["not_yet"]
+
+
+def test_a_stated_tag_this_engine_cannot_name_is_reported_and_not_dropped():
+    """Two programs sharing a vocabulary will disagree about it eventually. The quiet
+    version of that is a race missing something nobody can name, so an unknown tag
+    becomes a `not_yet` line the forge shows and never a silent omission."""
+    odd = races.draft("Aetherkin", ["They flicker."],
+                      granted=["sense.darkvision.60", "sense.tremorsense.60"])
+    assert _traits_of(odd) == ["sense.darkvision.60"]
+    assert any("sense.tremorsense.60" in n for n in odd["not_yet"]), odd["not_yet"]
+
+
+def test_a_card_that_stated_its_tags_is_not_marked_as_converted():
+    """`converted` means this app read prose and guessed. On a stated card nothing
+    guessed, and the flag would be a lie — the ingredient bench shows it as
+    "unreviewed"."""
+    assert races.draft("Tengu", ["Crow-featured."], granted=["natural.bite"])["converted"] is False
+    assert races.draft("Tengu", ["Crow-featured, with a beak."])["converted"] is True
+
+
+def test_the_shipped_world_s_cards_reach_the_forge_by_their_own_tags():
+    """End to end on real data rather than a constructed card: every Aurvantis race the
+    forge offers carries exactly the tags its card states.
+
+    Measured when this was built: all 16 agree with what the cue table would have read,
+    because World Bible generates `grants[]` by running the same vocabulary. That makes
+    this change a no-op on today's export ON PURPOSE — the point is that the next time
+    their generator gets better at anatomy, this engine follows without a regex here.
+    """
+    world = loader.load_cached("fixtures/aurvantis-campaign.json")
+    cards = {c["name"]: c for c in (world.play or {}).get("races") or []}
+    assert cards, "the fixture stopped carrying race cards"
+    built = {d["name"]: d for d in races.from_world(world)}
+    for name, card in cards.items():
+        stated = [t for t in (card.get("grants") or []) if t in races.TAG_MEANS]
+        assert _traits_of(built[name]) == stated, name

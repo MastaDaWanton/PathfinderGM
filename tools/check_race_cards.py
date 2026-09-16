@@ -39,6 +39,26 @@ _DIGIT = re.compile(r"\d")
 
 FIELDS = ("body", "senses", "movement")
 
+# Races Pathfinder itself publishes that have NO natural attack, whatever their teeth
+# look like. Not a list of what a race may have — a world is free to say its half-orcs
+# bite — but the one place where "described with tusks" and "has a bite attack" come
+# apart, and they come apart constantly because anatomy is what a card is FOR.
+#
+# Measured 2026-09-16 on the shipped Aurvantis export: four cards state `natural.bite`
+# and three of them are this. A Half-Orc card reading "sometimes visible tusks" put a
+# 1d6 bite on every half-orc a player could roll, end to end, through the forge and onto
+# the sheet. The tengu is the fourth and is correct — tengu DO have a bite — which is why
+# this is a named list and not a rule about tusks.
+#
+# A note and never a PROBLEM. A world that means it outranks this file.
+_NO_NATURAL_ATTACK = {
+    "human", "half-elf", "half-orc", "elf", "dwarf", "halfling", "gnome", "orc",
+    "goblin", "hobgoblin", "halfling", "aasimar", "tiefling", "ifrit", "oread",
+    "sylph", "undine", "dhampir", "changeling", "kitsune", "nagaji", "samsaran",
+    "suli", "svirfneblin", "wayang", "ratfolk",
+}
+_NATURAL = ("natural.bite", "natural.claws")
+
 
 def load_cues(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -54,6 +74,14 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
     problems: list[str] = []
     notes: list[str] = []
     name = str(race.get("name") or "(unnamed)")
+    # Which half of the contract this card is playing by, decided once at the top: a card
+    # that STATES its tags is read from them and its prose is description. Half of the
+    # checks below are about prose that reaches nothing, and on a stated card that is the
+    # intended state of affairs rather than a defect. Measured 2026-09-16, on the first
+    # run after teaching this file to read grants: it called a correct Undine card a
+    # PROBLEM and told nine authors their sentences were wasted.
+    vocabulary = cues.get("grants") or {}
+    stated = [str(t).strip() for t in (race.get("grants") or []) if str(t).strip()]
 
     for key in ("id", "name", "people_id"):
         if not str(race.get(key) or "").strip():
@@ -85,7 +113,18 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
     hits = fired(blob, cues["cues"])
 
     ready = [c for c in hits if c["engine_ready"]]
-    if not hits:
+    if stated and vocabulary:
+        known = [vocabulary[t] for t in stated if t in vocabulary]
+        usable = [m for m in known if m.get("engine_ready")]
+        if not known:
+            problems.append("no grant this consumer knows: this card produces size and "
+                            "speed and nothing else")
+        elif not usable:
+            problems.append(
+                "every tag it states is one the engine cannot use yet (" +
+                "; ".join(sorted({m["waits_on"] for m in known if m.get("waits_on")}))
+                + ")")
+    elif not hits:
         problems.append("no cue fires: this card produces size and speed and nothing else")
     elif not ready:
         problems.append(
@@ -103,11 +142,14 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
             notes.append(f"the same sentence appears twice in {field}")
         seen[key] = field
 
-    # A field whose words reach nothing.
-    for field in FIELDS:
-        got = [str(x) for x in (race.get(field) or [])]
-        if got and not fired(" ".join(got), cues["cues"]):
-            notes.append(f"{field} triggers no cue — its words reach nothing")
+    # A field whose words reach nothing. Only on the prose path: on a stated card the
+    # words are meant to reach nothing, and the two notes further down measure the thing
+    # that actually matters there — whether the tags and the sentences cover each other.
+    if not stated:
+        for field in FIELDS:
+            got = [str(x) for x in (race.get(field) or [])]
+            if got and not fired(" ".join(got), cues["cues"]):
+                notes.append(f"{field} triggers no cue — its words reach nothing")
 
     for field, text in lines:
         if _RULES_WORDS.search(text):
@@ -149,6 +191,44 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
     about = str(race.get("about") or "").strip()
     if not about:
         notes.append("no about paragraph — the character-creation screen will be blank")
+
+    # Schema 1.5: a card may STATE its tags. When it does they are the whole answer and
+    # the prose above is description — so the two must cover each other, and this is
+    # where that is measured. Ruled 2026-09-16: World Bible writes the description FROM
+    # the tags, which only means anything if a tag with no sentence and a sentence with
+    # no tag are both defects rather than both invisible.
+    if stated and not vocabulary:
+        notes.append("this card states grants[] and the cue file is too old to check "
+                     "them — regenerate race-cues.json from the consumer")
+    elif stated:
+        for tag in stated:
+            if tag not in vocabulary:
+                problems.append(f"grants {tag!r}, which is not a tag the consumer knows "
+                                f"— it reaches nothing")
+        # A tag no sentence accounts for. Not a rules error: the trait works. It is a
+        # player who is told "darkvision 60 ft" on a card that never mentions their eyes.
+        for tag in stated:
+            if tag in vocabulary and not any(
+                    tag in (c.get("grants") or []) for c in fired(blob, cues["cues"])):
+                notes.append(f"grants {tag} and no sentence describes it — the trait is "
+                             f"real and the player is never told why they have it")
+        # And the mirror: prose that promises something the tags do not deliver. This is
+        # the one that reaches the table as a lie, because the player reads the sentence.
+        promised = {t for c in hits for t in (c.get("grants") or [])}
+        for tag in sorted(promised - set(stated)):
+            said = next((c["shows"] for c in hits if tag in (c.get("grants") or [])), tag)
+            notes.append(f"a sentence describes {said} and grants[] does not state "
+                         f"{tag} — the player reads it and the engine will not do it")
+
+    # A natural attack on a race the rulebook gives none. Checked on both paths, because
+    # a 1.4 card reaches the same sheet by the cue table.
+    if name.strip().lower() in _NO_NATURAL_ATTACK:
+        got = set(stated) if stated else {t for c in hits for t in (c.get("grants") or [])}
+        for tag in sorted(got & set(_NATURAL)):
+            notes.append(f"{tag} on a {name}: Pathfinder's {name} has no natural attack, "
+                         f"whatever its teeth look like. Every {name} a player rolls in "
+                         f"this world will have one. Deliberate is fine — say so; "
+                         f"described-and-therefore-granted is the bug this catches")
 
     return problems, notes, hits
 
@@ -210,11 +290,29 @@ def main() -> int:
         array = "+2/+2/-2 as written" if not [p for p in problems if "strength" in p
                 or "ability words" in p or "weakness" in p] and (race.get("strengths")
                 or race.get("weakness")) else "generic (player chooses)"
-        print(f"    builds: size {race.get('size')}, speed {race.get('speed')}, "
-              f"abilities {array}, {len(hits)} trait(s), {len(ready)} usable in play")
-        for c in hits:
-            mark = "ok  " if c["engine_ready"] else "wait"
-            print(f"      [{mark}] {c['shows']}")
+        # What the card BUILDS is what it states, when it states anything. Reading the
+        # cues instead would report the consumer's guess at a card that no longer needs
+        # guessing at — and on a card where the two disagree it would report the wrong
+        # one, which is exactly the case the notes above exist to find.
+        vocabulary = cues.get("grants") or {}
+        stated = [str(t).strip() for t in (race.get("grants") or []) if str(t).strip()]
+        if stated and vocabulary:
+            shown = [(t, vocabulary.get(t) or {}) for t in stated]
+            ready = [m for _t, m in shown if m.get("engine_ready")]
+            print(f"    builds: size {race.get('size')}, speed {race.get('speed')}, "
+                  f"abilities {array}, {len(shown)} stated trait(s), "
+                  f"{len(ready)} usable in play")
+            for tag, means in shown:
+                mark = "ok  " if means.get("engine_ready") else (
+                    "wait" if means else "NONE")
+                print(f"      [{mark}] {means.get('shows') or tag}")
+        else:
+            print(f"    builds: size {race.get('size')}, speed {race.get('speed')}, "
+                  f"abilities {array}, {len(hits)} trait(s) read from prose, "
+                  f"{len(ready)} usable in play")
+            for c in hits:
+                mark = "ok  " if c["engine_ready"] else "wait"
+                print(f"      [{mark}] {c['shows']}")
         for p in problems:
             print(f"    PROBLEM  {p}")
         for n in notes:

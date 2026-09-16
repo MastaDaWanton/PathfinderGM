@@ -999,6 +999,43 @@ GRANTS: dict[str, dict] = {
         {"type": "save_mod", "target": save, "amount": 1, "bonus_type": "racial"}
         for save in ("fort", "ref", "will")]},
 }
+
+# What each tag SHOWS, one tag at a time.
+#
+# CUES carries a line per row, and a row can grant two tags: the gills row grants both
+# `amphibious` and `move.swim.30` and shows "amphibious; swim 30 ft". That is right for a
+# card whose prose says gills and wrong for a card that STATES one tag and not the other,
+# which schema 1.5 made possible. So the trait line belongs to the tag, and the rows keep
+# theirs only for the prose path they were written for.
+#
+# Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should receive
+# exactly the anatomy as our engine will read it, and World Bible should also write the
+# description from those tags."* The regex table is not deleted — a schema 1.4 export, or
+# a card whose author wrote prose and no tags, still needs it — but it stops being the
+# authority the moment a card states its own.
+#
+# `tests/test_races.py` asserts this covers every tag CUES can grant, so a cue added
+# without a meaning fails there rather than shipping a trait that shows as nothing.
+TAG_MEANS: dict[str, tuple[str, str]] = {
+    "move.fly.30": ("fly 30 ft (clumsy)", ""),
+    "sense.blindsense.30": ("blindsense 30 ft", ""),
+    "sense.darkvision.60": ("darkvision 60 ft", ""),
+    "sense.low-light": ("low-light vision", ""),
+    "sense.scent": ("scent", ""),
+    "amphibious": ("amphibious", ""),
+    "move.swim.30": ("swim 30 ft",
+                     "swimming as movement: a swim speed spares you the water's "
+                     "penalties, and does not yet carry you faster through it"),
+    "move.climb.20": ("climb 20 ft", ""),
+    "move.burrow.20": ("burrow 20 ft", "a burrow speed: the engine has no earth"),
+    "natural.claws": ("claws", ""),
+    "natural.bite": ("bite", ""),
+    "natural.armor.1": ("+1 natural armour", ""),
+    "weakness.light-sensitivity": ("light sensitivity", ""),
+    "versatile": ("an extra feat and an extra skill rank", ""),
+    "lucky": ("+1 on all saving throws", ""),
+}
+
 _SMALL = re.compile(r"\b(small|short|slight|diminutive|half the height|child-sized|"
                     r"waist-high|knee-high|halfling-sized)\b", re.I)
 _LARGE = re.compile(r"\b(towering|giant|huge|massive|twice the height|ten feet|"
@@ -1024,23 +1061,53 @@ def is_species(entity) -> bool:
 
 def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
           about: str = "", origin: str = "", people_id: str = "", world: str = "",
-          strengths=(), weakness: str = "") -> dict:
-    """One race document from the world's own sentences. The words decide which lines
-    of the table apply; the table decides the numbers."""
+          strengths=(), weakness: str = "", granted=()) -> dict:
+    """One race document from the world's own sentences — unless the card states its
+    tags, in which case the tags are the card's and the sentences are only description.
+
+    `granted` is `play.races[].grants[]`, schema 1.5. When it is present NOTHING is read
+    out of the prose: not a tag, not a trait line. That is the point of it. A card that
+    says "sometimes visible tusks" and states no bite does not get a bite, and a card
+    that states a bite gets one whether or not any word in it would have fired the cue.
+
+    The prose path below it is unchanged and still live — a 1.4 export, or an author who
+    wrote sentences and no tags, still gets the table.
+    """
     text = " ".join(str(p) for p in phrases if str(p).strip())
     low = text.lower()
     tags: list[str] = []
     traits: list[str] = []
     not_yet: list[str] = []
-    for pattern, granted, line, waits in CUES:
-        if re.search(pattern, low):
-            for t in granted:
-                if t not in tags:
-                    tags.append(t)
-            if line not in traits:
+    stated = [str(t).strip() for t in (granted or ()) if str(t).strip()]
+    if stated:
+        for tag in stated:
+            if tag in tags:
+                continue
+            tags.append(tag)
+            line, waits = TAG_MEANS.get(tag, ("", ""))
+            if line and line not in traits:
                 traits.append(line)
+            elif not line:
+                # Stated and unreadable. Recorded rather than dropped: a tag this engine
+                # has no meaning for is a disagreement between two programs about their
+                # shared vocabulary, and the quiet version of that is a race that is
+                # missing something nobody can name. The forge shows `not_yet`.
+                tags.remove(tag)
+                not_yet.append(f"{tag}: the world grants this and this engine has no "
+                               f"such tag — it reaches nothing until one side changes")
+                continue
             if waits and waits not in not_yet:
                 not_yet.append(waits)
+    else:
+        for pattern, cued, line, waits in CUES:
+            if re.search(pattern, low):
+                for t in cued:
+                    if t not in tags:
+                        tags.append(t)
+                if line not in traits:
+                    traits.append(line)
+                if waits and waits not in not_yet:
+                    not_yet.append(waits)
     size = size_hint.strip().lower() if size_hint in SIZES else (
         "small" if _SMALL.search(low) else "medium")
     if _LARGE.search(low) and size == "medium":
@@ -1078,8 +1145,10 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
         "not_yet": not_yet, "origin": origin or "world",
         "people_id": people_id, "world": world,
         # Converted mechanically from prose and read by nobody yet — the same flag the
-        # ingredient bench shows as "unreviewed".
-        "converted": True,
+        # ingredient bench shows as "unreviewed". A card that STATED its tags was not
+        # converted by anything: the world said what it meant and this app agreed to
+        # read it, so the flag that means "this app guessed" would be a lie on it.
+        "converted": not stated,
     })
 
 
@@ -1126,6 +1195,7 @@ def from_world(world) -> list[dict]:
                              about=str(raw.get("about") or ""),
                              strengths=raw.get("strengths") or (),
                              weakness=str(raw.get("weakness") or ""),
+                             granted=raw.get("grants") or (),
                              origin=f"world:{raw.get('people_id') or raw.get('id') or slug(raw['name'])}",
                              people_id=str(raw.get("people_id") or ""), world=world_id))
         return out

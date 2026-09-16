@@ -22,7 +22,7 @@ the world already contains.
 ## Read this first
 
 ```json
-{ "schema_version": "1.4" }
+{ "schema_version": "1.5" }
 ```
 
 Check it before anything else. The rule is ordinary semver:
@@ -131,7 +131,7 @@ the consuming application's job.
 |---|---|
 | `settlements` | `{id, name, scale, sells, buys, tension, governed_by, parent_id}` |
 | `cast` | `{id, name, role, home_id, home}` |
-| `travel` | `{from_id, to_id, from, to, carrying, friction}` — a route is also a road between two places that demonstrably deal with each other. |
+| `travel` | `{from_id, to_id, from, to, carrying, friction, by}` — a route is also a road between two places that demonstrably deal with each other. *(1.5)* `by` is `road`, `sea` or `river`, and it **outranks anything a consumer can work out**: a trade route is an economic relationship, and "Brackgate sells tempered steel to Ashwatch" was never a claim that you can walk there. Measured before it existed: 48 of Aurvantis's 48 legs crossed a continent boundary and every one of them was being walked. Aurvantis 1.5 says road 81, sea 38, river 13. |
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |
 | `timeline` | `{year, name, summary}`, sorted, undated events last. |
 | `races` | *(1.1)* The world's peoples as playable races — one per `PEOPLE` that carries an anatomy. See below. |
@@ -155,7 +155,8 @@ gets **no** entry: treat it as a heritage of some other body rather than a speci
   "movement": ["Korvu have avian-like wings and bodies."],
   "about":    "One paragraph, in the world's own words.",
   "strengths": ["strong", "perceptive"],
-  "weakness":  "nimble"
+  "weakness":  "nimble",
+  "grants":    ["move.fly.30", "sense.blindsense.30", "natural.claws"]
 }
 ```
 
@@ -169,6 +170,19 @@ gets **no** entry: treat it as a heritage of some other body rather than a speci
   `perceptive`, `commanding`, and `weakness` **exactly one** that is not a strength: what
   the people is good and bad at, in words, which a consumer prices as its ability array.
   **All three or none** — an incomplete array is ignored whole.
+- *(1.5)* `grants[]` is the card's own list of tags, and **when it is present nothing is
+  read out of the prose** — not a trait, not a sense, not a natural weapon. The exact
+  names are in `docs/race-cues.json` under `grants`. This is the field that matters most
+  on a modern card: everything above it is description, and the description should be
+  written *from* these tags rather than the tags guessed from it. A tag the consumer does
+  not know reaches nothing and is shown to the player as a trait neither side can name.
+
+  Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should
+  receive exactly the anatomy as our engine will read it, and World Bible should also
+  write the description from those tags."* What that replaced, measured the same day on
+  the shipped Aurvantis export: a Half-Orc card reading "sometimes visible tusks" tripped
+  a `tusks?` pattern here and put a 1d6 bite on every half-orc a player could roll.
+  Pathfinder's half-orc has no natural attack.
 - Each sentence appears in **one** field only, says the thing and stops, and uses the
   world's words, never a rules term.
 
@@ -342,6 +356,25 @@ what the players have learned, what has changed — in your own file, keyed by t
   consumer cannot tell by inspection whether a `scale` it does not recognise is a word
   the supplier forgot to translate or a world that genuinely has no such settlement, and
   a version answers that where a field cannot.
+- **1.5** — three fields, each of which moves a decision from the consumer to the world.
+
+  A race card carries `grants[]`, the tags themselves, and they are read INSTEAD of the
+  prose rather than alongside it. A travel route carries `by` — `road`, `sea` or `river`
+  — which settles how you get there rather than leaving a consumer to infer it from the
+  continent tree. A settlement carries its own `places[]`, so a world that has written
+  its rooms is not given generated ones.
+
+  **In the JSON only.** Checked on the shipped 1.5 pair: the `races` table has no
+  `grants` column and `trade_routes` has no `by`, so a consumer reading the SQLite mirror
+  gets a 1.4 world that calls itself 1.5 — and gets it silently, which is the one thing a
+  version number is supposed to prevent. Ask 10 in `docs/for-world-bible.md`. This app
+  reads the JSON, so nothing here is broken by it; the next consumer will not be so
+  lucky.
+
+  Additive on the wire, and a reversal of authority for anyone who sends them: a 1.4
+  export with none of the three is still read exactly as before, by the same guesswork
+  as before. That is the whole point of the number — the guesses were often right, and
+  a consumer cannot tell a right guess from a wrong one.
 - **1.3** — adds `play.places[]` and the `places` table: the rooms inside a settlement,
   with the ground in the id and the room's own size, footing and shape. Additive.
 - **1.2** — a race card carries `strengths[]` and `weakness`; the `races` table gains both

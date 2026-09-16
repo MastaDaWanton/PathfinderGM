@@ -200,5 +200,83 @@
   }
  ],
  "cue_count": 14,
- "engine_ready_count": 12
+ "engine_ready_count": 12,
+ "grants_rule": "a card may state play.races[].grants[] — exactly these tag names. When it does, the prose is description only and nothing is read out of it; a tag not on this list reaches nothing and is reported to the player as a trait neither side can name.",
+ "grants": {
+  "move.fly.30": {
+   "shows": "fly 30 ft (clumsy)",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.blindsense.30": {
+   "shows": "blindsense 30 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.darkvision.60": {
+   "shows": "darkvision 60 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.low-light": {
+   "shows": "low-light vision",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.scent": {
+   "shows": "scent",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "amphibious": {
+   "shows": "amphibious",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "move.swim.30": {
+   "shows": "swim 30 ft",
+   "engine_ready": false,
+   "waits_on": "swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it"
+  },
+  "move.climb.20": {
+   "shows": "climb 20 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "move.burrow.20": {
+   "shows": "burrow 20 ft",
+   "engine_ready": false,
+   "waits_on": "a burrow speed: the engine has no earth"
+  },
+  "natural.claws": {
+   "shows": "claws",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "natural.bite": {
+   "shows": "bite",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "natural.armor.1": {
+   "shows": "+1 natural armour",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "weakness.light-sensitivity": {
+   "shows": "light sensitivity",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "versatile": {
+   "shows": "an extra feat and an extra skill rank",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "lucky": {
+   "shows": "+1 on all saving throws",
+   "engine_ready": true,
+   "waits_on": ""
+  }
+ }
 }
