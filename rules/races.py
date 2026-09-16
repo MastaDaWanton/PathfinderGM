@@ -970,7 +970,35 @@ CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
      ("natural.armor.1",), "+1 natural armour", ""),
     (r"\b(light|sun|sunlight|daylight)\b[^.]{0,40}\b(pain\w*|blind\w*|burn\w*|dazzl\w*|hurt\w*|weak\w*)\b",
      ("weakness.light-sensitivity",), "light sensitivity", ""),
+    # The two words this table did not have, and the reason three of Aurvantis's race
+    # cards produced nothing at all. The supplier checked each against its own anatomy
+    # before touching it and said so plainly: a Human "physically unremarkable and highly
+    # variable" and a Halfling with "unusually good luck" are described correctly and
+    # completely — there was simply no cue that meant versatile or lucky, so the words
+    # reached nothing. That is a vocabulary gap on THIS side, and they were right to
+    # refuse to invent traits to fill it.
+    #
+    # Both are plain 1e. A human's versatility is the extra feat and the extra skill rank
+    # every human gets; a halfling's luck is the +1 racial bonus on all saving throws
+    # printed on the core race. `GRANTS` below turns each tag into the thing it means.
+    (r"\b(versatile|adaptable|unremarkable|highly variable|jack of all)\b",
+     ("versatile",), "an extra feat and an extra skill rank", ""),
+    (r"\b(luck|lucky|luckier|fortunate|charmed)\b", ("lucky",),
+     "+1 on all saving throws", ""),
 )
+
+# What a tag means when the thing it means is not another tag. Two entries, because two
+# cues grant something the tag vocabulary cannot say by itself: a budget is an allowance
+# the sheet spends, and a luck bonus is three modifiers.
+#
+# Kept here rather than as extra columns on CUES so that table stays four wide and one
+# kind of thing — a pattern, what it grants, what it reads as, and what it waits on.
+GRANTS: dict[str, dict] = {
+    "versatile": {"budget": {"feats": 1, "ranks": 1}},
+    "lucky": {"modifiers": [
+        {"type": "save_mod", "target": save, "amount": 1, "bonus_type": "racial"}
+        for save in ("fort", "ref", "will")]},
+}
 _SMALL = re.compile(r"\b(small|short|slight|diminutive|half the height|child-sized|"
                     r"waist-high|knee-high|halfling-sized)\b", re.I)
 _LARGE = re.compile(r"\b(towering|giant|huge|massive|twice the height|ten feet|"
@@ -1023,6 +1051,15 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
     speed = {"slow": 20, "normal": 30, "fast": 40}.get(speed_hint.strip().lower(), 0) or (
         40 if _FAST.search(low) and not _SLOW.search(low) else
         20 if _SLOW.search(low) else 30)
+    # What those tags actually grant, where the thing granted is not another tag.
+    budget: dict = {}
+    modifiers: list = []
+    for tag in tags:
+        got = GRANTS.get(tag) or {}
+        for key, value in (got.get("budget") or {}).items():
+            budget[key] = budget.get(key, 0) + int(value)
+        modifiers.extend(dict(m) for m in (got.get("modifiers") or ()))
+
     rid = slug(name)
     mods, choose = array_from_words(strengths, weakness)
     if not mods and (strengths or weakness):
@@ -1036,8 +1073,8 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
         "description": (about or text)[:400],
         "type": "humanoid", "size": size, "speed": speed,
         "mods": mods, "choose": choose,
-        "modifiers": [], "tags": tags, "traits": traits,
-        "budget": {}, "languages": [rid] if rid else [],
+        "modifiers": modifiers, "tags": tags, "traits": traits,
+        "budget": budget, "languages": [rid] if rid else [],
         "not_yet": not_yet, "origin": origin or "world",
         "people_id": people_id, "world": world,
         # Converted mechanically from prose and read by nobody yet — the same flag the

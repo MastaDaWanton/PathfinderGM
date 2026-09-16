@@ -328,11 +328,23 @@ class _Rolls:
 # Five feet to a square, as everywhere else in the game.
 FEET_PER_SQUARE = 5
 
-# What a room may come out as, in squares. The floor is six because a scene smaller than
-# that has nowhere to stand off; the ceiling is twenty-four because the authored range
-# runs to 125 feet (25 squares) and a grid much past twenty-four is a map the player reads
-# badly. Measured range: 25-125 ft wide, 15-110 ft deep.
-MIN_SQUARES, MAX_SQUARES = 6, 24
+# What a room may come out as, in squares.
+#
+# The floor was six — thirty feet — and it was wrong, which the supplier caught and
+# argued better than the floor was argued for: **"a lane ten feet across is an alley; the
+# same lane at thirty feet is a street."** Two things followed from that and both were
+# real. "Walls close on both sides" is this app's OWN stated reason for keeping the lane
+# and the back streets flat, and a thirty-foot floor removes the geometry the reason
+# depends on. And their generator had a rule that flattened anything three squares or
+# less, which a floor of six made permanently unreachable.
+#
+# So two squares: ten feet, which is the width two Medium creatures can pass in and the
+# narrowest thing that is still a fight rather than a queue. Nothing below that, because
+# a one-square room has no room to miss in.
+#
+# The ceiling stays twenty-four: the authored range runs to 125 feet and a grid much past
+# twenty-four is a map a player reads badly.
+MIN_SQUARES, MAX_SQUARES = 2, 24
 
 # How much of the floor each clutter word puts something solid on, as a fraction of the
 # inner squares. Calibrated against the hand-written shapes rather than invented: "some"

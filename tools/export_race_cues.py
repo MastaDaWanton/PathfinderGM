@@ -94,6 +94,21 @@ _SAYS: dict[str, dict[str, str]] = {
                  "of pain / blind / burn / dazzle / hurt / weak (any ending)",
         "example": "Direct sunlight dazzles them within moments.",
     },
+    # The two added 2026-09-16, after the supplier pointed out that three of their race
+    # cards produced nothing because this table had no word for either. Both are plain
+    # 1e — a human's extra feat and skill rank, a halfling's +1 on all saves — and both
+    # are things a people's anatomy paragraph says about itself all the time.
+    "versatile": {
+        "write": "versatile / adaptable / unremarkable / highly variable / jack of all",
+        "example": "They are physically unremarkable and highly variable.",
+        "note": "grants the extra feat and the extra skill rank a human gets, not a "
+                "number on any roll",
+    },
+    "lucky": {
+        "write": "luck / lucky / fortunate / charmed",
+        "example": "They have a reputation for unusually good luck.",
+        "note": "+1 racial bonus on every saving throw, which is a halfling's luck",
+    },
 }
 
 

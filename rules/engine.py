@@ -6750,7 +6750,13 @@ class Engine:
         self.scene.grid = floorplan.for_place(
             self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         mid = self.scene.grid.height // 2
-        pc_side, foe_row = 4, 0
+        # A quarter of the way in, and never off the board. The literal 4 was safe while
+        # every room was at least twelve squares wide; it stopped being safe the day a
+        # ten-foot alley became authorable, and a PC placed at column 4 of a two-square
+        # room is a PC standing in the sea. Reported from the World Bible side as "the
+        # alley is gone" — their narrow-room rule had been made unreachable by this app's
+        # own floor — and this is the half of that fix which is not the floor.
+        pc_side, foe_row = max(1, min(4, self.scene.grid.width // 4)), 0
         for side, refs in sides.items():
             has_pc = any(self.scene.actors[r].is_pc for r in refs
                          if r in self.scene.actors)

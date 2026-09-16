@@ -133,6 +133,13 @@ def build() -> dict:
         "size_ft": {
             "width_min": min(widths), "width_max": max(widths),
             "depth_min": min(depths), "depth_max": max(depths),
+            # The clamp as FIELDS, asked for by the supplier 2026-09-16: they apply it
+            # before writing so that what they author is what gets laid out, and they
+            # were reading it out of the prose below because there was nowhere else to
+            # read it from. Parsing a sentence for a number is worse than either side
+            # simply publishing it.
+            "clamp_min_ft": floorplan.MIN_SQUARES * floorplan.FEET_PER_SQUARE,
+            "clamp_max_ft": floorplan.MAX_SQUARES * floorplan.FEET_PER_SQUARE,
             "why": "the range the consumer's own tables cover. An authored value is "
                    "read at five feet to a square and clamped to "
                    f"{floorplan.MIN_SQUARES}-{floorplan.MAX_SQUARES} squares "

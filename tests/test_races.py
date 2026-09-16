@@ -674,3 +674,82 @@ def test_the_published_cue_list_is_what_the_table_says_today():
     assert on_disk == module.build(), (
         "docs/race-cues.json is stale — run tools/export_race_cues.py")
     assert on_disk["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)
+
+
+def test_versatile_and_lucky_are_words_this_app_now_knows():
+    """The supplier was right and this was the gap on our side.
+
+    Three of Aurvantis's sixteen race cards produced no usable trait, and this app called
+    them content defects. They were checked against their own anatomy before anything was
+    touched: a Human "physically unremarkable and highly variable" and a Halfling with
+    "unusually good luck" are described correctly and completely — there was simply no cue
+    that meant versatile or lucky, so the words reached nothing. They declined to invent
+    traits to fill a vocabulary gap, which was the right call.
+
+    Both are plain 1e: a human's extra feat and extra skill rank, a halfling's +1 racial
+    bonus on all saving throws.
+    """
+    human = races.expand(races.draft(
+        "Human", ["Humans are physically unremarkable and highly variable."]))
+    assert "versatile" in human["tags"]
+    assert human["budget"] == {"feats": 1, "ranks": 1}, human["budget"]
+
+    halfling = races.expand(races.draft(
+        "Halfling", ["Halflings are small, nimble, and have unusually good luck."]))
+    assert "lucky" in halfling["tags"]
+    saves = {m["target"] for m in halfling["modifiers"] if m["type"] == "save_mod"}
+    assert saves == {"fort", "ref", "will"}, halfling["modifiers"]
+    assert all(m["amount"] == 1 and m["bonus_type"] == "racial"
+               for m in halfling["modifiers"])
+
+
+def test_the_two_new_cues_price_themselves_from_parts_and_never_from_a_guess():
+    """`versatile` carries its cost in the budget it grants — the Race Builder prices a
+    bonus feat and a bonus rank, and `BUDGET_RP` is that. `lucky` carries its cost in its
+    modifiers.
+
+    Neither tag is in `TAG_RP`, and that is deliberate rather than an omission: the Race
+    Builder's own price for a +1 racial bonus on all saves could not be sourced in two
+    searches, and `price_tag` has a three-way answer for exactly this — it reports
+    `unknown` instead of letting an unpriced tag look free.
+    """
+    assert races.price_tag("versatile")[2] == "unknown"
+    assert races.price_tag("lucky")[2] == "unknown"
+    human = races.expand(races.draft("Human", ["Physically unremarkable and variable."]))
+    assert races.rp(human) >= sum(races.BUDGET_RP.values()), "the budget priced at nothing"
+
+
+def test_the_checker_we_ship_reads_the_vocabulary_we_ship():
+    """The defect this prevents, found 2026-09-16 and six days old by then.
+
+    `tools/check_race_cards.py` is written to be copied into the World Bible repo with
+    `race-cues.json` beside it, so its default looked for the file next to itself. A
+    second copy of that generated list had been sitting in `tools/` since 10 September —
+    **twelve cues against fourteen, six engine-ready against twelve** — and because it was
+    beside the script, it won.
+
+    Every count this checker printed in between was measured against a vocabulary this app
+    had already moved past, including the counts reported to the supplier as evidence
+    about THEIR content. On the same fixture, with nothing in the world changed, the real
+    numbers were 1 card with problems and 11 thin against the 3 and 15 that were reported.
+
+    A generated file with two copies is the exact trap CLAUDE.md names, one level down
+    from the rule it names it in.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR, "tools", "check_race_cards.py")
+    spec = importlib.util.spec_from_file_location("check_race_cards", path)
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+
+    assert not path.with_name("race-cues.json").exists(), (
+        "a second copy of the generated cue list is back in tools/ — it will go stale "
+        "and it will win, because the checker looks beside itself first")
+    cues = checker.load_cues(checker._default_cues())
+    assert cues["cue_count"] == len(races.CUES), (
+        f"the checker reads {cues['cue_count']} cues and the table has {len(races.CUES)}")
+    assert cues["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)

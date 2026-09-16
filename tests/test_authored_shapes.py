@@ -146,10 +146,44 @@ def test_the_roof_the_world_wrote_is_the_one_the_stairs_read():
     assert places.is_indoors(tavern.id, tavern.terrain, tavern.shape)
 
 
+def test_a_ten_foot_lane_is_still_ten_feet():
+    """The floor was thirty feet and it was wrong. The supplier argued it better than it
+    had been argued for: **"a lane ten feet across is an alley; the same lane at thirty
+    feet is a street."** Two real consequences followed — "walls close on both sides" is
+    this app's own stated reason for keeping lanes flat, and a thirty-foot floor removes
+    the geometry that reason depends on; and their generator's narrow-room rule fired on
+    anything three squares or less, which a floor of six made unreachable for ever.
+
+    Two squares now: ten feet, the width two Medium creatures can pass in."""
+    narrow = floorplan.from_world({"size_ft": {"width": 10, "depth": 60, "height": None},
+                                   "clutter": "some", "footing": "firm",
+                                   "vertical": "none"})
+    assert narrow.width == 2, narrow
+    assert floorplan.MIN_SQUARES * floorplan.FEET_PER_SQUARE == 10
+
+
+def test_a_fight_in_the_narrowest_room_the_world_ships_puts_nobody_off_the_board():
+    """The half of the alley fix which is not the floor.
+
+    The party was placed at column 4 of the grid, which was safe while every room was at
+    least twelve squares wide and stopped being safe the moment a ten-foot lane became
+    authorable. Driven on the narrowest room in either shipped world — a five-square well
+    — because a synthetic room proves the arithmetic and a real one proves the path.
+    """
+    narrow = "b8a937672991"
+    room = next(p for p in places.home_set(AURVANTIS.get(narrow)) if p.name == "the well")
+    assert room.shape.width <= 6, room.shape
+    scene, _foe = _fight(room, location_id=narrow)
+    assert scene.grid.width == room.shape.width
+    for ref, spot in scene.positions.items():
+        assert 0 <= spot[0] < scene.grid.width, (ref, spot, scene.grid.width)
+        assert 0 <= spot[1] < scene.grid.height, (ref, spot, scene.grid.height)
+
+
 def test_nothing_comes_out_smaller_than_a_scene_or_bigger_than_a_map():
-    """A fifteen-foot closet is a real room and not a fight; a 125-foot square is a real
-    square and 25 squares is more map than anybody reads. Both ends are clamped, and the
-    clamp is stated rather than left to whatever the export happens to hold."""
+    """A five-foot crack is not a room; a 125-foot square is a real square and 25 squares
+    is more map than anybody reads. Both ends are clamped, and the clamp is published as
+    a field rather than left in a sentence for somebody to parse."""
     every = [p.shape for p in list(_places(AURVANTIS)) + list(_places(PANGRELLA))]
     assert min(min(s.width, s.height) for s in every) >= floorplan.MIN_SQUARES
     assert max(max(s.width, s.height) for s in every) <= floorplan.MAX_SQUARES
@@ -236,13 +270,13 @@ def test_giving_a_room_its_floors_does_not_drop_anything_else_about_it():
 
 # --- and it reaches the fight -------------------------------------------------------------
 
-def _fight(place, spawn_far=False):
+def _fight(place, spawn_far=False, location_id=ASHWATCH):
     from rules.bestiary import instantiate
     from rules.dice import Dice
     from rules.engine import Engine, Scene
     from rules.sheet import load_pc
 
-    scene = Scene(location_id=ASHWATCH)
+    scene = Scene(location_id=location_id)
     scene.add(load_pc("fixtures/pc-kesst.json"))
     engine = Engine(scene, Dice(seed=3), world=AURVANTIS)
     engine.place_party(place.id)

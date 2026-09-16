@@ -2,9 +2,9 @@
 
 **Generated from `rules/races.py` by `tools/export_race_cues.py`. Do not edit by hand — regenerate it.**
 
-This is the complete list. A race card in a World Bible export can produce **a size, a speed, up to 12 traits, and an ability array** — all of them below, and nothing else. There is no other channel: any sentence whose words match none of these rows is read by the consumer, matched against every pattern, and discarded.
+This is the complete list. A race card in a World Bible export can produce **a size, a speed, up to 14 traits, and an ability array** — all of them below, and nothing else. There is no other channel: any sentence whose words match none of these rows is read by the consumer, matched against every pattern, and discarded.
 
-**10 of the 12 do something in play today.** The rest are recorded on the sheet and shown to the player, and the engine cannot act on them yet — it has no walls to climb, no water to swim, no air to fly through, and it rolls the weapon in hand rather than a claw. Write them anyway; they are true about the people and they will start working without the card changing.
+**12 of the 14 do something in play today.** The rest are recorded on the sheet and shown to the player, and the engine cannot act on them yet — it has no walls to climb, no water to swim, no air to fly through, and it rolls the weapon in hand rather than a claw. Write them anyway; they are true about the people and they will start working without the card changing.
 
 ## Size
 
@@ -122,6 +122,24 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 - *Status:* works in play
 
 > Direct sunlight dazzles them within moments.
+
+### an extra feat and an extra skill rank
+
+- *Write one of:* versatile / adaptable / unremarkable / highly variable / jack of all
+- *Grants:* `versatile`
+- *Status:* works in play
+- *Note:* grants the extra feat and the extra skill rank a human gets, not a number on any roll
+
+> They are physically unremarkable and highly variable.
+
+### +1 on all saving throws
+
+- *Write one of:* luck / lucky / fortunate / charmed
+- *Grants:* `lucky`
+- *Status:* works in play
+- *Note:* +1 racial bonus on every saving throw, which is a halfling's luck
+
+> They have a reputation for unusually good luck.
 
 ## What a people is good and bad at
 

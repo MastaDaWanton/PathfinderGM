@@ -173,8 +173,32 @@
    "engine_ready": true,
    "waits_on": "",
    "pattern": "\\b(light|sun|sunlight|daylight)\\b[^.]{0,40}\\b(pain\\w*|blind\\w*|burn\\w*|dazzl\\w*|hurt\\w*|weak\\w*)\\b"
+  },
+  {
+   "grants": [
+    "versatile"
+   ],
+   "shows": "an extra feat and an extra skill rank",
+   "write": "versatile / adaptable / unremarkable / highly variable / jack of all",
+   "example": "They are physically unremarkable and highly variable.",
+   "note": "grants the extra feat and the extra skill rank a human gets, not a number on any roll",
+   "engine_ready": true,
+   "waits_on": "",
+   "pattern": "\\b(versatile|adaptable|unremarkable|highly variable|jack of all)\\b"
+  },
+  {
+   "grants": [
+    "lucky"
+   ],
+   "shows": "+1 on all saving throws",
+   "write": "luck / lucky / fortunate / charmed",
+   "example": "They have a reputation for unusually good luck.",
+   "note": "+1 racial bonus on every saving throw, which is a halfling's luck",
+   "engine_ready": true,
+   "waits_on": "",
+   "pattern": "\\b(luck|lucky|luckier|fortunate|charmed)\\b"
   }
  ],
- "cue_count": 12,
- "engine_ready_count": 10
+ "cue_count": 14,
+ "engine_ready_count": 12
 }
