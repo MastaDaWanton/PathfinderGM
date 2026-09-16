@@ -151,7 +151,10 @@ def build() -> dict:
         # settlement that has one, and whether anything reads it yet.
         "settlement_places": [
             {"name": label, "about": about, "smallest": floor, "category": category,
-             "read_by": engine, "staffed": places.STAFFED.get(label, "")}
+             "read_by": engine, "staffed": places.staffed(label),
+             # Who the app itself stands behind the counter, since 2026-09-16. Published
+             # so an author can see that this place already has somebody in it.
+             "keeper": places.keeper_of(label)[0]}
             for label, about, floor, category, engine in places.SETTLEMENT_PLACES
         ],
         "implied": [{"place": spot, "slug": _slug(spot), "about": about,

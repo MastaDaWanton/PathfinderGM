@@ -565,7 +565,8 @@ def manual(request):
     from django.conf import settings as dj_settings
 
     from pathfindergm import version
-    from rules import backgrounds, bestiary, classes, feats, races, schemes, spells
+    from rules import (backgrounds, bestiary, classes, feats, places, races, schemes,
+                       spells)
 
     from . import library, preflight
     from .craft_views import DISCIPLINES
@@ -592,6 +593,8 @@ def manual(request):
         "races": len(races.all_races()),
         "backgrounds": len(backgrounds.catalogue()),
         "quests": len(schemes.all_schemes()),
+        # Read from the table that holds them, like every other number on this page.
+        "keepers": len(places.STAFFED),
         "feats": f"{len(feats.all_feats()):,}",
         "spells": f"{len(spells.all_spells()):,}",
         "creatures": f"{len(bestiary.everything()):,}",
@@ -1941,9 +1944,18 @@ def _merchant_here(scene):
     objects can be handled through the prompts." The narrated path (the sell/buy
     injectors) deliberately keeps working anywhere; this gates only the panel.
     """
+    from rules import keepers
+
     for ref, a in scene.actors.items():
         if a.is_pc or a.is_down:
             continue
+        # Whoever keeps this counter, first and by what they ARE rather than by what
+        # they are called. The name test below cannot see a keeper: they are named out
+        # of the world ("Gorvothys Vyrnys") precisely so that they are a person and not
+        # a job title, and a panel that only opens for people called "the stallholder"
+        # would refuse every real shopkeeper this app builds.
+        if keepers.keeps_a_counter(a):
+            return a
         if _MERCHANT.search(str(a.name or "")) or _MERCHANT.search(str(a.kind or "")):
             return a
     return None

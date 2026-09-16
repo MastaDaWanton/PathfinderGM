@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from rules import places
+from rules import keepers, places
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -94,7 +94,12 @@ def test_walking_to_another_place_sheds_the_room_it_left():
 
     assert engine.here().id == other.id
     assert s.biome == "urban", "a change of room is not a change of ground"
-    assert list(s.actors) == ["pc"], "the merchant followed her out of his own stall"
+    # Whoever keeps the room they walked INTO is standing in it (`rules/keepers.py`):
+    # this test is about the room they walked out of, so the new room's own people are
+    # not part of the question.
+    came = [r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")]
+    assert came == ["pc"], "the merchant followed her out of his own stall"
     assert other.name in got.outcomes[0].tell
 
 

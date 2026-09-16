@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from rules import places
+from rules import keepers, places
 from rules.bestiary import instantiate, next_ref
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -47,8 +47,15 @@ def test_presence_is_derived_and_the_room_keeps_its_people():
     stall = s.at
     engine.run(engine.validate([{"op": "travel", "because": "she walks out",
                                  "params": {"place": _other(engine).name}}]))
-    assert list(s.actors) == ["pc"], "the room's people followed her out"
-    assert set(s.people) == {"pc", "c1", "c2"}, "walking out destroyed them"
+    # Whoever keeps the room they walked INTO is standing in it (`rules/keepers.py`):
+    # this test is about the room they walked out of, so the new room's own people are
+    # not part of the question.
+    came = [r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")]
+    assert came == ["pc"], "the room's people followed her out"
+    kept = {r for r, a in s.people.items()
+            if not keepers.is_keeper(a.world_entity_id or "")}
+    assert kept == {"pc", "c1", "c2"}, "walking out destroyed them"
     assert {s.people[r].at for r in ("c1", "c2")} == {stall}
     engine.run(engine.validate([{"op": "travel", "because": "she comes back",
                                  "params": {"place": places.find(engine.places(), stall).name}}]))
@@ -127,7 +134,8 @@ def test_a_guard_survives_when_both_ends_walk_through_the_door():
     s.guards.append(Guard(guardian="c1", protects="pc"))
     engine.run(engine.validate([{"op": "travel", "because": "together",
                                  "params": {"place": _other(engine).name, "with": ["c1"]}}]))
-    assert set(s.actors) == {"pc", "c1"}
+    assert {r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")} == {"pc", "c1"}
     assert [g.guardian for g in s.guards] == ["c1"], "an escort's guard was cut in the doorway"
 
 
@@ -367,7 +375,13 @@ def test_a_new_campaign_stands_the_company_beside_the_party(tmp_path):
         cm._LIVE.clear()
         c = cm.new_campaign("fresh")
         assert c.scene.at and places.terrain_of(c.scene.at) == "urban"
-        assert len(c.scene.actors) == 2, "the opening companion is standing nowhere"
+        standing = [a for a in c.scene.actors.values()
+                    if not keepers.is_keeper(a.world_entity_id or "")]
+        assert len(standing) == 2, "the opening companion is standing nowhere"
+        # And a third body: the market has a stallholder in it now, which is what
+        # `rules/keepers.py` is for and is worth asserting rather than filtering away
+        # in silence.
+        assert len(c.scene.actors) == 3, "nobody is keeping the market"
         assert all(a.at == c.scene.at for a in c.scene.people.values())
         cm._LIVE.clear()
 

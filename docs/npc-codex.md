@@ -142,6 +142,28 @@ chooser.
   "trader". The `_ROLE_WORDS` lists carry the synonyms by hand.
 - **The bench lists but does not yet offer a picker** for `creature`; it is a text field
   holding a creature id. The creatures bench's search is the obvious source for one.
-- **No use outside schemes yet.** The GM's `bring_in` still names templates by hand, and
-  the opening scene's people are still the hand-written townsfolk. Both could ask the
-  chooser.
+- **The GM's `bring_in` still names templates by hand**, and the opening scene's people
+  are still the hand-written townsfolk. Both could ask the chooser. (`_template_for` in
+  `rules/schemes.py` does now, and so do keepers — see below.)
+
+## Who asks for a block
+
+Two callers today, and they reach the same chooser by the same door.
+
+1. **A scheme's cast** (`rules/schemes.py`, `_role_for`). A slot says "a guard officer";
+   the world's own cast supplies the person, the chooser supplies the numbers, and
+   `block_for` remembers the pairing.
+2. **A shop's keeper** (`rules/keepers.py`), since 2026-09-16. Twenty-five kinds of
+   settlement place sell something or do something for money, and each of them now has
+   somebody standing in it. The role words are the third field of `rules/places.STAFFED`
+   — in the bestiary's own spelling, because "harbormaster" is how the blocks spell it —
+   and they are filed under `keeper:<place id>`, which is not a World Bible entity id
+   and is stamped so that nothing mistakes a keeper for cast.
+
+   Measured when the words were chosen: **23 of the 25 find a real block** near a 3rd
+   level party — Expert Blacksmith, Shopkeeper, Barkeep, Guard, Scholar Priest, Old
+   Sailor — and two (the workshops, the warehouses) fall through to the hand-written
+   `guildhand`, which is what a guild hand is. That is the floor doing its job rather
+   than the floor being reached by accident, and `tests/test_keepers.py` fails if a
+   third one starts falling through, since that would mean the words had drifted from
+   the index.

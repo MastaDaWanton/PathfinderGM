@@ -220,37 +220,92 @@ POPULATION_BY_SCALE = {
 # standing in them. "any place that offers services or merchandise needs an NPC to man it"
 # (2026-09-15).
 #
-# NOT WIRED YET, and `docs/settlement-places.md` says so rather than this quietly implying
-# otherwise: the value is who ought to be there, and nothing generates them. It is the
-# next piece of work on this and it is a real one — a keeper needs a name the world would
-# use, a place in the codex, and to still be there next session.
+# Three things per row, because they have three different jobs:
+#
+#   who    what the ledger says ought to be there, in the plural where the place has
+#          more than one of them. Published to World Bible in the vocabulary.
+#   title  the ONE person the engine stands behind the counter, and the name they wear
+#          in a world that has no names to lend. A market has stallholders; the keeper
+#          is the one who runs the pitch.
+#   words  what the codex chooser is asked for (`rules/npcs.py`) — role words, first
+#          one heaviest, in the bestiary's own spelling. "harbormaster" and "armorer"
+#          are American because the stat blocks are; the prose beside them is not.
+#
+# `rules/keepers.py` is what reads the last two. Until 2026-09-16 nothing read any of
+# it, and this comment said so.
 STAFFED = {
-    "the market": "stallholders, and one who runs the pitch",
-    "the smithy": "a smith",
-    "the mill": "a miller",
-    "the workshops": "the trades that work there",
-    "the tannery": "a tanner",
-    "the brewery": "a brewer",
-    "the warehouses": "a warehouseman with a ledger",
-    "the counting house": "a clerk, and whoever they answer to",
-    "the merchants row": "shopkeepers who know what you can afford",
-    "the inn": "an innkeeper",
-    "the tavern": "whoever is behind the bar",
-    "the bathhouse": "an attendant",
-    "the theatre": "a company, and somebody taking the money",
-    "the arena": "a master of the games",
-    "the gardens": "a gardener who would rather you did not",
-    "the stables": "an ostler",
-    "the docks": "a harbourmaster",
-    "the carters yard": "a carter taking bookings",
-    "the guardhouse": "the watch",
-    "the barracks": "the garrison",
-    "the gaol": "a gaoler",
-    "the temple": "whoever keeps it",
-    "the cathedral": "clergy, and a great many of them",
-    "the guildhall": "a clerk of the guild",
-    "the customs house": "an officer who wants to see your papers",
+    "the market": ("stallholders, and one who runs the pitch",
+                   "the stallholder who runs the pitch",
+                   ("stallholder", "merchant", "trader")),
+    "the smithy": ("a smith", "the smith", ("blacksmith", "smith", "armorer")),
+    "the mill": ("a miller", "the miller", ("miller", "farmer", "commoner")),
+    "the workshops": ("the trades that work there", "the master of the workshops",
+                      ("artisan", "craftsman", "laborer")),
+    "the tannery": ("a tanner", "the tanner", ("laborer", "commoner")),
+    "the brewery": ("a brewer", "the brewer", ("brewer", "laborer", "commoner")),
+    "the warehouses": ("a warehouseman with a ledger", "the warehouseman",
+                       ("dockworker", "laborer", "clerk")),
+    "the counting house": ("a clerk, and whoever they answer to",
+                           "the clerk of the counting house",
+                           ("clerk", "moneylender", "merchant")),
+    "the merchants row": ("shopkeepers who know what you can afford", "the shopkeeper",
+                          ("shopkeeper", "merchant", "trader")),
+    "the inn": ("an innkeeper", "the innkeeper", ("innkeeper", "barkeep", "merchant")),
+    "the tavern": ("whoever is behind the bar", "the one behind the bar",
+                   ("barkeep", "innkeeper", "bartender")),
+    "the bathhouse": ("an attendant", "the attendant", ("commoner", "servant", "attendant")),
+    "the theatre": ("a company, and somebody taking the money",
+                    "the doorkeeper of the theatre",
+                    ("performer", "entertainer", "acrobat")),
+    "the arena": ("a master of the games", "the master of the games",
+                  ("gladiator", "champion", "fighter")),
+    "the gardens": ("a gardener who would rather you did not", "the gardener",
+                    ("gardener", "servant", "commoner")),
+    "the stables": ("an ostler", "the ostler", ("commoner", "ostler", "handler")),
+    "the docks": ("a harbourmaster", "the harbourmaster",
+                  ("harbormaster", "sailor", "captain")),
+    "the carters yard": ("a carter taking bookings", "the carter",
+                         ("teamster", "carter", "driver")),
+    "the guardhouse": ("the watch", "the sergeant of the watch",
+                       ("guard", "watch", "sergeant")),
+    "the barracks": ("the garrison", "the garrison sergeant",
+                     ("guard", "officer", "soldier")),
+    "the gaol": ("a gaoler", "the gaoler", ("jailer", "guard", "warden")),
+    "the temple": ("whoever keeps it", "the priest", ("priest", "acolyte", "cleric")),
+    "the cathedral": ("clergy, and a great many of them", "the priest of the cathedral",
+                      ("priest", "bishop", "cleric")),
+    "the guildhall": ("a clerk of the guild", "the clerk of the guild",
+                      ("guild", "clerk", "master")),
+    "the customs house": ("an officer who wants to see your papers",
+                          "the customs officer", ("customs", "officer", "clerk")),
 }
+
+
+def staffed(label: str) -> str:
+    """Who ought to be standing in this place, or "" where nobody need be."""
+    row = STAFFED.get(" ".join(str(label or "").split()).lower())
+    return row[0] if row else ""
+
+
+def category_of(label: str) -> str:
+    """Which of the seven kinds of place this is, or "" for one the table has no row for.
+
+    Read by `rules/keepers.py` to answer whether a keeper is somebody you can BUY from:
+    a gaoler and a stallholder are both people standing in a room they keep, and only
+    one of them has a counter.
+    """
+    want = " ".join(str(label or "").split()).lower()
+    return next((cat for lbl, _a, _s, cat, _e in SETTLEMENT_PLACES if lbl == want), "")
+
+
+def keeper_of(label: str) -> tuple[str, tuple[str, ...]]:
+    """The one person behind the counter: (what they are called, the codex's words).
+
+    ("", ()) for a place that sells nothing — a well has no keeper, and inventing one
+    would put a person in every empty street.
+    """
+    row = STAFFED.get(" ".join(str(label or "").split()).lower())
+    return (row[1], tuple(row[2])) if row else ("", ())
 
 
 def population(scale: str) -> str:

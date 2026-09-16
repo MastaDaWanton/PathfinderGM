@@ -246,6 +246,10 @@ class Campaign:
                 "cards": [dict(c) for c in self.scene.cards],
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
+                # Which counters already have somebody behind them. Absent in saves
+                # written before keepers, which reads as none staffed yet — so an old
+                # campaign gains its smith the next time the party stands in the smithy.
+                "staffed": list(self.scene.staffed),
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -343,6 +347,7 @@ class Campaign:
             cards=[dict(c) for c in (s.get("cards") or [])],
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
+            staffed=[str(x) for x in (s.get("staffed") or [])],
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),

@@ -182,16 +182,22 @@ def test_the_ledger_counts_what_has_no_rule_and_gets_it_right():
         f"the ledger does not say {unread} of {len(places.SETTLEMENT_PLACES)}")
 
 
-def test_the_places_that_want_somebody_in_them_are_named_and_admitted_to():
+def test_the_places_that_want_somebody_in_them_have_somebody_in_them():
     """"any place that offers services or merchandise needs an NPC to man it" — the table
-    says who ought to be standing in each and nothing generates them. The ledger says so
-    out loud rather than letting the field imply otherwise."""
+    says who ought to be standing in each, and since 2026-09-16 `rules/keepers.py` stands
+    them up. The ledger carried the gap as a written promise while it was open; now it
+    has to carry the delivery, or it is a promise somebody stopped keeping."""
     buildable = {label for label, *_r in places.SETTLEMENT_PLACES}
     staffed = [l for l in places.STAFFED if l in buildable]
     assert len(staffed) >= 20
     doc = _doc()
-    assert "Nothing generates them" in doc
+    assert "Nothing generates them" not in doc, "the ledger still says nobody builds them"
+    assert "rules/keepers.py" in doc
     assert f"{len(staffed)} of these places sell something" in doc
+    # And every one of them names a person and the words that find them.
+    for label in staffed:
+        title, words = places.keeper_of(label)
+        assert title and words, label
 
 
 def test_the_population_bands_are_words_and_never_a_figure():

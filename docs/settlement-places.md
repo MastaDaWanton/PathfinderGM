@@ -135,16 +135,42 @@ before anything mechanical reads it, and the shapes are real — an arena is ban
 round sand, a lane is two walls and what is left between them, so a fight in one is not a
 fight in the other. It is a promise, and this is where it is written down.
 
-## The one that is a real gap: nobody is in them
+## Somebody is in them now
 
 > "any place that offers services or merchandise needs an NPC to man it"
 
-25 of these places sell something or do something for money, and
-`rules/places.STAFFED` says who ought to be standing in each. **Nothing generates them.**
+25 of these places sell something or do something for money, and `rules/places.STAFFED`
+names three things for each: who ought to be there, the one person the engine stands
+behind the counter, and the words the NPC codex is asked for. **`rules/keepers.py` builds
+them**, since 2026-09-16.
 
-That is the next piece of work on this and it is a real one, not a table entry: a keeper
-needs a name the world would actually use, a place in the NPC codex, and to still be there
-next session — which is the difference between a shopkeeper and a sentence the narrator
-improvised and forgot. Until then the narrator may describe whoever is behind the counter,
-and the engine does not know them.
+A keeper is an ordinary actor in `Scene.people`, standing at their own place — so the
+narrator's WHO IS HERE names them when the party walks in, and stops when they walk out,
+with no code in either direction. Four things make them a person rather than a sentence
+the narrator improvised:
 
+- **named out of the world.** The settlement's own families first (Aurvantis writes four
+  cast members per settlement, two families between them), the world's own given names
+  behind that, and never a name the world already gave somebody. A world that ships no
+  cast gets a keeper called what they are — "the smith" — because an invented name is a
+  person the world does not contain.
+- **the same person next time.** The pick is seeded off the place id, the same SHA-256
+  that seeds the floor plan, so nothing is stored that could drift from the rule that
+  made it.
+- **numbers from the codex.** `rules/npcs.py` chooses a stat block by those role words
+  near the party's level and writes it to `homebrew/npcs/`, so a keeper met at 1st level
+  has the same numbers at 9th and one file on the NPCs bench corrects them. Measured:
+  23 of the 25 find a real block; the workshops and the warehouses fall to the
+  hand-written `guildhand`, which is what a guild hand is.
+- **mortal.** The scene remembers which counters have been staffed, not who is standing
+  at one — so the smith the party killed this morning is not behind the counter this
+  afternoon.
+
+What was deliberately NOT built: a keeper owns nothing, stocks nothing and prices
+nothing. Ultima Online gave its shopkeepers inventory, cash on hand and a supply-and-
+demand simulation, the shopkeepers went broke holding goods nobody wanted, and the
+simulation was abandoned rather than tuned. The shelf is `rules/market.py`, drawn and
+not stored; the price is `rules/pricing.py`, out of the rulebook. The keeper is a person
+to talk to.
+
+`tests/test_keepers.py` holds all of it.

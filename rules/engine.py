@@ -236,6 +236,11 @@ class Scene:
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
     schemes: list[dict] = field(default_factory=list)
+    # Which counters have had somebody put behind them (`rules/keepers.py`): place ids,
+    # once each, for ever. The ledger is the PLACE and not the person on purpose — a
+    # keeper who is dead is swept out of the scene two turns later, and a check for
+    # "is anybody standing here" would mint the murdered smith a second time.
+    staffed: list[str] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -3563,6 +3568,19 @@ class Engine:
         for a in self.scene.people.values():
             if not a.at:
                 a.at = target.id
+        self.staff_the_place()
+
+    def staff_the_place(self):
+        """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
+
+        Called from the two doors that change where the party is — here, and the end of
+        a `travel` that moved — because those are the two, and a third caller would be
+        a third place to forget. Idempotent: a place that has been staffed once is
+        never staffed again, so a save reloaded fifty times still has one smith.
+        """
+        from . import keepers
+
+        return keepers.staff(self)
 
     def _march(self, pc, hours: int, biome: str) -> tuple[bool, str]:
         """Walk a journey, eight hours a day with a camp between, and say what it cost.
@@ -3735,6 +3753,8 @@ class Engine:
         how the GM says an escort comes along. The dead and the dying are not eligible
         even there: they stay where they fell.
         """
+        from . import keepers
+
         want = str(intent.params.get("biome") or "").strip().lower()
         place = " ".join(str(intent.params.get("place") or "").split())
         if not want and not place:
@@ -3912,6 +3932,13 @@ class Engine:
                     # hold, and the tell lands on the visible card.
                     if a.has_state("state.hidden") or a.has_state("state.down.dead"):
                         continue
+                    # Nor whoever keeps the room being walked out of. "Left behind:
+                    # Gorvothys Vyrnys" of the stallholder standing at her own stall
+                    # reads as an abandoned companion; she is where she lives, and the
+                    # party is the one who left. A keeper who has come away from their
+                    # place and is then dropped IS left behind, and is said.
+                    if keepers.place_of(getattr(a, "world_entity_id", "") or "") == a.at:
+                        continue
                     left.append(a.name)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
@@ -3929,6 +3956,9 @@ class Engine:
                 self.scene.move(ref, going_to.id)
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
+            # And whoever keeps the room they have just walked into, if it is a room
+            # somebody keeps and nobody has kept it yet.
+            self.staff_the_place()
 
         note = str(intent.params.get("note") or "").strip()
         bits = []

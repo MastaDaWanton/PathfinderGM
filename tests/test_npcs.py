@@ -193,7 +193,9 @@ def test_the_npcs_bench_is_ready_and_lists_the_codex(tmp_path):
         cm._LIVE.clear()
     assert d["bench"]["ready"] is True
     assert d["bench"]["shipped"] == npcs.humanoid_count() > 2900
-    assert d["bench"]["yours"] == 1
+    # Two: the border guard remembered above, and whoever keeps the market the opening
+    # stands the party in (`rules/keepers.py`).
+    assert d["bench"]["yours"] == 2
     row = next(r for r in d["rows"] if r["id"] == "05b7a28595a3")
     assert row["name"] == "Ariniel Thorne" and row["kind"] == "codex"
     assert "border-guard" in row["note"] and "border guard" in row["note"] and "05b7a28595a3" in row["note"]

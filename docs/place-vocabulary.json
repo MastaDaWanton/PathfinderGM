@@ -130,7 +130,8 @@
    "smallest": "village",
    "category": "trade",
    "read_by": "market",
-   "staffed": "stallholders, and one who runs the pitch"
+   "staffed": "stallholders, and one who runs the pitch",
+   "keeper": "the stallholder who runs the pitch"
   },
   {
    "name": "the smithy",
@@ -138,7 +139,8 @@
    "smallest": "village",
    "category": "trade",
    "read_by": "crafting",
-   "staffed": "a smith"
+   "staffed": "a smith",
+   "keeper": "the smith"
   },
   {
    "name": "the mill",
@@ -146,7 +148,8 @@
    "smallest": "village",
    "category": "trade",
    "read_by": "",
-   "staffed": "a miller"
+   "staffed": "a miller",
+   "keeper": "the miller"
   },
   {
    "name": "the workshops",
@@ -154,7 +157,8 @@
    "smallest": "town",
    "category": "trade",
    "read_by": "crafting",
-   "staffed": "the trades that work there"
+   "staffed": "the trades that work there",
+   "keeper": "the master of the workshops"
   },
   {
    "name": "the tannery",
@@ -162,7 +166,8 @@
    "smallest": "town",
    "category": "trade",
    "read_by": "",
-   "staffed": "a tanner"
+   "staffed": "a tanner",
+   "keeper": "the tanner"
   },
   {
    "name": "the brewery",
@@ -170,7 +175,8 @@
    "smallest": "town",
    "category": "trade",
    "read_by": "",
-   "staffed": "a brewer"
+   "staffed": "a brewer",
+   "keeper": "the brewer"
   },
   {
    "name": "the warehouses",
@@ -178,7 +184,8 @@
    "smallest": "town",
    "category": "trade",
    "read_by": "",
-   "staffed": "a warehouseman with a ledger"
+   "staffed": "a warehouseman with a ledger",
+   "keeper": "the warehouseman"
   },
   {
    "name": "the mine head",
@@ -186,7 +193,8 @@
    "smallest": "village",
    "category": "trade",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the counting house",
@@ -194,7 +202,8 @@
    "smallest": "city",
    "category": "trade",
    "read_by": "",
-   "staffed": "a clerk, and whoever they answer to"
+   "staffed": "a clerk, and whoever they answer to",
+   "keeper": "the clerk of the counting house"
   },
   {
    "name": "the merchants row",
@@ -202,7 +211,8 @@
    "smallest": "city",
    "category": "trade",
    "read_by": "market",
-   "staffed": "shopkeepers who know what you can afford"
+   "staffed": "shopkeepers who know what you can afford",
+   "keeper": "the shopkeeper"
   },
   {
    "name": "the gate",
@@ -210,7 +220,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "travel",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the guardhouse",
@@ -218,7 +229,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "wanted",
-   "staffed": "the watch"
+   "staffed": "the watch",
+   "keeper": "the sergeant of the watch"
   },
   {
    "name": "the guildhall",
@@ -226,7 +238,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "",
-   "staffed": "a clerk of the guild"
+   "staffed": "a clerk of the guild",
+   "keeper": "the clerk of the guild"
   },
   {
    "name": "the library",
@@ -234,7 +247,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the keep",
@@ -242,7 +256,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the moot hall",
@@ -250,7 +265,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the gaol",
@@ -258,7 +274,8 @@
    "smallest": "town",
    "category": "civic",
    "read_by": "wanted",
-   "staffed": "a gaoler"
+   "staffed": "a gaoler",
+   "keeper": "the gaoler"
   },
   {
    "name": "the barracks",
@@ -266,7 +283,8 @@
    "smallest": "city",
    "category": "civic",
    "read_by": "wanted",
-   "staffed": "the garrison"
+   "staffed": "the garrison",
+   "keeper": "the garrison sergeant"
   },
   {
    "name": "the courthouse",
@@ -274,7 +292,8 @@
    "smallest": "city",
    "category": "civic",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the customs house",
@@ -282,7 +301,8 @@
    "smallest": "city",
    "category": "civic",
    "read_by": "",
-   "staffed": "an officer who wants to see your papers"
+   "staffed": "an officer who wants to see your papers",
+   "keeper": "the customs officer"
   },
   {
    "name": "the shrine",
@@ -290,7 +310,8 @@
    "smallest": "village",
    "category": "faith",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the graveyard",
@@ -298,7 +319,8 @@
    "smallest": "village",
    "category": "faith",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the temple",
@@ -306,7 +328,8 @@
    "smallest": "town",
    "category": "faith",
    "read_by": "",
-   "staffed": "whoever keeps it"
+   "staffed": "whoever keeps it",
+   "keeper": "the priest"
   },
   {
    "name": "the cathedral",
@@ -314,7 +337,8 @@
    "smallest": "city",
    "category": "faith",
    "read_by": "",
-   "staffed": "clergy, and a great many of them"
+   "staffed": "clergy, and a great many of them",
+   "keeper": "the priest of the cathedral"
   },
   {
    "name": "the inn",
@@ -322,7 +346,8 @@
    "smallest": "village",
    "category": "leisure",
    "read_by": "",
-   "staffed": "an innkeeper"
+   "staffed": "an innkeeper",
+   "keeper": "the innkeeper"
   },
   {
    "name": "the green",
@@ -330,7 +355,8 @@
    "smallest": "village",
    "category": "leisure",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the tavern",
@@ -338,7 +364,8 @@
    "smallest": "town",
    "category": "leisure",
    "read_by": "",
-   "staffed": "whoever is behind the bar"
+   "staffed": "whoever is behind the bar",
+   "keeper": "the one behind the bar"
   },
   {
    "name": "the bathhouse",
@@ -346,7 +373,8 @@
    "smallest": "city",
    "category": "leisure",
    "read_by": "",
-   "staffed": "an attendant"
+   "staffed": "an attendant",
+   "keeper": "the attendant"
   },
   {
    "name": "the theatre",
@@ -354,7 +382,8 @@
    "smallest": "city",
    "category": "leisure",
    "read_by": "",
-   "staffed": "a company, and somebody taking the money"
+   "staffed": "a company, and somebody taking the money",
+   "keeper": "the doorkeeper of the theatre"
   },
   {
    "name": "the arena",
@@ -362,7 +391,8 @@
    "smallest": "city",
    "category": "leisure",
    "read_by": "",
-   "staffed": "a master of the games"
+   "staffed": "a master of the games",
+   "keeper": "the master of the games"
   },
   {
    "name": "the gardens",
@@ -370,7 +400,8 @@
    "smallest": "city",
    "category": "leisure",
    "read_by": "",
-   "staffed": "a gardener who would rather you did not"
+   "staffed": "a gardener who would rather you did not",
+   "keeper": "the gardener"
   },
   {
    "name": "the well",
@@ -378,7 +409,8 @@
    "smallest": "village",
    "category": "utility",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the granary",
@@ -386,7 +418,8 @@
    "smallest": "town",
    "category": "utility",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the midden",
@@ -394,7 +427,8 @@
    "smallest": "town",
    "category": "utility",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the cistern",
@@ -402,7 +436,8 @@
    "smallest": "city",
    "category": "utility",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the stables",
@@ -410,7 +445,8 @@
    "smallest": "village",
    "category": "transport",
    "read_by": "",
-   "staffed": "an ostler"
+   "staffed": "an ostler",
+   "keeper": "the ostler"
   },
   {
    "name": "the docks",
@@ -418,7 +454,8 @@
    "smallest": "town",
    "category": "transport",
    "read_by": "",
-   "staffed": "a harbourmaster"
+   "staffed": "a harbourmaster",
+   "keeper": "the harbourmaster"
   },
   {
    "name": "the bridge",
@@ -426,7 +463,8 @@
    "smallest": "town",
    "category": "transport",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the carters yard",
@@ -434,7 +472,8 @@
    "smallest": "city",
    "category": "transport",
    "read_by": "",
-   "staffed": "a carter taking bookings"
+   "staffed": "a carter taking bookings",
+   "keeper": "the carter"
   },
   {
    "name": "the lane",
@@ -442,7 +481,8 @@
    "smallest": "village",
    "category": "hidden",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the back streets",
@@ -450,7 +490,8 @@
    "smallest": "town",
    "category": "hidden",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   },
   {
    "name": "the warrens",
@@ -458,7 +499,8 @@
    "smallest": "city",
    "category": "hidden",
    "read_by": "",
-   "staffed": ""
+   "staffed": "",
+   "keeper": ""
   }
  ],
  "implied": [
