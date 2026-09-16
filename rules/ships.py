@@ -325,6 +325,52 @@ def sink_tick(vessel: Vessel) -> str:
     return ""
 
 
+# --- closing, and then boarding ----------------------------------------------------------------
+#
+# The whole ship-to-ship model, and it is three words long on purpose.
+#
+# The fast-play rules put ships on a mat at thirty feet to the square and move them on the
+# captain's initiative. This app has no mat and no picture — it has a narrator — and that
+# is exactly the ground Pillars of Eternity II came to grief on: its naval combat was
+# turns of text in which the player could not tell how the two ships were oriented, and
+# the winning move was always to close and board anyway. So the distance between two ships
+# is a BAND, the same shape the tactical zones already are, and the interesting decisions
+# are what you do while it shrinks.
+#
+# distant     they are a sail on the horizon. You can run, or you can turn and close
+# closing     bowshot: arrows, spells, and the last round in which running is cheap
+# alongside   oars touching. Grapnels, boarding planks, and the fight is a deck away
+RANGES = ("distant", "closing", "alongside")
+
+# What running costs once the grapnels are in: you do not get to leave until they are cut.
+# The one thing on the whole engagement that is not reversible in a round, which is what
+# makes throwing them a decision rather than a formality.
+GRAPPLE_ESCAPE_DC = 15
+
+
+def closer(band: str) -> str:
+    i = RANGES.index(band) if band in RANGES else 0
+    return RANGES[min(len(RANGES) - 1, i + 1)]
+
+
+def further(band: str) -> str:
+    i = RANGES.index(band) if band in RANGES else 0
+    return RANGES[max(0, i - 1)]
+
+
+def ram_self_damage(kind: str) -> int:
+    """What ramming costs the rammer.
+
+    "...inflicting damage as indicated on the ship statistics table to the target, as well
+    as minimum damage to the ramming ship." The minimum of your own ram dice, which is the
+    book's way of saying a ram is a thing you do to a hull with a hull.
+    """
+    spec = ram_damage(kind)
+    dice, _, bonus = spec.partition("+")
+    count = int(dice.split("d")[0] or 1)
+    return count + (int(bonus) if bonus else 0)
+
+
 def crewed(vessel: Vessel) -> bool:
     """Whether there are enough hands to work her. A galley wants two hundred; a keelboat
     wants one. A ship below her minimum does not move, which is the quiet reason you

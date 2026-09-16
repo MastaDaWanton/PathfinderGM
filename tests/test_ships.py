@@ -255,3 +255,187 @@ def test_a_land_journey_is_untouched():
     hours, _m, how = journey.hours_for(leg, 30)
     assert how in ("exact", "derived")
     assert "on the road" in journey.describe(leg, hours)
+
+
+# --- closing, and then boarding ----------------------------------------------------------------
+#
+# The ruling, run end to end: ships close, and then people board, and the fight is on the
+# deck. Five verbs and a band — no mat, no orientation to lose track of, and every rung of
+# the approach a decision rather than a die roll dressed up.
+
+def _at_sea(seed: int = 11, sailor: bool = False, ours_scale: str = "city",
+            theirs_scale: str = "town"):
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    town = "5bbd0c40345f"
+    scene = Scene(location_id=town)
+    pc = load_pc("fixtures/pc-kesst.json")
+    scene.add(pc)
+    if sailor:
+        # Paid for rather than added: the sheet is legality-checked on save, and a test
+        # that hands a character free ranks is a test that would be caught by the engine
+        # the moment it wrote the campaign to disk. It was.
+        for skill, rank in sorted(pc.ranks.items(), key=lambda kv: -kv[1]):
+            if rank and skill != "profession":
+                pc.ranks[skill] = rank - 1
+                pc.ranks["profession"] = pc.ranks.get("profession", 0) + 1
+                break
+    engine = Engine(scene, Dice(seed=seed), world=PANGRELLA)
+    engine.place_party(f"{town}~urban:the-market")
+    ours = ships.offered_at(town, ours_scale)[0]
+    theirs = ships.offered_at("another-port", theirs_scale)[0]
+    scene.vessels = [ours.as_dict(), theirs.as_dict()]
+    scene.sea = {"ours": ours.id, "theirs": theirs.id, "range": "distant",
+                 "grappled": False}
+    scene.at = ships.deck_of(ours)
+    pc.at = scene.at
+    return scene, engine, ours, theirs
+
+
+def _do(engine, do, face: int = 18, **params):
+    res = engine.run(engine.validate(
+        [{"op": "sea", "actor": "pc", "because": "the chase",
+          "params": {"do": do, **params}}], origin="author:test"))
+    if res.awaiting:
+        res = engine.resume(face)
+    return res.outcomes[-1]
+
+
+def test_a_sail_on_the_horizon_becomes_oars_touching():
+    """Three bands and one step a round. A player can hold that in their head from prose
+    alone, which is the thing Deadfire's mat-less naval combat could not give anybody."""
+    scene, engine, _ours, theirs = _at_sea()
+    assert scene.sea["range"] == "distant"
+    _do(engine, "close")
+    assert scene.sea["range"] == "closing"
+    _do(engine, "close")
+    assert scene.sea["range"] == "alongside"
+    _do(engine, "close")
+    assert scene.sea["range"] == "alongside", "there is nothing closer than alongside"
+
+
+def test_running_away_is_a_real_answer():
+    """The book's ships are faster than they are tough, and a merchantman's best move is
+    to be somewhere else. A fight you can decline is a fight worth having."""
+    scene, engine, _ours, _theirs = _at_sea()
+    _do(engine, "close")
+    out = _do(engine, "sheer off")
+    assert scene.sea == {}, "the engagement did not end"
+    assert "only the sea" in out.tell
+
+
+def test_the_grapnels_are_the_one_thing_you_cannot_take_back():
+    """Everything else in the engagement is reversible in a round. That is what makes
+    throwing them a decision rather than a formality."""
+    scene, engine, _ours, _theirs = _at_sea()
+    _do(engine, "close")
+    _do(engine, "close")
+    _do(engine, "grapple")
+    assert scene.sea["grappled"] is True
+    out = _do(engine, "sheer off")
+    assert "not going anywhere" in out.tell
+    assert scene.sea["range"] == "alongside"
+
+
+def test_ramming_wants_a_sailor_and_says_so():
+    """Profession (sailor) is trained-only, and the rule has teeth here: a party with
+    nobody who has sailed cannot ram anybody. The refusal names what is missing rather
+    than quietly rolling an untrained check the book does not allow."""
+    _scene, engine, _ours, _theirs = _at_sea(sailor=False)
+    _do(engine, "close")
+    out = _do(engine, "ram")
+    assert "no sailor" in out.tell and "Profession (sailor)" in out.tell
+
+
+def test_a_ram_wants_a_run_at_them():
+    """"The ship must move at least 30 feet and end with its bow adjacent." Alongside is
+    too late and hull down is too far, which leaves exactly one band it happens from."""
+    _scene, engine, _ours, _theirs = _at_sea(sailor=True)
+    out = _do(engine, "ram")
+    assert "way on" in out.tell
+    _do(engine, "close")
+    _do(engine, "close")
+    assert "too late" in _do(engine, "ram").tell
+
+
+def test_a_ram_that_lands_hurts_both_hulls():
+    """"...inflicting damage as indicated on the ship statistics table to the target, as
+    well as minimum damage to the ramming ship." A ram is a thing you do to a hull with
+    a hull."""
+    scene, engine, ours, theirs = _at_sea(sailor=True)
+    _do(engine, "close")
+    out = _do(engine, "ram", face=20)
+    assert engine.vessel(theirs.id).hp < theirs.hp, out.tell
+    assert engine.vessel(ours.id).hp < ours.hp, "the rammer took nothing"
+    assert scene.sea["range"] == "alongside", "a ram ends alongside, hit or miss"
+
+
+def test_boarding_puts_the_party_on_their_deck():
+    """The whole point. The fight is not resolved out here — it happens on a deck, with a
+    floor plan, a mast to put between you and them, and a rail with the sea past it."""
+    scene, engine, _ours, theirs = _at_sea()
+    _do(engine, "close")
+    _do(engine, "close")
+    out = _do(engine, "board")
+    assert scene.at == ships.deck_of(theirs)
+    assert places.terrain_of(scene.at) == ships.DECK
+    assert "over the rail" in out.tell
+
+
+def test_you_cannot_step_across_open_water():
+    scene, engine, _ours, _theirs = _at_sea()
+    assert "too far to step" in _do(engine, "board").tell
+    assert scene.at != ""
+
+
+def test_somebody_is_waiting_at_the_rail():
+    """Arriving on an empty deck is the anticlimax the ruling exists to avoid. The watch
+    comes from the NPC codex, by role words, at the party's own level — the same door a
+    shop's keeper and a scheme's cast come through.
+
+    A handful, never the crew list: a galley carries two hundred rowers, and two hundred
+    creatures is not an encounter. What the count says is how many were quick enough to
+    be there; the rest are why the fight has to be won before they come up."""
+    scene, engine, _ours, theirs = _at_sea()
+    _do(engine, "close")
+    _do(engine, "close")
+    out = _do(engine, "board")
+    met = [a for a in scene.actors.values() if not a.is_pc]
+    assert met, out.tell
+    assert len(met) <= 4, [a.name for a in met]
+    assert len({a.name for a in met}) == len(met), "the crew are all called the same thing"
+
+
+def test_a_ship_with_nobody_aboard_is_boarded_unopposed():
+    scene, engine, _ours, theirs = _at_sea()
+    hulk = ships.Vessel.from_dict({**theirs.as_dict(), "crew": 0})
+    scene.vessels = [v for v in scene.vessels if v["id"] != theirs.id] + [hulk.as_dict()]
+    _do(engine, "close")
+    _do(engine, "close")
+    out = _do(engine, "board")
+    assert "Nobody is on it" in out.tell
+
+
+def test_the_engagement_and_the_hulls_survive_a_save(tmp_path, settings):
+    """A hull does not heal and a chase does not reset."""
+    from play import campaign as cm
+
+    settings.CAMPAIGN_DIR = tmp_path
+    scene, engine, _ours, theirs = _at_sea(sailor=True)
+    _do(engine, "close")
+    _do(engine, "ram", face=20)
+    hurt = engine.vessel(theirs.id).hp
+    c = cm.Campaign(id="sea-test", world_source="fixtures/pangrella-campaign.json",
+                    scene=scene)
+    c.save()
+    back = cm.Campaign.load(c.path())
+    assert back.scene.sea["range"] == "alongside"
+    assert [v for v in back.scene.vessels if v["id"] == theirs.id][0]["hp"] == hurt
+
+
+def test_nothing_happens_at_sea_with_nobody_to_fight():
+    _scene, engine, _ours, _theirs = _at_sea()
+    engine.scene.sea = {}
+    assert "no other ship" in _do(engine, "close").tell

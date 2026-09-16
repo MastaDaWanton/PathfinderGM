@@ -320,6 +320,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
     "found": (("name",), ("actor", "owner", "parent", "about"), "player"),
     "venture": (("kind",), ("actor", "parent", "name"), "player"),
+    # Two ships and the distance between them. `do` is close / sheer off / ram / grapple
+    # / board, and `with` names whoever goes across — the same word travel uses for the
+    # people who come along, because a boarding party is a party.
+    "sea": (("do",), ("with", "actor"), "player"),
     # Searching the ground. The roll is the player's: it is their afternoon.
     # `hours` because foraging is time now: a minimum of one, and as many as the player
     # wants to spend. Every hour is its own Survival check, and past a day awake every

@@ -67,6 +67,20 @@ def zone_for_feet(feet: int) -> str:
     return "far"
 
 
+def _sentence(name: str) -> str:
+    """A name at the start of a sentence. Ships and keepers carry their article — "the
+    Cold Widow" — and a tell that opens with a lower-case "the" reads as a typo."""
+    said = str(name or "")
+    return said[:1].upper() + said[1:]
+
+
+def _and_list(names) -> str:
+    got = [str(n) for n in names if str(n).strip()]
+    if len(got) <= 1:
+        return got[0] if got else ""
+    return ", ".join(got[:-1]) + " and " + got[-1]
+
+
 def _drowning_ground(actor) -> bool:
     """Whether this creature is under water it cannot breathe.
 
@@ -262,6 +276,20 @@ class Scene:
     # spends the day too. Without it the check is free and a player rolls until the dice
     # agree with them, which is the shape of every social system that stops mattering.
     swayed: dict[str, int] = field(default_factory=dict)
+    # The ships this campaign knows, as `ships.Vessel` dicts — the one the party took
+    # passage on, the one closing on it. Stored rather than derived, unlike a place: a
+    # room does not move and a hull does not heal, so where a ship is and how much of it
+    # is left are facts play made and nothing can recompute.
+    vessels: list[dict] = field(default_factory=list)
+    # The engagement at sea, when there is one: which two ships, how far apart, and
+    # whether the grapnels are in. `{"ours", "theirs", "range", "grappled"}`.
+    #
+    # A band and not a grid. The fast-play rules use a mat at thirty feet to the square;
+    # this app has a narrator instead of a picture, and a picture is the thing Pillars of
+    # Eternity II's naval combat could not give its players either — they could not tell
+    # how the ships were oriented, so the fight was noise before the boarding that decided
+    # it. The band is what a player can hold in their head from prose alone.
+    sea: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -4756,6 +4784,225 @@ class Engine:
             tell=f"{name} is a place now, off {parent.name}{held}. "
                  f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
             because=intent.because)
+
+    # --- the sea ------------------------------------------------------------------------
+
+    def vessel(self, vessel_id: str):
+        """One ship the campaign holds, as a live record. None if it holds no such ship."""
+        from . import ships as ships_mod
+
+        for raw in self.scene.vessels:
+            if str(raw.get("id")) == str(vessel_id):
+                return ships_mod.Vessel.from_dict(raw)
+        return None
+
+    def _keep_vessel(self, vessel) -> None:
+        """Write a vessel back. The one door: a hull's hit points are stored state, and
+        two writers of stored state is how a save and a scene start disagreeing."""
+        rows = [dict(v) for v in self.scene.vessels if str(v.get("id")) != vessel.id]
+        rows.append(vessel.as_dict())
+        self.scene.vessels = rows
+
+    def _op_sea(self, intent: Intent, partial: dict) -> Outcome:
+        """Two ships, and the distance between them.
+
+        The ruling this implements (2026-09-16): **ships close and then people board, and
+        the fight is on the deck.** So this op is five verbs and a band, and every one of
+        them is a decision rather than a die roll dressed up:
+
+            close       a sail on the horizon becomes bowshot becomes oars touching
+            sheer off   the other way, and at the far end you are away
+            ram         the book's own: Profession (sailor) against their AC, and it
+                        costs you the minimum of your own ram dice
+            grapple     the grapnels go in and nobody leaves until they are cut
+            board       across to their deck, where the engine takes over
+
+        The fight that matters is not here. It is on a deck, with a floor plan, a mast to
+        put between you and them and a rail with the sea past it — which is ground this
+        app has always been good at and Pathfinder's own fast-play rules stop short of.
+        """
+        from . import places as places_mod
+        from . import ships as ships_mod
+
+        from .sheet import IllegalSheet
+
+        do = str(intent.params.get("do") or "").strip().lower()
+        sea = dict(self.scene.sea or {})
+        if not sea:
+            return self._refuse(intent, "There is no other ship in sight.")
+        ours, theirs = self.vessel(sea.get("ours", "")), self.vessel(sea.get("theirs", ""))
+        if ours is None or theirs is None:
+            return self._refuse(intent, "There is no other ship in sight.")
+        band = str(sea.get("range") or "distant")
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+
+        if do in ("close", "sheer off", "sheer-off", "sheer"):
+            if do != "close" and sea.get("grappled"):
+                return self._refuse(
+                    intent, f"The grapnels are in. {ours.name} is not going anywhere "
+                            f"until they are cut.")
+            now = ships_mod.closer(band) if do == "close" else ships_mod.further(band)
+            sea["range"] = now
+            if do != "close" and now == "distant":
+                # Away. The engagement is over, which is a real outcome and the one a
+                # merchantman wants: the book's ships are faster than they are tough.
+                self.scene.sea = {}
+                return Outcome(
+                    intent_id=intent.id, op="sea",
+                    effects=[{"kind": "sea", "range": "away"}],
+                    tell=f"{_sentence(ours.name)} comes about and runs. {theirs.name} "
+                         f"falls astern, and then there is only the sea.",
+                    because=intent.because)
+            self.scene.sea = sea
+            said = {"closing": "is within bowshot now",
+                    "alongside": "is alongside, close enough to throw to",
+                    "distant": "is hull down again"}[now]
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "range": now}],
+                tell=f"{_sentence(theirs.name)} {said}.", because=intent.because)
+
+        if do == "ram":
+            if band != "closing":
+                return self._refuse(
+                    intent, "A ram wants way on and a run at them: from bowshot, closing. "
+                            "Alongside is too late and hull down is too far.")
+            if actor is None:
+                return self._refuse(intent, "Nobody is at the helm.")
+            # The book: the captain makes a Profession (sailor) check against the target's
+            # AC. Profession is trained only, which is a rule with teeth here — a party
+            # with no sailor in it cannot ram anybody, and the refusal says so rather than
+            # quietly rolling untrained.
+            try:
+                mods = actor.skill_modifiers("profession")
+            except IllegalSheet:
+                # Profession is trained-only, and `skill_modifiers` says so by raising.
+                # That rule has teeth here: a party with nobody who has sailed cannot ram
+                # anybody, and the refusal names what is missing rather than quietly
+                # rolling an untrained check the book does not allow.
+                return self._refuse(
+                    intent, f"{actor.name} is no sailor. Ramming is a Profession (sailor) "
+                            f"check at the helm, and it wants somebody who has done it "
+                            f"before — find whoever has.")
+            roll = self._roll_or_suspend(
+                intent, actor, mods, label=f"Ramming {theirs.name} (AC {theirs.ac})",
+                dc=theirs.ac, partial=partial)
+            sea["range"] = "alongside"
+            self.scene.sea = sea
+            if roll.total < theirs.ac:
+                self._keep_vessel(ours)
+                return Outcome(
+                    intent_id=intent.id, op="sea", rolls=[roll],
+                    effects=[{"kind": "sea", "range": "alongside", "hit": False}],
+                    tell=f"{_sentence(theirs.name)} turns inside it. {ours.name} slides "
+                         f"past her beam, close enough to touch.",
+                    because=intent.because)
+            hit = self.dice.roll(ships_mod.ram_damage(ours.kind),
+                                 label=f"{ours.name} rams", visibility="hidden")
+            said = ships_mod.take_damage(theirs, hit.total)
+            back = ships_mod.take_damage(ours, ships_mod.ram_self_damage(ours.kind))
+            self._keep_vessel(theirs)
+            self._keep_vessel(ours)
+            return Outcome(
+                intent_id=intent.id, op="sea", rolls=[roll, hit],
+                effects=[{"kind": "sea", "range": "alongside", "hit": True,
+                          "target": theirs.id, "sinking": theirs.sinking}],
+                tell=f"{_sentence(ours.name)} goes into her. "
+                     f"{_sentence(said)} {_sentence(back)}",
+                because=intent.because)
+
+        if do == "grapple":
+            if band != "alongside":
+                return self._refuse(
+                    intent, "Grapnels do not carry that far. Close with her first.")
+            sea["grappled"] = True
+            self.scene.sea = sea
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "range": band, "grappled": True}],
+                tell=f"The grapnels go across and bite. {ours.name} and {theirs.name} "
+                     f"are one deck now, whether anybody likes it or not.",
+                because=intent.because)
+
+        if do == "board":
+            if band != "alongside":
+                return self._refuse(
+                    intent, f"{theirs.name} is too far to step to. Close with her first.")
+            if actor is None:
+                return self._refuse(intent, "Nobody is here to go across.")
+            deck = ships_mod.deck_of(theirs)
+            if not deck:
+                return self._refuse(intent, f"{theirs.name} has no deck to board.")
+            # Everybody who goes across, goes across. `with` is the same word travel uses
+            # for the people who come along, and for the same reason: a boarding party is
+            # a party.
+            going = [actor.ref] + [str(w) for w in (intent.params.get("with") or [])
+                                   if str(w) in self.scene.actors]
+            for ref in going:
+                self.scene.move(ref, deck)
+            self.scene.settle_relations()
+            names = [self.scene.people[r].name for r in going if r in self.scene.people]
+            said = ", ".join(names)
+            verb = "goes" if len(names) == 1 else "go"
+            # And somebody to meet them. Arriving on an empty deck is the anticlimax the
+            # whole ruling exists to avoid — "the fight is on the deck" is not a design
+            # if the deck is empty — so the watch at the rail is put on the board from
+            # the NPC codex, by role words, at the party's own level. Not the whole crew:
+            # two hundred rowers is not an encounter, it is a reason the fight has to be
+            # won before the rest of them come up.
+            met = self._defenders(theirs, deck)
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "boarded": theirs.id, "place": deck,
+                          "who": going, "met": [a.ref for a in met]}],
+                tell=f"{said} {verb} over the rail onto {theirs.name}'s deck."
+                     + (f" {_and_list([a.name for a in met])} "
+                        f"{'is' if len(met) == 1 else 'are'} waiting at the rail."
+                        if met else " Nobody is on it."),
+                because=intent.because)
+
+        return self._refuse(
+            intent, f"{do or 'that'} is not something to do to a ship. There is close, "
+                    f"sheer off, ram, grapple and board.")
+
+    def _defenders(self, vessel, deck: str) -> list:
+        """Whoever meets a boarding party at the rail.
+
+        From the NPC codex by role words, at the party's own level — the same door a
+        scheme's cast and a shop's keeper come through, so a ship's crew is people rather
+        than a number on a vessel record.
+
+        A handful, and never the crew list: a galley carries two hundred rowers and two
+        hundred creatures is not an encounter, it is a spreadsheet. What the count says
+        instead is how many are *quick enough to be there* — a keelboat's one or two, a
+        warship's four — and the rest of them are the reason a boarding action has to be
+        won before they come up from below.
+        """
+        from . import npcs
+        from .bestiary import instantiate
+
+        if not vessel.crew:
+            return []
+        pc = self.scene.pc()
+        level = int(getattr(pc, "level", 1) or 1)
+        how_many = max(1, min(4, 1 + vessel.crew // 25))
+        template = str((npcs.choose(["sailor", "pirate"], level) or {}).get("id")
+                       or "thug")
+        # Named apart, because the brief lists people by name beside their ref and three
+        # actors all called "a hand" is a narrator writing about one person three times.
+        called = ("a hand", "a second hand", "a third hand", "a fourth hand")
+        out = []
+        for i in range(how_many):
+            try:
+                who = instantiate(template, scene=self.scene,
+                                  name=called[min(i, len(called) - 1)])
+            except Exception:
+                break
+            self.scene.add(who)
+            self.scene.move(who.ref, deck)
+            out.append(who)
+        return out
 
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.

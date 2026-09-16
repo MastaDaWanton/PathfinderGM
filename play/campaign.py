@@ -253,6 +253,9 @@ class Campaign:
                 # And when each of them was last talked round: a 24-hour limit that
                 # forgot itself on reload would be no limit at all.
                 "swayed": dict(self.scene.swayed),
+                # A hull does not heal and a chase does not reset: both survive a reload.
+                "vessels": [dict(v) for v in self.scene.vessels],
+                "sea": dict(self.scene.sea),
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -352,6 +355,8 @@ class Campaign:
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
+            vessels=[dict(v) for v in (s.get("vessels") or [])],
+            sea=dict(s.get("sea") or {}),
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),
