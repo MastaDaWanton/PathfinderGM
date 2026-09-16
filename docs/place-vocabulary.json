@@ -25,7 +25,9 @@
   "swamp",
   "tundra",
   "underground",
-  "urban"
+  "underwater",
+  "urban",
+  "water"
  ],
  "vertical": {
   "ledge": "a raised band along one side with a rail at its lip to shoot over — a gallery, a landing over a hall, a wall-walk, a quay",
@@ -44,8 +46,8 @@
   "the-sump"
  ],
  "vertical_balance": {
-  "consumer_tables": "59 of 69",
-  "ratio": 0.855,
+  "consumer_tables": "59 of 71",
+  "ratio": 0.831,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {

@@ -1600,7 +1600,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -2451,7 +2451,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -3884,7 +3884,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -5290,7 +5290,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -6440,8 +6440,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -7906,7 +7905,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -8281,7 +8280,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -8517,8 +8516,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -8852,7 +8850,7 @@
     "forest",
     "jungle",
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -9181,7 +9179,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -9403,7 +9401,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -10107,7 +10105,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -10608,8 +10606,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -11868,7 +11865,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -12659,8 +12656,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -20260,7 +20256,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -21804,7 +21800,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate"
@@ -26081,7 +26077,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -29580,8 +29576,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -30911,7 +30906,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -30994,7 +30989,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -34363,7 +34358,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -36045,7 +36040,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -36564,7 +36559,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -38543,8 +38538,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -46758,7 +46752,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -47875,7 +47869,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -51954,7 +51948,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -56907,8 +56901,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -57189,8 +57182,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -58425,7 +58417,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -62722,8 +62714,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -64887,7 +64878,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -67846,8 +67837,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -68302,7 +68292,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -72320,7 +72310,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -74065,8 +74055,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -74237,8 +74226,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -74406,7 +74394,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -74485,7 +74473,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -75114,8 +75102,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -75191,8 +75178,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -83977,8 +83963,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -84315,8 +84300,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -84389,8 +84373,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -85058,7 +85041,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -85706,7 +85689,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -86496,7 +86479,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -87616,8 +87599,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -88155,7 +88137,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -93222,7 +93204,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -97323,8 +97305,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -98382,8 +98363,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -99322,8 +99302,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -100613,7 +100592,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -102903,8 +102882,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -103441,8 +103419,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -103518,8 +103495,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -103940,8 +103916,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -105876,7 +105851,7 @@
     "forest",
     "jungle",
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -106246,7 +106221,8 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "coast",
+    "water"
    ],
    "climates": [
     "warm"
@@ -109158,7 +109134,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -109887,7 +109863,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -110260,7 +110236,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -111452,8 +111428,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -112777,8 +112752,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -112927,8 +112901,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -117093,7 +117066,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -117342,8 +117315,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -118464,7 +118436,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -119829,8 +119801,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -121236,8 +121207,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -121309,8 +121279,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -122926,8 +122895,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -124266,8 +124234,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -124339,7 +124306,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -128499,7 +128466,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -129241,7 +129208,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -134670,7 +134637,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -135137,8 +135104,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -135308,8 +135274,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -135667,8 +135632,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -136063,8 +136027,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -136520,8 +136483,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -137643,7 +137605,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -138870,8 +138832,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -138942,8 +138903,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -139015,8 +138975,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -139664,8 +139623,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142227,8 +142185,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142318,7 +142275,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142405,7 +142362,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142492,7 +142449,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142586,7 +142543,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -142682,7 +142639,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -143132,8 +143089,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -143368,7 +143324,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -145348,7 +145304,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -154387,7 +154343,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -154560,7 +154516,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -157863,8 +157819,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -161062,7 +161017,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -165692,7 +165647,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -169692,8 +169647,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -170110,7 +170064,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -171621,8 +171575,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -174060,8 +174013,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -177472,8 +177424,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -178480,7 +178431,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -179341,7 +179292,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -181992,7 +181943,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -184942,8 +184893,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -186311,7 +186261,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -189014,8 +188964,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -189377,7 +189326,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -192162,8 +192111,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -194305,8 +194253,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -196778,7 +196725,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -200213,8 +200160,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -200289,7 +200235,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -200359,7 +200305,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -200439,7 +200385,7 @@
     "forest",
     "jungle",
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -200511,7 +200457,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -200659,8 +200605,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -201095,8 +201040,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -201169,7 +201113,7 @@
    "playable": true,
    "biomes": [
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -201245,7 +201189,7 @@
    "playable": true,
    "biomes": [
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -201318,7 +201262,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -201711,7 +201655,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -201966,8 +201910,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -202111,7 +202054,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -202268,7 +202211,7 @@
     "forest",
     "jungle",
     "swamp",
-    "coast"
+    "water"
    ],
    "climates": [
     "warm"
@@ -202532,7 +202475,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -202608,7 +202551,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -202932,8 +202875,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -205014,7 +204956,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -205095,7 +205037,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -206757,7 +206699,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -206852,7 +206794,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -207885,8 +207827,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -214312,8 +214253,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -218874,7 +218814,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -219222,7 +219162,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -219958,7 +219898,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -220315,7 +220255,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -220482,7 +220422,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -225766,8 +225706,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -231512,8 +231451,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -234382,8 +234320,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -239031,7 +238968,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -239117,7 +239054,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -241949,7 +241886,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -242033,7 +241970,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -243395,7 +243332,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -245129,8 +245066,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -252691,8 +252627,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -253148,8 +253083,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -253430,8 +253364,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -254133,7 +254066,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -258678,7 +258611,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -259421,7 +259354,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -260390,7 +260323,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -262637,7 +262570,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -265016,7 +264949,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -266646,8 +266579,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -267001,8 +266933,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -267355,8 +267286,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -267563,7 +267493,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -267951,8 +267881,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -268026,8 +267955,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -269607,7 +269535,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -270420,7 +270348,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -270784,7 +270712,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -278800,7 +278728,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -278871,7 +278799,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -278943,8 +278871,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -279017,8 +278944,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -283645,8 +283571,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -283719,8 +283644,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -283794,8 +283718,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -284450,7 +284373,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -285263,8 +285186,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -285664,7 +285586,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -285757,7 +285679,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -285833,8 +285755,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -286034,7 +285955,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -287035,7 +286956,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -287913,8 +287834,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -288974,7 +288894,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -293545,8 +293465,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -295170,7 +295089,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -295827,7 +295746,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -296578,7 +296497,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -298084,8 +298003,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -298252,8 +298170,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -298920,7 +298837,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -299610,7 +299527,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -299706,7 +299623,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -304442,7 +304359,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -304936,7 +304853,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -307531,7 +307448,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -310410,7 +310327,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -312611,7 +312528,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -313509,7 +313426,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -318722,7 +318639,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -325664,7 +325581,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -325737,8 +325654,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -326334,7 +326250,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -326443,7 +326359,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -334307,7 +334223,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -335352,7 +335268,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -335458,7 +335374,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -336021,8 +335937,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -339170,7 +339085,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -342415,8 +342330,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -344925,7 +344839,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -345672,7 +345586,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -347073,7 +346987,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -347993,7 +347907,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate"
@@ -355193,7 +355107,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -356480,7 +356394,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -356569,7 +356483,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -356737,7 +356651,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -358639,8 +358553,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -361275,7 +361188,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -362195,7 +362108,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -363025,7 +362938,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -363199,7 +363112,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -364899,8 +364812,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -365918,7 +365830,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -366263,7 +366175,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -366517,8 +366429,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -367851,7 +367762,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -367940,7 +367851,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -370263,7 +370174,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -370468,7 +370379,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -375489,7 +375400,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -375576,7 +375487,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -376208,8 +376119,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -377344,8 +377254,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -378943,7 +378852,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -379020,7 +378929,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -380351,7 +380260,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -383896,7 +383805,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -385074,7 +384983,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -385163,7 +385072,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -387339,8 +387248,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -387523,7 +387431,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -388928,7 +388836,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -389203,7 +389111,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -393711,7 +393619,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -401754,7 +401662,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -403897,7 +403805,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -404824,8 +404732,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -405300,7 +405207,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -407177,7 +407084,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -408753,8 +408660,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -409377,7 +409283,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -410372,8 +410278,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -410447,8 +410352,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -410528,8 +410432,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -414042,8 +413945,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "tundra",
-    "coast",
+    "water",
     "underground"
    ],
    "climates": [
@@ -414122,8 +414024,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -420507,7 +420408,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -420603,7 +420504,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -425978,7 +425879,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -426081,7 +425982,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -431272,7 +431173,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -432034,8 +431935,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -432959,7 +432859,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -433845,8 +433745,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -434597,7 +434496,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -436569,8 +436468,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -436643,8 +436541,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -439392,8 +439289,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -442371,8 +442267,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -442754,7 +442649,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -442937,7 +442832,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -443711,8 +443606,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -444268,8 +444162,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -444347,8 +444240,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -444734,7 +444626,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -444826,7 +444718,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -444911,7 +444803,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445004,7 +444896,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445089,7 +444981,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445177,7 +445069,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445273,7 +445165,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445361,7 +445253,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445452,7 +445344,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445544,7 +445436,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445633,7 +445525,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445718,7 +445610,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445806,7 +445698,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -445892,7 +445784,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [
     "temperate",
@@ -447598,7 +447490,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -451030,7 +450922,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -452000,7 +451892,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -452287,7 +452179,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -452370,7 +452262,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -452726,8 +452618,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -452800,8 +452691,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -460701,7 +460591,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -460865,7 +460755,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -461596,8 +461486,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -464114,7 +464003,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -464656,8 +464545,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -466408,7 +466296,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -466485,7 +466373,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -466555,7 +466443,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -466648,7 +466536,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -467633,8 +467521,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -469961,7 +469848,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -470901,7 +470788,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -471899,7 +471786,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -474472,7 +474359,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -475046,8 +474933,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -475123,8 +475009,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -480756,7 +480641,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -481510,7 +481395,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482313,7 +482198,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482394,7 +482279,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482473,7 +482358,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482558,7 +482443,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482642,7 +482527,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -482721,7 +482606,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -485089,8 +484974,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -485255,8 +485139,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -485708,7 +485591,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -487587,7 +487470,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -488999,7 +488882,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -489260,8 +489143,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -489803,8 +489685,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -491156,7 +491037,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -495999,8 +495880,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -497241,8 +497121,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -497317,8 +497196,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -498823,7 +498701,7 @@
     "hills",
     "mountain",
     "tundra",
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [
@@ -501914,7 +501792,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -502270,8 +502148,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -502343,8 +502220,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -502914,8 +502790,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -503779,7 +503654,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -503965,7 +503840,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -504046,7 +503921,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -507592,8 +507467,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -509793,8 +509667,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -509867,8 +509740,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -510549,7 +510421,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -511899,7 +511771,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -513331,7 +513203,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -514322,8 +514194,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -515102,7 +514973,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -515694,7 +515565,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -515870,7 +515741,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -519683,7 +519554,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -522483,7 +522354,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -523588,7 +523459,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -523663,7 +523534,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -528255,8 +528126,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -529751,8 +529621,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -529825,8 +529694,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -529900,8 +529768,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -530432,8 +530299,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -536615,7 +536481,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -540338,7 +540204,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -540419,7 +540285,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -540788,7 +540654,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -540878,7 +540744,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -544891,7 +544757,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -545440,7 +545306,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -546235,7 +546101,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -546604,8 +546470,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -548203,7 +548068,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -549363,7 +549228,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -549449,7 +549314,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -550227,7 +550092,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -550821,7 +550686,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -565311,8 +565176,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -569054,7 +568918,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -569319,7 +569183,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -571163,7 +571027,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -572777,8 +572641,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -574337,7 +574200,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast",
+    "water",
     "planar"
    ],
    "climates": [],
@@ -576453,7 +576316,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -576537,7 +576400,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -580633,8 +580496,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -580802,8 +580664,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -582037,7 +581898,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -582417,7 +582278,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -588719,7 +588580,7 @@
    "playable": true,
    "biomes": [
     "mountain",
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -589275,7 +589136,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -590181,7 +590042,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -590323,8 +590184,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "forest",
-    "coast"
+    "forest"
    ],
    "climates": [],
    "biomes_any": false,
@@ -592164,7 +592024,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -592343,7 +592203,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -595729,7 +595589,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -598601,7 +598461,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,
@@ -603974,7 +603834,7 @@
    "notes": "",
    "playable": true,
    "biomes": [
-    "coast"
+    "water"
    ],
    "climates": [],
    "biomes_any": false,

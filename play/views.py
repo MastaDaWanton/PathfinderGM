@@ -1348,6 +1348,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     if swept:
         c.transcript.append({"who": "gm", "text": " ".join(swept),
                              "kind": "consequence"})
+    # And the breath anybody under the water is holding. Beside the fallen because it is
+    # the same kind of thing — the engine resolving what happens to a body while nobody
+    # is acting on it — and said out loud every rung of the way down, because drowning is
+    # the one death in the game that arrives on a schedule and a schedule the player
+    # cannot see is just a trapdoor.
+    for line in agent.engine.breathe():
+        c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
     # Walking away lets the scene go: the dying resolve off-screen and the fallen
     # stay where they fell, whether or not the walk crossed a biome line.
     if judgement.player_departs(player_input):

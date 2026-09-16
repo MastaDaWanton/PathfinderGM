@@ -70,7 +70,7 @@ Every one of these is matched over `body[]`, `senses[]` and `movement[]` **joine
 
 - *Write one of:* gills, amphibious, aquatic, "breathe water", "breathes underwater"
 - *Grants:* `amphibious`, `move.swim.30`
-- *Status:* **not yet: a swim speed: the engine has no water**
+- *Status:* **not yet: swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it**
 - *Note:* grants TWO tags: amphibious and a swim speed
 
 > Gills at the throat let them breathe underwater.

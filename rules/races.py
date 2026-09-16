@@ -942,9 +942,17 @@ CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
      "low-light vision", ""),
     (r"\b(scent|smell|olfact\w*|nose)\b[^.]{0,40}\b(keen|sharp|track|hunt|acute|strong)\b|"
      r"\b(track|hunt)\w*\s+by\s+(scent|smell)\b", ("sense.scent",), "scent", ""),
+    # "The engine has no water" was true when this was written and stopped being true on
+    # 2026-09-16. Both halves of this row now decide something at the table: `amphibious`
+    # is whether the drowning clock runs on you at all, and a swim speed is which row of
+    # the underwater table you are in — a swimmer keeps their Dexterity to AC, gives
+    # opponents no bonus, and does full damage with a piercing weapon, where a character
+    # who went over the side in armour has none of the three. What is still not read is
+    # swimming as MOVEMENT (`water.speed_factor`), which docs/water.md carries as open.
     (r"\b(gills?|amphibious|breathe\w*\s+(under)?water|aquatic)\b",
      ("amphibious", "move.swim.30"), "amphibious; swim 30 ft",
-     "a swim speed: the engine has no water"),
+     "swimming as movement: a swim speed spares you the water's penalties, and does "
+     "not yet carry you faster through it"),
     (r"\b(climb\w*|arboreal|tree-?dwell\w*)\b", ("move.climb.20",), "climb 20 ft", ""),
     (r"\b(burrow\w*|tunnel\w*|dig\w*)\b", ("move.burrow.20",), "burrow 20 ft",
      "a burrow speed: the engine has no earth"),

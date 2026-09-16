@@ -256,6 +256,20 @@ BY_TERRAIN: dict[str, Shape] = {
                     vertical="none", about="open, and hard going"),
     "coast": Shape(18, 16, None, clumps=5, clump_max=2, rough=8, rise=4, rise_to=1,
                    about="rocks, and the tide line"),
+    # Water, and under it. Both are `none` — flat, and meant to be, which is the one
+    # honest answer here: the whole surface of a lake is one height, and a ledge in open
+    # water is a thing nobody can point at. The verticality of water is DEPTH, and depth
+    # is the other place (`underwater`), reached by diving rather than by climbing.
+    #
+    # Nothing is blocked and nothing is difficult, for the same reason: water is not
+    # rough going the way scree is — it is a different way of moving altogether, and it
+    # is `rules/water.py` that says what that costs, creature by creature. A wave is not
+    # a wall.
+    "water": Shape(20, 20, None, clumps=0, clump_max=1, rough=0,
+                   vertical="none", about="open water, and nothing to stand on"),
+    "underwater": Shape(20, 20, None, clumps=2, clump_max=2, rough=0,
+                        vertical="none",
+                        about="green light from above, and weed moving with you"),
 }
 
 OPEN = Shape(about="open ground")

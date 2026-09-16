@@ -400,6 +400,19 @@ class Actor:
     # copies of one fact desynchronise. Written by exactly two doors, `Scene.add` and
     # `Scene.move`; `Scene.actors` is the view of everyone whose `at` is the party's.
     at: str = ""
+    # Whether this creature's last Swim check in the water was made, failed, or never
+    # asked for. Three states and not a bool, because the Core Rulebook's table has three
+    # answers: a made check is treading water, a failed one is floundering, and nobody
+    # having asked is a creature simply in the water — weighed down on the bottom, or
+    # floundering if it is not. `None` is the ordinary case and the one a save restores.
+    swim_check_made: bool | None = None
+    # How many rounds this creature has been under without breathing, and how many
+    # Constitution checks it has already failed down there. Counters, moved by
+    # `Scene.advance` on the clock everything else moves on; the CHECK belongs to the
+    # engine, which is the rule `advance` states in its own comment — it rolls dice, and
+    # a counter that is right beats a counter that is wrong.
+    held_breath_rounds: int = 0
+    drown_failures: int = 0
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
     # the other.
@@ -1197,6 +1210,31 @@ class Actor:
                 best, why = m.value, m.source or "concealment"
         return best, why
 
+    def water_row(self) -> str:
+        """Which row of the underwater table this creature is in, or "" on dry ground.
+
+        One derivation, asked in four places — the attack roll, the damage, the AC of
+        whoever is being swung at, and the tell. Derived rather than stored for the reason
+        every other spatial fact here is: the place id says where you are, and a stored
+        copy is a second writer waiting to disagree with it.
+        """
+        from . import places as places_mod
+        from . import water as water_mod
+
+        terrain = places_mod.terrain_of(str(getattr(self, "at", "") or ""))
+        if not water_mod.is_wet(terrain):
+            return ""
+        return water_mod.row_for(self, self.swim_check_made)
+
+    def _water_penalty(self, weapon: dict) -> "Modifier | None":
+        from . import water as water_mod
+
+        row = self.water_row()
+        if not row:
+            return None
+        penalty = water_mod.attack_penalty(row, str(weapon.get("type") or ""))
+        return Modifier(penalty, "the water") if penalty else None
+
     def _condition_mods(self, field_name: str) -> list[Modifier]:
         out = []
         for c in self.conditions:
@@ -1504,6 +1542,17 @@ class Actor:
         mods.extend(self._condition_mods("attack"))
         if w["category"] == "melee":
             mods.extend(self._condition_mods("melee_attack"))
+        # What the water takes off this particular swing. Scoped to the damage TYPE
+        # because that is how the Core Rulebook scopes it — a spear works down there and
+        # a sword does not — which is why it cannot ride a condition's flat `attack` the
+        # way `shaken` does.
+        #
+        # Read off this creature's OWN place id: the ground is inside the id (`~water:`),
+        # `terrain_of` parses it and looks nothing up, and that is precisely why a sheet
+        # with no world can still answer. The same reason `scene.biome` is derived.
+        wet = self._water_penalty(w)
+        if wet:
+            mods.append(wet)
         # Weapon Focus and Power Attack arrive here now, scoped and conditional, from
         # their documents — never as literals appended above.
         mods.extend(self._buff_mods("combat_mod", "attack",
@@ -2690,14 +2739,24 @@ class Actor:
         changed = []
         con = self.ability_score("con")
         if self.hp <= -con and not self.has_condition("dead"):
-            for gone in ("dying", "stable", "unconscious"):
+            # `disabled` belongs on the list and was missing from it. Most deaths never
+            # stop at exactly 0 hit points, so nobody had ever been disabled and then
+            # killed — until drowning, which walks a body down the ladder one rung a
+            # round (0, then -1, then dead) and left a corpse that was still "conscious,
+            # and a standard action costs a hit point".
+            for gone in ("dying", "stable", "unconscious", "disabled"):
                 self.remove_condition(gone)
             self.add_condition("dead", source="hit points")
             changed.append("dead")
-        elif self.hp < 0 and not self.has_condition("dead"):
-            # Ferocity (a half-orc's, or an evolution's): conscious and fighting below
-            # 0 as if disabled — staggered, and still dying a point a round — until
-            # −Con. A tag question, so a world's people with the trait get it too.
+        elif (self.hp < 0 or (self.hp == 0 and self.drown_failures)) \
+                and not self.has_condition("dead"):
+            # Drowning enters here at exactly 0, which every other route to 0 does not.
+            # "He falls unconscious (0 hp)" is the book's own sentence and it overrides
+            # the book's own threshold: a sword that leaves you on nothing leaves you
+            # DISABLED — upright, conscious, and a standard action costs a hit point —
+            # and a lungful of water does not. The rule lives here with the other
+            # thresholds because this is the one place that owns what a hit point total
+            # means, and `Engine.breathe` owns only the schedule that got them here.
             if self.has_state("ferocity"):
                 if not self.has_state("state.impaired.staggered"):
                     self.add_condition("staggered", source="ferocity")
@@ -2705,8 +2764,11 @@ class Actor:
             elif not self.has_condition("unconscious"):
                 self.add_condition("unconscious", source="hit points")
                 changed.append("unconscious")
-            # Stabilising once keeps you stable; fresh damage starts it again.
-            if not self.has_condition("stable") and not self.has_condition("dying"):
+            # Stabilising once keeps you stable; fresh damage starts it again. Not at
+            # exactly 0, though: a drowning character is unconscious for a round BEFORE
+            # they start dying, which is the middle rung of the three-round fall.
+            if self.hp < 0 and not self.has_condition("stable") \
+                    and not self.has_condition("dying"):
                 self.add_condition("dying", source="hit points")
                 changed.append("dying")
         elif self.hp == 0 and not self.has_condition("disabled"):
@@ -3478,6 +3540,12 @@ def to_dict(actor: Actor) -> dict:
         "nonlethal": actor.nonlethal, "speed": actor.speed,
         "compulsions": [c.as_dict() for c in actor.compulsions],
         "coating": dict(actor.coating),
+        # The water's two counters and the footing that goes with them. A save taken
+        # mid-dive that forgot how long the breath had been held would hand the diver a
+        # fresh lungful for reloading, which is the cheapest cheat in the game.
+        "held_breath_rounds": actor.held_breath_rounds,
+        "drown_failures": actor.drown_failures,
+        "swim_check_made": actor.swim_check_made,
         "awake_minutes": actor.awake_minutes, "fed_minutes": actor.fed_minutes,
         "watered_minutes": actor.watered_minutes,
         "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
@@ -3834,6 +3902,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),
         speed=int(data.get("speed", 30) or 30),
+        held_breath_rounds=int(data.get("held_breath_rounds", 0) or 0),
+        drown_failures=int(data.get("drown_failures", 0) or 0),
+        swim_check_made=data.get("swim_check_made"),
         awake_minutes=int(data.get("awake_minutes", 0) or 0),
         fed_minutes=int(data.get("fed_minutes", 0) or 0),
         watered_minutes=int(data.get("watered_minutes", 0) or 0),

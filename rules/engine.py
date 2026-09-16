@@ -28,6 +28,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import states
 from . import survival
+from . import water
 from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
@@ -64,6 +65,20 @@ def zone_for_feet(feet: int) -> str:
     if squares <= SQUARES_BY_ZONE["near"]:
         return "near"
     return "far"
+
+
+def _drowning_ground(actor) -> bool:
+    """Whether this creature is under water it cannot breathe.
+
+    Two questions, both asked through their own vocabulary: the terrain comes off the
+    place id (`places.terrain_of` parses and looks nothing up) and whether the creature
+    can breathe the stuff is a tag. A shark is not drowning; a knight in plate is.
+    """
+    from . import places as places_mod
+
+    if not water.is_under(places_mod.terrain_of(str(getattr(actor, "at", "") or ""))):
+        return False
+    return not water.breathes_water(actor)
 
 
 class _Here(Mapping):
@@ -789,6 +804,16 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
+            # The breath they are holding, for anybody under the surface who does not
+            # breathe water. A counter, like hunger above it and for the same reason:
+            # the Constitution check that follows it rolls dice and belongs to the
+            # engine (`Engine.breathe`). Surfacing resets it, because breathing is what
+            # holding your breath stops being.
+            if _drowning_ground(a):
+                a.held_breath_rounds += rounds
+            elif a.held_breath_rounds or a.drown_failures:
+                a.held_breath_rounds = 0
+                a.drown_failures = 0
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
@@ -2421,8 +2446,22 @@ class Engine:
             or not self.scene.initiative
             or not self._has_acted(defender.ref)
         )
-        target_ac = defender.ac(against=weapon["category"], flat_footed=flat_footed)
+        # A creature floundering in water is easier to hit and keeps no guard: the book
+        # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
+        # about the DEFENDER's footing, so they are read here where the defender is known
+        # and applied to the number being rolled against — the same reasoning the cover
+        # block below states, and for the same reason: everything that reads an AC should
+        # see the real one.
+        wet_defender = defender.water_row()
+        flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
+        target_ac = defender.ac(against=weapon["category"],
+                                flat_footed=flat_footed or bool(flounders))
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
+        if wet_defender:
+            against = water.bonus_against(wet_defender)
+            if against:
+                target_ac -= against
+                ac_note += f", floundering in the water"
 
         # What the board is worth to the defender. Added to the number being rolled
         # against rather than taken off the attack roll: the two are the same arithmetic
@@ -2602,6 +2641,16 @@ class Engine:
                 )
                 state["rolls"].append(dmg.as_dict())
                 amount = max(1, dmg.total)
+                # Half, for a blade swung in water. The book halves the DAMAGE of a
+                # slashing or bludgeoning weapon and leaves a spear whole, which no
+                # modifier can express — a modifier is a number added to a roll and this
+                # is a rule about the roll's result. Halved here, where the weapon's type
+                # and the swinger's footing are both known, and never below one: a hit
+                # that lands is a hit.
+                wet_row = actor.water_row()
+                if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
+                    amount = max(1, amount // 2)
+                    state["tells"].append("The water takes half the force out of it.")
                 hit = self._apply_damage(defender, amount, weapon["type"])
                 state["effects"].append(hit)
                 # What the *defender* lost, not what the die said. A hit for 12 against
@@ -3548,6 +3597,69 @@ class Engine:
                     tells.extend(self._resolve_dying(a))
                 self.scene.depart(ref)
                 self.scene.fallen.pop(ref, None)
+        return tells
+
+    def breathe(self) -> list[str]:
+        """Everybody underwater holds their breath, and then stops being able to.
+
+        The Core Rulebook's drowning rule, which is three sentences and a cliff: you hold
+        your breath for twice your Constitution in rounds; after that it is a Constitution
+        check each round at DC 10, rising by one every round; and on the first failure you
+        are unconscious at 0, the next round dying at -1, and the round after that dead.
+
+        There is no save against the last part and that is deliberate on the book's side —
+        drowning is the one death in the game that arrives on a schedule. What the engine
+        owes the player is that the schedule be visible, so every rung tells.
+
+        Called where `tidy_the_fallen` is called, for the same reason: it is the engine
+        resolving something that happens to a body while nobody is acting on it.
+        """
+        tells: list[str] = []
+        for a in list(self.scene.people.values()):
+            if not _drowning_ground(a) or a.has_state("state.down.dead"):
+                continue
+            limit = water.breath_rounds(a)
+            if a.held_breath_rounds <= limit and not a.drown_failures:
+                continue
+            if not a.drown_failures:
+                # Still trying to hold it. One check a round, one harder each time.
+                dc = water.drown_dc(a.drown_failures)
+                roll = self.dice.d20([Modifier(a.ability_mod("con"), "Con")],
+                                     label=f"{a.name} holds their breath (DC {dc})",
+                                     visibility="hidden")
+                if roll.total >= dc:
+                    tells.append(f"{a.name} holds on.")
+                    continue
+                # No condition is written here, and that is the point: the book does
+                # not have a "drowning" condition, it has a schedule that writes
+                # unconscious, then dying, then dead — all three of which
+                # `apply_hp_state` derives from hit points already. The suite caught the
+                # invention four separate ways (not in Appendix 2, no tag entry, helpless
+                # but able to act, and one more literal condition key in this file than
+                # the ceiling allows), which is the vocabulary law doing exactly its job.
+                # The schedule lives in a counter; the states are the book's own.
+                a.drown_failures = 1
+                a.hp = 0
+                # And `apply_hp_state` reads `drown_failures` to know that this
+                # particular 0 is unconscious rather than disabled — the rule lives with
+                # the other hit-point thresholds, which is both where it belongs and the
+                # only way to write it without adding a literal condition name to this
+                # file. The three laws hold the count here to a ceiling that may only
+                # fall, and they are right to.
+                tells.extend(f"{a.name} " + t for t in
+                             ["breathes water, and goes limp."])
+                a.apply_hp_state()
+                continue
+            # Past the first failure it is not a check any more, it is a countdown.
+            a.drown_failures += 1
+            if a.drown_failures == 2:
+                a.hp = -1
+                a.apply_hp_state()
+                tells.append(f"{a.name} is dying, and nobody down here can help them.")
+            else:
+                a.hp = -max(1, a.ability_score("con"))
+                a.apply_hp_state()
+                tells.append(f"{a.name} has drowned.")
         return tells
 
     def _resolve_dying(self, a: Actor) -> list[str]:

@@ -99,7 +99,7 @@
    "example": "Gills at the throat let them breathe underwater.",
    "note": "grants TWO tags: amphibious and a swim speed",
    "engine_ready": false,
-   "waits_on": "a swim speed: the engine has no water",
+   "waits_on": "swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it",
    "pattern": "\\b(gills?|amphibious|breathe\\w*\\s+(under)?water|aquatic)\\b"
   },
   {

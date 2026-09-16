@@ -273,10 +273,21 @@ to remove. Get the `~terrain` in.
 - `~` separates the location from its ground; `:` separates the ground from the slug; `^`
   introduces a storey. None of the three may appear in a World Bible entity id (checked
   against the fixture: they are twelve hex characters).
-- `terrain` is one of the **fourteen** the consumer knows, and no other word:
+- `terrain` is one of the **sixteen** the consumer knows, and no other word:
   `coast`, `desert`, `farmland`, `forest`, `grassland`, `hills`, `jungle`, `mountain`,
-  `planar`, `ruins`, `swamp`, `tundra`, `underground`, `urban`.
+  `planar`, `ruins`, `swamp`, `tundra`, `underground`, `underwater`, `urban`, `water`.
   A settlement's places are `urban` whatever the continent's facts say.
+- **`water` and `underwater` are new (2026-09-16)** and they are two words on purpose.
+  `water` is a surface — a river, a lake, the sea seen from a boat, and somewhere a body
+  can breathe and has cover from anyone on the shore. `underwater` is below it, where the
+  clock is the breath you brought and fire does not burn. Diving is a move between two
+  places, the same shape as a storey, so a lake that matters is two places and a lake
+  that is scenery is one.
+
+  Before this the consumer had no word for water at all: `aquatic`, `ocean`, `river` and
+  `lake` all resolved to `coast`, which put 468 creatures — every shark and kraken in the
+  bestiary — on a beach. If your worlds have coastlines, rivers or lakes that a party
+  could go **into** rather than walk beside, these are the words for them.
 - The slug is lower case, hyphenated, and includes the article: `the-market`.
 - **Ids must be stable across exports.** Everything the campaign overlay remembers about a
   place is keyed by this string.
