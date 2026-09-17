@@ -28,6 +28,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import states
 from . import survival
+from . import water
 from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
@@ -64,6 +65,34 @@ def zone_for_feet(feet: int) -> str:
     if squares <= SQUARES_BY_ZONE["near"]:
         return "near"
     return "far"
+
+
+def _sentence(name: str) -> str:
+    """A name at the start of a sentence. Ships and keepers carry their article — "the
+    Cold Widow" — and a tell that opens with a lower-case "the" reads as a typo."""
+    said = str(name or "")
+    return said[:1].upper() + said[1:]
+
+
+def _and_list(names) -> str:
+    got = [str(n) for n in names if str(n).strip()]
+    if len(got) <= 1:
+        return got[0] if got else ""
+    return ", ".join(got[:-1]) + " and " + got[-1]
+
+
+def _drowning_ground(actor) -> bool:
+    """Whether this creature is under water it cannot breathe.
+
+    Two questions, both asked through their own vocabulary: the terrain comes off the
+    place id (`places.terrain_of` parses and looks nothing up) and whether the creature
+    can breathe the stuff is a tag. A shark is not drowning; a knight in plate is.
+    """
+    from . import places as places_mod
+
+    if not water.is_under(places_mod.terrain_of(str(getattr(actor, "at", "") or ""))):
+        return False
+    return not water.breathes_water(actor)
 
 
 class _Here(Mapping):
@@ -236,6 +265,31 @@ class Scene:
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
     schemes: list[dict] = field(default_factory=list)
+    # Which counters have had somebody put behind them (`rules/keepers.py`): place ids,
+    # once each, for ever. The ledger is the PLACE and not the person on purpose — a
+    # keeper who is dead is swept out of the scene two turns later, and a check for
+    # "is anybody standing here" would mint the murdered smith a second time.
+    staffed: list[str] = field(default_factory=list)
+    # When each creature was last talked round, by ref, as the world clock's minute.
+    # "You cannot use Diplomacy to influence a given creature's attitude more than once
+    # in a 24 hour period" (Core Rulebook) — the limit is on TRYING, so a failed attempt
+    # spends the day too. Without it the check is free and a player rolls until the dice
+    # agree with them, which is the shape of every social system that stops mattering.
+    swayed: dict[str, int] = field(default_factory=dict)
+    # The ships this campaign knows, as `ships.Vessel` dicts — the one the party took
+    # passage on, the one closing on it. Stored rather than derived, unlike a place: a
+    # room does not move and a hull does not heal, so where a ship is and how much of it
+    # is left are facts play made and nothing can recompute.
+    vessels: list[dict] = field(default_factory=list)
+    # The engagement at sea, when there is one: which two ships, how far apart, and
+    # whether the grapnels are in. `{"ours", "theirs", "range", "grappled"}`.
+    #
+    # A band and not a grid. The fast-play rules use a mat at thirty feet to the square;
+    # this app has a narrator instead of a picture, and a picture is the thing Pillars of
+    # Eternity II's naval combat could not give its players either — they could not tell
+    # how the ships were oriented, so the fight was noise before the boarding that decided
+    # it. The band is what a player can hold in their head from prose alone.
+    sea: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -778,6 +832,16 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
+            # The breath they are holding, for anybody under the surface who does not
+            # breathe water. A counter, like hunger above it and for the same reason:
+            # the Constitution check that follows it rolls dice and belongs to the
+            # engine (`Engine.breathe`). Surfacing resets it, because breathing is what
+            # holding your breath stops being.
+            if _drowning_ground(a):
+                a.held_breath_rounds += rounds
+            elif a.held_breath_rounds or a.drown_failures:
+                a.held_breath_rounds = 0
+                a.drown_failures = 0
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
@@ -2095,6 +2159,14 @@ class Engine:
                 )
 
         level = actor.level if actor.is_pc else 1
+        # Talking somebody round is a rule with a table behind it, so the DC is the
+        # engine's and never the plan's (`rules/attitude.py`). A `check` naming a subject
+        # with `target` and a skill that moves the track is the ordinary way to change a
+        # mind — it is what the `condition` refusal has been telling the model to do
+        # since stage 8, while nothing on this side did anything with it.
+        swayed = self._sway_subject(intent, skill)
+        if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
+            return refusal
         if opposed:
             target = opposing_roll.total
             resolved_dc = dc_mod.ResolvedDC(value=target, band=None)
@@ -2102,6 +2174,12 @@ class Engine:
                 c = intent.params["circumstance"]
                 resolved_dc.circumstance = dc_mod.CIRCUMSTANCE[c["value"]]
                 resolved_dc.circumstance_why = c.get("why", "") or c["value"]
+        elif swayed is not None:
+            from . import attitude as attitude_mod
+
+            resolved_dc = dc_mod.ResolvedDC(
+                value=(attitude_mod.influence_dc(swayed) if skill == "diplomacy"
+                       else attitude_mod.intimidate_dc(swayed)), band=None)
         else:
             resolved_dc = dc_mod.resolve(
                 intent.params.get("dc"), level, intent.params.get("circumstance")
@@ -2144,10 +2222,90 @@ class Engine:
             beaten = (opposing_roll.total if opposing_roll else resolved_dc.final)
             tell += self.reward_check(actor, skill, beaten)
 
+        effects: list[dict] = []
+        if swayed is not None:
+            moved_tell, effects = self._sway(actor, swayed, skill, margin,
+                                             intent.because)
+            # The margin has already been said; what the player is told about the person
+            # is how they now feel, which is the only part of this a character could
+            # see. No step count, no DC — the third law.
+            tell = f"{tell} {moved_tell}".strip()
+
         return Outcome(
             intent_id=intent.id, op="check", rolls=rolls, dc=resolved_dc.as_dict(),
-            verdict=verdict, margin=margin, tell=tell, because=intent.because,
+            verdict=verdict, margin=margin, effects=effects, tell=tell,
+            because=intent.because,
         )
+
+    # --- talking somebody round ----------------------------------------------------------
+
+    def _sway_subject(self, intent: Intent, skill: str):
+        """The creature a social check is aimed at, or None if this is not one.
+
+        A `check` with a `target` and a skill that moves the track. Everything else — a
+        Diplomacy check at a band the GM named, a Climb, an opposed Bluff — resolves
+        exactly as it did, which is what keeps this additive.
+        """
+        from . import attitude as attitude_mod
+
+        if skill not in attitude_mod.LEVERS or intent.params.get("opposed_by"):
+            return None
+        refs = [r for r in intent.targets() if r and r != intent.actor]
+        return self.scene.actors.get(refs[0]) if refs else None
+
+    def _sway_refusal(self, intent: Intent, actor, target, skill: str):
+        """Why this attempt does not happen at all, as an outcome. Or None.
+
+        "You cannot use Diplomacy to influence a given creature's attitude more than once
+        in a 24 hour period" — the Core Rulebook's own limit, and the thing that stops a
+        player rolling until the dice agree with them. Intimidate has no such limit in
+        the book and is not given one here; what it has instead is a target who ends up
+        unfriendly, which is the book's own price.
+        """
+        from . import attitude as attitude_mod
+
+        if skill != "diplomacy":
+            return None
+        last = self.scene.swayed.get(target.ref)
+        if last is None or self.scene.clock_minutes - int(last) >= attitude_mod.COOLDOWN_MINUTES:
+            return None
+        return Outcome(
+            intent_id=intent.id, op="check", rolls=[], effects=[],
+            tell=(f"{target.name} has heard {actor.name} out once today and will not "
+                  f"hear it again. Come back tomorrow, or find another way."),
+            because=intent.because)
+
+    def _sway(self, actor, target, skill: str, margin: int, because: str):
+        """Move the target along the track, and say how they now feel.
+
+        The book, and nothing but: Diplomacy shifts one step plus one per 5 over, two at
+        most, and costs a step on a failure by 5 or more; the shift lasts 1d4 hours.
+        Intimidate buys `1d6 x 10` minutes of friendliness on a success and nothing on a
+        failure. Both land through `_set_attitude`, which is the one applicator.
+        """
+        from . import attitude as attitude_mod
+
+        was = attitude_mod.of(target)
+        if skill == "intimidate":
+            if margin < 0:
+                return f"{target.name} does not scare.", []
+            minutes = self.dice.roll(attitude_mod.INTIMIDATE_DICE,
+                                     label="cowed for", visibility="hidden").total * 10
+            now, rounds = "friendly", _to_rounds(minutes, "minute")
+        else:
+            # The attempt is spent whether or not it worked: the limit is on trying.
+            self.scene.swayed[target.ref] = int(self.scene.clock_minutes)
+            steps = attitude_mod.steps_for(margin)
+            now = attitude_mod.moved(was, steps)
+            if not steps or now == was:
+                return attitude_mod.said(target.name, was, was), []
+            hours = self.dice.roll(attitude_mod.SHIFT_DICE, label="for",
+                                   visibility="hidden").total
+            rounds = _to_rounds(hours, "hour")
+        cond = self._set_attitude(target, now, rounds, because or f"{skill} check")
+        return (attitude_mod.said(target.name, was, now),
+                [{"ref": target.ref, "kind": "condition", "condition": now,
+                  "rounds_left": cond.rounds_left}])
 
     # save --------------------------------------------------------------------------------
 
@@ -2316,8 +2474,22 @@ class Engine:
             or not self.scene.initiative
             or not self._has_acted(defender.ref)
         )
-        target_ac = defender.ac(against=weapon["category"], flat_footed=flat_footed)
+        # A creature floundering in water is easier to hit and keeps no guard: the book
+        # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
+        # about the DEFENDER's footing, so they are read here where the defender is known
+        # and applied to the number being rolled against — the same reasoning the cover
+        # block below states, and for the same reason: everything that reads an AC should
+        # see the real one.
+        wet_defender = defender.water_row()
+        flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
+        target_ac = defender.ac(against=weapon["category"],
+                                flat_footed=flat_footed or bool(flounders))
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
+        if wet_defender:
+            against = water.bonus_against(wet_defender)
+            if against:
+                target_ac -= against
+                ac_note += f", floundering in the water"
 
         # What the board is worth to the defender. Added to the number being rolled
         # against rather than taken off the attack roll: the two are the same arithmetic
@@ -2497,6 +2669,16 @@ class Engine:
                 )
                 state["rolls"].append(dmg.as_dict())
                 amount = max(1, dmg.total)
+                # Half, for a blade swung in water. The book halves the DAMAGE of a
+                # slashing or bludgeoning weapon and leaves a spear whole, which no
+                # modifier can express — a modifier is a number added to a roll and this
+                # is a rule about the roll's result. Halved here, where the weapon's type
+                # and the swinger's footing are both known, and never below one: a hit
+                # that lands is a hit.
+                wet_row = actor.water_row()
+                if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
+                    amount = max(1, amount // 2)
+                    state["tells"].append("The water takes half the force out of it.")
                 hit = self._apply_damage(defender, amount, weapon["type"])
                 state["effects"].append(hit)
                 # What the *defender* lost, not what the die said. A hit for 12 against
@@ -3445,6 +3627,69 @@ class Engine:
                 self.scene.fallen.pop(ref, None)
         return tells
 
+    def breathe(self) -> list[str]:
+        """Everybody underwater holds their breath, and then stops being able to.
+
+        The Core Rulebook's drowning rule, which is three sentences and a cliff: you hold
+        your breath for twice your Constitution in rounds; after that it is a Constitution
+        check each round at DC 10, rising by one every round; and on the first failure you
+        are unconscious at 0, the next round dying at -1, and the round after that dead.
+
+        There is no save against the last part and that is deliberate on the book's side —
+        drowning is the one death in the game that arrives on a schedule. What the engine
+        owes the player is that the schedule be visible, so every rung tells.
+
+        Called where `tidy_the_fallen` is called, for the same reason: it is the engine
+        resolving something that happens to a body while nobody is acting on it.
+        """
+        tells: list[str] = []
+        for a in list(self.scene.people.values()):
+            if not _drowning_ground(a) or a.has_state("state.down.dead"):
+                continue
+            limit = water.breath_rounds(a)
+            if a.held_breath_rounds <= limit and not a.drown_failures:
+                continue
+            if not a.drown_failures:
+                # Still trying to hold it. One check a round, one harder each time.
+                dc = water.drown_dc(a.drown_failures)
+                roll = self.dice.d20([Modifier(a.ability_mod("con"), "Con")],
+                                     label=f"{a.name} holds their breath (DC {dc})",
+                                     visibility="hidden")
+                if roll.total >= dc:
+                    tells.append(f"{a.name} holds on.")
+                    continue
+                # No condition is written here, and that is the point: the book does
+                # not have a "drowning" condition, it has a schedule that writes
+                # unconscious, then dying, then dead — all three of which
+                # `apply_hp_state` derives from hit points already. The suite caught the
+                # invention four separate ways (not in Appendix 2, no tag entry, helpless
+                # but able to act, and one more literal condition key in this file than
+                # the ceiling allows), which is the vocabulary law doing exactly its job.
+                # The schedule lives in a counter; the states are the book's own.
+                a.drown_failures = 1
+                a.hp = 0
+                # And `apply_hp_state` reads `drown_failures` to know that this
+                # particular 0 is unconscious rather than disabled — the rule lives with
+                # the other hit-point thresholds, which is both where it belongs and the
+                # only way to write it without adding a literal condition name to this
+                # file. The three laws hold the count here to a ceiling that may only
+                # fall, and they are right to.
+                tells.extend(f"{a.name} " + t for t in
+                             ["breathes water, and goes limp."])
+                a.apply_hp_state()
+                continue
+            # Past the first failure it is not a check any more, it is a countdown.
+            a.drown_failures += 1
+            if a.drown_failures == 2:
+                a.hp = -1
+                a.apply_hp_state()
+                tells.append(f"{a.name} is dying, and nobody down here can help them.")
+            else:
+                a.hp = -max(1, a.ability_score("con"))
+                a.apply_hp_state()
+                tells.append(f"{a.name} has drowned.")
+        return tells
+
     def _resolve_dying(self, a: Actor) -> list[str]:
         """One dying creature's story ends off-screen: stable, or gone."""
         floor = -a.ability_score("con")
@@ -3563,6 +3808,19 @@ class Engine:
         for a in self.scene.people.values():
             if not a.at:
                 a.at = target.id
+        self.staff_the_place()
+
+    def staff_the_place(self):
+        """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
+
+        Called from the two doors that change where the party is — here, and the end of
+        a `travel` that moved — because those are the two, and a third caller would be
+        a third place to forget. Idempotent: a place that has been staffed once is
+        never staffed again, so a save reloaded fifty times still has one smith.
+        """
+        from . import keepers
+
+        return keepers.staff(self)
 
     def _march(self, pc, hours: int, biome: str) -> tuple[bool, str]:
         """Walk a journey, eight hours a day with a camp between, and say what it cost.
@@ -3675,7 +3933,17 @@ class Engine:
         # `_op_venture` uses, because `pass_hours` can stop early and only it knows how
         # many hours were actually survived.
         toll_note = ""
-        arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
+        if how == "sea":
+            # A passage is not a march. Nobody aboard is walking eight hours and camping
+            # at dusk — they are fed, watered and slept by the ship, which is exactly what
+            # `_march`'s camp does for a traveller and with none of the walking. So the
+            # clock moves and the body is not charged, and a crossing always completes:
+            # a ship does not turn back because a passenger is tired.
+            arrived, walked = True, ""
+            self.scene.advance(hours * survival.MINUTES_PER_HOUR, charge_body=False)
+        else:
+            arrived, walked = self._march(pc, hours,
+                                          places_mod.terrain_of(self.scene.at))
         if walked:
             toll_note = f" The road cost them: {walked}"
 
@@ -3735,6 +4003,8 @@ class Engine:
         how the GM says an escort comes along. The dead and the dying are not eligible
         even there: they stay where they fell.
         """
+        from . import keepers
+
         want = str(intent.params.get("biome") or "").strip().lower()
         place = " ".join(str(intent.params.get("place") or "").split())
         if not want and not place:
@@ -3912,6 +4182,13 @@ class Engine:
                     # hold, and the tell lands on the visible card.
                     if a.has_state("state.hidden") or a.has_state("state.down.dead"):
                         continue
+                    # Nor whoever keeps the room being walked out of. "Left behind:
+                    # Gorvothys Vyrnys" of the stallholder standing at her own stall
+                    # reads as an abandoned companion; she is where she lives, and the
+                    # party is the one who left. A keeper who has come away from their
+                    # place and is then dropped IS left behind, and is said.
+                    if keepers.place_of(getattr(a, "world_entity_id", "") or "") == a.at:
+                        continue
                     left.append(a.name)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
@@ -3929,6 +4206,9 @@ class Engine:
                 self.scene.move(ref, going_to.id)
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
+            # And whoever keeps the room they have just walked into, if it is a room
+            # somebody keeps and nobody has kept it yet.
+            self.staff_the_place()
 
         note = str(intent.params.get("note") or "").strip()
         bits = []
@@ -4505,6 +4785,225 @@ class Engine:
                  f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
             because=intent.because)
 
+    # --- the sea ------------------------------------------------------------------------
+
+    def vessel(self, vessel_id: str):
+        """One ship the campaign holds, as a live record. None if it holds no such ship."""
+        from . import ships as ships_mod
+
+        for raw in self.scene.vessels:
+            if str(raw.get("id")) == str(vessel_id):
+                return ships_mod.Vessel.from_dict(raw)
+        return None
+
+    def _keep_vessel(self, vessel) -> None:
+        """Write a vessel back. The one door: a hull's hit points are stored state, and
+        two writers of stored state is how a save and a scene start disagreeing."""
+        rows = [dict(v) for v in self.scene.vessels if str(v.get("id")) != vessel.id]
+        rows.append(vessel.as_dict())
+        self.scene.vessels = rows
+
+    def _op_sea(self, intent: Intent, partial: dict) -> Outcome:
+        """Two ships, and the distance between them.
+
+        The ruling this implements (2026-09-16): **ships close and then people board, and
+        the fight is on the deck.** So this op is five verbs and a band, and every one of
+        them is a decision rather than a die roll dressed up:
+
+            close       a sail on the horizon becomes bowshot becomes oars touching
+            sheer off   the other way, and at the far end you are away
+            ram         the book's own: Profession (sailor) against their AC, and it
+                        costs you the minimum of your own ram dice
+            grapple     the grapnels go in and nobody leaves until they are cut
+            board       across to their deck, where the engine takes over
+
+        The fight that matters is not here. It is on a deck, with a floor plan, a mast to
+        put between you and them and a rail with the sea past it — which is ground this
+        app has always been good at and Pathfinder's own fast-play rules stop short of.
+        """
+        from . import places as places_mod
+        from . import ships as ships_mod
+
+        from .sheet import IllegalSheet
+
+        do = str(intent.params.get("do") or "").strip().lower()
+        sea = dict(self.scene.sea or {})
+        if not sea:
+            return self._refuse(intent, "There is no other ship in sight.")
+        ours, theirs = self.vessel(sea.get("ours", "")), self.vessel(sea.get("theirs", ""))
+        if ours is None or theirs is None:
+            return self._refuse(intent, "There is no other ship in sight.")
+        band = str(sea.get("range") or "distant")
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+
+        if do in ("close", "sheer off", "sheer-off", "sheer"):
+            if do != "close" and sea.get("grappled"):
+                return self._refuse(
+                    intent, f"The grapnels are in. {ours.name} is not going anywhere "
+                            f"until they are cut.")
+            now = ships_mod.closer(band) if do == "close" else ships_mod.further(band)
+            sea["range"] = now
+            if do != "close" and now == "distant":
+                # Away. The engagement is over, which is a real outcome and the one a
+                # merchantman wants: the book's ships are faster than they are tough.
+                self.scene.sea = {}
+                return Outcome(
+                    intent_id=intent.id, op="sea",
+                    effects=[{"kind": "sea", "range": "away"}],
+                    tell=f"{_sentence(ours.name)} comes about and runs. {theirs.name} "
+                         f"falls astern, and then there is only the sea.",
+                    because=intent.because)
+            self.scene.sea = sea
+            said = {"closing": "is within bowshot now",
+                    "alongside": "is alongside, close enough to throw to",
+                    "distant": "is hull down again"}[now]
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "range": now}],
+                tell=f"{_sentence(theirs.name)} {said}.", because=intent.because)
+
+        if do == "ram":
+            if band != "closing":
+                return self._refuse(
+                    intent, "A ram wants way on and a run at them: from bowshot, closing. "
+                            "Alongside is too late and hull down is too far.")
+            if actor is None:
+                return self._refuse(intent, "Nobody is at the helm.")
+            # The book: the captain makes a Profession (sailor) check against the target's
+            # AC. Profession is trained only, which is a rule with teeth here — a party
+            # with no sailor in it cannot ram anybody, and the refusal says so rather than
+            # quietly rolling untrained.
+            try:
+                mods = actor.skill_modifiers("profession")
+            except IllegalSheet:
+                # Profession is trained-only, and `skill_modifiers` says so by raising.
+                # That rule has teeth here: a party with nobody who has sailed cannot ram
+                # anybody, and the refusal names what is missing rather than quietly
+                # rolling an untrained check the book does not allow.
+                return self._refuse(
+                    intent, f"{actor.name} is no sailor. Ramming is a Profession (sailor) "
+                            f"check at the helm, and it wants somebody who has done it "
+                            f"before — find whoever has.")
+            roll = self._roll_or_suspend(
+                intent, actor, mods, label=f"Ramming {theirs.name} (AC {theirs.ac})",
+                dc=theirs.ac, partial=partial)
+            sea["range"] = "alongside"
+            self.scene.sea = sea
+            if roll.total < theirs.ac:
+                self._keep_vessel(ours)
+                return Outcome(
+                    intent_id=intent.id, op="sea", rolls=[roll],
+                    effects=[{"kind": "sea", "range": "alongside", "hit": False}],
+                    tell=f"{_sentence(theirs.name)} turns inside it. {ours.name} slides "
+                         f"past her beam, close enough to touch.",
+                    because=intent.because)
+            hit = self.dice.roll(ships_mod.ram_damage(ours.kind),
+                                 label=f"{ours.name} rams", visibility="hidden")
+            said = ships_mod.take_damage(theirs, hit.total)
+            back = ships_mod.take_damage(ours, ships_mod.ram_self_damage(ours.kind))
+            self._keep_vessel(theirs)
+            self._keep_vessel(ours)
+            return Outcome(
+                intent_id=intent.id, op="sea", rolls=[roll, hit],
+                effects=[{"kind": "sea", "range": "alongside", "hit": True,
+                          "target": theirs.id, "sinking": theirs.sinking}],
+                tell=f"{_sentence(ours.name)} goes into her. "
+                     f"{_sentence(said)} {_sentence(back)}",
+                because=intent.because)
+
+        if do == "grapple":
+            if band != "alongside":
+                return self._refuse(
+                    intent, "Grapnels do not carry that far. Close with her first.")
+            sea["grappled"] = True
+            self.scene.sea = sea
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "range": band, "grappled": True}],
+                tell=f"The grapnels go across and bite. {ours.name} and {theirs.name} "
+                     f"are one deck now, whether anybody likes it or not.",
+                because=intent.because)
+
+        if do == "board":
+            if band != "alongside":
+                return self._refuse(
+                    intent, f"{theirs.name} is too far to step to. Close with her first.")
+            if actor is None:
+                return self._refuse(intent, "Nobody is here to go across.")
+            deck = ships_mod.deck_of(theirs)
+            if not deck:
+                return self._refuse(intent, f"{theirs.name} has no deck to board.")
+            # Everybody who goes across, goes across. `with` is the same word travel uses
+            # for the people who come along, and for the same reason: a boarding party is
+            # a party.
+            going = [actor.ref] + [str(w) for w in (intent.params.get("with") or [])
+                                   if str(w) in self.scene.actors]
+            for ref in going:
+                self.scene.move(ref, deck)
+            self.scene.settle_relations()
+            names = [self.scene.people[r].name for r in going if r in self.scene.people]
+            said = ", ".join(names)
+            verb = "goes" if len(names) == 1 else "go"
+            # And somebody to meet them. Arriving on an empty deck is the anticlimax the
+            # whole ruling exists to avoid — "the fight is on the deck" is not a design
+            # if the deck is empty — so the watch at the rail is put on the board from
+            # the NPC codex, by role words, at the party's own level. Not the whole crew:
+            # two hundred rowers is not an encounter, it is a reason the fight has to be
+            # won before the rest of them come up.
+            met = self._defenders(theirs, deck)
+            return Outcome(
+                intent_id=intent.id, op="sea",
+                effects=[{"kind": "sea", "boarded": theirs.id, "place": deck,
+                          "who": going, "met": [a.ref for a in met]}],
+                tell=f"{said} {verb} over the rail onto {theirs.name}'s deck."
+                     + (f" {_and_list([a.name for a in met])} "
+                        f"{'is' if len(met) == 1 else 'are'} waiting at the rail."
+                        if met else " Nobody is on it."),
+                because=intent.because)
+
+        return self._refuse(
+            intent, f"{do or 'that'} is not something to do to a ship. There is close, "
+                    f"sheer off, ram, grapple and board.")
+
+    def _defenders(self, vessel, deck: str) -> list:
+        """Whoever meets a boarding party at the rail.
+
+        From the NPC codex by role words, at the party's own level — the same door a
+        scheme's cast and a shop's keeper come through, so a ship's crew is people rather
+        than a number on a vessel record.
+
+        A handful, and never the crew list: a galley carries two hundred rowers and two
+        hundred creatures is not an encounter, it is a spreadsheet. What the count says
+        instead is how many are *quick enough to be there* — a keelboat's one or two, a
+        warship's four — and the rest of them are the reason a boarding action has to be
+        won before they come up from below.
+        """
+        from . import npcs
+        from .bestiary import instantiate
+
+        if not vessel.crew:
+            return []
+        pc = self.scene.pc()
+        level = int(getattr(pc, "level", 1) or 1)
+        how_many = max(1, min(4, 1 + vessel.crew // 25))
+        template = str((npcs.choose(["sailor", "pirate"], level) or {}).get("id")
+                       or "thug")
+        # Named apart, because the brief lists people by name beside their ref and three
+        # actors all called "a hand" is a narrator writing about one person three times.
+        called = ("a hand", "a second hand", "a third hand", "a fourth hand")
+        out = []
+        for i in range(how_many):
+            try:
+                who = instantiate(template, scene=self.scene,
+                                  name=called[min(i, len(called) - 1)])
+            except Exception:
+                break
+            self.scene.add(who)
+            self.scene.move(who.ref, deck)
+            out.append(who)
+        return out
+
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.
         Generated on entry from a seed off the parent's id (the roguelike answer), so the
@@ -4642,8 +5141,9 @@ class Engine:
         # Here rather than in `add_condition`, for the reason argued directly above:
         # the applicator is the engine's own hand and this is a rule about the op.
         if key in states.ATTITUDES:
-            target.clear_states("attitude")
-        cond = target.add_condition(key, rounds, source=intent.because)
+            cond = self._set_attitude(target, key, rounds, intent.because)
+        else:
+            cond = target.add_condition(key, rounds, source=intent.because)
         return Outcome(
             intent_id=intent.id, op="condition",
             effects=[{"ref": target.ref, "kind": "condition", "condition": key,
@@ -4652,6 +5152,23 @@ class Engine:
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
         )
+
+    def _set_attitude(self, target, key: str, rounds: int | None, source: str):
+        """Move a creature to one step of the track. The one applicator for an attitude.
+
+        One step at a time: nobody is hostile and helpful at once, and without the clear
+        a charm laid over an old grudge left both standing and `attitude_of` answered
+        with whichever the reversed walk hit first. Here rather than in `add_condition`,
+        because that is the engine's own hand — it writes dead, dying and helpless — and
+        this is a rule about changing somebody's mind, not about recording a fact.
+
+        Two callers, which is exactly why it is a method: `condition` (a spell, a power)
+        and `check` (talking to them). The second arrived 2026-09-16 and would otherwise
+        have been a second copy of the clear-then-add rule — CLAUDE.md's "when you fix a
+        rule, grep for every copy of it", applied before there was a copy to grep for.
+        """
+        target.clear_states("attitude")
+        return target.add_condition(key, rounds, source=source)
 
     # What a natural weapon does past its damage. The rider tags a race grants —
     # `natural.trip`, `natural.grab.bite`, `natural.poison.sting` — and the intent each
@@ -5314,7 +5831,7 @@ class Engine:
     # family. Nothing that used to be narrated silently starts happening.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
-                 "choose_one", "bundle")
+                 "choose_one", "bundle", "attitude")
 
     def _executes(self, spec: dict) -> bool:
         return (str(spec.get("type", "")) in self._EXECUTES
@@ -5353,7 +5870,48 @@ class Engine:
             return self._conceal(spec, ctx)
         if kind == "object_damage":
             return self._object_damage(spec, ctx)
+        if kind == "attitude":
+            return self._attitude(spec, ctx)
         return self._stand_by(spec, ctx)
+
+    def _attitude(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell that changes how somebody feels about you. Charm person, and 32 others.
+
+        The type has existed since the spell import and shipped `engine=False` with the
+        note "no check in the app consults an attitude yet". A check does now
+        (`rules/attitude.py`), so the block came off — and the suite immediately caught
+        that lifting the block is a CLAIM: `test_every_executable_type_has_something_that
+        _executes_it` exists because a type marked executable with no executor is
+        "narrative wearing a costume". This is the executor that makes the claim true.
+
+        Through `_set_attitude`, the same one applicator the `condition` op and a
+        Diplomacy check use, so a charmed guard and a talked-round guard are one kind of
+        thing and one `remove_effects(source=...)` clears either.
+
+        The spec's `towards` field is not honoured and cannot be: an `attitude.*` tag says
+        how a creature feels, full stop, and the app has no per-observer attitudes. Twelve
+        of the thirty-three spells say "towards the caster", which is what the tag already
+        means in practice — the party is who the brief is written for.
+        """
+        from . import attitude as attitude_mod
+
+        key = str(spec.get("target") or "").strip().lower()
+        if key not in states.ATTITUDES:
+            return self._stand_by(spec, ctx)
+        rounds = ctx.get("rounds")
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in ctx.get("targets") or []:
+            who = self.scene.actors.get(str(ref))
+            if who is None:
+                continue
+            was = attitude_mod.of(who)
+            cond = self._set_attitude(who, key, rounds,
+                                      str(ctx.get("source") or "a spell"))
+            effects.append({"ref": who.ref, "kind": "condition", "condition": key,
+                            "rounds_left": cond.rounds_left})
+            tells.append(attitude_mod.said(who.name, was, key))
+        return effects, tells
 
     def _choose(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """One option, or none and a sentence saying so.
@@ -5877,7 +6435,9 @@ class Engine:
             return ""
         if there == 0 and mine == 0:
             return ""                      # the town's own ground floor: as it always was
-        if going_to.id in places_mod.stairs_from(here.id, here.terrain):
+        if going_to.id in places_mod.stairs_from(here.id, here.terrain,
+                                                 getattr(here, "shape", None),
+                                                 getattr(here, "floors", ())):
             return ""
         # One floor of a building, named from somewhere that is not the floor below it.
         building = places_mod.base_of(going_to.id)
@@ -6180,10 +6740,23 @@ class Engine:
         # id, so the market has the same stalls every time anybody fights in it and none
         # of it is saved. A place nobody has a shape for falls through to its terrain and
         # then to open ground, which is what every fight used to get.
+        # And the world's own dimensions for the room when it wrote them: World Bible
+        # ships width, depth, height, clutter, footing and a vertical kind on every place
+        # it authors, and for two releases a fight in a 125-foot square was fought on
+        # whatever this app's table said a room of that NAME looks like. `here()` carries
+        # the authored shape; a generated or founded place carries None and derives, as
+        # every place did before.
+        authored = getattr(self.here(), "shape", None)
         self.scene.grid = floorplan.for_place(
-            self.scene.at, places_mod.terrain_of(self.scene.at))
+            self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         mid = self.scene.grid.height // 2
-        pc_side, foe_row = 4, 0
+        # A quarter of the way in, and never off the board. The literal 4 was safe while
+        # every room was at least twelve squares wide; it stopped being safe the day a
+        # ten-foot alley became authorable, and a PC placed at column 4 of a two-square
+        # room is a PC standing in the sea. Reported from the World Bible side as "the
+        # alley is gone" — their narrow-room rule had been made unreachable by this app's
+        # own floor — and this is the half of that fix which is not the floor.
+        pc_side, foe_row = max(1, min(4, self.scene.grid.width // 4)), 0
         for side, refs in sides.items():
             has_pc = any(self.scene.actors[r].is_pc for r in refs
                          if r in self.scene.actors)
@@ -6202,7 +6775,19 @@ class Engine:
                 away = (max(1, stated // FEET_PER_SQUARE) if stated
                         else SQUARES_BY_ZONE.get(zone, 3))
                 if pc_side + away >= self.scene.grid.width:
-                    self.scene.grid.width = pc_side + away + 2
+                    if authored is not None:
+                        # A room the world measured is that size, and the distance gives
+                        # way rather than the walls. Without this the reader would be
+                        # undone by the first archer: a thirty-foot shop grew into a
+                        # seventy-foot hall the moment somebody spawned at `far`, and the
+                        # dimensions the export wrote would have survived exactly until a
+                        # fight started in them.
+                        away = max(1, self.scene.grid.width - pc_side - 2)
+                    else:
+                        # Ground nobody measured has no walls to argue with: a bowshot at
+                        # a hundred and twenty feet is twenty-four squares, and the blank
+                        # field is twenty. It grows.
+                        self.scene.grid.width = pc_side + away + 2
                 if has_pc:
                     self.scene.positions[ref] = self._clear_square(
                         (pc_side, mid + i), self.scene.actors[ref].size)

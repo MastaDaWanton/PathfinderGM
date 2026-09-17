@@ -228,6 +228,26 @@ def expand(doc: dict) -> dict:
         waits = _fill(str(ev.get("not_yet") or ""), choice or "—")
         if waits and waits not in not_yet:
             not_yet.append(waits)
+    # A natural attack tag with no evolution behind it still has to be a weapon.
+    #
+    # A world's race card is written from cue words — "heavy fangs" grants `natural.bite`
+    # — and carries the tag with no pick to carry the weapon, so `sheet.natural_weapon`
+    # looked in `doc["weapons"]`, found nothing, and the bite was a sentence in a trait
+    # list. Measured 2026-09-16 on the shipped world: four of Aurvantis's sixteen races
+    # grant claws or a bite and not one of them could swing it, while this app's own
+    # checker told World Bible their cards were "thin". Half of that thinness was here.
+    #
+    # The weapon comes from the evolution that grants the same tag rather than from a
+    # second table — the catalogue already holds a bite's dice by size, and two copies of
+    # that is the trap CLAUDE.md names. Same shape as the `PAIRED_LIMBS` rule below,
+    # which exists for exactly this case one field over.
+    by_tag = {tg: ev for ev in cat.values() if ev.get("weapons")
+              for tg in (ev.get("tags") or [])}
+    for tg in tags:
+        for w in (by_tag.get(tg) or {}).get("weapons") or ():
+            if not any(x.get("key") == w.get("key") for x in weapons):
+                weapons.append(dict(w))
+
     # The count goes on at the end, so three separate picks of one read the same as one
     # pick of three. Lines the document wrote itself are not in `earned` and keep theirs.
     traits = [f"{ln} (x{earned[ln]})" if earned.get(ln, 1) > 1 else ln for ln in traits]
@@ -922,21 +942,100 @@ CUES: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
      "low-light vision", ""),
     (r"\b(scent|smell|olfact\w*|nose)\b[^.]{0,40}\b(keen|sharp|track|hunt|acute|strong)\b|"
      r"\b(track|hunt)\w*\s+by\s+(scent|smell)\b", ("sense.scent",), "scent", ""),
+    # "The engine has no water" was true when this was written and stopped being true on
+    # 2026-09-16. Both halves of this row now decide something at the table: `amphibious`
+    # is whether the drowning clock runs on you at all, and a swim speed is which row of
+    # the underwater table you are in — a swimmer keeps their Dexterity to AC, gives
+    # opponents no bonus, and does full damage with a piercing weapon, where a character
+    # who went over the side in armour has none of the three. What is still not read is
+    # swimming as MOVEMENT (`water.speed_factor`), which docs/water.md carries as open.
     (r"\b(gills?|amphibious|breathe\w*\s+(under)?water|aquatic)\b",
      ("amphibious", "move.swim.30"), "amphibious; swim 30 ft",
-     "a swim speed: the engine has no water"),
+     "swimming as movement: a swim speed spares you the water's penalties, and does "
+     "not yet carry you faster through it"),
     (r"\b(climb\w*|arboreal|tree-?dwell\w*)\b", ("move.climb.20",), "climb 20 ft", ""),
     (r"\b(burrow\w*|tunnel\w*|dig\w*)\b", ("move.burrow.20",), "burrow 20 ft",
      "a burrow speed: the engine has no earth"),
-    (r"\b(talons?|claws?|clawed)\b", ("natural.claws",), "claws",
-     "natural attacks: the engine rolls the weapon in hand"),
-    (r"\b(fangs?|bite|tusks?|mandibles?|beak)\b", ("natural.bite",), "bite",
-     "natural attacks: the engine rolls the weapon in hand"),
+    # Both of these were marked as waiting on the engine until 2026-09-16, with the line
+    # "natural attacks: the engine rolls the weapon in hand". That had stopped being
+    # true: the validator knows every natural weapon's name, the sheet builds one at the
+    # right die for the body's size, and `_NATURAL_RIDERS` resolves what a bite does past
+    # its damage. What was actually missing was `expand` turning the TAG into a weapon,
+    # which it does now — measured end to end on the shipped world, where a Catfolk
+    # imported from Aurvantis swings claws for 1d4 slashing. Until today this app's own
+    # checker reported that gap to World Bible as a thin race card.
+    (r"\b(talons?|claws?|clawed)\b", ("natural.claws",), "claws", ""),
+    (r"\b(fangs?|bite|tusks?|mandibles?|beak)\b", ("natural.bite",), "bite", ""),
     (r"\b(carapace|chitin\w*|scales?|scaled|hide|armou?red|plated|shell)\b",
      ("natural.armor.1",), "+1 natural armour", ""),
     (r"\b(light|sun|sunlight|daylight)\b[^.]{0,40}\b(pain\w*|blind\w*|burn\w*|dazzl\w*|hurt\w*|weak\w*)\b",
      ("weakness.light-sensitivity",), "light sensitivity", ""),
+    # The two words this table did not have, and the reason three of Aurvantis's race
+    # cards produced nothing at all. The supplier checked each against its own anatomy
+    # before touching it and said so plainly: a Human "physically unremarkable and highly
+    # variable" and a Halfling with "unusually good luck" are described correctly and
+    # completely — there was simply no cue that meant versatile or lucky, so the words
+    # reached nothing. That is a vocabulary gap on THIS side, and they were right to
+    # refuse to invent traits to fill it.
+    #
+    # Both are plain 1e. A human's versatility is the extra feat and the extra skill rank
+    # every human gets; a halfling's luck is the +1 racial bonus on all saving throws
+    # printed on the core race. `GRANTS` below turns each tag into the thing it means.
+    (r"\b(versatile|adaptable|unremarkable|highly variable|jack of all)\b",
+     ("versatile",), "an extra feat and an extra skill rank", ""),
+    (r"\b(luck|lucky|luckier|fortunate|charmed)\b", ("lucky",),
+     "+1 on all saving throws", ""),
 )
+
+# What a tag means when the thing it means is not another tag. Two entries, because two
+# cues grant something the tag vocabulary cannot say by itself: a budget is an allowance
+# the sheet spends, and a luck bonus is three modifiers.
+#
+# Kept here rather than as extra columns on CUES so that table stays four wide and one
+# kind of thing — a pattern, what it grants, what it reads as, and what it waits on.
+GRANTS: dict[str, dict] = {
+    "versatile": {"budget": {"feats": 1, "ranks": 1}},
+    "lucky": {"modifiers": [
+        {"type": "save_mod", "target": save, "amount": 1, "bonus_type": "racial"}
+        for save in ("fort", "ref", "will")]},
+}
+
+# What each tag SHOWS, one tag at a time.
+#
+# CUES carries a line per row, and a row can grant two tags: the gills row grants both
+# `amphibious` and `move.swim.30` and shows "amphibious; swim 30 ft". That is right for a
+# card whose prose says gills and wrong for a card that STATES one tag and not the other,
+# which schema 1.5 made possible. So the trait line belongs to the tag, and the rows keep
+# theirs only for the prose path they were written for.
+#
+# Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should receive
+# exactly the anatomy as our engine will read it, and World Bible should also write the
+# description from those tags."* The regex table is not deleted — a schema 1.4 export, or
+# a card whose author wrote prose and no tags, still needs it — but it stops being the
+# authority the moment a card states its own.
+#
+# `tests/test_races.py` asserts this covers every tag CUES can grant, so a cue added
+# without a meaning fails there rather than shipping a trait that shows as nothing.
+TAG_MEANS: dict[str, tuple[str, str]] = {
+    "move.fly.30": ("fly 30 ft (clumsy)", ""),
+    "sense.blindsense.30": ("blindsense 30 ft", ""),
+    "sense.darkvision.60": ("darkvision 60 ft", ""),
+    "sense.low-light": ("low-light vision", ""),
+    "sense.scent": ("scent", ""),
+    "amphibious": ("amphibious", ""),
+    "move.swim.30": ("swim 30 ft",
+                     "swimming as movement: a swim speed spares you the water's "
+                     "penalties, and does not yet carry you faster through it"),
+    "move.climb.20": ("climb 20 ft", ""),
+    "move.burrow.20": ("burrow 20 ft", "a burrow speed: the engine has no earth"),
+    "natural.claws": ("claws", ""),
+    "natural.bite": ("bite", ""),
+    "natural.armor.1": ("+1 natural armour", ""),
+    "weakness.light-sensitivity": ("light sensitivity", ""),
+    "versatile": ("an extra feat and an extra skill rank", ""),
+    "lucky": ("+1 on all saving throws", ""),
+}
+
 _SMALL = re.compile(r"\b(small|short|slight|diminutive|half the height|child-sized|"
                     r"waist-high|knee-high|halfling-sized)\b", re.I)
 _LARGE = re.compile(r"\b(towering|giant|huge|massive|twice the height|ten feet|"
@@ -962,23 +1061,53 @@ def is_species(entity) -> bool:
 
 def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
           about: str = "", origin: str = "", people_id: str = "", world: str = "",
-          strengths=(), weakness: str = "") -> dict:
-    """One race document from the world's own sentences. The words decide which lines
-    of the table apply; the table decides the numbers."""
+          strengths=(), weakness: str = "", granted=()) -> dict:
+    """One race document from the world's own sentences — unless the card states its
+    tags, in which case the tags are the card's and the sentences are only description.
+
+    `granted` is `play.races[].grants[]`, schema 1.5. When it is present NOTHING is read
+    out of the prose: not a tag, not a trait line. That is the point of it. A card that
+    says "sometimes visible tusks" and states no bite does not get a bite, and a card
+    that states a bite gets one whether or not any word in it would have fired the cue.
+
+    The prose path below it is unchanged and still live — a 1.4 export, or an author who
+    wrote sentences and no tags, still gets the table.
+    """
     text = " ".join(str(p) for p in phrases if str(p).strip())
     low = text.lower()
     tags: list[str] = []
     traits: list[str] = []
     not_yet: list[str] = []
-    for pattern, granted, line, waits in CUES:
-        if re.search(pattern, low):
-            for t in granted:
-                if t not in tags:
-                    tags.append(t)
-            if line not in traits:
+    stated = [str(t).strip() for t in (granted or ()) if str(t).strip()]
+    if stated:
+        for tag in stated:
+            if tag in tags:
+                continue
+            tags.append(tag)
+            line, waits = TAG_MEANS.get(tag, ("", ""))
+            if line and line not in traits:
                 traits.append(line)
+            elif not line:
+                # Stated and unreadable. Recorded rather than dropped: a tag this engine
+                # has no meaning for is a disagreement between two programs about their
+                # shared vocabulary, and the quiet version of that is a race that is
+                # missing something nobody can name. The forge shows `not_yet`.
+                tags.remove(tag)
+                not_yet.append(f"{tag}: the world grants this and this engine has no "
+                               f"such tag — it reaches nothing until one side changes")
+                continue
             if waits and waits not in not_yet:
                 not_yet.append(waits)
+    else:
+        for pattern, cued, line, waits in CUES:
+            if re.search(pattern, low):
+                for t in cued:
+                    if t not in tags:
+                        tags.append(t)
+                if line not in traits:
+                    traits.append(line)
+                if waits and waits not in not_yet:
+                    not_yet.append(waits)
     size = size_hint.strip().lower() if size_hint in SIZES else (
         "small" if _SMALL.search(low) else "medium")
     if _LARGE.search(low) and size == "medium":
@@ -989,6 +1118,15 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
     speed = {"slow": 20, "normal": 30, "fast": 40}.get(speed_hint.strip().lower(), 0) or (
         40 if _FAST.search(low) and not _SLOW.search(low) else
         20 if _SLOW.search(low) else 30)
+    # What those tags actually grant, where the thing granted is not another tag.
+    budget: dict = {}
+    modifiers: list = []
+    for tag in tags:
+        got = GRANTS.get(tag) or {}
+        for key, value in (got.get("budget") or {}).items():
+            budget[key] = budget.get(key, 0) + int(value)
+        modifiers.extend(dict(m) for m in (got.get("modifiers") or ()))
+
     rid = slug(name)
     mods, choose = array_from_words(strengths, weakness)
     if not mods and (strengths or weakness):
@@ -1002,13 +1140,15 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
         "description": (about or text)[:400],
         "type": "humanoid", "size": size, "speed": speed,
         "mods": mods, "choose": choose,
-        "modifiers": [], "tags": tags, "traits": traits,
-        "budget": {}, "languages": [rid] if rid else [],
+        "modifiers": modifiers, "tags": tags, "traits": traits,
+        "budget": budget, "languages": [rid] if rid else [],
         "not_yet": not_yet, "origin": origin or "world",
         "people_id": people_id, "world": world,
         # Converted mechanically from prose and read by nobody yet — the same flag the
-        # ingredient bench shows as "unreviewed".
-        "converted": True,
+        # ingredient bench shows as "unreviewed". A card that STATED its tags was not
+        # converted by anything: the world said what it meant and this app agreed to
+        # read it, so the flag that means "this app guessed" would be a lie on it.
+        "converted": not stated,
     })
 
 
@@ -1032,8 +1172,14 @@ def written_for(world) -> dict[str, dict]:
 
 def from_world(world) -> list[dict]:
     """The races a world ships with: the ones its author wrote (`play.races[]`, the
-    contract in docs/campaign-format.md — World Bible does not write them yet) and,
-    when that list is absent, one per people whose entry describes a body."""
+    contract in docs/campaign-format.md) and, when that list is absent, one per people
+    whose entry describes a body.
+
+    Both branches are live. World Bible has written race cards since schema 1.1, so the
+    first is the normal path for a current export and the second is what a 1.0 world — or
+    one whose author wrote no cards — still gets. The difference is not cosmetic: a card
+    can carry `strengths`/`weakness` and a derived people cannot, because an anatomy fact
+    says what a body looks like and never what it is good at."""
     out: list[dict] = []
     world_id = world_key(world)
     play = getattr(world, "play", None) or {}
@@ -1049,6 +1195,7 @@ def from_world(world) -> list[dict]:
                              about=str(raw.get("about") or ""),
                              strengths=raw.get("strengths") or (),
                              weakness=str(raw.get("weakness") or ""),
+                             granted=raw.get("grants") or (),
                              origin=f"world:{raw.get('people_id') or raw.get('id') or slug(raw['name'])}",
                              people_id=str(raw.get("people_id") or ""), world=world_id))
         return out

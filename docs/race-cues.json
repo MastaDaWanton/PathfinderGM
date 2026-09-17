@@ -37,8 +37,8 @@
    "write": "wings, winged, fly, flight, glide, soar, airborne",
    "example": "They have broad wings and fly between the canopy platforms.",
    "note": "",
-   "engine_ready": false,
-   "waits_on": "a fly speed: the engine moves on the ground only",
+   "engine_ready": true,
+   "waits_on": "",
    "pattern": "\\b(wings?|winged|fly|flight|glide|soar|airborne)\\b"
   },
   {
@@ -99,7 +99,7 @@
    "example": "Gills at the throat let them breathe underwater.",
    "note": "grants TWO tags: amphibious and a swim speed",
    "engine_ready": false,
-   "waits_on": "a swim speed: the engine has no water",
+   "waits_on": "swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it",
    "pattern": "\\b(gills?|amphibious|breathe\\w*\\s+(under)?water|aquatic)\\b"
   },
   {
@@ -110,8 +110,8 @@
    "write": "climb (any ending), arboreal, tree-dwelling",
    "example": "They climb sheer trunks without rope.",
    "note": "",
-   "engine_ready": false,
-   "waits_on": "a climb speed: the engine has no walls",
+   "engine_ready": true,
+   "waits_on": "",
    "pattern": "\\b(climb\\w*|arboreal|tree-?dwell\\w*)\\b"
   },
   {
@@ -134,8 +134,8 @@
    "write": "talon, talons, claw, claws, clawed",
    "example": "Each hand ends in heavy claws.",
    "note": "",
-   "engine_ready": false,
-   "waits_on": "natural attacks: the engine rolls the weapon in hand",
+   "engine_ready": true,
+   "waits_on": "",
    "pattern": "\\b(talons?|claws?|clawed)\\b"
   },
   {
@@ -146,8 +146,8 @@
    "write": "fang, fangs, bite, tusk, tusks, mandibles, beak",
    "example": "A hooked beak, strong enough to break bone.",
    "note": "",
-   "engine_ready": false,
-   "waits_on": "natural attacks: the engine rolls the weapon in hand",
+   "engine_ready": true,
+   "waits_on": "",
    "pattern": "\\b(fangs?|bite|tusks?|mandibles?|beak)\\b"
   },
   {
@@ -173,8 +173,110 @@
    "engine_ready": true,
    "waits_on": "",
    "pattern": "\\b(light|sun|sunlight|daylight)\\b[^.]{0,40}\\b(pain\\w*|blind\\w*|burn\\w*|dazzl\\w*|hurt\\w*|weak\\w*)\\b"
+  },
+  {
+   "grants": [
+    "versatile"
+   ],
+   "shows": "an extra feat and an extra skill rank",
+   "write": "versatile / adaptable / unremarkable / highly variable / jack of all",
+   "example": "They are physically unremarkable and highly variable.",
+   "note": "grants the extra feat and the extra skill rank a human gets, not a number on any roll",
+   "engine_ready": true,
+   "waits_on": "",
+   "pattern": "\\b(versatile|adaptable|unremarkable|highly variable|jack of all)\\b"
+  },
+  {
+   "grants": [
+    "lucky"
+   ],
+   "shows": "+1 on all saving throws",
+   "write": "luck / lucky / fortunate / charmed",
+   "example": "They have a reputation for unusually good luck.",
+   "note": "+1 racial bonus on every saving throw, which is a halfling's luck",
+   "engine_ready": true,
+   "waits_on": "",
+   "pattern": "\\b(luck|lucky|luckier|fortunate|charmed)\\b"
   }
  ],
- "cue_count": 12,
- "engine_ready_count": 6
+ "cue_count": 14,
+ "engine_ready_count": 12,
+ "grants_rule": "a card may state play.races[].grants[] — exactly these tag names. When it does, the prose is description only and nothing is read out of it; a tag not on this list reaches nothing and is reported to the player as a trait neither side can name.",
+ "grants": {
+  "move.fly.30": {
+   "shows": "fly 30 ft (clumsy)",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.blindsense.30": {
+   "shows": "blindsense 30 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.darkvision.60": {
+   "shows": "darkvision 60 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.low-light": {
+   "shows": "low-light vision",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "sense.scent": {
+   "shows": "scent",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "amphibious": {
+   "shows": "amphibious",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "move.swim.30": {
+   "shows": "swim 30 ft",
+   "engine_ready": false,
+   "waits_on": "swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it"
+  },
+  "move.climb.20": {
+   "shows": "climb 20 ft",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "move.burrow.20": {
+   "shows": "burrow 20 ft",
+   "engine_ready": false,
+   "waits_on": "a burrow speed: the engine has no earth"
+  },
+  "natural.claws": {
+   "shows": "claws",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "natural.bite": {
+   "shows": "bite",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "natural.armor.1": {
+   "shows": "+1 natural armour",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "weakness.light-sensitivity": {
+   "shows": "light sensitivity",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "versatile": {
+   "shows": "an extra feat and an extra skill rank",
+   "engine_ready": true,
+   "waits_on": ""
+  },
+  "lucky": {
+   "shows": "+1 on all saving throws",
+   "engine_ready": true,
+   "waits_on": ""
+  }
+ }
 }

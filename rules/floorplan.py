@@ -139,6 +139,93 @@ BY_SPOT: dict[str, Shape] = {
                       about="a wellhead, and the ground worn round it"),
     "the-workshop-loft": Shape(10, 10, LOW, clumps=5, clump_max=2,
                                about="a loft over the work"),
+
+    # --- the settlement vocabulary (2026-09-15) -------------------------------------
+    # "cities and towns have businesses and entertainment and leisure/recreation and
+    # religious establishments/cultural buildings...the list goes on and on". Thirty-eight
+    # kinds of place now, and a place with no row here falls through to plain `urban` —
+    # a sixteen-by-fourteen room with walls and clutter, which works and is the same room
+    # every time. A tuned row is what makes a bathhouse read differently from a gaol when
+    # a fight starts in one.
+    #
+    # Most are vertical, per the standing instruction, and the flat ones are flat because
+    # a reader would agree they are: a lane between two walls, a midden, a green.
+
+    # buying, selling, making
+    "the-smithy": Shape(10, 10, LOW, clumps=5, clump_max=1, rise=2,
+                        vertical="scatter", about="a hearth, an anvil, and what is stacked round them"),
+    "the-mill": Shape(12, 12, HALL, clumps=5, clump_max=2, rise=3, rise_to=2,
+                      about="the wheel, the sacks, and a floor above them"),
+    "the-tannery": Shape(14, 12, LOW, clumps=7, clump_max=2, rough=10,
+                         vertical="scatter", about="pits and frames, and nowhere clean to stand"),
+    "the-brewery": Shape(14, 12, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                         about="vats to climb between, and a gantry over them"),
+    "the-warehouses": Shape(16, 14, HALL, clumps=10, clump_max=3,
+                            about="stacked to the roof, with a walk round the top"),
+    "the-counting-house": Shape(10, 10, LOW, clumps=4, clump_max=1,
+                                about="a desk, a grille, and a stair to the strongroom"),
+    "the-merchants-row": Shape(18, 8, None, clumps=6, clump_max=2, rise=2,
+                               about="a long street with steps up to every door"),
+    # who is in charge
+    "the-guardhouse": Shape(12, 10, LOW, clumps=4, clump_max=2, rise=2,
+                            about="a rack of arms, a stair to the wall, and always more of them inside"),
+    "the-barracks": Shape(16, 14, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                          about="a yard, a gallery of bunks over it, and a drill square"),
+    "the-moot-hall": Shape(14, 12, HALL, clumps=4, clump_max=1, rise=2,
+                           about="benches round a floor, and a gallery for everyone else"),
+    "the-gaol": Shape(10, 10, LOW, clumps=6, clump_max=1,
+                      vertical="none", about="cells, a passage between them, and one door"),
+    "the-courthouse": Shape(14, 14, HALL, clumps=5, clump_max=1, rise=4, rise_to=2,
+                            about="a bench above the floor, and a gallery above that"),
+    "the-customs-house": Shape(12, 12, LOW, clumps=6, clump_max=2,
+                               about="a counter, a scale, and everything waiting to be opened"),
+    # faith, and the dead
+    "the-graveyard": Shape(16, 14, None, clumps=9, clump_max=1, rough=6, rise=3,
+                           vertical="scatter", about="stones, and the ground uneven between them"),
+    "the-cathedral": Shape(20, 16, HALL, clumps=8, clump_max=2, rise=4, rise_to=2,
+                           about="a nave, a triforium over it, and pillars the width of a cart"),
+    # drinking, watching, resting
+    "the-inn": Shape(12, 10, LOW, clumps=6, clump_max=2,
+                     about="tables, a hearth, and the stair to the rooms"),
+    "the-green": Shape(18, 16, None, clumps=2, clump_max=2,
+                       vertical="none", about="open ground the whole place uses"),
+    "the-bathhouse": Shape(14, 12, HALL, clumps=5, clump_max=2, rough=8,
+                           about="wet stone, a colonnade, and a gallery to look down from"),
+    "the-theatre": Shape(16, 16, HALL, clumps=4, clump_max=2, rise=8, rise_to=3,
+                         vertical="slope", about="a stage, and the seats banked above it"),
+    "the-arena": Shape(20, 18, None, clumps=2, clump_max=2, rough=6, rise=10, rise_to=3,
+                       vertical="slope", about="sand, and the crowd banked all the way round"),
+    "the-gardens": Shape(18, 16, None, clumps=7, clump_max=2, rough=4, rise=3,
+                         vertical="scatter", about="walls, walks, and something to get behind"),
+    # what a place needs to exist
+    "the-granary": Shape(12, 12, HALL, clumps=6, clump_max=2, rise=3, rise_to=2,
+                         about="bins to the roof, and a loading gallery"),
+    "the-midden": Shape(12, 12, None, clumps=4, clump_max=2, rough=14,
+                        vertical="none", about="where it all ends up, and the footing shows it"),
+    "the-cistern": Shape(14, 12, LOW, clumps=5, clump_max=2, rough=10,
+                         vertical="scatter", about="standing water, and the pillars holding the street up"),
+    # getting somewhere else
+    "the-stables": Shape(14, 10, LOW, clumps=6, clump_max=2, rough=4,
+                         about="stalls, a tack room, and a hayloft over both"),
+    "the-carters-yard": Shape(16, 14, None, clumps=7, clump_max=3, rough=4, rise=3,
+                              vertical="scatter", about="carts, crates, and the gaps between them"),
+    # where nobody is watching
+    "the-lane": Shape(8, 16, None, clumps=6, clump_max=3, rough=4,
+                      vertical="none", about="two walls, and whatever is left between them"),
+    "the-warrens": Shape(14, 14, None, clumps=12, clump_max=3, rough=8, rise=3,
+                         vertical="scatter", about="a street plan nobody drew, on three levels"),
+
+    # the shape of a city: a square, and the crossings off it
+    "the-great-square": Shape(20, 18, None, clumps=4, clump_max=2, rise=3,
+                              about="the middle of it, with steps and a plinth to fight from"),
+    "the-north-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                                about="where four streets meet, and the balconies over them"),
+    "the-east-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                               about="where four streets meet, and the balconies over them"),
+    "the-south-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                                about="where four streets meet, and the balconies over them"),
+    "the-west-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
+                               about="where four streets meet, and the balconies over them"),
 }
 
 # Everything else, by the ground it stands on.
@@ -169,6 +256,25 @@ BY_TERRAIN: dict[str, Shape] = {
                     vertical="none", about="open, and hard going"),
     "coast": Shape(18, 16, None, clumps=5, clump_max=2, rough=8, rise=4, rise_to=1,
                    about="rocks, and the tide line"),
+    # Water, and under it. Both are `none` — flat, and meant to be, which is the one
+    # honest answer here: the whole surface of a lake is one height, and a ledge in open
+    # water is a thing nobody can point at. The verticality of water is DEPTH, and depth
+    # is the other place (`underwater`), reached by diving rather than by climbing.
+    #
+    # Nothing is blocked and nothing is difficult, for the same reason: water is not
+    # rough going the way scree is — it is a different way of moving altogether, and it
+    # is `rules/water.py` that says what that costs, creature by creature. A wave is not
+    # a wall.
+    # A ship. Small, crowded, and with a rail: the one piece of ground in the game where
+    # the edge of the map is a real edge and going over it is a different set of rules.
+    "deck": Shape(12, 20, None, clumps=4, clump_max=2, rough=0, rise=2,
+                  vertical="ledge", about="planking, a mast to put between you and them, "
+                                          "and a rail with the sea past it"),
+    "water": Shape(20, 20, None, clumps=0, clump_max=1, rough=0,
+                   vertical="none", about="open water, and nothing to stand on"),
+    "underwater": Shape(20, 20, None, clumps=2, clump_max=2, rough=0,
+                        vertical="none",
+                        about="green light from above, and weed moving with you"),
 }
 
 OPEN = Shape(about="open ground")
@@ -205,8 +311,122 @@ class _Rolls:
         return (self.n >> 16) % max(1, upper)
 
 
-def shape_for(place_id: str, terrain: str = "") -> Shape:
-    """Which shape this place takes: its own spot first, then its ground, then open.
+# --- what the world said about the ground -------------------------------------------------
+#
+# World Bible has written four things about every place it ships since schema 1.3 —
+# `size_ft`, `clutter`, `footing`, `vertical` — and for two releases nothing read one of
+# them. Measured 2026-09-16 across both fixtures: 456 authored places, every one carrying
+# all four, and every one of them fought on a shape this app made up out of the room's
+# NAME. Ashwatch's market is written 75 by 70 feet and was laid out 16 by 16 squares; a
+# place whose name the table does not know got the twenty-by-twenty blank field, which is
+# what the whole of stages 1 to 7 existed to remove.
+#
+# The mapping below is the whole of the reader: arithmetic and a lookup. It lives HERE
+# rather than in `rules/places.py` because feet, squares and levels are this module's
+# units — `places` holds the id grammar and knows nothing about how wide a square is.
+
+# Five feet to a square, as everywhere else in the game.
+FEET_PER_SQUARE = 5
+
+# What a room may come out as, in squares.
+#
+# The floor was six — thirty feet — and it was wrong, which the supplier caught and
+# argued better than the floor was argued for: **"a lane ten feet across is an alley; the
+# same lane at thirty feet is a street."** Two things followed from that and both were
+# real. "Walls close on both sides" is this app's OWN stated reason for keeping the lane
+# and the back streets flat, and a thirty-foot floor removes the geometry the reason
+# depends on. And their generator had a rule that flattened anything three squares or
+# less, which a floor of six made permanently unreachable.
+#
+# So two squares: ten feet, which is the width two Medium creatures can pass in and the
+# narrowest thing that is still a fight rather than a queue. Nothing below that, because
+# a one-square room has no room to miss in.
+#
+# The ceiling stays twenty-four: the authored range runs to 125 feet and a grid much past
+# twenty-four is a map a player reads badly.
+MIN_SQUARES, MAX_SQUARES = 2, 24
+
+# How much of the floor each clutter word puts something solid on, as a fraction of the
+# inner squares. Calibrated against the hand-written shapes rather than invented: "some"
+# lands a 14x12 room on six clumps, which is what the tavern and the market were already
+# given by hand, and "dense" lands it on twelve, which is what the warrens have.
+CLUTTER = {"bare": 0.02, "some": 0.05, "cluttered": 0.08, "dense": 0.11}
+
+# And how much of it is bad going. "firm" is not nothing — a floor with no rubble on it
+# anywhere reads as a stage — and the hand-written places sit at two to three per cent.
+FOOTING = {"firm": 0.02, "broken": 0.08, "bad": 0.18}
+
+# A clump runs one to this many squares; the count below is divided by the average.
+CLUMP_MAX = 2
+
+VERTICAL_KINDS = ("ledge", "slope", "scatter", "none")
+
+
+def from_world(raw: dict, ground: "Shape | None" = None) -> "Shape | None":
+    """The shape an authored place actually has, or None when the world said nothing.
+
+    The dimensions, the clutter, the footing and the vertical kind are the world's. The
+    `about` phrase is NOT: it is the sentence a tell is built from, written for that
+    purpose and never a number, while the export's own `about` is a line about the
+    settlement's politics ("A merchant oligarchy that outspends the nobility") which would
+    read as nonsense said of a floor. So the ground the table would have given keeps its
+    phrase and loses everything else.
+    """
+    if not isinstance(raw, dict):
+        return None
+    size = raw.get("size_ft") if isinstance(raw.get("size_ft"), dict) else {}
+    clutter = str(raw.get("clutter") or "").strip().lower()
+    footing = str(raw.get("footing") or "").strip().lower()
+    vertical = str(raw.get("vertical") or "").strip().lower()
+    if not (size or clutter or footing or vertical):
+        return None
+    base = ground if ground is not None else OPEN
+    width = _squares(size.get("width"), base.width)
+    height = _squares(size.get("depth"), base.height)
+    # An authored height of null is a place with no roof, which is a fact and not a gap:
+    # 241 of the 456 are written that way and they are the yards, the greens and the
+    # streets. Only a place that wrote nothing at all about its size keeps the table's
+    # ceiling — the empty-is-not-absent trap, and the one field here where it bites.
+    ceiling = base.ceiling if not size else _levels(size.get("height"))
+    inner = max(1, width - 2) * max(1, height - 2)
+    clumps = round(inner * CLUTTER.get(clutter, CLUTTER["some"]) / ((1 + CLUMP_MAX) / 2))
+    rough = round(inner * FOOTING.get(footing, FOOTING["firm"]))
+    kind = vertical if vertical in VERTICAL_KINDS else base.vertical
+    # `rise` and `rise_to` are not authored and are not asked for: they are how many
+    # raised things a SCATTER scatters and how far a SLOPE climbs, which the kind already
+    # implies. A ledge and a flat floor use neither.
+    return Shape(width=width, height=height, ceiling=ceiling,
+                 clumps=max(0, clumps), clump_max=CLUMP_MAX if clumps else 1,
+                 rough=max(0, rough),
+                 rise=max(3, inner // 60) if kind == "scatter" else 0,
+                 rise_to=2 if kind == "slope" else 1,
+                 vertical=kind, about=base.about)
+
+
+def _squares(feet, fallback: int) -> int:
+    try:
+        n = round(float(feet) / FEET_PER_SQUARE)
+    except (TypeError, ValueError):
+        return fallback
+    return max(MIN_SQUARES, min(MAX_SQUARES, n)) if n else fallback
+
+
+def _levels(feet) -> int | None:
+    try:
+        n = round(float(feet) / FEET_PER_SQUARE)
+    except (TypeError, ValueError):
+        return None
+    return max(1, n) if n else None
+
+
+def shape_for(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Shape:
+    """Which shape this place takes: what the world wrote, then its own spot, then its
+    ground, then open.
+
+    `authored` is carried on the `Place` by `places._authored` and handed down, never
+    looked up: this module has no world and must not acquire one. A caller holding only an
+    id gets the derived answer, which is what every place got before World Bible shipped
+    room dimensions.
 
     A storey is read as the building it is a floor of. Without that, `the-tavern^1` matches
     no spot, falls through to `urban`, and an upstairs room comes out **with no roof on it**
@@ -215,7 +435,7 @@ def shape_for(place_id: str, terrain: str = "") -> Shape:
     """
     bare = str(place_id or "").rsplit(STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
-    found = BY_SPOT.get(spot) or BY_TERRAIN.get(
+    found = authored or BY_SPOT.get(spot) or BY_TERRAIN.get(
         str(terrain or "").strip().lower(), OPEN)
     level = _storey(place_id)
     if not level or found.ceiling is None:
@@ -254,13 +474,13 @@ def _upstairs(ground: Shape, level: int) -> Shape:
                  about="partitioned, and lower than the room below")
 
 
-def for_place(place_id: str, terrain: str = "") -> Grid:
+def for_place(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> Grid:
     """The ground at this place, the same every time it is asked for.
 
     Nothing is placed in the outermost ring, so a plan can never wall a scene in or strand
     a combatant in a corner they cannot leave. Everything in the middle is fair game.
     """
-    shape = shape_for(place_id, terrain)
+    shape = shape_for(place_id, terrain, authored)
     r = _Rolls(_seed(place_id))
     grid = Grid(width=shape.width, height=shape.height, ceiling=shape.ceiling)
 
@@ -343,6 +563,6 @@ def _raise(grid: Grid, shape: Shape, r: "_Rolls") -> None:
             grid.floor[p] = 1 + r.next(shape.rise_to)
 
 
-def describe(place_id: str, terrain: str = "") -> str:
+def describe(place_id: str, terrain: str = "", authored: "Shape | None" = None) -> str:
     """One phrase about the ground, for a tell. Never a number — the third law."""
-    return shape_for(place_id, terrain).about
+    return shape_for(place_id, terrain, authored).about

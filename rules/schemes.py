@@ -41,8 +41,16 @@ CARRIERS = ("letter", "courier", "crier", "notice", "gossip", "kin", "invitation
 REACHES = ("kin", "town", "region")
 PLACE_KINDS = {
     # slot kind -> the place names the settlement set uses, in order of preference
-    "market": ("the market",), "lodging": ("the tavern", "the inn"),
-    "gate": ("the gate",), "temple": ("the temple",), "guildhall": ("the guildhall",),
+    # Alternatives, best first, because a settlement is not obliged to have the grandest
+    # version of anything. Widened 2026-09-16 after the checker reported 57 of Aurvantis's
+    # 64 settlements as having nowhere a quest's `temple` could go — while many of them
+    # had a cathedral or a shrine. Somewhere to pray is somewhere to pray, and a table
+    # that only knew one word for it was measuring its own narrowness.
+    "market": ("the market", "the merchants row"),
+    "lodging": ("the tavern", "the inn"),
+    "gate": ("the gate",),
+    "temple": ("the temple", "the cathedral", "the shrine"),
+    "guildhall": ("the guildhall", "the moot hall", "the counting house"),
     # The road is the open ground outside the walls, like the wild: a wanted player
     # who was shown a way past the watch reaches it by biome, never through the arch.
     # The fairness critic measured "fled" unreachable while the road WAS the gate.

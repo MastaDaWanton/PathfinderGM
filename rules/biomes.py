@@ -30,6 +30,24 @@ BIOMES: dict[str, str] = {
     "desert": "Dune, hardpan and badlands",
     "tundra": "Snowfield, ice and the far north",
     "coast": "Shore, tideline and salt marsh",
+    # Water, and under it. Added 2026-09-16, and they are two words rather than one
+    # because the Core Rulebook treats them as two situations and this app's own tables
+    # said so out loud before it had either: `rules/races.py` carried "a swim speed: the
+    # engine has no water" as the reason a race trait could not work, and every aquatic
+    # creature in the bestiary was filed under `coast` — the sea was a beach.
+    #
+    # The line between them is what a body can do. On the surface you can breathe, you
+    # have improved cover from anyone on land, and you are swimming or you are wading.
+    # Under it you cannot breathe, you have total cover, fire does not burn, and the
+    # clock that matters is your own held breath. A place is one or the other, and
+    # diving is a move between two places — the same shape a storey is.
+    "water": "Open water: river, lake and the sea from above",
+    # Planking, and whatever is bolted to it. Its own ground rather than `water` — a
+    # creature standing on a deck is not swimming, and the underwater table must not
+    # reach them — and not `urban` either, because what lives in a street has no
+    # business in the Atlantic. `rules/ships.py` builds the rooms that stand on it.
+    "deck": "A ship's planking: decks, rigging and the hold below",
+    "underwater": "Below the surface, where the air you have is what you brought",
     "underground": "Cave, tunnel and the deep places",
     "ruins": "Barrows, battlefields and cursed ground",
     "planar": "Ground that is not of this world",
@@ -72,9 +90,12 @@ ALIASES: dict[str, str] = {
     "snow": "tundra", "icy": "tundra", "frozen": "tundra", "northern climate": "tundra",
     "frost": "tundra",
 
+    # The SHORE, and only the shore. `sea`, `ocean` and `reef` used to be listed here
+    # too and were overridden further down by the water block — the same key twice in one
+    # literal, where the first one reads like the rule and the second one is the rule.
+    # A reader who stopped here would have believed the wrong thing.
     "coast": "coast", "shore": "coast", "beach": "coast", "tideline": "coast",
-    "littoral": "coast", "reef": "coast", "estuary": "coast", "sea": "coast",
-    "ocean": "coast", "riverbank": "coast", "bank": "coast",
+    "littoral": "coast", "estuary": "coast", "riverbank": "coast", "bank": "coast",
 
     "cave": "underground", "cavern": "underground", "subterranean": "underground",
     "tunnel": "underground", "underdark": "underground", "underground": "underground",
@@ -87,7 +108,14 @@ ALIASES: dict[str, str] = {
     # Bestiary ecology lines say "any (Plane of Fire)" and "any (Hell)" rather than
     # naming an elemental plane in full.
     "plane of": "planar", "hell": "planar", "heaven": "planar", "abaddon": "planar",
-    "aquatic": "coast", "underwater": "coast", "river": "coast", "lake": "coast",
+    # Repointed 2026-09-16, when water became a place rather than a beach. Every one of
+    # these used to answer `coast`, which is why the bestiary's aquatic creatures were
+    # filed on the shore: a shark's environment line reads "any ocean" and the only word
+    # this table had for an ocean was the sand beside it.
+    "aquatic": "water", "ocean": "water", "sea": "water", "river": "water",
+    "lake": "water", "reef": "water", "open water": "water", "shallow": "water",
+    "underwater": "underwater", "deep water": "underwater", "abyssal plain": "underwater",
+    "sunken": "underwater", "submerged": "underwater",
     "elemental plane": "planar", "ethereal": "planar", "astral": "planar",
     "planar": "planar", "abyss": "planar", "celestial": "planar",
     "river oceanus": "planar",
@@ -103,8 +131,10 @@ ALIASES: dict[str, str] = {
     "plane": "planar", "nirvana": "planar", "dimension of": "planar",
     "outer space": "planar", "vacuum": "planar",
     # 26 lines say "water" with no other water word: "any water", "temperate water",
-    # "warm fresh water", "any saltwater". Without these they came back with nothing.
-    "water": "coast", "saltwater": "coast", "freshwater": "coast",
+    # "warm fresh water", "any saltwater". Without these they came back with nothing —
+    # and until 2026-09-16 they came back with `coast`, which put twenty-six kinds of
+    # water-dwelling creature on a beach. They mean the water now, which is a place.
+    "water": "water", "saltwater": "water", "freshwater": "water",
     "volcano": "mountain", "volcanic": "mountain",
 }
 

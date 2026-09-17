@@ -474,7 +474,7 @@ def characters(request):
     return JsonResponse({
         "playing": c.character_id,
         "ended": c.ended,
-        "roster": [{**e.summary(), "playable": e.status != roster.DEAD,
+        "roster": [{**e.summary(), "playable": e.playable(),
                     "current": e.id == c.character_id}
                    for e in roster.everyone()],
         "choices": roster.pregens(),
@@ -652,7 +652,8 @@ def manual(request):
     from django.conf import settings as dj_settings
 
     from pathfindergm import version
-    from rules import backgrounds, bestiary, classes, feats, races, schemes, spells
+    from rules import (backgrounds, bestiary, classes, feats, places, races, schemes,
+                       spells)
 
     from . import library, preflight
     from .craft_views import DISCIPLINES
@@ -679,6 +680,8 @@ def manual(request):
         "races": len(races.all_races()),
         "backgrounds": len(backgrounds.catalogue()),
         "quests": len(schemes.all_schemes()),
+        # Read from the table that holds them, like every other number on this page.
+        "keepers": len(places.STAFFED),
         "feats": f"{len(feats.all_feats()):,}",
         "spells": f"{len(spells.all_spells()):,}",
         "creatures": f"{len(bestiary.everything()):,}",
@@ -1146,6 +1149,35 @@ def combat_act(request):
 
 
 @require_POST
+def roll_face(request):
+    """What the pending die shows — and nothing else.
+
+    Reported from the table 2026-09-16: *"as it stands when dice are rolled the last die
+    spins until a reply is sent to the user. I would prefer that the dice land show the
+    number it landed on and then be able to be closed while the user waits."*
+
+    They are describing the shape of `roll` below. The face is known in its first few
+    lines; everything after it — resolution, then the narrator, which is a local model
+    and the slow part of a turn — runs before the number is returned. So the die spun
+    through the whole generation, and the LAST die of a turn spun longest, because the
+    ones before it only had to be handed back for the next prompt.
+
+    Splitting it here rather than streaming one response out of `roll`: nine tests read
+    that endpoint as JSON, a `StreamingHttpResponse` has no `.json()`, and the error
+    paths would have to move from status codes into frames. This adds a request that
+    **mutates nothing at all** — it does not touch `awaiting`, does not remember what it
+    said, and can be called and abandoned. `roll` then receives the face the same way it
+    already receives one from the debug toggle, so no trust boundary moves: the client
+    could always name its own face, and the die is still rolled by `rules.dice`.
+    """
+    c = campaign_mod.current()
+    if not c.scene.awaiting:
+        return JsonResponse({"error": "nothing is waiting on a roll"}, status=409)
+    from rules.dice import Dice
+    return JsonResponse({"face": Dice().roll(c.scene.awaiting.get("die", "1d20")).raw})
+
+
+@require_POST
 def roll(request):
     """The player's answer to the dice popup. Resolution resumes from where it stopped."""
     c = campaign_mod.current()
@@ -1432,6 +1464,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     if swept:
         c.transcript.append({"who": "gm", "text": " ".join(swept),
                              "kind": "consequence"})
+    # And the breath anybody under the water is holding. Beside the fallen because it is
+    # the same kind of thing — the engine resolving what happens to a body while nobody
+    # is acting on it — and said out loud every rung of the way down, because drowning is
+    # the one death in the game that arrives on a schedule and a schedule the player
+    # cannot see is just a trapdoor.
+    for line in agent.engine.breathe():
+        c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
     # Walking away lets the scene go: the dying resolve off-screen and the fallen
     # stay where they fell, whether or not the walk crossed a biome line.
     if judgement.player_departs(player_input):
@@ -2028,9 +2067,18 @@ def _merchant_here(scene):
     objects can be handled through the prompts." The narrated path (the sell/buy
     injectors) deliberately keeps working anywhere; this gates only the panel.
     """
+    from rules import keepers
+
     for ref, a in scene.actors.items():
         if a.is_pc or a.is_down:
             continue
+        # Whoever keeps this counter, first and by what they ARE rather than by what
+        # they are called. The name test below cannot see a keeper: they are named out
+        # of the world ("Gorvothys Vyrnys") precisely so that they are a person and not
+        # a job title, and a panel that only opens for people called "the stallholder"
+        # would refuse every real shopkeeper this app builds.
+        if keepers.keeps_a_counter(a):
+            return a
         if _MERCHANT.search(str(a.name or "")) or _MERCHANT.search(str(a.kind or "")):
             return a
     return None
@@ -2048,11 +2096,26 @@ def _counter_refusal(c, pc):
     homes drifts. Asked through the vocabulary, so the one `remove_effects(source=...)`
     that clears the name reopens the counter with nothing else touched.
     """
-    from rules import states
+    from rules import attitude, states
 
     merchant = _merchant_here(c.scene)
     town = str(c.scene.location_id or "")
-    if merchant is None or states.standing_with_the_law(pc, town) != "wanted":
+    if merchant is None:
+        return None
+    # How they feel about you, before what the law thinks of you. 1e gates what a
+    # creature will do for you on their attitude — "once a creature's attitude is
+    # indifferent or better you can make requests" — and buying from somebody is a
+    # request. A shopkeeper who has been given a reason to dislike you does not serve
+    # you, and Diplomacy is the way back in (`rules/attitude.py`). Nobody starts here:
+    # an attitude is only ever set by something that happened, so a counter the player
+    # has not poisoned opens exactly as it always did.
+    mood = attitude.of(merchant, default="")
+    if mood in ("hostile", "unfriendly"):
+        return JsonResponse({"error": (
+            f"{merchant.name} will not trade with {pc.name}. Talk them round first — "
+            f"it takes a minute of it, and the engine rolls your Diplomacy against how "
+            f"they feel about you.")}, status=409)
+    if states.standing_with_the_law(pc, town) != "wanted":
         return None
     return JsonResponse({"error": (
         f"{merchant.name} looks at {pc.name} and then at the door. {pc.name} is "

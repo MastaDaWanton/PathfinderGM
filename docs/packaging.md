@@ -15,7 +15,7 @@ pip install pyinstaller
 python -m PyInstaller --noconfirm --clean pathfindergm.spec
 ```
 
-Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.3, one file, no installer, no side
+Output: `dist/PathfinderGM.exe`, **37 MB** at 0.1.6, one file, no installer, no side
 directory. A build takes about 100 seconds after the first one (the first is ~145s
 while PyInstaller caches its analysis). `build/` and `dist/` are both gitignored; `pathfindergm.spec` is
 not — `.gitignore` excludes `*.spec` and then re-includes this one by name, because the
@@ -282,7 +282,7 @@ before any JavaScript existed:
 portfile appears with a live pid → the URL answers → kill the shell's tree → **no
 backend survives**. Green in both dev mode (`electron .` over this machine's Python)
 and against the electron-builder output. `npm run dist` in `electron/` builds
-`release/Pathfinder GM Setup 0.1.3.exe` (115 MB NSIS installer, backend exe bundled as
+`release/Pathfinder-GM-Setup-0.1.6.exe` (115 MB NSIS installer, backend exe bundled as
 an extraResource).
 
 ## The server outlived the browser by four hours (2026-09-01)
@@ -347,6 +347,63 @@ own: send three heartbeats, stop, and watch the real exe exit by itself — chil
 then the bootloader that holds the file handle, with `server.json` removed, which is what
 marks the exit as the clean one rather than an axe.
 
+## Updates, and the two things a release must carry (2026-09-15)
+
+The shell checks for a new version once the game is on screen, and does nothing else on its
+own: `autoDownload` and `autoInstallOnAppQuit` are both off, so a player is asked before
+115 MB is spent and asked again before the game closes. Same idiom as the setup page — find
+out what is missing, say so, offer a button — and with an unsigned build it is also the
+mitigation.
+
+**What is verified, exactly.** `latest.yml` is fetched from GitHub over TLS and carries a
+SHA-512 of the installer, which electron-updater checks after downloading, so a network
+attacker cannot substitute a binary. What is absent is the Authenticode check: with no
+certificate there is no publisher name to compare against, so a release published by
+somebody who had taken the GitHub account would be installed. That is the same trust anyone
+downloading by hand already places in the releases page; automating it widens who is
+affected, which is why the install stays a button rather than a silent swap.
+
+**A release must carry `latest.yml` as well as the installer.** Measured on the real
+packaged app against the real repository, before it could mislead anybody:
+
+```
+[update] Cannot find latest.yml in the latest release artifacts
+         (https://github.com/MastaDaWanton/PathfinderGM/releases/download/v0.1.5/latest.yml)
+```
+
+v0.1.5 was built and published before `build.publish` existed, so no manifest was written
+and none was uploaded. Nothing to repair — no build at or below 0.1.5 carries an updater at
+all, so nobody on one will ever check. **v0.1.6 is the first release that can update
+anyone, and only if its assets include `latest.yml`.**
+
+**And the name has to match.** electron-builder writes the installer into the manifest with
+spaces replaced by hyphens, so a product name containing a space produced a manifest naming
+a file that did not exist:
+
+```
+latest.yml wanted    Pathfinder-GM-Setup-0.1.6.exe
+the build produced   Pathfinder GM Setup 0.1.6.exe
+0.1.5 was published  PathfinderGM-Setup-0.1.5.exe
+```
+
+Three strings for one file, and the failure is silent because a failed check is logged and
+never shown — which is right for being offline and exactly wrong for this.
+`build.nsis.artifactName` is pinned to `Pathfinder-GM-Setup-${version}.${ext}` so the file,
+the manifest and the uploaded asset are one string, and
+`tests/test_auto_update.py::test_a_built_manifest_names_a_file_that_is_there` checks a real
+build rather than trusting it.
+
+### Cutting a release, in order
+
+1. Bump `electron/package.json` and `package-lock.json`; commit.
+2. `python -m PyInstaller --noconfirm --clean pathfindergm.spec`
+3. `cd electron && npm run dist`
+4. `prove_build.py`, then `prove_shell.py` and `prove_shell.py --packaged`.
+5. **Tag after building, never before.** v0.1.3's installer was rebuilt hours after its tag
+   while `package.json` still read 0.1.3, so the artifact on disk was not that tag's code
+   and the release had to ship without one.
+6. `gh release create` with **both** `Pathfinder-GM-Setup-<version>.exe` and `latest.yml`.
+
 ## What remains unproven
 
 - **Only ever built and run on the machine it was built on.** Never installed onto a clean
@@ -394,10 +451,12 @@ list is what anybody checks before deciding what is left to do. Each is now asse
   call it seven to nine seconds to unpack ~39 MB and answer, and note that three runs on
   one machine is a reading rather than a benchmark. The prover prints it every run now
   and faults above 60s — not as a performance bar but because 60s is the signature of
-  the leftover-`_MEI*` pathology rather than of any code change. At 0.1.3 the first run
-  after a build read **13.1s** and the next read **8.6s** on the same artifact: time the
-  cold start on a second run, or you are timing the machine still digesting a 37 MB
-  write rather than the exe.
+  the leftover-`_MEI*` pathology rather than of any code change. One reading of **13.1s**
+  at 0.1.3, taken immediately after a build, did not reproduce: the next run on the same
+  artifact read 8.6s and the first run after the *following* rebuild read **9.1s**. So it
+  was an outlier and not the post-build effect it was first written up as — five readings
+  now sit between 7.3s and 9.1s, and a single high one is worth re-running rather than
+  explaining.
 
 Still true, and left where they are: the clean-machine install, the signatures,
 `console=True`, the unseen Electron window, and cross-platform. Those need a machine or

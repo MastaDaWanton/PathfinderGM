@@ -69,7 +69,8 @@ def test_it_is_the_only_copy():
 
 def test_the_counts_are_the_real_catalogues_and_not_typed_in(page):
     """The check the README never had. If a class is added, this number moves."""
-    from rules import backgrounds, bestiary, classes, feats, races, schemes, spells
+    from rules import (backgrounds, bestiary, classes, feats, places, races, schemes,
+                       spells)
 
     for label, n in [("classes", len(classes.all_classes())),
                      ("races", len(races.all_races())),
@@ -81,10 +82,24 @@ def test_the_counts_are_the_real_catalogues_and_not_typed_in(page):
                      # without saying how many there are invites somebody to type the
                      # number in later.
                      ("backgrounds", len(backgrounds.catalogue())),
-                     ("quest schemes", len(schemes.all_schemes()))]:
+                     ("quest schemes", len(schemes.all_schemes())),
+                     # Added 2026-09-16 with `rules/keepers.py`. The manual not knowing
+                     # about a shipped feature is this project's own recurring defect —
+                     # it did not know about the viewport for three releases — and a
+                     # player who is not told that shops have people in them has no
+                     # reason to talk to one.
+                     ("places with a keeper", len(places.STAFFED))]:
         assert f"{n:,}" in page or str(n) in page, (
             f"the manual does not show the real {label} count ({n:,}) — it has either "
             f"drifted or gone back to a typed-in number")
+
+
+def test_it_says_that_a_shop_has_somebody_in_it(page):
+    """A count alone would pass while the paragraph said nothing useful. The two facts a
+    player can act on are that the person is the world's own and that they persist —
+    both of which are reasons to talk to them rather than to the room."""
+    assert "behind the counter" in page.lower()
+    assert "same smith" in page, "the manual does not say a keeper persists"
 
 
 def test_the_models_and_their_sizes_come_from_preflight(page):

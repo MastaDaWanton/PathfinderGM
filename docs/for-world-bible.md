@@ -200,6 +200,183 @@ sample and read the JSON — it is the same world Pathfinder GM tests against
 
 ---
 
+# THE LEDGER: what is asked, what is delivered, what is next
+
+**Kept current at the top of the file, because an ask list whose statuses are stale is
+worse than none — somebody builds a thing that shipped a month ago.** Last read
+2026-09-16.
+
+| # | Ask | State |
+|---|---|---|
+| 1 | `play.races[]` | **delivered** (schema 1.1, extended 1.2). Read; 16 cards in Aurvantis |
+| 2 | `play.cards[]` | **delivered** (1.1). 22 cards in Pangrella |
+| 3 | `play.places[]` | **delivered** (1.3), tier 1 and tier 2 both read since 2026-09-16 |
+| 4 | Resources, materials, ingredients | **not started.** Still the largest gap |
+| 5 | `play.schemes[]` | **not started, and deliberately last** |
+| 6 | `play.travel[].miles` | **not started.** 0 of 5 legs in Pangrella carry one |
+| 7 | `play.names[]` | **built, and empty.** See below |
+| 8 | **Where the water is** | **new, and now the sharpest.** See below |
+| 9 | A vocabulary for versatile and lucky | **this side's**, listed so it is not lost |
+
+## 7. `play.names[]` — naming material (built; needs back-filling)
+
+The supplier built this the same day it was asked for, in the shape asked for:
+
+```json
+{"home_id": "5bbd0c40345f", "family": ["Sootspar", "Halloran"], "given": ["Bregan"]}
+```
+
+`people_id` for a people, `home_id` for a settlement, ten to twenty of each. **Both
+shipped worlds export `"names": []`** until they are regenerated or back-filled, which
+needs about eighty local model calls on the supplier's side.
+
+Why it matters more than it sounds: this app now puts a keeper in every place that sells
+something — 88 of Pangrella's 192 places, seven per settlement — and names them from the
+world's own stock. The supplier's own measurement is worse than the one that prompted the
+ask: **ten distinct surnames across 256 characters** in Aurvantis. Harvesting the cast was
+never going to work. Until the pools land, a town's shopkeepers share two family names.
+
+## 8. Where the water is
+
+**The ruling (2026-09-16): continents are separated by water unless otherwise specified.**
+This app implements that off the tree the export already carries, so nothing is blocked —
+but two things would make it real rather than inferred.
+
+**8a. Which settlements are on the water.** Nothing in the export says. Measured: Aurvantis
+has 11 ports out of 64, and every one of them is this app's own cue table minting a docks
+out of the settlement's prose ("a port town with a quay"). **Pangrella has none out of
+12** — and the reason is a genuine interaction worth knowing: Pangrella's places are
+authored, an authored list replaces the generated one by design, and so the cue that was
+the only way to spot a port never fires. *Authoring places removed the one signal this app
+had for what is coastal.*
+
+Either shape works and the first is smaller:
+
+```json
+"settlements": [{"id": "...", "coastal": true, "on": "sea"}]
+```
+`on` is one of `sea`, `river`, `lake` — a river port is not a deep-water port — or omit
+the whole key for inland, which is the safe default and what everything reads today.
+
+Or simply **author a docks place** in coastal settlements; this app already knows that
+word and will read it with no change at either end.
+
+**8b. Which routes are sea and which are land.** `play.travel[]` is an edge list of trade
+relationships, and this app had been reading every one as a road. Measured: **48 of
+Aurvantis's 48 legs cross a continent boundary**, and 2 of Pangrella's 5. That is not a
+defect in the export — "Brackgate sells tempered steel to Ashwatch" was never a claim that
+you can walk there — but it means every journey in Aurvantis is currently a sea crossing by
+inference. One optional field settles it per route:
+
+```json
+"travel": [{"from_id": "...", "to_id": "...", "by": "sea"}]
+```
+`by` is `road`, `sea` or `river`. **A stated `road` is already the "otherwise specified"**
+and is read today: a world that writes a road between two landmasses has said there is an
+isthmus or a causeway, and a thing the world says beats a thing this app worked out.
+
+**Not asked for:** coastlines as geometry, sea routes as waypoints, or anything with
+coordinates in it. The boundary holds — the world says which places touch water, and this
+app decides what crossing it costs.
+
+## 9. Versatile and lucky — this side's gap, recorded here so it is not lost
+
+The supplier is right that two of the three race cards this app called content problems are
+not. A Human "physically unremarkable and highly variable" and a Halfling with "unusually
+good luck" produce no usable trait because **this app's cue vocabulary has twelve words and
+none of them means versatile or lucky** — and both are expressible in 1e (a bonus feat and
+a skill rank; a +1 luck bonus on all saves). That is work for this side, not content for
+theirs.
+
+## 10. The SQLite mirror is a version behind the JSON
+
+Small, mechanical, and the kind of thing that costs somebody a day six months from now.
+
+The 1.5 JSON carries three new fields. The SQLite mirror in the same export carries none
+of them. Checked on the shipped pair:
+
+```
+races        id, name, people_id, size, speed, body, senses, movement, about,
+             strengths, weakness          <- no `grants`
+trade_routes id, origin, destination, origin_id, destination_id, commodity,
+             sought_as, acquisition, demand, conduct, friction   <- no `by`
+```
+
+So a consumer that reads the database gets a 1.4 world stamped 1.5, and gets it silently.
+That is precisely the failure the version number exists to prevent — `schema_version` is
+a promise about the export, and half the export is not keeping it.
+
+Pathfinder GM reads the JSON and is not affected. This is filed because the next consumer
+will not be, and because the two halves drifting apart once means the mechanism that
+should have kept them together is not there.
+
+**Done when** the two halves are generated from one description of the shape, so a field
+added to one cannot be missing from the other, and `grants` and `by` are in both.
+
+## 11. WITHDRAWN — "three races have a bite Pathfinder does not give them"
+
+Kept as a heading rather than deleted, because the reason it was wrong is worth more than
+the ask was.
+
+For about an hour on 2026-09-16 this ledger asked the supplier to take the bite off
+Aurvantis's Goblin, Half-Orc and Orc cards, on the grounds that Pathfinder gives those
+races no natural attack. `check_race_cards.py` had a table of the core races to flag it.
+
+> *"These races are specific to this world even if they are called Orcs, so it's okay if
+> they're different."*
+
+Which is this project's oldest rule — **a thing the world said beats a thing this app
+worked out** — and the check was that rule backwards: measuring a world against a
+rulebook it never agreed to, on the strength of a name. An Aurvantis orc is Aurvantis's.
+The table is gone and the note with it.
+
+What survives is not about the bite and is not a table. See ask 12.
+
+## 12. Write the description from the tags, not the tags from the description
+
+This is the one that matters, and the consumer side of it shipped on 2026-09-16.
+
+> *"We should not need to interpret anatomy on import. We should receive exactly the
+> anatomy as our engine will read it, and World Bible should also write the description
+> from those tags."*
+
+**What changed here.** When a card states `grants[]`, this app now reads the tags and
+**nothing** out of the prose — not a trait, not a sense, not a natural weapon. The regex
+table that used to do the interpreting is still there for a 1.4 card and is no longer
+consulted for a 1.5 one. `docs/race-cues.json` gained a `grants` block listing the exact
+tag names; `check_race_cards.py` validates against it and reports a tag neither side
+knows rather than dropping it.
+
+Measured the day it shipped: **all 16 Aurvantis cards produce the same tags either way**,
+because the supplier generates `grants[]` by running the same vocabulary over the same
+prose. So this changes nothing about today's export, on purpose. What it changes is who
+is allowed to be wrong: when the generator gets better at anatomy, the engine follows
+without a regex changing here, and when it gets something wrong the error is visible in a
+field a person can read instead of buried in a pattern match.
+
+**What is asked of the supplier.** Pick the tags first, from the people. Then write the
+body, senses and movement sentences to describe what those tags are. Not the other way
+round.
+
+The direction matters because of what running it backwards costs, and the cost is not
+that the result is wrong — a world's half-orcs may bite, and Aurvantis's do. The cost is
+that **the world cannot decline.** "Sometimes visible tusks" became a bite attack, and
+the only way to have had no bite was to stop describing their faces. A rule nobody can
+refuse is a rule nobody chose, and by the time it reaches a character sheet there is
+nothing left that says it was ever a guess.
+
+The Goblin card is the tell. It states `natural.bite` and its body reads "A hooked beak,
+strong enough to break bone" — a sentence that exists to justify the tag. Run the other
+way that card would have started from "these goblins bite" and the beak would be a fact
+about goblins rather than a rationalisation. Same output, and only one of them was
+decided by anybody.
+
+**Done when** `grants[]` is chosen before the prose is written, and the checker's two
+cross-cover notes — a tag no sentence describes, a sentence describing a tag that is not
+stated — stay at zero for reasons rather than by coincidence.
+
+---
+
 # The asks, easiest to hardest
 
 ## 1. `play.races[]` — the world's own peoples as playable races
@@ -384,6 +561,13 @@ no chronology event does, and no settlement but the starting one.
 
 ## 3. `play.places[]` — the places inside a town
 
+> **Superseded in detail by `docs/places-and-races-for-world-bible.md` (2026-09-15).**
+> That document is what to build from: it carries the corrected id grammar, the room's
+> shape and height, and the three tiers to ship in. What follows is the original ask, kept
+> because the reasoning is still the reasoning. Two things in it have since changed —
+> the id format below gained the `~terrain` segment it is shown with here, and a place now
+> also carries how big it is, how high, and how it is shaped upward.
+
 **The first ask with no written contract yet, and the first that needs real generation
 rather than projection. Propose the schema below or something close to it; the consumer's
 existing `Place` shape is what it has to fit.**
@@ -417,7 +601,7 @@ somewhere nobody authored. That is why the schema below carries an `origin` fiel
 
 | Field | Meaning |
 |---|---|
-| `id` | durable and unique within the export. Prefix with the settlement id so two towns may both have a market: `5bbd0c40345f:the-market` |
+| `id` | durable and unique within the export. Prefix with the settlement id so two towns may both have a market: `5bbd0c40345f~urban:the-market` |
 | `name` | what people call it, lower case, article included: `"the market"`, `"the mine head"` |
 | `about` | one short sentence: what it is for, what it is like. Prose the narrator may use |
 | `parent` | the 12-char entity id of the settlement or region containing it |
@@ -434,16 +618,16 @@ effects rather than a cost table nobody would tune.
 
 ```json
 [
-  {"id": "5bbd0c40345f:the-market", "name": "the market",
+  {"id": "5bbd0c40345f~urban:the-market", "name": "the market",
    "about": "Windcatchers turning over every stall, and ironwork under noble seal.",
    "parent": "5bbd0c40345f", "terrain": "urban",
-   "exits": ["5bbd0c40345f:the-gate", "5bbd0c40345f:the-workshops"],
+   "exits": ["5bbd0c40345f~urban:the-gate", "5bbd0c40345f~urban:the-workshops"],
    "described_only": false, "origin": "world"},
 
-  {"id": "5bbd0c40345f:the-workshops", "name": "the workshops",
+  {"id": "5bbd0c40345f~urban:the-workshops", "name": "the workshops",
    "about": "Where the trades are, and where the castes outnumber the nobility.",
    "parent": "5bbd0c40345f", "terrain": "urban",
-   "exits": ["5bbd0c40345f:the-market"],
+   "exits": ["5bbd0c40345f~urban:the-market"],
    "described_only": false, "origin": "world"}
 ]
 ```

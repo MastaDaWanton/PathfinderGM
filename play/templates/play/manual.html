@@ -106,6 +106,7 @@ number, every condition and every die. Nothing leaves your computer.</p>
   <a href="#aside">Asking and cheating</a>
   <a href="#benches">Benches</a>
   <a href="#files">Your files</a>
+  <a href="#updates">New versions</a>
   <a href="#wrong">When it goes wrong</a>
 </nav>
 
@@ -117,6 +118,14 @@ free, it installs into your own account without asking for an administrator, and
 does not bundle it — partly because the models are far too large to ship inside an
 installer, and partly because if you already have Ollama you should keep using the one
 you have.</p>
+
+<p><b>You do not have to go and find it.</b> If Ollama is not on this machine, Settings has
+an <b>Install Ollama</b> button that fetches it and opens it for you, with a progress bar,
+so there is no download page to hunt through. It checks the file before it runs anything:
+Windows itself has to vouch for the signature, and it has to say Ollama. Then Ollama's own
+installer appears and you agree to it — nothing is installed quietly. The link is still
+there beside the button if you would rather do it yourself, and on a Mac or on Linux the
+link is the way.</p>
 
 <p>Then the models themselves. The app fetches these for you; you never type a command.</p>
 
@@ -242,6 +251,20 @@ engine disposes.</b> The narrator can say a blow is struck; only the rules decid
 it landed and for how much. It cannot talk the game out of its own rules, because it is
 never asked.</p>
 
+<h3>Who is behind the counter</h3>
+
+<p>{{ keepers }} kinds of place sell something or do something for money — a smithy, an
+inn, a tannery, a harbour, a gaol — and each one has <b>somebody in it</b>. They are not
+invented as you walk in. The name is drawn from the families the world itself wrote in
+that settlement, so the smith in a town is one of that town&rsquo;s own people; the
+choice is fixed by the place, so it is the same smith when you come back next week; and
+the numbers come from the stat block the game picked for the job, which you can correct
+on the NPCs bench like anything else.</p>
+
+<p>They belong to the room and not to you. Walk out and they stay behind their counter,
+still there when you return &mdash; and if something happens to them, it has happened.
+Nobody new appears to take over a shop whose keeper you killed.</p>
+
 <h3>Things that start without you</h3>
 
 <p>The world has {{ quests }} <b>quest lines</b> in it, and none of them waits to be
@@ -311,10 +334,24 @@ spin: a tactical board you can point anywhere is a board you lose your place on.
 
 <p>Both views are the same map. A square you can click in one is a square you can click in
 the other, and clicking it queues the same move — nothing in the 3D view is decided
-anywhere else, and nothing in it is decoration. There are no textures on purpose: a box is
-something solid, a thin standing plane is a rail you can shoot over, and a figure drawn
-faint is standing on a level you are not currently looking at. The <b>⤢</b> button opens
-either view at a size you can actually plan a turn on.</p>
+anywhere else, and nothing in it is decoration. The <b>⤢</b> button opens either view at a
+size you can actually plan a turn on.</p>
+
+<p><b>Reading it without textures.</b> There is one lamp, high and to your left, and it
+belongs to the room rather than to the board — so when you turn the board the lit side
+stays the side the light is on, and the shape of a thing is told by which of its faces are
+bright. A box is something solid. A thin standing rail is a thing to shoot over, and it
+stands through exactly the heights it blocks: a shot under its top is stopped and a shot
+over it is not. Your own party is gold, foes are red, allies green, bystanders white —
+the same four colours the flat map uses. Squares you can reach this turn are washed gold
+over whatever the ground already is.</p>
+
+<p><b>A floor over your head is drawn through.</b> Pick a level with <b>Looking at</b> and
+anything higher — a gallery, a landing — goes translucent so you can see yourself and the
+fight underneath it. Walls never do that, however you are looking: a wall is a wall from
+every level, and a transparent one would be telling you that you have a shot you do not
+have. A figure standing on a level you are not looking at is drawn faint; it is still
+there, and it can still see you.</p>
 
 <p>Conditions, buffs, durations, iterative attacks, manoeuvres, damage reduction,
 resistances and stacking rules are the engine's business and are applied whether or not
@@ -360,6 +397,23 @@ it is the same kind of document underneath.</p>
 <p>Campaigns and characters are plain JSON files — readable, copyable, and backed up by
 copying the folder. There is no database and nothing to migrate. Deleting the app does not
 touch them.</p>
+
+<h2 id="updates">New versions</h2>
+
+<p>When a new version is out, the app says so shortly after you open it, and then waits.
+<b>Nothing downloads and nothing installs unless you press something</b> — you are asked
+once before the download starts, and again before the game closes to install it. If you
+would rather not, say so and it will not ask again until the next version.</p>
+
+<p>Your characters, campaigns, worlds and homebrew are not touched by an update. They live
+in your own data folder, which is named on the console window behind the game, and a new
+version reads the same files the old one wrote.</p>
+
+<p>One thing to expect, because it is better to know than to wonder: <b>Windows will warn
+you</b> when you run the installer, and it will warn you again on the next version. The app
+is not signed with a paid certificate, and Windows treats every unsigned file as a stranger
+until enough people have run that exact file. The warning is about who paid for a
+certificate, not about what the program does.</p>
 
 <h2 id="wrong">When something goes wrong</h2>
 

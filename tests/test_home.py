@@ -260,12 +260,17 @@ def test_authored_content_is_counted_and_marked(client, tmp_path):
 
 
 def test_the_tab_counts_what_you_wrote(client, tmp_path):
+    """A delta rather than a count from zero, since 2026-09-16: the NPC codex fills
+    itself as people are put on the board, and standing in a market now puts a
+    stallholder there (`rules/keepers.py`). The bench has always said so — "entries
+    appear as the world's people are put on the board" — and a codex entry is yours in
+    the sense that matters here: you can correct it."""
     from play import homebrew
 
-    assert homebrew.authored_total() == 0
+    before = homebrew.authored_total()
     (homebrew.folder("creatures") / "mine.json").write_text(
         json.dumps({"name": "Yard dog"}), encoding="utf-8")
-    assert homebrew.authored_total() == 1
+    assert homebrew.authored_total() == before + 1
 
 
 def test_every_bench_names_a_real_folder(client):

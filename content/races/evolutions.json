@@ -481,7 +481,7 @@
       "tags": [
         "move.swim.base"
       ],
-      "not_yet": "a swim speed waits on the engine having water to swim in"
+      "not_yet": "swimming as movement: a swim speed spares you the water's penalties, and does not yet carry you faster through it"
     },
     {
       "id": "flight",

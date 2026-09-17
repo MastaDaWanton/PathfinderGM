@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from gm import prompts
-from rules import cards, provenance, schemes, states
+from rules import cards, keepers, provenance, schemes, states
 from rules.activeeffect import ActiveEffect
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -78,6 +78,13 @@ def test_gossip_is_never_carried_by_the_hidden_or_the_dead():
     hid = s.add(instantiate("guildhand", s, name="Hidden Giver"))
     inst["slots"]["giver"]["ref"] = hid.ref
     _hide(hid)
+    # The market has a stallholder in it since 2026-09-16 (`rules/keepers.py`), and she
+    # would carry the news perfectly well — which is right, and is not what is under
+    # test. The question here is whether the HIDDEN giver can, so the room is emptied
+    # of everybody who is not hiding.
+    for keep in [a for a in list(e.scene.actors.values())
+                 if keepers.is_keeper(a.world_entity_id or "")]:
+        e.scene.depart(keep.ref)
     ok, how = schemes._news_arrives(e, inst, {"carrier": "gossip", "says": "x"})
     assert not ok, "nobody visible to hear it from"
     other = s.add(instantiate("guildhand", s, name="Passer By"))

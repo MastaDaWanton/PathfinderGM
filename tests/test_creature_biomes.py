@@ -47,7 +47,10 @@ def spread():
     ("any (Hell)", ["planar"], []),
     ("temperate marshes", ["swamp"], ["temperate"]),
     ("warm hills or mountains", ["hills", "mountain"], ["warm"]),
-    ("any oceans", ["coast"], []),
+    # The sea, not the sand beside it. Until 2026-09-16 this read `coast`, because that
+    # was the only water word the table had — so every shark, kraken and aquatic
+    # elemental in the bestiary was filed on a beach. 468 creatures moved.
+    ("any oceans", ["water"], []),
     ("any urban", ["urban"], []),
     ("temperate or tropical swamps", ["swamp"], ["temperate", "warm"]),
 ])
@@ -200,7 +203,7 @@ def test_a_mechanical_subtype_never_votes_on_habitat():
                    .read_text(encoding="utf-8"))["creatures"])
     assert ("sub", "incorporeal") not in profiles
     # ...while the subtypes that are about habitat still do.
-    assert profiles[("sub", "aquatic")][0] == ["coast"]
+    assert profiles[("sub", "aquatic")][0] == ["water"]
     assert profiles[("sub", "cold")][1] == ["cold"]
 
 

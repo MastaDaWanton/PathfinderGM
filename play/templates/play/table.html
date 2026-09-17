@@ -315,26 +315,29 @@
      is to be able to read the board at a glance, and shading exists only to tell one
      face of a box from another. The two visible sides are stepped darker so a cube
      reads as a cube without an outline round it. */
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
+     to read the board at a glance.
+
+     There are no `fill` rules here on purpose, and that is the whole of the rework. Every
+     face's colour is its material multiplied by a light that belongs to the ROOM, worked
+     out in `scene3d.js` from the face's own normal and written onto the polygon — the
+     same expression and the same LIGHT vector `dice3d.js` shades brass with. The version
+     before this shaded by class (`.face-a` .72, `.face-b` .55), which welded a brightness
+     to a geometric side, so turning the board turned the light with it. A `fill` rule in
+     here would overrule the shading and put that back, because a stylesheet rule beats a
+     presentation attribute. Hover is the one deliberate exception. */
   #view3d { width: 100%; height: auto; display: block; background: #14110e;
             border: 1px solid #241d15; border-radius: 3px; }
-  #view3d polygon { stroke: #14110e; stroke-width: .4; }
-  #view3d .tile.face-top, #view3d .tile { fill: #241f18; }
-  #view3d .tile.raised.face-top, #view3d .tile.raised { fill: #3d3527; }
-  #view3d .rough { fill: #2a2416; }
-  #view3d .murk { fill: #23262b; }
-  #view3d .solid { fill: #3a3128; }
-  #view3d .face-a { filter: brightness(.72); }
-  #view3d .face-b { filter: brightness(.55); }
-  #view3d .lit.face-top { fill: #4a4026; cursor: pointer; }
+  #view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
+  #view3d .lit.face-top { cursor: pointer; }
   #view3d .lit.face-top:hover { fill: var(--gold); }
-  #view3d .rail3 { fill: #7a6a44; stroke: none; opacity: .92; }
-  #view3d .fig { fill: #6b4a3a; }
-  #view3d .fig.pc { fill: var(--gold); }
-  #view3d .fig.ally { fill: #8ea56b; }
-  #view3d .fig.foe { fill: #a33; }
-  #view3d .fig.bystander { fill: #cfc4ad; }
-  #view3d .fig.down { opacity: .45; }
-  #view3d .fig.offlevel { opacity: .35; }
+  /* Solid things read as solid: a seam between two faces of one box says "two faces". */
+  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig.offlevel { opacity: .38; }
+  /* A floor over your head — a gallery you are not standing on — and the rail along it.
+     Walls are never in here: a wall is a wall from every level, and drawing one through
+     would tell the player they have a shot they do not have. */
+  #view3d .above { opacity: .45; }
   .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
   .levelpick button { padding: 1px 8px; font-size: 11px; }
   .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
@@ -1970,7 +1973,15 @@ async function post(url, body) {
   return data;
 }
 
-function render(s) {
+/* `hold` defers only the dice popup, not the drawing.
+
+   Since 2026-09-16 the page renders a turn's result while the previous die's mat may
+   still be open — the player closes it when they please, which was the whole point of
+   landing the die early. A turn that asks for ANOTHER roll would then reset that mat
+   under their eyes, mid-read, and replace the number they had just been shown. So the
+   caller that knows a mat is open passes `hold` and opens the next popup itself once
+   the player has closed the last one. */
+function render(s, hold) {
   STATE = s;
   renderCombat(s);
   reflectMerchant(s);
@@ -2098,6 +2109,7 @@ function render(s) {
 
   renderRolls(s.log);
 
+  if (hold) return;
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
 }
 
@@ -2511,13 +2523,46 @@ document.addEventListener("click", async e => {
   // a payload from an older save mid-flight, which reads as shown — the same
   // answer it had before the flag existed.
   if (p.dc != null && p.dc_shown !== false) terms.push({ label: "beat", value: p.dc });
-      const face = await Dice3D.ask({
+      // Held open, and then landed on its number before the turn is posted — the same
+      // shape the table's own roll uses, and for the same reason.
+      //
+      // Two things were wrong here until 2026-09-17. The ask took no `hold`, so the mat
+      // shut the instant the player threw and the Survival die NEVER LANDED: they wound
+      // up, the die went, and the mat vanished with no number on it. That is the defect
+      // reported on 2026-09-09 for the main path, still living on this one. And the
+      // closing narration — a second model call, the slow half of a forage — ran before
+      // anything came back, so the player watched nothing at all for the length of it.
+      let face = await Dice3D.ask({
+        hold: true,
         title: p.label, why: p.because || "", sides: 20, lo: 1, hi: 20, die: "1d20",
         terms,
       });
+      // `null` means "the table rolls it". Ask what it shows before asking what it did:
+      // the excursion's prompt is a pending roll like any other, so the same endpoint
+      // answers, and it still changes nothing by answering.
+      if (face == null) {
+        try { face = (await post("/api/roll/face", {})).face; } catch { face = null; }
+      }
+      let survival = null;
+      if (face != null) {
+        survival = Dice3D.land({
+          title: p.label, why: p.because || "", die: "1d20",
+          sides: 20, lo: 1, hi: 20, result: face, terms,
+        });
+      }
       busy(true);
-      d = await post("/api/craftaction", { face: face == null ? "auto" : face });
-      busy(false);
+      try {
+        d = await post("/api/craftaction", { face: face == null ? "auto" : face });
+      } catch (err) {
+        // A held mat over a dead request is a die spinning on a page that has stopped.
+        Dice3D.close();
+        throw err;
+      } finally {
+        busy(false);
+      }
+      // The haul is a second die, and it may not open on top of the first. The player
+      // closes the Survival check when they have read it; the d100 follows.
+      if (survival) await survival; else Dice3D.close();
     }
     if (d.rolls && d.rolls.length) {
       await Dice3D.land({
@@ -2841,9 +2886,41 @@ document.addEventListener("click", async e => {
 
 async function sendRoll(face, shown) {
   $("#veil").classList.remove("on");
+
+  // The number FIRST, on a request of its own.
+  //
+  // Reported 2026-09-16: "when dice are rolled the last die spins until a reply is sent
+  // to the user. I would prefer that the dice land show the number it landed on and
+  // then be able to be closed while the user waits." The whole of `/api/roll` used to
+  // be awaited before the die could land, and the slow part of it is the narrator — so
+  // the die span through the generation, and the LAST die of a turn span longest.
+  //
+  // `/api/roll/face` decides the face and mutates nothing, so an abandoned one costs
+  // nothing. When the player rolled a real die themselves the face is already in hand
+  // and there is nothing to ask.
+  let landed = face;
+  if (landed == null) {
+    // A failure here is not worth showing anybody: it costs the early landing and
+    // nothing else, because `/api/roll` rolls its own face when sent null — which is
+    // exactly what this did before the split.
+    try { landed = (await post("/api/roll/face", {})).face; } catch { landed = null; }
+  }
+
+  // Not awaited. `land` resolves when the player closes the mat, and the point of this
+  // change is that they may close it whenever they like — before the reply, after it,
+  // or not at all. Without the landing we keep the old order and land at the end.
+  let closing = null;
+  if (landed != null) {
+    closing = Dice3D.land({
+      title: shown.title, why: shown.why, die: shown.die,
+      sides: shown.sides, lo: shown.lo, hi: shown.hi,
+      result: landed, terms: shown.terms, note: shown.note,
+    });
+  }
+
   busy(true);
   let state = null;
-  try { state = await post("/api/roll", { face }); }
+  try { state = await post("/api/roll", { face: landed }); }
   catch (e) { $("#err").textContent = e.message; }
   finally { busy(false); }
 
@@ -2851,16 +2928,31 @@ async function sendRoll(face, shown) {
   // played a decorative throw that ended on an arbitrary face, closed the mat, and
   // told the player the number in a table — reported 2026-09-09 as "the dice don't
   // land with the number facing the user", and they never did.
-  if (state && state.rolled != null) {
-    await Dice3D.land({
-      title: shown.title, why: shown.why, die: shown.die,
-      sides: shown.sides, lo: shown.lo, hi: shown.hi,
-      result: state.rolled, terms: shown.terms, note: shown.note,
-    });
-  } else {
-    Dice3D.close();
+  if (closing == null) {
+    if (state && state.rolled != null) {
+      await Dice3D.land({
+        title: shown.title, why: shown.why, die: shown.die,
+        sides: shown.sides, lo: shown.lo, hi: shown.hi,
+        result: state.rolled, terms: shown.terms, note: shown.note,
+      });
+    } else {
+      Dice3D.close();
+    }
   }
-  if (state) render(state);
+  // Drawn behind the mat rather than after it. The mat is an overlay, so a player who
+  // is still reading the terms loses nothing, and one who already closed it is looking
+  // at the page when the reply arrives instead of at a closed mat and a spinner.
+  //
+  // The exception is the next die. A turn can ask for another roll, and opening its
+  // popup now would reset the mat the player is still reading — so the page is drawn
+  // and that one part waits for them to close it.
+  if (state && closing && state.awaiting) {
+    render(state, true);
+    await closing;
+    showPopup(state.awaiting);
+  } else if (state) {
+    render(state);
+  }
 }
 
 async function takeTurn(body, clearInput) {

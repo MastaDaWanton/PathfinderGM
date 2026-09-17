@@ -64,10 +64,41 @@ The obvious home for this is the NSIS installer. It is the wrong home:
   UI for one.
 - **The app is unsigned.** An unsigned installer that downloads and executes a second
   installer is the shape SmartScreen and antivirus heuristics are built to stop. Being
-  quarantined on the first screen is a worse first run than one extra click, which is
-  also why the app links to Ollama's download page rather than fetching and running
-  `OllamaSetup.exe` itself. (Ollama's own installer is per-user and never asks for an
-  administrator, so the click costs the player nothing but the click.)
+  quarantined on the first screen is a worse first run than one extra click.
+
+### The app does fetch the installer now — 2026-09-15
+
+That last paragraph used to end "which is also why the app links to Ollama's download page
+rather than fetching and running `OllamaSetup.exe` itself". It does both now, and the
+reasoning changed because the request did:
+
+> "I want a button that will install Ollama similar to how we pull the models with a
+> button. I dont want the user to have to leave the app to set it up if they dont have the
+> models or Ollama because that can be confusing for people."
+
+The objection above is about **the NSIS installer** doing it at install time, and it still
+stands there. The app doing it, on a button the player pressed, is a different act — and
+the four things that make it a different act are in `play/preflight.py` and pinned by
+`tests/test_install_ollama.py`:
+
+- **the URL is a constant**, and the endpoint takes no parameters at all, so unlike the
+  pull endpoint there is nothing to validate because there is nothing to aim;
+- **nothing runs unverified** — a PE header, a plausible size, then Windows' own
+  `WinVerifyTrust`, which must return a trusted signature whose subject names Ollama.
+  Anything else is deleted rather than executed. We cannot sign ourselves from inside the
+  app, but we can refuse to execute what the operating system will not vouch for, which is
+  a stronger check than a digest fetched over the same connection we are distrusting;
+- **it opens visibly**, through `os.startfile`, so Ollama's own signed installer appears
+  and the player agrees to it. An unsigned app installing software *silently* is what the
+  heuristics are actually about, and that is the thing not done here;
+- **and it is still not a subprocess.** `os.startfile` has no pipe to deadlock on.
+
+The link stays beside the button. It is the only route on macOS and Linux, and some
+players would simply rather do it themselves.
+
+None of this changes the decision above it: **Ollama is still not bundled.** Nothing ships
+in the installer, the 9.9 GB of weights is still the player's own download, and a machine
+that already has Ollama is never offered any of this.
 
 It runs on every launch and costs one HTTP call.
 
@@ -80,7 +111,7 @@ offered the same empty dropdown to each. `gm.client.probe()` tells them apart an
 
 | State | What it means | What the page offers |
 |---|---|---|
-| `not-installed` | port refused, no binary on disk | a link to ollama.com/download |
+| `not-installed` | port refused, no binary on disk | **Install Ollama**, which fetches and opens Ollama's own signed installer with a progress bar, and the link beside it |
 | `not-running` | port refused, binary is there | "start Ollama", and Check again |
 | `missing-models` | Ollama answers, the model is not pulled | Download, with a progress bar |
 | `unreachable` | anything else — a typo'd host, a timeout | the reason, and the host |

@@ -232,6 +232,7 @@ def test_a_refused_turn_leaves_no_creatures_standing():
     not not-happening: the campaign lives in `_LIVE`, so the next successful
     turn wrote the ghosts to disk.
     """
+    from rules import keepers
     from rules.dice import Dice
     from rules.engine import Engine, Scene
     from rules.intents import IntentError
@@ -254,10 +255,19 @@ def test_a_refused_turn_leaves_no_creatures_standing():
            {"op": "attack", "actor": "pc", "target": "c1", "because": "the swing"}]
     with pytest.raises((IntentError, ValueError, KeyError)):
         engine.run(engine.validate(raw))
-    assert len(scene.people) == 11, (
+    # The ten thugs and the player. Whoever keeps the room the travel walked into is
+    # standing in it too (`rules/keepers.py`) and is not one of the ghosts, so they are
+    # not counted among them.
+    ghosts = [r for r, a in scene.people.items()
+              if not keepers.is_keeper(a.world_entity_id or "")]
+    assert len(ghosts) == 11, (
         "the probe no longer reproduces a half-applied list; find one that does")
 
     scene.restore(before)
+    # Including the ledger of which counters have been staffed: a refused turn that
+    # left a place marked staffed would leave that shop empty for the rest of the
+    # campaign, since a counter is only ever staffed once.
+    assert scene.staffed == []
     assert sorted(scene.people) == ["pc"], (
         f"the refused turn left {len(scene.people) - 1} creatures in the campaign: "
         f"{sorted(scene.people)}")

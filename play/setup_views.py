@@ -60,3 +60,32 @@ def setup_pull(request):
     response["Cache-Control"] = "no-store"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+@require_POST
+def setup_install(request):
+    """Fetch Ollama's own installer and open it, reporting progress as it goes.
+
+    The same NDJSON stream `setup_pull` uses, so the page draws it with the bar it
+    already has. It takes no parameters at all — deliberately. The pull endpoint has to
+    check its `model` against what a role is configured to use, because otherwise it is
+    an arbitrary-download button on a localhost port; this one closes that hole by
+    having nothing to point anywhere. The URL is a constant in `preflight`.
+
+    Refused when Ollama is already there, which is not pedantry: the whole cost of this
+    button is a 1.5 GB download, and a page that offers it to somebody who is only
+    missing a *model* would spend that for nothing.
+    """
+    report = preflight.check()
+    if report.state != "not-installed":
+        return JsonResponse(
+            {"error": "Ollama is already installed on this machine."}, status=409)
+
+    def frames():
+        for frame in preflight.fetch_and_run_installer():
+            yield json.dumps(frame) + "\n"
+
+    response = StreamingHttpResponse(frames(), content_type="application/x-ndjson")
+    response["Cache-Control"] = "no-store"
+    response["X-Accel-Buffering"] = "no"
+    return response

@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from rules import places
+from rules import keepers, places
 from rules.bestiary import instantiate, next_ref
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -47,8 +47,15 @@ def test_presence_is_derived_and_the_room_keeps_its_people():
     stall = s.at
     engine.run(engine.validate([{"op": "travel", "because": "she walks out",
                                  "params": {"place": _other(engine).name}}]))
-    assert list(s.actors) == ["pc"], "the room's people followed her out"
-    assert set(s.people) == {"pc", "c1", "c2"}, "walking out destroyed them"
+    # Whoever keeps the room they walked INTO is standing in it (`rules/keepers.py`):
+    # this test is about the room they walked out of, so the new room's own people are
+    # not part of the question.
+    came = [r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")]
+    assert came == ["pc"], "the room's people followed her out"
+    kept = {r for r, a in s.people.items()
+            if not keepers.is_keeper(a.world_entity_id or "")}
+    assert kept == {"pc", "c1", "c2"}, "walking out destroyed them"
     assert {s.people[r].at for r in ("c1", "c2")} == {stall}
     engine.run(engine.validate([{"op": "travel", "because": "she comes back",
                                  "params": {"place": places.find(engine.places(), stall).name}}]))
@@ -102,7 +109,11 @@ def test_move_cleans_every_tactical_table_and_no_relational_one():
     s.pools.append(BloodPool(owner="c1", at=(3, 3), place=s.at))
     s.guards.append(Guard(guardian="c1", protects="pc"))
 
-    s.move("c1", "5bbd0c40345f~urban:the-gate")
+    # Somewhere that is not where the party is standing, asked rather than named: this
+    # said `the-gate` until 2026-09-15, and the rebuilt settlement vocabulary made the
+    # gate the FIRST place, which is where `stand_on` puts everybody — so the guard was
+    # moved into the room it was already in and the relation correctly survived.
+    s.move("c1", _other(engine).id)
 
     for table in ("positions", "spawn_feet", "fallen", "acted"):
         assert "c1" not in getattr(s, table), f"{table} still names a creature who left"
@@ -123,7 +134,8 @@ def test_a_guard_survives_when_both_ends_walk_through_the_door():
     s.guards.append(Guard(guardian="c1", protects="pc"))
     engine.run(engine.validate([{"op": "travel", "because": "together",
                                  "params": {"place": _other(engine).name, "with": ["c1"]}}]))
-    assert set(s.actors) == {"pc", "c1"}
+    assert {r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")} == {"pc", "c1"}
     assert [g.guardian for g in s.guards] == ["c1"], "an escort's guard was cut in the doorway"
 
 
@@ -363,7 +375,20 @@ def test_a_new_campaign_stands_the_company_beside_the_party(tmp_path):
         cm._LIVE.clear()
         c = cm.new_campaign("fresh")
         assert c.scene.at and places.terrain_of(c.scene.at) == "urban"
-        assert len(c.scene.actors) == 2, "the opening companion is standing nowhere"
+        standing = [a for a in c.scene.actors.values()
+                    if not keepers.is_keeper(a.world_entity_id or "")]
+        assert len(standing) == 2, "the opening companion is standing nowhere"
+        # And a keeper where the opening room is one somebody keeps. At schema 1.5 the
+        # world's first settlement is a quartered city and a campaign opens in its GREAT
+        # SQUARE, which is a junction rather than a shop — so the count depends on the
+        # room, and the rule is what is worth asserting rather than the number.
+        from rules import places as places_mod
+
+        here = places_mod.find(c.engine().places(), c.scene.at)
+        wants_one = bool(places_mod.keeper_of(here.name)[0]) if here else False
+        kept = [a for a in c.scene.actors.values()
+                if keepers.is_keeper(a.world_entity_id or "")]
+        assert bool(kept) == wants_one, (c.scene.at, [a.name for a in kept])
         assert all(a.at == c.scene.at for a in c.scene.people.values())
         cm._LIVE.clear()
 

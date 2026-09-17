@@ -246,6 +246,16 @@ class Campaign:
                 "cards": [dict(c) for c in self.scene.cards],
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
+                # Which counters already have somebody behind them. Absent in saves
+                # written before keepers, which reads as none staffed yet — so an old
+                # campaign gains its smith the next time the party stands in the smithy.
+                "staffed": list(self.scene.staffed),
+                # And when each of them was last talked round: a 24-hour limit that
+                # forgot itself on reload would be no limit at all.
+                "swayed": dict(self.scene.swayed),
+                # A hull does not heal and a chase does not reset: both survive a reload.
+                "vessels": [dict(v) for v in self.scene.vessels],
+                "sea": dict(self.scene.sea),
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -343,6 +353,10 @@ class Campaign:
             cards=[dict(c) for c in (s.get("cards") or [])],
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
+            staffed=[str(x) for x in (s.get("staffed") or [])],
+            swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
+            vessels=[dict(v) for v in (s.get("vessels") or [])],
+            sea=dict(s.get("sea") or {}),
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),

@@ -47,13 +47,22 @@ def test_two_places_are_not_the_same_room():
 
 
 def test_nothing_is_saved_to_get_this():
-    """A plan is a pure function of the id and the ground: entities in, grid out. If it
-    ever needed scene state the save would have to carry it, and every campaign written
-    before today would lose its rooms."""
+    """A plan is a pure function of what the id, the ground and the WORLD say: arguments
+    in, grid out. If it ever needed scene state the save would have to carry it, and every
+    campaign written before today would lose its rooms.
+
+    The third argument arrived 2026-09-16 with the reader for World Bible's authored room
+    dimensions, and it does not weaken this: it is handed down from the `Place`, which is
+    re-read from the export every time, and `Place.as_dict` deliberately leaves it out so
+    that not one byte of a plan reaches a save file. The parameter list is checked by name
+    rather than by count so that a fourth one has to be justified here.
+    """
     import inspect
 
     sig = inspect.signature(floorplan.for_place)
-    assert list(sig.parameters) == ["place_id", "terrain"], sig
+    assert list(sig.parameters) == ["place_id", "terrain", "authored"], sig
+    assert "shape" not in places.Place(id=MARKET).as_dict(), (
+        "a room's shape is being written into saves; it is derived, not stored")
     assert _plan(MARKET).blocked == floorplan.for_place(
         MARKET, places.terrain_of(MARKET)).blocked
 

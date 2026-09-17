@@ -135,9 +135,30 @@ def test_a_race_over_the_tables_tier_is_refused_with_the_fix_named(tmp_path, mon
 
 def test_a_people_with_a_body_is_a_race_and_one_without_is_a_heritage(monkeypatch):
     """The fixture's six peoples: the Korvu carry Anatomy, Body, Senses and Lifecycle;
-    the other five are ethnic groups with no body of their own. (With nothing written
-    for the world — Pangrella ships its races now, so that is switched off here.)"""
+    the other five are ethnic groups with no body of their own.
+
+    This is the DERIVED path — what the consumer does for a world that ships no race
+    cards — and forcing it took two goes.
+
+    The first version patched `races.written_for`, which `from_world` does not call: it
+    reads `world.play["races"]` itself. So the patch was inert and the test exercised
+    whichever branch the fixture happened to trigger, passing only because the fixture
+    was schema 1.0 and had no `play.races[]` at all. A World Bible export at 1.3 put one
+    there, the written branch ran, the Korvu came back with the ability array from their
+    own card (`perceptive, clever` against `hardy`), and the assertion below about the
+    generic spread failed — correctly, and three versions of the schema late.
+
+    So the emptying is done where the function actually looks. `test_a_world_that_ships
+    _race_cards_is_read_from_them` covers the other branch.
+
+    BOTH are needed, and they are different things with confusingly similar names.
+    `written_for` is the races somebody wrote BY HAND for this world in `content/races`
+    or on the bench; `play["races"]` is the list the EXPORT ships. `heritages_from_world`
+    reads the first and `from_world` reads the second, so silencing one says nothing
+    about the other.
+    """
     monkeypatch.setattr(races, "written_for", lambda w: {})
+    monkeypatch.setattr(WORLD, "play", {**(WORLD.play or {}), "races": []}, raising=False)
     drafted = races.from_world(WORLD)
     assert [d["name"] for d in drafted] == ["Korvu"]
     korvu = drafted[0]
@@ -555,3 +576,272 @@ def test_the_scaled_price_is_shown_as_scaled():
     d = derive({"id": "deepseer", "name": "Deepseer", "size": "medium", "speed": 30,
                    "tags": ["sense.darkvision.90"]})
     assert d["derived_prices"] and "scaled" in d["derived_prices"][0]
+
+
+def test_a_world_that_ships_race_cards_is_read_from_them_not_derived(monkeypatch):
+    """The other branch, which had no test at all until an export exercised it by
+    accident.
+
+    A card carrying `strengths` and `weakness` gives the people a fixed array; the
+    derived path cannot, because a `PEOPLE` entity's anatomy facts say what a body looks
+    like and never what it is good at. So the two branches genuinely differ, and which
+    one runs is decided by whether `play.races[]` is there — not by any patching.
+    """
+    card = {"id": "korvu", "name": "Korvu", "people_id": "fd4449bc9a64",
+            "size": "medium", "speed": "normal",
+            "body": ["Korvu have avian-like wings and bodies."],
+            "senses": ["Korvu have enhanced echolocation abilities."],
+            "movement": ["Korvu have avian-like wings and bodies."],
+            "about": "One paragraph.",
+            "strengths": ["perceptive", "clever"], "weakness": "hardy"}
+    monkeypatch.setattr(WORLD, "play", {**(WORLD.play or {}), "races": [card]},
+                        raising=False)
+    drafted = races.from_world(WORLD)
+    assert [d["name"] for d in drafted] == ["Korvu"]
+    korvu = drafted[0]
+    # perceptive -> wis, clever -> int, hardy -> con. Words in, table out: the export
+    # states what the people is good at and never what that is worth.
+    assert korvu["mods"] == {"wis": 2, "int": 2, "con": -2}
+    assert korvu["choose"] == [], "a stated array and a chosen one are not both given"
+    # And the body still comes from the card's own sentences.
+    assert "move.fly.30" in korvu["tags"]
+
+
+def test_an_incomplete_ability_array_falls_back_rather_than_half_applying():
+    """The contract says all three or none. Half an array priced as a race would be the
+    world's opinion applied and the player's choice taken away in the same move."""
+    for strengths, weakness in ((["perceptive"], "hardy"),      # one strength
+                                (["perceptive", "clever"], ""),  # no weakness
+                                (["clever", "clever"], "hardy"),  # not two distinct
+                                (["clever", "hardy"], "hardy")):  # weakness is a strength
+        mods, choose = races.array_from_words(strengths, weakness)
+        assert mods == {}, (strengths, weakness)
+        assert choose == list(races.STANDARD_CHOOSE), (strengths, weakness)
+
+
+# --- a tag the world grants has to be a thing the character can do --------------------------
+
+def test_a_race_the_world_wrote_can_actually_swing_its_bite():
+    """Measured 2026-09-16, on the shipped world and reported from the World Bible side
+    as thin race cards: four of Aurvantis's sixteen races grant claws or a bite off their
+    own words, and not one of them could use it.
+
+    The machinery was all there — the validator knows every natural weapon's name, the
+    sheet builds one at the right die for the body's size, `_NATURAL_RIDERS` resolves what
+    a bite does past its damage — and the one missing link was `expand` turning the TAG
+    into a weapon. A race card only ever carries tags: it has no evolutions, because
+    nobody picked any. So the weapon comes from the evolution that grants the same tag,
+    which keeps one definition of what a bite is worth.
+
+    This is the half of "thin" that was this app's own, and it was being reported to the
+    supplier as a defect in their content.
+    """
+    card = {"id": "fangfolk", "name": "Fangfolk", "size": "medium", "speed": "normal",
+            "body": ["Fangfolk have heavy fangs and clawed hands."],
+            "senses": [], "movement": [], "about": "One paragraph.",
+            "strengths": ["strong", "hardy"], "weakness": "clever"}
+    doc = races.expand(races.draft(card["name"], card["body"],
+                                   size_hint=card["size"], speed_hint=card["speed"],
+                                   strengths=card["strengths"],
+                                   weakness=card["weakness"]))
+    assert {"natural.bite", "natural.claws"} <= set(doc["tags"]), doc["tags"]
+    keys = {str(w.get("key")) for w in doc.get("weapons") or []}
+    assert {"bite", "claws"} <= keys, keys
+    # The die is the body's, not a constant: one definition of what a bite is worth.
+    bite = next(w for w in doc["weapons"] if w["key"] == "bite")
+    assert bite["damage"]["medium"] == "1d6" and bite["damage"]["small"] == "1d4"
+    # And nothing tells the player it is waiting on the engine any more.
+    assert not any("natural attacks" in line for line in doc.get("not_yet") or [])
+
+
+def test_the_published_cue_list_is_what_the_table_says_today():
+    """`docs/race-cues.json` is what World Bible reads to know which words do something,
+    and it is generated — but generating it is only half. It was published saying 6 of 12
+    cues were engine-ready while the table said 10, so an author was told that four of the
+    traits they write reach nothing. The same guard the place vocabulary already had."""
+    from pathlib import Path
+
+    import importlib.util
+
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR, "tools", "export_race_cues.py")
+    spec = importlib.util.spec_from_file_location("export_race_cues", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    on_disk = json.loads(
+        Path(settings.BASE_DIR, "docs", "race-cues.json").read_text(encoding="utf-8"))
+    assert on_disk == module.build(), (
+        "docs/race-cues.json is stale — run tools/export_race_cues.py")
+    assert on_disk["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)
+
+
+def test_versatile_and_lucky_are_words_this_app_now_knows():
+    """The supplier was right and this was the gap on our side.
+
+    Three of Aurvantis's sixteen race cards produced no usable trait, and this app called
+    them content defects. They were checked against their own anatomy before anything was
+    touched: a Human "physically unremarkable and highly variable" and a Halfling with
+    "unusually good luck" are described correctly and completely — there was simply no cue
+    that meant versatile or lucky, so the words reached nothing. They declined to invent
+    traits to fill a vocabulary gap, which was the right call.
+
+    Both are plain 1e: a human's extra feat and extra skill rank, a halfling's +1 racial
+    bonus on all saving throws.
+    """
+    human = races.expand(races.draft(
+        "Human", ["Humans are physically unremarkable and highly variable."]))
+    assert "versatile" in human["tags"]
+    assert human["budget"] == {"feats": 1, "ranks": 1}, human["budget"]
+
+    halfling = races.expand(races.draft(
+        "Halfling", ["Halflings are small, nimble, and have unusually good luck."]))
+    assert "lucky" in halfling["tags"]
+    saves = {m["target"] for m in halfling["modifiers"] if m["type"] == "save_mod"}
+    assert saves == {"fort", "ref", "will"}, halfling["modifiers"]
+    assert all(m["amount"] == 1 and m["bonus_type"] == "racial"
+               for m in halfling["modifiers"])
+
+
+def test_the_two_new_cues_price_themselves_from_parts_and_never_from_a_guess():
+    """`versatile` carries its cost in the budget it grants — the Race Builder prices a
+    bonus feat and a bonus rank, and `BUDGET_RP` is that. `lucky` carries its cost in its
+    modifiers.
+
+    Neither tag is in `TAG_RP`, and that is deliberate rather than an omission: the Race
+    Builder's own price for a +1 racial bonus on all saves could not be sourced in two
+    searches, and `price_tag` has a three-way answer for exactly this — it reports
+    `unknown` instead of letting an unpriced tag look free.
+    """
+    assert races.price_tag("versatile")[2] == "unknown"
+    assert races.price_tag("lucky")[2] == "unknown"
+    human = races.expand(races.draft("Human", ["Physically unremarkable and variable."]))
+    assert races.rp(human) >= sum(races.BUDGET_RP.values()), "the budget priced at nothing"
+
+
+def test_the_checker_we_ship_reads_the_vocabulary_we_ship():
+    """The defect this prevents, found 2026-09-16 and six days old by then.
+
+    `tools/check_race_cards.py` is written to be copied into the World Bible repo with
+    `race-cues.json` beside it, so its default looked for the file next to itself. A
+    second copy of that generated list had been sitting in `tools/` since 10 September —
+    **twelve cues against fourteen, six engine-ready against twelve** — and because it was
+    beside the script, it won.
+
+    Every count this checker printed in between was measured against a vocabulary this app
+    had already moved past, including the counts reported to the supplier as evidence
+    about THEIR content. On the same fixture, with nothing in the world changed, the real
+    numbers were 1 card with problems and 11 thin against the 3 and 15 that were reported.
+
+    A generated file with two copies is the exact trap CLAUDE.md names, one level down
+    from the rule it names it in.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR, "tools", "check_race_cards.py")
+    spec = importlib.util.spec_from_file_location("check_race_cards", path)
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+
+    assert not path.with_name("race-cues.json").exists(), (
+        "a second copy of the generated cue list is back in tools/ — it will go stale "
+        "and it will win, because the checker looks beside itself first")
+    cues = checker.load_cues(checker._default_cues())
+    assert cues["cue_count"] == len(races.CUES), (
+        f"the checker reads {cues['cue_count']} cues and the table has {len(races.CUES)}")
+    assert cues["engine_ready_count"] == sum(1 for *_x, waits in races.CUES if not waits)
+
+
+# --- the card states its own tags (schema 1.5) -----------------------------------------
+
+def _traits_of(doc) -> list:
+    """A document's tags minus its own identity. `race.half-orc` is what the race IS and
+    every document has one; these tests are about what it GRANTS."""
+    return [t for t in doc["tags"] if not t.startswith("race.")]
+
+def test_every_tag_a_cue_can_grant_has_a_meaning_of_its_own():
+    """`TAG_MEANS` is what a tag shows when a card STATES it rather than describing it.
+
+    A cue row can grant two tags and show one line for both — the gills row grants
+    `amphibious` and `move.swim.30` and shows "amphibious; swim 30 ft". A card stating
+    only one of them would get the other's words, so the line belongs to the tag. This
+    asserts the two tables cannot drift: a cue added without a meaning fails here.
+    """
+    from_cues = {t for _p, granted, _l, _w in races.CUES for t in granted}
+    assert from_cues <= set(races.TAG_MEANS), from_cues - set(races.TAG_MEANS)
+
+
+def test_a_card_that_states_its_tags_is_not_read_for_them():
+    """Ruled 2026-09-16: *"we should not need to interpret anatomy on import. We should
+    receive exactly the anatomy as our engine will read it."*
+
+    Measured on the shipped Aurvantis export the same day, which is why the rule was
+    needed: the Half-Orc card's body said "sometimes visible tusks", the `tusks?` cue
+    granted `natural.bite`, and every half-orc a player could roll walked out of the
+    forge with a 1d6 bite.
+
+    The defect is not the bite. Ruled hours later, correcting the first version of this
+    docstring: *"these races are specific to this world even if they are called Orcs, so
+    it's okay if they're different."* A world's half-orcs may bite. The defect is that
+    the world could not say NO — declining the bite meant deleting the word "tusks" from
+    a sentence about their faces. The card is the authority on what it grants now, which
+    makes both answers sayable.
+    """
+    tusks = ["Human build with orcish ruggedness — a heavier brow, visible tusks."]
+    read = races.draft("Half-Orc", tusks)
+    assert "natural.bite" in read["tags"], "the cue table is what this rule replaces"
+
+    stated = races.draft("Half-Orc", tusks, granted=["sense.darkvision.60"])
+    assert _traits_of(stated) == ["sense.darkvision.60"]
+    assert stated["traits"] == ["darkvision 60 ft"]
+
+
+def test_a_stated_tag_is_granted_even_when_no_word_in_the_card_would_have_found_it():
+    """The other direction, and the one that makes this a contract rather than a filter:
+    a tag the prose gives no hint of is still granted. Otherwise the cue table is still
+    the authority and the card is only allowed to agree with it."""
+    quiet = races.draft("Stoneborn", ["They keep to themselves and say little."],
+                        granted=["move.burrow.20", "sense.darkvision.60"])
+    assert _traits_of(quiet) == ["move.burrow.20", "sense.darkvision.60"]
+    assert "burrow 20 ft" in quiet["traits"]
+    # And a tag the engine cannot use yet still says so, exactly as the prose path does.
+    assert any("no earth" in n for n in quiet["not_yet"]), quiet["not_yet"]
+
+
+def test_a_stated_tag_this_engine_cannot_name_is_reported_and_not_dropped():
+    """Two programs sharing a vocabulary will disagree about it eventually. The quiet
+    version of that is a race missing something nobody can name, so an unknown tag
+    becomes a `not_yet` line the forge shows and never a silent omission."""
+    odd = races.draft("Aetherkin", ["They flicker."],
+                      granted=["sense.darkvision.60", "sense.tremorsense.60"])
+    assert _traits_of(odd) == ["sense.darkvision.60"]
+    assert any("sense.tremorsense.60" in n for n in odd["not_yet"]), odd["not_yet"]
+
+
+def test_a_card_that_stated_its_tags_is_not_marked_as_converted():
+    """`converted` means this app read prose and guessed. On a stated card nothing
+    guessed, and the flag would be a lie — the ingredient bench shows it as
+    "unreviewed"."""
+    assert races.draft("Tengu", ["Crow-featured."], granted=["natural.bite"])["converted"] is False
+    assert races.draft("Tengu", ["Crow-featured, with a beak."])["converted"] is True
+
+
+def test_the_shipped_world_s_cards_reach_the_forge_by_their_own_tags():
+    """End to end on real data rather than a constructed card: every Aurvantis race the
+    forge offers carries exactly the tags its card states.
+
+    Measured when this was built: all 16 agree with what the cue table would have read,
+    because World Bible generates `grants[]` by running the same vocabulary. That makes
+    this change a no-op on today's export ON PURPOSE — the point is that the next time
+    their generator gets better at anatomy, this engine follows without a regex here.
+    """
+    world = loader.load_cached("fixtures/aurvantis-campaign.json")
+    cards = {c["name"]: c for c in (world.play or {}).get("races") or []}
+    assert cards, "the fixture stopped carrying race cards"
+    built = {d["name"]: d for d in races.from_world(world)}
+    for name, card in cards.items():
+        stated = [t for t in (card.get("grants") or []) if t in races.TAG_MEANS]
+        assert _traits_of(built[name]) == stated, name

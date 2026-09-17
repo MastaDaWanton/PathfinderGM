@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from rules import keepers
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -124,7 +125,12 @@ def test_leaving_a_room_is_a_scene_change_even_on_the_same_ground(yard):
 
     assert engine.here().id == other.id
     assert s.biome == "urban", "changing room must not change the ground underfoot"
-    assert list(s.actors) == ["pc"], "the people of the old room followed her out"
+    # Whoever keeps the room they walked INTO is standing in it (`rules/keepers.py`):
+    # this test is about the room they walked out of, so the new room's own people are
+    # not part of the question.
+    came = [r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")]
+    assert came == ["pc"], "the people of the old room followed her out"
     assert other.name in got.outcomes[0].tell
 
 
@@ -135,7 +141,8 @@ def test_an_escort_still_comes_along_between_rooms(yard):
          "params": {"place": next(p.name for p in engine.places()
                                    if p.id != engine.here().id),
                     "with": ["c1"]}}]))
-    assert set(s.actors) == {"pc", "c1"}
+    assert {r for r, a in s.actors.items()
+            if not keepers.is_keeper(a.world_entity_id or "")} == {"pc", "c1"}
 
 
 def test_new_ground_is_a_place_of_its_own(yard):

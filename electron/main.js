@@ -12,11 +12,14 @@
  *     binds somewhere else and the user's bookmark quietly stops mattering.
  *
  * What was NOT ported, and why:
- *   - electron-updater: this repo has no release pipeline to update from yet. Thin
- *     beats speculative.
  *   - the running-jobs quit guard: a model turn in flight is lost on quit, but the
  *     campaign is saved at every resolved turn, so the cost is one unanswered
  *     sentence rather than an hour of generation. Worth revisiting if that changes.
+ *
+ * electron-updater WAS on that list — "this repo has no release pipeline to update
+ * from yet. Thin beats speculative." It has one now: tagged releases carrying the
+ * installer, from v0.1.4 on. See `wireUpdates` at the bottom for what it does and,
+ * more to the point, what it refuses to do without being asked.
  */
 
 const { app, BrowserWindow, dialog, nativeTheme, shell } = require('electron');
@@ -247,6 +250,10 @@ if (!app.requestSingleInstanceLock()) {
       createWindow();
       const url = await startBackend();
       showGame(url);
+      // After the game is on screen, never before it. An update check is a network
+      // call that can hang for its own timeout, and nothing about it is worth putting
+      // between a player and the thing they double-clicked.
+      wireUpdates();
     } catch (error) {
       showStartupFailure(error);
     }
@@ -268,3 +275,105 @@ app.on('window-all-closed', () => {
 app.on('before-quit', stopBackend);
 // Covers a hard exit path where before-quit never fires.
 process.on('exit', stopBackend);
+
+/**
+ * Updates: offered, never applied behind the player's back.
+ *
+ * `autoDownload` and `autoInstallOnAppQuit` are both OFF. That is the whole design, and
+ * it is the same shape as everything else in this app: it finds out what is missing,
+ * says so in words, and offers a button. A 115 MB download that starts itself on a
+ * metered connection, or a version that changes underneath somebody mid-campaign, is
+ * the opposite of that.
+ *
+ * WHAT IS AND IS NOT VERIFIED, stated plainly because the app is unsigned and will stay
+ * that way. `latest.yml` is fetched from GitHub over TLS and carries a SHA-512 of the
+ * installer, which electron-updater checks after downloading — so a network attacker
+ * cannot substitute a binary. What is absent is the Authenticode check: with no signing
+ * certificate there is no publisher name to compare against, so a release published by
+ * somebody who had taken the GitHub account would be installed. That is the same trust
+ * already placed in the releases page by anyone downloading from it by hand; automating
+ * it widens who is affected, which is the honest reason the install stays a button.
+ *
+ * Failures are logged and never shown. Being offline, GitHub being down, or a rate limit
+ * are all normal, and none of them is worth a box in front of somebody's game.
+ */
+function wireUpdates() {
+  // Unpackaged there is no `app-update.yml`, and electron-updater throws rather than
+  // shrugging — `prove_shell.py` runs the dev shell and would fail on it.
+  if (!isPackaged) return;
+  // The provers launch the packaged shell to watch its lifecycle, not to talk to
+  // GitHub. Set by `tools/prove_shell.py`.
+  if (process.env.PATHFINDER_GM_NO_UPDATE) return;
+
+  let updater;
+  try {
+    ({ autoUpdater: updater } = require('electron-updater'));
+  } catch (error) {
+    // The dependency is named in `build.files`; if it is ever dropped from the asar
+    // this is the line that says so, in the log, rather than a blank window.
+    console.error('[update] electron-updater is not in the build:', error.message);
+    return;
+  }
+
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = false;
+  updater.logger = { info: console.log, warn: console.warn, error: console.error,
+                     debug: () => {} };
+
+  updater.on('error', (error) => {
+    console.error('[update]', error && error.message ? error.message : error);
+  });
+
+  updater.on('update-available', async (info) => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'A new version of Pathfinder GM',
+      message: `Version ${info.version} is out. You have ${app.getVersion()}.`,
+      detail: 'The download is about 115 MB. Nothing is installed until you say so, ' +
+              'and your characters, campaigns and worlds are not touched by it.',
+      buttons: ['Download it', 'Not now'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response !== 0) return;
+    updater.downloadUpdate().catch((error) => {
+      console.error('[update] download failed:', error.message);
+    });
+  });
+
+  updater.on('download-progress', (p) => {
+    // In the title bar rather than a progress dialog: the player can carry on playing
+    // while it downloads, and a modal would stop them.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitle(`Pathfinder GM — downloading update ${Math.round(p.percent)}%`);
+    }
+  });
+
+  updater.on('update-downloaded', async (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitle('Pathfinder GM');
+    }
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Ready to install',
+      message: `Version ${info.version} is downloaded.`,
+      detail: 'Installing closes the game. Anything you have played is already saved — ' +
+              'the campaign is written at the end of every turn.',
+      buttons: ['Install and restart', 'Next time I close it'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) {
+      // `quitAndInstall` quits the app, so `before-quit` fires and the backend is
+      // stopped the same way it is on any other exit. That ordering is why the backend
+      // does not outlive this.
+      updater.quitAndInstall();
+    } else {
+      updater.autoInstallOnAppQuit = true;
+    }
+  });
+
+  updater.checkForUpdates().catch((error) => {
+    console.error('[update] check failed:', error.message);
+  });
+}

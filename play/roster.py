@@ -60,19 +60,66 @@ class Entry:
 
     @property
     def actor(self) -> Actor:
+        """The sheet as a live character. Raises if it will not validate, and that is
+        deliberate — see `summary` for the half that must not."""
         return from_dict(self.sheet, ref="pc")
 
     def summary(self) -> dict:
-        a = self.actor
+        """One card's worth of this character, and it never raises.
+
+        Reported from a live session on 2026-09-15: the home page returned a 500 and
+        every campaign became unreachable, because ONE character on the roster no longer
+        validated —
+
+            IllegalSheet: Kesst Vayr: 10 skill ranks spent, 9 available
+                          (8 class + Int + race, x1)
+
+        — and `library.recent_characters` calls this in a loop with nothing catching it.
+        Four places do: two in `library`, two in `views`. So the guard belongs here
+        rather than at any of them, which is the same lesson as the model gate that was
+        put on two doors of three and the background that was bound by one of three.
+
+        This module already fails soft twice for the same reason: `load` returns None for
+        a file that is not JSON and None for one from another roster version. A sheet that
+        will not validate is the third way a character on disk can be unreadable, and it
+        was the only one that took a page down with it.
+
+        `actor` still raises. Listing a character must be safe; PLAYING one must not be,
+        because a game started from a sheet the rules reject is a worse failure than a
+        card that says it cannot be read. The split is the point.
+        """
+        blank = {
+            "id": self.id, "name": self.name, "status": self.status,
+            "created": self.created, "died": self.died, "epitaph": self.epitaph,
+            "turns_played": self.turns_played, "unreadable": "",
+        }
+        try:
+            a = self.actor
+        except Exception as exc:
+            # Every key a caller or template reads, so an unreadable character produces a
+            # card rather than a KeyError one frame later — which would move the crash
+            # rather than fix it. The reason is shown: a player who cannot see why cannot
+            # decide whether to fix the character or delete it, and both are their call.
+            reason = str(exc).strip() or exc.__class__.__name__
+            # The name is already the card's heading; the sheet's own message repeats it.
+            if reason.lower().startswith(f"{self.name.lower()}:"):
+                reason = reason[len(self.name) + 1:].strip()
+            return {**blank, "line": reason, "hp": "—", "unreadable": reason}
         cls = a.class_data.get("name", "")
         return {
-            "id": self.id, "name": self.name, "status": self.status,
+            **blank,
             "line": " · ".join(x for x in (a.heritage, _race_name(a.race), f"{cls} {a.level}".strip())
                                if x),
             "hp": f"{a.hp}/{a.hp_max}",
-            "created": self.created, "died": self.died, "epitaph": self.epitaph,
-            "turns_played": self.turns_played,
         }
+
+    def playable(self) -> bool:
+        """Whether a game can be started from this character at all.
+
+        Computed here because it was computed in two views with the same expression and
+        neither of them knew about the third reason: dead, and now unreadable.
+        """
+        return self.status != DEAD and not self.summary()["unreadable"]
 
 
 def path_for(character_id: str) -> Path:

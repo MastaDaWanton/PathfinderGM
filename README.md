@@ -23,6 +23,7 @@ and everything below this line is for people working on the code.
 | `docs/campaign-format.md` | The World Bible data contract |
 | `docs/from-world-bible.md` | What the export hands over today |
 | `docs/for-world-bible.md` | What it does not hand over yet, easiest first |
+| `docs/places-and-races-for-world-bible.md` | The two it must generate, in the shape the engine can read |
 | `docs/first-run.md` | Why Ollama is detected rather than bundled |
 | `docs/packaging.md` | Every frozen-path trap paid for, and what is still unproven |
 
@@ -47,7 +48,7 @@ campaign is a JSON file under your user data directory, and the world export is 
 python -m pytest
 ```
 
-3,590 tests, about six minutes. Run the whole suite, not the file you touched.
+3,729 tests, about seven minutes. Run the whole suite, not the file you touched.
 
 To build the packaged app:
 
@@ -75,8 +76,10 @@ rule and `rules/grid.py` says so where it is decided.
 **Seeing it.** The grid draws two ways from one payload: flat from overhead, or a
 three-dimensional board turned in quarter-turns, with the raised parts raised. Both write
 the same targeted square, so the engine cannot tell which one was clicked and neither view
-can become a second map. Hand-rolled SVG — an axonometric projection with a painter's
-depth sort — because the app bundles no third-party JavaScript at all.
+can become a second map. Hand-rolled SVG — real vertex geometry, an orthographic camera
+and a painter's depth sort — because the app bundles no third-party JavaScript at all.
+Faces are shaded per normal against one lamp that belongs to the room, the same light
+`dice3d.js` throws on the brass, so turning the board turns the board and not the light.
 
 **Characters.** Full guided 1e creation with legality enforced, 1,474 feats, point buy,
 outfitting from starting gold, and levelling to 20th. A fresh install ships **12 classes**
