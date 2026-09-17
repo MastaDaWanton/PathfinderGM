@@ -230,6 +230,13 @@ class GMAgent:
                 # narrator as ordinary prose and get written as working.
                 raw = judgement.refuse_unnamed_power(raw, player_input,
                                                      self.engine.scene)
+                # And the thing summoned rather than the power claimed. The fiat
+                # phrasings never reach here — `play/player_input.py` hands those back
+                # before any model call — but "I summon a celestial dog" is a real
+                # sentence from a summoner and an empty one from a rogue, and only the
+                # sheet can tell them apart.
+                raw = judgement.refuse_declared_creation(raw, player_input,
+                                                         self.engine.scene)
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.
@@ -699,6 +706,33 @@ class GMAgent:
         return tuple(a.name for a in self.engine.scene.actors.values()
                      if not a.is_pc and a.name)
 
+    def _body_count(self) -> dict:
+        """Who is standing and who is whole, for the prose reviewer to check against.
+
+        Read off the engine at the moment the prose is judged, never carried forward:
+        the whole point is that it is the authority. `alive` means conscious and on
+        their feet; `hurt` means anything has actually touched them, which includes
+        conditions, so a narrator may say a held creature is straining and may not say
+        an untouched one is bleeding.
+
+        The PC is left out. `second_person_narrator` owns how the player is written and
+        a player reading "you collapse" about their own 70 hit points has a different
+        complaint from the one this answers.
+        """
+        out = {}
+        for ref, a in self.engine.scene.actors.items():
+            if a.is_pc or not a.name:
+                continue
+            try:
+                alive = self.engine.scene.conscious(ref)
+            except Exception:
+                alive = (a.hp or 0) > 0
+            hurt = ((a.hp or 0) < (a.hp_max or 0)
+                    or bool(getattr(a, "conditions", None))
+                    or bool(getattr(a, "nonlethal", 0)))
+            out[a.name] = {"alive": bool(alive), "hurt": bool(hurt)}
+        return out
+
     def _alone(self) -> bool:
         """Whether the player has nobody standing beside them.
 
@@ -833,6 +867,15 @@ class GMAgent:
         "echoes-the-examples", "misgendered-pc", "formulaic-opening",
         "third-person-pc", "too-short", "too-long-for-a-fight",
         "invented-companion",
+        # Prose asserting an outcome the engine did not produce. There is no
+        # deterministic repair for it — a sentence saying the guard collapsed cannot be
+        # mended by deleting a word — so the rewrite is the only thing that can fix it,
+        # and it is the one finding about whether the turn was true rather than how it
+        # read.
+        "contradicts-the-engine",
+        # Stock scene-setting over a square with bodies in it. No deterministic
+        # repair either: the opening has to be rewritten, not trimmed.
+        "ignores-the-dead",
     })
 
     def polish(self, text: str, earlier: list[str] | None = None,
@@ -861,7 +904,7 @@ class GMAgent:
                 known_names=known, earlier=earlier,
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
-                gender=self._pc_gender(),
+                gender=self._pc_gender(), state=self._body_count(),
             )
 
         review = _review(text)

@@ -55,6 +55,32 @@ TOPICS = {
 }
 
 
+# A question the engine cannot answer however much of it it recognises.
+#
+# Reported 2026-09-17: "/gm what are the people around me doing in reaction to this?"
+# was answered with a `WHO:` roster and a spell block, and the GM was never asked —
+# because `answer()` returns as soon as any section produces a line, and "people"
+# matched the `who` topic.
+#
+# The roster was not *wrong*, it was beside the point. The engine holds who is present
+# and their hit points; it does not hold what they are doing about the bodies on the
+# cobbles, and no amount of state will ever contain that. These questions ask for a
+# reading of the scene, which is the one thing the GM is for.
+#
+# The engine's own lines are still gathered and handed to the model as grounding — the
+# question does not stop being about the people who are actually there.
+_WANTS_A_READING = re.compile(
+    r"\b(?:doing|do(?:es)?\s+(?:it|he|she|they|that)|react(?:ing|ion|ions)?|"
+    r"reacting|responding|response|thinking|think|feel(?:ing|s)?|"
+    r"say(?:ing)?\s+about|make\s+of|looks?\s+like|seems?|mood|"
+    r"watching|staring|happening\s+(?:around|to))\b", re.I)
+
+
+def wants_a_reading(question: str) -> bool:
+    """Is this a question about behaviour rather than about state?"""
+    return bool(_WANTS_A_READING.search(str(question or "")))
+
+
 def topics_for(question: str) -> list[str]:
     """Which sections answer this. Everything, when the question names nothing."""
     asked = " " + " ".join(str(question or "").lower().split()) + " "
@@ -89,6 +115,13 @@ def answer(campaign, engine, question: str) -> tuple[str, str]:
     found = look_up(campaign, engine, question)
     if found:
         out += found
+
+    # A question about what people are *doing* goes to the GM even when the engine
+    # recognised half of it. The state says who is standing there; only the GM can say
+    # what they are doing about it. `_ask_the_gm` runs `look_up` itself, so whatever the
+    # books did find is still handed over as grounding.
+    if out and wants_a_reading(question):
+        return "gm", ""
 
     if out:
         if houserules.gm_view():
@@ -351,6 +384,21 @@ def _match(names: dict, term: str):
     starts = [n for n in names if n.startswith(term + " ")]
     if len(starts) == 1:
         return names[starts[0]]
+    # A term found in the MIDDLE of a name has to be more than one word.
+    #
+    # Reported 2026-09-17: "/gm what are the people around me doing in reaction to
+    # this?" came back with a roster and the full text of the spell **Negative
+    # Reaction** — because "reaction" is one word of that spell's name and this clause
+    # matched it. The docstring above already promised "never a loose contains", and at
+    # word granularity this was exactly that.
+    #
+    # One ordinary English word is not somebody naming a rules entry; two in sequence
+    # usually is, which is why "power attack" and "magic missile" still land. The cost
+    # is that a single mid-name word no longer finds its entry, and that is the right
+    # way round: failing to find a lookup sends the question to the GM, while finding
+    # the wrong one answers a question nobody asked and stops the GM being asked at all.
+    if " " not in term:
+        return None
     whole = [n for n in names if (" " + n + " ").find(" " + term + " ") >= 0]
     return names[whole[0]] if len(whole) == 1 else None
 

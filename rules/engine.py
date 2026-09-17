@@ -521,17 +521,53 @@ class Scene:
             # player described.
             if self.grid is not None and px + away >= self.grid.width:
                 self.grid.width = px + away + 2
-            for dy in range(0, self.grid.height):
-                for sign in (1, -1):
-                    spot = (min(self.grid.width - 1, max(0, px + away)),
-                            min(self.grid.height - 1, max(0, py + sign * dy)))
-                    if spot not in taken:
-                        self.positions[ref] = spot
-                        taken.add(spot)
-                        break
-                else:
+            spot = self._free_spot_at(px, py, away, taken)
+            if spot is not None:
+                self.positions[ref] = spot
+                taken.add(spot)
+
+    def _free_spot_at(self, px: int, py: int, away: int,
+                      taken: set) -> tuple[int, int] | None:
+        """A free square about `away` squares from (px, py), spread around it.
+
+        Reported from the table 2026-09-17 with a picture of the board: seven creatures
+        in a single vertical line, one per row, all in the same column. The old search
+        fixed x at `px + away` and walked y — so every actor placed at one zone landed
+        in the same column by construction, and a market brawl looked like a bus queue.
+
+        The ring is walked by offset rather than by angle because the board is squares
+        and the distance that matters is `grid.distance`, which counts diagonals
+        5-10-5. Candidates are ordered by how far their real distance sits from the one
+        the zone asked for, so the first free square is the one that keeps the zone
+        honest; ties break by a fixed rotation so the spread is deterministic and a
+        seeded test can assert where everybody stood.
+        """
+        from .grid import distance
+
+        if self.grid is None:
+            return None
+        want_ft = away * FEET_PER_SQUARE
+        anchor = (px, py)
+        best: list[tuple[int, int, tuple[int, int]]] = []
+        reach = away + 3
+        for dx in range(-reach, reach + 1):
+            for dy in range(-reach, reach + 1):
+                if dx == 0 and dy == 0:
                     continue
-                break
+                x, y = px + dx, py + dy
+                if not (0 <= x < self.grid.width and 0 <= y < self.grid.height):
+                    continue
+                if (x, y) in taken or (x, y) in self.grid.blocked:
+                    continue
+                off = abs(distance(anchor, (x, y)) - want_ft)
+                # Second key spreads the ring: squares are tried in a rotation around
+                # the anchor rather than column by column, which is the whole defect.
+                best.append((off, (abs(dx) * 7 + abs(dy) * 13 + (dx < 0) * 3
+                                   + (dy < 0) * 5) % 29, (x, y)))
+        if not best:
+            return None
+        best.sort()
+        return best[0][2]
 
     def resync_zones(self) -> dict[str, str]:
         """Re-derive every zone from the map.

@@ -621,13 +621,175 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     return f"{said} {HAND_BACK}", True
 
 
+# --- prose that contradicts the engine ---------------------------------------------
+#
+# The third law says the narrator is fed tells and nothing else about mechanics. It does
+# not say the narrator cannot write mechanics anyway, and when a turn produces no tells
+# there is nothing to contradict it with — so it invents.
+#
+# Reported 2026-09-17, and the day's `attack: actor null` bug made it vivid: seven
+# rejected attempts, no roll of any kind, and prose describing a guard whose "scream is
+# cut short as the air is forced from his lungs" and who "collapses forward into the
+# dirt" — while the scene list beside it showed that guard at 11/11, unhurt, standing.
+# The player's own summary: "no rolls were done at all and combat never happened."
+#
+# Detected by comparing what the prose asserts against what the engine holds, because
+# every other shape of fix on this project has failed: the brief already tells the model
+# who is alive, and instructing it not to kill them is the instruction-volume trap.
+#
+# Bound to a name, never floating. "his voice dies", "the sound falls away" and "the
+# light collapses" are all ordinary prose, and a detector that read the verb without
+# asking who it was about would refuse the narrator its own language.
+_FELLED = re.compile(
+    r"\b(?:dies|died|dying|dead|killed|kills|slain|slays|lifeless|corpse|body|"
+    r"collapses?|collapsed|crumples?|crumpled|slumps?|slumped|"
+    r"drops?\s+(?:dead|to\s+the\s+(?:ground|floor|cobbles|dirt))|"
+    r"falls?\s+(?:dead|lifeless|limp|still|unconscious)|"
+    r"goes\s+(?:limp|still|slack)|"
+    r"hits?\s+the\s+(?:ground|floor|cobbles|dirt))\b", re.I)
+
+# A place going about its business. Harmless prose, and the one thing a square with
+# bodies in it is not doing.
+#
+# Reported 2026-09-17 with the scene list beside it — `man (c7) - dead`, `guards (c8) -
+# dead`, the crowd scattering — under a turn that opened: "The market of Vyrakon is a
+# cacophony of commerce - the rhythmic thud of hammers on anvils, the sharp cries of
+# vendors hawking salt and textiles, and the heavy, earthy scent of livestock." The
+# player's verdict: "the place was a screaming mess and it's doubtful anyone would have
+# been shopping."
+#
+# The model was not ignorant of it — the same paragraph later names "the fleeing
+# bystanders" and "the dying guard". It opened on a stock description of the location
+# and only then remembered the scene, which is why this is a finding about the prose
+# rather than a gap in the brief.
+_BUSINESS_AS_USUAL = re.compile(
+    r"\b(?:cacophony\s+of\s+commerce|bustling|bustle|hawking|hawkers?|haggling|haggles?|"
+    r"browsing|shoppers?|shopping|going\s+about\s+(?:their|its)\s+business|"
+    r"business\s+as\s+usual|the\s+usual\s+(?:crowd|din|noise|trade)|"
+    r"trade\s+continues|market\s+day|merry|cheerful|laughter\s+(?:rings|drifts)|"
+    r"idle\s+chatter|lively)\b", re.I)
+
+# Hurt, short of felled. Kept separate because the threshold is different: a narrator
+# may say somebody is bleeding when they have taken a point, and may not say it when
+# nothing has touched them at all.
+_WOUNDED = re.compile(
+    r"\b(?:wounded|bleeding|bleeds|blood\s+(?:pours|runs|spurts|sprays)|"
+    r"staggers?|staggered|reels?|reeled|cries?\s+out|screams?|howls?\s+in\s+pain|"
+    r"shattered|broken|cracks?\s+(?:open|apart)|gashed|torn\s+open)\b", re.I)
+
+
+def _name_stems(name: str) -> list[str]:
+    """The distinctive words of a name, singular and plural both.
+
+    Matched on words rather than the whole string because the scene calls somebody "the
+    crier working through the notices" and the prose calls them "the crier" — comparing
+    full strings sees two different people.
+
+    And on stems because of the case this was written for: the scene named the actor
+    `guards` and the prose wrote "the guard's scream is cut short". Without the stem the
+    detector reads those as two different people and passes a death it should have
+    caught, which is exactly the way a checker fails silently.
+    """
+    stems = []
+    for w in _WORD.findall(name.lower()):
+        w = w.strip("'")
+        if len(w) <= 3 or w in _NOT_A_NAME:
+            continue
+        stems.append(w[:-1] if w.endswith("s") and len(w) > 4 else w)
+    return stems
+
+
+def _sentences_about(text: str, name: str) -> list[str]:
+    """Every sentence in already-unquoted prose that names this actor."""
+    stems = _name_stems(name)
+    if not stems:
+        return []
+    # Built with `chr(92)` rather than typed. The first version of this line went
+    # in through a shell heredoc and both word boundaries arrived as literal
+    # backspace bytes - CLAUDE.md's "bash heredocs mangle backslashes", which it
+    # says has already cost this project real time twice. The regex still compiled
+    # and matched nothing, so the detector passed a death it should have caught
+    # and looked from the outside exactly like a detector that worked.
+    edge = chr(92) + "b"
+    hit = re.compile(edge + r"(?:" + "|".join(re.escape(x) for x in stems)
+                     + r")(?:s|es)?" + edge, re.I)
+    return [s for s in _SENTENCE.findall(text or "") if hit.search(s)]
+
+
+def contradicts_state(text: str, state: dict | None) -> list[tuple]:
+    """Claims in the prose that the engine says are not true.
+
+    `state` is `{name: {"alive": bool, "hurt": bool}}`, built by the caller off the live
+    scene. Returns `(name, claim, sentence)` for each contradiction, so the repair can
+    quote the sentence back rather than describe the problem in the abstract.
+    """
+    if not text or not state:
+        return []
+    # Speech stripped from the whole passage before anything is split into sentences. A
+    # character may perfectly well SAY somebody is dead, and a quotation routinely runs
+    # across a full stop — `The crier shouts, "The guard is dead, he collapsed!"` is two
+    # sentences to the splitter and one utterance to a reader, so stripping per sentence
+    # let the second half through as if the narrator had asserted it.
+    bare_text = unquoted(text)
+    out = []
+    for name, how in state.items():
+        if not isinstance(how, dict):
+            continue
+        for sentence in _sentences_about(bare_text, str(name)):
+            bare = sentence
+            if how.get("alive") and _FELLED.search(bare):
+                out.append((name, "down or dead", sentence.strip()))
+                break
+            if not how.get("hurt") and _WOUNDED.search(bare):
+                out.append((name, "hurt", sentence.strip()))
+                break
+    return out
+
+
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
-           pronouns: str = '', others: tuple = (), gender: str = '') -> Review:
+           pronouns: str = '', others: tuple = (), gender: str = '',
+           state: dict | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0. The prose says somebody was felled or hurt and the engine says otherwise.
+    #    First because it is the one finding about whether the turn was *true*: every
+    #    other rule here is about how the prose reads. Weight 3 so a rewrite that fixes
+    #    only this one still counts as an improvement worth keeping.
+    wrong = contradicts_state(text, state)
+    if wrong:
+        who = "; ".join(f"{n} is described as {claim} — {s!r}" for n, claim, s in wrong[:3])
+        out.findings.append(Finding(
+            "contradicts-the-engine", who,
+            "You have written an outcome that did not happen. The engine resolves what "
+            "lands and what does not, and nobody named here was hurt or felled this "
+            "turn — so the blow missed, was turned, or never connected. Rewrite those "
+            "sentences to describe the attempt and its failure, and leave everyone "
+            "standing exactly as they are. Describe effort, not effect.",
+            weight=3,
+        ))
+
+    # 0b. The square has bodies in it and the prose is describing a market day.
+    #     Gated on somebody actually being down, so an untouched market keeps every one
+    #     of these words — the finding is the contradiction, never the vocabulary.
+    felled = [n for n, how in (state or {}).items()
+              if isinstance(how, dict) and not how.get("alive")]
+    if felled:
+        stock = _BUSINESS_AS_USUAL.search(unquoted(text))
+        if stock:
+            out.findings.append(Finding(
+                "ignores-the-dead",
+                f"{stock.group(0)!r} with {', '.join(sorted(felled)[:3])} down",
+                f"There are bodies on the ground and you have written {stock.group(0)!r}. "
+                f"The place has seen what happened: the trade nearest the violence has "
+                f"stopped, people are backing away or staring or running, and whoever is "
+                f"still shouting is shouting about this. Open on what the square is doing "
+                f"*now*, not on what it does on an ordinary morning.",
+                weight=2,
+            ))
 
     # 5. A single line where a scene should be. Only asked of the turn narration —
     #    `min_chars` is left at zero for the consequence call, which is meant to be two or

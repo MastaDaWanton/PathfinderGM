@@ -48,6 +48,38 @@ SUBJECT = re.compile(
     re.I,
 )
 
+# A thing declared into existence, with the player as the subject of the sentence.
+#
+# Reported 2026-09-17: "I use my godly powers to will the missing transport of refined
+# salt to appear before me". `gm/judgement.py` now refuses the *claimed faculty*, and
+# that fix has a one-word bypass — "I use my **rope** to make a wagon of salt appear"
+# names nothing supernatural, so no faculty door opens and the model's `spawn` puts the
+# cart in the market. Found by the player who reported the original, asking what else
+# would work.
+#
+# The exemption above — anything with a nominative "I" is the player's to say — is right
+# for *actions*, and the file says why: "I find a chest containing five thousand gold
+# pieces" is allowed through because the engine is what makes sure no chest exists. That
+# reasoning does not reach this shape. "I make a wagon of salt appear" is not an attempt
+# at anything the engine can adjudicate; the sentence's whole content is that the world
+# now contains something it did not. There is no roll to fail.
+#
+# Deliberately NOT here: summon, conjure, manifest. Those are spell vocabulary, and a
+# summoner is entitled to type them — the sheet decides whether they have it, which is
+# `gm/judgement.py`'s job and not a regex's. What this owns is fiat: a wagon appearing
+# because it was willed to.
+FIAT_CREATION = re.compile(
+    r"\b(?:make|makes|making|have|has|cause|causes|will|wills|willing|"
+    r"command|commands|order|orders|bring|brings|force|forces)\s+"
+    # A determiner is required, and it is what keeps "I will appear calm" out: the verb
+    # has to be followed by the *thing*, not by the appearing.
+    r"(?:the|a|an|some|that|this|my|their|his|her|its|every|all|\d+)\s+"
+    r"[\w\s,'\-]{0,50}?"
+    r"\b(?:appear|appears|materiali[sz]e|materiali[sz]es|exist|exists)\b"
+    r"|\binto\s+(?:being|existence)\b"
+    r"|\bout\s+of\s+(?:thin\s+air|nowhere)\b",
+    re.I)
+
 _SENTENCE = re.compile(r"[^.!?]+[.!?]?")
 _QUOTED = re.compile(r"[\"“”][^\"“”]*[\"“”]")
 
@@ -70,10 +102,24 @@ def check(text: str) -> Verdict:
         s = sentence.strip()
         if len(s) < 8 or s.endswith("?"):
             continue
+        # Dialogue the player's character speaks is theirs, quotes and all. Hoisted
+        # above the first-person exemption because the fiat check below has to read a
+        # sentence the player is the subject of, and a boast inside quotation marks —
+        # "I tell him I will make a dragon appear" — is still only a boast.
+        bare = _QUOTED.sub(" ", s)
+        if FIAT_CREATION.search(bare):
+            return Verdict(
+                ok=False,
+                offending=s,
+                hint=(
+                    f"{s.rstrip('.')} — whether that exists is the GM's to decide, and "
+                    f"there is no roll that makes it so. Say what your character does "
+                    f"about the thing you want: search for it, ask after it, go where "
+                    f"it would be."
+                ),
+            )
         if FIRST_PERSON.search(s):
             continue
-        # Dialogue the player's character speaks is theirs, quotes and all.
-        bare = _QUOTED.sub(" ", s)
         if not SUBJECT.match(bare) or not WORLD_VERB.search(bare):
             continue
         return Verdict(

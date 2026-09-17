@@ -1766,10 +1766,88 @@ _PSYCHIC_NAMES = (
 )
 
 
+# A faculty claimed outright, whatever is then done with it.
+#
+# Reported from the table 2026-09-17: "I use my godly powers to will the missing
+# transport of refined salt to appear before me, since a god such as myself could easily
+# do this at any point, instantly." The narrator wrote the cart arriving — a rift, a
+# shockwave, merchants on their knees — and the salt was in the market.
+#
+# This is the 2026-09-09 psychic report one category over, and it got through for a
+# reason worth naming: `_PSYCHIC`'s faculty arm listed the *adjectives* it knew —
+# psychic, psionic, telepathic, mental, mind — so "godly" walked past a door built for
+# exactly this sentence. An adjective list is a denylist, and a denylist for "ways of
+# claiming a power you were never granted" has no end: godly, divine, cosmic, eldritch,
+# reality-warping, and whatever the next player writes.
+#
+# So the adjective is not read at all. What fires is the SHAPE — reaching for a faculty
+# — and the sheet decides, which is the rule the rest of this file already runs on: an
+# ability that was never granted cannot be activated. `refuse_unnamed_power` stands down
+# whenever an intent names an ability the character really has, so a cleric channelling
+# and a wizard casting are untouched; what is left is a claim with nothing behind it,
+# and the engine's own door answers it with the list of what they can actually do.
+_CLAIMED_FACULTY = re.compile(
+    r"\b(?:use|using|reach(?:ing)?\s+for|call(?:ing)?\s+(?:on|upon)|focus(?:ing)?|"
+    r"channel(?:ling|ing)?|invok(?:e|ing)|exert(?:ing)?|wield(?:ing)?|"
+    r"unleash(?:ing)?|draw(?:ing)?\s+(?:on|upon)|harness(?:ing)?)\s+"
+    r"(?:my|the|his|her|their)\s+(?:own\s+)?"
+    # At most two words of whatever they called it. Unread, deliberately.
+    r"(?:[\w-]+\s+){0,2}"
+    r"(?:powers?|abilit(?:y|ies)|magic|sorcery|divinity|godhood|godhead|"
+    r"omnipotence|omniscience)\b",
+    re.I)
+
+# The same claim with a softer noun: "my divine might", "my godly strength". `might`,
+# `force` and `strength` are not in the list above on purpose — "I use my last strength
+# to push the door" is an ordinary turn, and a pattern that refused it would be worse
+# than the one it was fixing.
+#
+# So this arm reads the SOURCE instead, and yes, that is a word list. It is a defensible
+# one here for a reason the arm above is not: it is *additive*. The gate is the general
+# shape; this only widens which nouns count when the sentence has already named
+# somewhere a level 1 rogue cannot draw from. A miss here costs a phrasing, not the rule.
+_CLAIMED_SOURCE = re.compile(
+    r"\b(?:my|the|his|her|their)\s+(?:own\s+)?"
+    r"(?:god(?:ly|like|-like|given)?|divine|holy|unholy|celestial|infernal|demonic|"
+    r"cosmic|eldritch|arcane|psychic|psionic|supernatural|otherworldly|immortal)\s+"
+    r"(?:[\w-]+\s+){0,1}"
+    r"(?:powers?|abilit(?:y|ies)|might|magic|force|energy|strength|will|word|"
+    r"command|touch|authority|nature)\b",
+    re.I)
+
+# Claiming to BE the thing, which is the same declaration with the faculty implied:
+# "since a god such as myself", "as a god I can", "I am a deity". Speech is redacted
+# before any of this runs, so a character boasting to a guard is untouched — a lie about
+# what you are is a character's to tell.
+_CLAIMS_GODHOOD = re.compile(
+    r"\b(?:a|as\s+a|being\s+a|i\s+am\s+(?:a|an|the))\s+"
+    r"(?:god|goddess|deity|demigod|divine\s+being|immortal)\b"
+    r"|\bgod\s+such\s+as\s+(?:myself|me|i)\b"
+    r"|\bmy\s+(?:godhood|godhead|divinity|divine\s+nature)\b",
+    re.I)
+
+
 def _psychic_called(text: str) -> str:
+    """What to name back at them — their own words, never a label we invented.
+
+    The engine's door prints "no ability called <X>; they can use: …", and the whole
+    value of that sentence is that it quotes the claim. A player who wrote "godly
+    powers" and is told there is no ability called "psychic powers" has been answered
+    about somebody else's turn.
+    """
     for pattern, name in _PSYCHIC_NAMES:
         if pattern.search(text):
             return name
+    claimed = _CLAIMED_FACULTY.search(text) or _CLAIMED_SOURCE.search(text)
+    if claimed:
+        # Their phrasing, minus the reaching verb and the possessive: "my godly powers"
+        # reads back as "godly powers".
+        said = re.sub(
+            r"^(?:\w+(?:ing)?\s+)?(?:for\s+|on\s+|upon\s+)?(?:my|the|his|her|their)\s+"
+            r"(?:own\s+)?", "", claimed.group(0).strip(), flags=re.I)
+        return " ".join(said.split())
+    if _CLAIMS_GODHOOD.search(text):
+        return "godhood"
     return "psychic powers"
 
 
@@ -1801,7 +1879,10 @@ def refuse_unnamed_power(raw_intents, player_text: str, scene) -> list:
     if "?" in player_text:
         return raw_intents
     said = redact_speech(str(player_text))
-    if not _PSYCHIC.search(said):
+    # Three doors into the same refusal: reaching into a mind, reaching for a faculty of
+    # any name, or claiming to be the kind of thing that would not need one.
+    if not (_PSYCHIC.search(said) or _CLAIMED_FACULTY.search(said)
+            or _CLAIMED_SOURCE.search(said) or _CLAIMS_GODHOOD.search(said)):
         return raw_intents
     pc = scene.pc()
     if pc is None:
@@ -1842,6 +1923,77 @@ def refuse_unnamed_power(raw_intents, player_text: str, scene) -> list:
                     "params": {"ability": name}}]
 
 
+# --- a thing summoned that nothing grants ------------------------------------------
+#
+# `play/player_input.py` hands back the fiat phrasings — "I make a wagon of salt
+# appear" — before a model is ever called, because there is no roll that could decide
+# them. It deliberately leaves `summon`, `conjure` and `manifest` alone: those are spell
+# vocabulary, a summoner is entitled to type them, and whether this character has one is
+# a question for the sheet rather than a regex.
+#
+# This is that question. Same shape as `refuse_unnamed_power` above and the same rule
+# underneath it: a thing that was never granted cannot be activated. A real summoner's
+# turn produces a `cast`, which stands down untouched; what is left is a `spawn` nobody
+# can account for, which is how a level 1 rogue's declaration puts a creature on the
+# board.
+_SUMMONS = re.compile(
+    _DECLARES + r"(?:summon|conjure|manifest|materiali[sz]e)\b"
+    r"(?:\s+up)?\s+(?:a|an|the|some|my|two|three|\d+)\b", re.I)
+
+# What a player's turn may not do: put a thing in the world, or mint one into a purse.
+# Both are bounded in `rules/intents.py` and neither is gated on anything the player
+# has — `spawn` is the GM's op for reading opposition into a scene, and it does not stop
+# being the GM's op because the model wrote it on the player's behalf.
+_CREATING_OPS = ("spawn", "give")
+
+
+def refuse_declared_creation(raw_intents, player_text: str, scene) -> list:
+    """A creature summoned by somebody with nothing that summons does not arrive.
+
+    The complement of the fiat handback in `play/player_input.py`, for the half that
+    handback must not take: "I summon a celestial dog" is a legitimate sentence from a
+    summoner and an empty claim from a rogue, and only the sheet knows which.
+
+    Found 2026-09-17, by the player who reported the salt cart asking what else would
+    get through — "I use my rope to explode the enemy" and its neighbours. The faculty
+    fix had closed the phrasing they used and not the room behind it: naming anything
+    mundane, or nothing at all, left `spawn` untouched.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    said = redact_speech(str(player_text))
+    if not _SUMMONS.search(said):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    from rules import leveling
+
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            continue
+        op = str(r.get("op", "")).lower()
+        if op == "cast":
+            return raw_intents              # a spell; the spell's own door answers
+        if op == "use_ability":
+            named = str((r.get("params") or {}).get("ability", "")).strip()
+            if not named:
+                return raw_intents
+            _path, found, _fx = leveling.find_ability(pc, named)
+            if found:
+                return raw_intents
+
+    kept = [r for r in raw_intents
+            if isinstance(r, dict)
+            and str(r.get("op", "")).lower() not in _CREATING_OPS]
+    return kept + [{"op": "use_ability", "actor": pc.ref,
+                    "because": "the player reached for a summoning",
+                    "params": {"ability": "a summoning"}}]
+
+
 # "I drink my healing potion", "I quaff the elixir", "I throw the flask at c1",
 # "I apply the salve": a using verb and, somewhere after it, a jar word. The jar itself
 # is matched against the satchel by name; the sentence only has to be about one.
@@ -1875,6 +2027,10 @@ def _jar_instead(raw_intents, ref: str, item_id: str, because: str) -> list:
 
 
 # The ops a player turn's model reply may leave without an actor and mean the PC.
+#
+# `attack` is deliberately NOT here, and gets its own gated door inside the function: on
+# a turn where the GM also moves somebody, an attack with no actor might be theirs, and
+# filling it with the PC would aim the player's fist at the wrong body.
 _ACTS_ITSELF = ("cast", "use_item", "use_ability", "hazard")
 
 
@@ -1888,17 +2044,37 @@ def fill_missing_actor(raw_intents, player_text: str, scene) -> list:
     every attempt burned on the same omission and the turn degraded to narration.
     The fix is a fill, not a schema change: `fill_obvious_targets` already fills the
     target the same way, and the actor of the player's own spell is not a guess.
+
+    **And `attack`, read off a live save on 2026-09-17.** The same shape, the same cost,
+    two weeks later: "I don my Extracorporeal Blood Armament and punch the guard in the
+    back of the lower spine" produced `{"op": "attack", "actor": null}` on **seven
+    consecutive attempts** — five from the narrator, then two more after the turn was
+    handed to the fallback model — and every one was refused with `attack: unknown actor
+    None`. Eighty-three seconds, seven model calls, and the turn degraded to narration:
+    no roll, no initiative, no fight, and a guard the prose said had collapsed still
+    standing at 11/11 in the scene list.
+
+    The `cast` fix above was written for exactly this and `attack` was never added to it.
+    It is not added to `_ACTS_ITSELF` now either, because an attack is the one op on this
+    list that somebody else might plausibly be doing on the player's turn — so the fill
+    is gated on the player's own words saying who is swinging, which is a question this
+    file already answers for `wants_a_fight`.
     """
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
     pc = scene.pc()
     if pc is None:
         return raw_intents
+    # Speech redacted first, for the reason the top of this file gives at length: a
+    # character who SAYS "I will punch him" has not swung at anybody.
+    swinging = bool(player_text) and _player_is_the_one_swinging(
+        redact_speech(str(player_text)))
     out = []
     for r in raw_intents:
-        if isinstance(r, dict) and str(r.get("op", "")).lower() in _ACTS_ITSELF \
-                and not r.get("actor"):
-            r = dict(r, actor=pc.ref)
+        if isinstance(r, dict) and not r.get("actor"):
+            op = str(r.get("op", "")).lower()
+            if op in _ACTS_ITSELF or (op == "attack" and swinging):
+                r = dict(r, actor=pc.ref)
         out.append(r)
     return out
 

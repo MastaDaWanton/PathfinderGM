@@ -1184,7 +1184,8 @@
      stop so a mote reads as a glowing coal rather than a pixel. The sway is
      still baked into the rise so the loop stays seamless, and each layer
      still flickers on its own prime-numbered clock. */
-  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 56;
+  #embers { position: fixed; inset: 0; pointer-events: none; z-index: 8;
+    /* With the candle; drifting embers over a dice popup is the same bug. */
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%,
                                                 transparent 96%);
@@ -1386,7 +1387,16 @@
      keyframe is a strobe and real fire is noise. See the pointer block. */
   #cursorshade {
     position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
-    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 55;
+    /* Reported 2026-09-17: "every tooltip that has loaded has loaded partially
+       covered by the cursor". The candle and its shade are *decoration*, and they were
+       stacked at 55-60 — above the story, the footer, the side panel, the combat bar
+       and, worst, the dice popup at 20-40. A light meant to fall on the page was being
+       drawn on top of the interface, so anything that appeared near the pointer came up
+       underneath a 170px bright gradient.
+       Now just above the vignette (5) and below every panel and popup. The page is lit
+       exactly as before — main, footer and aside all sit at z-index 2 — and nothing the
+       player is meant to read is under it any more. */
+    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 6;
     transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
                scale(calc(.94 + .10 * var(--flick, .8)));
     /* Taken well down from the first cut (.13/.30/.34): the illusion of
@@ -1399,7 +1409,7 @@
   }
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;
-    margin: -85px 0 0 -85px; pointer-events: none; z-index: 60;
+    margin: -85px 0 0 -85px; pointer-events: none; z-index: 7;
     opacity: calc(.5 + .5 * var(--flick, .8));
     transform: translate(calc(var(--cx, -9000px) + var(--jx, 0px)),
                          calc(var(--cy, -9000px) + 5px + var(--jy, 0px)));
