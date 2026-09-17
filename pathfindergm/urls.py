@@ -13,6 +13,9 @@ urlpatterns = [
     # closed one. See `pathfindergm/liveness.py` for the four hours of orphaned server
     # that made it necessary.
     path("api/alive", views.alive, name="alive"),
+    # What a second device polls to learn the game moved without it. See
+    # `play/concurrency.py` and `docs/lan-play.md`.
+    path("api/revision", views.game_revision, name="game_revision"),
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),

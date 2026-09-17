@@ -37,7 +37,17 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
+    # Before CSRF, and inert unless `desktop.py --lan` armed it. A request from off this
+    # machine with no pass must be turned away at the door rather than a step inside it:
+    # CSRF's answer to a stranger is a 403 about a token, which tells somebody who
+    # mistyped their pass exactly the wrong thing.
+    "pathfindergm.lan.TheDoor",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # Last, so it wraps the view and nothing else. Below CSRF deliberately: a request
+    # that fails the CSRF check never reaches a campaign, so it must not take the game
+    # lock and must not move the revision — a rejected probe that bumped the counter
+    # would send every open device off to re-fetch a state that had not changed.
+    "play.concurrency.OneGameAtATime",
 ]
 
 ROOT_URLCONF = "pathfindergm.urls"

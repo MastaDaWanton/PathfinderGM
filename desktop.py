@@ -55,6 +55,13 @@ from pathlib import Path
 PREFERRED_PORT = 8917
 HOST = "127.0.0.1"
 
+# `--lan` binds every interface instead, so a phone on the same Wi-Fi can reach the
+# table. Opt-in and never the default: the app's posture has always been that it listens
+# to nobody, and the day it listens to a network is the day `/api/say` becomes something
+# a stranger can POST to. `pathfindergm/lan.py` is the door that answers them, and
+# `docs/lan-play.md` is why any of this exists.
+LAN_HOST = "0.0.0.0"
+
 
 def _bind(host: str, port: int):
     """A listening socket on `port` if it is free, otherwise on whatever the OS gives.
@@ -269,10 +276,23 @@ def main(argv: list[str] | None = None) -> int:
     django.setup()
     application = get_wsgi_application()
 
-    server = _bind(HOST, PREFERRED_PORT)
+    from pathfindergm import lan
+
+    on_the_lan = "--lan" in argv
+    server = _bind(LAN_HOST if on_the_lan else HOST, PREFERRED_PORT)
     server.set_app(application)
     port = server.server_address[1]
+    # The URL everything else is told is always the loopback one, even in LAN mode: it is
+    # what the Electron shell loads, what `_open_browser_when_up` opens and what the
+    # portfile carries, and every one of those is on this machine. `0.0.0.0` is a bind
+    # address, not somewhere a browser can go — handing it to `webbrowser.open` opens a
+    # page that cannot connect.
     url = f"http://{HOST}:{port}/"
+
+    pass_for_the_table = ""
+    if on_the_lan:
+        pass_for_the_table = lan.mint()
+        lan.arm(pass_for_the_table, port)
 
     # The portfile after the log, so nothing that launched us reads an address the
     # log has not yet vouched for.
@@ -315,6 +335,21 @@ def main(argv: list[str] | None = None) -> int:
     say(f"  installed {install_root()}")
     say(f"  your data {user_data_root()}")
     say(f"  serving   {url}")
+    if on_the_lan:
+        # Printed as a whole address rather than "go to this IP and enter this pass",
+        # because the thing a player has to get right on a phone keyboard should be one
+        # string they can read off in one go. The pass is spent on arrival and redirected
+        # out of the address bar — see `pathfindergm/lan.py`.
+        found = lan.addresses()
+        say("")
+        say("  On this Wi-Fi, from a phone or tablet:")
+        for address in found or ["<this machine's address>"]:
+            say(f"    http://{address}:{port}/?{lan.QUERY_KEY}={pass_for_the_table}")
+        if not found:
+            say("    (no network address found — is this machine on Wi-Fi?)")
+        say("  The pass is new every launch, and Windows may ask you to allow this")
+        say("  app through the firewall the first time.")
+        say("")
     say("Close this window to stop the game — or just close the game's window; it "
         "shuts down a few minutes later.")
 

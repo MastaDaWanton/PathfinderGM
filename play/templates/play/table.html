@@ -955,6 +955,81 @@
     .figure { display: none; }
   }
 
+  /* --- The phone -----------------------------------------------------------
+   * Measured in a browser at 375x812 before this block existed: the desktop grid
+   * (`1fr 350px`) put the *character sheet* on screen and pushed the story, the
+   * suggestions and the input box off to the left. A player opening the table on a
+   * phone landed on a stat block with nothing to type into and no sign there was
+   * anything else — the page was not narrow, it was simply showing the wrong column.
+   *
+   * The sheet becomes a drawer rather than a column, reusing the map tray's idiom two
+   * hundred lines up — an edge tab and a slide-over — so there is one way this page
+   * shows a panel it has no room for rather than two.
+   */
+  #sheettab { display: none; }
+
+  @media (max-width: 760px) {
+    /* 100dvh, not 100vh. Mobile browsers count their own collapsing address bar in
+       `vh`, so a 100vh page is taller than the window and the bottom of it sits under
+       the chrome — which on this page is the input bar, the one control the game
+       cannot be played without. */
+    body { grid-template-columns: 1fr; height: 100dvh; }
+
+    aside {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
+      width: min(400px, 88vw);
+      /* Off-screen rather than hidden, so it slides rather than appears — same
+         reasoning as `#maptray`. */
+      transform: translateX(102%);
+      transition: transform .32s cubic-bezier(.2,.7,.3,1);
+      border-width: 0 0 0 4px;
+      box-shadow: -14px 0 40px rgba(0,0,0,.6);
+    }
+    aside.on { transform: translateX(0); }
+
+    #sheettab {
+      display: block;
+      position: fixed; right: 0; top: 46%; z-index: 60; cursor: pointer;
+      writing-mode: vertical-rl; text-orientation: mixed;
+      padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-right: 0;
+      border-radius: 3px 0 0 3px; background: linear-gradient(#241d15, #17120d);
+      color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
+      box-shadow: -3px 0 14px rgba(0,0,0,.6);
+    }
+
+    /* 48px of horizontal padding is a quarter of a phone screen spent on margin. */
+    #story { padding: 20px 16px 22px; }
+    footer { padding: 12px 14px 16px; }
+    #busy, #err { padding: 0 16px 10px; }
+
+    /* Thumbs rather than a mouse. 44px is the minimum target size both platforms'
+       guidance agrees on, and the buttons on this page are sized for a pointer. */
+    button, .sugg, .pick, .tab, .opensheet { min-height: 44px; }
+    button { padding: 12px 16px; letter-spacing: .1em; }
+
+    /* The input row wraps instead of squeezing. Measured at 375px before this rule:
+       the flex row wanted 384px inside 347px, so the four buttons collapsed to 34px
+       each and read "Sa", "Co", "Cr", "Tr" — and the overflow pushed the whole page
+       into sideways scroll. The box gets its own line and the buttons share the next,
+       which is also the only arrangement in which they reach a thumb-sized width. */
+    #sayform { gap: 8px; flex-wrap: wrap; }
+    #sayform input[type=text] { flex: 1 0 100%; }
+    #sayform button { flex: 1 1 auto; min-width: 0; padding: 12px 10px; }
+
+    /* Exactly 16px, and it is not a taste decision: iOS Safari zooms the whole page
+       in when a focused input's text is smaller than that, and does not zoom back
+       out afterwards — so one tap on the box leaves the player scrolled sideways
+       through a page they then have to pinch their way out of. */
+    input[type=text] { font-size: 16px; }
+
+    /* The map tray shares the screen with nothing on a phone. */
+    #maptray { width: 92vw; }
+  }
+
+  @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+    aside { transition: none; }
+  }
+
   .opensheet {
     width: 100%; margin-top: 14px; background: transparent; color: var(--accent);
     border: 1px solid var(--edge); padding: 10px; border-radius: 3px; cursor: pointer;
@@ -1478,6 +1553,10 @@
 <!-- The map, big enough to read. A tab on the left edge rather than a button in the
      panel, so it is reachable whether or not the ground is currently drawn there. -->
 <button id="maptab" title="The map">MAP</button>
+<!-- Only ever visible under the phone breakpoint, where the sheet is a drawer rather
+     than a column. On a desktop the panel is simply there and a tab for it would be a
+     button that scrolls you to something already on screen. -->
+<button id="sheettab" title="Your character">SHEET</button>
 <div id="maptray">
   <div class="traybar"><b>The ground</b>
     <button id="mapclose" title="Close">✕</button></div>
@@ -1612,12 +1691,30 @@ function showMap(on) {
   $("#maptab").style.display = on ? "none" : "";
   if (on && STATE) renderMap(STATE);
 }
+// The sheet drawer, which exists only under the phone breakpoint. Two panels that slide
+// over the same screen must not both be open: on a 375px phone the second one lands on
+// top of the first and the one underneath can only be found by closing the one above it.
+function showSheet(on) {
+  $("aside").classList.toggle("on", on);
+  $("#sheettab").style.display = on ? "none" : "";
+  if (on) showMap(false);
+}
 document.addEventListener("click", e => {
-  if (e.target.closest("#maptab") || e.target.closest("#mapopen")) showMap(true);
+  if (e.target.closest("#maptab") || e.target.closest("#mapopen")) {
+    showSheet(false);
+    showMap(true);
+  }
   else if (e.target.closest("#mapclose")) showMap(false);
+  else if (e.target.closest("#sheettab")) showSheet(true);
+  // Anywhere outside it, while it is open. A drawer with no way out but a tab it is
+  // currently covering is a trap, and the tab is hidden precisely while it is open.
+  else if ($("aside").classList.contains("on") && !e.target.closest("aside")) {
+    showSheet(false);
+  }
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("#maptray").classList.contains("on")) showMap(false);
+  if (e.key === "Escape" && $("aside").classList.contains("on")) showSheet(false);
   // A map is worth a shortcut in a game where the whole question is where you stand.
   if (e.key === "m" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
     showMap(!$("#maptray").classList.contains("on"));
@@ -1716,12 +1813,90 @@ function showDeath(d) {
 // so picking a character to switch to also posted /api/character/new with an undefined
 // source, and the 404 from that was the error the player saw.
 
+/* --- Two views on one game ------------------------------------------------------
+ *
+ * The phone and the laptop are two screens on one campaign: `play/campaign.py` keeps
+ * the live game in a process-global, so there is exactly one state and nothing to
+ * merge. What there is, is a screen that does not know it moved — every render on this
+ * page follows *this* client's own fetch, so a view that did not act never learns
+ * anything happened. Act on the laptop from a scene the phone has already left, and the
+ * engine applies the turn to a world that no longer matches the text you read.
+ *
+ * The channel carries a number and never a state. A view that is behind re-fetches
+ * /api/state through the path it already uses, so there is one serialiser and one
+ * render — the alternative is a second copy of the state to keep in step, which is the
+ * shape CLAUDE.md's "grep for every copy of it" was written about.
+ *
+ * `docs/lan-play.md` is the design record; `play/concurrency.py` is the server half.
+ */
+// Parsed rather than pasted bare. A Django template renders a missing variable as the
+// empty string, so `let REVISION = {{ revision }};` would become `let REVISION = ;` —
+// a syntax error that takes the whole page down, silently, from a context key somebody
+// forgot. Zero is the safe floor: it can only cause one redundant resync.
+let REVISION = parseInt("{{ revision }}", 10) || 0;
+
+// Three seconds. A GM turn is 10-95 s of local model, so anything faster buys nothing a
+// player can perceive and costs a wake-up on a phone that is doing nothing else.
+const RESYNC_MS = 3000;
+let resyncing = false;
+
+function noteRevision(r) {
+  const seen = r.headers.get("X-Game-Revision");
+  if (seen === null) return;
+  const n = parseInt(seen, 10);
+  if (!isNaN(n)) REVISION = n;
+}
+
+// Every read of the state goes through here, so the revision is recorded in exactly one
+// place. A fetch that skipped it would leave this page believing it was current while
+// showing something older, which is worse than not knowing at all.
+async function getState() {
+  const r = await fetch("/api/state", { cache: "no-store" });
+  noteRevision(r);
+  return r.json();
+}
+
+async function resync() { render(await getState()); }
+
+async function checkTheOtherDevice() {
+  // Not while this page is hidden: a backgrounded phone is not looking, and it will
+  // catch up on `visibilitychange` the moment it is. Not while a turn of our own is in
+  // flight either — `busy` is up, the player is waiting on their own answer, and
+  // re-rendering underneath it would replace the screen they are about to be given.
+  if (resyncing || document.hidden || $("#busy").classList.contains("on")) return;
+  resyncing = true;
+  try {
+    const r = await fetch("/api/revision", { cache: "no-store" });
+    if (!r.ok) return;
+    const theirs = (await r.json()).revision;
+    if (typeof theirs === "number" && theirs !== REVISION) await resync();
+  } catch {
+    // The server is gone, or saturated by a turn. Neither is this loop's business and a
+    // console error every three seconds would bury the ones that matter — same
+    // reasoning as `js/keepalive.js`, which has been doing this since 0.1.0.
+  } finally {
+    resyncing = false;
+  }
+}
+
+setInterval(checkTheOtherDevice, RESYNC_MS);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkTheOtherDevice();
+});
+
 async function post(url, body) {
+  const headers = {"Content-Type": "application/json", "X-CSRFToken": csrf()};
+  // What this screen was drawn from. The server refuses the write if it has moved on,
+  // which is the only thing standing between a stale screen and a turn taken against a
+  // world that has already changed. Optional by design on the server: the forge, the
+  // benches and the builders post without it and are untouched.
+  headers["X-Game-Revision"] = String(REVISION);
   const r = await fetch(url, {
     method: "POST",
-    headers: {"Content-Type": "application/json", "X-CSRFToken": csrf()},
+    headers,
     body: JSON.stringify(body || {}),
   });
+  noteRevision(r);
   // A response that is not JSON is a server error page, and `r.json()` on it throws
   // "JSON.parse: unexpected character at line 1 column 1" — which is what the player
   // sees instead of the actual failure. Measured in play: that string appeared in the
@@ -1740,6 +1915,24 @@ async function post(url, body) {
   // deliberately left in the box so they can rewrite it.
   if (r.status === 422) { const e = new Error(data.hint); e.hint = true; throw e; }
   if (r.status === 410) { showDeath(data); const e = new Error(""); e.handled = true; throw e; }
+  // 412 and 409 are the two halves of the second-device story and they are deliberately
+  // different codes, because the player has to do different things about them.
+  //
+  // 412 — this screen was stale. The turn was NOT taken. Catch the page up first, so
+  // the sentence "take another look" is true by the time they read it.
+  if (r.status === 412) {
+    await resync();
+    const e = new Error("Another device moved the game on. This screen has caught up — "
+                        + "take another look before you act.");
+    e.hint = true;
+    throw e;
+  }
+  // 409 with `busy` — the table is mid-turn on the other device. Nothing is wrong and
+  // nothing is lost; the text stays in the box. Told as a hint rather than an error for
+  // the same reason 422 is: the player has not done anything wrong.
+  if (r.status === 409 && data.busy) {
+    const e = new Error(data.error); e.hint = true; throw e;
+  }
   if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
   return data;
 }
@@ -2253,7 +2446,7 @@ document.addEventListener("click", async e => {
           ? d.found.map(h => `${h.name} ×${h.count}`).join(" · ")
           : "Nothing worth carrying.",
       });
-      render(await (await fetch("/api/state")).json());
+      render(await getState());
     } catch (err) { busy(false); $("#err").textContent = err.message; }
     return;
   }
@@ -2310,7 +2503,7 @@ document.addEventListener("click", async e => {
           ? `The first of ${d.checks.length} hours — none of them found a thing.` : "",
       });
     }
-    render(await (await fetch("/api/state")).json());
+    render(await getState());
   } catch (err) {
     busy(false);
     $("#err").textContent = err.message;
@@ -2324,7 +2517,7 @@ document.addEventListener("change", async e => {
   try {
     await post("/api/travel", { biome: e.target.value });
     await loadCraftActions();
-    render(await (await fetch("/api/state")).json());
+    render(await getState());
   } catch (err) { $("#err").textContent = err.message; }
   finally { busy(false); }
 });
@@ -2838,7 +3031,7 @@ document.addEventListener("click", async e => {
     $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
     if (say) say.textContent = "";
     $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
-    render(await (await fetch("/api/state")).json());
+    render(await getState());
   } catch (err) {
     if (say) say.textContent = err.message;
   } finally {
@@ -3608,7 +3801,7 @@ async function closeTrade() {
   $("#tradepanel").setAttribute("aria-hidden", "true");
   // The purse and the satchel have both moved; the page behind this is now stale, and
   // the transcript has gained a line for every trade that happened.
-  render(await (await fetch("/api/state")).json());
+  render(await getState());
 }
 
 $("#tradeaction").onclick = openTrade;

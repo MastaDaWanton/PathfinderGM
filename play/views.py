@@ -23,6 +23,7 @@ from rules import biomes, grid, ingredients as ing_mod
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
+from . import concurrency
 from .apiutil import read_body, read_int
 from . import downed, gm_answers, player_input, roster
 
@@ -394,6 +395,25 @@ def alive(request):
 
 
 @require_GET
+def game_revision(request):
+    """How many times the game has moved, and nothing else.
+
+    The whole second-device channel. A view that is behind re-fetches `/api/state`
+    through the path it already uses; this only ever answers whether it needs to.
+
+    Cheap on purpose, and exempt from the game lock on purpose — `play/concurrency.py`
+    carries both reasons. The short one: a GM turn holds the lock for up to ninety-five
+    seconds, and a device that could not read this number until the turn finished could
+    not tell it was waiting rather than broken.
+    """
+    response = JsonResponse({"revision": concurrency.revision()})
+    # Same reasoning as the heartbeat above: a cached answer here is a device that never
+    # learns the game moved, which is the exact failure this endpoint exists to prevent.
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@require_GET
 def characters(request):
     """Everyone who has been played, and everyone available to play."""
     c = campaign_mod.current()
@@ -471,6 +491,12 @@ def table(request):
     c = campaign_mod.current(reset=request.GET.get("new") == "1")
     return render(request, "play/table.html", {
         "state_json": json.dumps(_state(c)),
+        # The revision the state below was drawn at, handed over with it rather than
+        # fetched afterwards. A page that had to ask would race its own first render:
+        # between the two requests another device can act, and the answer would then
+        # describe a state this page is not showing — so the page would either resync
+        # for no reason or, worse, believe it was current when it was not.
+        "revision": concurrency.revision(),
         "models": settings.MODELS,
         "ollama_models": available(settings.MODELS["narrator"]["host"]),
     })
@@ -483,8 +509,15 @@ def state(request):
     # the request thread, against the live state — never from the watcher's own thread,
     # which would race the save. Not while a roll is suspended: resolution is genuinely
     # stopped mid-list, and nothing else may move underneath it.
+    #
+    # The one mutating GET in the app, and so the one place the revision has to be moved
+    # by hand: `OneGameAtATime` counts successful *unsafe* requests, and this is neither.
+    # Without the bump, a second device would sit on a stale screen until somebody
+    # happened to act — the watcher's work is exactly the kind that arrives while nobody
+    # is touching the phone. `drain` already answers whether it changed anything.
     if not c.scene.awaiting:
-        watcher.drain(c)
+        if watcher.drain(c):
+            concurrency.bump()
     return JsonResponse(_state(c))
 
 
