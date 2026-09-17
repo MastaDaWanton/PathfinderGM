@@ -396,3 +396,62 @@ def test_the_die_keeps_rolling_while_the_table_works_it_out():
     # And the throw takes over from it rather than fighting it.
     throw = _code(_fn("tumble"))
     assert 'el.style.animation = "none";' in throw,         "the waiting animation is never stopped, so the throw competes with it"
+
+
+def test_the_foraging_survival_die_lands_and_can_be_closed():
+    """The same two faults as the main path, found on 2026-09-17 when asked to fix the
+    craft dice, and one of them older than the other.
+
+    1. **The Survival die never landed at all.** `Dice3D.ask` was called with no `hold`,
+       so the mat shut the instant the player threw: they wound the die up, it went, and
+       the mat vanished with no number on it. That is precisely the defect reported on
+       2026-09-09 — "the dice don't land with the number facing the user" — fixed on the
+       table's own roll and left living here.
+
+    2. **The number waited on the narrator.** The second half of a forage runs a closing
+       narration, a model call, before it answers. With `hold` added and nothing else,
+       that would have made this path strictly worse than it was: a die spinning over a
+       held mat for the length of a generation, which is the exact complaint that started
+       this work.
+
+    So the face is asked for first, on the endpoint that changes nothing, and the die
+    lands on it before the turn is posted.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+
+    at = table.index('post("/api/craftaction", { action: "forage"')
+    block = table[at:table.index("render(await", at)]
+
+    assert "hold: true" in block, "the forage mat still shuts on the throw"
+    assert "/api/roll/face" in block, "the forage die still waits on the narrator"
+    assert block.index("Dice3D.land(") < block.index('"/api/craftaction", { face:'), \
+        "the Survival die still lands after the turn instead of before it"
+    # A held mat over a failed request is a die spinning on a page that has stopped.
+    assert "Dice3D.close()" in block, "a failed forage would leave the die spinning"
+    # And the haul is a second die: it must not open on top of the first.
+    assert "await survival" in block, "the d100 would open over the Survival check"
+
+
+def test_the_excursion_die_is_left_alone_because_nothing_narrates_behind_it():
+    """Checked rather than assumed, and it corrected something I had reported.
+
+    The excursion dice were named alongside foraging as having the same defect. They do
+    not: `craft_excursion` makes no narration call at all — the line it returns is built
+    out of the haul by string formatting — so its answer comes back in milliseconds and a
+    die that lands on it is not waiting for anything.
+
+    This pins the reason. If a narration call is ever added to that view, the die in
+    front of it becomes the foraging problem and this fails, which is the only warning
+    anyone would get.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    src = (root / "play" / "craft_views.py").read_text(encoding="utf-8")
+    view = src[src.index("def craft_excursion("):src.index("def craft_action(")]
+    assert "_narrate(" not in view, (
+        "craft_excursion now narrates, so its die waits on a model — it needs the "
+        "same split as foraging (see /api/roll/face)")

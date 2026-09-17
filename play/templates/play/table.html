@@ -2297,13 +2297,46 @@ document.addEventListener("click", async e => {
   // a payload from an older save mid-flight, which reads as shown — the same
   // answer it had before the flag existed.
   if (p.dc != null && p.dc_shown !== false) terms.push({ label: "beat", value: p.dc });
-      const face = await Dice3D.ask({
+      // Held open, and then landed on its number before the turn is posted — the same
+      // shape the table's own roll uses, and for the same reason.
+      //
+      // Two things were wrong here until 2026-09-17. The ask took no `hold`, so the mat
+      // shut the instant the player threw and the Survival die NEVER LANDED: they wound
+      // up, the die went, and the mat vanished with no number on it. That is the defect
+      // reported on 2026-09-09 for the main path, still living on this one. And the
+      // closing narration — a second model call, the slow half of a forage — ran before
+      // anything came back, so the player watched nothing at all for the length of it.
+      let face = await Dice3D.ask({
+        hold: true,
         title: p.label, why: p.because || "", sides: 20, lo: 1, hi: 20, die: "1d20",
         terms,
       });
+      // `null` means "the table rolls it". Ask what it shows before asking what it did:
+      // the excursion's prompt is a pending roll like any other, so the same endpoint
+      // answers, and it still changes nothing by answering.
+      if (face == null) {
+        try { face = (await post("/api/roll/face", {})).face; } catch { face = null; }
+      }
+      let survival = null;
+      if (face != null) {
+        survival = Dice3D.land({
+          title: p.label, why: p.because || "", die: "1d20",
+          sides: 20, lo: 1, hi: 20, result: face, terms,
+        });
+      }
       busy(true);
-      d = await post("/api/craftaction", { face: face == null ? "auto" : face });
-      busy(false);
+      try {
+        d = await post("/api/craftaction", { face: face == null ? "auto" : face });
+      } catch (err) {
+        // A held mat over a dead request is a die spinning on a page that has stopped.
+        Dice3D.close();
+        throw err;
+      } finally {
+        busy(false);
+      }
+      // The haul is a second die, and it may not open on top of the first. The player
+      // closes the Survival check when they have read it; the d100 follows.
+      if (survival) await survival; else Dice3D.close();
     }
     if (d.rolls && d.rolls.length) {
       await Dice3D.land({
