@@ -30,9 +30,31 @@ from .craft_views import DISCIPLINES
 @require_GET
 def home(request):
     """The shelf. Everything here is read from disk on each load rather than cached: this
-    page is opened rarely and being wrong on it is expensive."""
-    active = campaign_mod.current()
-    pc = active.scene.pc()
+    page is opened rarely and being wrong on it is expensive.
+
+    **The shelf loads even when the active campaign will not.** Measured 2026-09-17
+    against a real save: one character whose sheet had gone over budget —
+
+        IllegalSheet: Dorito: 3 skill ranks spent, 2 available (4 class + Int + race, x1)
+
+    — took `/` and `/play/` down together with an uncaught `UnreadableSave`, because this
+    line is the first thing the shelf does. In the packaged build that is "Server Error
+    (500)" and nothing else: no way to switch character, no way to read the reason, no way
+    back into the app at all. The campaign was still there and still fine; the player
+    simply could not reach anything.
+
+    `play/roster.py::summary` learned this one level down, when a single unreadable
+    character took the page out through `recent_characters`. Its note is the rule here
+    too: *listing* a campaign must be safe; *playing* one must not be. So the failure is
+    caught, named, and handed to the page — and `current()` still raises for everybody
+    who is actually trying to play, which is the half that must keep refusing.
+    """
+    unreadable = ""
+    try:
+        active = campaign_mod.current()
+    except campaign_mod.UnreadableSave as exc:
+        active, unreadable = None, str(exc)
+    pc = active.scene.pc() if active else None
     from pathfindergm import version
 
     # Load the models now, in the background, while the player reads the shelf or
@@ -61,6 +83,9 @@ def home(request):
                 "turns": len(active.turn_log),
                 "ended": active.ended,
             } if pc else None,
+            # Why Continue is missing, in the engine's own words. Empty on every
+            # ordinary load, so the banner costs nothing to carry.
+            "unreadable": unreadable,
             "pregens": roster.pregens(),
         }),
     })

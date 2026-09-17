@@ -95,6 +95,12 @@
   }
   .lanalt { font: 12.5px/1.6 ui-monospace, monospace; word-break: break-all;
             color: var(--accent); }
+  /* A campaign that will not open. Alarm-coloured rather than gold: this is the one
+     card on the shelf that is telling the player something is wrong. */
+  .continue.unreadable { border-color: rgba(190, 70, 60, .5); }
+  .continue.unreadable .who b { color: #e0776a; }
+  .continue.unreadable .who span { display: block; margin-top: 5px; color: var(--dim);
+                                   font-size: 13px; line-height: 1.5; }
   a.go, button.go {
     display: inline-block; text-decoration: none; cursor: pointer;
     font: 400 17px/1 var(--display); letter-spacing: .1em; font-variant: small-caps;
@@ -833,6 +839,24 @@ function tabs() {
 }
 
 function continueBlock() {
+  // The campaign is on disk and the app cannot open it. Said here rather than left as a
+  // missing Continue button, because a button that is simply absent reads as the app
+  // having forgotten the game — and before this the page did not load at all.
+  //
+  // No repair offered, deliberately. The sheet is the player's, the engine has named the
+  // exact numbers, and a one-click "fix" that guessed which rank to drop or which score
+  // to raise would be the app editing somebody's character on its own initiative. What
+  // it owes them is the reason, the file, and a way to keep playing meanwhile.
+  if (STATE.unreadable) {
+    return `<div class="continue unreadable">
+      <div class="who">
+        <b>This campaign will not open</b>
+        <span>${esc(STATE.unreadable)}</span>
+        <span>Nothing has been changed or deleted. Pick somebody else below to keep
+          playing, or fix the sheet and reload this page.</span>
+      </div>
+    </div>`;
+  }
   const c = STATE.continue;
   if (!c) return "";
   return `<div class="continue">

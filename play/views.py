@@ -542,7 +542,14 @@ def table(request):
 
     if not preflight.check().ok:
         return redirect("/?setup=1")
-    c = campaign_mod.current(reset=request.GET.get("new") == "1")
+    try:
+        c = campaign_mod.current(reset=request.GET.get("new") == "1")
+    except campaign_mod.UnreadableSave:
+        # Back to the shelf, which now survives this and says why. The refusal itself
+        # stands — `current()` still raises, nothing is repaired behind the player's
+        # back, and the save is untouched — but a bookmark straight to `/play/` must
+        # not be a dead end. See `home_views.home` for the measurement.
+        return redirect("/?unreadable=1")
     return render(request, "play/table.html", {
         "state_json": json.dumps(_state(c)),
         # The revision the state below was drawn at, handed over with it rather than
