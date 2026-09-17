@@ -82,6 +82,19 @@
   .continue .who b { display: block; color: var(--brew);
     font: 400 24px/1.2 var(--display); letter-spacing: .04em; font-variant: small-caps; }
   .continue .who span { color: var(--dim); font-size: 14px; }
+  /* The phone panel. The code is drawn on a light ground because this page is
+     near-black and a camera never finds a dark-on-dark QR. */
+  .phonewrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .phonewrap .qr { flex: 0 0 210px; }
+  .phonewrap .qr svg { width: 210px; height: 210px; display: block; border-radius: 4px; }
+  .phonesaid { flex: 1 1 260px; min-width: 240px; }
+  .lanurl {
+    font: 14px/1.5 ui-monospace, monospace; word-break: break-all; margin: 8px 0 10px;
+    padding: 9px 11px; border: 1px solid var(--edge); border-radius: 3px;
+    background: rgba(0,0,0,.28); color: var(--accent);
+  }
+  .lanalt { font: 12.5px/1.6 ui-monospace, monospace; word-break: break-all;
+            color: var(--accent); }
   a.go, button.go {
     display: inline-block; text-decoration: none; cursor: pointer;
     font: 400 17px/1 var(--display); letter-spacing: .1em; font-variant: small-caps;
@@ -1441,6 +1454,7 @@ function blockedByModel(err) {
   if (!SETTINGS) {
     fetch("/api/settings/models").then(r => r.json()).then(d => { SETTINGS = d; render(); });
   }
+  if (!LAN) lanFetch("/api/lan");
   // The report the gate attached has no `room` line — that is computed by the setup
   // endpoint — so ask for the full one, which repaints with the disk warning if there
   // is one to give.
@@ -1530,6 +1544,9 @@ function paneSettings() {
     <h2 class="sect">Before you can play</h2>
     ${setupPanel()}
 
+    <h2 class="sect">Play on your phone</h2>
+    ${phonePanel()}
+
     <h2 class="sect">Who does which job</h2>
     <p class="note">Four jobs, and they are genuinely different work. Everything ships
       pointed at Ollama on this machine, which needs no key and sends nothing anywhere;
@@ -1579,6 +1596,62 @@ function paneSettings() {
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
     <div id="modelerr"></div>`;
+}
+
+/* --- Playing from a phone -------------------------------------------------------
+ *
+ * The app ships as one executable and its standing constraint is "no terminal, no
+ * pip install, no Python knowledge required to run it". Serving to the network used to
+ * need `desktop.py --lan`, which broke that for the one feature whose whole point is
+ * convenience — so the socket is bound on demand by this button instead of at launch.
+ *
+ * The code is drawn by `pathfindergm/qr.py` rather than fetched from a generator: the
+ * address it encodes is a private one on the player's own network, and putting that
+ * through somebody else's server to get a picture back would be sending the location of
+ * their game to a stranger for no reason at all.
+ */
+let LAN = null;
+
+function phonePanel() {
+  if (!LAN) return `<p class="note">Checking…</p>`;
+  if (LAN.error) return `<div class="problems"><div>${esc(LAN.error)}</div></div>`;
+  if (!LAN.open) {
+    return `<p class="note">The game listens only to this machine until you say
+      otherwise. Open the door and this page shows a code your phone's camera can
+      follow — you stay on your own Wi-Fi and nothing goes to the internet.</p>
+      <button class="go" id="lanopen">Open the door</button>`;
+  }
+  const extra = (LAN.addresses || []).slice(1);
+  return `<div class="phonewrap">
+    <div class="qr">${LAN.qr || ""}</div>
+    <div class="phonesaid">
+      <p class="note">Point your phone's camera at this. Same Wi-Fi as this machine —
+        Windows may ask you to allow the app through the firewall the first time.</p>
+      <div class="lanurl">${esc(LAN.url || "no network address found")}</div>
+      <p class="note">If the camera will not focus, type that in — the pass is the ten
+        characters after <code>k=</code>, and it is new every time you open the door.</p>
+      ${extra.length ? `<p class="note">This machine has more than one address. If the
+        first does not work, try:${extra.map(a =>
+          `<br><span class="lanalt">${esc(a)}</span>`).join("")}</p>` : ""}
+      <button class="quiet" id="lanclose">Close the door</button>
+    </div>
+  </div>`;
+}
+
+async function lanFetch(url, method) {
+  try {
+    const r = await fetch(url, method === "POST" ? {
+      method: "POST", headers: { "Content-Type": "application/json",
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: "{}",
+    } : undefined);
+    const body = await r.text();
+    let d; try { d = JSON.parse(body); } catch { d = { error: body.slice(0, 160) }; }
+    LAN = r.ok ? d : { open: false, error: d.error || `HTTP ${r.status}` };
+  } catch (err) {
+    LAN = { open: false, error: String(err) };
+  }
+  render();
 }
 
 async function saveModelSettings() {
@@ -2145,6 +2218,9 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("click", async e => {
+  if (e.target.closest("#lanopen")) { LAN = null; render(); return lanFetch("/api/lan/open", "POST"); }
+  if (e.target.closest("#lanclose")) { LAN = null; render(); return lanFetch("/api/lan/close", "POST"); }
+
   const tab = e.target.closest("[data-tab]");
   if (tab) {
     TAB = tab.dataset.tab; WORLD = null; BENCH = null;
@@ -2152,6 +2228,10 @@ document.addEventListener("click", async e => {
       render();
       SETTINGS = await (await fetch("/api/settings/models")).json();
     }
+    // Asked when the tab is opened rather than at page load: it is the only thing on
+    // this page that needs to know whether a socket is bound, and the front page should
+    // not be doing that work for players who never open Settings.
+    if (TAB === "settings" && !LAN) lanFetch("/api/lan");
     render(); return;
   }
 

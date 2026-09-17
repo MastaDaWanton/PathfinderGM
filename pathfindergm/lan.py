@@ -7,9 +7,16 @@ property of today's launcher rather than a guarantee"*. Serving on the LAN so a 
 join is the day that stops being true, and `/api/say` becomes something anybody on the
 café Wi-Fi can POST to.
 
-**Off unless asked for.** Nothing in this module does anything until `arm()` is called,
-which only happens on `desktop.py --lan`. An ordinary launch keeps the posture it has
-always had: loopback only, no token, no cookie, not a byte different.
+**Off unless asked for.** Nothing in this module does anything until `open_the_door()` is
+called, which happens when the player presses the button in Settings — or at launch with
+`desktop.py --lan`, which is the same call with no window open yet. Until then the process
+is listening on `127.0.0.1` and nothing else, exactly as it has since 0.1.0: no socket on
+the network, no token, no cookie, not a byte different on the wire.
+
+The button is the point. "The user installs one file. No terminal, no `pip install`, no
+Python knowledge required to run it" is a standing constraint, and a feature reachable
+only by a command-line flag breaks it — which is why the socket is bound on demand rather
+than at launch.
 
 The shape is Jupyter's, because Jupyter has been solving exactly this problem — a local
 single-user server that sometimes has to be reachable from elsewhere — for a decade:
@@ -27,16 +34,17 @@ single-user server that sometimes has to be reachable from elsewhere — for a d
   the player pays for.
 
 Ten characters from an alphabet with no `0`/`O` or `1`/`l`/`I` in it: fifty bits, which is
-far past anything worth brute-forcing on a LAN, and short enough to type on a phone
-keyboard once. That last part is not a nicety — the alternative is a 22-character
-`token_urlsafe` that a player gets wrong twice and gives up on. A QR code would remove
-the typing entirely and is the obvious next step; it is not built yet.
+far past anything worth brute-forcing on a LAN. The QR code in the Settings panel is how
+the pass is meant to travel — `pathfindergm/qr.py` draws it — and the short, unambiguous
+alphabet is the fallback for a camera that will not focus, which is exactly when a player
+has to read characters off a screen and type them.
 """
 from __future__ import annotations
 
 import hmac
 import secrets
 import socket
+import threading
 
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -90,6 +98,92 @@ def disarm() -> None:
     """Back to loopback-only. For tests; nothing in the app calls this."""
     global _token
     _token = None
+
+
+# --- The door as a thing that opens and shuts --------------------------------------
+#
+# The socket is bound when the player asks for it, not at launch, and the main server
+# stays on `127.0.0.1` either way. That is a change from the first version of this
+# feature, which bound `0.0.0.0` for the whole process when `--lan` was passed, and it
+# fixes a real defect rather than tidying one: a wildcard bind and a loopback bind are
+# different addresses, so the OS grants both and Windows then splits loopback
+# connections between whichever two servers happen to be running. With the game always
+# on loopback and the network always on a separate OS-chosen port, the two cannot
+# collide at all.
+#
+# It is also the only shape in which a *button* can work. `desktop.py` binds its socket
+# before Django starts; nothing a page does could have changed that decision afterwards.
+
+_server = None
+_thread = None
+
+
+def is_open() -> bool:
+    return _server is not None
+
+
+def open_the_door() -> dict:
+    """Start listening on the network and mint the pass. Idempotent."""
+    global _server, _thread
+
+    if _server is not None:
+        return status()
+
+    from django.core.servers.basehttp import ThreadedWSGIServer, WSGIRequestHandler
+    from django.core.wsgi import get_wsgi_application
+
+    # Port 0: the OS picks. A fixed one would buy a bookmarkable address, and the pass
+    # changes every launch anyway, so there is nothing to bookmark.
+    server = ThreadedWSGIServer(("0.0.0.0", 0), WSGIRequestHandler,
+                                ipv6=False, allow_reuse_address=False)
+    server.set_app(get_wsgi_application())
+    port = server.server_address[1]
+
+    arm(mint(), port)
+    _server = server
+    _thread = threading.Thread(target=server.serve_forever, daemon=True,
+                               name="pathfindergm-lan")
+    _thread.start()
+    return status()
+
+
+def close_the_door() -> dict:
+    """Stop listening, and make the pass worthless.
+
+    Must not be called from a request being served *by the LAN server itself*:
+    `shutdown()` waits for `serve_forever` to come back round, and a thread waiting on
+    its own server's loop is a deadlock. The views that call this refuse anything that
+    did not come from this machine, which rules that out — see `_from_this_machine`.
+    """
+    global _server, _thread
+
+    server, _server, _thread = _server, None, None
+    disarm()
+    if server is not None:
+        server.shutdown()
+        server.server_close()
+    return status()
+
+
+def status() -> dict:
+    """Everything a page needs to show the panel, including the code itself."""
+    if not is_open():
+        return {"open": False, "url": "", "pass": "", "qr": "", "addresses": []}
+
+    from pathfindergm import qr as qr_mod
+
+    found = addresses()
+    port = _server.server_address[1]
+    url = f"http://{found[0]}:{port}/?{QUERY_KEY}={token()}" if found else ""
+    return {
+        "open": True,
+        "url": url,
+        "pass": token(),
+        # Every address, because a machine on both Wi-Fi and Ethernet has two and only
+        # the player knows which one their phone can see.
+        "addresses": [f"http://{a}:{port}/?{QUERY_KEY}={token()}" for a in found],
+        "qr": qr_mod.svg(url) if url else "",
+    }
 
 
 def enabled() -> bool:

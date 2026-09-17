@@ -73,7 +73,11 @@ READ_WAIT = 300.0
 #                  seconds into a turn would otherwise watch the manual hang — for a
 #                  page that could not have been affected by the turn either way.
 #   /static/       is files.
-EXEMPT = ("/static/", "/api/alive", "/api/revision", "/api/setup", "/manual", "/licence")
+#   /api/lan       decides whether the app listens to the network. It touches no
+#                  campaign, and the one moment a player reaches for it is while a
+#                  turn is running and they want the phone in their hand.
+EXEMPT = ("/static/", "/api/alive", "/api/revision", "/api/setup", "/api/lan",
+          "/manual", "/licence")
 
 _GAME = threading.RLock()
 

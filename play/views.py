@@ -413,6 +413,60 @@ def game_revision(request):
     return response
 
 
+def _only_this_machine(request):
+    """Refuse anything that did not come from the desktop's own browser, or None.
+
+    The three views below decide whether the app listens to the network at all, so a
+    request that arrived *over* the network must never be able to work them. Two reasons,
+    and either alone would be enough: a phone that could close the door could lock the
+    desktop out of its own game, and `lan.close_the_door()` waits for its server's loop
+    to come back round — called from a request that server is currently serving, that is
+    a deadlock rather than an error.
+    """
+    from pathfindergm import lan
+
+    if lan._from_this_machine(request):
+        return None
+    return JsonResponse({"error": "Only the machine running the game can change this."},
+                        status=403)
+
+
+@require_GET
+def lan_status(request):
+    """Whether the table is reachable from the network, and the code that reaches it."""
+    from pathfindergm import lan
+
+    refusal = _only_this_machine(request)
+    return refusal or JsonResponse(lan.status())
+
+
+@require_POST
+def lan_open(request):
+    """Start listening on the network. The button in Settings, and `--lan` at launch."""
+    from pathfindergm import lan
+
+    refusal = _only_this_machine(request)
+    if refusal:
+        return refusal
+    try:
+        return JsonResponse(lan.open_the_door())
+    except OSError as exc:
+        # A bind can fail for reasons the player can act on — a firewall policy, a
+        # machine with no network at all — and a 500 with a traceback tells them none of
+        # them. Same rule as everywhere else in this file: refuse in words.
+        return JsonResponse(
+            {"error": f"Could not start listening on the network: {exc}"}, status=503)
+
+
+@require_POST
+def lan_close(request):
+    """Stop listening, and make the pass worthless."""
+    from pathfindergm import lan
+
+    refusal = _only_this_machine(request)
+    return refusal or JsonResponse(lan.close_the_door())
+
+
 @require_GET
 def characters(request):
     """Everyone who has been played, and everyone available to play."""

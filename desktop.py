@@ -55,11 +55,14 @@ from pathlib import Path
 PREFERRED_PORT = 8917
 HOST = "127.0.0.1"
 
-# `--lan` binds every interface instead, so a phone on the same Wi-Fi can reach the
-# table. Opt-in and never the default: the app's posture has always been that it listens
-# to nobody, and the day it listens to a network is the day `/api/say` becomes something
-# a stranger can POST to. `pathfindergm/lan.py` is the door that answers them, and
-# `docs/lan-play.md` is why any of this exists.
+# The address the *network* socket uses, when there is one. The game's own server never
+# binds this: `pathfindergm/lan.py` opens a second socket on its own OS-chosen port when
+# the player presses the button in Settings (or `--lan` presses it at launch), and the two
+# cannot collide precisely because they are never the same address on the same port.
+#
+# Kept here rather than in `lan.py` because `_bind` is the thing that has to refuse a
+# wildcard bind over a loopback one, and `test_packaging.py` drives that refusal with this
+# constant. `docs/lan-play.md` is why any of it exists.
 LAN_HOST = "0.0.0.0"
 
 
@@ -307,21 +310,20 @@ def main(argv: list[str] | None = None) -> int:
 
     from pathfindergm import lan
 
-    on_the_lan = "--lan" in argv
-    server = _bind(LAN_HOST if on_the_lan else HOST, PREFERRED_PORT)
+    # The game's own socket is always loopback, `--lan` or not. The network, when it is
+    # wanted, is a *second* socket on its own OS-chosen port — see `pathfindergm/lan.py`
+    # for why that separation is load-bearing rather than tidy, and `_bind` above for the
+    # defect that taught it.
+    server = _bind(HOST, PREFERRED_PORT)
     server.set_app(application)
     port = server.server_address[1]
-    # The URL everything else is told is always the loopback one, even in LAN mode: it is
-    # what the Electron shell loads, what `_open_browser_when_up` opens and what the
-    # portfile carries, and every one of those is on this machine. `0.0.0.0` is a bind
-    # address, not somewhere a browser can go — handing it to `webbrowser.open` opens a
-    # page that cannot connect.
     url = f"http://{HOST}:{port}/"
 
-    pass_for_the_table = ""
-    if on_the_lan:
-        pass_for_the_table = lan.mint()
-        lan.arm(pass_for_the_table, port)
+    # `--lan` is now the same call the button in Settings makes, just made before there is
+    # a window to press it in. Kept because a player who wants the phone every session
+    # should not have to press it every session, and because the packaging checks can
+    # drive it without a browser.
+    lan_state = lan.open_the_door() if "--lan" in argv else None
 
     # The portfile after the log, so nothing that launched us reads an address the
     # log has not yet vouched for.
@@ -364,18 +366,17 @@ def main(argv: list[str] | None = None) -> int:
     say(f"  installed {install_root()}")
     say(f"  your data {user_data_root()}")
     say(f"  serving   {url}")
-    if on_the_lan:
-        # Printed as a whole address rather than "go to this IP and enter this pass",
+    if lan_state:
+        # Printed as whole addresses rather than "go to this IP and enter this pass",
         # because the thing a player has to get right on a phone keyboard should be one
         # string they can read off in one go. The pass is spent on arrival and redirected
-        # out of the address bar — see `pathfindergm/lan.py`.
-        found = lan.addresses()
+        # out of the address bar — see `pathfindergm/lan.py`. There is a QR code for this
+        # in Settings, which is the way it is meant to be used; the console cannot draw
+        # one, so it prints what it can.
         say("")
-        say("  On this Wi-Fi, from a phone or tablet:")
-        for address in found or ["<this machine's address>"]:
-            say(f"    http://{address}:{port}/?{lan.QUERY_KEY}={pass_for_the_table}")
-        if not found:
-            say("    (no network address found — is this machine on Wi-Fi?)")
+        say("  On this network, from a phone or tablet:")
+        for address in lan_state["addresses"] or ["  (no network address found)"]:
+            say(f"    {address}")
         say("  The pass is new every launch, and Windows may ask you to allow this")
         say("  app through the firewall the first time.")
         say("")

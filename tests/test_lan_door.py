@@ -4,8 +4,8 @@ The app shipped with no authentication of any kind — `MIDDLEWARE` was `CommonM
 and `CsrfViewMiddleware` and nothing else — because `desktop.py` bound `127.0.0.1` and
 "only this machine can talk to it" was the whole security model. `settings.py` had
 already written down that this was a property of the launcher rather than a guarantee.
-`desktop.py --lan` is the day it stops being true: without a door, `/api/say` is
-something anybody on the same Wi-Fi can POST to.
+Opening the door — the button in Settings, or `--lan` at launch — is the day it stops
+being true: without a door, `/api/say` is something anybody on the same Wi-Fi can POST to.
 
 The thing these mostly pin is the **off** state. A feature that quietly changed how the
 ordinary loopback launch behaves would be a far worse bug than the one it was added for.
@@ -45,9 +45,9 @@ def armed():
 def test_an_ordinary_launch_asks_nobody_for_anything(client):
     """The off state, and the most important test in this file.
 
-    Nothing in `pathfindergm/lan.py` runs until `desktop.py --lan` arms it. A loopback
-    launch keeps the posture it has had since 0.1.0 — no token, no cookie, and not one
-    byte different on the wire."""
+    Nothing in `pathfindergm/lan.py` runs until the door is opened. A launch nobody has
+    pressed the button in keeps the posture it has had since 0.1.0 — no socket on the
+    network, no token, no cookie, and not one byte different on the wire."""
     assert not lan.enabled()
     assert client.get("/api/state", REMOTE_ADDR="127.0.0.1").status_code == 200
     # Even a request claiming to be from elsewhere: with the door disarmed there is no
@@ -144,3 +144,101 @@ def test_a_minted_pass_is_typeable_and_unambiguous(client):
     for one in minted:
         assert len(one) == lan.TOKEN_LENGTH
         assert not set(one) & set("0O1lI")
+
+
+# --- The door as a thing a button opens ---------------------------------------------
+
+@pytest.fixture
+def shut_afterwards():
+    """Whatever a test does, the process must not be left listening to the network."""
+    yield
+    lan.close_the_door()
+
+
+def test_the_door_starts_shut_and_binds_nothing(client):
+    """The posture, restated as a test because it is the whole promise. Until somebody
+    presses the button there is no socket on the network at all — not a refused one, not
+    a guarded one, none."""
+    assert not lan.is_open()
+    assert lan.status() == {"open": False, "url": "", "pass": "", "qr": "",
+                            "addresses": []}
+
+
+def test_opening_the_door_binds_a_second_socket_and_leaves_the_game_on_loopback(
+        client, shut_afterwards):
+    """Two sockets, never one shared one.
+
+    The first version of this feature bound `0.0.0.0` for the whole process, and a
+    wildcard bind plus a loopback bind are different addresses — so the OS grants both
+    and Windows splits loopback connections between them at random (measured 2026-09-17,
+    two live servers on 8917). The game stays on `127.0.0.1` and the network gets its own
+    OS-chosen port, which is a shape in which that cannot happen."""
+    state = lan.open_the_door()
+    assert state["open"] and lan.is_open()
+    assert lan._server.server_address[0] == "0.0.0.0"
+    assert lan._server.server_address[1] != 8917
+
+
+def test_an_open_door_hands_over_a_scannable_code_and_the_text_behind_it(
+        client, shut_afterwards):
+    """The QR is the feature; the text is what a player falls back on when the camera
+    will not focus. Both have to describe the same door."""
+    state = lan.open_the_door()
+    assert state["pass"] and len(state["pass"]) == lan.TOKEN_LENGTH
+    assert state["pass"] in state["url"]
+    assert state["url"].startswith("http://")
+    assert state["qr"].startswith("<svg") and state["pass"] in "".join(state["addresses"])
+
+
+def test_opening_twice_does_not_mint_a_second_pass(client, shut_afterwards):
+    """A player pressing the button again — or a second window rendering the panel —
+    must not invalidate the code their phone is already looking at."""
+    first = lan.open_the_door()
+    assert lan.open_the_door()["pass"] == first["pass"]
+
+
+def test_closing_the_door_makes_the_pass_worthless(client, shut_afterwards):
+    """Not merely unreachable. The token is forgotten, so a phone that kept the address
+    cannot walk back in if the door is opened again later."""
+    spent = lan.open_the_door()["pass"]
+    lan.close_the_door()
+    assert not lan.is_open() and not lan.enabled()
+    assert lan.token() != spent
+
+
+@pytest.mark.parametrize("path,method", [
+    ("/api/lan", "get"), ("/api/lan/open", "post"), ("/api/lan/close", "post")])
+def test_only_this_machine_may_work_the_door(client, path, method, shut_afterwards):
+    """Two reasons, either sufficient. A phone that could close the door could lock the
+    desktop out of its own game; and `close_the_door` waits for its server's loop to come
+    round, so a request that server is itself serving would deadlock rather than fail."""
+    answered = getattr(client, method)(path, content_type="application/json",
+                                       REMOTE_ADDR=ELSEWHERE)
+    assert answered.status_code == 403
+    assert not lan.is_open()
+
+
+def test_the_door_endpoints_never_wait_on_the_game_lock(client, monkeypatch,
+                                                        shut_afterwards):
+    """The one moment a player reaches for this is mid-turn, with the phone in their
+    hand. A panel that hung for ninety seconds would be a panel they conclude is broken."""
+    import threading
+
+    from play import concurrency
+
+    monkeypatch.setattr(concurrency, "READ_WAIT", 0.05)
+    taken, release = threading.Event(), threading.Event()
+
+    def hold():
+        with concurrency.held(5.0):
+            taken.set()
+            release.wait(30)
+
+    worker = threading.Thread(target=hold, daemon=True)
+    worker.start()
+    assert taken.wait(5)
+    try:
+        assert client.get("/api/lan", REMOTE_ADDR="127.0.0.1").status_code == 200
+    finally:
+        release.set()
+        worker.join(5)

@@ -216,6 +216,52 @@ Smaller, and mostly one-liners, but with one thing that does not currently exist
   anyone on the network can POST to `/api/say`. A per-launch token, shown on the desktop
   and exchanged once for a session cookie, is the Jupyter pattern and the right size.
 
+### A button, not a flag — and why that changed the architecture
+
+The first cut put LAN serving behind `desktop.py --lan`. That works and it is wrong:
+*"The user installs one file. No terminal, no `pip install`, no Python knowledge required
+to run it"* is a standing constraint, and a feature reachable only from a command line
+breaks it for the one feature whose entire value is convenience.
+
+A button cannot work with the original design, and the reason is worth writing down:
+**`desktop.py` binds its socket before Django starts**, so nothing a page does could
+change that decision afterwards. Making it pressable meant binding the network socket on
+demand — which turned out to fix the two-servers-on-one-port defect below at the same
+time, because the game now *always* holds `127.0.0.1:8917` and the network always gets its
+own OS-chosen port. Two sockets that cannot collide, instead of one whose address depends
+on a flag.
+
+`--lan` is kept: it is now the same `open_the_door()` call, made before there is a window
+to press anything in.
+
+### The QR code, drawn here
+
+`pathfindergm/qr.py` — byte mode, level M, versions 1 to 6, about 300 lines. A dependency
+was the obvious alternative and `requirements.txt` rules it out in its own words:
+*"Every dependency is another thing PyInstaller has to be told about and another thing
+that can break in the frozen build, so the Ollama client is stdlib urllib rather than
+requests."* A generator service was never an option — the address encoded is a private one
+on the player's own network, and fetching a picture of it from someone else's server sends
+the location of their game to a stranger for nothing.
+
+**The risk a hand-rolled encoder buys is that a broken QR looks exactly like a working
+one**, so it was checked against two independent implementations before anything shipped.
+That caught a real defect: the fifteen format-information bits were being written
+least-significant-bit first. Everything else was already byte-identical to `segno` —
+bitstream, Reed-Solomon, interleaving, zigzag placement, mask selection — and every code
+was unreadable anyway, because the field that tells a scanner which mask was applied was
+backwards. Nothing about the picture looked wrong.
+
+`tests/test_qr.py` freezes matrices that OpenCV's decoder read back as exactly their input
+string, for versions 1 through 6. Neither `segno` nor OpenCV is a dependency of this
+project or its suite; both were installed into a throwaway virtualenv, used once, and
+discarded. What is committed is the verified output.
+
+One deliberate difference from segno: where the data ends on a codeword boundary, this
+module emits the `0xEC` pad codeword ISO/IEC 18004 §7.4.10 specifies and segno emits a
+zero. Pad codewords sit after the terminator and are never interpreted — OpenCV reads both
+— so a test asserting byte-identity with segno would have been a test of a coin flip.
+
 - **The Electron shell kills the backend when its window closes** (`electron/main.js`,
   `stopBackend` → `taskkill /PID /T /F`). Phone play needs a mode where the shell can be
   closed while the server keeps serving the table.
@@ -305,9 +351,8 @@ precisely the check that cannot see this case.
   four-hour orphaned server and a build broken by `WinError 5`, and CLAUDE.md's rule is
   that a packaging fix is not real until it has been run against the built exe. This one
   needs a packaged build to prove, not a source run.
-- **A QR code.** The pass is ten typeable characters precisely because there is no QR yet.
-  Generating one means hand-rolling the encoder — the app bundles no third-party
-  JavaScript and has no Python QR dependency — which is self-contained but not small.
+- ~~A QR code.~~ Built — see "The QR code, drawn here" above. The ten-character pass
+  remains as the fallback for a camera that will not focus.
 - **Whether a phone alone can hold the session open.** `liveness.py` reaps after 180 s of
   silence; the counter is process-global so any one client's heartbeat is enough, and a
   phone-only session should therefore be safe. But iOS suspends JS in a locked tab

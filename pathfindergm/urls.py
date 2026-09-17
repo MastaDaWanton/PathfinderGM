@@ -16,6 +16,11 @@ urlpatterns = [
     # What a second device polls to learn the game moved without it. See
     # `play/concurrency.py` and `docs/lan-play.md`.
     path("api/revision", views.game_revision, name="game_revision"),
+    # Playing from a phone: whether the network door is open, and the QR that opens it.
+    # Loopback-only, enforced in the views — see `docs/lan-play.md`.
+    path("api/lan", views.lan_status, name="lan_status"),
+    path("api/lan/open", views.lan_open, name="lan_open"),
+    path("api/lan/close", views.lan_close, name="lan_close"),
     path("api/sheet", views.sheet, name="sheet"),
     path("api/slots", views.slots, name="slots"),
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),
