@@ -256,6 +256,46 @@ Verified in a real browser against a running server at 375x812 and again at 1400
 the desktop layout reads `1050px 350px` with the aside `position: relative` and the tab
 `display: none` — unchanged.
 
+### The narration losing an argument it should never have been in
+
+Reported from a real phone in a real fight, and the first thing a player actually hit:
+**the story was a 90px strip of two clipped lines** while the footer had everything else.
+
+`main` is a flex column, `#story` is `flex: 1; min-height: 0`, and the footer is
+unbounded. `min-height: 0` is what lets a flex item collapse below its own content — it
+is exactly right on a desktop's 900px, where the footer never needs the room, and exactly
+wrong on a phone, where in a round-5 combat the footer carries suggestions, the combat bar
+(nine buttons, a target row, a hint), the abilities list and the input row. Reproduced at
+375x812 by injecting that geometry: **story 42px, footer 884px — taller than the 812px
+viewport — and the input row's bottom edge at 922px, off the screen entirely.**
+
+Three rules, and the shape of them matters. A **floor on the story** (`min-height: 34dvh`)
+rather than only a cap on the footer, because the failure is the narration losing an
+argument it should never have been in. A **ceiling on the footer**
+(`max-height: 58dvh; overflow-y: auto`) so what it cannot fit it scrolls instead of takes.
+And the **input row sticky** at the bottom of the footer, because it is the one control the
+game cannot be played without and it sits *after* the combat bar and the abilities in the
+DOM — so in a fight it is the first thing pushed out of reach.
+
+After, at the same 375x812: story **329px**, footer 471px and scrolling, the input row on
+screen, and — checked separately, because sticky-bottom overlaps *preceding* content while
+mid-scroll — every combat button reachable and uncovered at full footer scroll. Out of
+combat the story takes **432px** of 812 and the footer does not scroll at all.
+
+### Two servers on one port
+
+Not a layout bug, but found by this work and fixed with it. `allow_reuse_address=False` in
+`desktop.py::_bind` stops the *same* address being bound twice, which was the whole story
+while the only address was `127.0.0.1`. `--lan` binds `0.0.0.0`, and a wildcard bind and a
+loopback bind are **different addresses** — the OS grants both, and Windows then splits
+incoming loopback connections between the two processes at random.
+
+Measured 2026-09-17: pid 29304 on `0.0.0.0:8917` and pid 43380 on `127.0.0.1:8917`
+listening at once. `curl` reached one and the browser reached the other, so a CSS rule that
+was being served correctly the whole time read as missing. `_bind` now asks the question
+the way a client asks it — by *connecting* to `127.0.0.1:port` — because binding is
+precisely the check that cannot see this case.
+
 ---
 
 ## Still to do

@@ -1002,6 +1002,39 @@
     footer { padding: 12px 14px 16px; }
     #busy, #err { padding: 0 16px 10px; }
 
+    /* The narration keeps a third of the screen, whatever the footer is doing.
+     *
+     * Reported from a real phone in a real fight: the story was a 90px strip showing two
+     * clipped lines while the footer had the rest. `main` is a flex column, `#story` is
+     * `flex: 1; min-height: 0`, and the footer is unbounded — so on a desktop's 900px
+     * there is room for everything and on a phone the footer simply takes it. In a
+     * round-5 combat the footer carries suggestions, the combat bar (nine buttons, a
+     * target row, a hint), the abilities list and the input row: about 620px of a 700px
+     * viewport. `min-height: 0` is what lets a flex item collapse below its content, and
+     * it is exactly right on a desktop and exactly wrong here.
+     *
+     * A floor on the story rather than a cap alone, because the failure is the story
+     * losing an argument it should never have been in. */
+    #story { min-height: 34dvh; }
+
+    /* And a ceiling on the footer, so what it cannot fit it scrolls instead of taking.
+     * `min-height: 0` here for the same reason it is wrong above: a flex item will not
+     * shrink below its content without it, and an overflow that never scrolls is just
+     * the same theft with extra steps. */
+    footer { max-height: 58dvh; overflow-y: auto; min-height: 0; }
+
+    /* The input row stays reachable while the rest of the footer scrolls under it. It is
+     * the one control the game cannot be played without, and it sits *after* the combat
+     * bar and the abilities list in the DOM — so in a fight it is the first thing pushed
+     * out of reach. Opaque, because sticky over scrolling content is unreadable
+     * otherwise. */
+    #sayform {
+      position: sticky; bottom: -16px; z-index: 3;
+      margin: 0 -14px -16px; padding: 10px 14px 16px;
+      background: linear-gradient(rgba(20, 15, 10, .86), rgba(12, 9, 6, .97));
+      box-shadow: 0 -10px 22px rgba(0, 0, 0, .55);
+    }
+
     /* Thumbs rather than a mouse. 44px is the minimum target size both platforms'
        guidance agrees on, and the buttons on this page are sized for a pointer. */
     button, .sugg, .pick, .tab, .opensheet { min-height: 44px; }

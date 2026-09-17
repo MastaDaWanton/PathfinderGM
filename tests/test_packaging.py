@@ -889,3 +889,36 @@ def test_the_map_paints_foes_red_and_bystanders_white():
     assert '" bystander"' in text and '" foe"' in text
     views = (ROOT / "play" / "views.py").read_text(encoding="utf-8")
     assert '"side": next((s for s, refs in (c.scene.sides or {}).items()' in views
+
+
+def test_a_lan_bind_does_not_land_on_top_of_a_loopback_one():
+    """Two live servers on one port, which `allow_reuse_address=False` cannot prevent.
+
+    That flag stops the *same* address being bound twice, and that was the whole story
+    while the only address was `127.0.0.1`. `--lan` binds `0.0.0.0`, and a wildcard bind
+    and a loopback bind are different addresses — the OS grants both, and Windows then
+    splits incoming loopback connections between the two processes at random.
+
+    Measured 2026-09-17 while verifying the phone layout: pid 29304 on `0.0.0.0:8917`
+    and pid 43380 on `127.0.0.1:8917` were listening simultaneously. `curl` reached one
+    and the browser reached the other, so a CSS rule that was being served correctly the
+    entire time read as missing, and half an hour went into chasing it. Same class of
+    defect as `test_the_launcher_falls_back_to_a_free_port` above, through the one door
+    that test's fix left open.
+    """
+    import desktop
+
+    probe = socket.socket()
+    try:
+        probe.bind((desktop.HOST, desktop.PREFERRED_PORT))
+    except OSError:
+        pytest.skip(f"port {desktop.PREFERRED_PORT} is in use — the app is running")
+    probe.listen(1)
+    try:
+        lan = desktop._bind(desktop.LAN_HOST, desktop.PREFERRED_PORT)
+        try:
+            assert lan.server_address[1] != desktop.PREFERRED_PORT
+        finally:
+            lan.server_close()
+    finally:
+        probe.close()

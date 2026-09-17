@@ -63,6 +63,32 @@ HOST = "127.0.0.1"
 LAN_HOST = "0.0.0.0"
 
 
+def _somebody_is_already_serving(port: int) -> bool:
+    """Is there already a copy of this app answering on this machine's `port`?
+
+    `allow_reuse_address=False` below stops the *same* address being bound twice, and
+    that was the whole story while the only address was `127.0.0.1`. `--lan` binds
+    `0.0.0.0`, and a wildcard bind and a loopback bind are different addresses — so the
+    OS grants both, and Windows then splits incoming loopback connections between the two
+    processes at random. Measured 2026-09-17 while verifying the phone layout: pid 29304
+    on `0.0.0.0:8917` and pid 43380 on `127.0.0.1:8917` were listening at once, `curl`
+    reached the new build and the browser reached the old one, and half an hour went into
+    a CSS rule that was being served correctly the entire time.
+
+    So the question is asked the way a client asks it — by connecting — rather than by
+    trying to bind, because binding is exactly the check that cannot see this case.
+    """
+    probe = socket.socket()
+    probe.settimeout(0.3)
+    try:
+        probe.connect(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        probe.close()
+
+
 def _bind(host: str, port: int):
     """A listening socket on `port` if it is free, otherwise on whatever the OS gives.
 
@@ -70,6 +96,9 @@ def _bind(host: str, port: int):
     anything is told where to look.
     """
     from django.core.servers.basehttp import ThreadedWSGIServer, WSGIRequestHandler
+
+    if port and _somebody_is_already_serving(port):
+        port = 0
 
     for candidate in (port, 0):
         try:
