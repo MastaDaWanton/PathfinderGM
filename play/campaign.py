@@ -510,7 +510,16 @@ def _open_with(c: Campaign, opened: tuple[str, list[str]]) -> None:
     is in front of it; the opening has to be in front of it.
     """
     text, suggestions = opened
-    c.transcript.append({"who": "gm", "text": text})
+    # `kind: "setup"`: the opening is the narrator's own prose, and `narration.own_prose`
+    # — what the prose call is shown as "what you narrated just before this" — keeps
+    # only setup beats. Without the kind the first turn continued from nothing.
+    beat = {"who": "gm", "text": text, "kind": "setup"}
+    record = getattr(c, "_opening_record", None)
+    if record:
+        # Why the first screen read as it did, on the beat it describes.
+        beat["opening"] = dict(record)
+        c._opening_record = None
+    c.transcript.append(beat)
     c.history.append({"role": "assistant", "content": text})
     # The opening's own "you could": the page shows them as it shows a turn's, so
     # the first screen already has three things to press.
@@ -541,9 +550,20 @@ def opening_text(campaign: Campaign, written: bool = True) -> tuple[str, list[st
     if not written:
         return skeleton, could
     text, suggestions, wrong = opening_prose.write(campaign, here, skeleton, could)
+    floor = text.strip() == skeleton.strip()
     if wrong:
         logging.getLogger(__name__).warning(
-            "opening fell back to the template: %s", "; ".join(wrong))
+            "opening fell back to the template: %s" if floor
+            else "opening shipped with soft problems: %s", "; ".join(wrong))
+    # On the save as well as in the log. Measured 2026-09-18: a player's opening fell
+    # to the template and the only trace was one warning line in the app log, which a
+    # save file cannot carry to whoever is asked "why was this so short". Handed to
+    # `_open_with` for the opening beat itself rather than written to `turn_log`: an
+    # entry there is a turn played, and a start with one is no longer the abandoned
+    # start `begin_with` retires (test_an_abandoned_start_is_retired_when_the_next_
+    # game_begins caught the first version).
+    campaign._opening_record = {"floor": floor, "chars": len(text),
+                                "problems": list(wrong)}
     return text, suggestions
 
 

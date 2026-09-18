@@ -1589,7 +1589,12 @@ def invented_names(text: str, known: set[str]) -> list[str]:
     blander, so sentence-initial words are skipped entirely and anything the world, the
     scene or the rules already contain is allowed.
     """
-    allowed = {w.lower() for name in known for w in _WORD.findall(name.lower())}
+    # Straight apostrophes throughout. The world writes Khy'vyr; the model, asked to
+    # use only the material's names, wrote Khy’vyr — the same name with the curly
+    # quote its training prefers — and was told it had invented a people. Measured
+    # 2026-09-18 on two opening drafts of five, each costing a repair call.
+    allowed = {w.lower() for name in known
+               for w in _WORD.findall(name.lower().replace("’", "'"))}
     found: list[str] = []
     for sentence in _SENTENCE.findall(text or ""):
         tokens = re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", sentence)
@@ -1620,11 +1625,15 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             m.group(1) for m in re.finditer(r"[\"“”'‘’]\s*([A-Z][a-zA-Z'’-]{2,})",
                                             sentence)}
         for tok in tokens:
-            low = tok.lower()
+            low = tok.lower().replace("’", "'")
             # The whole token first, so a name that owns its apostrophe survives: this
             # world's people are Khy'vyr and Khra'gix, and splitting before checking
             # would reduce them to "khy" and report both as invented.
             if low in _NOT_A_NAME or low in allowed:
+                continue
+            # "Khy'vyr-style", "Nirkor-made": a known name with a hyphenated tail is
+            # the known name, used as an adjective. Measured on the same drafts.
+            if "-" in low and low.split("-")[0] in allowed:
                 continue
             # "Thrain's place" is Thrain, who exists. Reading the possessive as its own
             # token reported a real clan elder as an invention.

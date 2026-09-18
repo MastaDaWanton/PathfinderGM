@@ -145,6 +145,53 @@ SCHEMA = {"type": "object",
 # Jerz's cop-outs, the same list `tests/test_opening.py` holds the template to.
 _DECIDES = re.compile(r"you reali[sz]e|you decide|you can't bear|something tells you|"
                       r"you feel that", re.I)
+
+# The ferry landing's own furniture — what a draft has taken from the EXAMPLE rather
+# than from this place. Same device as `gm.narration._EXAMPLE_MARKS`.
+#
+# Measured 2026-09-18 on a player's opening (the log line reads "opening fell back to
+# the template: it copies the example about the ferry"): both drafts shared one
+# six-word run with the example and were thrown away for the template, which is a
+# third shorter than either. Reproduced the same morning on a different character,
+# one write in three. The run in question is the kind of stock English the example
+# and the material both use — "with the last of your money" — and a six-word match
+# on stock English is a coincidence, not a copy. A copy carries the ferry's nouns.
+EXAMPLE_MARKS = frozenset({
+    "hollin", "stair", "teodor", "vance", "marrish", "ferry", "landing", "porter",
+    "porters", "reeve", "tide", "channel", "gulls", "shallows", "hull", "jerkin",
+    "slate", "cliff", "weed", "nets", "woodsmoke", "verdict", "coasts", "dish",
+})
+# How many shared runs make a copy even without a ferry noun in them: three six-word
+# runs is a sentence lifted whole, whatever it is about.
+COPIED_RUNS = 3
+
+
+def copied_from_the_example(text: str) -> list[str]:
+    """The six-word runs a draft shares with the worked example that are copying
+    rather than coincidence, as phrases the repair can be told to remove."""
+    shared = build_echo_index(text) & build_echo_index(
+        json.loads(EXAMPLE["assistant"])["opening"])
+    if not shared:
+        return []
+    marked = [g for g in shared if set(g) & EXAMPLE_MARKS]
+    if not marked and len(shared) < COPIED_RUNS:
+        return []
+    return sorted({" ".join(g) for g in (marked or shared)})[:4]
+
+
+# The problems that make the template the better first screen. Everything else
+# `problems` reports is a reason to ask for a rewrite, not a reason to prefer the
+# template: measured 2026-09-18, a draft short of the word floor by a dozen words was
+# being dropped for a template a third shorter still, and a draft that had not quoted
+# the place's own paragraphs for one that quotes only its facts. The template is the
+# floor for prose that is *wrong* — the wrong place, no player, a decided outcome, a
+# person who does not exist, a number, the ferry — not for prose that is merely less
+# than was asked.
+_SOFT = ("only ", "it describes nothing", "give two to four suggestions")
+
+
+def hard_problems(found: list[str]) -> list[str]:
+    return [p for p in found if not p.startswith(_SOFT)]
 _WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
 
@@ -255,10 +302,20 @@ def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
         out.append(f"it never says where this is; name {place_name}")
     elif place_name and place_name not in first:
         out.append(f"the first paragraph must say where this is; name {place_name} in it")
-    if pc_name and pc_name.split()[0] not in text:
+    # Case-blind: every character on the player's own shelf is saved in lowercase
+    # ("john", "dorito", "spooter"), and a model writing "John" has named the player.
+    if pc_name and pc_name.split()[0].lower() not in text.lower():
         out.append(f"it never says who the player is; name {pc_name}")
-    if build_echo_index(text) & build_echo_index(json.loads(EXAMPLE["assistant"])["opening"]):
-        out.append("it copies the example about the ferry; this is not a ferry landing")
+    copied = copied_from_the_example(text)
+    if copied:
+        # Named, so the repair can find them. "It copies the example" on its own is a
+        # blind retry — the lesson `gm.narration.review` learned on the same check —
+        # and a blind retry against a model that shares one stock phrase with the
+        # example produced a second draft sharing another.
+        out.append("it copies the example about the ferry, word for word: "
+                   + "; ".join(repr(p) for p in copied)
+                   + " — this is not a ferry landing; say those parts in this place's "
+                     "own words")
     if suggestions is not None:
         clean = [s for s in suggestions if isinstance(s, str) and 3 <= len(s.split()) <= 16]
         if not 2 <= len(clean) <= 4:
@@ -322,11 +379,14 @@ def write(campaign, situation, skeleton: str,
                         suggestions=offered)
 
     found: list[str] = []
+    best: tuple[str, list[str], list[str]] | None = None
     try:
         draft, offered = _ask(messages, cfg)
         found = check(draft, offered)
         if draft and not found:
             return narration.destutter(draft), offered, []
+        if draft and not hard_problems(found):
+            best = (draft, offered, found)
         if draft:
             messages += [{"role": "assistant",
                           "content": json.dumps({"opening": draft, "suggestions": offered})},
@@ -336,6 +396,19 @@ def write(campaign, situation, skeleton: str,
             found = check(draft, offered)
             if draft and not found:
                 return narration.destutter(draft), offered, []
+            if draft and not hard_problems(found):
+                best = (draft, offered, found)
     except Exception as exc:                       # noqa: BLE001 — the floor is the point
         found = [f"the prose model failed: {exc}"]
+    # A draft that is merely less than was asked — a dozen words under the floor, not
+    # quoting the place's paragraphs — still beats the template, provided it is at
+    # least the template's length: the template is the floor for prose that is
+    # WRONG. The soft problems are returned so the caller can record them; they
+    # are not a reason to ship a third less text (see `hard_problems`).
+    if best is not None and len(best[0].split()) >= len(skeleton.split()):
+        draft, offered, soft = best
+        clean = [s for s in offered if isinstance(s, str) and 3 <= len(s.split()) <= 16]
+        return (narration.destutter(draft),
+                clean[:4] if 2 <= len(clean) else list(fallback_suggestions or []),
+                soft)
     return *floor, found

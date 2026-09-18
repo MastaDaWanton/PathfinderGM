@@ -232,3 +232,132 @@ def test_the_game_nobody_asked_for_does_not_wait_on_the_model(monkeypatch):
     text, could = cm.opening_text(c, written=False)
     assert text.endswith("What do you do?")
     assert len(could) == 3
+
+
+# --- 2026-09-18: a player's opening fell to the template, and why ----------------------
+#
+# The app log for 09:05 that morning reads "opening fell back to the template: it copies
+# the example about the ferry; this is not a ferry landing". Both drafts had shared one
+# six-word run of stock English with the worked example and were thrown away for a
+# template a third shorter than either. Reproduced the same morning on a different
+# character: one write in three. The player's verdict: "short and bland".
+
+
+def test_one_stock_phrase_shared_with_the_example_is_not_a_copy():
+    """"with the last of your money" is in the example and in half the openings any
+    model will write about a character who is short of coin. A copy carries the ferry's
+    nouns; three shared runs is a sentence lifted whole."""
+    stock = ("Vyrakon wakes slowly. You came to the yard with the last of your money, "
+             "meaning to find work. " + "The yard is loud with somebody else's trade. " * 25
+             + "You are john, asura. What do you do?")
+    assert opening_prose.copied_from_the_example(stock) == []
+    # The boundary: the example's own sentence with two words changed is a nine-word
+    # run — three overlapping six-word runs — and that is a copy whatever it is about.
+    lifted_clause = ("Vyrakon wakes. You came down this morning with the last of your "
+                     "money and no plan. " + "The yard is loud. " * 30 + "What do you do?")
+    assert opening_prose.copied_from_the_example(lifted_clause)
+    ferry = json.loads(opening_prose.EXAMPLE["assistant"])["opening"]
+    lifted = ferry.split("\n\n")[0] + " You are john, in Vyrakon. What do you do?"
+    copied = opening_prose.copied_from_the_example(lifted)
+    assert copied and any(set(p.split()) & opening_prose.EXAMPLE_MARKS for p in copied)
+
+
+def test_the_copy_complaint_names_the_phrases():
+    """A repair the model cannot locate is a blind retry — the same lesson
+    `gm.narration.review` learned on its echo finding."""
+    c = _campaign()
+    _, allowed = opening_prose.material(c, SITUATION, _skeleton(c))
+    ferry = json.loads(opening_prose.EXAMPLE["assistant"])["opening"]
+    found = opening_prose.problems(ferry.split("\n\n")[0] + " You are Borin Achereth in "
+                                   "Vyrakon. What do you do?", allowed, "Vyrakon",
+                                   "Borin Achereth")
+    copy = [f for f in found if "copies the example" in f]
+    assert copy and "word for word: '" in copy[0] and "ferry landing" in copy[0]
+
+
+def test_a_capitalised_player_name_still_names_the_player():
+    """Every character on the player's shelf is saved lowercase; a model that writes
+    "John" has not failed to say who the player is."""
+    c = _campaign()
+    _, allowed = opening_prose.material(c, SITUATION, _skeleton(c))
+    allowed = allowed | {"john"}
+    text = ("The Salt Market of Vyrakon has gone quiet. " * 25
+            + "You are John, a long way from home. What do you do?")
+    assert not [p for p in opening_prose.problems(text, allowed, "Vyrakon", "john")
+                if "who the player is" in p]
+
+
+def test_a_draft_short_of_the_floor_but_longer_than_the_template_ships(monkeypatch):
+    """The template is the floor for prose that is wrong, not for prose that is a dozen
+    words under what was asked. Measured: a repaired draft was being dropped for a
+    template a third shorter than it."""
+    from gm import client
+
+    def Reply(text):
+        return client.Reply(text=text, seconds=0.0, model="fake")
+
+    c = _campaign()
+    skeleton = _skeleton(c)
+    n_skel = len(skeleton.split())
+    # Long enough to beat the template, short of MIN_WORDS, otherwise clean.
+    body = ("The Salt Market of Vyrakon has gone quiet under the thatch. " * 2
+            + "A cart stands where the crowd has parted. ")
+    while len(body.split()) < n_skel + 5:
+        body += "Somebody has put their tools down and not picked them up. "
+    draft = body + "You are Borin Achereth, longsword at your side. What do you do?"
+    assert n_skel <= len(draft.split()) < opening_prose.MIN_WORDS, (n_skel, len(draft.split()))
+
+    monkeypatch.setattr(client, "chat", lambda *a, **k: Reply(json.dumps(
+        {"opening": draft, "suggestions": ["Ask who put the cart there",
+                                            "Look at the cart more closely"]})))
+    monkeypatch.setattr(opening_prose, "ENABLED", True)
+    text, could, wrong = opening_prose.write(c, SITUATION, skeleton, ["Ask", "Look"])
+    assert text.startswith("The Salt Market"), "the draft shipped, not the template"
+    assert could == ["Ask who put the cart there", "Look at the cart more closely"]
+    assert wrong and wrong[0].startswith("only "), wrong
+
+
+def test_a_draft_shorter_than_the_template_does_not_ship_over_it(monkeypatch):
+    from gm import client
+
+    def Reply(text):
+        return client.Reply(text=text, seconds=0.0, model="fake")
+
+    c = _campaign()
+    skeleton = _skeleton(c)
+    stub = "Vyrakon. You are Borin Achereth. What do you do?"
+    monkeypatch.setattr(client, "chat", lambda *a, **k: Reply(json.dumps(
+        {"opening": stub, "suggestions": ["Ask", "Look"]})))
+    monkeypatch.setattr(opening_prose, "ENABLED", True)
+    text, could, wrong = opening_prose.write(c, SITUATION, skeleton, ["Ask", "Look"])
+    assert text == skeleton and wrong
+
+
+def test_a_wrong_draft_still_falls_to_the_template(monkeypatch):
+    """Hard problems keep the floor: a person who does not exist is not "less than was
+    asked", it is wrong."""
+    from gm import client
+
+    def Reply(text):
+        return client.Reply(text=text, seconds=0.0, model="fake")
+
+    c = _campaign()
+    skeleton = _skeleton(c)
+    draft = ("Old Grimble looks up from the Salt Market of Vyrakon. " * 30
+             + "You are Borin Achereth. What do you do?")
+    monkeypatch.setattr(client, "chat", lambda *a, **k: Reply(json.dumps(
+        {"opening": draft, "suggestions": ["Ask him", "Leave now"]})))
+    monkeypatch.setattr(opening_prose, "ENABLED", True)
+    text, could, wrong = opening_prose.write(c, SITUATION, skeleton, ["Ask", "Look"])
+    assert text == skeleton and any("Grimble" in w for w in wrong)
+
+
+def test_the_worlds_own_name_with_a_curly_apostrophe_or_a_suffix_is_not_invented():
+    """Two of five live drafts were sent back for "inventing" Khy'vyr — the world's own
+    people, written with the curly quote the model prefers, or as "Khy'vyr-style"."""
+    from gm.narration import invented_names
+
+    known = {"Khy'vyr", "Nirkor", "Vyrakon"}
+    assert invented_names("The Nirkor quarter is quiet; a Khy’vyr boy runs past.", known) == []
+    assert invented_names("The stall sells Khy'vyr-style knives to Nirkor women.", known) == []
+    assert invented_names("The stall is kept by Grimble, a Nirkor.", known) == ["Grimble"]

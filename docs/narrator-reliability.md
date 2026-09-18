@@ -407,6 +407,23 @@ anchor and the award-as-narration are gone and tested gone; the phrase check cat
 tic dense enough to sit in three of twelve beats and not one that recurs in one of seven,
 which is the floor of an exact-phrase detector (`narrator-guards.md`, "The second run").
 
+## The first screen (2026-09-18)
+
+"The prose it gave was short and bland": a new character's opening had come back as the
+709-character template. The app log had the reason — both model drafts shared one six-word
+run of stock English with the worked example and were dropped as copies — and a
+reproduction on another character hit the same floor one write in three. The opening path
+is identical in 0.1.8 and 0.1.9; this was a coin toss the app had always carried. Four
+corrections in `play/opening_prose.py` and `gm/narration.invented_names` (a copy carries
+the example's own nouns; the template is the floor for prose that is wrong, not for prose
+that is less; the player's name is matched case-blind; the world's names survive a curly
+apostrophe or a hyphenated tail), and the outcome is recorded on the campaign.
+
+| | before | after |
+|---|---|---|
+| writes that fell to the template | 1 of 3 | **0 of 6** |
+| drafts accepted first time | — | 6 of 6, 245–305 words |
+
 ## Still open
 
 - Whether the prose is any *good* is still not a number here. What is: whether it is
