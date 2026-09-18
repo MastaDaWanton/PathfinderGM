@@ -746,13 +746,54 @@ def contradicts_state(text: str, state: dict | None) -> list[tuple]:
     return out
 
 
+# The player striking, in the prose's own words: their weapon doing something, or
+# "you" with an attack verb. Read only when the engine says the player struck no blow
+# this turn — then every one of these is a blow that was somebody else's.
+_YOUR_BLOW = re.compile(
+    r"\b(?:your (?:blade|sword|strike|fist|fists|punch|swing|blow|attack|weapon|club|"
+    r"dagger|knife|axe|spear|staff|cudgel|kick|thrust|slash|cut|jab)\b"
+    r"|you (?:swing|strike|stab|slash|lunge|punch|hack|thrust|cut|kick|drive|bring|"
+    r"slam|smash|bash|land|connect|hit|attack)\b)", re.I)
+
+
+def wrong_hands(text: str, blows: list[dict] | None) -> list[str]:
+    """Sentences that put a blow in the player's hands when the engine's tells put it
+    in somebody else's.
+
+    Measured 2026-09-18: the tell was "weapon's attack misses Masta" — an NPC's swing —
+    and the consequence read "Your blade whistles through the air, but the heavy iron
+    of the guard's shield…": attacker and defender swapped, because the attacker was
+    named after an object and the model read "weapon" as the player's. Agency is a fact
+    of the tell: the attacker stays the subject. Fires only when the tells hold at least
+    one blow and none of them is the player's.
+    """
+    blows = [b for b in (blows or []) if isinstance(b, dict)]
+    if not blows or any(b.get("pc") for b in blows):
+        return []
+    return [s for s in _sentences(unquoted(text)) if _YOUR_BLOW.search(s)]
+
+
+def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
+    """The deterministic backstop under `wrong-hands`: the sentences that gave the
+    player somebody else's blow are cut, and the plain tell stands in their place
+    once, in second person. Returns (text, the sentences cut)."""
+    wrong = wrong_hands(text, blows)
+    if not wrong:
+        return text, []
+    kept = [s for s in _sentences(text) if s not in set(wrong)]
+    tell = next((str(b.get("tell") or "") for b in (blows or []) if b.get("tell")), "")
+    if tell and tell not in kept:
+        kept.append(tell)
+    return " ".join(kept).strip(), wrong
+
+
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
            pronouns: str = '', others: tuple = (), gender: str = '',
            state: dict | None = None, deaths: list[dict] | None = None,
            pull: dict | None = None, heat: dict | None = None,
-           claim: str = "") -> Review:
+           claim: str = "", blows: list[dict] | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -870,6 +911,24 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     #    First because it is the one finding about whether the turn was *true*: every
     #    other rule here is about how the prose reads. Weight 3 so a rewrite that fixes
     #    only this one still counts as an improvement worth keeping.
+    # 0d. The blow was somebody else's and the prose put it in the player's hands.
+    #     Weight 3 with the two above: who struck whom is whether the turn was true.
+    #     Rewrite first; `right_hands` is the free backstop under it.
+    handed = wrong_hands(text, blows)
+    if handed:
+        striker = next((str(b.get("attacker") or "") for b in (blows or [])
+                        if isinstance(b, dict) and b.get("attacker")), "somebody else")
+        out.findings.append(Finding(
+            "wrong-hands",
+            f"the blow this turn was {striker}'s, and the prose gives it to the "
+            f"player: {handed[0][:90]!r}",
+            f"The player struck no blow this turn. {striker} did — at the player. "
+            f"Rewrite {handed[0]!r} so that {striker} is the one swinging and the "
+            f"player is the one the blow is aimed at; the outcome stays exactly what "
+            f"the tells say. Keep the rest.",
+            weight=3,
+        ))
+
     wrong = contradicts_state(text, state)
     if wrong:
         who = "; ".join(f"{n} is described as {claim} — {s!r}" for n, claim, s in wrong[:3])
@@ -2044,7 +2103,15 @@ def clean_consequence(text: str, example_answer: str = "", context: str = "") ->
 # What counts as the prose having actually put a death on the page.
 _DEATH_LANGUAGE = re.compile(
     r"\b(dead|dies|died|dying|lifeless|corpse|slain|kills?|killed|"
-    r"no longer breath\w*|last breath|life leaves|lifeblood)\b", re.I)
+    r"no longer breath\w*|last breath|life leaves|lifeblood|"
+    # A death described without the word. Measured 2026-09-18: "He collapses into
+    # the dirt … He doesn't move." was not accepted, and the backstop APPENDED a
+    # second death — "The head is simply gone, and the body stands … spraying" —
+    # after a beat that had already laid him in the dirt with a caved cheek.
+    r"(?:doesn't|does not|did not|didn't|will not|won't|never) (?:move|moves|stir|stirs|"
+    r"get up|gets up|rise|rises|breathe|breathes)(?: again)?|"
+    r"(?:lies?|lay|lying) (?:still|motionless|unmoving)|stops? moving|"
+    r"stopped moving|goes still|went still|never moves? again|motionless)\b", re.I)
 
 
 def death_on_the_page(text: str, name: str) -> bool:
@@ -2355,6 +2422,16 @@ def death_line(death: dict, said: dict | None = None) -> str:
     name = definite(str(death.get("name") or ""))
     fam = death_family(str(death.get("family") or ""))
     bucket = death_bucket(int(death.get("margin", 0) or 0), int(death.get("hp_max", 1) or 1))
+    # The weapon is the third axis. Measured 2026-09-18: a thrown pebble killed a
+    # 4-hp man by 17 — "overkill" by the share rule — and the authored line took his
+    # head off and left the body spraying. A fist, a pebble or a sap does not do that
+    # whatever the margin says, so a light weapon's death is always the plain one and
+    # a one-handed weapon's stops short of the lines that carry through the body.
+    heft = str(death.get("heft") or "")
+    if heft == "light":
+        bucket = "barely"
+    elif heft == "one-handed" and bucket == "overkill":
+        bucket = "ruinous"
     pool = _DEATHS[fam][bucket]
     pick = least_recently_used(said, f"death:{fam}/{bucket}", len(pool))
     # The actor's own pronouns, defaulting neutral — the same courtesy `right_body`
@@ -2388,7 +2465,18 @@ def press_the_death(text: str, deaths: list[dict],
         if not name or death_on_the_page(text, name):
             continue
         added.append(name)
-        text = _append_before_hand_back(text, death_line(d, said))
+        line = death_line(d, said)
+        # The beat already has him going down — collapsing, hitting the dirt — and
+        # only failed to say the word. Then the death line REPLACES that sentence
+        # rather than following it: two fallings of one man is the "dead man
+        # swinging" the player reported (2026-09-18). With no such sentence, the
+        # line is appended as before.
+        felled = [s for s in _sentences_about(unquoted(text), name) if _FELLED.search(s)]
+        if felled:
+            text = text.replace(felled[-1], line, 1) if felled[-1] in text else \
+                _append_before_hand_back(text, line)
+        else:
+            text = _append_before_hand_back(text, line)
     return text, added
 
 

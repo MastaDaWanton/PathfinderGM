@@ -224,6 +224,18 @@ class GMAgent:
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
+                # A blow at a thing somebody holds is a blow at that somebody, and
+                # a sunder asked for is a sunder: "I strike the weapon and sunder it"
+                # died five times on "a sunder needs a target" and then spawned a
+                # thug named "weapon" (2026-09-18).
+                raw = judgement.aim_at_the_holder(raw, player_input,
+                                                  self.engine.scene) or raw
+                # Then the target held to the person the player is engaged with —
+                # or handed back as a question when two are live and the player
+                # named neither. The fight with the challenger that was resolved
+                # against the stranger (2026-09-18) is this check's measurement.
+                raw = judgement.check_the_target(raw, player_input, self.engine.scene,
+                                                 recent=getattr(self, "recent", ())) or raw
                 raw = judgement.redirect_attacks_off_corpses(
                     raw, player_input, self.engine.scene) or raw
                 # Before survival: a drunk potion is the jar door, not a waterskin
@@ -749,8 +761,12 @@ class GMAgent:
                 alive = self.engine.scene.conscious(ref)
             except Exception:
                 alive = (a.hp or 0) > 0
+            # A role (`bystander`) is a condition on the sheet and not a wound: it
+            # must not let the prose bleed an untouched merchant.
+            touched = [c for c in (getattr(a, "conditions", None) or [])
+                       if not str(getattr(c, "key", "")).startswith("bystander")]
             hurt = ((a.hp or 0) < (a.hp_max or 0)
-                    or bool(getattr(a, "conditions", None))
+                    or bool(touched)
                     or bool(getattr(a, "nonlethal", 0)))
             out[a.name] = {"alive": bool(alive), "hurt": bool(hurt)}
         return out
@@ -773,7 +789,8 @@ class GMAgent:
                rewrite: bool = True, backed=(),
                deaths: list[dict] | None = None,
                pull: dict | None = None,
-               claim: str = "") -> tuple[str, list[str], list[Attempt]]:
+               claim: str = "",
+               blows: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -822,7 +839,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
-                deaths=deaths, pull=pull, claim=claim)
+                deaths=deaths, pull=pull, claim=claim, blows=blows)
             repairs += p_repairs
             attempts += p_attempts
 
@@ -872,6 +889,14 @@ class GMAgent:
             if named:
                 repairs.append(f"the player narrated by name: {named} swap(s) "
                                f"to second person")
+        # Agency is a fact of the tell. When every blow this turn was somebody else's
+        # and the prose still swings the player's blade, the sentences go and the
+        # plain tell stands — the free backstop under `wrong-hands`, the one that
+        # runs on the NPC turn where the rewrite never does.
+        text, handed = narration_mod.right_hands(text, blows)
+        if handed:
+            repairs.append(f"wrong hands: cut {len(handed)} sentence(s) that gave the "
+                           f"player somebody else's blow")
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
@@ -936,7 +961,8 @@ class GMAgent:
                extra_known: set[str] | None = None,
                deaths: list[dict] | None = None,
                pull: dict | None = None,
-               claim: str = "") -> tuple[str, list[str], list[Attempt]]:
+               claim: str = "",
+               blows: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -960,7 +986,7 @@ class GMAgent:
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
                 gender=self._pc_gender(), state=self._body_count(),
-                deaths=deaths, pull=pull, claim=claim,
+                deaths=deaths, pull=pull, claim=claim, blows=blows,
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter
@@ -1265,7 +1291,7 @@ class GMAgent:
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
-            claim=claim)
+            claim=claim, blows=self._blows_from(outcomes))
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -1315,9 +1341,35 @@ class GMAgent:
                     "margin": max(0, -int(a.hp) - int(a.ability_score("con"))),
                     "hp_max": int(a.hp_max),
                     "family": str(worst.get("type") or "") if worst else "",
+                    # The weapon's weight, the death pool's third axis: a pebble
+                    # does not take a head off.
+                    "heft": str(worst.get("heft") or "") if worst else "",
                     "subj": subj or "they", "obj": obj or "them", "poss": poss,
                 })
         return deaths
+
+    def _blows_from(self, outcomes: list) -> list[dict]:
+        """Who struck this turn, from the attack outcomes that rolled — the reviewer's
+        feed for `wrong-hands`. `{"attacker", "pc", "tell"}` per blow; the tell is the
+        plain, second-person line the backstop stands in the prose's place."""
+        from play.views import plain_tell
+
+        pc = self.engine.scene.pc()
+        out = []
+        for o in outcomes or []:
+            if getattr(o, "op", "") != "attack" or not getattr(o, "rolls", None):
+                continue
+            actor = self.engine.scene.actors.get(getattr(o, "actor", "") or "")
+            # The outcome does not carry its actor; the tell opens with their name.
+            tell = str(getattr(o, "tell", "") or "")
+            attacker = actor.name if actor is not None else tell.split("'")[0].split(" hits ")[0].split(" misses ")[0].strip()
+            is_pc = bool(pc is not None and (attacker == pc.name
+                                             or tell.startswith(pc.name)))
+            line = plain_tell(tell)
+            if pc is not None:
+                line, _ = narration_mod.pc_to_second_person(line, pc.name)
+            out.append({"attacker": attacker or "somebody", "pc": is_pc, "tell": line})
+        return out
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
@@ -1372,7 +1424,8 @@ class GMAgent:
         text, repairs, _more = self._groom(
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,
-            backed=claims_the_engine_backs(outcomes), deaths=deaths)
+            backed=claims_the_engine_backs(outcomes), deaths=deaths,
+            blows=self._blows_from(outcomes))
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

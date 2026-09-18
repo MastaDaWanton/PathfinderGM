@@ -98,8 +98,22 @@ def award_for_fallen(scene, pc) -> tuple[int, list[str]]:
             got = worth(foe)
             if got:
                 total += got
-                names.append(foe.name)
+                names.append(_definite(foe.name))
     return total, names
+
+
+def _definite(name: str) -> str:
+    """"desperate man" → "the desperate man"; "Drenn Ironvale" stays. The award line
+    reaches the page raw by design, and "You gain 200 XP for weapon, desperate man"
+    (2026-09-18) printed actor names as the ledger holds them."""
+    name = " ".join(str(name or "").split())
+    if not name:
+        return name
+    first = name.split()[0]
+    if first[:1].isupper() or first.lower() in {"the", "a", "an", "your", "his", "her",
+                                                  "their", "its", "some"}:
+        return name
+    return "the " + name
 
 
 def ready_to_level(actor) -> bool:

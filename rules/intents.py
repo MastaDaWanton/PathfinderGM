@@ -241,7 +241,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # which contradicts the architecture decision outright. NPC attacks still resolve
     # hidden — `Engine._force_visibility` demotes any non-PC actor.
     "attack": ((), ("weapon", "full_attack", "manoeuvre", "power_attack",
-                    "iteration"), "player"),
+                    # `undecided` is written by code, never by the model: the target
+                    # check hands an ambiguous attack back as a printed question.
+                    "iteration", "undecided"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),

@@ -395,7 +395,17 @@ def _can_be_fought(actor) -> bool:
     """
     if int(getattr(actor, "hp", 1)) <= 0:
         return False
-    return not actor.has_state("state.down")
+    if actor.has_state("state.down"):
+        return False
+    # And not somebody who is merely in the room. Measured 2026-09-18 with the map
+    # open: nine non-player actors, seven of them promoted from prose — a guard,
+    # traders, a boy, "nearby merchants" — every one a candidate for "him", and the
+    # planner's attack on "the man" landed on a 4-hp bystander who had never been in
+    # the fight. A bystander becomes fightable the moment they act or are acted on
+    # (`Engine.join_fight`, `Engine._op_attack` lift the tag); until then "I attack"
+    # cannot mean them. The player naming one by name goes round this — the plan
+    # then carries the ref and nothing here fills anything.
+    return not actor.has_state("role.bystander")
 
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is
@@ -877,7 +887,10 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
     return amended
 
 
-_ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iteration"}
+_ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iteration",
+                  # Ours, never the model's: `check_the_target` hands an ambiguous
+                  # attack back as a question through it.
+                  "undecided"}
 
 
 def normalize_attacks(raw_intents, scene):
@@ -1088,6 +1101,12 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
     victim_phrase = " ".join(aimed.group(1).split())
     victim_words = _name_words(victim_phrase)
     if not victim_words:
+        return None
+    # A thing is never a victim to create. "I strike the weapon and sunder it" read
+    # "the weapon" as somebody the scene had not made real and spawned a thug named
+    # "weapon" (2026-09-18); `aim_at_the_holder` owns that sentence and aims it at
+    # whoever holds the thing.
+    if names_a_thing(victim_phrase):
         return None
 
     actors = getattr(scene, "actors", {}) or {}
@@ -3382,7 +3401,13 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         return
     ops = {str(o).lower() for o in (resolved_ops or ())}
     if ops & {"begin_encounter", "travel"}:
-        scene.thread = {}
+        # The fight IS the engagement now — and the person it was with survives it as
+        # the opponent, so a plan's target can be checked against them and the brief
+        # can name them. No subject, so the prose anchor and the brief stay silent
+        # mid-fight. Measured 2026-09-18: clearing the thread here lost the challenger
+        # the moment the fight began, and the first attack went to the wrong man.
+        ref = scene.thread.get("ref") if "begin_encounter" in ops else None
+        scene.thread = {"opponent": ref} if ref and ref in scene.actors else {}
         return
     text = " ".join(str(player_text or "").split())
     # The place used to be read out of the player's own sentence here and written to
@@ -3418,6 +3443,9 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
             return
         scene.thread = {"doing": _THREAD_DOINGS[which - 1],
                         "subject": subject, "age": 0}
+        # A subject that names somebody on the board is bound to them now; a role
+        # nobody holds yet ("a challenger") waits for `promote_cast` to bind it.
+        bind_thread(scene)
         return
     # Walking away ends the engagement, and until this it did not. Found in a live
     # session: the player spent a turn talking to a merchant, then wrote "I leave the
@@ -3498,9 +3526,33 @@ _CAST_GROUP = re.compile(
     re.I)
 # Any-case adjectives, in any order: "an elderly Kelvaxian vendor" has the
 # lowercase one first and the demonym second, and an ordered pattern missed it.
+#
+# And the description that comes AFTER the role, when there is one: "the man in the
+# leather apron", "a woman with a scarred face". Measured 2026-09-18 (the ring fight):
+# the man who drew on the player was introduced as "the man in the leather apron",
+# this pattern kept "man", the ledger already held "desperate man", and the head-word
+# dedup below skipped him — so the man who swung first was never on the board, "him"
+# resolved to a bystander, and a boy died. One optional article-led phrase: an optional
+# participle or material or colour, then one noun, so "in the doorway watches" stops
+# at the doorway and never books the verb.
+_CAST_TAIL = (r"(\s+(?:in|with)\s+(?:a|an|the)\s+"
+              r"(?:(?:[a-z]+(?:ed|en)|leather|iron|steel|red|black|grey|gray|white|"
+              r"blue|green|brown|dark|heavy|ragged|torn|fine|plain|long|short|broad)"
+              r"\s+)?[a-z]+)?")
 _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
-    r"(?:" + _CAST_ROLES + r"))\b", re.I)
+    r"(?:" + _CAST_ROLES + r"))\b" + _CAST_TAIL, re.I)
+_ROLE_WORD = re.compile(r"\b(?:" + _CAST_ROLES + r")\b", re.I)
+
+
+def _role_head(phrase: str) -> str:
+    """The role word of a cast phrase — "man" for "man in the leather apron", the last
+    word when no role word is in it ("Drenn Ironvale" → "ironvale")."""
+    words = str(phrase or "").split()
+    if not words:
+        return ""
+    roles = [w.lower() for w in words if _ROLE_WORD.fullmatch(w)]
+    return roles[0] if roles else words[-1].lower()
 _CAST_MAX = 8
 # Words that cannot be part of a person's description: what separates "a tall hooded
 # stranger" from "the weaver is a man".
@@ -3626,7 +3678,14 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
     if scene is None or not gm_beat:
         return []
     real = " ".join(a.name.lower() for a in scene.actors.values())
+    real_names = {a.name.lower() for a in scene.actors.values()}
     heads = {str(e.get("who", "")).split()[-1].lower() for e in scene.cast}
+    # The whole phrases already booked, beside their heads: the head answers "is
+    # this a bare repeat", the phrase answers "is this the same description".
+    phrases = {str(e.get("who", "")).lower() for e in scene.cast}
+    # A ledger entry's head is its ROLE word, which is not always its last word now
+    # that a description can follow it ("man in the leather apron" → "man").
+    heads |= {_role_head(str(e.get("who", ""))) for e in scene.cast}
     added = []
     # Groups first, and they are why this was widened: "a group of six men and
     # women gathered in a circle" registered NOBODY — the ledger only spoke
@@ -3699,9 +3758,23 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
             continue
         if who.strip().lower() in _A_WORD_NOT_A_PERSON:
             continue
-        if head in heads or head in real:
+        # The description after the role rides along — "man in the leather apron" —
+        # so two men with different descriptions are two men. The head stays the
+        # role word: it is what the dedup and the fight cues read.
+        tail = " ".join((m.group(2) or "").split())
+        if tail:
+            who = f"{who} {tail}"
+        # Dedup on the head word ONLY for a bare repeat. "the man" after "desperate
+        # man" is the same man mentioned again; "the man in the leather apron" is a
+        # second person, and skipping him is how the man who swung first at the
+        # player was never on the board (2026-09-18). An exact repeat of a phrase is
+        # always the same person, whatever the description.
+        if who.lower() in phrases or who.lower() in real_names:
+            continue
+        if (head in heads or head in real) and len(who.split()) == 1:
             continue
         heads.add(head)
+        phrases.add(who.lower())
         scene.cast.append({"who": who, "turn": int(turn),
                            "zone": zone_of_mention(gm_beat, *m.span())})
         added.append(who)
@@ -4012,12 +4085,16 @@ def promote_cast(scene, added) -> list[str]:
         # Mid-fight, bystanders stay prose: joining a battle takes the spawn op's
         # initiative bookkeeping, not a quiet walk-on.
         return []
-    standing = [e for e in scene.cast
-                if e.get("ref") and e["ref"] in scene.actors
-                and scene.actors[e["ref"]].hp > 0]
+    # The cap counts the promoted civilians STANDING, not the ledger entries that
+    # still remember them. Measured 2026-09-18: the ledger is cleared after every
+    # fight and the actors are not, so the count restarted at zero while nine
+    # non-player actors stood on a five-by-five board.
+    standing = [a for a in scene.actors.values()
+                if not a.is_pc and a.hp > 0 and a.has_state("role.bystander")]
     counts = {str(e.get("who")): int(e.get("count", 1) or 1) for e in scene.cast}
     zones = {str(e.get("who")): str(e.get("zone") or "near") for e in scene.cast}
-    made = []
+    made: list[str] = []
+    refs: list[str] = []
     # A group is bodies, plural. "a group of six men" that promotes one actor is
     # the same lie as a pair of guards being one guard: the fiction says six and
     # the dice know about one.
@@ -4037,6 +4114,12 @@ def promote_cast(scene, added) -> list[str]:
         # write into a derived view and vanish; `add` stamps the place and the zone —
         # the zone the prose put them in, so the map lays them out where the words did.
         scene.add(actor, zone=zones.get(phrase, "near"))
+        # In the room, not in the fight. Law two: the fact travels as an effect whose
+        # tag is `role.bystander`, lifted by the one door into a fight and by a blow
+        # given or taken — never by a flag beside it.
+        from rules import states
+
+        actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
         if getattr(scene, "grid", None) is not None:
             scene.place_by_zone([actor.ref])
         for e in scene.cast:
@@ -4044,4 +4127,302 @@ def promote_cast(scene, added) -> list[str]:
                 e["ref"] = actor.ref
                 break
         made.append(phrase)
+        refs.append(actor.ref)
+    bind_thread(scene, refs)
     return made
+
+
+# --- The engagement: who the player is dealing with, as a ref ---------------------------
+
+def bind_thread(scene, promoted: list[str] | None = None) -> str | None:
+    """Give the standing thread's subject a ref, when the scene can say whose it is.
+
+    The thread's subject was a free phrase — "a challenger", "him", "the stranger" —
+    and nothing tied it to an actor. Measured 2026-09-18, the ring fight: "wait for a
+    challenger" bound to nobody, the challenger was promoted from the next beat as
+    "desperate man", "tell him to come at me" continued the thread on a bare pronoun,
+    and the first attack plan aimed at the man the player had spoken to all scene
+    instead. From that wrong choice everything downstream was correct and a bystander
+    died.
+
+    Two ways to a ref, in order: an actor whose name shares a distinctive word with the
+    subject; else the ONE person promoted this beat while the subject named a role
+    nobody on the board held. Two promoted at once is a guess, and is not made.
+    """
+    if scene is None:
+        return None
+    t = getattr(scene, "thread", None) or {}
+    subject = str(t.get("subject") or "")
+    if not subject or t.get("ref") in (getattr(scene, "actors", {}) or {}):
+        return t.get("ref")
+    words = _name_words(subject) - {"him", "her", "them", "it", "man", "woman",
+                                    "one", "someone", "somebody"}
+    for a in scene.actors.values():
+        if a.is_pc:
+            continue
+        if words and words & _name_words(a.name):
+            t["ref"] = a.ref
+            scene.thread = t
+            return a.ref
+    if promoted and len(promoted) == 1 and promoted[0] in scene.actors:
+        t["ref"] = promoted[0]
+        scene.thread = t
+        return promoted[0]
+    return None
+
+
+def engaged_refs(scene) -> list[str]:
+    """Who the player is engaged with, as refs, most certain first — or [].
+
+    In a fight: the conscious foes on the other sides, the one the thread marked as the
+    opponent first. Out of one: the actor the thread is bound to. Never a bystander,
+    never a body.
+    """
+    if scene is None:
+        return []
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    t = getattr(scene, "thread", None) or {}
+    marked = t.get("opponent") or t.get("ref")
+    out: list[str] = []
+    if getattr(scene, "in_encounter", False):
+        for side, refs in (getattr(scene, "sides", None) or {}).items():
+            if pc is not None and pc.ref in refs:
+                continue
+            out.extend(r for r in refs if r in actors and _can_be_fought(actors[r]))
+    elif marked in actors:
+        # Out of a fight the one the player is engaged with IS engaged, bystander tag
+        # or not — the player squaring up to him is how he stops being one. Only a
+        # body is not.
+        a = actors[marked]
+        if int(getattr(a, "hp", 0)) > 0 and not a.has_state("state.down"):
+            out.append(marked)
+    if marked in out:
+        out.remove(marked)
+        out.insert(0, marked)
+    return out
+
+
+def check_the_target(raw_intents, player_text: str, scene, recent=()) -> list | None:
+    """Hold the plan's attack to the person the player is engaged with.
+
+    Runs after the target fills and before validation. The mechanical test: the
+    player's own attack is aimed at a known actor whose name the player's sentence
+    never uses — a pronoun, "the man" — while the scene knows who they are engaged
+    with (`engaged_refs`) and it is somebody else. One engaged person: the attack is
+    moved onto them with the fix named. Several, and the model's choice is one the
+    recent beats mention: nobody chooses for the player — the attack is handed back
+    as a question through the engine's own refusal (`params.undecided`), which reaches
+    the page as "Which of them — …?" and costs nothing else.
+
+    A player who NAMES their victim is never second-guessed: `repair_misaimed_attack`
+    owns that sentence, and a match on the target's own name ends this at once.
+    Returns amended intents, or the list unchanged when there is nothing to do.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    text = redact_speech(player_text or "")
+    if _AIMED_AT.search(text):
+        return raw_intents
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_ref = getattr(pc, "ref", "pc")
+    engaged = engaged_refs(scene)
+    if not engaged:
+        return raw_intents
+    said = " ".join(str(b) for b in (recent or ())[-2:]).lower()
+    changed = False
+    out = []
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and (raw.get("actor") or pc_ref) == pc_ref):
+            out.append(raw)
+            continue
+        target = raw.get("target")
+        if not isinstance(target, str) or target not in actors or target in engaged:
+            out.append(raw)
+            continue
+        if _name_words(text) & _name_words(actors[target].name):
+            out.append(raw)                      # the player named this person
+            continue
+        raw = dict(raw)
+        if len(engaged) == 1:
+            raw["target"] = engaged[0]
+            raw["because"] = (f"the player is engaged with {actors[engaged[0]].name}, "
+                              f"not {actors[target].name}")
+            changed = True
+        else:
+            live = list(engaged)
+            if (_name_words(actors[target].name) & set(re.findall(r"[a-z']+", said))
+                    and target not in live):
+                live.append(target)
+            params = dict(raw.get("params") or {})
+            params["undecided"] = live
+            raw["params"] = params
+            changed = True
+        out.append(raw)
+    return out if changed else raw_intents
+
+
+# --- The fight opened from their side ------------------------------------------------
+
+# A blow struck, in the present tense the beats are written in. Finite forms only: an
+# infinitive ("to strike") is an intention, and the guards below cut those.
+_STRIKES = (r"(?:lunges?|swings?|strikes?|stabs?|slashes?|thrusts?|hacks?|charges?|"
+            r"lashes? out|comes? at|drives?|smashes?|punches?|kicks?|shoves?|grabs?|"
+            r"seizes?|tackles?|swipes?|jabs?|clubs?|bashes?|slams?|cuts?|brings? "
+            r"(?:\w+\s+){0,3}down|throws? (?:\w+\s+){0,3}at|attacks?|rushes?)")
+_STRIKES_AT_YOU = re.compile(
+    r"\b" + _STRIKES + r"\b(?:[^.!?]{0,80}?)\b(?:you|your)\b", re.I)
+# What turns a blow into a threat, a feint, or somebody else's: these within four
+# words before the verb, and the sentence opens no fight. "coils his muscles, waiting
+# for you" (beat 31 of the ring fight) must not; "he lunges … as he tries to overwhelm
+# your guard" (beat 33) must.
+_NOT_A_BLOW = re.compile(
+    r"\b(?:doesn't|does not|didn't|did not|not|never|without|nor|"
+    r"as if to|as though to|threatens? to|threatening to|ready to|about to|"
+    r"prepar\w+ to|poised to|waiting to|wants? to|means? to|would|could|might|"
+    r"feints?|pretends? to|mimes?|before (?:he|she|they) can|if (?:he|she|they)|"
+    r"you)\s+(?:\w+\s+){0,3}?$", re.I)
+_PRONOUN_SUBJECT = re.compile(r"\b(he|she|they)\b", re.I)
+
+
+def attacked_by(scene, gm_beat: str) -> list[tuple[str, str]]:
+    """(ref, sentence) for each non-player actor this beat says struck at the player,
+    outside a fight — the mirror of `inject_fight`.
+
+    Measured 2026-09-18, the ring fight: "he lunges, the blade whistling through the air
+    as he tries to overwhelm your guard with a heavy, horizontal sweep" — the plan was
+    `narrate_only`, the beat had him swing, and the engine rolled nothing. The only door
+    into an encounter was the model's `begin_encounter`; `inject_fight` opens one only
+    when the PLAYER starts it, and `joiners` reads a bystander in only while a fight is
+    already running. Three turns later the player was "put into combat" by his own sunder.
+
+    The sentence's striker is found in code, in this order: an actor whose name's head
+    word stands in the sentence before the verb; else a third-person pronoun, which is
+    the most recent non-player actor named earlier in the beat; else nobody, and the
+    sentence is left — a fight is not opened on a guess. The engine opens the fight
+    from their side (`Engine.struck_first`).
+    """
+    if scene is None or not gm_beat or getattr(scene, "in_encounter", False):
+        return []
+    from .narration import unquoted
+
+    actors = getattr(scene, "actors", {}) or {}
+    people = [(r, a) for r, a in actors.items()
+              if not a.is_pc and int(getattr(a, "hp", 0)) > 0 and not a.is_down]
+    if not people:
+        return []
+
+    def heads(name: str) -> set[str]:
+        return {w for w in _name_words(name) if len(w) >= 3}
+
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    last_named: str | None = None
+    for sentence in re.split(r"(?<=[.!?])\s+", unquoted(gm_beat)):
+        low = sentence.lower()
+        # Who this sentence names, for the pronoun that may follow in the next.
+        named_here = [r for r, a in people
+                      if any(re.search(rf"\b{re.escape(h)}s?\b", low) for h in heads(a.name))]
+        m = _STRIKES_AT_YOU.search(sentence)
+        if not m:
+            if named_here:
+                last_named = named_here[-1]
+            continue
+        before = sentence[:m.start()]
+        if _NOT_A_BLOW.search(before + " "):
+            if named_here:
+                last_named = named_here[-1]
+            continue
+        # The striker: a name before the verb, else the pronoun's antecedent.
+        striker = next((r for r, a in people
+                        if any(re.search(rf"\b{re.escape(h)}s?\b", before, re.I)
+                               for h in heads(a.name))), None)
+        if striker is None and _PRONOUN_SUBJECT.search(before):
+            striker = last_named
+        if named_here:
+            last_named = named_here[-1]
+        if striker is None or striker in seen:
+            continue
+        seen.add(striker)
+        out.append((striker, sentence.strip()))
+    return out
+
+
+# --- A thing is not a person -----------------------------------------------------------
+
+# Objects the prose and the player talk about hitting: a strike at one of these is a
+# strike at whoever holds it, never a person to spawn. Measured 2026-09-18: "I strike
+# the weapon and sunder it" → the misaim repair read "the weapon" as a victim nobody had
+# made real, spawned a THUG NAMED "weapon" with 13 hp, and the player killed it for XP.
+_A_THING = frozenset({
+    "weapon", "weapons", "blade", "sword", "club", "axe", "dagger", "knife", "spear",
+    "staff", "cudgel", "mace", "hammer", "sap", "bow", "shield", "hilt", "haft",
+    "table", "door", "chair", "stool", "bench", "barrel", "crate", "stall", "cart",
+    "wall", "window", "rope", "chain", "lock", "gate", "bottle", "torch", "lantern",
+    "sign", "post", "pole", "plank", "board", "wood", "rock", "stone", "pebble",
+    "armor", "armour", "helm", "helmet", "cloak", "belt", "purse", "pouch", "bag",
+})
+
+
+def names_a_thing(phrase: str) -> bool:
+    """Whether a victim phrase is an object — its head word, or all of it."""
+    words = re.findall(r"[a-z']+", str(phrase or "").lower())
+    return bool(words) and (words[-1] in _A_THING or all(w in _A_THING | _NAME_NOISE
+                                                          for w in words))
+
+
+_AT_THE_THING = re.compile(
+    r"\b(?:strike|strikes|hit|hits|smash|smashes|break|breaks|sunder|sunders|shatter|"
+    r"shatters|attack|attacks|swing (?:at|on)|swings (?:at|on)|cut|cuts|slash|slashes)\s+"
+    r"(?:at\s+)?(?:the|his|her|their|that|this)\s+(?:\w+\s+){0,2}?(" +
+    "|".join(sorted(_A_THING)) + r")\b", re.I)
+
+
+def aim_at_the_holder(raw_intents, player_text: str, scene) -> list | None:
+    """A strike at a thing somebody is holding is a strike at that somebody.
+
+    The player wrote "I strike the weapon and sunder it"; the engine's sunder needs the
+    PERSON as its target and refused five times ("a sunder needs a target"), and the
+    misaim repair then made the thing a person. So: when the player's sentence names an
+    object as what they hit and an attack in the plan has no target (or one that is a
+    bystander), the target becomes the one person engaged with the player
+    (`engaged_refs`), and a sunder the sentence asked for is set. Nobody engaged, or two:
+    the list comes back unchanged and the ordinary paths speak.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    text = redact_speech(player_text or "")
+    if not _AT_THE_THING.search(text):
+        return raw_intents
+    engaged = engaged_refs(scene)
+    if len(engaged) != 1:
+        return raw_intents
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_ref = getattr(pc, "ref", "pc")
+    wants_sunder = bool(MANOEUVRE_CUES["sunder"].search(text))
+    changed = False
+    out = []
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and (raw.get("actor") or pc_ref) == pc_ref):
+            out.append(raw)
+            continue
+        raw = dict(raw)
+        target = raw.get("target")
+        aimed_at_a_thing = (not target or target not in actors
+                            or actors[target].has_state("role.bystander"))
+        if aimed_at_a_thing:
+            raw["target"] = engaged[0]
+            raw["because"] = (f"the player struck at the {_AT_THE_THING.search(text).group(1)} "
+                              f"{actors[engaged[0]].name} is holding")
+            changed = True
+        params = dict(raw.get("params") or {})
+        if wants_sunder and params.get("manoeuvre") != "sunder":
+            params["manoeuvre"] = "sunder"
+            raw["params"] = params
+            changed = True
+        out.append(raw)
+    return out if changed else raw_intents

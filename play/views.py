@@ -1744,12 +1744,43 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                     repairs.append(f"{c.scene.actors[ref].name} joined the fight "
                                    f"on {'your' if side == 'pc' else 'their'} side")
                     agent.engine.rally(ref)
+            # And whoever the beat says struck at the player, outside a fight: the
+            # fight opens from THEIR side and their blow is rolled now, not after the
+            # player's next line. "I should be put into combat when I am attacked, it
+            # shouldn't wait for me" (2026-09-18). The NPC loop below then carries
+            # the order on to the player.
+            struck = judgement.attacked_by(c.scene, text)
+            struck_lines: list[str] = []
+            for n, (ref, sentence) in enumerate(struck):
+                if n == 0:
+                    outs = agent.engine.struck_first(ref)
+                    c.turn_log.append({"kind": "npc-opener", "ref": ref,
+                                       "sentence": sentence[:300],
+                                       "opened": bool(c.scene.in_encounter),
+                                       "outcomes": [o.as_dict() for o in outs]})
+                    if not outs:
+                        continue
+                    repairs.append(f"{c.scene.actors[ref].name} struck first: the fight "
+                                   f"opened from their side")
+                    pc = c.scene.pc()
+                    for o in outs:
+                        if not o.tell:
+                            continue
+                        line = plain_tell(o.tell)
+                        if pc is not None:
+                            line, _ = narration_mod.pc_to_second_person(line, pc.name)
+                        # After the beat that described the swing, not before it.
+                        struck_lines.append(line)
+                elif c.scene.in_encounter and agent.engine.join_fight(ref, "them"):
+                    repairs.append(f"{c.scene.actors[ref].name} came in with them")
             # `added`: the sentences that are ours, so the next turn's `earlier` can
             # leave them out of what the model is shown as its own.
             added = added + ours
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
                                  **({"added": added} if added else {})})
             c.history.append({"role": "assistant", "content": text})
+            for line in struck_lines:
+                c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
     elif outcomes:
         try:
             text, attempt = agent.narrate_outcome(narration, outcomes, player_input)

@@ -1313,10 +1313,25 @@ class Resolution:
 # them — it spent five attempts guessing at refs that could not exist. A rejection that
 # names the way out turns a lost turn into a repair.
 _SPAWN_HINT = (
-    ' If someone new should be in the scene, create them first with '
+    ' If a PERSON or creature new to the scene should be in it, create them first with '
     '{"op": "spawn", "params": {"template": "thug", "count": 2}} — the templates are '
-    "guildhand, watchman, thug and guard dog — and use the refs it returns."
+    "guildhand, watchman, thug and guard dog — and use the refs it returns. A thing "
+    "(a weapon, a table, a door) is never spawned: a blow at a weapon is an attack on "
+    "the person holding it."
 )
+
+# A spawn named after an object. Measured 2026-09-18: a thug named "weapon", 13 hp,
+# on the initiative list of a saved campaign, killed for 135 XP. Refused at
+# validation, with the fix named. The vocabulary is `judgement._A_THING`'s, imported
+# lazily: rules must not import gm at module load.
+def _spawn_names_a_thing(name) -> bool:
+    if not name:
+        return False
+    try:
+        from gm.judgement import names_a_thing
+    except Exception:            # pragma: no cover — rules standing alone
+        return False
+    return names_a_thing(str(name))
 
 
 class _NeedsPlayerRoll(Exception):
@@ -1638,6 +1653,12 @@ class Engine:
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
         if intent.op in ("narrate_only", "advance_time", "spawn", "begin_encounter"):
+            if intent.op == "spawn" and _spawn_names_a_thing(intent.params.get("name")):
+                raise IntentError(
+                    f"spawn: {str(intent.params.get('name'))!r} is a thing, not a person "
+                    f"or creature, and things are not spawned. A blow at a weapon or a "
+                    f"table is an attack on the person holding or standing at it: aim "
+                    f"the attack at their ref.", "legality", index)
             if intent.op == "begin_encounter":
                 sides = intent.params["sides"]
                 # Same family as the `_known` guard above: a container where a mapping
@@ -2440,6 +2461,21 @@ class Engine:
                 "refs",
             )
         defender = self.scene.actors[targets[0]]
+        # Two live people and no word from the player about which: nobody chooses for
+        # them. `judgement.check_the_target` parks the candidates here, and the refusal
+        # is prose on the page (Inform's check rulebook), never a lost turn.
+        undecided = [r for r in (intent.params.get("undecided") or [])
+                     if r in self.scene.actors]
+        if len(undecided) >= 2:
+            names = [self.scene.actors[r].name for r in undecided]
+            asked = ", ".join(names[:-1]) + f" or {names[-1]}"
+            return self._refuse(
+                intent, f"Which of them — {asked}? Say who, and the blow follows.")
+        # A blow given or taken ends being a bystander. The one place besides
+        # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
+        # the sides are drawn with both of them in.
+        actor.remove_condition(states.BYSTANDER_KEY)
+        defender.remove_condition(states.BYSTANDER_KEY)
         # The moment of first violence opens the battle and stops there. Measured in
         # play (2026-08-27): a spoken turn spawned an opponent, began the encounter,
         # swung, confirmed a critical, killed, ended the fight and paid out XP — an
@@ -2722,6 +2758,16 @@ class Engine:
                     amount = max(1, amount // 2)
                     state["tells"].append("The water takes half the force out of it.")
                 hit = self._apply_damage(defender, amount, weapon["type"])
+                # What struck, and how heavy it was: the death line's third axis.
+                # Measured 2026-09-18: a thrown pebble took a man's head clean off
+                # in the authored backstop, because the pool knew the damage type
+                # and the margin and nothing about the weapon.
+                hit["weapon"] = str(weapon.get("name") or weapon_key)
+                hit["heft"] = ("light" if weapon.get("light")
+                               or weapon_key in ("unarmed", "improvised")
+                               or "unarmed" in str(weapon.get("name", ""))
+                               else "heavy" if int(weapon.get("hands", 1) or 1) >= 2
+                               else "one-handed")
                 state["effects"].append(hit)
                 # What the *defender* lost, not what the die said. A hit for 12 against
                 # DR 5 is a hit for 7, and the GM must be told the second number or it
@@ -2801,6 +2847,7 @@ class Engine:
         cmd = sum(x.value for x in cmd_mods)
         cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
 
+        state = partial.get("attack_state") or {}
         automatic = defender.is_helpless or defender.is_down
         if automatic:
             # "If your target is immobilized, unconscious, or otherwise incapacitated,
@@ -2817,10 +2864,19 @@ class Engine:
             margin = 0
             verdict = "success"
         else:
-            roll = self._roll_or_suspend_stage(
-                intent, actor, mods, f"{m['name'].title()} (CMB)", cmd, partial,
-                partial.get("attack_state") or {}, "1d20",
-            )
+            # The CMB roll is kept in the parked state, because a sunder has a second
+            # stage (the damage to the item) and the player rolls both. Before this,
+            # the state handed to the suspension was a fresh dict every time: a second
+            # popup would have spent its face on the CMB roll again.
+            state = partial.get("attack_state") or {}
+            if state.get("cmb"):
+                roll = _roll_from_dict(state["cmb"])
+            else:
+                roll = self._roll_or_suspend_stage(
+                    intent, actor, mods, f"{m['name'].title()} (CMB)", cmd, partial,
+                    state, "1d20",
+                )
+                state["cmb"] = roll.as_dict()
             natural = roll.natural
             margin = roll.total - cmd
             # A natural 20 always succeeds and a natural 1 always fails, whatever the
@@ -2834,13 +2890,65 @@ class Engine:
 
         effects: list[dict] = []
         bits: list[str] = []
+        extra_rolls: list[Roll] = []
 
         if verdict == "success":
             bits.append(
                 f"{actor.name} {m['name']}s {defender.name}"
                 + (" automatically — it cannot resist" if automatic else f" by {margin}")
-                + f": {m['effect']}."
+                + ("" if m.get("damages_item") else f": {m['effect']}.")
             )
+            if m.get("damages_item"):
+                # Sunder, Core Rulebook (aonprd.com, Rules: Sunder): "If your attack is
+                # successful, you deal damage to the item normally. Damage that exceeds
+                # the object's Hardness is subtracted from its hit points. If an object
+                # has equal to or less than half its total hit points remaining, it
+                # gains the broken condition. If the damage you deal would reduce the
+                # object to less than 0 hit points, you can choose to destroy it."
+                # Measured 2026-09-18: `damages_item` was a table flag nothing read —
+                # the tell said "you damage an item", no damage was rolled, the club
+                # took nothing, and the prose decided it was in fragments (and, a beat
+                # later, a table). The damage is the attacker's weapon's, rolled by
+                # the player when it is theirs, through hardness, and the state the
+                # item is left in is in the tell for the prose to hold to.
+                weapon = actor.weapon(weapon_key)
+                item_name = str(intent.params.get("item") or defender.equipped
+                                or (defender.weapons[0] if defender.weapons else "")
+                                or "").strip()
+                if not item_name or item_name == "unarmed":
+                    bits.append(f"{defender.name} holds nothing that can be broken.")
+                else:
+                    dmg = self._roll_or_suspend_stage(
+                        intent, actor, actor.damage_modifiers(weapon_key),
+                        f"Sunder damage ({weapon['name']}) against {defender.name}'s "
+                        f"{item_name}", None, partial, state, weapon["damage"])
+                    extra_rolls.append(dmg)
+                    item = defender.item(item_name)
+                    was_broken = item.broken
+                    res = defender.damage_item(item_name, max(0, dmg.total),
+                                               str(weapon["type"]))
+                    if res["destroyed"]:
+                        what = "destroyed — in pieces"
+                        # A weapon in pieces is not in the hand any more.
+                        if (defender.equipped or "").lower() == item_name.lower():
+                            others = [w for w in defender.weapons
+                                      if w.lower() != item_name.lower()]
+                            defender.equipped = others[0] if others else "unarmed"
+                    elif res["broken"]:
+                        what = "broken (half its hit points gone; -2 to hit and damage with it)"
+                    elif was_broken:
+                        what = "already broken, and worse for it"
+                    elif res["taken"] == 0:
+                        what = "unmarked — the blow did not get through its hardness"
+                    else:
+                        what = "dented, still whole"
+                    bits.append(
+                        f"{defender.name}'s {item_name} takes {res['taken']} through "
+                        f"hardness {res['hardness']} ({res['hp']}/{res['hp_max']} left): "
+                        f"{what}.")
+                    effects.append({"kind": "item_damage", "ref": defender.ref,
+                                    "owner": defender.ref, "weapon": weapon["name"],
+                                    **res})
             cond = m.get("condition")
             if cond:
                 defender.add_condition(cond, source=f"{m['name']} by {actor.name}")
@@ -2876,7 +2984,8 @@ class Engine:
         crossed = self._hp_state_effects(defender)
         effects.extend(crossed)
         return Outcome(
-            intent_id=intent.id, op="attack", rolls=[roll] if roll else [],
+            intent_id=intent.id, op="attack",
+            rolls=([roll] if roll else []) + extra_rolls,
             dc={"value": cmd, "explain": cmd_note, "flat_footed": flat_footed,
                 "breakdown": [x.as_dict() for x in cmd_mods]},
             verdict=verdict, margin=margin, effects=effects,
@@ -2909,11 +3018,21 @@ class Engine:
         # off the initiative, and painted so — until they join it themselves (an
         # NPC that attacks is added to a side by `_op_attack`).
         pc_side = [r for r in standing if self.scene.actors[r].is_pc]
-        if target and target in self.scene.actors and target not in pc_side:
+        if initiator in self.scene.actors and not self.scene.actors[initiator].is_pc:
+            # Opened from THEIR side (`struck_first`): the fight is between the one
+            # who swung and the player. Every other non-player in the room used to
+            # land on "them" here — the whole market against the player because one
+            # man drew.
+            them = [initiator]
+        elif target and target in self.scene.actors and target not in pc_side:
             them = [target]
         else:
-            them = [r for r in standing if not self.scene.actors[r].is_pc]
+            # Nobody named: everyone standing who is not merely in the room.
+            them = [r for r in standing if not self.scene.actors[r].is_pc
+                    and not self.scene.actors[r].has_state(states.BYSTANDER)]
         combatants = pc_side + [r for r in them if r in standing]
+        for r in them:
+            self.scene.actors[r].remove_condition(states.BYSTANDER_KEY)
         if len(combatants) < 2:
             return False
 
@@ -2958,6 +3077,8 @@ class Engine:
             return False
         if any(ref in refs for refs in self.scene.sides.values()):
             return False
+        # Whoever walks through this door has stopped watching.
+        a.remove_condition(states.BYSTANDER_KEY)
         init = self.dice.d20(a.initiative_modifiers(), label=f"{a.name} initiative",
                              visibility="hidden")
         self.scene.initiative.append((ref, init.total))
@@ -2970,6 +3091,48 @@ class Engine:
         if ref not in self.scene.positions and self.scene.grid is not None:
             self.scene.place_by_zone([ref])
         return True
+
+    def struck_first(self, ref: str) -> list[Outcome]:
+        """Somebody in the room swung at the player: the fight opens from THEIR side and
+        their blow is rolled, before the player's next line.
+
+        The mirror of the swing that auto-starts an encounter. Measured 2026-09-18, the
+        ring fight: the man in the leather apron "lunges … tries to overwhelm your guard
+        with a heavy, horizontal sweep" and the engine rolled nothing, because the only
+        door into a fight from the world's side was the model's `begin_encounter` op and
+        the model narrated instead — this project's oldest lesson. The player: "I should
+        be put into combat when I am attacked, it shouldn't wait for me."
+
+        Two runs of the same attack, on purpose. The first finds no fight, forms one
+        (`_ensure_encounter`: sides drawn between him and the player only, initiative
+        rolled, the grid laid, the initiator holding the turn) and stops at "battle is
+        joined" — the first-swing gate, honoured from this side too. The second is his
+        swing, with dice, resolved the way any NPC attack is; the tells go to the page
+        as consequences. Then the NPC loop carries the order on to the player, who is
+        flat-footed until they act, as 1e says of a combatant who has not yet taken a
+        turn. Returns the outcomes, [] when nothing could open.
+        """
+        pc = self.scene.pc()
+        a = self.scene.actors.get(ref)
+        if (pc is None or a is None or a.is_pc or a.is_down
+                or self.scene.in_encounter or pc.is_down):
+            return []
+        raw = {"op": "attack", "actor": ref, "target": pc.ref,
+               "because": f"{a.name} struck first"}
+        outcomes: list[Outcome] = []
+        try:
+            first = self.run(self.validate([raw]))
+        except (IntentError, ValueError, KeyError):
+            return []
+        outcomes.extend(first.outcomes)
+        if not self.scene.in_encounter:
+            return outcomes
+        try:
+            second = self.run(self.validate([raw]))
+            outcomes.extend(second.outcomes)
+        except (IntentError, ValueError, KeyError):
+            pass                        # the fight is open; his swing is the loop's
+        return outcomes
 
     def rally(self, ref: str) -> list[str]:
         """The bystanders who come in on a foe's side when they are struck: the ones

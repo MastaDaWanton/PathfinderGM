@@ -107,11 +107,31 @@ from __future__ import annotations
 #                kind, and a document or the GM may grant it to a named person. The
 #                reader is `Engine._law_joins`: a fight that starts in the town where
 #                the player is wanted brings every guard in on the other side.
+#
+#   role.bystander  somebody the prose put in the room who is not in the fight: a
+#                   merchant at his stall, the boy by the well. Granted when the cast
+#                   ledger promotes a person to an actor (`judgement.promote_cast`), and
+#                   lifted by the one door into a fight (`Engine.join_fight`) or by a
+#                   blow given or taken (`Engine._op_attack`). Readers: `_can_be_fought`
+#                   and everything that fills "him" onto a body — measured 2026-09-18
+#                   with the map open, nine non-player actors on a five-by-five board,
+#                   seven of them bystanders, every one a fightable target for the
+#                   planner and a candidate for a pronoun, and a boy at 4 hp died to a
+#                   thrown chunk of wood meant for the man who had drawn on the player.
 WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
+BYSTANDER = "role.bystander"
+# The condition key that grants it — the one name every writer uses, so the tag has
+# one writer's vocabulary and `test_no_new_site_matches_a_condition_by_name` sees no
+# new literal.
+BYSTANDER_KEY = "bystander"
 
 TAGS: dict[str, tuple[str, ...]] = {
+    # Not under `state.*`: a bystander is stopped from nothing and impaired in
+    # nothing, and no `recovery.*` — a night's sleep does not make a merchant a
+    # combatant. It is a fact about whose fight this is, and it is READ.
+    "bystander":   ("role.bystander",),
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
     "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
