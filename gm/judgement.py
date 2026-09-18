@@ -3725,6 +3725,11 @@ _CAST_ROLES = ("servants?|apprentices?|"
                "elders?|farmers?|fishermen|fisherman|smiths?|scribes?|"
                "porters?|drovers?|peddlers?|fighters?|warriors?|mercenaries|"
                "mercenary|brawlers?|toughs?|swordsmen|swordsman|duellists?|"
+               # The words a beat uses for the man who squares off: measured on the
+               # group-2 replay (2026-09-18), "the brute" was never booked, so the
+               # sunder went to a named resident who happened to be standing there.
+               "brutes?|bruisers?|ruffians?|challengers?|veterans?|hulks?|giants?|"
+               "drunks?|dockhands?|sailors?|"
                "men|man|women|woman|boys?|girls?|people|folk")
 # A crowd is people. Counted where the prose counts them, capped by the same
 # reading the fight injector uses for an uncounted group.

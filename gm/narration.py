@@ -839,7 +839,11 @@ _BLOW_LANDS = re.compile(
     r"across|into)|shatters|buckles|snaps|splinters|caves in|lands (?:on|against|"
     r"across|square)|smashes into|tears (?:into|through)|opens (?:a|his|her|their)|"
     r"draws blood|drives (?:into|through)|is (?:ruined|mangled|shattered|broken|"
-    r"in pieces|in fragments)|now a mangled|ruined (?:steel|blade|weapon))\b", re.I)
+    r"in pieces|in fragments)|now a mangled|ruined (?:steel|blade|weapon)|"
+    # The group-2 replay's phrasing of a sunder that had not happened: "the shock of
+    # his weapon's destruction … his empty hands … where the blade used to be".
+    r"weapon'?s destruction|destruction of (?:his|her|their) (?:weapon|blade|club)|"
+    r"empty hands|where the (?:blade|weapon|club) used to be|in ruins|shards of)\b", re.I)
 
 
 def premature_blows(text: str, blows: list[dict] | None) -> list[str]:
