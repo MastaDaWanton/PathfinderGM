@@ -382,7 +382,17 @@ def who_you_are(pc, standing: str) -> str:
     carry = carrying(pc)
     if carry:
         line += f", {carry}"
-    return line + "."
+    out = line + "."
+    # The past the world bound to them, in the world's own names: "You fought where
+    # Drenn Ironvale took the bets, near the market, and drew a crowd." Written in the
+    # second person by `_bind_background`, so it goes in as it is. Two at most; the
+    # template is held to Nelson's budget and this is one sentence of it.
+    past = [str(t).strip() for t in (getattr(pc, "background_ties", None) or [])
+            if str(t).strip()]
+    if past:
+        out += " " + " ".join(t if t.endswith((".", "!", "?")) else t + "."
+                              for t in past[:2])
+    return out
 
 
 def carrying(pc) -> str:

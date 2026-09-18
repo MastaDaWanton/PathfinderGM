@@ -424,6 +424,21 @@ apostrophe or a hyphenated tail), and the outcome is recorded on the campaign.
 | writes that fell to the template | 1 of 3 | **0 of 6** |
 | drafts accepted first time | — | 6 of 6, 245–305 words |
 
+The same morning, the same player, two more on the first screen: "I chose pit-fighter as
+my background but there is no mention of that and still nobody knows me?" and "have the
+stranger ask a question to me or something." The bound past had never reached the
+opening's template or material (fixed 09-15 for the turn brief only), and the worked
+example's porter stood silent, so every stranger the model wrote did too. Both are the
+opening writer's business now, as soft checks with the fix named and a demonstration that
+shows the person beside the player speaking first. Measured live on a fresh campaign with
+the tie bound:
+
+| | after |
+|---|---|
+| openings naming the past | 3 of 3 |
+| openings where somebody speaks to the player first | 3 of 3 |
+| template floors | 0 of 3 |
+
 ## Still open
 
 - Whether the prose is any *good* is still not a number here. What is: whether it is

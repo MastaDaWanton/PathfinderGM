@@ -94,9 +94,10 @@ def test_the_material_allows_the_worlds_own_words_and_nothing_else():
     text, allowed = opening_prose.material(c, SITUATION, _skeleton(c))
     assert "Salt Market" in text and "Vyrakon" in text and "longsword" in text
     assert {"Salt", "Market", "Vyrakon", "Borin", "Achereth"} <= allowed
-    assert not opening_prose.problems(
+    # Nothing WRONG with it; the soft asks (somebody speaking, the past) are separate.
+    assert not opening_prose.hard_problems(opening_prose.problems(
         "The Salt Market of Vyrakon has gone quiet. " * 30 + "You are Borin Achereth. "
-        "What do you do?", allowed, "Vyrakon", "Borin Achereth")
+        "What do you do?", allowed, "Vyrakon", "Borin Achereth"))
     wrong = opening_prose.problems(
         "The Salt Market of Vyrakon has gone quiet. " * 30 + "A keeper called Grimble watches you, "
         "Borin, in Vyrakon. What do you do?", allowed, "Vyrakon", "Borin Achereth")
@@ -188,7 +189,9 @@ def test_a_bad_draft_is_repaired_once_with_the_complaint_and_then_dropped(monkey
     monkeypatch.setattr(opening_prose, "ENABLED", True)
     c = _campaign()
     text, could, wrong = opening_prose.write(c, SITUATION, _skeleton(c))
-    assert wrong == []
+    # Nothing wrong with the repaired draft; the soft asks (a spoken line) may remain
+    # and are returned for the record, not held against it.
+    assert opening_prose.hard_problems(wrong) == []
     assert text.startswith("Vyrakon's cyclone thatch")
     assert could == ["Ask the man clearing the table what happened",
                      "Look at the door", "Finish my bowl"]
@@ -214,8 +217,10 @@ def test_a_draft_that_ignores_the_places_own_writing_is_sent_back():
     assert any("place's own writing" in f for f in found), found
     placed = bland.replace("through the room", "through a room built for cyclone winds")
     assert opening_prose.drawn_from_the_place(placed, prose, skeleton) == ["cyclone"]
-    assert not opening_prose.problems(placed, allowed, "Vyrakon", "Borin Achereth",
-                                      prose=prose, skeleton=skeleton)
+    assert not [f for f in opening_prose.problems(placed, allowed, "Vyrakon",
+                                                  "Borin Achereth", prose=prose,
+                                                  skeleton=skeleton)
+                if "place's own writing" in f]
 
 
 def test_the_game_nobody_asked_for_does_not_wait_on_the_model(monkeypatch):
@@ -361,3 +366,75 @@ def test_the_worlds_own_name_with_a_curly_apostrophe_or_a_suffix_is_not_invented
     assert invented_names("The Nirkor quarter is quiet; a Khy’vyr boy runs past.", known) == []
     assert invented_names("The stall sells Khy'vyr-style knives to Nirkor women.", known) == []
     assert invented_names("The stall is kept by Grimble, a Nirkor.", known) == ["Grimble"]
+
+
+# --- 2026-09-18: "nobody knows me", and a stranger who waits to be asked ---------------
+#
+# On the same morning, the same player: "I chose pit-fighter as my background but there
+# is no mention of that and still nobody knows me?" and "its major issue is that again it
+# didn't interact with me first, have the stranger ask a question to me or something".
+# The save carried `background_ties: ["You fought where Drenn Ironvale took the bets,
+# near the market, and drew a crowd."]` — bound on 09-15, read by the turn brief, and
+# never handed to the opening's template or material. And the worked example's porter
+# stood silent, so every opening's stranger did too.
+
+TIE = "You fought where Drenn Ironvale took the bets, near the market, and drew a crowd."
+
+
+def _known(c, ties=(TIE,)):
+    """A campaign whose character the world has bound a past to. `_campaign()`'s scene
+    hands out a fresh FakePC on every call, so the tie has to live on one instance."""
+    pc = FakePC()
+    pc.background_ties = list(ties)
+    c.scene.pc = lambda: pc
+    return pc
+
+
+def test_the_material_carries_the_past_and_allows_its_names():
+    c = _campaign()
+    _known(c)
+    text, allowed = opening_prose.material(c, SITUATION, _skeleton(c))
+    assert "Drenn Ironvale took the bets" in text
+    assert {"Drenn", "Ironvale"} <= allowed
+
+
+def test_the_template_names_who_knows_them_instead_of_calling_them_a_stranger():
+    from play import campaign as cm
+
+    c = _campaign()
+    pc = _known(c)
+    pc.world_people_id = None
+    standing = cm._standing(c.world, pc)
+    assert "long way from anyone who knows you" not in standing
+    line = opening.who_you_are(pc, standing)
+    assert TIE in line and "long way" not in line
+    # Without a past the stranger's line stands, as it always has.
+    pc.background_ties = []
+    assert "long way from anyone who knows you" in cm._standing(c.world, pc)
+
+
+def test_ignoring_the_past_and_a_silent_stranger_are_reasons_to_rewrite_not_to_fall_back():
+    c = _campaign()
+    _, allowed = opening_prose.material(c, SITUATION, _skeleton(c))
+    silent = ("The Salt Market of Vyrakon has gone quiet under the thatch. " * 24
+              + "You are Borin Achereth, longsword at your side. What do you do?")
+    found = opening_prose.problems(silent, allowed, "Vyrakon", "Borin Achereth", past=[TIE])
+    assert any(f.startswith("it never uses the character's own past") for f in found), found
+    assert any(f.startswith("nobody here has spoken") for f in found), found
+    assert opening_prose.hard_problems(found) == [], "soft: the draft still beats the template"
+    spoken = silent.replace("What do you do?",
+                            "'Ironvale's man, aren't you?' the woman beside you says. "
+                            "'Thought you'd left.' What do you do?")
+    again = opening_prose.problems(spoken, allowed | {"Ironvale"}, "Vyrakon",
+                                   "Borin Achereth", past=[TIE])
+    assert not any(f.startswith(("it never uses", "nobody here")) for f in again), again
+
+
+def test_the_example_shows_the_person_beside_them_speaking_first():
+    """Instruction volume loses to demonstration volume: the brief said the person
+    beside them "belongs here" and the example showed him silent, and every stranger
+    the model wrote was silent too."""
+    ferry = json.loads(opening_prose.EXAMPLE["assistant"])["opening"]
+    third = ferry.split("\n\n")[2]
+    assert opening_prose._SPEECH.search(third), third
+    assert "porter beside you" in third

@@ -62,11 +62,15 @@ The order is how a person orients, and it is the whole craft:
    place's own writing below. This is the longest paragraph.
 2. WHY. Who the player is (shown by what they carry and where they come from, never
    a class name), why they came here today — the errand in the material — and what
-   they are doing at this moment.
+   they are doing at this moment. If the material gives them a past here, it is the
+   one thing that makes them more than a stranger: use it, and let somebody present
+   know them from it.
 3. WHAT. The thing already happening, as seen and heard from where they stand; then
    what it looks like it means to someone standing there, drawn from how the place
    is run or from what is really going on underneath. Show the visible edge of that;
-   never state its cause outright. The person beside them belongs here.
+   never state its cause outright. The person beside them belongs here, and they
+   speak first — a question, a warning, a remark about what is happening — in quotes,
+   in their own words, said to the player. Nobody here waits to be asked.
 4. NOW. Two or three concrete things the player could do next, in one sentence, and
    then the question of what they do.
 
@@ -127,7 +131,9 @@ EXAMPLE = {
         "here and the boat-owners set everything else, which is why a ferry that has "
         "not come is not a delay to these men but a verdict: somebody with a hull has "
         "decided something, and the porters are waiting to find out what. The porter "
-        "beside you has not picked his load back up.\n\n"
+        "beside you has not picked his load back up. 'You waiting on the boat?' he "
+        "says, without looking at you. 'Then you are waiting on the reeve, same as "
+        "the rest of us.'\n\n"
         "You could ask him what a stopped ferry means here, go up the stair and find "
         "whoever owns the boats, or open the letter while you wait. What do you do?"
     ), "suggestions": [
@@ -187,11 +193,19 @@ def copied_from_the_example(text: str) -> list[str]:
 # floor for prose that is *wrong* — the wrong place, no player, a decided outcome, a
 # person who does not exist, a number, the ferry — not for prose that is merely less
 # than was asked.
-_SOFT = ("only ", "it describes nothing", "give two to four suggestions")
+_SOFT = ("only ", "it describes nothing", "give two to four suggestions",
+         "it never uses the character's own past", "nobody here has spoken")
 
 
 def hard_problems(found: list[str]) -> list[str]:
     return [p for p in found if not p.startswith(_SOFT)]
+
+
+# Somebody speaking, by the marks around it: the same test `gm.narration.texture` uses.
+# Single quotes need a run long enough that two contractions in one sentence do not
+# pair up as speech — a miss in the lenient direction, which for a soft check is the
+# right way to miss.
+_SPEECH = re.compile(r'["“][^"”]{4,}["”]|(?:^|\s)\'[^\']{8,}\'')
 _WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
 
@@ -230,6 +244,14 @@ def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
         people = campaign.world.get(pc.world_people_id) if pc.world_people_id else None
         heritage = people.name if people is not None else (pc.heritage or pc.race or "")
         lines.append(f"Character: {pc.name}. Heritage: {heritage}. Carrying: {carrying}.")
+        # The past the world bound to them — who knows them here and from what. It was
+        # bound on 09-15 and read by the turn brief, and never reached this material,
+        # so the first screen kept calling a known pit-fighter a stranger (2026-09-18).
+        past = [str(t).strip() for t in (getattr(pc, "background_ties", None) or [])
+                if str(t).strip()]
+        if past:
+            lines.append("Their past here, which people in this place remember: "
+                         + " ".join(past))
     if situation.errand:
         lines.append(f"Why they are here today: {situation.errand}")
     lines.append(f"Situation: {situation.when}. {situation.where}. {situation.doing}")
@@ -275,8 +297,14 @@ def drawn_from_the_place(text: str, prose: str, skeleton: str) -> list[str]:
 
 def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
              prose: str = "", skeleton: str = "",
-             suggestions: list[str] | None = None) -> list[str]:
-    """Everything wrong with a draft, each named so the repair call can fix only that."""
+             suggestions: list[str] | None = None,
+             past: list[str] | None = None) -> list[str]:
+    """Everything wrong with a draft, each named so the repair call can fix only that.
+
+    Hard problems first, in the order they have always come; the two soft ones the
+    player asked for on 2026-09-18 last (the bound past used, the person beside them
+    speaking first), so callers reading the first problem read the one that matters.
+    """
     out = []
     if prose and skeleton and not drawn_from_the_place(text, prose, skeleton):
         out.append("it describes nothing the place's own writing describes; put one "
@@ -321,6 +349,20 @@ def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
         if not 2 <= len(clean) <= 4:
             out.append("give two to four suggestions, each one short line in the "
                        "player's voice")
+    # Soft, both: reasons to ask for a rewrite, never to prefer the template, which
+    # does neither. "I chose pit-fighter as my background but there is no mention of
+    # that and still nobody knows me?" and "have the stranger ask a question to me or
+    # something" — the same player, the same morning.
+    if past:
+        keys = {w.lower() for t in past for w in re.findall(r"[A-Za-z][A-Za-z'’-]{4,}", t)}
+        keys -= _STOP | {"where", "which", "there", "their", "market", "crowd", "near"}
+        if keys and not any(re.search(r"\b" + re.escape(k), text.lower()) for k in keys):
+            out.append("it never uses the character's own past here; somebody present "
+                       f"may know them from it — work in: {past[0]}")
+    if text and not _SPEECH.search(text):
+        out.append("nobody here has spoken to the player; give the person beside them "
+                   "one line, in quotes, said to the player — a question or a remark "
+                   "about what is happening")
     return out
 
 
@@ -372,11 +414,14 @@ def write(campaign, situation, skeleton: str,
                 {"role": "assistant", "content": EXAMPLE["assistant"]},
                 {"role": "user", "content": user}]
 
+    past = [str(t).strip() for t in (getattr(pc, "background_ties", None) or [])
+            if str(t).strip()] if pc is not None else []
+
     def check(draft, offered):
         return problems(draft, allowed, place.name if place is not None else "",
                         pc.name if pc is not None else "",
                         prose=getattr(place, "prose", "") or "", skeleton=skeleton,
-                        suggestions=offered)
+                        suggestions=offered, past=past)
 
     found: list[str] = []
     best: tuple[str, list[str], list[str]] | None = None

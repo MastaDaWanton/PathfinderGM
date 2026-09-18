@@ -575,16 +575,25 @@ def _standing(world, pc) -> str:
     Kesst and flatly wrong for a winged Korvu — the app shipped two more characters and
     kept telling them they could not fly.
     """
+    # Somebody with a bound past is not "a long way from anyone who knows you": the
+    # binding names who knows them and from what. Reported 2026-09-18 — "I chose
+    # pit-fighter as my background but there is no mention of that and still nobody
+    # knows me?" — on a save whose ties read "You fought where Drenn Ironvale took the
+    # bets, near the market, and drew a crowd." The 09-15 fix bound the ties and the
+    # turn brief reads them; the opening's template and material never did.
+    known = bool(getattr(pc, "background_ties", None))
     people = world.get(pc.world_people_id) if pc.world_people_id else None
     if people is None:
-        return f"{pc.heritage or pc.race}, a long way from anyone who knows you"
+        return (f"{pc.heritage or pc.race}"
+                + ("" if known else ", a long way from anyone who knows you"))
 
     origin = people.fact("Origin", "")
     if "flightless" in origin.lower():
         return f"{people.name} — flightless, in a city whose nobility is not"
     if "wing" in people.fact("Anatomy", "").lower():
         return f"{people.name} — winged, in a city that expects you to act like it"
-    return f"{people.name} — {origin.rstrip('.').lower()}, and a stranger here"
+    return (f"{people.name} — {origin.rstrip('.').lower()}"
+            + ("" if known else ", and a stranger here"))
 
 
 # --- Live store ---------------------------------------------------------------------------
