@@ -1501,7 +1501,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # GM's secret ones.
                                     recent=[b["text"] for b in c.transcript[-4:]],
                                     turn=len(c.transcript))
-        earlier = [b["text"] for b in c.transcript[-8:] if b["who"] == "gm"]
+        # The model's own recent prose — with the sentences WE appended to it (a death
+        # line, a thread anchor) taken back out. Shown its own backstop as "what you
+        # narrated", the model learns the template (docs/narrator-guards.md D4).
+        earlier = [narration_mod.strip_added(b["text"], b.get("added"))
+                   for b in c.transcript[-8:] if b["who"] == "gm"]
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier)
@@ -1545,16 +1549,25 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         # exactly this, and Façade carries global deflection mix-ins beside its
         # beat-specific ones; no tradition accepts silence here. See
         # docs/speech-vs-action.md and gm/narration.unanswered_speech.
+        # What the floor writes is ours, and is marked as ours on the transcript beat
+        # (`added`) so the next prose call is not shown a holding line as "what you
+        # narrated just before this". Measured on the 2026-09-17 baseline: the
+        # holding line's own six-word phrases recurred across beats like any other tic.
+        ours: list[str] = []
+
         def _floor(reason: str) -> str:
             if judgement.was_speech(player_input):
                 repairs.append(f"{reason}: the player spoke, so the answer is theirs")
-                return narration_mod.unanswered_speech(
+                line = narration_mod.unanswered_speech(
                     player_input,
                     [a.name for a in c.scene.actors.values() if not a.is_pc],
                     turn=len(c.transcript))
-            repairs.append(f"{reason}: replaced with a holding line")
-            return ("The moment holds — nothing new shows itself just yet. "
-                    "What do you do?")
+            else:
+                repairs.append(f"{reason}: replaced with a holding line")
+                line = ("The moment holds — nothing new shows itself just yet. "
+                        "What do you do?")
+            ours.extend(narration_mod._sentences(line))
+            return line
 
         if not text:
             # A turn may NEVER answer with silence. Measured live: "I talk to
@@ -1562,10 +1575,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # were no tells, no degraded sentence, and the empty string skipped
             # every floor below because they all lived inside `if text`.
             text = _floor("empty turn")
+        added = list(getattr(agent, "last_added", []) or [])
         if text:
-            text, anchored = narration_mod.keep_the_thread(text, c.scene.thread)
+            before = text
+            text, anchored = narration_mod.keep_the_thread(text, c.scene.thread,
+                                                           said=c.scene.said)
             if anchored:
                 repairs.append(f"the thread held: re-tethered {anchored!r}")
+                added += narration_mod.added_sentences(before, text)
             # The engine's place, not the thread's: `thread["where"]` was a second
             # writer of where the party is and is gone. Skipped on the turn the party
             # ARRIVES — `here()` is already the destination when the prose runs, and
@@ -1600,7 +1617,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                     repairs.append(f"{c.scene.actors[ref].name} joined the fight "
                                    f"on {'your' if side == 'pc' else 'their'} side")
                     agent.engine.rally(ref)
-            c.transcript.append({"who": "gm", "text": text, "kind": "setup"})
+            # `added`: the sentences that are ours, so the next turn's `earlier` can
+            # leave them out of what the model is shown as its own.
+            added = added + ours
+            c.transcript.append({"who": "gm", "text": text, "kind": "setup",
+                                 **({"added": added} if added else {})})
             c.history.append({"role": "assistant", "content": text})
     elif outcomes:
         try:

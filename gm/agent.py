@@ -71,6 +71,10 @@ class GMAgent:
         self.prose_provider = prose.get("provider", self.provider)
         self.prose_key = prose.get("api_key", "")
         self._echoes = None
+        # The sentences the pipeline appended to the last beat it produced (a death
+        # line, a thread anchor) — ours, not the model's, and kept apart so they are
+        # never shown back to it as its own prose.
+        self.last_added: list[str] = []
         # The experiment. Off by default and read per agent, so a run can be flipped
         # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
         # being tested and why it is measured rather than argued about.
@@ -748,8 +752,8 @@ class GMAgent:
     def _groom(self, text: str, *, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
-               rewrite: bool = True,
-               backed=()) -> tuple[str, list[str], list[Attempt]]:
+               rewrite: bool = True, backed=(),
+               deaths: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -797,7 +801,8 @@ class GMAgent:
         if rewrite:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
-                player_input=player_input, scene_brief=brief, extra_known=extra)
+                player_input=player_input, scene_brief=brief, extra_known=extra,
+                deaths=deaths)
             repairs += p_repairs
             attempts += p_attempts
 
@@ -812,7 +817,11 @@ class GMAgent:
         # and which went on acting in every paragraph for the rest of the session.
         dead = [a.name for r, a in self.engine.scene.actors.items()
                 if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead"))]
-        text, risen = narration_mod.cut_dead_men_walking(text, dead)
+        # Whoever died THIS turn keeps their killing sentence (see the function): the
+        # cut used to delete "the sailor crumples to the deck" as a dead man acting,
+        # which is how every one-punch kill ended in the same appended template.
+        text, risen = narration_mod.cut_dead_men_walking(
+            text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])])
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
         text, leaked = narration_mod.strip_leaked_options(text)
@@ -876,12 +885,19 @@ class GMAgent:
         # Stock scene-setting over a square with bodies in it. No deterministic
         # repair either: the opening has to be rewritten, not trimmed.
         "ignores-the-dead",
+        # A phrase the narrator keeps reaching for. Cutting a clause out of the middle
+        # of a paragraph leaves a hole where a sentence was, so the rewrite is the only
+        # repair. `death-left-off-the-page` is deliberately NOT here: it has a
+        # deterministic backstop (`press_the_death`), and a kill is nearly always in
+        # a fight, where the retry is gated off anyway.
+        "recurring-phrase",
     })
 
     def polish(self, text: str, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                scene_brief: str = "",
-               extra_known: set[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               extra_known: set[str] | None = None,
+               deaths: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -905,6 +921,7 @@ class GMAgent:
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
                 gender=self._pc_gender(), state=self._body_count(),
+                deaths=deaths,
             )
 
         review = _review(text)
@@ -1133,17 +1150,26 @@ class GMAgent:
             return "", ["prose failed on every model"], attempts
         # No claim repair here on purpose: the engine has already resolved the turn, so
         # "the blow lands" is a fact being reported, not an outcome being invented.
+        # Who died, before grooming: the review needs it to ask for the death, the
+        # dead-men cut needs it to spare the killing sentence, and the backstop below
+        # needs it last.
+        deaths = self._deaths_from(outcomes)
         text, repairs, groom_attempts = self._groom(
             text, earlier=earlier or [],
             min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
                        else narration_mod.MIN_SCENE_CHARS),
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=True,
-            backed=claims_the_engine_backs(outcomes))
+            backed=claims_the_engine_backs(outcomes), deaths=deaths)
         attempts.extend(groom_attempts)
-        # After grooming, never before: cut_dead_men_walking would read a fresh
-        # death sentence as a dead man acting.
-        text, pressed = narration_mod.press_the_death(text, self._deaths_from(outcomes))
+        # The backstop, after the rewrite has had its chance: an authored line chosen
+        # by the death's own axes and never the same one twice running. What it adds
+        # is remembered on `last_added`, so the transcript can mark it and the next
+        # prose call is not shown our sentence as its own (docs/narrator-guards.md D4).
+        before = text
+        text, pressed = narration_mod.press_the_death(text, deaths,
+                                                      said=self.engine.scene.said)
+        self.last_added = narration_mod.added_sentences(before, text)
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
                            f"{', '.join(pressed)}")
@@ -1169,10 +1195,20 @@ class GMAgent:
                 pron = str(getattr(a, "pronouns", "") or "").lower()
                 subj, _, obj = pron.partition("/")
                 poss = {"he": "his", "she": "her", "they": "their"}.get(subj, "their")
+                # The blow that did it, for the death line's axes: the heaviest damage
+                # this same outcome landed on them, by type. CircleMUD keys its death
+                # pool on the attack type and QuickMUD on the share of the victim; both
+                # facts are on the outcome already.
+                hits = [x for x in (getattr(o, "effects", None) or [])
+                        if isinstance(x, dict) and x.get("kind") == "damage"
+                        and x.get("ref") == e.get("ref")]
+                worst = max(hits, key=lambda x: int(x.get("amount", 0) or 0),
+                            default=None)
                 deaths.append({
                     "name": a.name,
                     "margin": max(0, -int(a.hp) - int(a.ability_score("con"))),
                     "hp_max": int(a.hp_max),
+                    "family": str(worst.get("type") or "") if worst else "",
                     "subj": subj or "they", "obj": obj or "them", "poss": poss,
                 })
         return deaths
@@ -1226,11 +1262,15 @@ class GMAgent:
         # of 43 of them below forty characters. The answer was to tell the detector, not
         # to turn it off. `hand_back=False`: two or three sentences about what the dice
         # did hand nothing back. `min_chars` stays 0 for the same reason.
+        deaths = self._deaths_from(outcomes)
         text, repairs, _more = self._groom(
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,
-            backed=claims_the_engine_backs(outcomes))
-        text, pressed = narration_mod.press_the_death(text, self._deaths_from(outcomes))
+            backed=claims_the_engine_backs(outcomes), deaths=deaths)
+        before = text
+        text, pressed = narration_mod.press_the_death(text, deaths,
+                                                      said=self.engine.scene.said)
+        self.last_added = narration_mod.added_sentences(before, text)
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
                            f"{', '.join(pressed)}")

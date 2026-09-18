@@ -75,6 +75,27 @@ SCRIPTS = {
         "I walk out before anyone else decides to try me.",
         "I find somewhere quiet and sit down.",
     ],
+    # Kills, as many as the dice allow. The death line is the one piece of prose this
+    # project has measured as byte-identical across a session (docs/narrator-guards.md),
+    # and neither script above kills more than once. A level-one fixture cannot be
+    # relied on to kill in one blow, so this measures what it can: how the deaths that
+    # DO happen read against each other. Read `recurring` in the report for the rest.
+    "kills": [
+        "I walk into the worst tavern on the street.",
+        "I pick a fight with the biggest man in the room.",
+        "I punch him in the face as hard as I can.",
+        "I hit him again and do not stop until he goes down.",
+        "I finish him.",
+        "I turn on the nearest of his friends and hit him.",
+        "I hit him again, harder.",
+        "I put him down for good.",
+        "I look for anyone else who wants to try me.",
+        "I go for the next one who steps up.",
+        "I keep hitting him until he stops moving.",
+        "I stand over the bodies and look around the room.",
+        "I walk out before anyone else decides to try me.",
+        "I find somewhere quiet and sit down.",
+    ],
     # --- the long horizon ---------------------------------------------------------------
     #
     # Both scripts above are ten lines and loop, which measures a narrator's first ten
@@ -285,8 +306,16 @@ def _texture_report(rows: list[dict]) -> dict:
     per_turn = [narration_mod.texture(t) for t in said]
     share, opener = narration_mod.formulaic(said)
     spoke = sum(1 for t in per_turn if t["has_speech"])
+    # The narrator against itself. Measured 2026-09-17 on the shipped narrator, a run
+    # this report called clean at 96% with openings at 7%: "the transition from the" in
+    # 12 of 53 beats. Self-repetition (Salkar et al.) and the gzip ratio (Shaib et al.)
+    # are the two numbers that see it; docs/narrator-guards.md.
+    same = narration_mod.self_repetition(said)
     return {
         "turns_with_prose": len(said),
+        "self_repetition": same["score"],
+        "recurring": same["top"][:8],
+        "compression_ratio": narration_mod.compression_ratio(said),
         "chars_mean": round(statistics.mean(lengths)),
         "chars_median": lengths[len(lengths) // 2],
         "chars_min": lengths[0], "chars_max": lengths[-1],
@@ -327,6 +356,8 @@ def _drift_report(rows: list[dict], parts: int = 3) -> list[dict]:
             "words_spread": round(statistics.mean(p["words_spread"] for p in per), 1),
             "same_opening_share": round(share, 2),
             "same_opening": opener,
+            "self_repetition": narration_mod.self_repetition(texts)["score"],
+            "compression_ratio": narration_mod.compression_ratio(texts),
             "faults": sum(len(r["faults"]) for r in chunk),
         })
     return out
@@ -389,15 +420,20 @@ def main() -> None:
         print(f"  openings        {int(100 * tex['same_opening_share'])}% share the "
               f"commonest ({tex['same_opening']!r})"
               + ("  ** FORMULAIC **" if tex["formulaic"] else ""))
+        print(f"  self-repeat     {tex['self_repetition']} of each beat's four-word "
+              f"phrases appear in another beat; gzip ratio {tex['compression_ratio']}")
+        for phrase, n in tex.get("recurring") or []:
+            print(f"                  {n:3d} beats  {phrase!r}")
 
     drift = result.get("drift") or []
     if drift:
         print("\ndrift, by third of the run:")
-        print(f"  {'part':6} {'turns':>5} {'chars':>6} {'spread':>7} {'faults':>7}   "
-              f"commonest opening")
+        print(f"  {'part':6} {'turns':>5} {'chars':>6} {'spread':>7} {'self-rep':>8} "
+              f"{'gzip':>6} {'faults':>7}   commonest opening")
         for d in drift:
             print(f"  {d['part']:6} {d['turns']:5d} {d['chars_mean']:6d} "
-                  f"{d['words_spread']:7.1f} {d['faults']:7d}   "
+                  f"{d['words_spread']:7.1f} {d['self_repetition']:8.3f} "
+                  f"{d['compression_ratio']:6.2f} {d['faults']:7d}   "
                   f"{int(100 * d['same_opening_share'])}% {d['same_opening']!r}")
 
     if args.json:

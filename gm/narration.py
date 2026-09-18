@@ -750,10 +750,42 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
            pronouns: str = '', others: tuple = (), gender: str = '',
-           state: dict | None = None) -> Review:
+           state: dict | None = None, deaths: list[dict] | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0a. The engine killed somebody and the prose has not said so. Weight 3, like the
+    #     contradiction it is the mirror of: a death that did not happen and a death
+    #     that did not reach the page are both the turn being untrue. The fix hint
+    #     carries the facts — who, by what, how far past dead in words — because the
+    #     repair that held everywhere else here is the one handed something specific
+    #     to write. Measured before this existed: the prose wrote a wounded man, the
+    #     dead-men cut deleted him, and an authored template filled the hole, four times
+    #     out of four in one save. The template is now the backstop under THIS.
+    for d in deaths or []:
+        who = str(d.get("name") or "").strip()
+        if not who or death_on_the_page(text, who):
+            continue
+        fam = death_family(str(d.get("family") or ""))
+        bucket = death_bucket(int(d.get("margin", 0) or 0), int(d.get("hp_max", 1) or 1))
+        how = {"barely": "just enough to kill",
+               "ruinous": "far more than enough — the wound is ruinous",
+               "overkill": "more than the whole body could take — the blow carries "
+                           "through"}[bucket]
+        blow = ("a blow" if fam == "other" else f"a {fam} blow")
+        out.findings.append(Finding(
+            "death-left-off-the-page",
+            f"{definite(who)} died this turn and the prose does not say so",
+            f"{definite(who)} is dead. The engine resolved it: {blow}, {how}. The "
+            f"passage does not say so, and it must — write {definite(who)}'s death in "
+            f"one or two sentences that are specific to this body and this blow: where "
+            f"it landed, what it did to them, how they fall and where they lie. Say "
+            f"plainly that they are dead. Do not have them speak, stagger, or struggle "
+            f"for breath afterwards. Leave the rest of the passage as it is.",
+            weight=3,
+        ))
+        break
 
     # 0. The prose says somebody was felled or hurt and the engine says otherwise.
     #    First because it is the one finding about whether the turn was *true*: every
@@ -911,6 +943,33 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
                 f"You have opened {same + 1} turns in a row with {mine!r}. Start this one "
                 f"somewhere else — on a person, on a sound, on the thing that has "
                 f"changed — and do not begin it with the player.",
+                weight=2,
+            ))
+
+    # 3c. A phrase this narrator keeps reaching for. Measured on the 2026-09-17
+    #     sixty-turn baseline, AFTER the opening repair had brought the commonest
+    #     opening down to 7%: "the transition from the" in 12 of 53 beats, "to your
+    #     left the" in 9, "the silence of the" in 7, "the ground beneath your boots" in
+    #     6 — none of it visible to 3 (a whole sentence), 3b (the first two words) or
+    #     the echo index (the worked examples, never the campaign's own prose). Xu et
+    #     al. (NeurIPS 2022) name the mechanism: a sentence already in the context
+    #     self-reinforces, and the phrasings that were likeliest to begin with converge
+    #     fastest. So the campaign's own recent beats are the index here, and the
+    #     phrase is named in the hint — a repair the model cannot locate is a blind
+    #     retry. No deterministic backstop: cutting a clause from the middle of a
+    #     paragraph leaves a hole where a sentence was.
+    if earlier:
+        tics = recurring_phrases(text, earlier)
+        if tics:
+            named = "; ".join(repr(p) for p, _ in tics[:3])
+            out.findings.append(Finding(
+                "recurring-phrase",
+                f"{tics[0][0]!r} has appeared in {tics[0][1]} recent turns",
+                f"You keep writing the same phrases: {named}. Each of those has "
+                f"appeared in several recent turns already. Rewrite the sentences that "
+                f"contain them so that none of those phrases appears, saying the same "
+                f"thing in a different shape — a different subject, a different verb, "
+                f"a detail of this place rather than a formula. Change nothing else.",
                 weight=2,
             ))
 
@@ -1384,7 +1443,7 @@ _DEAD_MAY = re.compile(
 _PLAYER_ACTS = re.compile(r"[\"“'‘]?\s*Your?\b", re.I)
 
 
-def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
+def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str]]:
     """Drop sentences where a dead actor gets up and acts.
 
     Measured across a live session: the stranger died in the opening turns, the panel
@@ -1393,6 +1452,15 @@ def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
     arm", yelling, glaring, stumbling. A sentence naming the dead survives when it
     treats them as dead (lying, fallen, a body, being stripped); one that has them
     doing anything else is cut whole.
+
+    `fresh` names whoever died THIS turn. For them a sentence carrying felling or
+    death language is the killing blow itself and is kept — "the sailor crumples to
+    the deck and does not move" has no word from `_DEAD_MAY` in it, and until this
+    it was cut as a dead man acting, which left the beat with no death in it at all
+    and handed the page to `press_the_death`'s one template. Measured in
+    `spooter.json`: four kills, four identical appended lines. Long-dead actors keep
+    the strict rule, because "the stranger collapses" two turns after he died is the
+    resurrection this cut exists for.
     """
     if not text or not dead_names:
         return text or "", []
@@ -1400,11 +1468,16 @@ def cut_dead_men_walking(text: str, dead_names) -> tuple[str, list[str]]:
     if not names:
         return text, []
     pattern = re.compile("|".join(re.escape(n) for n in names), re.I)
+    just_died = re.compile("|".join(re.escape(n) for n in fresh if n and len(n) >= 3),
+                           re.I) if any(n and len(n) >= 3 for n in fresh) else None
     kept, cut = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
         hit = pattern.search(s)
-        if hit and not _DEAD_MAY.search(s) and not _PLAYER_ACTS.match(s.strip()):
+        dying_now = bool(just_died and just_died.search(s)
+                         and (_FELLED.search(s) or _DEATH_LANGUAGE.search(s)))
+        if hit and not dying_now and not _DEAD_MAY.search(s) \
+                and not _PLAYER_ACTS.match(s.strip()):
             # The quote exemption exists so a living speaker may *mention* the
             # dead — and it let the dead keep talking, measured live: a merchant
             # at -19 spat "You'll pay for this!" and nodded through two beats,
@@ -1564,6 +1637,141 @@ def invented_names(text: str, known: set[str]) -> list[str]:
 # than a failure of the measures. They are reported by `tools/narrator_audit.py` so drift
 # has a baseline to drift *from* — a number nobody is watching is not a measurement.
 _OPENER_WORDS = 2
+
+# --- the narrator measured against itself -------------------------------------------------
+#
+# Holtzman's *Repetition* metric counts a phrase repeating three times at the END of one
+# generation, which scores this project's problem at zero; distinct-n falls with length
+# whatever the model does (Rethinking and Refining the Distinct Metric, ACL 2022). The
+# two that fit are the self-repetition score of Salkar et al. (AACL 2022) — n-grams of
+# four or more words that appear in MORE THAN ONE output of the same system — and the
+# gzip compression ratio Shaib et al. (2024) recommend as the cheap measure that tracks
+# the n-gram ones. Both are a few lines and need nothing installed. docs/narrator-guards.md.
+
+# Words that carry no content on their own. A four-word phrase made only of these ("and
+# then it is") is English, not a tic; one with a single content word in it ("the
+# transition from the") is exactly the kind of tic that was measured.
+_FUNCTION_WORDS = frozenset({
+    "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for",
+    "from", "with", "as", "is", "are", "was", "were", "be", "been", "it", "its", "you",
+    "your", "he", "she", "they", "his", "her", "their", "them", "him", "that", "this",
+    "there", "here", "then", "than", "not", "no", "so", "if", "into", "out", "up",
+    "down", "over", "under", "off", "do", "does", "did", "have", "has", "had", "what",
+    "who", "which", "when", "where", "how", "own", "one", "all", "some", "any",
+})
+
+# The recent-beat windows the phrase check reads, and the thresholds. Four words in
+# three of twelve is a phrase the narrator is settling into (the baseline's worst was
+# twelve of fifty-three); six words shared with two of the last eight is a clause being
+# lifted whole. See `recurring_phrases` for why not one of eight.
+PHRASE_WINDOW = 12
+PHRASE_REPEATS = 3
+LIFT_WINDOW = 8
+LIFT_LENGTH = 6
+
+
+_CASED_WORD = re.compile(r"[A-Za-z][A-Za-z']*")
+
+
+def _phrase_grams(text: str, n: int) -> set[tuple]:
+    """The n-word phrases of a beat that could be a tic: speech and the hand-back
+    stripped, at least one content word in each, and no phrase that is mostly a proper
+    name — "the Guild of Salt and Timber" recurring is the world, not a formula."""
+    body = unquoted(text or "")
+    sentences = [s for s in _sentences(body) if not s.rstrip().endswith("?")]
+    out: set[tuple] = set()
+    for s in sentences:
+        cased = _CASED_WORD.findall(s)
+        for i in range(max(0, len(cased) - n + 1)):
+            span = cased[i:i + n]
+            # Capitals past the first word of the sentence are names.
+            names = sum(1 for k, x in enumerate(span) if x[:1].isupper() and (i + k) > 0)
+            if names >= 2:
+                continue
+            g = tuple(x.lower() for x in span)
+            if any(x not in _FUNCTION_WORDS for x in g):
+                out.add(g)
+    return out
+
+
+def recurring_phrases(text: str, earlier: list[str] | None,
+                      window: int = PHRASE_WINDOW, repeats: int = PHRASE_REPEATS,
+                      lift_window: int = LIFT_WINDOW,
+                      lift_length: int = LIFT_LENGTH) -> list[tuple[str, int]]:
+    """The phrases of this beat that recent beats already used, worst first.
+
+    Returns `(phrase, beats)` pairs: four-word phrases found in `repeats` or more of
+    the last `window` beats, and `lift_length`-word phrases found in two or more of the
+    last `lift_window`. Calibrated on the 2026-09-17 baseline: at "any of the last
+    eight" the six-word rule fired on 29 of 56 beats, most of them a beat honestly
+    continuing the scene of the one before it ("the slap of water against the pilings"
+    while still standing at the river); at two of eight, 17 of 56, every one a tic. A
+    phrase is counted once per beat it appears in, so a beat that says a thing twice is
+    one beat.
+    """
+    if not text or not earlier:
+        return []
+    mine4 = _phrase_grams(text, 4)
+    mine6 = _phrase_grams(text, lift_length)
+    if not mine4 and not mine6:
+        return []
+    count4: Counter = Counter()
+    count6: Counter = Counter()
+    recent = [e for e in earlier if e][-window:]
+    for i, beat in enumerate(recent):
+        theirs4 = _phrase_grams(beat, 4) & mine4
+        count4.update(theirs4)
+        if i >= len(recent) - lift_window:
+            count6.update(_phrase_grams(beat, lift_length) & mine6)
+    found: dict[str, int] = {}
+    for g, c in count6.items():
+        if c >= 2:
+            found[" ".join(g)] = c
+    for g, c in count4.items():
+        if c >= repeats:
+            phrase = " ".join(g)
+            # A four-word phrase inside a six-word one already reported is the same
+            # finding twice.
+            if not any(phrase in longer for longer in found):
+                found[phrase] = max(c, found.get(phrase, 0))
+    return sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def self_repetition(turns: list[str], n: int = 4) -> dict:
+    """Salkar et al.'s self-repetition, over a run: the share of each beat's n-word
+    phrases that also appear in some OTHER beat of the same run, averaged, plus the
+    phrases that recur in most beats. Speech and hand-backs excluded, as above."""
+    grams = [_phrase_grams(t, n) for t in (turns or []) if t]
+    if len(grams) < 2:
+        return {"score": 0.0, "beats": len(grams), "top": []}
+    in_beats: Counter = Counter()
+    for g in grams:
+        in_beats.update(g)
+    shares = []
+    for g in grams:
+        if not g:
+            continue
+        shared = sum(1 for x in g if in_beats[x] > 1)
+        shares.append(shared / len(g))
+    top = [(" ".join(g), c) for g, c in in_beats.most_common(60) if c >= 3][:12]
+    return {
+        "score": round(sum(shares) / len(shares), 3) if shares else 0.0,
+        "beats": len(grams),
+        "top": top,
+    }
+
+
+def compression_ratio(turns: list[str]) -> float:
+    """Bytes of prose per byte of gzip — Shaib et al.'s direction, so HIGHER is samer:
+    redundant text compresses further. Reported beside length, as they insist, because
+    a longer run compresses better whatever its variety."""
+    import gzip
+
+    joined = "\n".join(t for t in (turns or []) if t).encode("utf-8")
+    if not joined:
+        return 0.0
+    return round(len(joined) / max(1, len(gzip.compress(joined))), 3)
+
 
 # How much opener reuse is too much. The measured rate is 2 repeats in 19 turns; a run
 # where more than a third of turns open the same way is formulaic in the sense that has
@@ -1751,52 +1959,348 @@ _DEATH_LANGUAGE = re.compile(
     r"no longer breath\w*|last breath|life leaves|lifeblood)\b", re.I)
 
 
-def press_the_death(text: str, deaths: list[dict]) -> tuple[str, list[str]]:
+def death_on_the_page(text: str, name: str) -> bool:
+    """Whether the prose already commits to this actor's death.
+
+    A sentence naming them (or carrying a third-person pronoun, which in a beat about
+    one death is them) with death language in it. Shared by the finding in `review`
+    and by the backstop below, so the two cannot disagree about what counts.
+    """
+    first = str(name or "").split()[0] if str(name or "").strip() else ""
+    if not first:
+        return False
+    return any(_DEATH_LANGUAGE.search(s) for s in _sentences(text)
+               if re.search(rf"\b{re.escape(first)}", s, re.I)
+               or re.search(r"\b(he|she|they)\b", s, re.I))
+
+
+def definite(name: str) -> str:
+    """"sailor" → "the sailor"; "Grist" and "the watchman" stay as they are.
+
+    Measured in `spooter.json`: four death lines reading "fell sailor as unmake them",
+    because the actor's name was a bare common noun and the template pasted it in
+    unchanged. A capitalised name is a proper name; a lowercase one is a kind of
+    person and takes the article.
+    """
+    name = " ".join(str(name or "").split())
+    if not name:
+        return name
+    first = name.split()[0]
+    if first[:1].isupper() or first.lower() in {"the", "a", "an", "your", "his", "her",
+                                                  "their", "its", "my", "our", "some"}:
+        return name
+    return "the " + name
+
+
+# How the death line is chosen: by what the blow was and how far past dead it went,
+# never by asking for variety.
+#
+# Measured 2026-09-17 in the player's own saves: `spooter.json`, eleven beats, four
+# kills, four BYTE-IDENTICAL sentences — "The blow does not so much fell sailor as
+# unmake them…" — because a one-punch kill reaches the top rung every time and the top
+# rung held exactly one line. The player quoted it back as the narrator's tic. It was
+# ours.
+#
+# Rebuilt the way six codebases that were read at source do it (docs/narrator-guards.md):
+# CircleMUD consults a random pool only for misses and death blows, and every death line
+# in it is anatomical and specific to the attack type; QuickMUD (a ROM fork — stock ROM
+# 2.4 used absolute damage) keys severity on damage as a share of the victim's own hit
+# points; Discworld crosses attack type with body part; DCSS lets the target supply the
+# image. None of them fixed thin, repetitive kill text
+# by asking for variety — they added mechanical axes and kept the pools tiny. So: three
+# lines per cell, each concrete, keyed on the damage family and the margin bucket, and
+# chosen least-recently-used per campaign, which is Inform 7's default `[at random]`
+# ("the same choice cannot come up twice running … to avoid the deadening effect of
+# repeating the exact same message") made deterministic.
+#
+# Slots: {name} (with its article), {subj}/{Subj}, {obj}, {poss}, {self}, {is_}, {was},
+# {has}, {does}, and the verb suffixes {s}/{es}, so a group actor ("the guards") reads as
+# grammatically as one person. No number anywhere: the third law.
+# Every line says "dead" in as many words. `death_on_the_page` is what decides whether
+# a death reached the page, and a backstop whose own sentence it could not recognise
+# would be pressed again by the next pass over the same beat.
+_DEATHS: dict[str, dict[str, list[str]]] = {
+    "bludgeoning": {
+        "barely": [
+            "{name} take{s} it on the side of the head and {poss} knees go first; {subj} "
+            "{is_} on the ground before {poss} hands know to break the fall, and {subj} "
+            "{does} not get up. {Subj} {is_} dead.",
+            "The blow lands under {poss} ear. {name} stand{s} one moment longer with "
+            "{poss} mouth working, then fold{s} sideways and lie{s} dead.",
+            "It catches {name} across the temple; {subj} sit{s} down hard, sway{s} once, "
+            "and slump{s} over dead.",
+        ],
+        "ruinous": [
+            "The impact caves in the side of {poss} skull. {name} drop{s} dead where "
+            "{subj} stood, one arm flung out, and the only movement after that is the "
+            "blood finding the low side of the floor.",
+            "{name}'s chest gives under it with a sound like a crate stove in. {Subj} "
+            "{is_} thrown back a step, {poss} legs already gone, and land{s} dead.",
+            "It breaks {poss} neck. {name}'s head goes over at an angle no living neck "
+            "allows and {subj} drop{s} in a heap, dead before the fall is done.",
+        ],
+        "overkill": [
+            "The blow does not stop at {name}. It goes through the skull and carries on, "
+            "and what hits the ground is dead and has no face left to speak of.",
+            "{name} burst{s} under it. The head is simply gone, and the body stands for "
+            "one grotesque instant, spraying, before it topples, dead.",
+            "It drives {name}'s ribs through lung and heart together; {subj} {is_} dead "
+            "standing, and fall{s} a moment later like a coat slipping off a hook.",
+        ],
+    },
+    "piercing": {
+        "barely": [
+            "The point goes in under {poss} ribs and {name} fold{s} over it, mouth "
+            "working, and slide{s} off the steel to the ground, dead, without another "
+            "sound.",
+            "It finds {poss} throat. {name} clap{s} both hands to it and the blood comes "
+            "through {poss} fingers anyway, and {subj} kneel{s}, and then {subj} {is_} "
+            "lying down, dead.",
+            "{name} look{s} down at the thing standing out of {poss} chest as if somebody "
+            "else had put it there, and {poss} legs quit, and {subj} {is_} dead by the "
+            "time {subj} reach{es} the floor.",
+        ],
+        "ruinous": [
+            "It goes in through the eye. {name} stop{s} — every part of {obj} at once — "
+            "and drop{s} straight down like a cut rope, dead.",
+            "The point takes {name} through the heart and out under the shoulder blade. "
+            "{Subj} {has} time to look surprised, and no more; {subj} {is_} dead on "
+            "{poss} feet.",
+            "It punches through {poss} breastbone and {name} {is_} lifted onto {poss} "
+            "toes by it, hanging there with {poss} arms slack, and when it is pulled "
+            "free {subj} {is_} only dead weight.",
+        ],
+        "overkill": [
+            "It goes through {name} and out the other side with most of {poss} back on "
+            "it. {Subj} fall{s} in two directions at once, dead.",
+            "The blow opens {name} from breastbone to hip; the insides follow it out, "
+            "and {subj} drop{s} into them, dead.",
+            "{name} {is_} pinned through and lifted clean off {poss} feet, and where the "
+            "point stops so {does} {subj}: {poss} head goes back, {subj} {is_} dead, "
+            "and nothing in {obj} moves again.",
+        ],
+    },
+    "slashing": {
+        "barely": [
+            "The edge opens {poss} throat. {name} stagger{s} two steps, hands full of it, "
+            "and sit{s} down against nothing and {is_} dead.",
+            "It takes {name} across the belly and {subj} fold{s} over the wound, trying "
+            "to hold {self} shut, and cannot, and {is_} dead on {poss} knees.",
+            "The cut goes deep under the arm. {name} turn{s} half round as if to leave, "
+            "and the leaving becomes a fall, and the fall ends with {obj} dead on the "
+            "ground.",
+        ],
+        "ruinous": [
+            "It takes {poss} arm at the shoulder and half the chest beneath it. {name} "
+            "look{s} at the place where the arm was, and then {subj} {is_} dead on the "
+            "ground, and the blood is everywhere the arm is not.",
+            "The edge goes through {poss} collarbone and into the chest. {name} drop{s} "
+            "the way a puppet drops when the hand lets go — all at once, every string, "
+            "dead.",
+            "{name}'s head comes half off. {Subj} stand{s} a heartbeat longer, a "
+            "fountain, and then the knees give and {subj} {is_} a dead heap on the "
+            "stones.",
+        ],
+        "overkill": [
+            "The edge goes through {name} from shoulder to hip and does not slow; {subj} "
+            "{is_} dead in the same instant, and the two halves part company on the way "
+            "down.",
+            "{name} {is_} opened like a sack, everything inside {obj} on the ground "
+            "before the rest of {obj} follows it, dead.",
+            "It takes {poss} head clean off. The body of {name} stands for one long "
+            "instant, not yet informed, then drops, dead.",
+        ],
+    },
+    "fire": {
+        "barely": [
+            "The heat takes {name} in the face and the scream stops in the middle. "
+            "{Subj} fall{s} burning, and the burning goes on after {subj} {is_} dead.",
+            "{name} beat{s} at the flames on {poss} chest and the beating slows and "
+            "stops, and {subj} sink{s} down dead into the fire {subj} {was} making.",
+            "The fire finds {poss} lungs. {name} draw{s} one breath of it, and there is "
+            "no second; {subj} {is_} dead where {subj} stood.",
+        ],
+        "ruinous": [
+            "{name} go{es} up like oiled cloth. Whatever {subj} {was} trying to shout is "
+            "lost in the roar, and what drops to the ground is black and dead.",
+            "The blast lifts {name} off {poss} feet and sets {obj} down again alight, "
+            "and {subj} {does} not get up from it; {subj} {is_} dead.",
+            "Heat strips the skin from {poss} arms before {subj} can raise them; {name} "
+            "fall{s} forward dead into it, and the smell arrives a moment after the "
+            "silence.",
+        ],
+        "overkill": [
+            "There is a flash and {name} {is_} dead in the instant of it — a shape of "
+            "ash standing in {poss} own outline, and then not even that.",
+            "The fire goes through {name} entire. What falls out of it onto the stones "
+            "is dead: bone with the meat cooked off it, still smoking.",
+            "{name} {is_} dead and gone into the blaze so fast that the shadow on the "
+            "wall behind {obj} outlasts {obj}.",
+        ],
+    },
+    "cold": {
+        "barely": [
+            "The cold goes into {name} and {poss} breath stops on the way out, white, "
+            "and hangs there after {subj} {has} fallen dead.",
+            "{name} shudder{s} once, violently, and then not at all; {subj} {is_} rigid "
+            "and dead before {subj} reach{es} the ground.",
+            "Frost climbs {poss} face from the jaw up. {name} blink{s} at it, once, and "
+            "the eyes stay open and go dull; {subj} {is_} dead.",
+        ],
+        "ruinous": [
+            "It freezes {name} dead where {subj} stand{s}. The fall comes a moment "
+            "later, and something breaks off when {subj} land{s}.",
+            "The cold stops {poss} heart between one beat and the next. {name} {is_} "
+            "already dead when {poss} knees hit the floor, rimed white to the elbows.",
+            "{name}'s scream turns to frost in the air. {Subj} {is_} dead before {subj} "
+            "topple{s}, like something carved, and shatter{s} at the shoulder.",
+        ],
+        "overkill": [
+            "{name} {is_} dead and ice before {subj} {is_} anything else — a figure of "
+            "it, mouth open — and the figure comes apart on the stones.",
+            "The cold takes {name} so completely that the dead body rings when it falls, "
+            "and the arm that hits first breaks off and skids away.",
+            "Frost goes through {name} to the marrow in an instant; what topples is a "
+            "statue of {obj}, dead, and it does not survive the landing whole.",
+        ],
+    },
+    # Acid, lightning, sonic, force, the untyped: what the engine does not name a
+    # family for is written as the body failing rather than as a wound of a kind.
+    "other": {
+        "barely": [
+            "{name} jerk{s} as if struck from inside, and the strength leaves {obj} all "
+            "at once, and {subj} {is_} down and dead.",
+            "Something goes out of {name}'s face — not pain, exactly; more like "
+            "attention — and {subj} sag{s} and fall{s} and {does} not stir again; "
+            "{subj} {is_} dead.",
+            "{name} take{s} one step that is not toward anything, and the second step "
+            "is a fall, and after that nothing: {subj} {is_} dead.",
+        ],
+        "ruinous": [
+            "It goes through {name} like a shout through a room. {Subj} arch{es}, every "
+            "muscle at once, and drop{s} slack and dead.",
+            "{name} {is_} thrown down as if the ground had reached up for {obj}, and "
+            "lie{s} dead where {subj} land{s}, eyes open, seeing nothing.",
+            "Whatever it is takes {name} at the root. {Subj} fold{s} in on {self} and "
+            "{is_} dead before the fold is finished.",
+        ],
+        "overkill": [
+            "{name} come{s} apart under it — torn loose at the joints, and what lands "
+            "has already stopped being a person; {subj} {is_} dead.",
+            "The force of it empties {name} the way a struck bell empties of sound; "
+            "{subj} {is_} dead on {poss} feet and fall{s} a moment later.",
+            "It goes through {name} and leaves nothing standing behind it but the "
+            "outline of where {subj} {was}; {subj} {is_} dead.",
+        ],
+    },
+}
+
+_DEATH_FAMILIES = ("bludgeoning", "piercing", "slashing", "fire", "cold")
+
+
+def death_family(dtype: str) -> str:
+    """The pool a damage type draws from. Anything unnamed is `other`."""
+    d = str(dtype or "").strip().lower()
+    for fam in _DEATH_FAMILIES:
+        if fam in d:
+            return fam
+    return "other"
+
+
+def death_bucket(margin: int, hp_max: int) -> str:
+    """How far past dead, in words: damage as a share of the victim (QuickMUD's rule,
+    the one change a ROM fork made to thirty-five years of absolute thresholds), in
+    three rungs."""
+    hp_max = max(1, int(hp_max or 1))
+    margin = int(margin or 0)
+    if margin >= hp_max:
+        return "overkill"
+    if margin >= max(3, hp_max // 2):
+        return "ruinous"
+    return "barely"
+
+
+def least_recently_used(said: dict | None, key: str, size: int) -> int:
+    """Pick from a pool the index that has waited longest, and record the pick.
+
+    Inform 7's `[at random]` — the same alternative never twice running — made
+    deterministic and stretched: a pool of three is walked whole before any line
+    returns, and the walk is stored on the campaign (`Scene.said`) so it survives a
+    reload. Handed no store, it returns the first line, which is what a caller with
+    no campaign (a test, a one-off) should get.
+    """
+    size = max(1, int(size))
+    if said is None:
+        return 0
+    used = [int(i) for i in (said.get(key) or []) if isinstance(i, (int, float))]
+    unused = [i for i in range(size) if i not in used]
+    # `used` is oldest-first, so the line that has waited longest is the one nearest
+    # the FRONT. The first cut took the nearest the back and, once a pool had been
+    # walked, returned its last line for ever — the smoke test caught it on the fifth
+    # kill.
+    pick = unused[0] if unused else min(range(size), key=lambda i: used.index(i))
+    used = [i for i in used if i != pick] + [pick]
+    said[key] = used[-size:]
+    return pick
+
+
+def _fill(line: str, name: str, subj: str, obj: str, poss: str) -> str:
+    plural = subj == "they"
+    words = {
+        "name": name, "subj": subj, "Subj": subj[:1].upper() + subj[1:], "obj": obj,
+        "poss": poss,
+        "self": {"he": "himself", "she": "herself", "it": "itself"}.get(subj, "themselves"),
+        "is_": "are" if plural else "is", "was": "were" if plural else "was",
+        "has": "have" if plural else "has", "does": "do" if plural else "does",
+        "s": "" if plural else "s", "es": "" if plural else "es",
+    }
+    out = line.format(**words)
+    # A name opens some of these lines mid-way — "…beneath it. {name} look{s}…" — and
+    # "the guards" arrives lowercase, so every sentence start is capitalised, not only
+    # the first.
+    out = re.sub(r"([.!?]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), out)
+    return out[:1].upper() + out[1:]
+
+
+def death_line(death: dict, said: dict | None = None) -> str:
+    """The authored backstop for one death, chosen by its axes and never twice running."""
+    name = definite(str(death.get("name") or ""))
+    fam = death_family(str(death.get("family") or ""))
+    bucket = death_bucket(int(death.get("margin", 0) or 0), int(death.get("hp_max", 1) or 1))
+    pool = _DEATHS[fam][bucket]
+    pick = least_recently_used(said, f"death:{fam}/{bucket}", len(pool))
+    # The actor's own pronouns, defaulting neutral — the same courtesy `right_body`
+    # already enforces everywhere else in the prose.
+    return _fill(pool[pick], name, str(death.get("subj") or "they"),
+                 str(death.get("obj") or "them"), str(death.get("poss") or "their"))
+
+
+def press_the_death(text: str, deaths: list[dict],
+                    said: dict | None = None) -> tuple[str, list[str]]:
     """A kill the engine resolved must be a death the prose commits to.
 
     Measured live: a watchman at -21 of 11 hit points — twice his whole life past
     dead — was narrated as "his eyes widen in shock as he struggles to catch his
     breath". Nobody struggles for breath at -21; the model writes wounded-man prose
     because wounded men are what its training saw, and no instruction has moved it.
-    So the fix is the repo's standing one: detect in code, repair with an authored
-    sentence. The sentence is scaled by how far past dead the blow went, because
-    "just enough" and "triple his life in one hit" are different deaths.
 
-    `deaths` entries: {"name", "margin" (hit points past the death line), "hp_max"}.
-    Appended after grooming, never before — `cut_dead_men_walking` would read a
-    fresh death sentence as a dead man acting and cut it.
+    This is now the BACKSTOP, not the repair. The repair is `review`'s
+    `death-left-off-the-page`, which hands the model the facts of the death and asks
+    for the two sentences itself; this runs only when that rewrite was refused or
+    failed, and what it appends is chosen by `death_line` — by damage family and
+    margin, least recently used — rather than the one sentence per rung it used to
+    hold. Measured before the change: four kills, four identical lines.
+
+    `deaths` entries: {"name", "margin" (hit points past the death line), "hp_max",
+    "family" (the damage type), "subj"/"obj"/"poss"}. Appended after grooming.
     """
     added = []
     for d in deaths or []:
         name = str(d.get("name") or "").strip()
-        if not name:
+        if not name or death_on_the_page(text, name):
             continue
-        first = name.split()[0]
-        said = any(_DEATH_LANGUAGE.search(s) for s in _sentences(text)
-                   if re.search(rf"\b{re.escape(first)}", s, re.I)
-                   or re.search(r"\b(he|she|they)\b", s, re.I))
-        if said:
-            continue
-        margin = int(d.get("margin", 0) or 0)
-        hp_max = max(1, int(d.get("hp_max", 1) or 1))
-        # The actor's own pronouns, defaulting neutral — the same courtesy
-        # `right_body` already enforces everywhere else in the prose.
-        subj = str(d.get("subj") or "they")
-        obj = str(d.get("obj") or "them")
-        poss = str(d.get("poss") or "their")
-        is_ = "is" if subj in ("he", "she", "it") else "are"
-        if margin >= hp_max:
-            line = (f"The blow does not so much fell {name} as unmake {obj} — it "
-                    f"carries through, and what folds to the ground is a ruin, "
-                    f"dead before it lands.")
-        elif margin >= max(3, hp_max // 2):
-            line = (f"{name} is driven from {poss} feet, the wound ruinous, "
-                    f"and {subj} {is_} dead before the dust settles.")
-        else:
-            line = (f"{name} sways, blood at {poss} lips, eyes rolling white — "
-                    f"and drops, dead.")
         added.append(name)
-        text = _append_before_hand_back(text, line)
+        text = _append_before_hand_back(text, death_line(d, said))
     return text, added
 
 
@@ -1809,12 +2313,57 @@ def _append_before_hand_back(text: str, line: str) -> str:
     return (text.rstrip() + " " + line).strip()
 
 
+def added_sentences(before: str, after: str) -> list[str]:
+    """The sentences `after` has that `before` did not — what a backstop appended."""
+    had = set(_sentences(before))
+    return [s for s in _sentences(after) if s not in had]
+
+
+def strip_added(text: str, added) -> str:
+    """The beat as the model wrote it, with the pipeline's own appended sentences
+    taken back out.
+
+    Used to build what the next prose call is shown of the narrator's recent work. Xu
+    et al. (NeurIPS 2022) measured why this matters: a sentence already in the context
+    self-reinforces, and the likelier it was to begin with the faster it converges. An
+    authored death line or thread anchor shown back as "what you narrated just before
+    this" is a template being taught — measured in `spooter.json`, where the model
+    began writing the template's own word ("unmade") after seeing it once.
+    """
+    if not text or not added:
+        return text or ""
+    gone = {str(a).strip() for a in added if str(a).strip()}
+    kept = [s for s in _sentences(text) if s not in gone]
+    return " ".join(kept).strip()
+
+
 _THREAD_STOP = {"the", "a", "an", "that", "who", "which", "walked", "away", "two",
                 "three", "some", "their", "his", "her", "its", "in", "of", "with",
                 "and", "to", "from", "near", "by"}
 
 
-def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
+# The anchor, in five shapes, chosen least recently used. Measured on the 2026-09-17
+# sixty-turn baseline: the single old anchor — "Through it all you keep your attention
+# where you put it: …" — shipped verbatim in four of fifty-three beats, the same defect
+# as the death template and for the same reason (one line, appended every time). None
+# of these needs the subject to agree in number, so "the woman" and "the two guards"
+# both read.
+_ANCHORS = (
+    "You have not let {subject} out of your sight; you are still {doing} them.",
+    "Whatever else is happening, you have not lost {subject}: you are still {doing} "
+    "them.",
+    "None of it moves you off {subject} — you are still {doing} them, and they have "
+    "not slipped away.",
+    "You keep {subject} where you can see them, and go on {doing} them.",
+    "In front of you, still: {subject}. You are still {doing} them.",
+)
+
+_WH_SUBJECT = re.compile(r"^(?:who|whom|whose|what|which|where|when|why|how|whether|if)\b",
+                         re.I)
+_FIRST_IN_SUBJECT = re.compile(r"\b(?:i|i'm|i'll|i've|i'd|me|my|mine|myself)\b", re.I)
+
+
+def keep_the_thread(text: str, thread: dict, said: dict | None = None) -> tuple[str, str]:
     """The subject of a standing engagement cannot vanish from the page.
 
     Measured live: following two guards toward a market, the next beat was a
@@ -1823,9 +2372,20 @@ def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
     content words survive into the beat, an anchor sentence is added before the
     hand-back. It re-tethers rather than rewrites — the model's scenery stands,
     but the person the player is engaged with is put back in it.
+
+    Two things the anchor may not do, both measured on the sixty-turn baseline: repeat
+    itself (one shape, four times in fifty-three beats — so `_ANCHORS`, least recently
+    used), and carry the player's own words in the first person. "I ask who I should
+    speak to about work outside the walls" made *who I should speak to…* the subject,
+    the anchor placed it in the narration, and `narrator-in-first-person` fired on our
+    own sentence. A subject that is a clause rather than somebody is refused here
+    (belt) and no longer set by `judgement.update_thread` (braces); a first-person
+    token that somehow arrives is turned to the second person before it is placed.
     """
     subject = str((thread or {}).get("subject") or "").strip()
     if not subject or not text:
+        return text, ""
+    if _WH_SUBJECT.match(subject):
         return text, ""
     words = [w for w in re.findall(r"[a-z']+", subject.lower())
              if w not in _THREAD_STOP and len(w) > 2]
@@ -1840,10 +2400,13 @@ def keep_the_thread(text: str, thread: dict) -> tuple[str, str]:
     # and introducing nobody new is continuing with the person already there.
     if re.search(r"\b(she|her|hers|he|him|his|they|them|their)\b", text, re.I):
         return text, ""
-    doing = str(thread.get("doing") or "").strip()
-    anchor = (f"Through it all you keep your attention where you put it: "
-              f"{subject} — you are still {doing or 'on'} them, and they have "
-              f"not slipped away.")
+    placed = _FIRST_IN_SUBJECT.sub(
+        lambda m: {"i": "you", "i'm": "you're", "i'll": "you'll", "i've": "you've",
+                   "i'd": "you'd", "me": "you", "my": "your", "mine": "yours",
+                   "myself": "yourself"}.get(m.group(0).lower(), m.group(0)), subject)
+    doing = str(thread.get("doing") or "").strip() or "with"
+    pick = least_recently_used(said, "anchor", len(_ANCHORS))
+    anchor = _ANCHORS[pick].format(subject=placed, doing=doing)
     return _append_before_hand_back(text, anchor), subject
 
 

@@ -244,6 +244,7 @@ class Campaign:
                 "rewarded": dict(self.scene.rewarded),
                 "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
                 "cards": [dict(c) for c in self.scene.cards],
+                "said": dict(self.scene.said),
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -351,6 +352,10 @@ class Campaign:
             rewarded={str(k): int(v) for k, v in (s.get("rewarded") or {}).items()},
             guarded_finds=[dict(g) for g in (s.get("guarded_finds") or [])],
             cards=[dict(c) for c in (s.get("cards") or [])],
+            # Absent in saves written before the pools were walked: an empty record
+            # means the first line of each pool is next, which is where a new campaign
+            # starts too.
+            said=dict(s.get("said") or {}),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],

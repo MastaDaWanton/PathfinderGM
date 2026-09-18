@@ -1062,10 +1062,13 @@ def test_press_the_death_writes_the_kill_the_prose_flinched_from():
     assert added == ["the watchman"]
     assert "dead" in out
 
+    # The top rung used to be ONE sentence — "…as unmake him…" — and the player quoted
+    # it back as the narrator's tic (docs/narrator-guards.md). Now it is a pool chosen
+    # by the blow's axes, and that word is gone from it.
     gore, _ = narration.press_the_death(
         "", [{"name": "the thug", "margin": 30, "hp_max": 13,
               "subj": "he", "obj": "him", "poss": "his"}])
-    assert "unmake" in gore
+    assert "dead" in gore and "unmake" not in gore
 
     already = "The watchman drops, dead before he hits the boards."
     same, added = narration.press_the_death(
@@ -1080,7 +1083,7 @@ def test_press_the_death_slips_in_before_the_hand_back():
         "Your fist lands with a crack. What do you do next?",
         [{"name": "the thug", "margin": 1, "hp_max": 13}])
     assert out.endswith("What do you do next?")
-    assert "drops, dead" in out
+    assert "dead" in out
 
 
 def test_a_pair_of_guards_is_two_guards():

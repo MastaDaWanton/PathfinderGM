@@ -256,6 +256,12 @@ class Scene:
     # in play, as dicts, kept by the engine and shown to the model when their keys
     # appear in the last few beats. The store; `cards.load`/`cards.save` are the doors.
     cards: list[dict] = field(default_factory=list)
+    # Which authored line each pool of the narrator's backstops used last, by pool
+    # (`narration.least_recently_used`). Measured before it existed: four kills, four
+    # byte-identical death sentences, because the pool had one line and nothing
+    # remembered it had been said. Kept on the scene so a reload does not reset the
+    # walk and hand the player the first line again.
+    said: dict = field(default_factory=dict)
     # Places minted in play (`rules/places.py`, doors two and three): the stored
     # exception to "derived, never stored", since the player made them. Place dicts
     # with a parent and an owner; `places.with_founded` grafts them onto the derived

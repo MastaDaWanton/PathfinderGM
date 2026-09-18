@@ -3110,6 +3110,11 @@ _THREAD_CONTINUES = re.compile(
     r"carry on|press on|stay (?:on|with) (?:them|him|her|it)|"
     r"take no action\b)", re.I)
 _THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
+# What cannot be the subject of an engagement: a question word opening it, or the
+# player's own first person anywhere in it. See `update_thread`.
+_THREAD_CLAUSE = re.compile(
+    r"^(?:who|whom|whose|what|which|where|when|why|how|whether|if)\b"
+    r"|\b(?:i|i'm|i'll|i've|i'd|me|my|mine|myself)\b", re.I)
 
 
 # At most two words after "the", end-anchored: unbounded, "I keep to the shadows
@@ -3152,6 +3157,15 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         sw = _THREAD_WHERE.search(subject)
         if sw:
             subject = subject[:sw.start()].strip() or subject
+        # A subject has to be somebody or something, not a clause. Measured on the
+        # 2026-09-17 sixty-turn baseline: "I ask who I should speak to about work
+        # outside the walls" set the thread to *who I should speak to about work
+        # outside the walls*, the anchor sentence then placed that in the narration,
+        # and the player's own "I" shipped as the narrator's — one of the run's two
+        # faults, caused by us. A question about whom to talk to engages nobody yet;
+        # the existing thread, if any, stands.
+        if _THREAD_CLAUSE.search(subject):
+            return
         scene.thread = {"doing": _THREAD_DOINGS[which - 1],
                         "subject": subject, "age": 0}
         return
