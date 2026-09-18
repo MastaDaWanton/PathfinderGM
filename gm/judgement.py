@@ -1827,6 +1827,62 @@ _CLAIMS_GODHOOD = re.compile(
     re.I)
 
 
+# Declaring WHAT YOU ARE, rather than what you can do: "I reveal my true form as a
+# divine being", "I shed my mortal guise", "I transform into a dragon". Reported with a
+# screenshot, 2026-09-18, on 0.1.9: the line above produced no intent at all —
+# nothing for `refuse_unnamed_power` to refuse — and the prose wrote the transformation
+# as fact: the mud flash-freezing to glass, the stranger on his knees, "the silhouette
+# isn't that of a man but something towering and ancient", and closed on "now that the
+# truth is laid bare". A nature the sheet does not grant is the same declaration as a
+# power the sheet does not grant, one level up, and it is answered at the door before
+# any model is asked, the way `play.player_input.FIAT_CREATION` answers a wagon willed
+# into being. Speech is redacted first: a character may CLAIM to be a god out loud —
+# that is a lie or a boast, and theirs to tell.
+_CLAIMS_A_NATURE = re.compile(
+    r"\b(?:reveal|revealing|show|showing|unveil|unveiling|assume|assuming|take|taking)"
+    r"\s+(?:my|its|the)\s+(?:true|real|divine|godly|celestial|infernal|dragon|"
+    r"draconic|demonic|angelic|hidden|secret)\s+(?:form|nature|self|shape|aspect)\b"
+    r"|\b(?:shed|shedding|drop|dropping|cast\s+off|let\s+go\s+of|let\s+fall)\s+"
+    r"(?:my|the)\s+(?:mortal|human|false)\s+(?:form|guise|mask|shell|skin|disguise)\b"
+    r"|\b(?:transform|transforms|transforming|turn|turning|change|changing|morph|"
+    r"morphing|shift|shifting)\s+(?:myself\s+)?into\s+(?:a|an|my)\s+"
+    r"(?:\w+\s+){0,2}(?:god|goddess|deity|dragon|demon|devil|angel|celestial|giant|"
+    r"titan|beast|wolf|bear|serpent|fiend|spirit|true\s+form|divine\s+form)\b"
+    r"|\bmy\s+(?:true|real|divine|godly)\s+(?:form|nature|self)\s+(?:is|as|to)\b"
+    r"|\bi\s+am\s+(?:no|not)\s+(?:mere\s+)?(?:mortal|human|man|woman)\b",
+    re.I)
+# What on a sheet would make such a line an ability being used rather than a claim.
+_SHAPE_ABILITIES = re.compile(
+    r"shape|form|polymorph|transform|manifest|aspect|avatar|apotheosis|ascend|"
+    r"divine|celestial|draconic|wild", re.I)
+
+
+def claims_a_nature(player_text: str, scene) -> str:
+    """The hand-back for a player declaring what their character IS, or ""."""
+    if scene is None or not player_text or "?" in player_text:
+        return ""
+    said = redact_speech(str(player_text))
+    m = _CLAIMS_A_NATURE.search(said) or _CLAIMS_GODHOOD.search(said)
+    if not m:
+        return ""
+    pc = scene.pc()
+    if pc is None:
+        return ""
+    # The sheet decides. A druid's Wild Shape, a class power named for a form or an
+    # aspect: the line is an ability being used and `inject_ability` routes it.
+    try:
+        from rules import leveling
+
+        if any(_SHAPE_ABILITIES.search(str(n)) for n in leveling.usable_names(pc)):
+            return ""
+    except Exception:  # noqa: BLE001 — a sheet that cannot be read is not a licence
+        pass
+    quoted = m.group(0).strip()
+    return (f"“{quoted}” — nothing on your sheet makes you that, and there is no roll "
+            f"that makes it so. You can claim it out loud: say it, and the people here "
+            f"decide what they believe. Or act as what you are.")
+
+
 def _psychic_called(text: str) -> str:
     """What to name back at them — their own words, never a label we invented.
 

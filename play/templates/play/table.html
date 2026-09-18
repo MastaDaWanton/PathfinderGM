@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pathfinder GM — Pangrella</title>
+<title>Pathfinder GM{% if world_name %} — {{ world_name }}{% endif %}</title>
 <style>
   /* ==========================================================================
      The grimoire. One design system, stated once:
@@ -1993,6 +1993,12 @@ async function post(url, body) {
    the player has closed the last one. */
 function render(s, hold) {
   STATE = s;
+  // The shell's title bar follows the world the state is in, not the one the page was
+  // opened on: the table page's picker can begin again in another campaign without a
+  // reload, and the title used to be the shipped world's name typed into the template.
+  if (s && typeof s.world === "string") {
+    document.title = "Pathfinder GM" + (s.world ? " — " + s.world : "");
+  }
   renderCombat(s);
   reflectMerchant(s);
   // `fresh` marks only the beats that were not on the page a moment ago, because this

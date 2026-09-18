@@ -86,7 +86,10 @@ def test_the_racial_int_pays_for_skill_ranks():
         # Int 18 is 17 of the 20-point budget on its own; the rest stay at 10.
         abilities={"str": 10, "dex": 10, "con": 10, "int": 18, "wis": 10, "cha": 10},
         paths=["battle blood"],
-        feats=["toughness", "dodge"],
+        # Two feats with no prerequisites. This spec carried Dodge at Dex 10 for as
+        # long as feat prerequisites were advisory; the day they became a refusal it
+        # was the first thing refused, and this test is about skill ranks.
+        feats=["toughness", "improved initiative"],
         skills=["acrobatics", "climb", "craft", "heal", "intimidate",
                 "knowledge (nature)", "perception", "profession", "stealth", "survival"],
     ))
@@ -646,3 +649,27 @@ def test_a_class_without_a_kit_starts_with_its_hands():
     assert problems == []
     assert built["sheet"]["weapons"] == ["unarmed"]
     assert built["sheet"]["equipped"] == "unarmed"
+
+
+# --- 2026-09-18: a feat the character has not earned --------------------------------------
+
+def test_a_feat_whose_read_prerequisites_are_not_met_is_refused_with_the_fix_named():
+    """Reported with a screenshot: "Toughness, great cleave" on a level-one sheet — "I am
+    allowed to choose feats I don't meet the prerequisites for." Great Cleave wants Cleave,
+    Power Attack and base attack +4; a first-level fighter has none of the three. The
+    first version of this check warned instead of refusing, and read a `why` key `meets`
+    never returned, so the warning named nothing."""
+    _, problems = creation.build(spec(feats=["great cleave",
+                                             {"id": "weapon-focus", "target": "longsword"}]))
+    assert problems, "an unearned feat must be a refusal, not a warning"
+    said = " ".join(problems)
+    assert "Great Cleave requires" in said
+    for need in ("Cleave", "Power Attack", "base attack bonus +4"):
+        assert need in said, (need, said)
+
+
+def test_a_feat_whose_prerequisites_are_met_still_builds():
+    """Power Attack on a Str 16 fighter with base attack +1: read, met, no complaint."""
+    built, problems = creation.build(spec())
+    assert not problems and built["sheet"]
+    assert not any("requires" in w for w in built["warnings"])

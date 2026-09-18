@@ -617,13 +617,31 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # saved, so a creation bug is a refusal here rather than a corrupt file on disk.
     from_dict(sheet)
 
-    # Feat legality is reported *after* the sheet exists, because prerequisites read the
-    # finished scores. Advisory rather than fatal: `meets` returns "cannot check" for
-    # prose prerequisites, and refusing those would refuse half the book.
+    # Feat legality is judged *after* the sheet exists, because prerequisites read the
+    # finished scores. Two verdicts, treated differently. A prerequisite that was READ
+    # and is NOT MET — Great Cleave's Cleave, Power Attack and base attack +4 on a
+    # first-level sheet — is a refusal with the fix named, the same law every other
+    # document here answers to. A prerequisite that could not be read (prose the parser
+    # does not know) is a warning: refusing those would refuse half the book.
+    #
+    # Reported 2026-09-18 with a screenshot — "Toughness, great cleave" on a level-one
+    # sheet: "I am allowed to choose feats I don't meet the prerequisites for." The
+    # first version of this block warned for both, and read a `why` key `meets` never
+    # returned, so the warning it did raise always said "short of a prerequisite" and
+    # named nothing.
     warnings = []
     actor = from_dict(sheet)
     for fid in feat_ids:
-        verdict = feats_mod.meets(actor, feats_mod.get(fid))
-        if verdict.get("ok") is False:
-            warnings.append(f"{feats_mod.get(fid).name}: {verdict.get('why', 'short of a prerequisite')}")
+        feat = feats_mod.get(fid)
+        verdict = feats_mod.meets(actor, feat)
+        if verdict.get("unmet"):
+            problems.append(
+                f"{feat.name} requires {', '.join(verdict['unmet'])}; this character "
+                f"does not meet that. Pick another feat, or build toward it.")
+        elif verdict.get("unknown"):
+            warnings.append(
+                f"{feat.name}: could not check {', '.join(verdict['unknown'])} — "
+                f"make sure the character qualifies.")
+    if problems:
+        return {}, problems
     return {"sheet": sheet, "warnings": warnings}, []

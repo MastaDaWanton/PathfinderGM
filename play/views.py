@@ -160,6 +160,10 @@ def _state(c) -> dict:
     coins = goods_mod.coinage(c.world, c.location)
     return {
         "transcript": c.transcript,
+        # The world's own name, for the title bar. Reported 2026-09-18 with a screenshot:
+        # "why does the shell say Pangrella when I'm playing in Aurvantis?" — the table's
+        # <title> was the shipped world's name, typed into the template.
+        "world": c.world.name if c.world else "",
         # What money is called here. Sent with the state because it is a fact about the
         # world, not a constant: a purse rendered with hard-coded "gp" would be the one
         # thing on the page that had never heard of the world it is being played in.
@@ -514,7 +518,16 @@ def new_character(request):
     except FileNotFoundError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
 
-    c = campaign_mod.begin_with(character)
+    # In the SAME world. Reported 2026-09-18: "clicking any of the premade characters
+    # as a player start puts you in Pangrella instead of the world you chose." This is
+    # the table page's picker; the home page's start passes the chosen world's source
+    # and this one passed nothing, so `new_campaign` filled it with the shipped
+    # default. Beginning again with somebody else is not leaving the world.
+    try:
+        staying = campaign_mod.current().world_source
+    except Exception:  # noqa: BLE001 — no readable campaign means no world to keep
+        staying = None
+    c = campaign_mod.begin_with(character, world_source=staying or None)
     return JsonResponse(_state(c))
 
 
@@ -552,6 +565,8 @@ def table(request):
         return redirect("/?unreadable=1")
     return render(request, "play/table.html", {
         "state_json": json.dumps(_state(c)),
+        # For the <title>, which read "Pangrella" in Aurvantis (2026-09-18).
+        "world_name": c.world.name if c.world else "",
         # The revision the state below was drawn at, handed over with it rather than
         # fetched afterwards. A page that had to ask would race its own first render:
         # between the two requests another device can act, and the answer would then
@@ -974,6 +989,13 @@ def say(request):
         if not said.ok:
             return JsonResponse({"hint": said.hint, "offending": said.offending},
                                 status=422)
+        # And what the character IS. `player_input.check` has no sheet to read; this
+        # door does, and it is the same answer fiat gets — before any model is asked,
+        # because the prose model narrated "I reveal my true form as a divine being"
+        # as fact on 0.1.9 (docs/narrator-guards.md, "the first screen and the door").
+        nature = judgement.claims_a_nature(text, c.scene)
+        if nature:
+            return JsonResponse({"hint": nature, "offending": text}, status=422)
 
     # A character at or below 0 hit points does not get a turn. Nothing used to ask:
     # Kesst was dying at -3, the player typed "now what", and the GM cheerfully narrated
