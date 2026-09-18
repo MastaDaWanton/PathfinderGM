@@ -47,6 +47,19 @@ class TurnPlan:
         return sum(a.seconds for a in self.attempts)
 
 
+# How long the prose call may wait, by who is being asked. The primary keeps
+# `client.chat`'s generous default — a cold load is genuinely slow, and the first turn
+# of a session pays it. The FALLBACK does not: measured 2026-09-17 on the first
+# sixty-turn run after the narrator guards, the 12B prose call lost the scene, the turn
+# was handed to the 4B fallback, and Ollama never answered it — no request line in its
+# own log, no error — until the 600-second timeout returned. One turn, ten minutes, while
+# the watcher's calls went through the same server the whole time: the hang was the
+# model swap under VRAM pressure, not the queue. A rescue that has not arrived in two
+# minutes is not a rescue; the floor line is better than the wait.
+PRIMARY_TIMEOUT = 600
+FALLBACK_TIMEOUT = 120
+
+
 class GMAgent:
     def __init__(self, world, engine, role: str = "narrator"):
         self.world = world
@@ -1119,7 +1132,9 @@ class GMAgent:
                 reply = client.chat(
                     messages, model, host, as_json=True, think=False,
                     temperature=0.8, num_predict=1400, provider=provider,
-                    api_key=key, schema=schema)
+                    api_key=key, schema=schema,
+                    timeout=(PRIMARY_TIMEOUT if model == self.prose_model
+                             else FALLBACK_TIMEOUT))
                 data = reply.json()
                 text = str(data.get("narration", "")).strip()
                 # The prose reply's own "you could". Under intents-first the plan

@@ -483,3 +483,24 @@ def test_mentioned_survives_the_card_round_trip():
 
     c = cards.Card(id="x", title="A matter", mentioned=7)
     assert cards.Card.from_dict(c.as_dict()).mentioned == 7
+
+
+# --- a rescue that does not arrive ------------------------------------------------------
+
+
+def test_the_fallback_prose_call_does_not_wait_ten_minutes():
+    """Measured on the first sixty-turn run after the guards: the 12B lost the scene,
+    the 4B fallback was asked, and Ollama never answered — until `client.chat`'s
+    600-second timeout returned it. One turn, ten minutes. The primary keeps the
+    generous timeout (a cold load is genuinely slow); the fallback gets two minutes."""
+    import ast
+    import inspect
+
+    from gm import agent
+
+    assert agent.FALLBACK_TIMEOUT <= 180 < agent.PRIMARY_TIMEOUT
+    src = inspect.getsource(agent)
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "narrate_turn")
+    body = ast.get_source_segment(src, fn) or ""
+    assert "FALLBACK_TIMEOUT" in body and "PRIMARY_TIMEOUT" in body
