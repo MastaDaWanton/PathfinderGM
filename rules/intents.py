@@ -243,7 +243,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "attack": ((), ("weapon", "full_attack", "manoeuvre", "power_attack",
                     # `undecided` is written by code, never by the model: the target
                     # check hands an ambiguous attack back as a printed question.
-                    "iteration", "undecided"), "player"),
+                    # `item`: the object an improvised weapon IS — "chunk of wood",
+                    # "pebble" — so the tell can name it and the props ledger can
+                    # move it.
+                    "iteration", "undecided", "item", "thrown"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
@@ -477,6 +480,12 @@ PARAM_ALIASES = {
 # A param that is merely *unrecognised* is still rejected. The difference matters: an
 # ignored engine-owned param is a value we can already compute, while an unknown one is
 # a mechanic the GM believes it applied and we have never heard of.
+# Params only code writes, never the model: accepted by validation, left out of the
+# "takes" list a rejection shows the model, so it is never taught to reach for them.
+# `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
+# printed question.
+CODE_ONLY_PARAMS = frozenset({"undecided"})
+
 ENGINE_OWNED_PARAMS = {
     "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",
     "attack_bonus", "attack_roll", "to_hit", "bonus", "modifier", "modifiers",
@@ -713,7 +722,8 @@ def parse(raw: dict, index: int = 0) -> Intent:
     if unknown:
         raise IntentError(
             f"{op}: unknown param(s) {', '.join(sorted(unknown))}. "
-            f"{op} takes {', '.join(sorted(set(required) | set(optional))) or 'no params'}.",
+            f"{op} takes "
+            f"{', '.join(sorted((set(required) | set(optional)) - CODE_ONLY_PARAMS)) or 'no params'}.",
             "schema", index,
         )
 

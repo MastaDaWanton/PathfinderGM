@@ -221,6 +221,10 @@ class GMAgent:
                 raw = judgement.fill_missing_actor(raw, player_input, self.engine.scene)
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
+                # A thing thrown or swung is an improvised-weapon attack that names
+                # the thing — before the misaim check reads "the man" it was thrown
+                # at, and before anything can dress the throw as a spell.
+                raw = judgement.inject_improvised(raw, player_input, self.engine.scene)
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
@@ -247,6 +251,10 @@ class GMAgent:
                 # way round for exactly as long as it took `declared_ops` to notice: "I
                 # sell the Yarow Elixir" matched `_HANDS_OVER`, became a `give`, and the
                 # elixir left the satchel for nothing.
+                # Coin first: "I pay her ten gold" is a give of gp out of the purse,
+                # and a `sell gold_coins_10` the model wrote is the same give — before
+                # the sale injector can read "pay" as a sale of stock.
+                raw = judgement.inject_payment(raw, player_input, self.engine.scene)
                 raw = judgement.inject_sale(raw, player_input, self.engine.scene)
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
@@ -790,7 +798,8 @@ class GMAgent:
                deaths: list[dict] | None = None,
                pull: dict | None = None,
                claim: str = "",
-               blows: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               blows: list[dict] | None = None,
+               fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -839,7 +848,12 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
-                deaths=deaths, pull=pull, claim=claim, blows=blows)
+                deaths=deaths, pull=pull, claim=claim, blows=blows,
+                # What could have lit anything: the place's brief and the recent
+                # beats. None when the caller had no brief (a consequence line),
+                # and the fire finding is not judged.
+                fire_context=(" ".join([brief] + list(earlier or []))
+                              if brief else fire_context))
             repairs += p_repairs
             attempts += p_attempts
 
@@ -903,6 +917,13 @@ class GMAgent:
         if early:
             repairs.append(f"swing not yet struck: cut {len(early)} sentence(s) that "
                            f"landed a blow before any die was rolled")
+        # Fire with nothing to light it, when the rewrite left it standing: cut. Judged
+        # only with a brief in hand, the same gate the finding has.
+        ctx = (" ".join([brief] + list(earlier or [])) if brief else fire_context)
+        if ctx is not None:
+            text, lit = narration_mod.cut_fire_from_nowhere(text, ctx)
+            if lit:
+                repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
@@ -968,7 +989,8 @@ class GMAgent:
                deaths: list[dict] | None = None,
                pull: dict | None = None,
                claim: str = "",
-               blows: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               blows: list[dict] | None = None,
+               fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -993,6 +1015,7 @@ class GMAgent:
                 pronouns=self._pc_pronouns(), others=self._other_names(),
                 gender=self._pc_gender(), state=self._body_count(),
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
+                fire_context=fire_context,
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter

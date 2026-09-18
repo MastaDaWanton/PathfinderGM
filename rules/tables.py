@@ -377,6 +377,20 @@ WEAPONS: dict[str, dict] = {
     "unarmed": {"name": "unarmed strike", "damage": "1d3", "crit_range": 20, "crit_mult": 2,
                 "type": "bludgeoning", "category": "melee", "finessable": False,
                 "nonlethal": True, "prof": "simple", "hands": 1},
+    # A chunk of wood, a pebble, a chair leg. Core Rulebook, Improvised Weapons: "any
+    # creature that uses an improvised weapon in combat is considered to be
+    # nonproficient with it and takes a –4 penalty on attack rolls made with that
+    # object. To determine the size category and appropriate damage … compare its
+    # relative size and damage potential to the weapon list to find a reasonable
+    # match. An improvised weapon scores a threat on a natural roll of 20 and deals
+    # double damage on a critical hit. An improvised thrown weapon has a range
+    # increment of 10 feet." The `prof` is one nobody holds, which is how the -4
+    # arrives through the ordinary proficiency check. 1d4 is the club's light cousin;
+    # the object's own name rides on the attack as `params.item`.
+    "improvised": {"name": "improvised weapon", "damage": "1d4", "crit_range": 20,
+                   "crit_mult": 2, "type": "bludgeoning", "category": "melee",
+                   "finessable": False, "prof": "improvised", "hands": 1, "light": True,
+                   "range_ft": 10.0, "traits": ["improvised"]},
 }
 
 # Using a weapon you are not proficient with.

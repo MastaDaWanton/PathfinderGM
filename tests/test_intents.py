@@ -71,7 +71,7 @@ def test_engine_owned_params_are_dropped_and_logged_not_rejected():
 
 
 def test_the_rejection_names_the_params_the_op_does_take():
-    with pytest.raises(IntentError, match="attack takes full_attack, iteration, manoeuvre"):
+    with pytest.raises(IntentError, match="attack takes full_attack, item, iteration, manoeuvre"):
         parse({"op": "attack", "actor": "pc", "target": "c1",
                "params": {"enthusiasm": "high"}})
 

@@ -223,6 +223,18 @@ class Scene:
     # to a real actor through the ordinary spawn machinery. Prose invented them;
     # the ledger just refuses to let prose disinvent them.
     cast: list = field(default_factory=list)
+    # Things that are not held by anybody, and things that are — THE PROPS LEDGER.
+    # One record per object the fiction has touched, with exactly one of `at` (a place
+    # id: it lies there) or `held_by` (a ref: it is in their hands), and beside it
+    # `owner` (whose it is, which is not the same question — Creation Kit's per-object
+    # owner beside the stolen flag; Inform's containment tree where a dropped thing
+    # lands on the room's floor), `from_` (its provenance: "fragments of the
+    # challenger's club"), `state` (intact / broken / destroyed / fragments), `turn`.
+    # Measured 2026-09-18: a sundered club became "a chunk of wood" the player picked
+    # up, then "the smoldering wood of the table" two beats later — no check grounded
+    # THINGS the way the cast ledger grounds people. Every transition goes through
+    # `Scene.place_prop` / `Scene.hold_prop`, never a direct write.
+    props: list[dict] = field(default_factory=list)
     # How long each fallen non-PC has been lying here, ref -> turns. Bodies get a
     # short grace for looting and then the scene lets them go on its own — the
     # live panel carried four corpses and a bleeding man through an entire market
@@ -1113,6 +1125,86 @@ class Scene:
         self.wards = []
         self.hazards = []
 
+    # --- the props ledger: one applicator for where a thing is -----------------------
+
+    def place_prop(self, name: str, *, owner: str = "", from_: str = "",
+                   state: str = "intact", at: str | None = None, turn: int = 0) -> dict:
+        """A thing comes to lie somewhere: dropped, thrown, left in fragments. The
+        record already held for it (by name, in the hands of somebody here or lying
+        here) moves; otherwise one is made. Returns the record."""
+        rec = self.prop_named(name)
+        if rec is None:
+            rec = {"name": " ".join(str(name).split()), "owner": owner, "from_": from_,
+                   "state": state, "turn": int(turn)}
+            self.props.append(rec)
+        rec.pop("held_by", None)
+        rec["at"] = str(at if at is not None else self.at)
+        if owner:
+            rec["owner"] = owner
+        if from_:
+            rec["from_"] = from_
+        if state:
+            rec["state"] = state
+        return rec
+
+    def hold_prop(self, name: str, ref: str, *, owner: str = "", from_: str = "",
+                  state: str = "", turn: int = 0) -> dict:
+        """A thing goes into somebody's hands, keeping its owner and its provenance:
+        picking up a fragment of the challenger's club does not make it yours, and does
+        not make it a table."""
+        rec = self.prop_named(name)
+        if rec is None:
+            rec = {"name": " ".join(str(name).split()), "owner": owner or ref,
+                   "from_": from_, "state": state or "intact", "turn": int(turn)}
+            self.props.append(rec)
+        rec.pop("at", None)
+        rec["held_by"] = ref
+        if owner:
+            rec["owner"] = owner
+        if from_:
+            rec["from_"] = from_
+        if state:
+            rec["state"] = state
+        return rec
+
+    def prop_named(self, name: str) -> dict | None:
+        """The record for a thing by name, here or in the hands of somebody here."""
+        key = " ".join(str(name or "").split()).lower()
+        if not key:
+            return None
+        for rec in self.props:
+            if str(rec.get("name", "")).lower() != key:
+                continue
+            if rec.get("at") == self.at or rec.get("held_by") in self.actors:
+                return rec
+        return None
+
+    def props_here(self) -> list[dict]:
+        """What lies at the party's spot, unheld."""
+        return [r for r in self.props if r.get("at") == self.at and not r.get("held_by")]
+
+    def prop_on_the_ground(self, asked: str) -> dict | None:
+        """The thing lying here that a player's phrase means, or None.
+
+        By name first; then by a shared word with what it is, what it was, or what it
+        is made of — "a chunk of wood" is the fragments of a wooden club lying at the
+        player's feet, and picking it up must find THAT record rather than conjure a
+        second, provenance-less piece of wood from nowhere."""
+        words = {w for w in re.findall(r"[a-z]+", str(asked or "").lower())
+                 if len(w) >= 3 and w not in ("the", "and", "chunk", "piece", "bit",
+                                              "some", "shard", "length", "lump")}
+        if not words:
+            return None
+        here = self.props_here()
+        for rec in here:
+            if str(rec.get("name", "")).lower() == " ".join(str(asked).split()).lower():
+                return rec
+        for rec in here:
+            about = " ".join(str(rec.get(k, "")) for k in ("name", "from_", "material")).lower()
+            if words & set(re.findall(r"[a-z]+", about)):
+                return rec
+        return None
+
     def _unseat(self, ref: str) -> None:
         """Take one creature out of every TACTICAL structure that names it.
 
@@ -1960,7 +2052,8 @@ class Engine:
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
                 )
-            elif actor.weapons and key not in actor.weapons and key != "unarmed":
+            elif (actor.weapons and key not in actor.weapons
+                  and key not in ("unarmed", "improvised")):
                 raise IntentError(
                     f"attack: {actor.name} is not carrying a {key} "
                     f"(has {', '.join(actor.weapons) or 'nothing'})",
@@ -2527,6 +2620,12 @@ class Engine:
         self._ensure_encounter(intent.actor, intent.target)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
+        # An improvised weapon IS the object: the tell names the chunk of wood, not
+        # "improvised weapon", and the object leaves the hand for the ground below
+        # (or the target's feet, thrown) when the swing is done.
+        thrown_thing = str(intent.params.get("item") or "").strip() if weapon_key == "improvised" else ""
+        if thrown_thing:
+            weapon = dict(weapon, name=thrown_thing)
         # A granted strike exists only while its toggle is formed. Refused here with
         # the forming ability's own name, because a swing with a weapon you are not
         # wearing is not a miss — it is a turn that should never have been declared.
@@ -2803,6 +2902,24 @@ class Engine:
         crossed = self._hp_state_effects(defender)
         effects = list(state["effects"]) + crossed
         any_hit = any(e.get("kind") == "damage" for e in effects)
+        # A thrown thing is on the ground now, at this spot, with its record — the
+        # player's, or whoever's it was before they picked it up. One applicator:
+        # the same `place_prop` the sunder and the drop use.
+        if thrown_thing and intent.params.get("thrown"):
+            rec = self.scene.prop_named(thrown_thing)
+            key = thrown_thing.lower()
+            for name in list(actor.goods):
+                if name.lower() == key:
+                    actor.goods[name] -= 1
+                    if actor.goods[name] <= 0:
+                        del actor.goods[name]
+                    break
+            self.scene.place_prop(thrown_thing,
+                                  owner=(rec or {}).get("owner") or actor.ref,
+                                  from_=(rec or {}).get("from_", ""),
+                                  state=(rec or {}).get("state", "intact"),
+                                  turn=int(self.scene.clock_minutes))
+            state["tells"].append(f"The {thrown_thing} lies where it fell.")
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
@@ -2934,6 +3051,16 @@ class Engine:
                             others = [w for w in defender.weapons
                                       if w.lower() != item_name.lower()]
                             defender.equipped = others[0] if others else "unarmed"
+                        # And the pieces lie at the spot, his, of his club, of its
+                        # material — so "I pick up a chunk of wood" finds THIS record
+                        # and keeps its provenance, and no later beat can make it a
+                        # table (the props ledger's first entry, 2026-09-18).
+                        self.scene.place_prop(
+                            f"fragments of {defender.name}'s {item_name}",
+                            owner=defender.ref, from_=item_name, state="fragments")
+                        self.scene.prop_named(
+                            f"fragments of {defender.name}'s {item_name}"
+                        )["material"] = str(item.material or "")
                     elif res["broken"]:
                         what = "broken (half its hit points gone; -2 to hit and damage with it)"
                     elif was_broken:
@@ -7156,6 +7283,7 @@ class Engine:
             paid = f" for {price}"
 
         moved = 0
+        note = ""
         if giver is not None:
             held = (giver.purse if denom else giver.goods)
             moved = min(count, int(held.get(denom or item, 0)))
@@ -7165,6 +7293,19 @@ class Engine:
                     del held[denom or item]
         else:
             moved = count           # it came from the world, which never runs out
+            # Unless it is lying right here with a record: then THAT thing is picked
+            # up, and its owner and provenance come with it. "I pick up a chunk of
+            # wood" after a sunder is the fragments of the challenger's club, his
+            # still, and never a second piece of wood from nowhere.
+            if taker is not None and not denom:
+                rec = self.scene.prop_on_the_ground(item)
+                if rec is not None:
+                    self.scene.hold_prop(rec["name"], taker.ref,
+                                         turn=int(self.scene.clock_minutes))
+                    item = rec["name"]
+                    whose = self.scene.actors.get(str(rec.get("owner") or ""))
+                    if whose is not None and whose.ref != taker.ref:
+                        note = f" — {whose.name}'s, not {taker.name}'s"
 
         if taker is not None and moved:
             if denom:
@@ -7205,9 +7346,18 @@ class Engine:
         if giver is not None and taker is not None:
             tell = f"{giver.name} hands {taker.name} {what}{paid}."
         elif taker is not None:
-            tell = f"{taker.name} takes {what}{paid}."
+            tell = f"{taker.name} takes {what}{paid}{note}."
         elif giver is not None:
             tell = f"{giver.name} parts with {what}."
+            # Dropped, not vanished: the thing lies here with its record, the
+            # giver's still (Inform: a dropped thing lands on the room's floor).
+            if moved and not denom:
+                rec = self.scene.prop_named(item)
+                self.scene.place_prop(item, owner=giver.ref,
+                                      from_=(rec or {}).get("from_", ""),
+                                      state=(rec or {}).get("state", "intact"),
+                                      turn=int(self.scene.clock_minutes))
+                tell = f"{giver.name} sets down {what}; it lies here."
         else:
             tell = f"{what} changes hands."
         if giver is not None and not moved:

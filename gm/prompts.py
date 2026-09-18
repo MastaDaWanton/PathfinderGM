@@ -909,6 +909,33 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 jars = ", ".join(f"{iid} ({s.base}" + (f" ×{s.count}" if s.count > 1 else "")
                                  + ")" for iid, s in sorted(stock.items()))
                 lines.append(f"    CARRYING (use_item by id): {jars}")
+            # And the purse and the goods, as facts. Neither was ever in the brief —
+            # the UI showed 231 gp and a chunk of wood, the narrator was shown nothing,
+            # and invented the coin changing hands (2026-09-18, the brothel). A thing
+            # picked up off the ground keeps whose it is and what it was
+            # (`Scene.props`), and that is said beside it.
+            from rules import goods as _goods
+
+            purse = getattr(actor, "purse", None) or {}
+            carried = getattr(actor, "goods", None) or {}
+            if purse or carried:
+                held_props = {str(r.get("name", "")).lower(): r
+                              for r in (getattr(scene, "props", None) or [])
+                              if r.get("held_by") == ref}
+                bits = []
+                for name, n in sorted(carried.items()):
+                    rec = held_props.get(str(name).lower())
+                    whose = ""
+                    if rec and rec.get("owner") and rec["owner"] != ref:
+                        owner = scene.actors.get(rec["owner"])
+                        whose = f", {owner.name}'s" if owner is not None else ""
+                    was = f", {rec['state']} {rec['from_']}" if rec and rec.get("from_") else ""
+                    bits.append(f"{name}" + (f" ×{n}" if n != 1 else "") + whose + was)
+                money = _goods.purse_line(purse, _goods.coinage()) if purse else "no coin"
+                lines.append(f"    HAS (fact): purse {money}"
+                             + (f"; carrying {', '.join(bits)}" if bits else "")
+                             + ". Coin leaves the purse only through a give; nothing "
+                               "is handed over that is not here.")
         else:
             note = actor.notes.split(".")[0] if actor.notes else ""
             # How they feel about the player, when anything has said. The attitude
@@ -1298,6 +1325,17 @@ def scene_now(scene) -> str:
     heat = getattr(scene, "heat", None) or {}
     if heat.get("note"):
         facts.append(f"what the crowd just saw: {heat['note']}")
+    # What lies at this spot, whose it is and what it was — the props ledger, so a
+    # sundered club's pieces stay the challenger's pieces of a club and never become
+    # a table (2026-09-18). Inform derives the room's floor from the tree the same way.
+    lying = scene.props_here() if hasattr(scene, "props_here") else []
+    if lying:
+        said = []
+        for rec in lying[:6]:
+            owner = actors.get(str(rec.get("owner") or ""))
+            whose = f" ({owner.name}'s)" if owner is not None else ""
+            said.append(f"{rec.get('name')}{whose}")
+        facts.append("lying on the ground here, and nothing else is: " + "; ".join(said))
     thread = getattr(scene, "thread", None) or {}
     if thread.get("subject"):
         facts.append(f"the player is {thread.get('doing', 'engaged with')} "

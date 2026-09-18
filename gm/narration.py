@@ -787,6 +787,52 @@ def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
     return " ".join(kept).strip(), wrong
 
 
+# Fire doing damage to a thing or a body, in the prose — not lamplight, not a hearth
+# described: wood smouldering, hair singed, steel glowing where a blow landed.
+_FIRE_DAMAGE = re.compile(
+    r"\b(?:smou?lder\w*|singe\w*|scorch\w*|charr\w*|char\b|catch(?:es)? fire|caught fire|"
+    r"bursts? into flame|ablaze|glowing (?:red|faintly|embers?|wood|steel|iron|metal)|"
+    r"still glowing|embers? (?:where|from|of)|smoke (?:rising|curling|drifting) from "
+    r"(?:the|his|her|their|its))\b", re.I)
+# What can set something alight: a source the place or the recent beats hold.
+_FIRE_SOURCE = re.compile(
+    r"\b(?:torch\w*|lantern\w*|hearth|forge|fire\b|fires\b|flame\w*|brazier\w*|candle\w*|"
+    r"campfire|bonfire|smithy|smith'?s|kiln|oven|furnace|coals|lamp\w*|burning|blaze|"
+    r"pyre|firepit|fire-pit|cook(?:ing)? fire|alchemist'?s fire|oil lamp)\b", re.I)
+
+
+def fire_from_nowhere(text: str, context: str = "") -> list[str]:
+    """Sentences in which fire damages something when nothing here could have lit it.
+
+    Measured 2026-09-18: "The wood is still smoldering from the impact" — a chunk of a
+    club a fist had broken — then "the smoldering wood of the table still glowing
+    faintly where his final strike landed", "singed hair". No forge, no torch, no spell:
+    the beat read its own invention back as fact. A source anywhere in `context` (the
+    brief, the recent beats) or earlier in the same beat grounds it; with none, the
+    sentence is an invention the way an unknown name is.
+    """
+    if not text or not _FIRE_DAMAGE.search(text):
+        return []
+    if _FIRE_SOURCE.search(context or ""):
+        return []
+    out = []
+    seen = ""
+    for s in _sentences(unquoted(text)):
+        if _FIRE_DAMAGE.search(s) and not _FIRE_SOURCE.search(seen):
+            out.append(s)
+        seen += " " + s
+    return out
+
+
+def cut_fire_from_nowhere(text: str, context: str = "") -> tuple[str, list[str]]:
+    """The backstop under `fire-from-nowhere`: the sentences go. Returns (text, cut)."""
+    gone = fire_from_nowhere(text, context)
+    if not gone:
+        return text, []
+    kept = [s for s in _sentences(text) if s not in set(gone)]
+    return " ".join(kept).strip(), gone
+
+
 # A blow LANDING, in the prose: the verbs a beat uses when steel meets something.
 _BLOW_LANDS = re.compile(
     r"\b(?:catches|connects|bites into|slams into|crashes into|cracks (?:against|"
@@ -832,7 +878,8 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            pronouns: str = '', others: tuple = (), gender: str = '',
            state: dict | None = None, deaths: list[dict] | None = None,
            pull: dict | None = None, heat: dict | None = None,
-           claim: str = "", blows: list[dict] | None = None) -> Review:
+           claim: str = "", blows: list[dict] | None = None,
+           fire_context: str | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -982,6 +1029,22 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             f"weapon breaks, nothing is cut, nobody staggers. Keep the rest.",
             weight=3,
         ))
+
+    # 0g. Fire from nowhere: something smoulders, singes or glows with no source in the
+    #     place or the recent beats. Weight 2 — an invention the way an unknown name is,
+    #     and the thing it burns is usually the props ledger's (2026-09-18: a chunk of
+    #     a club, then "the table"). Only judged when the caller could say what is here.
+    if fire_context is not None:
+        lit = fire_from_nowhere(text, fire_context)
+        if lit:
+            out.findings.append(Finding(
+                "fire-from-nowhere",
+                f"something burns with nothing here to light it: {lit[0][:90]!r}",
+                f"Nothing here is alight — no forge, torch, hearth or flame is in this "
+                f"place or the recent beats — so nothing smoulders, glows or is singed. "
+                f"Rewrite {lit[0]!r} without any fire or heat in it. Keep the rest.",
+                weight=2,
+            ))
 
     wrong = contradicts_state(text, state)
     if wrong:

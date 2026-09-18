@@ -890,7 +890,10 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
 _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iteration",
                   # Ours, never the model's: `check_the_target` hands an ambiguous
                   # attack back as a question through it.
-                  "undecided"}
+                  "undecided",
+                  # The object an improvised weapon is, and whether it left the hand
+                  # (`inject_improvised`).
+                  "item", "thrown"}
 
 
 def normalize_attacks(raw_intents, scene):
@@ -1247,7 +1250,13 @@ scene sight view air place position stand side part share step pace lay lie stro
 walk stairs road path route way route trail direction watch guard vigil pause breather
 initiative action reaction move measure account stance grip liberty leave offence
 umbrage pride solace revenge vengeance revenge stock example lesson point issue matter
+scene action satisfaction job patience services service pleasure attention silence
+on off up in out over under away back down
 """.split())
+# Measured in the masta save (2026-09-18): `goods` held "scene on" ×3 and
+# "satisfaction" ×1 — the Continue directive ("I take no action. Carry the scene on…")
+# read by `_ACQUIRES` as "I take … the scene on", and "pay for satisfaction" read as a
+# purchase. Words for what is happening are not things.
 
 # Idioms where the verb is not acquisition at all. Matched on what immediately follows the
 # verb, because "take in", "take note of" and "take stock of" are single verbs wearing two
@@ -1296,6 +1305,10 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text:
+        return raw_intents
+    # The Continue directive is not the player's sentence: "I take no action. Carry
+    # the scene on" put "scene on" into the goods three times (2026-09-18).
+    if re.match(r"\s*I take no action\b", player_text, re.I):
         return raw_intents
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     # `sell` too, and that is not symmetry for its own sake. "I sell the Yarow Elixir"
@@ -1351,6 +1364,195 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
 # sentence; this one does not have to, because what is being sold has to be something the
 # character is actually carrying — so the *satchel* is the vocabulary, and a name that
 # does not match a jar on the shelf is not a sale.
+# --- Coin by amount, out of the purse ------------------------------------------------------
+
+_NUMBERS = {"one": 1, "a": 1, "an": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+            "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
+            "fifty": 50, "hundred": 100}
+_PAYS = re.compile(
+    r"\bI\s+(?:pay|pays|give|gives|hand|hands|toss|tosses|slide|slides|throw|throws|"
+    r"leave|leaves|offer|offers|put down|drop|drops|count out)\s+(?:(?:him|her|them|"
+    r"the\s+\w+|\w+)\s+)?(?:over\s+)?"
+    r"(\d+|" + "|".join(_NUMBERS) + r")\s+(gold|gp|silver|sp|copper|cp|platinum|pp|coins?)"
+    r"(?:\s+(?:pieces?|coins?))?\b", re.I)
+_COIN_ITEM = re.compile(r"(?:^|_|\b)(gold|silver|copper|platinum|gp|sp|cp|pp|coins?)(?:_|\b)",
+                        re.I)
+
+
+def inject_payment(raw_intents, player_text: str, scene) -> list:
+    """Coin the player counts out leaves the purse, by amount, to the person paid.
+
+    Measured in the brothel (2026-09-18): "I pay her ten gold" reached the engine as
+    `sell gold_coins_10 to c16` — a sale of a stock item nobody carries — and was refused
+    ("Masta is not carrying gold_coins_10") while the prose took the coin. The purse
+    never moved. Money is a `give` of a denomination (`_op_give` already spends it and
+    refuses a purse that cannot cover it); the player's own number is the amount and the
+    addressee is who is paid. A `sell` or `give` the model wrote for coins is turned into
+    the same op rather than left to be refused.
+    """
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    text = redact_speech(player_text)
+    m = _PAYS.search(text)
+    out: list = []
+    changed = False
+    # The model's own coin op, whatever shape it took, becomes the give.
+    said_n = None
+    if m:
+        n = m.group(1).lower()
+        said_n = int(n) if n.isdigit() else _NUMBERS.get(n, 1)
+    for raw in raw_intents:
+        if isinstance(raw, dict) and str(raw.get("op", "")).lower() in ("sell", "give"):
+            params = dict(raw.get("params") or {})
+            item = str(params.get("item") or "")
+            coin = _COIN_ITEM.search(item)
+            bare_denom = re.fullmatch(r"(?i)gp|sp|cp|pp", item.strip())
+            if coin and (str(raw.get("op", "")).lower() == "sell" or not bare_denom):
+                # "gold_coins_10", "10 gold", "gold coins": the amount is the
+                # player's own number first, then the item's, then the op's count.
+                in_item = re.search(r"\d+", item)
+                count = said_n or (int(in_item.group(0)) if in_item else 0) \
+                    or int(params.get("count") or 0) or 1
+                word = coin.group(1).lower()
+                denom = {"gold": "gp", "silver": "sp", "copper": "cp",
+                         "platinum": "pp"}.get(word, word if word in ("gp", "sp", "cp", "pp") else "gp")
+                params = {"item": denom, "count": max(1, count), "from_": pc.ref}
+                if raw.get("params", {}).get("to") in scene.actors:
+                    params["to"] = raw["params"]["to"]
+                raw = {"op": "give", "because": "the player paid in coin", "params": params}
+                changed = True
+        out.append(raw)
+    if m is None:
+        return out if changed else raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
+           and str((r.get("params") or {}).get("item", "")) in ("gp", "sp", "cp", "pp")
+           for r in out):
+        return out
+    n = m.group(1).lower()
+    count = int(n) if n.isdigit() else _NUMBERS.get(n, 1)
+    word = m.group(2).lower()
+    denom = {"gold": "gp", "silver": "sp", "copper": "cp", "platinum": "pp",
+             "coin": "gp", "coins": "gp"}.get(word, word)
+    # Who is paid: the person the sentence names, else the one the player is
+    # engaged with, else the only other person here.
+    outside = text.lower()
+    to = next((ref for ref, a in scene.actors.items() if not a.is_pc
+               and (str(a.name).split() or [""])[-1].lower() in outside
+               and len((str(a.name).split() or [""])[-1]) > 2), None)
+    if not to:
+        engaged = engaged_refs(scene)
+        others = [r for r, a in scene.actors.items() if not a.is_pc and not a.is_down]
+        to = engaged[0] if len(engaged) == 1 else (others[0] if len(others) == 1 else None)
+    params = {"item": denom, "count": count, "from_": pc.ref}
+    if to:
+        params["to"] = to
+    return out + [{"op": "give", "because": "the player paid in coin", "params": params}]
+
+
+# --- A thing swung or thrown ----------------------------------------------------------------
+
+_THROWS = re.compile(
+    r"\b(?:I\s+)?(?:throw|throws|hurl|hurls|toss|tosses|lob|lobs|fling|flings|sling|slings|"
+    r"chuck|chucks|pitch|pitches)\s+(?:the|a|an|my|this|that|some)?\s*"
+    r"([a-z][a-z' -]{1,30}?)\s+(?:at|into|toward|towards)\s+", re.I)
+_SWINGS_WITH = re.compile(
+    r"\b(?:hit|hits|strike|strikes|smash|smashes|club|clubs|bash|bashes|swing|swings|"
+    r"beat|beats|brain|brains|crack|cracks)\s+(?:him|her|them|it|the\s+\w+|\w+)\s+"
+    r"(?:with|using)\s+(?:the|a|an|my|this|that)?\s*([a-z][a-z' -]{2,30}?)"
+    r"(?=[,.!?;]|\s+(?:and|as|until|before|while)\b|$)", re.I)
+_A_REAL_WEAPON = re.compile(r"\b(?:sword|blade|dagger|knife|axe|spear|bow|club|mace|"
+                            r"hammer|staff|sap|rapier|glaive|halberd|scimitar|flail|"
+                            r"fist|fists|hand|hands)\b", re.I)
+
+
+def inject_improvised(raw_intents, player_text: str, scene) -> list:
+    """A thing thrown or swung is an improvised-weapon attack, and the thing is named.
+
+    Measured 2026-09-18: "i pick up a chunk of wood and throw it at the man" came back
+    as `give chunk of wood` and a `cast` ("Masta is a blood bending and does not cast
+    spells"), then a `use_ability`; the pebble two turns later killed a man as an
+    unarmed strike (37 to hit, 21 damage) with no object in the arithmetic at all. The
+    Core Rulebook has the rule (`tables.WEAPONS["improvised"]`: -4, 1d4, thrown at
+    10-foot increments). The player's attack this turn — the model's, or the one
+    `inject_fight` adds — is given `weapon: improvised`, `item: <the thing>`, and
+    `thrown` when it left the hand; a thing not yet carried is picked up first through
+    the ordinary `give`, which finds the record lying here if there is one.
+    """
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    text = redact_speech(player_text)
+    thrown = _THROWS.search(text)
+    swung = None if thrown else _SWINGS_WITH.search(text)
+    m = thrown or swung
+    if not m:
+        return raw_intents
+    thing = " ".join(m.group(1).split()).strip(" -'")
+    if not thing or _A_REAL_WEAPON.search(thing) or thing.lower() in ("it", "them", "him", "her"):
+        # "throw my dagger at him" is the dagger's own attack; "throw it" names nothing
+        # this turn — the last thing picked up is the model's to say.
+        if thing.lower() in ("it", "them"):
+            # "I pick up a chunk of wood and throw it": the thing is what the same
+            # sentence picked up; failing that, the one thing in the hands.
+            taken = _ACQUIRES.search(text)
+            named = _THING.search(text[taken.end():]) if taken else None
+            if named and _is_a_thing(" ".join(named.group(1).split())):
+                thing = " ".join(named.group(1).split()).strip(" -'")
+            else:
+                held = [n for n in getattr(pc, "goods", {}) if _is_a_thing(n)
+                        and n.lower() not in ("traveler's outfit",)]
+                if len(held) != 1:
+                    return raw_intents
+                thing = held[0]
+        else:
+            return raw_intents
+    if not _is_a_thing(thing):
+        return raw_intents
+    out = []
+    for raw in raw_intents:
+        if isinstance(raw, dict) and str(raw.get("op", "")).lower() in ("cast", "use_ability") \
+                and raw.get("actor") in (None, pc.ref):
+            # The throw the model dressed as a spell or a power is the throw.
+            continue
+        out.append(raw)
+    carried = any(n.lower() == thing.lower() for n in getattr(pc, "goods", {}))
+    lying = scene.prop_on_the_ground(thing) if hasattr(scene, "prop_on_the_ground") else None
+    if not carried and not any(isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
+                               and str((r.get("params") or {}).get("item", "")).lower() == thing.lower()
+                               for r in out):
+        out.insert(0, {"op": "give", "because": "the player picked it up to use it",
+                       "params": {"item": lying["name"] if lying else thing, "to": pc.ref}})
+    attacks = [r for r in out if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
+               and (r.get("actor") or pc.ref) == pc.ref]
+    if not attacks:
+        engaged = engaged_refs(scene)
+        target = engaged[0] if len(engaged) == 1 else None
+        if target is None:
+            foes = [r for r, a in scene.actors.items() if not a.is_pc and _can_be_fought(a)]
+            target = foes[0] if len(foes) == 1 else None
+        attack = {"op": "attack", "actor": pc.ref, "because": f"the player threw the {thing}"
+                  if thrown else f"the player swung the {thing}", "params": {}}
+        if target:
+            attack["target"] = target
+        out.append(attack)
+        attacks = [attack]
+    for raw in attacks:
+        params = dict(raw.get("params") or {})
+        params.pop("manoeuvre", None)
+        params["weapon"] = "improvised"
+        params["item"] = lying["name"] if (lying and not carried) else thing
+        if thrown:
+            params["thrown"] = True
+        raw["params"] = params
+    return out
+
+
 _SELLS = re.compile(
     r"\b(?:i\s+)?(?:sell|sells|selling|offer\s+to\s+sell|hand\s+over|trade\s+away|"
     r"part\s+with|flog|pawn|barter\s+away)\b", re.I)

@@ -232,6 +232,7 @@ class Campaign:
                 "clock_minutes": self.scene.clock_minutes,
                 "thread": dict(self.scene.thread),
                 "cast": [dict(e) for e in self.scene.cast],
+                "props": [dict(e) for e in self.scene.props],
                 "fallen": dict(self.scene.fallen),
                 "heat": dict(self.scene.heat),
                 "market_taken": self.scene.market_taken,
@@ -341,6 +342,8 @@ class Campaign:
             clock_minutes=s.get("clock_minutes", 0),
             thread=dict(s.get("thread") or {}),
             cast=[dict(e) for e in (s.get("cast") or [])],
+            # Absent in saves written before things had records: nothing lies anywhere.
+            props=[dict(e) for e in (s.get("props") or [])],
             fallen={str(k): int(v) for k, v in (s.get("fallen") or {}).items()},
             heat=dict(s.get("heat") or {}),
             # Absent in saves written before shops had shelves: an empty ledger means
