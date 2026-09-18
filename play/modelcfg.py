@@ -57,8 +57,14 @@ PROVIDERS = {
                "host": "https://api.openai.com/v1"},
     "anthropic": {"name": "Anthropic", "key": True,
                   "host": "https://api.anthropic.com/v1"},
+    # The `/openai` segment is the whole difference between working and a 404: Google's
+    # OpenAI-compatible endpoint lives under it (ai.google.dev/gemini-api/docs/openai,
+    # base_url "https://generativelanguage.googleapis.com/v1beta/openai/"). Reported
+    # 2026-09-18: a fresh Gemini key set as the narrator was "refused immediately" —
+    # every request went to `/v1beta/chat/completions`, which is nothing. Roles saved
+    # before this carry the old host; `gm.client._hosted` mends it on the way out.
     "google": {"name": "Google Gemini", "key": True,
-               "host": "https://generativelanguage.googleapis.com/v1beta"},
+               "host": "https://generativelanguage.googleapis.com/v1beta/openai"},
     "mistral": {"name": "Mistral", "key": True,
                 "host": "https://api.mistral.ai/v1"},
     "groq": {"name": "Groq", "key": True,

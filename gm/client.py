@@ -246,6 +246,20 @@ def chat(
     )
 
 
+def hosted_base(provider: str, host: str) -> str:
+    """The base URL a hosted provider's chat completions hang off.
+
+    Google's OpenAI-compatible surface lives under `/v1beta/openai`, and the settings
+    page copies a provider's default host into the role when the provider is picked —
+    so every role saved before 2026-09-18 carries `/v1beta` and would 404 on every turn.
+    Mended here, on the way out, rather than by asking the player to re-save.
+    """
+    base = str(host or "").rstrip("/")
+    if provider == "google" and base.endswith("/v1beta"):
+        base += "/openai"
+    return base
+
+
 def _hosted(messages, model, host, provider, api_key, as_json,
             temperature, timeout, num_predict) -> Reply:
     """A provider that is not on this machine.
@@ -281,7 +295,7 @@ def _hosted(messages, model, host, provider, api_key, as_json,
                 "temperature": temperature, "max_tokens": num_predict}
         if as_json:
             body["response_format"] = {"type": "json_object"}
-        url = f"{host.rstrip('/')}/chat/completions"
+        url = f"{hosted_base(provider, host)}/chat/completions"
 
     req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
                                  headers=headers)
@@ -290,9 +304,26 @@ def _hosted(messages, model, host, provider, api_key, as_json,
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             got = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        # The provider's own words, which never contain the key: "model not found",
+        # "invalid API key", "response_format is not supported". A bare status code
+        # left a player with a fresh Gemini key reading "refused (404)" and nothing to
+        # act on — the 404 was this app's URL, not their key.
+        detail = ""
+        try:
+            raw = exc.read().decode("utf-8", "replace")
+            try:
+                parsed = json.loads(raw)
+                err = parsed.get("error", parsed) if isinstance(parsed, dict) else parsed
+                detail = str(err.get("message", err) if isinstance(err, dict) else err)
+            except ValueError:
+                detail = raw
+        except Exception:  # noqa: BLE001 — the body is a courtesy, not a requirement
+            detail = ""
+        detail = " ".join(detail.split())[:200]
         raise ModelUnavailable(
-            f"{provider} refused the request ({exc.code}). Check the model name and "
-            f"the key on the settings page.") from None
+            f"{provider} refused the request ({exc.code})"
+            + (f": {detail}" if detail else "")
+            + ". Check the model name and the key on the settings page.") from None
     # `OSError` and `HTTPException` for the same reason as the Ollama path above: a
     # connection dropped mid-request arrives unwrapped by urllib.
     except (urllib.error.URLError, TimeoutError, http.client.HTTPException,
