@@ -1644,8 +1644,14 @@ def test_a_group_is_not_reintroduced_by_one_more_of_its_kind():
 
     beat = "A man leans on the gatepost and spits. 'The same thing as everybody,' he says."
     assert reintroduces_the_present(beat, ["man", "man", "man", "man"]) == []
-    # One of him, though, is a person, and the rule above still holds for her.
-    assert reintroduces_the_present("A woman is there.", ["the woman", "man", "man"]) == ["the woman"]
+    # One of her, though, is a person — when the scene holds her as unique: alone, or
+    # as the subject of the standing thread. In a crowd with two men and no thread,
+    # "a woman" is one woman of several possible, which is the 2026-09-18 narrowing
+    # (tests/test_the_beat_that_lost_the_scene.py): four beats of sixty had been thrown
+    # away over exactly this reading of a role noun.
+    assert reintroduces_the_present("A woman is there.", ["the woman", "man", "man"],
+                                    thread="the woman") == ["the woman"]
+    assert reintroduces_the_present("A woman is there.", ["the woman", "man", "man"]) == []
 
 
 # --- the prose call's prompt and its schema must describe the same reply -----------------

@@ -472,8 +472,12 @@ _VIOLENCE = re.compile(
     r"|fight|fights|fighting"
     # Violence at a distance. Missing entirely at first, so "I throw my dagger at him"
     # started no fight at all — and once it did, it opened toe to toe, which is the one
-    # range a thrown dagger is not for.
-    r"|throw|throws|throwing|hurl|hurls|hurling|lob|lobs|lobbing|sling|slings|slinging"
+    # range a thrown dagger is not for. AT somebody, though: measured 2026-09-18, "I
+    # throw my coat open to show them" started a fight with the apprentice, because
+    # the bare verb was on this list and the model's actor-less attack was handed to
+    # the player as the one swinging.
+    r"|(?:throw|throws|throwing|hurl|hurls|hurling|lob|lobs|lobbing|sling|slings|"
+    r"slinging)\s+(?:\w+\s+){0,3}at"
     r"|shoot|shoots|shooting|loose|looses|loosing|fire at|fires at|firing at"
     r"|pelt|pelts|pelting|snipe|snipes|sniping)\b", re.I)
 
@@ -1857,30 +1861,204 @@ _SHAPE_ABILITIES = re.compile(
     r"divine|celestial|draconic|wild", re.I)
 
 
-def claims_a_nature(player_text: str, scene) -> str:
-    """The hand-back for a player declaring what their character IS, or ""."""
-    if scene is None or not player_text or "?" in player_text:
-        return ""
-    said = redact_speech(str(player_text))
-    m = _CLAIMS_A_NATURE.search(said) or _CLAIMS_GODHOOD.search(said)
-    if not m:
-        return ""
-    pc = scene.pc()
-    if pc is None:
-        return ""
-    # The sheet decides. A druid's Wild Shape, a class power named for a form or an
-    # aspect: the line is an ability being used and `inject_ability` routes it.
+# The SHAPE of a claim about oneself, whatever it claims. A word list would be found a
+# way around ("don't just do divine being or I will just find a way around it") — so
+# the shape is caught and the SHEET says whether it is true. Five shapes: "I am / I'm /
+# I have always been <a/an/the …>"; revealing or declaring what one is; "my true/secret/
+# divine … form/nature/power"; unleashing what is "within me"; transforming into a thing.
+_SELF_CLAIM = re.compile(
+    r"\b(?:i(?:'m|’m| am)|i(?:'ve|’ve| have) always been|i was born)\s+"
+    r"(?:actually\s+|really\s+|secretly\s+|truly\s+|in\s+truth\s+)?"
+    r"(?P<pred>(?:a|an|the|no|not\s+(?:a|an))\s+[^.,;!?\"“”]{2,60})"
+    r"|\b(?:reveal|reveals|revealing|show|shows|showing|unveil|unveils|unveiling|expose|"
+    r"exposes|admit|admits|confess|confesses|announce|announces|declare|declares|"
+    r"proclaim|proclaims|let\s+(?:them|him|her|you|everyone|the\s+\w+)\s+see)\s+"
+    r"(?:to\s+\w+\s+)?(?:that\s+)?(?P<pred2>(?:i\s+am|i'm|i’m|myself\s+(?:as|to\s+be)|"
+    r"what\s+i\s+(?:truly|really)\s+am|my\s+(?:true|real|secret|hidden|divine|godly|"
+    r"ancient|inner|latent)\s+(?:form|nature|self|identity|power|powers|heritage|"
+    r"lineage|blood|strength|gift|gifts|face))[^.,;!?\"“”]{0,60})"
+    r"|\b(?P<pred3>my\s+(?:true|real|secret|hidden|divine|godly|ancient|inner|latent)\s+"
+    r"(?:form|nature|self|identity|power|powers|heritage|lineage|blood|might|gift|gifts))\b"
+    r"|\b(?:unleash|unleashes|release|releases|awaken|awakens|call\s+(?:up)?on|summon|"
+    r"channel|draw\s+on|let\s+loose)\s+"
+    r"(?P<pred4>(?:the\s+)?(?:\w+\s+){0,3}(?:within|inside|in)\s+me)\b"
+    r"|\b(?:transform|turn|change|shift|morph)(?:s|ing)?\s+(?:myself\s+)?into\s+"
+    r"(?P<pred5>(?:a|an|the|my)\s+[^.,;!?\"“”]{2,40})",
+    re.I)
+# What makes a predicate a claim about WHAT one is rather than a passing state ("I am
+# tired", "I am the last in the queue"): a being, a rank, a lineage, a calling, a power.
+_IDENTITY_HEAD = re.compile(
+    r"\b(?:god|gods|goddess|deity|deities|divine|divinity|demigod|immortal|angel|"
+    r"celestial|demon|devil|fiend|dragon|wyrm|lich|vampire|werewolf|beast|spirit|"
+    r"ghost|titan|giant|elemental|king|queen|prince|princess|emperor|empress|heir|"
+    r"heiress|lord|lady|noble|royal|royalty|chosen|prophet|prophesied|saint|messiah|"
+    r"savio[u]r|herald|avatar|incarnation|reincarnation|vessel|champion|hero|legend|"
+    r"legendary|master|grandmaster|archmage|wizard|sorcerer|sorceress|witch|warlock|"
+    r"mage|necromancer|assassin|knight|paladin|general|captain|commander|warrior|"
+    r"swordsman|swordswoman|fighter|rogue|thief|cleric|priest|priestess|druid|ranger|"
+    r"monk|bard|barbarian|oracle|summoner|alchemist|inquisitor|magus|slayer|hunter|"
+    r"shaman|merchant|guard|soldier|mercenary|noblewoman|nobleman|form|nature|self|"
+    r"identity|power|powers|might|magic|gift|gifted|blood|lineage|heritage|descendant|"
+    r"blessed|cursed|marked|being|creature|man|woman|human|mortal|elf|dwarf|orc|"
+    r"halfling|gnome|tiefling|aasimar|asura|dragonborn|undead|spirit)s?\b", re.I)
+_CLAIM_STOP = frozenset({"the", "a", "an", "my", "of", "and", "who", "that", "with",
+                         "from", "this", "here", "there", "in", "on", "to", "for",
+                         "within", "inside", "me", "am", "i", "actually", "really",
+                         "truly", "secretly", "no", "not", "mere", "one", "true", "real",
+                         "secret", "hidden", "very", "own"})
+
+
+def _sheet_vocabulary(pc) -> set[str]:
+    """Every word the sheet can vouch for: the name, the people, the class and its paths,
+    the feats and powers, the background and the past the world bound to it."""
+    bits: list[str] = []
+    for attr in ("name", "race", "heritage", "char_class", "background", "gender"):
+        bits.append(str(getattr(pc, attr, "") or ""))
+    cd = getattr(pc, "class_data", None) or {}
+    if isinstance(cd, dict):
+        bits.append(str(cd.get("name", "") or ""))
+    for attr in ("paths", "feats", "background_ties"):
+        for x in (getattr(pc, attr, None) or []):
+            bits.append(str(x))
     try:
         from rules import leveling
 
-        if any(_SHAPE_ABILITIES.search(str(n)) for n in leveling.usable_names(pc)):
-            return ""
-    except Exception:  # noqa: BLE001 — a sheet that cannot be read is not a licence
+        bits.extend(str(n) for n in leveling.usable_names(pc))
+    except Exception:  # noqa: BLE001 — an unreadable sheet vouches for nothing extra
         pass
-    quoted = m.group(0).strip()
-    return (f"“{quoted}” — nothing on your sheet makes you that, and there is no roll "
-            f"that makes it so. You can claim it out loud: say it, and the people here "
-            f"decide what they believe. Or act as what you are.")
+    try:
+        bits.extend(str(x) for x in (pc.carried() or []))
+    except Exception:  # noqa: BLE001
+        pass
+    return {w for b in bits for w in re.findall(r"[a-z][a-z'’-]{2,}", b.lower())}
+
+
+def _denied(text: str, start: int) -> bool:
+    """Whether the words just before `start` deny the thing: "I am NOT a god"."""
+    return bool(re.search(r"\b(?:not|no|never|n't|hardly)\s+(?:a|an|the|even\s+a)?\s*$",
+                          text[max(0, start - 16):start], re.I))
+
+
+def _as_they(claim: str) -> str:
+    """The player's words, said about them: "I am the heir" → "are the heir"."""
+    s = " ".join(claim.split())
+    s = re.sub(r"^(?:i(?:'m|’m| am))\b", "are", s, flags=re.I)
+    s = re.sub(r"^(?:i(?:'ve|’ve| have) always been)\b", "have always been", s, flags=re.I)
+    s = re.sub(r"^i was born\b", "were born", s, flags=re.I)
+    s = re.sub(r"\bmyself\b", "themselves", s, flags=re.I)
+    s = re.sub(r"\bmy\b", "their", s, flags=re.I)
+    s = re.sub(r"\bme\b", "them", s, flags=re.I)
+    s = re.sub(r"\bi\b", "they", s, flags=re.I)
+    return s
+
+
+def false_claim(player_text: str, scene) -> str:
+    """The player's own words for what they claim to be, when the sheet says otherwise.
+
+    "" when the line makes no such claim, is a question, or is something the sheet
+    vouches for. Otherwise the claim, in their words said about them — "reveal their
+    true form as a divine being", "are the king's lost heir" — for the Bluff it becomes
+    (`inject_false_claim`), the prose that has to write it as false
+    (`prompts.false_claim_block`), the finding that catches prose which makes it true
+    (`narration.review`, `grants-a-nature`), and the crowd's reaction (`note_heat`,
+    kind "delusion").
+
+    **Shape, then sheet.** The first cut listed gods and dragons; the player's answer
+    was that they would find a way around a word list, and they would. What is caught
+    now is the shape of asserting what one IS — "I am the …", "I reveal that I am …",
+    "my true …", "the … within me", "into a …" — and the predicate must name a being,
+    a rank, a lineage, a calling or a power (`_IDENTITY_HEAD`): "I am tired" and "I am
+    the last in the queue" are states, not claims. Then the sheet decides. "I am a
+    rogue" on a rogue's sheet, "I am a pit-fighter" with that background bound, "I
+    unleash the blood in me" for a Blood Bender, a druid's "I turn into a bear": the
+    words are the sheet's own and the line goes through to the injectors that route
+    them. The same words on a sheet that has none of them are the claim.
+
+    **Speech counts.** Elsewhere a boast inside quotation marks is the character's to
+    tell and is redacted first. Here it is the clearest boast there is — "if I were to
+    say aloud that I will reveal my true nature and then nothing happens … people
+    should roll their eyes" — so a lie told out loud is a Bluff the room rolls against.
+    A denial is not a claim ("I am not a god").
+
+    The first cut of all this was a door: the line was handed back before any model
+    was asked, the way fiat is. The player's own correction, 2026-09-18: "It should
+    read as my character being delusional and the people should see it similarly."
+    A claim is a boast, and a boast is a Bluff the room sees through or half-believes.
+    So the turn PLAYS, with the engine holding the claim false.
+    """
+    if scene is None or not player_text or "?" in player_text:
+        return ""
+    text = str(player_text)
+    pc = scene.pc()
+    if pc is None:
+        return ""
+    vouched = _sheet_vocabulary(pc)
+    # A power the sheet grants that reads like a form: Wild Shape, an aspect, an
+    # avatar. Such a line is an ability being used and `inject_ability` routes it.
+    shapeshifter = any(_SHAPE_ABILITIES.search(w) for w in vouched)
+
+    candidates: list[str] = []
+    for m in _SELF_CLAIM.finditer(text):
+        pred = next((g for g in (m.group("pred"), m.group("pred2"), m.group("pred3"),
+                                 m.group("pred4"), m.group("pred5")) if g), "")
+        pred = " ".join(pred.split())
+        if not pred or re.match(r"^(?:no|not)\b", pred, re.I) and not re.match(
+                r"^no\s+mere\b", pred, re.I):
+            continue                      # a denial is not a claim
+        if not _IDENTITY_HEAD.search(pred):
+            continue                      # a state, not what one is
+        words = {w for w in re.findall(r"[a-z][a-z'’-]{2,}", pred.lower())} - _CLAIM_STOP
+        heads = {w for w in words if _IDENTITY_HEAD.fullmatch(w)}
+        # The sheet vouches when it holds the claim's head; a sheet with a form-granting
+        # power behind it vouches for any talk of forms, shapes and turning into things.
+        if heads & vouched:
+            continue
+        if shapeshifter and (m.group("pred5") or re.search(
+                r"\b(?:form|shape|nature|self|aspect|guise|skin)s?\b", pred, re.I)):
+            continue
+        if words and words <= vouched:
+            continue
+        candidates.append(m.group(0))
+    for rx in (_CLAIMS_A_NATURE, _CLAIMS_GODHOOD):
+        m = rx.search(text)
+        if m and not shapeshifter and not _denied(text, m.start()):
+            candidates.append(m.group(0))
+    if not candidates:
+        return ""
+    return _as_they(candidates[0].strip())
+
+
+def claims_a_nature(player_text: str, scene) -> str:
+    """Kept for the callers that asked the old question; the answer is the claim."""
+    return false_claim(player_text, scene)
+
+
+def inject_false_claim(raw_intents, player_text: str, scene) -> list:
+    """A claim about what you are is a Bluff, and the room rolls to see through it.
+
+    PF1e's own answer: convincing somebody of something untrue is Bluff against their
+    Sense Motive, and the more outlandish the lie the harder it is — "I am a god" is
+    at the far end. The check is the player's to roll, visibly; its verdict reaches the
+    prose as a tell, and the prose is told what each verdict looks like on the faces
+    around them (`prompts.false_claim_block`). Replaces a bare `narrate_only`, the
+    way every injector here does, and never doubles a Bluff the model already wrote.
+    """
+    if not isinstance(raw_intents, list) or not false_claim(player_text, scene):
+        return raw_intents
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "check":
+            skill = str((r.get("params") or {}).get("skill", "")).lower()
+            if skill in ("bluff", "intimidate"):
+                return raw_intents
+    kept = [r for r in raw_intents
+            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")]
+    kept.append({
+        "op": "check", "actor": "pc",
+        "params": {"skill": "bluff", "dc": {"band": "heroic"}},
+        "because": "claiming to be what the sheet says they are not",
+        "visibility": "player",
+    })
+    return kept
 
 
 def _psychic_called(text: str) -> str:
@@ -3171,6 +3349,15 @@ _THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
 _THREAD_CLAUSE = re.compile(
     r"^(?:who|whom|whose|what|which|where|when|why|how|whether|if)\b"
     r"|\b(?:i|i'm|i'll|i've|i'd|me|my|mine|myself)\b", re.I)
+# Where a subject stops being somebody and starts being what was asked of them: "him
+# what he carries downstream" is "him"; "the smith about the ore he uses" is "the
+# smith". Measured 2026-09-18 on a sixty-turn audit, where the anchor sentence read
+# "You have not let him what he carries downstream out of your sight".
+_THREAD_TAIL = re.compile(r"\s+(?:what|whether|if|about|for|where|when|why|how|who|whom)\b.*$",
+                          re.I)
+# A bare pronoun is not a subject worth anchoring to: "him" has no content word for
+# `keep_the_thread` to find, and the anchor it would write says "them" of "him".
+_THREAD_PRONOUN = re.compile(r"^(?:him|her|them|it|you|me|us|this|that)$", re.I)
 
 
 # At most two words after "the", end-anchored: unbounded, "I keep to the shadows
@@ -3221,6 +3408,13 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         # faults, caused by us. A question about whom to talk to engages nobody yet;
         # the existing thread, if any, stands.
         if _THREAD_CLAUSE.search(subject):
+            return
+        # And the somebody stops where the question begins: "him what he carries
+        # downstream" is an engagement with him. If nothing but a pronoun is left, the
+        # engagement already on the books is the one being continued.
+        subject = _THREAD_TAIL.sub("", subject).strip().rstrip(",") or subject
+        if _THREAD_PRONOUN.match(subject) and scene.thread:
+            scene.thread["age"] = 0
             return
         scene.thread = {"doing": _THREAD_DOINGS[which - 1],
                         "subject": subject, "age": 0}
@@ -3619,46 +3813,137 @@ def clear_cast(scene) -> None:
 
 # --- Heat: what the bystanders just saw -----------------------------------------------
 
-def note_heat(scene, outcomes) -> None:
-    """A public killing is a fact the next beat must carry.
+# The notable acts short of a killing that a crowd cannot fail to see. Reported with a
+# screenshot, 2026-09-18: a longsword put through a merchant's crates in the open, and
+# "the stranger on the step watches the arc of your sword, his face unmoving, and the
+# crowd at the end of the street remains silent". Heat used to be written for a kill
+# and nothing else, so nothing carried "he just attacked somebody's goods" into the
+# next beat, and the model — which continues what is in front of it — wrote the crowd
+# as it had been: watching.
+_HEAT_PROPERTY = re.compile(
+    r"\b(?:strike|strikes|hit|hits|smash|smashes|kick|kicks|hack|hacks|break|breaks|"
+    r"shatter|shatters|implode|implodes|topple|topples|burn|burns|cut|cuts|slash|"
+    r"slashes|stab|stabs|overturn|overturns|knock|knocks|split|splits|destroy|destroys|"
+    r"swing|swings|swung|bring|brings|drive|drives|slam|slams|hurl|hurls)"
+    r"\b[^.!?]{0,40}?\b(?:crates?|box(?:es)?|barrels?|stalls?|carts?|wagons?|doors?|"
+    r"tables?|walls?|signs?|windows?|shutters?|posts?|beams?|ropes?|sacks?|goods|wares|"
+    r"awnings?|benches?|counters?|shelves|shelf|jars?|pots?)\b", re.I)
+_HEAT_BRANDISH = re.compile(
+    r"\b(?:draw|draws|unsheathe|unsheathes|brandish|brandishes|level|levels)\s+"
+    r"(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|dagger|knife|weapon|spear|mace|"
+    r"hammer|bow|crossbow)\b"
+    r"|\bswing\w*\s+(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|hammer|weapon|mace)\b",
+    re.I)
+_HEAT_SHOUT = re.compile(r"\b(?:shout|shouts|scream|screams|yell|yells|bellow|bellows|"
+                         r"roar|roars|howl|howls)\b", re.I)
+HEAT_TURNS = 8
+
+
+def note_heat(scene, outcomes, player_text: str = "") -> None:
+    """What the bystanders just saw is a fact the next beat must carry.
 
     Measured live: the player murdered a merchant in the middle of the market and
     the very next stall-keeper chatted amiably about silk. Witnesses were
     everywhere — the cast ledger held them — and nothing carried the event
     forward. A kill with the ledger non-empty (or any living non-PC watching)
     writes scene.heat; the brief states it until it cools.
+
+    And since 2026-09-18, the acts short of a kill that a crowd sees just as well:
+    an attack that landed on somebody standing here, a weapon put through somebody's
+    goods, a blade drawn in the open, a shout. Each carries its `kind`, because the
+    reaction the brief asks for differs — nobody runs for the watch over a kicked
+    barrel, and nobody objects politely to a killing.
     """
     if scene is None:
         return
     heat = dict(scene.heat or {})
     if heat:
         heat["age"] = int(heat.get("age", 0)) + 1
-        scene.heat = {} if heat["age"] > 8 else heat
-    killed = []
+        scene.heat = {} if heat["age"] > HEAT_TURNS else heat
+    watchers = bool(scene.cast) or any(
+        not a.is_pc and not a.is_down for a in scene.actors.values())
+    if not watchers:
+        return
+    killed, struck = [], []
     for o in outcomes or []:
         for e in getattr(o, "effects", None) or []:
-            if isinstance(e, dict) and e.get("kind") == "condition" \
-                    and e.get("condition") == "dead":
-                a = scene.actors.get(e.get("ref"))
-                if a is not None and not getattr(a, "is_pc", False):
-                    killed.append(a.name)
-    if not killed:
-        return
-    watchers = bool(scene.cast) or any(
-        not a.is_pc and not a.is_down
-        for a in scene.actors.values())
-    if watchers:
+            if not isinstance(e, dict):
+                continue
+            a = scene.actors.get(e.get("ref"))
+            if a is None or getattr(a, "is_pc", False):
+                continue
+            if e.get("kind") == "condition" and e.get("condition") == "dead":
+                killed.append(a.name)
+            elif e.get("kind") == "damage" and str(getattr(o, "op", "")) in ("attack", "damage"):
+                struck.append(a.name)
+    if killed:
         scene.heat = {"note": f"the player just killed {', '.join(killed)} in "
-                              f"front of onlookers", "age": 0}
+                              f"front of onlookers", "age": 0, "kind": "killing"}
+        return
+    if struck:
+        scene.heat = {"note": f"the player just attacked {', '.join(sorted(set(struck)))} "
+                              f"in front of onlookers", "age": 0, "kind": "violence"}
+        return
+    said = str(player_text or "")
+    # A claim about what they are, made out loud, that the sheet holds false: the
+    # crowd saw somebody announce they were a god and nothing happen. The Bluff's
+    # verdict, when the engine rolled one, decides whether anybody half-believed it.
+    claim = false_claim(said, scene)
+    if claim:
+        bluff = next((o for o in (outcomes or [])
+                      if str(getattr(o, "op", "")) == "check"
+                      and "bluff" in str(getattr(o, "tell", "")).lower()), None)
+        took = bluff is not None and str(getattr(bluff, "verdict", "")) == "success"
+        scene.heat = {"note": f"the player just declared, out loud and in front of "
+                              f"onlookers, that they {claim} — and nothing happened"
+                              + ("; the claim half-took with some of them" if took
+                                 else "; nobody believed a word of it"),
+                      "age": 0, "kind": "delusion"}
+        return
+    m = _HEAT_PROPERTY.search(said)
+    if m:
+        scene.heat = {"note": f"the player just went at somebody's goods in the open "
+                              f"— {' '.join(m.group(0).split())} — in front of "
+                              f"onlookers", "age": 0, "kind": "property"}
+        return
+    m = _HEAT_BRANDISH.search(said)
+    if m:
+        scene.heat = {"note": f"the player just drew a weapon in the open — "
+                              f"{' '.join(m.group(0).split())} — in front of onlookers",
+                      "age": 0, "kind": "threat"}
+        return
+    if _HEAT_SHOUT.search(redact_speech(said)):
+        scene.heat = {"note": "the player just shouted in the open, in front of "
+                              "onlookers", "age": 0, "kind": "threat"}
+
+
+_HEAT_REACTS = {
+    "killing": ("Bystanders react to it — fear, scattering, someone running for the "
+                "watch. Nobody chats casually with the killer, and merchants do not "
+                "approach."),
+    "violence": ("The people here react to it NOW — flinching, backing off, somebody "
+                 "shouting at the player or reaching for a weapon, somebody going for "
+                 "the watch. Nobody stands and watches in silence."),
+    "property": ("The people here react to it NOW — whoever owns the goods objects out "
+                 "loud, the nearest person steps back or squares up, somebody says "
+                 "something to the player about it. Nobody stands and watches in "
+                 "silence."),
+    "threat": ("The people nearest react to it NOW — a hand to a weapon, a step back, "
+               "a word said to the player. Nobody stands and watches in silence."),
+    "delusion": ("The people here react as people do to somebody announcing they are "
+                 "what they plainly are not: an exchanged look, a step back, a laugh, "
+                 "pity, somebody finding something else to look at — or, if the claim "
+                 "half-took, unease and a muttered prayer. Nobody kneels. The claim "
+                 "is false and stays false."),
+}
 
 
 def heat_brief(scene) -> str:
     t = getattr(scene, "heat", None) or {}
     if not t.get("note"):
         return ""
-    return (f"WHAT THE CROWD JUST SAW (fact): {t['note']}. Bystanders react to "
-            f"it — fear, scattering, someone running for the watch. Nobody "
-            f"chats casually with the killer, and merchants do not approach.")
+    react = _HEAT_REACTS.get(str(t.get("kind") or "killing"), _HEAT_REACTS["killing"])
+    return f"WHAT THE CROWD JUST SAW (fact): {t['note']}. {react}"
 
 
 # --- Company: the person the player addresses must exist ------------------------------

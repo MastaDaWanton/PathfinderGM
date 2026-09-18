@@ -989,13 +989,16 @@ def say(request):
         if not said.ok:
             return JsonResponse({"hint": said.hint, "offending": said.offending},
                                 status=422)
-        # And what the character IS. `player_input.check` has no sheet to read; this
-        # door does, and it is the same answer fiat gets — before any model is asked,
-        # because the prose model narrated "I reveal my true form as a divine being"
-        # as fact on 0.1.9 (docs/narrator-guards.md, "the first screen and the door").
-        nature = judgement.claims_a_nature(text, c.scene)
-        if nature:
-            return JsonResponse({"hint": nature, "offending": text}, status=422)
+    # And what the character claims to BE. Not a door: the player's own design,
+    # 2026-09-18, is that "I reveal my true form as a divine being" should PLAY — the
+    # character does it, nothing happens, and the people here react to somebody
+    # claiming what they plainly are not. The claim becomes a Bluff in the plan
+    # (`judgement.inject_false_claim`), the prose is told it is false and how the
+    # roll went (`prompts.false_claim_block`), a finding catches prose that makes it
+    # true, and the crowd's reaction rides `note_heat`. Stashed on the agent for the
+    # prose call once there is one, and cleared every turn so a claim never outlives
+    # its turn.
+    claim = "" if carry_on else judgement.false_claim(text, c.scene)
 
     # A character at or below 0 hit points does not get a turn. Nothing used to ask:
     # Kesst was dying at -3, the player typed "now what", and the GM cheerfully narrated
@@ -1028,6 +1031,7 @@ def say(request):
     world = c.world
     agent = GMAgent(world, c.engine())
     _arm_cards(agent, c)
+    agent.false_claim = claim
 
     # Free actions taken since the last spoken turn ride along as context rather than
     # having cost turns of their own. Into `history`, not `player_input`: the injectors
@@ -1486,7 +1490,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     # declared — "I follow the guards" must constrain the beat that answers it.
     judgement.update_thread(c.scene, player_input,
                             [o.op for o in resolution.outcomes])
-    judgement.note_heat(c.scene, resolution.outcomes)
+    judgement.note_heat(c.scene, resolution.outcomes, player_input)
     # Bodies age out on their own: two turns' grace to loot and mourn, then the
     # scene lets them go whether or not the player ever says the word "leave".
     swept = agent.engine.tidy_the_fallen()
@@ -1544,7 +1548,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier,
-                scene_now=prompts.scene_now(c.scene), pull=pull)
+                scene_now=prompts.scene_now(c.scene), pull=pull,
+                claim=str(getattr(agent, "false_claim", "") or ""))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first

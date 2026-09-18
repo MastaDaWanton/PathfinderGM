@@ -1308,12 +1308,41 @@ def scene_now(scene) -> str:
             "describes this, not an ordinary day here): " + "; ".join(facts) + ".")
 
 
+def false_claim_block(claim: str) -> str:
+    """The engine's word on a claim the player made about what they are.
+
+    Reported with a screenshot, 2026-09-18: "I reveal my true form as a divine being"
+    and the prose made it so — mud to glass, a stranger on his knees, "the truth laid
+    bare". The player's own design, the same morning: "It should read as my character
+    being delusional and the people should see it similarly … people should roll their
+    eyes or look at me with pity." The claim is a Bluff now (`judgement.
+    inject_false_claim`), its verdict is in the tells above this block, and this is
+    the fact the prose writes from. Last in the prompt, with the other things the
+    beat must not get wrong.
+    """
+    claim = " ".join(str(claim or "").split())
+    if not claim:
+        return ""
+    return (f"A CLAIM THE ENGINE HOLDS FALSE: the player has declared that they {claim}. "
+            f"Nothing on their sheet makes it so, and NOTHING HAPPENED. Write what they "
+            f"actually did — the words said aloud, the gesture, the coat thrown open — "
+            f"and that the world stayed exactly as it was: no light, no change, no "
+            f"power. The people here saw somebody claim to be what they plainly are "
+            f"not, and they react as people do. If the Bluff in the tells above "
+            f"SUCCEEDED, they take it for now — warily, a step back, a look exchanged, "
+            f"an uneasy quiet. If it FAILED, or there was no roll, nobody believes a "
+            f"word: pity, a short laugh, an exchanged look, somebody finding something "
+            f"else to look at, somebody saying so to their face. Never make the claim "
+            f"true. Nobody kneels.")
+
+
 def call_prose_messages(briefing_scene: str, history: list[dict], player_input: str,
                         tells: list[str], in_combat: bool = False,
                         enemy: str | None = None,
                         earlier: list[str] | None = None,
                         ledger: list[dict] | None = None,
-                        scene_now_block: str = "", pull: str = "") -> list[dict]:
+                        scene_now_block: str = "", pull: str = "",
+                        claim: str = "") -> list[dict]:
     """Write the whole turn, after the dice.
 
     The *call-one* briefing and examples, not the consequence ones, because this is being
@@ -1350,7 +1379,8 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                     + (f"What the engine decided:\n{said}" if said
                        else "The engine decided nothing mechanical this turn.")
                     + (f"\n\n{scene_now_block}" if scene_now_block else "")
-                    + (f"\n\n{pull}" if pull else "")),
+                    + (f"\n\n{pull}" if pull else "")
+                    + (f"\n\n{claim}" if claim else "")),
     }
     return call_one_messages(
         briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,

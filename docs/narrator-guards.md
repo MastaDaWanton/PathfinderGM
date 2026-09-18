@@ -494,6 +494,45 @@ Whisker stretches out behind you", a guard repeating its name — and forced in 
 rhythmic chime of the Sphinx Whisker", a whisker that makes a sound), which is what D12's
 longer rest is for; its effect is unmeasured until the next run.
 
+## The morning after, at the table (2026-09-18)
+
+The player played 0.1.9 and reported six things in two hours. Three were on the turn path
+and belong in this record; the rest (an opening that fell to the template, the pregen
+picker's world, the title bar, feat prerequisites) are in `narrator-reliability.md` and the
+commits.
+
+**D15. The deflection check that threw beats away.** `reintroduces_the_present` — "a
+woman is there" of the one woman in the scene — had been rejecting BOTH models' prose on
+role-noun actor names: four turns of sixty in the second audit, four of fourteen in the
+player's save, every one a false positive ("a merchant guild house" on a wax seal, "a man"
+in a market, "a stranger" in the woods), and what shipped instead was the engine's raw
+lines: "You eats. You take stall." Three narrowings — only an introduction construction
+counts; "another" is excluded; a common noun is a candidate only when the scene holds that
+person as unique (sole other, or the thread's subject) — and the shape every fix here has
+held under it: one retry naming who is present, then the next model, then the article made
+definite and the beat shipped. The engine's tell verbs agree with "you" now, and "him what
+he carries downstream" is no longer a thread's subject.
+
+**D16. The world reacts.** Heat, the engine's note of what bystanders saw, was written
+for a killing and nothing else; a sword through a merchant's crates carried nothing into
+the next beat, and the crowd "remains silent". Heat has kinds now (killing, violence,
+property, threat, delusion), from the outcomes or the player's line; the brief asks for
+the reaction each deserves; `nobody-reacts` sends back a fresh beat in which nobody
+present acts or speaks, with the people named. Rewrite-only and out of fights.
+
+**D17. A claim about yourself plays as the boast it is.** "I reveal my true form as a
+divine being" made the mud freeze to glass and put a stranger on his knees. Built first as
+a door, like fiat; the player's correction — "it should read as my character being
+delusional and the people should see it similarly" — is the design: the claim is caught by
+SHAPE (asserting what one is, with a predicate naming a being, rank, lineage, calling or
+power) and the SHEET decides whether it is true; a false one becomes a Bluff at the far
+end of the ladder, the prose is told it is false and what each verdict looks like on the
+faces around, `grants-a-nature` catches prose that makes it true with the granting
+sentences cut and the world's answer written in from a pool, and heat of kind `delusion`
+carries the crowd's verdict forward. Played live before it was committed: "the weary pity
+of a man who has seen many people try to claim more than they are." The same run found
+"I throw my coat open" starting a fight; thrown violence is *at* somebody now.
+
 ## Refused, with reasons
 
 - **Turning on `repeat_penalty` / `frequency_penalty`.** Documented to penalise English

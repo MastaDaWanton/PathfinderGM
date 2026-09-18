@@ -751,10 +751,56 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
            pronouns: str = '', others: tuple = (), gender: str = '',
            state: dict | None = None, deaths: list[dict] | None = None,
-           pull: dict | None = None) -> Review:
+           pull: dict | None = None, heat: dict | None = None,
+           claim: str = "") -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0c. The player claimed to be what the sheet says they are not, and the prose made
+    #     it true. Weight 3, with `contradicts-the-engine`: this is the turn being
+    #     untrue, not badly written. "The mud at your feet flash-freezes into glass …
+    #     the silhouette isn't that of a man, but something towering and ancient. The
+    #     stranger on the step falls to his knees" — measured, 2026-09-18, for "I reveal
+    #     my true form as a divine being" on a sheet that grants nothing of the kind.
+    if claim:
+        granted = grants_a_nature(text)
+        if granted:
+            out.findings.append(Finding(
+                "grants-a-nature",
+                f"the player claimed to {claim} and the prose made it so: "
+                f"{granted[0][:80]!r}",
+                f"You have made the player's claim true — {granted[0]!r}. It is false: "
+                f"nothing on their sheet makes them that, and nothing happened. Rewrite "
+                f"those sentences so the player DOES the thing — says it, gestures, "
+                f"throws the coat open — and the world stays exactly as it was; the "
+                f"people here react to a person claiming this, with pity or unease or "
+                f"a laugh, never to a god. Nobody kneels. Keep the rest.",
+                weight=3,
+            ))
+
+    # 0e. The crowd saw something and nobody did anything about it. Reported with a
+    #     screenshot, 2026-09-18: a sword put through a merchant's crates in the open,
+    #     and "the stranger on the step watches the arc of your sword, his face
+    #     unmoving, and the crowd at the end of the street remains silent" — the
+    #     player: "the world hardly reacts to my very odd behaviour … like the model
+    #     is afraid to interact with the PC first." `heat` is the engine's note of what
+    #     the bystanders just saw (`judgement.note_heat`); while it is fresh, a beat in
+    #     which nobody present acts or speaks is sent back with the people named.
+    #     Out of fights only — the caller passes None in one — and rewrite-only.
+    if heat and heat.get("note") and int(heat.get("age", 0) or 0) <= 1 \
+            and nobody_reacts(text, others):
+        who = ", ".join(str(o) for o in (others or ())[:4]) or "the people here"
+        out.findings.append(Finding(
+            "nobody-reacts",
+            f"{heat['note']!r}, and nobody here has done anything about it",
+            f"You have {who} watching in silence after this: {heat['note']}. They saw "
+            f"it. At least one of them acts or speaks to the player about it, in this "
+            f"passage — a word said to them, a step back or forward, a hand going to a "
+            f"weapon, somebody shouting for the watch — not watching, not silence. "
+            f"Keep everything else as it is.",
+            weight=2,
+        ))
 
     # 0d. The one open matter nearest to hand has gone unmentioned too long, and this
     #     beat did not carry it either. `pull` is `rules.cards.thread_to_pull`'s pick —
@@ -2529,6 +2575,22 @@ _YOU_VERBS = {
     "hits": "hit", "misses": "miss", "gains": "gain", "attacks": "attack",
     "deals": "deal", "makes": "make", "rolls": "roll", "wins": "win",
     "squares": "square", "loots": "loot", "pays": "pay", "spends": "spend",
+    # The rest of the engine's own tell verbs, read out of `rules/engine.py` after
+    # "You eats. You take stall." shipped as a whole beat (2026-09-18): the prose had
+    # been thrown away and the tells "Kesst Vayr eats." and "Kesst Vayr takes stall."
+    # were all the player got, one of them wrongly conjugated.
+    "eats": "eat", "drinks": "drink", "buys": "buy", "sells": "sell", "gives": "give",
+    "comes": "come", "casts": "cast", "rides": "ride", "follows": "follow",
+    "works": "work", "tries": "try", "rests": "rest", "recovers": "recover",
+    "lets": "let", "hands": "hand", "forms": "form", "fits": "fit", "fails": "fail",
+    "beats": "beat", "uses": "use", "picks": "pick", "walks": "walk", "runs": "run",
+    "climbs": "climb", "searches": "search", "forages": "forage", "sleeps": "sleep",
+    "travels": "travel", "arrives": "arrive", "leaves": "leave", "enters": "enter",
+    "goes": "go", "sits": "sit", "waits": "wait", "asks": "ask", "tells": "tell",
+    "says": "say", "speaks": "speak", "heals": "heal", "carries": "carry",
+    "wears": "wear", "puts": "put", "lights": "light", "cuts": "cut", "cooks": "cook",
+    "brews": "brew", "grinds": "grind", "gathers": "gather", "crafts": "craft",
+    "founds": "found", "ventures": "venture", "journeys": "journey", "loses": "lose",
 }
 
 
@@ -2651,7 +2713,30 @@ def reads_as_a_refusal(text: str) -> bool:
     return bool(_DECLINED.search(first))
 
 
-def reintroduces_the_present(text: str, names) -> list[str]:
+# What follows an indefinite noun phrase when somebody is being INTRODUCED: they are,
+# they stand, they step, they speak. "A merchant guild house" is followed by "house";
+# "a man's voice" by a possessive. Neither is a person walking in.
+_PRESENCE = (r"(?:is|was|stands?|stood|sits?|sat|leans?|steps?|comes?|appears?|emerges?|"
+             r"lies|waits?|watches|kneels?|looks?|turns?|moves?|walks?|says|calls?|"
+             r"shouts?|blocks?|holds?|pushes|approaches|lingers?|hovers?|crouches|"
+             r"who|that|with|in|at|on|near|behind|beside|by|from|carrying|holding|"
+             r"wearing|standing|sitting|leaning|watching|waiting)")
+
+
+def _introduced(text: str, head: str) -> bool:
+    """Whether `head` appears in an introduction construction: as a new subject after a
+    sentence or clause boundary, after "there is", or after "you see"."""
+    h = re.escape(head)
+    noun = rf"(?:a|an)\s+(?:[a-z][a-z'’-]*\s+){{0,2}}{h}(?:s|es)?(?!['’]s)\b(?=\s*(?:[.,;:!?]|$|{_PRESENCE}\b))"
+    patterns = (
+        rf"(?:^|[.!?]\s+|[,;:]\s+(?:and\s+|but\s+)?){noun}",
+        rf"\bthere(?:'s|’s|\s+is|\s+was|\s+stands?|\s+sits?)\s+{noun}",
+        rf"\byou\s+(?:see|notice|spot|find|make\s+out|catch\s+sight\s+of|glimpse)\s+{noun}",
+    )
+    return any(re.search(p, text, re.I) for p in patterns)
+
+
+def reintroduces_the_present(text: str, names, thread: str = "") -> list[str]:
     """Somebody already standing here cannot walk in as a stranger.
 
     Measured live on an intimate beat the model would not continue: instead of
@@ -2662,7 +2747,25 @@ def reintroduces_the_present(text: str, names) -> list[str]:
     an indefinite article in front of somebody the scene already holds.
 
     Returns the names re-introduced. The caller decides what to do with a beat
-    that has lost the scene — the honest answer is to ask a different model.
+    that has lost the scene.
+
+    **What it must not do, measured 2026-09-18 on a sixty-turn audit and in the
+    player's own save.** Four turns of sixty lost BOTH models' prose to this check
+    and shipped the engine's lines instead ("You eats. You take stall."); in
+    `dorito.json`, four turns of fourteen. Every one was a false positive: "the
+    distinct, heavy crest of a merchant guild house" on a wax seal, with an actor
+    named `merchant` present; "a man" in a market with an actor named `man`; "a
+    stranger" in the woods with an actor the cast ledger had promoted as `stranger`.
+    A role noun is a kind, and a town has many of a kind. So three narrowings:
+
+      * only an INTRODUCTION counts — a new subject after a boundary, "there is a",
+        "you see a" — followed by presence or action, never a possessive or a
+        compound ("a merchant guild house", "a man's voice");
+      * "another" is excluded: it says in as many words that this is a second one;
+      * a common-noun name is a candidate only when the scene holds them as unique —
+        the sole other person present, or the subject of the standing thread. A
+        proper name is always a candidate. The measured deflection was the sole
+        other person, and is still caught.
     """
     if not text:
         return []
@@ -2676,19 +2779,166 @@ def reintroduces_the_present(text: str, names) -> list[str]:
     # then died on its budget. A name that several actors share is a group's.
     from collections import Counter
 
-    shared = {n for n, c in Counter(str(n or "").strip().lower() for n in names or ()).items()
-              if c > 1}
-    for name in names or ():
-        if str(name or "").strip().lower() in shared:
+    cleaned = [str(n or "").strip() for n in names or () if str(n or "").strip()]
+    shared = {n for n, c in Counter(n.lower() for n in cleaned).items() if c > 1}
+    sole = len({n.lower() for n in cleaned}) == 1
+    thread_low = str(thread or "").lower()
+    for name in cleaned:
+        if name.lower() in shared:
             continue
+        head = name.lower().split()[-1:] or [""]
+        head = head[0]
+        if len(head) < 3:
+            continue
+        proper = any(ch.isupper() for ch in name)
+        if not proper and not sole and not re.search(rf"\b{re.escape(head)}", thread_low):
+            continue
+        if _introduced(text, head):
+            found.append(name)
+    return found
+
+
+# Somebody present doing something about what they saw, and the words for merely
+# watching it. A reaction is speech, or a person-subject with an acting verb.
+_ANY_SPEECH = re.compile(r'["“][^"”]{4,}["”]|(?:^|\s)\'[^\']{8,}\'')
+_SOMEBODY = (r"man|woman|stranger|guards?|merchants?|crowd|people|onlookers?|bystanders?|"
+             r"folk|vendors?|smiths?|boys?|girls?|child|children|priests?|soldiers?|"
+             r"watchm[ae]n|sailors?|porters?|traders?|elders?|he|she|they|someone|somebody")
+# Verbs only in verb position. "The stranger on the STEP watches" and "within REACH" are
+# nouns, and the first cut of this list read them as somebody stepping and reaching — the
+# measured silent beat passed as a reaction. The ambiguous ones are kept only in the
+# multi-word forms a body actually does.
+_REACTS = re.compile(
+    r"\b(?:moves?|shouts?|says?|asks?|grabs?|draws?|flees?|scatters?|shoves?|spits?|"
+    r"laughs?|swears?|curses?|approach(?:es)?|comes?|kneels?|raises?|pushes|throws?|"
+    r"screams?|yells?|barks?|snaps?|demands?|warns?|hisses|mutters?|gestures?|beckons?|"
+    r"advances?|lunges?|flinch(?:es)?|recoils?|retreats?|ducks?|bolts?|hurries|"
+    r"stumbles?|seizes?|stops?\s+you|turns?\s+(?:to|on|toward|towards)\s+you|"
+    r"steps?\s+(?:back|forward|between|in|toward|towards|away|off|down|up)|"
+    r"backs?\s+(?:away|off|up)|points?\s+(?:at|to|toward)|calls?\s+(?:out|to|for|over)|"
+    r"reach(?:es)?\s+(?:for|into|out|toward)|drops?\s+(?:to|the|his|her|their)|"
+    r"blocks?\s+(?:your|the)|runs?\s+(?:at|for|off|to|toward|from)|cries\s+out|"
+    r"pulls?\s+(?:a|the|his|her|their|you|out|back))\b", re.I)
+
+
+def nobody_reacts(text: str, others=()) -> bool:
+    """Whether a beat has the people present doing nothing about what just happened.
+
+    True when nobody speaks and no sentence about a person present carries an acting
+    verb. "The stranger on the step watches the arc of your sword, his face unmoving,
+    and the crowd at the end of the street remains silent" is the measured case: two
+    people named, both watching, nobody speaking.
+    """
+    if not text:
+        return False
+    if _ANY_SPEECH.search(text):
+        return False
+    body = unquoted(text)
+    stems = [s for n in (others or ()) for s in _name_stems(str(n))]
+    who = re.compile(r"\b(?:" + "|".join([re.escape(s) for s in stems] + [_SOMEBODY])
+                     + r")(?:s|es)?\b", re.I)
+    for s in _sentences(body):
+        if who.search(s) and _REACTS.search(s):
+            return False
+    return True
+
+
+# The prose granting the player a nature the sheet does not: the claim coming true. Read
+# against unquoted prose, sentence by sentence; a sentence that says so is cut whole.
+_GRANTED_NATURE = re.compile(
+    r"\byour\s+(?:true|real|divine|godly|celestial|infernal|draconic|hidden)\s+"
+    r"(?:form|nature|self|shape|aspect)\b(?!\s+(?:is|was|remains?)\s+(?:a\s+)?(?:lie|"
+    r"nothing|fantasy|delusion|story))"
+    r"|\b(?:no\s+longer|not)\s+(?:a\s+|the\s+)?(?:man|woman|human|mortal|person)\b"
+    r"|\bsomething\s+(?:towering|ancient|vast|immense|older|more\s+than\s+(?:a\s+)?"
+    r"(?:man|woman|human|mortal))\b"
+    r"|\bmask\s+of\s+(?:being\s+)?(?:human|mortal|a\s+man|a\s+woman)\b"
+    r"|\b(?:falls?|fell|drops?|sinks?|goes|went)\s+to\s+(?:his|her|their|its)\s+knees\b"
+    r"|\bkneels?\s+(?:before|to|at\s+your\s+feet)\b|\bprostrat\w*\b"
+    r"|\bthe\s+truth\s+(?:is\s+)?laid\s+bare\b"
+    r"|\b(?:shadow|silhouette)\b[^.]{0,60}\b(?:isn['’]t|is\s+not|no\s+longer)\s+"
+    r"(?:that\s+of\s+)?(?:a\s+)?(?:man|woman|human|mortal)\b"
+    r"|\b(?:light|air|ground|world|earth)\b[^.]{0,40}\b(?:bends?|folds?|pulls?|warps?|"
+    r"kneels?|bows?)\s+(?:toward|towards|to|before)\s+you\b"
+    r"|\bflash-?freez\w*\b|\bcrystalli[sz]es?\s+into\b|\bresidue\s+of\s+your\s+presence\b"
+    r"|\byou\s+(?:are|have\s+become|become)\s+(?:a\s+|an\s+|the\s+)?(?:god|goddess|"
+    r"deity|divine|dragon|demon|angel|celestial|titan)\b",
+    re.I)
+
+
+def grants_a_nature(text: str) -> list[str]:
+    """The sentences in which the prose makes a false claim about the player true."""
+    if not text:
+        return []
+    return [s.strip() for s in _sentences(unquoted(text)) if _GRANTED_NATURE.search(s)]
+
+
+# What the world says when the model would not: nothing happened, and somebody saw.
+# A pool, least recently used, like the death lines — one authored sentence appended
+# every time is the tic this file has already had to remove twice.
+_DELUSION = (
+    "Nothing happens. {who} looks at you the way people look at a man talking to "
+    "himself in the street, and the moment closes over.",
+    "The words hang there and the air declines to do anything about them. {who} finds "
+    "something else to look at.",
+    "You wait for the change to come, and it does not. {who}'s face has gone carefully "
+    "blank, the face of somebody deciding how far away to stand.",
+    "Nothing. {who} has already decided what kind of person says a thing like that out "
+    "loud, and it is not a god.",
+)
+
+
+def cut_granted_nature(text: str, claim: str, others=(),
+                       said: dict | None = None) -> tuple[str, list[str]]:
+    """The backstop under `grants-a-nature`: the sentences that made the claim true are
+    cut, and the world's answer is written in their place, never the same line twice
+    running. `others` names the people present; the nearest is the one who reacts."""
+    if not text or not claim:
+        return text or "", []
+    granted = set(grants_a_nature(text))
+    if not granted:
+        return text, []
+    kept = [s for s in _sentences(text) if s.strip() not in granted]
+    who = definite(str(next((o for o in (others or ()) if str(o).strip()), "") or "somebody"))
+    who = who[:1].upper() + who[1:]
+    pick = least_recently_used(said, "delusion", len(_DELUSION))
+    line = _DELUSION[pick].format(who=who)
+    body = " ".join(kept).strip()
+    out = _append_before_hand_back(body, line) if body else line
+    return out, sorted(granted)
+
+
+def definite_present(text: str, names) -> tuple[str, list[str]]:
+    """The backstop under the check above: the indefinite article on somebody already
+    here becomes definite, and the beat ships.
+
+    For when every model has "lost the scene" by the check's lights. Measured before
+    this existed: the alternative was the holding line, or the engine's tells rendered
+    raw — "You eats. You take stall." — under a thousand characters of good prose the
+    detector had rejected for one article. A scene that is genuinely deflected is not
+    mended by this; but a deflection survives the fallback model far less often than a
+    false positive does, and the article is the only defect the check can actually
+    name.
+    """
+    if not text or not names:
+        return text or "", []
+    swapped: list[str] = []
+    out = text
+    for name in names:
         head = str(name or "").strip().lower().split()[-1:] or [""]
         head = head[0]
         if len(head) < 3:
             continue
-        if re.search(rf"\b(?:a|an|another)\s+(?:\w+\s+){{0,2}}{re.escape(head)}\b",
-                     text, re.I):
-            found.append(str(name))
-    return found
+        h = re.escape(head)
+        pattern = re.compile(
+            rf"\b(a|an)(\s+(?:[a-z][a-z'’-]*\s+){{0,2}}{h}(?:s|es)?)(?!['’]s)\b"
+            rf"(?=\s*(?:[.,;:!?]|$|{_PRESENCE}\b))", re.I)
+        new, n = pattern.subn(lambda m: ("The" if m.group(1)[0].isupper() else "the")
+                              + m.group(2), out)
+        if n:
+            out = new
+            swapped.append(str(name))
+    return out, swapped
 
 
 # --- when the player spoke and the turn produced nothing ---------------------------

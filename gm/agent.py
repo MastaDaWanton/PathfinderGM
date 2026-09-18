@@ -254,6 +254,11 @@ class GMAgent:
                 # sheet can tell them apart.
                 raw = judgement.refuse_declared_creation(raw, player_input,
                                                          self.engine.scene)
+                # And the thing CLAIMED rather than summoned: "I reveal my true form as
+                # a divine being" is a Bluff the room rolls to see through. Before the
+                # check injector, whose broad verbs would otherwise read it as
+                # something else or nothing.
+                raw = judgement.inject_false_claim(raw, player_input, self.engine.scene)
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.
@@ -767,7 +772,8 @@ class GMAgent:
                brief: str = "", hand_back: bool = True, claims: bool = True,
                rewrite: bool = True, backed=(),
                deaths: list[dict] | None = None,
-               pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
+               pull: dict | None = None,
+               claim: str = "") -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -816,7 +822,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
-                deaths=deaths, pull=pull)
+                deaths=deaths, pull=pull, claim=claim)
             repairs += p_repairs
             attempts += p_attempts
 
@@ -836,6 +842,16 @@ class GMAgent:
         # which is how every one-punch kill ended in the same appended template.
         text, risen = narration_mod.cut_dead_men_walking(
             text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])])
+        # A claim the engine holds false, written as true anyway: the sentences that
+        # make the player a god are cut and the world's answer is written in their
+        # place, from a pool that never repeats twice running. The rewrite above had
+        # its chance; this is the backstop under it.
+        if claim:
+            text, granted = narration_mod.cut_granted_nature(
+                text, claim, self._other_names(), said=self.engine.scene.said)
+            if granted:
+                repairs.append(f"the claim was made true: cut {len(granted)} sentence(s) "
+                               f"and wrote the world's answer")
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
         text, leaked = narration_mod.strip_leaked_options(text)
@@ -909,6 +925,9 @@ class GMAgent:
         # the formula again, so the rewrite is the only repair; the finding is only
         # ever raised out of fights (`views` hands the pick over out of fights only).
         "drops-the-thread",
+        # A crowd that saw something and did nothing. Only a rewrite can make somebody
+        # act; an appended "the crowd murmurs" would be the anchor formula again.
+        "nobody-reacts",
     })
 
     def polish(self, text: str, earlier: list[str] | None = None,
@@ -916,7 +935,8 @@ class GMAgent:
                scene_brief: str = "",
                extra_known: set[str] | None = None,
                deaths: list[dict] | None = None,
-               pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
+               pull: dict | None = None,
+               claim: str = "") -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -940,7 +960,11 @@ class GMAgent:
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
                 gender=self._pc_gender(), state=self._body_count(),
-                deaths=deaths, pull=pull,
+                deaths=deaths, pull=pull, claim=claim,
+                # What the crowd just saw, out of fights only: in a fight the NPC
+                # turns are the reaction.
+                heat=(None if self.engine.scene.in_encounter
+                      else (getattr(self.engine.scene, "heat", None) or None)),
             )
 
         review = _review(text)
@@ -1069,7 +1093,8 @@ class GMAgent:
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
                      earlier: list[str] | None = None, *,
                      scene_now: str = "",
-                     pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
+                     pull: dict | None = None,
+                     claim: str = "") -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
 
         The other half of `intents_first`. Here the prose call is the only one there is,
@@ -1096,8 +1121,10 @@ class GMAgent:
             enemy=self._current_enemy(), earlier=earlier,
             ledger=getattr(self, "ledger", None),
             # Last in the prompt, after the tells: the scene this moment and the one
-            # open matter nearest to hand (docs/narrator-guards.md D6, D7).
-            scene_now_block=scene_now, pull=str((pull or {}).get("text") or ""))
+            # open matter nearest to hand (docs/narrator-guards.md D6, D7), and the
+            # claim the engine holds false, when the player made one.
+            scene_now_block=scene_now, pull=str((pull or {}).get("text") or ""),
+            claim=prompts.false_claim_block(claim) if claim else "")
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
@@ -1120,6 +1147,10 @@ class GMAgent:
 
         attempts: list[Attempt] = []
         text, reply = "", None
+        # The best beat the deflection check rejected, kept for the backstop below.
+        best_lost: tuple[str, list[str]] | None = None
+        present = [a.name for a in self.engine.scene.actors.values() if not a.is_pc]
+        thread = str((getattr(self.engine.scene, "thread", None) or {}).get("subject") or "")
         for model, host, provider, key in schedule:
             reply = None
             try:
@@ -1157,12 +1188,15 @@ class GMAgent:
             declined = narration_mod.reads_as_a_refusal(text)
             # A deflection is a refusal that reads as prose: rather than saying
             # no, the model writes a different scene and re-introduces somebody
-            # already standing here as a stranger. Same answer as a refusal —
-            # ask the next model — because the beat the player declared did not
-            # get written either way.
-            lost = narration_mod.reintroduces_the_present(
-                text, [a.name for a in self.engine.scene.actors.values()
-                       if not a.is_pc])
+            # already standing here as a stranger. It used to get a refusal's
+            # answer — hand to the next model, blind — and measured 2026-09-18 that
+            # threw away both models' good prose four turns in sixty (four in
+            # fourteen in the player's own save), every one a false positive, and
+            # shipped the engine's raw lines instead. The check is narrower now
+            # (see `reintroduces_the_present`), and what it catches gets the shape
+            # every fix here has held: ONE retry on the same model naming who is
+            # already present, then the next model, then a deterministic backstop.
+            lost = narration_mod.reintroduces_the_present(text, present, thread=thread)
             note = ("declined — handing to the next model" if declined
                     else f"lost the scene, re-introduced {', '.join(lost)}"
                     if lost else "")
@@ -1170,8 +1204,52 @@ class GMAgent:
                                     reply.text, note=note))
             if text and not declined and not lost:
                 break
+            if lost and not declined:
+                best_lost = (text, lost)
+                who = ", ".join(lost)
+                correction = (
+                    f"{who} {'is' if len(lost) == 1 else 'are'} already here, standing "
+                    f"in this scene from the beat before, and you have written "
+                    f"{'them' if len(lost) > 1 else 'them'} in as if newly arrived — "
+                    f"'a {lost[0].split()[-1]}'. Write the same beat again with "
+                    f"{who} as the person already present: no arrival, no indefinite "
+                    f"article, the same events otherwise.")
+                try:
+                    again = client.chat(
+                        messages + [{"role": "assistant", "content": reply.text},
+                                    {"role": "user", "content": correction}],
+                        model, host, as_json=True, think=False, temperature=0.7,
+                        num_predict=1400, provider=provider, api_key=key,
+                        schema=schema, timeout=FALLBACK_TIMEOUT)
+                    data2 = again.json()
+                    text2 = str(data2.get("narration", "")).strip()
+                    lost2 = narration_mod.reintroduces_the_present(text2, present,
+                                                                    thread=thread)
+                    attempts.append(Attempt(
+                        "prose", again.seconds, again.model, again.text,
+                        note="retry, present named"
+                             + (f" — still re-introduced {', '.join(lost2)}"
+                                if lost2 else "")))
+                    if text2 and not lost2 and not narration_mod.reads_as_a_refusal(text2):
+                        text = text2
+                        self.last_suggestions = _suggestions(data2)
+                        break
+                    if text2 and lost2:
+                        best_lost = (text2, lost2)
+                except Exception as exc:
+                    attempts.append(Attempt("prose", 0.0, model,
+                                            note=f"retry failed: {str(exc)[:100]}"))
             if declined or lost:
                 text = ""
+        early: list[str] = []
+        if not text and best_lost is not None:
+            # The backstop: the beat every model wrote and the check rejected, with the
+            # one thing the check can name — the indefinite article — made definite.
+            # Better than the holding line, and far better than "You eats."
+            text, lost = best_lost
+            text, made = narration_mod.definite_present(text, lost)
+            early.append(f"lost the scene on every model: kept the beat and made "
+                         f"{', '.join(made or lost)} the one already here")
         if not text:
             return "", ["prose failed on every model"], attempts
         # No claim repair here on purpose: the engine has already resolved the turn, so
@@ -1186,7 +1264,9 @@ class GMAgent:
                        else narration_mod.MIN_SCENE_CHARS),
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=True,
-            backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull)
+            backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
+            claim=claim)
+        repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
         # by the death's own axes and never the same one twice running. What it adds
