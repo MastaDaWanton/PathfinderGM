@@ -364,6 +364,92 @@ imageability was *higher* for general sentences). So: a concreteness report in t
 first, from a CC BY resource, thresholds read off real output, and a finding only once
 the number is shown to track what the player means by "thin".
 
+## The first run after, and what it corrected
+
+Same script, model and machine as the baseline, run the evening the guards went in. It
+reached turn 59 of 60 and died there — Ollama restarted under the running model — so
+these are 58 turns, read off the campaign file rather than the audit's report. The
+instrument is what the run improved most, and this section is the honest account.
+
+**The narrator's own prose got better; the page got worse.** Self-repetition over the
+narrator's beats fell from 0.131 to **0.098**, by thirds 0.104 / 0.120 / 0.077 →
+0.057 / 0.083 / 0.071. Over the whole page it *rose*, 0.132 → 0.153, and the reason was
+a third authored line: the watcher files its story award — "You gain 200 XP for moving a
+matter along: …" — as a `setup` beat, so it was shown back to the model as "what you
+narrated just before this", opened four of the last nineteen beats in that register, and
+was the run's single most repeated phrase (seven beats, five of the top eight four-grams).
+The same lesson as the death template and the anchor, arriving a third time: **every line
+the pipeline puts on the page is a template, and the instrument has to tell the
+narrator's prose from the engine's lines — while remembering the player reads both.**
+
+**The phrase check was starved.** "the transition from the" held at 11 beats (12
+before). Retrospectively, with its full window, `recurring-phrase` fires on 7 of 56
+after-beats; live it fired once, because `earlier` was `transcript[-8:]` filtered to the
+GM — four beats once the player's lines are taken out — against a check designed for
+twelve. Every check that reads `earlier` had been working from that same four.
+
+**One thread to pull pulled on every turn.** Fifty of fifty prose turns carried a pull,
+fifteen distinct, one town-strain card eight times running; `note_mentions` stamped
+fifteen cards as carried by a single beat about winged and flightless folk. Three
+causes, all in the scoring: `keys_from` gives a shipped world card forty to
+seventy-eight keys ("between", "power", "resources", "competition" are on most of them)
+and one hit in three beats made a card "recent"; "pinned to this place" alone qualified
+the town's strain card on every turn spent in town; and a card the beat had just carried
+scored again next turn because the beat put its words in the window. The prose itself
+was not harmed — none of the block's phrasing leaked ("nearest to hand", "still open",
+"fraternal": zero hits) and the beats that took a card worked it in gracefully
+("the crystalline sparkle of salt deposits — a sign of the long trade routes toward the
+great refineries of Xylorvotha") — but `drops-the-thread` fired eight times, six on strain
+cards, and the rewrites came back all but unchanged. The constants were also in the wrong
+unit: `turn` counts transcript entries, two or three per turn of play, so "ten turns
+quiet" was five.
+
+**Two turns lost ten minutes each** to a fallback that never answered (D14, shipped the
+same evening), and the run itself died to an unwrapped `RemoteDisconnected` — CPython's
+`urlopen` raises it bare from `getresponse()` when the server drops a request already
+sent, and `client.chat` caught `URLError` and `TimeoutError` only. A player would have
+seen a 500 where the next line already writes "start Ollama".
+
+The decisions that follow are the corrections.
+
+**D9. The narrator is shown its own prose and only its own prose.** `narration.own_prose`
+returns the last twelve `setup` beats, each stripped of what the pipeline appended; the
+watcher's award is filed as `consequence` like every other engine line. Every consumer of
+`earlier` slices its own tail, so the ones that wanted six or two see no change; the
+phrase check sees its twelve.
+
+**D10. Identity, not keys.** A card's identity is its title's content words, its open
+objectives' words, the names of its people, and the proper nouns in its facts — not the
+fact words. "Spoken" needs two of the card's keys or a person in the player's line or the
+tells; "recent" needs two identity words or a person in the last three beats; a beat
+carries a card when it names a person or two identity words. Measured on the run's own
+beats, the loose rule marked up to nineteen cards carried by one beat; the strict one
+marks the cards the beat is about.
+
+**D11. The player's own matters, or nothing.** A quest, the errand the character came
+with, a situation that arose in play, or a card whose person is standing here qualifies on
+any criterion but time. The world's ambient cards — a town's strain, a guild's description
+— qualify only when spoken of or recently in the prose; they are the brief's business
+already. So a quiet town pulls nothing, which is most turns.
+
+**D12. A matter the beat just carried rests.** Four transcript entries, about two turns
+of play (Valve's "not if it has been said in the last N", SillyTavern's Cooldown). Quiet
+is twelve entries and urgent twenty, stated in the unit they are counted in.
+
+**D13. The rewrite is for quests.** `drops-the-thread` is raised only for an urgent,
+uncarried card of kind `quest`. A task the player took on and has not heard of for ten
+turns is the failure the player described; a town's politics is colour the beat may pass
+over.
+
+**D14. A rescue that has not arrived in two minutes is not a rescue.** The primary prose
+call keeps the generous timeout a cold load needs; the fallback gets 120 seconds.
+
+**And the instrument.** `client.chat` wraps every socket-level failure as
+`ModelUnavailable`. The audit survives a turn that raises (a `turn-failed` row, like any
+other), stops after three consecutive turns that could not reach the model rather than
+burning the script against a server that is not there, reports the narrator's own prose
+apart from the page, and counts the pulls it sent.
+
 ## Refused, with reasons
 
 - **Turning on `repeat_penalty` / `frequency_penalty`.** Documented to penalise English
@@ -389,4 +475,5 @@ Before: the 2026-09-17 sixty-turn baseline above, plus `spooter.json`'s four of 
 After: the same script, the same model, the same machine, one run at a time on the GPU,
 reporting self-repetition and compression ratio by third alongside the existing columns;
 and the kill-line pool walked in a unit harness, since a level-one fixture cannot be
-relied on to kill in one blow. Numbers go in `narrator-reliability.md` when they exist.
+relied on to kill in one blow. The first after-run is the section above; the run with
+D9–D14 in follows it. Numbers go in `narrator-reliability.md` as they exist.

@@ -9,6 +9,7 @@ always be sufficient.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import time
@@ -219,14 +220,23 @@ def chat(
                 body = _post(bare)
             else:
                 raise
-    except urllib.error.URLError as exc:
-        raise ModelUnavailable(
-            f"cannot reach Ollama at {host}: {exc}. Start Ollama, or point "
-            f"settings.MODELS at a running host."
-        ) from exc
     except TimeoutError as exc:
         raise ModelUnavailable(
             f"{model} did not answer within {timeout}s."
+        ) from exc
+    # `URLError` is what urllib raises when the CONNECT fails. When Ollama dies or
+    # restarts with a request already sent — measured 2026-09-17, turn 59 of a sixty-turn
+    # audit, the server restarted under the running model — CPython's `do_open` calls
+    # `getresponse()` OUTSIDE its `except OSError` and the bare
+    # `http.client.RemoteDisconnected` comes up through `urlopen` unwrapped. It reached
+    # the view as a 500 (the audit's log has "Internal Server Error: /api/say" right under
+    # the "Service Unavailable" of the turn before), where a player would have seen a
+    # server error instead of the "start Ollama" message the next line already writes.
+    # Every socket-level failure is the same fact to the player: the model is not there.
+    except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
+        raise ModelUnavailable(
+            f"cannot reach Ollama at {host}: {exc}. Start Ollama, or point "
+            f"settings.MODELS at a running host."
         ) from exc
 
     return Reply(
@@ -283,7 +293,10 @@ def _hosted(messages, model, host, provider, api_key, as_json,
         raise ModelUnavailable(
             f"{provider} refused the request ({exc.code}). Check the model name and "
             f"the key on the settings page.") from None
-    except (urllib.error.URLError, TimeoutError) as exc:
+    # `OSError` and `HTTPException` for the same reason as the Ollama path above: a
+    # connection dropped mid-request arrives unwrapped by urllib.
+    except (urllib.error.URLError, TimeoutError, http.client.HTTPException,
+            OSError) as exc:
         raise ModelUnavailable(f"cannot reach {provider}: {exc}") from None
 
     if anthropic:

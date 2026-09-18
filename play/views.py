@@ -1501,11 +1501,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # GM's secret ones.
                                     recent=[b["text"] for b in c.transcript[-4:]],
                                     turn=len(c.transcript))
-        # The model's own recent prose — with the sentences WE appended to it (a death
-        # line, a thread anchor) taken back out. Shown its own backstop as "what you
-        # narrated", the model learns the template (docs/narrator-guards.md D4).
-        earlier = [narration_mod.strip_added(b["text"], b.get("added"))
-                   for b in c.transcript[-8:] if b["who"] == "gm"]
+        # The model's own recent prose — the narrator's beats only, with the sentences
+        # WE appended to them (a death line, a thread anchor) taken back out. Shown its
+        # own backstop or the engine's award line as "what you narrated", the model
+        # learns the template (docs/narrator-guards.md D4). Twelve beats, because the
+        # phrase check reads twelve and was being handed four.
+        earlier = narration_mod.own_prose(c.transcript)
         # Last in the prompt, after the tells (docs/narrator-guards.md D6, D7): the
         # scene as the engine holds it this moment, and — out of fights only, so it
         # can never cost a rewrite mid-combat — the one open matter nearest to hand,

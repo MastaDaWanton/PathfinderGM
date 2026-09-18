@@ -729,7 +729,14 @@ def _apply_cards(c, p: dict) -> bool:
                                "action": "new", "title": new["title"]})
             changed = True
     for line in lines:
-        c.transcript.append({"who": "gm", "text": line, "kind": "setup"})
+        # An engine line, not narration: "consequence", like every other award and tell
+        # `play/views.py` appends. Measured 2026-09-17 on the first sixty-turn audit
+        # after the narrator guards: filed as "setup", the award — "You gain 200 XP for
+        # moving a matter along: …" — was handed to the next prose call as "what you
+        # narrated just before this", opened four of the last nineteen beats in that
+        # register, and was the single largest phrase repeating across the run (seven
+        # beats). The narrator's own prose, measured apart from it, had improved.
+        c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
     return changed
 
@@ -756,6 +763,13 @@ def _apply_undercurrent(c, p: dict) -> bool:
     # has no beat to ride on. "i should be receiving EXP for ... resolving situations".
     line = c.engine().award_story(p.get("action", ""), p.get("thread", "")).strip()
     if line:
-        c.transcript.append({"who": "gm", "text": line, "kind": "setup"})
+        # An engine line, not narration: "consequence", like every other award and tell
+        # `play/views.py` appends. Measured 2026-09-17 on the first sixty-turn audit
+        # after the narrator guards: filed as "setup", the award — "You gain 200 XP for
+        # moving a matter along: …" — was handed to the next prose call as "what you
+        # narrated just before this", opened four of the last nineteen beats in that
+        # register, and was the single largest phrase repeating across the run (seven
+        # beats). The narrator's own prose, measured apart from it, had improved.
+        c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
     return True

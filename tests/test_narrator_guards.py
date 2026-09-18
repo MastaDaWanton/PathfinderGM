@@ -414,7 +414,8 @@ def _table():
 
 def test_the_pick_is_the_card_most_of_the_scene_points_at():
     """Ruskin's criteria count: the strain card is pinned here and the player's line
-    hits its keys (2); the quest is merely open (1)."""
+    names it (two of its keys); the quest is merely open (1). A world card qualifies
+    only because the player SPOKE of it — pinned here alone would not do."""
     s, cards = _table()
     ranked = cards.salience(s, recent=[], player_text="I ask about the border tolls.",
                             turn=3)
@@ -423,14 +424,32 @@ def test_the_pick_is_the_card_most_of_the_scene_points_at():
     pull = cards.thread_to_pull(s, recent=[], player_text="I ask about the border tolls.",
                                 turn=3)
     assert pull["title"] == "What is wrong in Vyrakon" and not pull["urgent"]
+    assert pull["kind"] == "situation"
+
+
+def test_the_worlds_own_cards_are_not_pulled_for_being_here():
+    """Measured on the first run: fifty of fifty beats carried a pull, the same town
+    strain or guild description up to eight times running, because "pinned to this
+    place" was a criterion and one loose key in three beats made anything "recent".
+    Ambient cards are the brief's business; they are pulled only when raised."""
+    s, cards = _table()
+    ranked = cards.salience(s, recent=["The smith hammers on."],
+                            player_text="I look around.", turn=3)
+    assert [c.id for _, _, c in ranked] == ["q-salt"]
+    # The quest is the player's own matter and qualifies on "open" alone; it is not
+    # quiet yet, so the pull says so without the "for a while" clause.
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=3)
+    assert pull["title"] == "Find the missing salt" and "for a while" not in pull["text"]
 
 
 def test_a_quiet_quest_gains_urgency_and_is_named_without_a_number():
+    """Twenty transcript entries is about ten turns of play — the unit the constants
+    are in, which the first cut got wrong by half."""
     s, cards = _table()
-    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12)
-    assert pull["title"] == "Find the missing salt"
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=24)
+    assert pull["title"] == "Find the missing salt" and pull["kind"] == "quest"
     assert "open" in pull["why"] and "quiet" in pull["why"] and "urgent" in pull["why"]
-    assert pull["since"] == 12
+    assert pull["since"] == 24
     assert "Ask the harbourmaster" in pull["text"] and "for a while" in pull["text"]
     assert not any(ch.isdigit() for ch in pull["text"])
 
@@ -439,35 +458,63 @@ def test_time_alone_raises_nothing():
     """An old situation from another town is not a candidate because it is old."""
     s, cards = _table()
     s.at = "docks"
-    for c in cards.load(s):
-        pass
-    ranked = cards.salience(s, recent=[], player_text="I look at the boats.", turn=12)
+    ranked = cards.salience(s, recent=[], player_text="I look at the boats.", turn=24)
     assert [c.id for _, _, c in ranked] == ["q-salt"], "only the open quest qualifies"
 
 
-def test_a_mention_is_written_back_and_the_urgency_starts_again():
+def test_a_mention_is_written_back_and_the_matter_rests():
+    """The write-back, and the cooldown it feeds. A card the beat just carried is
+    marked mentioned, loses its urgency, and is not pulled again for about two turns
+    of play — the first run pulled the same card eight times running because the beat
+    that mentioned it put its words in the window that scored it."""
     s, cards = _table()
     carried = cards.note_mentions(
         s, "The harbourmaster spits. 'Salt? The salt went north with the toll-men.'",
         turn=11)
     assert carried == ["Find the missing salt"]
     assert cards.find(s, "q-salt").mentioned == 11
-    ranked = {c.id: why for _, why, c in cards.salience(
-        s, recent=[], player_text="I look around.", turn=12)}
-    assert "quiet" not in ranked["q-salt"] and "urgent" not in ranked["q-salt"]
-    # And the matter that has NOT come up is now the one nearest to hand: the town's
-    # own strain, pinned here and twelve turns unmentioned, outscores the quest that
-    # was just talked about. That is the write-back moving the urgency.
-    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12)
-    assert pull["title"] == "What is wrong in Vyrakon" and pull["urgent"]
-    # One key is a coincidence.
-    assert cards.note_mentions(s, "You buy a pinch of salt for the road.", turn=13) == []
+    # Resting: nothing else is the player's matter here, so nothing is pulled.
+    assert cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12) is None
+    # Past the cooldown it is back, and no longer quiet.
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=16)
+    assert pull["title"] == "Find the missing salt"
+    assert "quiet" not in pull["why"] and not pull["urgent"]
+    # One identity word is a coincidence.
+    assert cards.note_mentions(s, "You buy a pinch of salt for the road.", turn=17) == []
 
 
-def test_review_asks_for_a_dropped_thread_only_when_urgent_and_uncarried():
-    pull = {"title": "Find the missing salt", "fact": "Ask the harbourmaster where the "
-            "salt went", "keys": ["find", "missing", "salt", "harbourmaster"],
-            "people": ["Marra"], "since": 12, "urgent": True}
+def test_identity_is_the_title_the_objectives_the_people_and_the_names_in_the_facts():
+    """"between", "power" and "resources" are on most cards in the shipped world; the
+    Khy'vyr and the Nirkor are on one. Sentence-opening capitals are not names."""
+    from rules import cards
+
+    c = cards.Card(id="s", title="What is wrong in Zhilvarnia",
+                   facts=["Tensions between Khy'vyr and Nirkor populations are elevated. "
+                          "Competition for land and resources drives it."],
+                   keys=cards.keys_from("Zhilvarnia", "Tensions between Khy'vyr and Nirkor "
+                                        "populations are elevated. Competition for land "
+                                        "and resources drives it."))
+    ident = cards.identity_keys(c, ["Marra"])
+    assert "khy'vyr" in ident and "nirkor" in ident and "zhilvarnia" in ident
+    assert "marra" in ident
+    for loose in ("tensions", "between", "populations", "competition", "resources",
+                  "elevated", "land"):
+        assert loose not in ident, loose
+    assert len(ident) < len(c.keys)
+    # A beat about the two peoples carries the card; a beat about tensions in general
+    # does not.
+    assert cards._identity_hits(ident, "The Nirkor quarter is quiet; a Khy'vyr boy runs.") == 2
+    assert cards._identity_hits(ident, "Tensions and competition for resources everywhere.") == 0
+
+
+def test_review_asks_for_a_dropped_thread_only_for_an_urgent_uncarried_quest():
+    """Eight fires in fifty turns on the first run, six of them on the world's strain
+    cards with rewrites that came back unchanged. A quest the player took on is the
+    matter that must not go quiet; a town's politics is colour."""
+    pull = {"title": "Find the missing salt", "kind": "quest",
+            "fact": "Ask the harbourmaster where the salt went",
+            "keys": ["find", "missing", "salt", "harbourmaster"],
+            "people": ["Marra"], "since": 24, "urgent": True}
     quiet = "The smith hammers on. Rain starts. What do you do?"
     r = narration.review(quiet, pull=pull)
     f = next(f for f in r.findings if f.kind == "drops-the-thread")
@@ -476,6 +523,81 @@ def test_review_asks_for_a_dropped_thread_only_when_urgent_and_uncarried():
     assert "drops-the-thread" not in {f.kind for f in narration.review(carried, pull=pull).findings}
     assert "drops-the-thread" not in {
         f.kind for f in narration.review(quiet, pull=dict(pull, urgent=False)).findings}
+    assert "drops-the-thread" not in {
+        f.kind for f in narration.review(quiet, pull=dict(pull, kind="situation")).findings}
+
+
+# --- what the model is shown of its own past -----------------------------------------------
+
+
+def test_own_prose_is_the_narrators_setup_beats_stripped_of_ours_twelve_deep():
+    """Measured on the first run after the guards: `transcript[-8:]` filtered to the GM
+    left the twelve-beat phrase check four beats to read (it fired once in fifty turns),
+    and the watcher's award line — filed as setup — was shown back as narration and
+    opened four of the last nineteen beats in that register."""
+    transcript = []
+    for i in range(20):
+        transcript.append({"who": "player", "text": f"I do thing {i}."})
+        transcript.append({"who": "gm", "kind": "setup", "text": f"Beat {i} happens. What do you do?",
+                           **({"added": ["The sailor drops, dead."]} if i == 19 else {})})
+        if i % 5 == 0:
+            transcript.append({"who": "gm", "kind": "consequence",
+                               "text": "You gain 200 XP for moving a matter along: x (200 of 2,000)."})
+    transcript[-1]["text"] = "Beat 19 happens. The sailor drops, dead. What do you do?"
+    shown = narration.own_prose(transcript)
+    assert len(shown) == 12
+    assert shown[-1] == "Beat 19 happens. What do you do?"
+    assert not any("XP" in s for s in shown)
+    assert not any(ch.isdigit() for s in shown for ch in s if "Beat" not in s)
+    assert narration.own_prose([]) == []
+
+
+def test_the_watchers_award_is_an_engine_line():
+    import inspect
+
+    from gm import watcher
+
+    src = inspect.getsource(watcher)
+    assert '"kind": "setup"' not in src, "an award filed as narration is a template taught"
+    assert src.count('"kind": "consequence"') >= 2
+
+
+# --- the model that is not there ----------------------------------------------------------
+
+
+def test_a_connection_dropped_mid_request_is_the_model_being_absent(monkeypatch):
+    """Turn 59 of 60: Ollama restarted with the request already sent, urllib raised a
+    bare `RemoteDisconnected` from `getresponse()`, and the player-facing path was a
+    500 instead of the 503 that says "start Ollama"."""
+    import http.client
+    import urllib.request
+
+    from gm import client
+
+    def boom(*a, **k):
+        raise http.client.RemoteDisconnected("Remote end closed connection without response")
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    with pytest.raises(client.ModelUnavailable) as err:
+        client.chat([{"role": "user", "content": "hi"}], "any-model", "http://localhost:1")
+    assert "cannot reach" in str(err.value)
+    with pytest.raises(client.ModelUnavailable):
+        client._hosted([{"role": "user", "content": "hi"}], "m", "http://x", "openai",
+                       "key", False, 0.5, 5, 10)
+
+
+def test_the_audit_knows_an_absent_model_from_a_bad_turn():
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from tools import narrator_audit as audit
+
+    assert audit._unreachable(503, '{"error": "cannot reach Ollama at http://localhost"}')
+    assert audit._unreachable(0, "RemoteDisconnected: Remote end closed connection")
+    assert audit._unreachable(503, "gemma did not answer within 600s.")
+    assert not audit._unreachable(410, "the character is dead")
+    assert not audit._unreachable(502, "The GM could not produce a legal turn.")
 
 
 def test_mentioned_survives_the_card_round_trip():

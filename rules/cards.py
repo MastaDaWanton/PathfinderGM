@@ -482,10 +482,96 @@ def _title_from_errand(errand: str) -> str:
 #
 # How long an open matter may go unmentioned before it starts to press, and before the
 # prose is asked for it. Booth's Director shape — a quiet stretch raises the pressure —
-# with constants that are ours rather than a shooter's, read off the sixty-turn script:
-# a quest taken at turn ten and untouched for a third of the session is the failure.
-QUIET_TURNS = 6
-URGENT_TURNS = 10
+# with constants that are ours rather than a shooter's. The unit is TRANSCRIPT ENTRIES,
+# which is what `turn` counts everywhere in this file: a player's turn is the player's
+# line plus the GM's beat, two entries, sometimes three. So twelve is about six turns
+# of play and twenty about ten — a quest taken up and not heard of for ten turns is the
+# failure the player described. The first cut of these read 6 and 10 and meant them in
+# turns; the audit's "has not come up for 14 turns" was seven.
+QUIET_TURNS = 12
+URGENT_TURNS = 20
+# A matter the beat just carried is left alone for about two turns of play — Valve's
+# "don't say this if it's been said in the last N" and SillyTavern's Cooldown. Without
+# it the first sixty-turn run pulled the same card on consecutive turns eight times:
+# the beat mentioned it, so its words were in the recent window, so it scored again.
+COOLDOWN_TURNS = 4
+
+_PROPER = re.compile(r"[A-Z][A-Za-z'’-]{3,}")
+
+
+def _proper_nouns(*texts) -> list[str]:
+    """Capitalised words that do not open a sentence — the names a card's facts carry.
+
+    "Tensions between Khy'vyr and Nirkor populations" is about the Khy'vyr and the
+    Nirkor; "tensions", "between" and "populations" are every strain card in the world.
+    The first word of a sentence is skipped because English capitalises it whatever it
+    is, which costs a name that happens to open a sentence and saves every "Tensions".
+    """
+    out: list[str] = []
+    for text in texts:
+        for sentence in re.split(r"(?<=[.!?])\s+", str(text or "")):
+            for w in sentence.split()[1:]:
+                m = _PROPER.match(w.strip("\"'“”‘’(),;:"))
+                if not m:
+                    continue
+                low = re.sub(r"['’]s$", "", m.group(0).lower()).strip("'’-")
+                if len(low) >= 4 and low not in _STOP and low not in out:
+                    out.append(low)
+    return out
+
+
+def identity_keys(card: Card, names=()) -> list[str]:
+    """The words that mean THIS card and not its neighbours.
+
+    `keys_from` takes every content word of the title and the facts — forty to
+    seventy-eight per world card in the shipped export, and "between", "power",
+    "resources", "competition" are on most of them. Measured on the first sixty-turn
+    run: one such key in a three-beat window was enough to make a card "recent", so
+    nearly every card was recent on nearly every turn, the same card was pulled eight
+    times running, and `note_mentions` stamped fifteen cards as carried by one beat.
+    Identity is narrower: the title's content words, the open objectives' words (what a
+    quest is about is what is left to do on it), the names of its people, and the
+    proper nouns in its facts. The fact words themselves stay out.
+    """
+    out = keys_from(card.title)
+    for o in card.objectives:
+        if not o.get("done"):
+            for k in keys_from(str(o.get("text", ""))):
+                if k not in out:
+                    out.append(k)
+    for k in _proper_nouns(*card.facts):
+        if k not in out:
+            out.append(k)
+    for nm in names:
+        low = " ".join(str(nm or "").lower().split())
+        if len(low) >= 3 and low not in out:
+            out.append(low)
+    return out
+
+
+def _identity_hits(keys, haystack: str) -> int:
+    low = haystack.lower()
+    return sum(1 for k in keys
+               if re.search(r"\b" + re.escape(k) + r"\w{0,2}\b", low))
+
+
+def _card_names(card: Card, scene) -> list[str]:
+    actors = getattr(scene, "actors", {}) or {}
+    people = getattr(scene, "people", None) or actors
+    out = []
+    for r in card.people:
+        a = actors.get(r)
+        if a is None and hasattr(people, "get"):
+            a = people.get(r)
+        name = (a.name if a is not None else str(r)).strip()
+        if len(name) >= 3:
+            out.append(name)
+    return out
+
+
+def _names_in(names, haystack: str) -> bool:
+    low = haystack.lower()
+    return any(n.lower() in low for n in names)
 
 
 def salience(scene, *, recent, player_text: str = "", tells=(),
@@ -495,14 +581,22 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     Ruskin's rule selection (Valve, GDC 2012), adopted whole: the score is the NUMBER
     of criteria that hold — "the simplest one imaginable" — so the card the scene points
     at from several directions beats the card it merely mentions. The criteria: pinned
-    to this place; one of its people present; its keys in what the player just said or
-    the engine just decided; its keys in the last few beats; an objective still open;
-    and how long since the prose last carried it, a point past QUIET_TURNS and another
-    past URGENT_TURNS. A card nothing but time points at is not a candidate — an old
-    situation from another town does not get raised because it is old. Ties go to the
-    card most recently touched, deterministic where Valve chose random, so a test can
-    pin the pick. Never the model's judgement: Drama Llama let a model decide which
-    storylet was live and its authors reported the triggers misfiring
+    to this place; one of its people present; named in what the player just said or
+    the engine just decided ("spoken": two of its keys, or one of its people); its
+    identity in the last few beats ("recent": two identity words, or a person); an
+    objective still open; and how long since the prose last carried it, a point past
+    QUIET_TURNS and another past URGENT_TURNS.
+
+    Which cards may be candidates at all is the correction the first run taught. The
+    player's OWN matters — a quest, the errand they came with, a situation that arose in
+    play, or any card whose person is standing here — qualify on any criterion but
+    time. The world's ambient cards — a town's strain, a guild's description — qualify
+    only when spoken of or recently in the prose: they are the brief's business already,
+    and pulling them for being pinned to the town turned fifty of fifty beats toward
+    faction politics nobody had raised. A card carried within COOLDOWN_TURNS rests.
+    Ties go to the card most recently touched, deterministic where Valve chose random,
+    so a test can pin the pick. Never the model's judgement: Drama Llama let a model
+    decide which storylet was live and its authors reported the triggers misfiring
     (docs/narrator-guards.md).
     """
     here = str(getattr(scene, "at", "") or "")
@@ -513,14 +607,19 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     for c in load(scene):
         if not c.live or c.secret:
             continue
+        if c.mentioned and int(turn) - int(c.mentioned) < COOLDOWN_TURNS:
+            continue
+        names = _card_names(c, scene)
+        ident = identity_keys(c, names)
         why: list[str] = []
+        present = any(r in actors for r in c.people)
         if c.place and c.place == here:
             why.append("here")
-        if any(r in actors for r in c.people):
+        if present:
             why.append("present")
-        if _hits(c, now):
+        if _hits(c, now) >= 2 or _names_in(names, now):
             why.append("spoken")
-        if _hits(c, window):
+        if _identity_hits(ident, window) >= 2 or _names_in(names, window):
             why.append("recent")
         if c.kind == "quest" and any(not o.get("done") for o in c.objectives):
             why.append("open")
@@ -529,7 +628,12 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("quiet")
         if since >= URGENT_TURNS:
             why.append("urgent")
-        if set(why) - {"quiet", "urgent"}:
+        own = (c.kind == "quest" or c.is_(TAG_ERRAND) or c.is_(TAG_PLAY) or present)
+        if own:
+            qualifies = bool(set(why) - {"quiet", "urgent"})
+        else:
+            qualifies = "spoken" in why or "recent" in why
+        if qualifies:
             out.append((len(why), why, c))
     out.sort(key=lambda t: (-t[0], -t[2].touched, t[2].id))
     return out
@@ -551,10 +655,7 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
     if not ranked:
         return None
     _score, why, c = ranked[0]
-    actors = getattr(scene, "actors", {}) or {}
-    people = getattr(scene, "people", None) or actors
-    names = [(actors[r].name if r in actors else people[r].name if r in people else r)
-             for r in c.people]
+    names = _card_names(c, scene)
     open_objective = next((str(o.get("text", "")) for o in c.objectives
                            if not o.get("done")), "")
     fact = open_objective or (c.facts[-1] if c.facts else "")
@@ -563,38 +664,30 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
             f"show where it fits, never to resolve for the player): {c.title}"
             + (f" — {fact}" if fact else "") + "."
             + (" It has not come up for a while." if "quiet" in why else ""))
-    return {"id": c.id, "title": c.title, "fact": fact, "keys": _keys_of(c),
-            "people": names, "since": since, "urgent": "urgent" in why, "why": why,
-            "text": text}
+    return {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
+            "keys": identity_keys(c, names), "people": names, "since": since,
+            "urgent": "urgent" in why, "why": why, "text": text}
 
 
 def note_mentions(scene, text: str, turn: int = 0) -> list[str]:
     """Which live cards this beat carried, marked `mentioned` — the write-back.
 
-    A card is carried when the prose names one of its people or hits two of its keys;
-    one key is a coincidence ("salt" in a market). Speech counts: a character talking
-    about the matter is the matter coming up.
+    A card is carried when the prose names one of its people or two of its IDENTITY
+    words (`identity_keys`); one word is a coincidence ("salt" in a market), and two
+    of the loose fact-keys was no bar at all — measured, fifteen cards "carried" by one
+    beat about winged and flightless folk. Speech counts: a character talking about the
+    matter is the matter coming up.
     """
     cards = load(scene)
     if not cards or not text:
         return []
-    actors = getattr(scene, "actors", {}) or {}
-    people = getattr(scene, "people", None) or actors
     low = " ".join(str(text).split()).lower()
     carried: list[str] = []
     for c in cards:
         if not c.live:
             continue
-        named = False
-        for r in c.people:
-            a = actors.get(r)
-            if a is None and hasattr(people, "get"):
-                a = people.get(r)
-            name = (a.name if a is not None else r).lower()
-            if name and len(name) >= 3 and name in low:
-                named = True
-                break
-        if named or _hits(c, low) >= 2:
+        names = _card_names(c, scene)
+        if _names_in(names, low) or _identity_hits(identity_keys(c, names), low) >= 2:
             c.mentioned = int(turn)
             carried.append(c.title)
     if carried:

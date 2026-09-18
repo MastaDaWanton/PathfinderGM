@@ -365,8 +365,29 @@ at "a six-word phrase shared with any of the last eight beats" it would have fir
 56 beats, most of them a beat honestly continuing the scene of the one before it; at two of
 eight, plus four words in three of twelve, 17 of 56 — every one of them a tic.
 
-**After**: the same script, model and machine, run once the guards were in. Reported below
-when the run has finished; a number that is not there yet is not a number.
+**After, first run** — the same script, model and machine, the evening the guards went
+in. It reached turn 59 of 60 and died there (Ollama restarted under the model; the
+unwrapped `RemoteDisconnected` is fixed, see `narrator-guards.md`), so these 58 turns are
+read off the campaign file, and the narrator's own beats are measured apart from the
+engine's lines — which the baseline did not do, and could not have known to:
+
+| | before | after (first run) |
+|---|---|---|
+| self-repetition, the narrator's own prose | 0.131 | **0.098** |
+| by thirds | 0.104 / 0.120 / 0.077 | 0.057 / 0.083 / 0.071 |
+| self-repetition, the whole page | 0.132 | 0.153 |
+| gzip ratio, own prose | 2.88 | 2.88 |
+| "the transition from the" | 12 beats | 11 beats |
+| mean chars, own prose | 1,060 | 1,062 |
+| prose turns that failed on every model | — | 2 (both the fallback hanging 600 s) |
+
+The prose improved and the page got worse, and the difference was one line: the
+watcher's story award ("You gain 200 XP for moving a matter along: …"), filed on the
+transcript as narration, shown back to the model as its own, and the run's most repeated
+phrase at seven beats. The phrase it was all for held at eleven because the live check
+was reading four beats, not twelve. Both are corrected (`narrator-guards.md` D9), along
+with the pull's over-selection (fifty of fifty turns carried one) — D10 to D13 — and the
+run with those in is the next row of this table.
 
 ## Still open
 

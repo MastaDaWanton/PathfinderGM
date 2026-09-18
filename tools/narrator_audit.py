@@ -197,28 +197,51 @@ def audit(turns: int, script: str, world: str, character: str,
         c.save()
         client = Client()
 
+        unreachable = 0
+        stopped_early = ""
         for n in range(turns):
             said = lines[n % len(lines)]
             before = cm.current()
             fighting = before.scene.in_encounter
-            # Where the transcript stood before this turn, so what the turn actually
-            # wrote can be recovered afterwards.
+            # Where the transcript and the turn log stood before this turn, so what the
+            # turn actually wrote can be recovered afterwards.
             was = len(before.transcript)
+            log_was = len(getattr(before, "turn_log", None) or [])
             started = time.monotonic()
             # Answer anything the engine is waiting on first. A fight suspends for the
             # player's d20, and `/api/say` correctly refuses while a roll is pending —
             # so a harness that cannot roll cannot audit a fight at all, which is the
             # half of the game most worth auditing. Rolled by the engine (no `face`),
             # which is what the popup's "roll for me" does.
-            for _ in range(12):
-                if not cm.current().scene.awaiting:
+            #
+            # And nothing the server does may take the run down. Measured 2026-09-17:
+            # Ollama restarted under turn 59 of 60, the view raised, Django's test
+            # client re-raised it here, and fifty-eight turns of measurement went
+            # unwritten. A turn that raises is a `turn-failed` row like any other; a
+            # run that cannot reach the model three turns running stops and says so,
+            # rather than burning the script against a server that is not there.
+            try:
+                for _ in range(12):
+                    if not cm.current().scene.awaiting:
+                        break
+                    client.post("/api/roll", data="{}",
+                                content_type="application/json")
+                    tally["rolls-answered"] += 1
+                r = client.post("/api/say", data=json.dumps({"text": said}),
+                                content_type="application/json")
+            except Exception as exc:  # noqa: BLE001 — the whole point is to survive it
+                seconds = time.monotonic() - started
+                why = f"{type(exc).__name__}: {str(exc)[:160]}"
+                tally["turn-failed"] += 1
+                rows.append({"n": n, "said": said, "faults": ["turn-failed"],
+                             "status": 0, "why": why, "seconds": round(seconds, 1)})
+                print(f"  turn {n + 1:3d}  {seconds:5.1f}s  turn-failed ({why})")
+                unreachable += 1
+                if unreachable >= 3:
+                    stopped_early = f"three turns running failed to reach the model: {why}"
+                    print(f"\nstopping early: {stopped_early}")
                     break
-                client.post("/api/roll", data="{}",
-                            content_type="application/json")
-                tally["rolls-answered"] += 1
-
-            r = client.post("/api/say", data=json.dumps({"text": said}),
-                            content_type="application/json")
+                continue
             seconds = time.monotonic() - started
             if r.status_code != 200:
                 # WHY it failed, not just that it did. Four instant failures in a
@@ -234,7 +257,16 @@ def audit(turns: int, script: str, world: str, character: str,
                 rows.append({"n": n, "said": said, "faults": ["turn-failed"],
                              "status": r.status_code, "why": why,
                              "seconds": round(seconds, 1)})
+                print(f"  turn {n + 1:3d}  {seconds:5.1f}s  turn-failed "
+                      f"({r.status_code} {why[:80]})")
+                if _unreachable(r.status_code, why):
+                    unreachable += 1
+                    if unreachable >= 3:
+                        stopped_early = f"three turns running failed to reach the model: {why[:120]}"
+                        print(f"\nstopping early: {stopped_early}")
+                        break
                 continue
+            unreachable = 0
 
             c = cm.current()
             body = r.json()
@@ -249,6 +281,18 @@ def audit(turns: int, script: str, world: str, character: str,
             said_this_turn = [b["text"] for b in c.transcript[was:]
                               if b.get("who") == "gm" and b.get("text")]
             text = " ".join(said_this_turn)
+            # The narrator's OWN prose apart from the engine's lines, for the texture
+            # and drift reports. Measured 2026-09-17: the watcher's award line ("You
+            # gain 200 XP for moving a matter along: …") sat in seven beats of a run
+            # and was the run's single most repeated phrase — an engine template, not
+            # the model's, and the two have to be told apart or the number says
+            # nothing about the narrator.
+            prose_this_turn = " ".join(b["text"] for b in c.transcript[was:]
+                                       if b.get("who") == "gm" and b.get("text")
+                                       and b.get("kind") == "setup")
+            new_log = (getattr(c, "turn_log", None) or [])[log_was:]
+            pull = next((str(t.get("pull") or "") for t in new_log
+                         if t.get("kind") == "prose"), "")
             faults: list[str] = []
 
             # What the app's own reviewer would say, run against the same world names the
@@ -282,15 +326,39 @@ def audit(turns: int, script: str, world: str, character: str,
                          # Whole, not truncated to 120 — the length of the prose is the
                          # thing being asked about now, and a clipped sample cannot
                          # answer it.
-                         "narration": text})
+                         "narration": text,
+                         "prose": prose_this_turn,
+                         "pull": pull})
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
         cm._LIVE.clear()
     modelcfg.for_role = real_for_role
 
     clean = sum(1 for r in rows if not r["faults"])
+    pulls = [r["pull"] for r in rows if r.get("pull")]
     return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows,
-            "texture": _texture_report(rows), "drift": _drift_report(rows)}
+            "texture": _texture_report(rows), "drift": _drift_report(rows),
+            "pulls": {"sent": len(pulls), "distinct": len(set(pulls)),
+                      "commonest": collections.Counter(pulls).most_common(3)},
+            "stopped_early": stopped_early}
+
+
+def _own(row: dict) -> str:
+    """The narrator's own prose for a row. Rows written since 2026-09-17 carry it as
+    `prose` (empty when the prose call whiffed and the page was the engine's tells —
+    which is then correctly NOT the narrator's); older runs' rows have only the whole
+    page, which is what they measured."""
+    return str(row["prose"] if "prose" in row else row.get("narration") or "")
+
+
+def _unreachable(status: int, why: str) -> bool:
+    """Whether a failed turn was the model being absent rather than the turn being
+    bad. A 503 carrying the client's own "cannot reach" or "did not answer" is the
+    server saying so; a 410 (the character died) or a 502 (no legal turn) is not."""
+    low = (why or "").lower()
+    return status in (0, 503) and ("cannot reach" in low or "did not answer" in low
+                                   or "remotedisconnected" in low
+                                   or "connection" in low)
 
 
 def _texture_report(rows: list[dict]) -> dict:
@@ -299,7 +367,9 @@ def _texture_report(rows: list[dict]) -> dict:
     Reported rather than judged. See `gm.narration.texture` on why most of what "good"
     means is not measurable here and why these particular numbers are.
     """
-    said = [r["narration"] for r in rows if r.get("narration")]
+    # The narrator's own beats (`prose`), not the whole page: the engine's award and
+    # tell lines are templates by design and belong to a different measurement.
+    said = [_own(r) for r in rows if _own(r)]
     if not said:
         return {}
     lengths = sorted(len(t) for t in said)
@@ -339,14 +409,14 @@ def _drift_report(rows: list[dict], parts: int = 3) -> list[dict]:
     honest way to see it: if the prose is shortening, the openings converging or the
     faults piling up, the columns say so.
     """
-    said = [r for r in rows if r.get("narration")]
+    said = [r for r in rows if _own(r)]
     if len(said) < parts * 3:
         return []
     size = len(said) // parts
     out = []
     for i in range(parts):
         chunk = said[i * size:(i + 1) * size] if i < parts - 1 else said[i * size:]
-        texts = [r["narration"] for r in chunk]
+        texts = [_own(r) for r in chunk]
         share, opener = narration_mod.formulaic(texts)
         per = [narration_mod.texture(t) for t in texts]
         out.append({
@@ -407,9 +477,16 @@ def main() -> None:
             if kind == "rolls-answered":
                 continue
             print(f"  {kind:28s} {n:4d}   {100 * n / turns:6.1f}")
+    if result.get("stopped_early"):
+        print(f"\nSTOPPED EARLY: {result['stopped_early']}")
+    pulls = result.get("pulls") or {}
+    if pulls.get("sent"):
+        print(f"\nthreads pulled: {pulls['sent']} of {turns} turns carried one, "
+              f"{pulls['distinct']} distinct; commonest "
+              + ", ".join(f"{t[:50]!r} x{n}" for t, n in pulls.get("commonest") or []))
     tex = result.get("texture") or {}
     if tex:
-        print("\nthe prose itself:")
+        print("\nthe narrator's own prose (the engine's lines set aside):")
         print(f"  length          mean {tex['chars_mean']} chars, "
               f"median {tex['chars_median']}, "
               f"range {tex['chars_min']}-{tex['chars_max']}")

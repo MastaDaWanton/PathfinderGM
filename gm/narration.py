@@ -764,7 +764,13 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     #     The hint names the matter and one fact of it; no deterministic backstop,
     #     because an appended anchor sentence would be the formula this file has just
     #     stopped writing twice over.
-    if pull and pull.get("urgent"):
+    #     Quests only. Measured on the first run after this shipped: eight fires in
+    #     fifty turns, six of them on the world's own strain cards ("Volatility between
+    #     winged clans and flightless communities"), and the rewrites came back all but
+    #     unchanged — a fact about a town's politics is colour the beat may pass over;
+    #     a task the player took on and has not heard of for ten turns is the failure
+    #     the player described.
+    if pull and pull.get("urgent") and pull.get("kind") == "quest":
         low = (text or "").lower()
         keys = [str(k).lower() for k in pull.get("keys") or [] if len(str(k)) >= 4]
         names = [str(n).lower() for n in pull.get("people") or [] if len(str(n)) >= 3]
@@ -2344,6 +2350,30 @@ def added_sentences(before: str, after: str) -> list[str]:
     """The sentences `after` has that `before` did not — what a backstop appended."""
     had = set(_sentences(before))
     return [s for s in _sentences(after) if s not in had]
+
+
+def own_prose(transcript, n: int = 12) -> list[str]:
+    """The narrator's own recent beats, as the model wrote them: the last `n` GM beats
+    of kind "setup", each with the pipeline's appended sentences taken back out.
+
+    Two things this is not, both measured 2026-09-17 on the first sixty-turn run after
+    the guards. Not the engine's lines: award and tell beats ("You gain XP for moving a
+    matter along", "The fight is over") are `consequence`, and shown back as "what you
+    narrated" they became the register of four of the last nineteen beats. And not
+    four beats long: the window used to be `transcript[-8:]` filtered to the GM, which
+    with the player's lines interleaved left the phrase check (twelve beats by design)
+    looking at four — it fired once in fifty turns while the phrase it exists for sat
+    in eleven of them. Every consumer slices its own tail from this list, so widening it
+    changes nothing for the ones that wanted six or two.
+    """
+    out = []
+    for b in list(transcript or [])[-4 * n:]:
+        if not isinstance(b, dict) or b.get("who") != "gm" or b.get("kind") != "setup":
+            continue
+        text = strip_added(str(b.get("text") or ""), b.get("added"))
+        if text:
+            out.append(text)
+    return out[-n:]
 
 
 def strip_added(text: str, added) -> str:
