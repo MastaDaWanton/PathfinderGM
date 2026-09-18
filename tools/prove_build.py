@@ -452,7 +452,11 @@ def check_the_gm_reads_the_world_through_fts5(http: Http) -> None:
     "unknown" words are the ones found in no document — so a build without FTS5 answers
     500 here, or a model's guess, instead of the refusal. No Ollama needed.
     """
-    s, body = http.post("/api/say", {"text": "/gm who is Zorblax Quinn of the Emerald Cabal"})
+    # Two invented words and nothing else: the first run of this check asked after
+    # "Zorblax Quinn of the Emerald Cabal", and the shipped Pangrella export has an
+    # Emerald in a name — a real hit, so the question went to the model (which, to its
+    # credit, said it had no such person). A probe of the refusal must find nothing.
+    s, body = http.post("/api/say", {"text": "/gm who is Zorblax Quixbane"})
     asides = [t.get("text", "") for t in (j(body).get("transcript") or [])
               if t.get("who") == "gm" and t.get("kind") == "aside"]
     said = asides[-1] if asides else ""
