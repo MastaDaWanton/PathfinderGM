@@ -439,11 +439,48 @@ the tie bound:
 | openings where somebody speaks to the player first | 3 of 3 |
 | template floors | 0 of 3 |
 
+## The GM asked out of character (2026-09-18)
+
+"Make sure the /gm speaks naturally to the user … any system or place should be able to
+be asked about and an answer given." docs/gm-questions.md carries the design and the
+prior art; this is the live record — the same fifteen questions typed through `/api/say`
+against the Aurvantis play-test save, three runs, the code between them.
+
+The first run is the one to remember. The retrieval module was built, measured on the
+fixture world and unit-tested green — and nine of ten questions never reached it. The
+older pass in `gm_answers` answered first, on bare words: "who runs this town" got the
+roster because it contained "who"; "how many hit points do I have" got the pack because
+"have" was a carrying word; "is there a temple here" got the Temple Sword, "who runs this
+town" the Town Watcher and "what are the winged clans" the spell Winged Sword, each the
+only rulebook entry beginning with that ordinary word. Then a second stale server answered
+the "re-run" with the first run's code, byte for byte, for half an hour.
+
+| | run 1 | run 2 (topics as phrases, no one-word prefix) | run 3 (+ one-word exact names only when asked what a thing is; refs named; the named thing first) |
+|---|---|---|---|
+| answered from the world's record or the engine, rightly | 1 of 10 | 13 of 15 | **15 of 15** |
+| answered by the wrong rulebook entry | 3 | 1 ("who guards the gate" → the creature *Guards*) | 0 |
+| answered by the wrong engine topic | 5 | 0 | 0 |
+| refused in code, rightly ("who is Grimble") | — | 1 | 1 |
+| honest "my notes don't cover it" from the model | — | 4 | 4 |
+| engine ref in the prose ("the confrontation with c1") | — | 1 | 0 |
+| model answers, seconds each (gemma 12B, loaded) | 2–4 | 1–3 | 1–3 |
+
+What the answers read like now, verbatim: "The town is officially governed by a local
+reeve who is confirmed by the Kragmoor Horde's central authority. However, my notes
+indicate that there is a shadow power in the form of an old veterans' league that
+everyone in office refuses to cross." — and for a temple: "there is no temple listed
+among the locations in Vormoor. The only places currently established in the village are
+the well, the market, the guildhall, the lane, and the green."
+
 ## Still open
 
 - Whether the prose is any *good* is still not a number here. What is: whether it is
   true, whether it is the same, and whether the engine's lines and the narrator's are
   being measured apart.
+- Fifteen questions is a smoke test, not a rate. The model's "my notes don't cover it"
+  on a question the notes do not cover held 4 of 4 times here; FaithEval puts a 9B
+  model's strict abstention near half, so the honest answer is that the code refuses
+  what it can be sure of and the rest is measured, not guaranteed.
 
 ## Still open
 
