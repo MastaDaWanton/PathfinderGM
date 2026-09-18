@@ -9,11 +9,21 @@ a statement true rather than answering a question.
 
 Three rules, and they are what make this worth having at all:
 
-**No model.** Every line below is read off the engine, which owns the state. A question
-answered by a language model is a guess with good grammar — a recent benchmark of
-narrative consistency has the best model contradicting an established fact within
-twenty turns in most runs — and the whole point of asking the GM is to get the truth
-rather than the fiction's version of it.
+**The engine first, and only when it is sure.** Every line below is read off the engine,
+which owns the state, or out of the rulebooks by name. A question answered by a language
+model is a guess with good grammar — a recent benchmark of narrative consistency has the
+best model contradicting an established fact within twenty turns in most runs — and the
+whole point of asking the GM is to get the truth rather than the fiction's version of it.
+What the engine does NOT hold — the town, its council, a name from the world — goes to
+the model in `views._ask_the_gm`, grounded in the world's own record (docs/gm-questions.md)
+and labelled as the GM's word rather than the engine's.
+
+Measured live 2026-09-18, ten questions through `/api/say`, before the matching below was
+tightened: nine were answered here and never reached the record — "is there a temple
+here" got the Temple Sword, "who runs this town" the Town Watcher (a creature whose name
+begins with "town"), "what do people around here eat" the roster, and "how many hit points
+do I have" the pack, because "have" was a carrying word. A door that answers the wrong
+question is worse than one that says nothing: it stops the right answer being sought.
 
 **Nothing changes, and no time passes.** Asking is not a turn. Nothing is rolled, the
 clock does not move, and no NPC gets to act because you wanted to check your own hit
@@ -35,23 +45,49 @@ import re
 from rules import cards as cards_mod
 from rules import houserules, states
 
-# What a question is about. Matched loosely on purpose: somebody typing "/gm who is
-# here again?" is asking the same thing as "/gm who", and a door that only opens for an
-# exact word is a door people stop using.
+# What a question is about, matched as a PHRASE. These used to be bare word lists —
+# "who", "have", "people", "day" — on the theory that a door that only opens for an
+# exact word is a door people stop using. Measured live (module docstring), the bare
+# words opened the door on nearly every question: "who runs this town" is not "who is
+# here", and "how many hit points do I have" is not about the pack. The phrases are the
+# ways people actually ask about the state, and a question that fits none of them is
+# about the world, which is a different answerer's.
 TOPICS = {
-    # Words are chosen to overlap as little as possible, because a question matches
-    # every topic it touches and "who is here" answering with the map first is noise.
-    # "here" and "me" are deliberately absent for that reason: they are in half of all
-    # questions.
-    "where": ("where", "place", "room", "exits", "leads", "map", "standing", "outside"),
-    "who": ("who", "people", "person", "npc", "npcs", "present", "cast", "with"),
-    "me": ("hp", "health", "hurt", "wounded", "condition", "conditions", "effects",
-           "buff", "buffs", "sheet", "myself", "dying"),
-    "carrying": ("carrying", "carry", "have", "inventory", "satchel", "pack", "items",
-                 "gear", "coin", "money", "purse"),
-    "quests": ("quest", "quests", "task", "tasks", "objective", "objectives", "job"),
-    "time": ("time", "clock", "day", "hour", "late", "when"),
-    "last": ("last", "happened", "just", "why", "roll", "rolled", "dice", "turn"),
+    "where": re.compile(
+        r"\b(?:where (?:am i|are we|is this|do i stand|can i go|could i go)|"
+        r"what (?:place|room|building) (?:is this|am i in)|exits?|which way (?:out|is)|"
+        r"the map|what(?:'s|’s| is) (?:outside|nearby|around me|this place))\b", re.I),
+    "who": re.compile(
+        r"\b(?:who(?:'s|’s| is| else is| all is)?\s+(?:all\s+|else\s+)?"
+        r"(?:here|around|present|nearby|with me|with us|standing here|"
+        r"in (?:the|this) (?:room|scene|place))|"
+        r"(?:people|everyone|anyone|npcs?) (?:here|around me|present|nearby|in the room)|"
+        r"the (?:cast|roster)|who did i (?:meet|see))\b", re.I),
+    "me": re.compile(
+        r"\b(?:hit points?|hp|health|how (?:hurt|wounded|badly hurt|injured) am i|"
+        r"am i (?:hurt|wounded|dying|ok|okay|alright|bleeding|poisoned|sick)|"
+        r"how am i (?:doing|holding up)|"
+        r"my (?:conditions?|states?|effects|buffs|wounds|sheet|status)|"
+        r"what(?:'s|’s| is) wrong with me|what conditions)\b", re.I),
+    "carrying": re.compile(
+        r"\b(?:what am i carrying|what do i (?:have|carry|own)(?: on me| with me)?|"
+        r"inventory|my (?:pack|bag|satchel|gear|items|belongings|purse|coins?|money|gold)|"
+        r"how much (?:gold|money|coin) (?:do i have|have i got|is in my purse)|"
+        r"what(?:'s|’s| is) in my (?:pack|bag|satchel|pockets?))\b", re.I),
+    "quests": re.compile(
+        r"\b(?:quests?|objectives?|my tasks?|what am i (?:supposed|meant) to (?:do|be doing)|"
+        r"what (?:jobs?|tasks?|work) (?:do|have) i|open (?:jobs|tasks)|"
+        r"what have i (?:agreed|promised) to do)\b", re.I),
+    "time": re.compile(
+        r"\b(?:what time|time is it|how late|what (?:day|hour) is it|the (?:world )?clock|"
+        r"what day|how long (?:has it been|have i been here|since))\b", re.I),
+    # "what happened" only when it is the whole question or about the last turn: "what
+    # happened in the war with the flightless" is history, and the record's to answer.
+    "last": re.compile(
+        r"\b(?:what just happened|what happened(?:\s*[?.!]*\s*$| (?:there|then|to me|"
+        r"last turn|on (?:my|the) last turn))|last turn|"
+        r"why did (?:that|it|i|he|she|they) (?:fail|work|miss|hit|happen)|"
+        r"what did i roll|the (?:roll|dice)|rolled|what went wrong)", re.I),
 }
 
 
@@ -82,14 +118,12 @@ def wants_a_reading(question: str) -> bool:
 
 
 def topics_for(question: str) -> list[str]:
-    """Which sections answer this. Everything, when the question names nothing."""
-    asked = " " + " ".join(str(question or "").lower().split()) + " "
-    if not asked.strip():
+    """Which sections answer this. Everything, when the question is empty — "/gm" on
+    its own is "tell me the state" — and nothing when it fits no phrase."""
+    asked = " ".join(str(question or "").split())
+    if not asked:
         return list(TOPICS)
-    found = [name for name, words in TOPICS.items()
-             if any(f" {w} " in asked or asked.startswith(f" {w}") or
-                    f" {w}?" in asked or f" {w}," in asked for w in words)]
-    return found or []
+    return [name for name, pattern in TOPICS.items() if pattern.search(asked)]
 
 
 def answer(campaign, engine, question: str) -> tuple[str, str]:
@@ -100,9 +134,10 @@ def answer(campaign, engine, question: str) -> tuple[str, str]:
     labelled differently on the page and that difference is the point: the player must
     always be able to tell a fact from an opinion, however well the opinion reads.
 
-    Three passes, cheapest and most certain first. What the engine holds; then the
-    shipped rules and the world's own material, looked up by name; and only when both
-    come up empty, the model — grounded in whatever those first two passes did find.
+    Three passes, cheapest and most certain first. What the engine holds, by phrase; then
+    the shipped rules, looked up by name; and when both come up empty, "gm" — the
+    world's own record and the model, in `views._ask_the_gm`, which runs `look_up` again
+    so whatever the books did find is still handed over as grounding.
     """
     wanted = topics_for(question)
     out: list[str] = []
@@ -328,8 +363,29 @@ def _hint(question: str) -> str:
     return ""
 
 
+# The shape of asking what a thing IS. A one-word term is looked up as a rules entry
+# only inside this shape (or with a catalogue hint), because the catalogues are full of
+# ordinary words filed as names: 2,137 of 7,135 creatures are one word (guards, acolyte,
+# merchant, wolf), 380 spells (light, fear, jump, sleep, command, break), feats (run,
+# dodge), weapons (club, net). Measured live 2026-09-18: "who guards the gate" was
+# answered with the bestiary's *Guards* — an exact match, on a verb. "What is a ghost"
+# and "what does fireball do" are asking about the entry; "is there light here" and
+# "should I run" are about the scene, and go to the GM.
+_DEFINITIONAL = re.compile(
+    r"\b(?:what(?:'s|’s| is| are| does| do| was| were)|how (?:does|do)|explain|define|"
+    r"describe|tell me about|meaning of|rules? (?:for|on|of|about))\b", re.I)
+
+
+def asks_what_a_thing_is(question: str) -> bool:
+    return bool(_DEFINITIONAL.search(str(question or "")))
+
+
 def look_up(c, engine, question: str):
-    """What the world and the rulebooks say about whatever was named. May be empty."""
+    """What the rulebooks say about whatever was named. May be empty.
+
+    The world's own material is no longer looked up here by exact name — it is FOUND, by
+    `play.gm_search`, which ranks the whole record and hands the model its passages.
+    """
     terms = _terms(question)
     if not terms:
         return []
@@ -337,11 +393,17 @@ def look_up(c, engine, question: str):
     finders = ([f for f in _FINDERS if f.__name__ == "_find_" + hint] if hint
                else list(_FINDERS))
     # By term and THEN by finder, so the longest phrase wins across every catalogue
-    # rather than the first catalogue winning with its worst match.
+    # rather than the first catalogue winning with its worst match. A catalogue hint
+    # ("the spell magic") is the player naming a thing, and a one-word start of a name
+    # is allowed to find it; without one it is not (`_match`). And a one-word term is
+    # tried at all only when the question asks what a thing is (`_DEFINITIONAL`).
+    single_ok = bool(hint) or asks_what_a_thing_is(question)
     for term in terms:
+        if " " not in term and not single_ok:
+            continue
         for finder in finders:
             try:
-                got = finder(c, engine, term)
+                got = finder(c, engine, term, bool(hint))
             except Exception:
                 got = []
             if got:
@@ -372,8 +434,12 @@ def _index(kind, build):
     return _INDEX[kind]
 
 
-def _match(names: dict, term: str):
-    """The row whose name IS this, or begins with it. Never a loose contains."""
+def _match(names: dict, term: str, named: bool = False):
+    """The row whose name IS this, or begins with it. Never a loose contains.
+
+    `named`: the question said which catalogue it meant ("the spell magic"), so a
+    one-word start of a name is somebody naming the entry rather than speaking English.
+    """
     term = " ".join(str(term or "").lower().split())
     if not term:
         return None
@@ -381,9 +447,15 @@ def _match(names: dict, term: str):
         return names[term]
     if len(term) < 4:
         return None
-    starts = [n for n in names if n.startswith(term + " ")]
-    if len(starts) == 1:
-        return names[starts[0]]
+    # A name that BEGINS with the term. Two words is somebody naming it ("power att…");
+    # one word is not, unless the catalogue was named. Measured live 2026-09-18, three
+    # of ten questions were answered by this clause and all three were wrong: "temple"
+    # found the Temple Sword, "town" the Town Watcher, "winged" the spell Winged Sword —
+    # each the only entry in its catalogue beginning with that ordinary word.
+    if " " in term or named:
+        starts = [n for n in names if n.startswith(term + " ")]
+        if len(starts) == 1:
+            return names[starts[0]]
     # A term found in the MIDDLE of a name has to be more than one word.
     #
     # Reported 2026-09-17: "/gm what are the people around me doing in reaction to
@@ -417,7 +489,7 @@ _KNOWLEDGE = {
 }
 
 
-def _find_creature(c, engine, term):
+def _find_creature(c, engine, term, named=False):
     """A creature by name — and the rule for whether the character knows it.
 
     NOT the stat block. Identifying a creature is a Knowledge check in these rules, and
@@ -430,7 +502,7 @@ def _find_creature(c, engine, term):
     rows = _index("creature", lambda: {
         str(v.get("name", k)).lower(): v
         for k, v in bestiary.everything().items() if isinstance(v, dict)})
-    b = _match(rows, term)
+    b = _match(rows, term, named)
     if not b:
         return []
     kind = str(b.get("creature_type") or "creature")
@@ -441,12 +513,12 @@ def _find_creature(c, engine, term):
             "  its numbers are not yours for the asking; make the check in play"]
 
 
-def _find_spell(c, engine, term):
+def _find_spell(c, engine, term, named=False):
     from rules import spells
 
     rows = _index("spell", lambda: {
         str(getattr(v, "name", k)).lower(): v for k, v in spells.all_spells().items()})
-    s = _match(rows, term)
+    s = _match(rows, term, named)
     if not s:
         return []
     out = ["SPELL: " + str(getattr(s, "name", term)) + "."]
@@ -461,12 +533,12 @@ def _find_spell(c, engine, term):
     return out
 
 
-def _find_feat(c, engine, term):
+def _find_feat(c, engine, term, named=False):
     from rules import feats
 
     rows = _index("feat", lambda: {
         str(getattr(v, "name", k)).lower(): v for k, v in feats.all_feats().items()})
-    f = _match(rows, term)
+    f = _match(rows, term, named)
     if not f:
         return []
     out = ["FEAT: " + str(getattr(f, "name", term)) + "."]
@@ -480,12 +552,12 @@ def _find_feat(c, engine, term):
     return out
 
 
-def _find_weapon(c, engine, term):
+def _find_weapon(c, engine, term, named=False):
     from rules import weapons
 
     rows = _index("weapon", lambda: {
         str(v.get("name", k)).lower(): v for k, v in weapons.all_weapons().items()})
-    w = _match(rows, term)
+    w = _match(rows, term, named)
     if not w:
         return []
     return ["WEAPON: {name} — {dmg} {kind}, crit {cr}/x{cm}, {prof} {cat}.".format(
@@ -494,11 +566,11 @@ def _find_weapon(c, engine, term):
         prof=w.get("prof", ""), cat=w.get("category", "")).replace("  ", " ")]
 
 
-def _find_hazard(c, engine, term):
+def _find_hazard(c, engine, term, named=False):
     from rules import hazards
 
     rows = _index("hazard", lambda: {str(n).lower(): n for n in hazards.names()})
-    name = _match(rows, term)
+    name = _match(rows, term, named)
     row = hazards.get(name) if name else None
     if not row:
         return []
@@ -509,13 +581,13 @@ def _find_hazard(c, engine, term):
     return out[:10]
 
 
-def _find_state(c, engine, term):
+def _find_state(c, engine, term, named=False):
     """A condition, by the one tag vocabulary every system in the app speaks."""
     from rules import states
 
     rows = _index("state", lambda: {str(k).lower().replace("-", " "): k
                                     for k in states.TAGS})
-    key = _match(rows, term)
+    key = _match(rows, term, named)
     if not key:
         return []
     out = ["CONDITION: " + str(key) + ".",
@@ -526,26 +598,12 @@ def _find_state(c, engine, term):
     return out
 
 
-def _find_world(c, engine, term):
-    """A place, a faction, a person or an event out of the world's own export."""
-    world = getattr(c, "world", None)
-    if world is None:
-        return []
-    thing = world.by_name(term)
-    if not thing:
-        return []
-    name = getattr(thing, "name", term)
-    kind = getattr(thing, "kind", "") or getattr(thing, "scale", "") or "thing"
-    out = ["IN THIS WORLD: " + str(name) + " — " + str(kind) + "."]
-    for field in ("summary", "description", "premise", "note", "text"):
-        text = " ".join(str(getattr(thing, field, "") or "").split())
-        if text:
-            out.append("  " + text[:700] + ("…" if len(text) > 700 else ""))
-            break
-    return out
-
-_FINDERS = (_find_world, _find_creature, _find_spell, _find_feat, _find_weapon,
-            _find_hazard, _find_state)
+# The world's own export used to have a finder here too, by exact name, and it answered
+# "who is Drenn Ironvale" with "IN THIS WORLD: Drenn Ironvale — CHARACTER. Person" —
+# the whole of his summary — and then stopped the GM being asked. The record is read by
+# `play.gm_search` now, ranked, and handed to the model as passages (docs/gm-questions.md).
+_FINDERS = (_find_creature, _find_spell, _find_feat, _find_weapon, _find_hazard,
+            _find_state)
 
 # "this creature", "that thing", "it" — a question about somebody standing right here
 # rather than about a name in a book. This is what the player actually asked on

@@ -1330,6 +1330,55 @@ def _gm_answer(c, question: str, shown: str):
     return JsonResponse(_state(c))
 
 
+# The engine's own handles for people, as the brief prints them: "(c1)", "c2".
+_REF = re.compile(r"\(\s*(c\d+)\s*\)|\b(c\d+)\b", re.I)
+
+
+def _name_the_refs(text: str, scene) -> str:
+    """Every engine ref in an answer replaced with the name it stands for.
+
+    The scene brief names people with their refs — "the apprentice minding the door
+    (c1)" — and the model, handed a shorter handle, used it: measured live 2026-09-18,
+    "you could focus on the immediate confrontation with c1". Repaired here from the
+    scene's own actors rather than the model told not to, because told-not-to is the
+    fix that has never held (CLAUDE.md). A bracketed ref after a name is dropped; a
+    bare one becomes the name.
+    """
+    actors = getattr(scene, "actors", None) or {}
+    if not actors or not text:
+        return text
+
+    def swap(m):
+        ref = (m.group(1) or m.group(2)).lower()
+        actor = actors.get(ref)
+        if actor is None:
+            return m.group(0)
+        if m.group(1):
+            return ""
+        return str(getattr(actor, "name", "") or ref)
+
+    return " ".join(_REF.sub(swap, text).split()).replace(" ,", ",").replace(" .", ".")
+
+
+def _sources_used(hits, said: str) -> list:
+    """The hits the answer actually drew on: those whose name, or most of whose name,
+    appears in it. A source label is a claim about where the answer came from, and
+    measured live 2026-09-18 the label under "who guards the gate" read "Dunvale (city);
+    Dustgate (city); Wynreach (city)" — three weak hits the answer never touched; it had
+    come from the notes on the town. Naming them as sources would have been a lie the
+    code told, which is worse than one the model tells."""
+    low = " ".join(str(said or "").lower().split())
+    used = []
+    for h in hits:
+        name = str(h.name or "").lower()
+        if not name:
+            continue
+        words = [w for w in re.findall(r"[a-z0-9'’-]+", name) if len(w) >= 4]
+        if name in low or (words and sum(w in low for w in words) * 2 >= len(words)):
+            used.append(h)
+    return used
+
+
 def _ask_the_gm(c, engine, question: str) -> str:
     """The model, grounded in the brief, answering out of character.
 
@@ -1337,27 +1386,58 @@ def _ask_the_gm(c, engine, question: str) -> str:
     scenes, which is the one thing this must not do, and the history is the fiction the
     player has just stepped out of.
     """
+    from . import gm_search
+
     agent = GMAgent(c.world, engine)
     brief = prompts.scene_brief(
         c.world, c.scene, c.location, _recent_events(c.world, c.location),
         here=engine.here(), known=engine.places())
     found = "\n".join(gm_answers.look_up(c, engine, question))
+    # What the world's own record holds on what was asked (docs/gm-questions.md). Names
+    # are found, not matched, by a BM25 index over the world alone; "here" and "this
+    # town" are the place the engine knows, and get its whole record as the GM's notes.
+    # A question that names a thing the record has nothing on is answered by the code,
+    # never by the model — which, told to say "unknown", does so about a third of the
+    # time and answers confidently the rest.
+    hits = gm_search.search(c.world, question)
+    here = gm_search.asks_about_here(question) or gm_answers.wants_a_reading(question)
+    # The place the party stands in is the default subject of a question that names
+    # nobody: "who guards the gate" found a town called Dustgate; the gate meant was this
+    # one. A proper name with hits is the one case the notes are left out.
+    notes = (gm_search.dossier(c.world, c.location, question)
+             if (here or not hits or not gm_search.proper_noun(question)) else "")
+    if not hits and not found and not here:
+        unknown = gm_search.unfiled(c.world, question)
+        if unknown:
+            return gm_search.nothing_filed(question, unknown, notes)
+    record = gm_search.passages(c.world, hits, question)
     try:
         reply = client.chat(
-            prompts.out_of_character_messages(brief, question, found),
+            prompts.out_of_character_messages(brief, question, found,
+                                              notes=notes, record=record),
             agent.prose_model, agent.prose_host, as_json=False, think=False,
-            temperature=0.4, num_predict=320, provider=agent.prose_provider,
+            temperature=0.4, num_predict=380, provider=agent.prose_provider,
             api_key=agent.prose_key)
     except ModelUnavailable as exc:
+        # The deterministic backstop: the record itself, unread by any model.
+        facts = "\n".join(x for x in (record, notes) if x)
+        if facts:
+            return f"The GM is not answering ({exc}), so here is the record as it stands:\n{facts}"
         return ("The engine has nothing filed under that, and the GM is not answering: "
                 f"{exc}\nIt can always answer these from its own state: "
                 + ", ".join(sorted(gm_answers.TOPICS)) + ".")
-    said = " ".join(str(getattr(reply, "text", "") or "").split())
+    said = _name_the_refs(" ".join(str(getattr(reply, "text", "") or "").split()), c.scene)
     if not said:
         return ("The engine has nothing filed under that, and the GM had nothing to "
                 "say either. It can always answer these from its own state: "
                 + ", ".join(sorted(gm_answers.TOPICS)) + ".")
-    return "The GM, out of character:\n  " + said
+    # The sources, named by the code that found them: a 13B model cites its passages
+    # correctly less than half the time (ALCE), and the label is the row's to give —
+    # for the rows the answer drew on, not every row the search returned.
+    used = _sources_used(hits, said)
+    sourced = ("\n  — from the world's record: "
+               + "; ".join(f"{h.name} ({h.kind})" for h in used)) if used else ""
+    return "The GM, out of character:\n  " + said + sourced
 
 
 def _cheat(c, wish: str, shown: str):

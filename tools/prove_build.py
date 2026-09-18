@@ -442,6 +442,29 @@ def check_a_turn_nobody_can_take_is_refused_in_prose(http: Http) -> None:
     note("a turn nobody can take is refused in prose, before any model", faults)
 
 
+def check_the_gm_reads_the_world_through_fts5(http: Http) -> None:
+    """`/gm` finds names in an FTS5 index of the world (play/gm_search.py).
+
+    FTS5 is compiled into the dev interpreter's sqlite3; the frozen app ships its own
+    sqlite3 DLL, and the critic pass on docs/gm-questions.md was right that this is a
+    thing to prove rather than assume. A name no world holds is refused by the code
+    before any model — and that refusal is reached only THROUGH the index, because the
+    "unknown" words are the ones found in no document — so a build without FTS5 answers
+    500 here, or a model's guess, instead of the refusal. No Ollama needed.
+    """
+    s, body = http.post("/api/say", {"text": "/gm who is Zorblax Quinn of the Emerald Cabal"})
+    asides = [t.get("text", "") for t in (j(body).get("transcript") or [])
+              if t.get("who") == "gm" and t.get("kind") == "aside"]
+    said = asides[-1] if asides else ""
+    faults = []
+    if s != 200:
+        faults.append(f"/gm answered {s}: {body[:200]}")
+    if "never mentions" not in said or "zorblax" not in said.lower():
+        faults.append(f"the refusal did not come from the index: {said[:200]!r}")
+    note("/gm refuses a name no world holds, through the FTS5 index, before any model",
+         faults)
+
+
 def pid_alive(pid: int) -> bool:
     out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
                          capture_output=True, text=True).stdout
@@ -899,6 +922,7 @@ def main() -> None:
             time.sleep(1)
         check_it_survived_the_restart(http2)
         check_a_turn_nobody_can_take_is_refused_in_prose(http2)
+        check_the_gm_reads_the_world_through_fts5(http2)
 
         logfile = data / "logs" / "pathfindergm.log"
         faults = []

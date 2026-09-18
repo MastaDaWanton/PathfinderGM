@@ -1891,18 +1891,34 @@ deciding it here: nothing you say in this answer changes the game.
 
 
 def out_of_character_messages(briefing_scene: str, question: str,
-                              found: str = "") -> list[dict]:
+                              found: str = "", notes: str = "",
+                              record: str = "") -> list[dict]:
     """The `/gm` question the engine could not answer from its own books.
 
     Deliberately given the brief and nothing else — no history, no examples. The
     examples teach the model to write scenes, which is the one thing this call must not
     do, and the history is the fiction, which is what the player has stepped out of.
+
+    `notes` (the GM's notes on where the party stands) and `record` (what the world's
+    own record says about what was asked) go in the USER message after the question,
+    last in the prompt — where a passage is read rather than lost in the middle — with
+    the one instruction that matters: answer from them, and say when they do not cover
+    it. docs/gm-questions.md.
     """
     facts = briefing_scene
     if found:
         facts += "\n\nWHAT THE BOOKS SAY ABOUT WHAT WAS ASKED:\n" + found
+    ask = question
+    if notes or record:
+        ask += "\n\n" + "\n\n".join(x for x in (notes, record) if x)
+        ask += ("\n\nAnswer the question from what is above, in your own voice, as the "
+                "person running the game would across the table — a few sentences, "
+                "specific, naming the people and places by their names here (never by a "
+                "tag like c1). These are your own notes: say \"my notes\", not \"the "
+                "information provided\". Where they do not cover the question, say so "
+                "plainly rather than filling it in.")
     return [{"role": "system", "content": OUT_OF_CHARACTER + "\n\n" + facts},
-            {"role": "user", "content": question}]
+            {"role": "user", "content": ask}]
 
 
 def cheat_messages(briefing_scene: str, wish: str) -> list[dict]:
