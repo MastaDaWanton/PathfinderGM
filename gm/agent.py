@@ -897,6 +897,12 @@ class GMAgent:
         if handed:
             repairs.append(f"wrong hands: cut {len(handed)} sentence(s) that gave the "
                            f"player somebody else's blow")
+        # And a blow landed on the turn the fight was only declared: cut, the
+        # declaration standing in its place.
+        text, early = narration_mod.cut_premature_blows(text, blows)
+        if early:
+            repairs.append(f"swing not yet struck: cut {len(early)} sentence(s) that "
+                           f"landed a blow before any die was rolled")
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
@@ -1357,7 +1363,21 @@ class GMAgent:
         pc = self.engine.scene.pc()
         out = []
         for o in outcomes or []:
-            if getattr(o, "op", "") != "attack" or not getattr(o, "rolls", None):
+            if getattr(o, "op", "") != "attack":
+                continue
+            # Read off the tell, never the effects: the narrator's side of the house
+            # is fed tells and nothing else about mechanics (law three), and the
+            # deferred first swing announces itself in the tell's own words.
+            joined = str(getattr(o, "tell", "") or "").startswith("Battle is joined")
+            if not getattr(o, "rolls", None) and not joined:
+                continue
+            if joined:
+                # The fight declared and the swing deferred: no blow to be in anybody's
+                # hands yet, which `premature_blows` reads.
+                line = plain_tell(str(getattr(o, "tell", "") or ""))
+                if pc is not None:
+                    line, _ = narration_mod.pc_to_second_person(line, pc.name)
+                out.append({"attacker": "", "pc": True, "joined": True, "tell": line})
                 continue
             actor = self.engine.scene.actors.get(getattr(o, "actor", "") or "")
             # The outcome does not carry its actor; the tell opens with their name.

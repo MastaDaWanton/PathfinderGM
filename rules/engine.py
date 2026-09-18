@@ -2896,7 +2896,7 @@ class Engine:
             bits.append(
                 f"{actor.name} {m['name']}s {defender.name}"
                 + (" automatically — it cannot resist" if automatic else f" by {margin}")
-                + ("" if m.get("damages_item") else f": {m['effect']}.")
+                + ("." if m.get("damages_item") else f": {m['effect']}.")
             )
             if m.get("damages_item"):
                 # Sunder, Core Rulebook (aonprd.com, Rules: Sunder): "If your attack is

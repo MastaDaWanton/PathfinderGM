@@ -787,6 +787,45 @@ def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
     return " ".join(kept).strip(), wrong
 
 
+# A blow LANDING, in the prose: the verbs a beat uses when steel meets something.
+_BLOW_LANDS = re.compile(
+    r"\b(?:catches|connects|bites into|slams into|crashes into|cracks (?:against|"
+    r"across|into)|shatters|buckles|snaps|splinters|caves in|lands (?:on|against|"
+    r"across|square)|smashes into|tears (?:into|through)|opens (?:a|his|her|their)|"
+    r"draws blood|drives (?:into|through)|is (?:ruined|mangled|shattered|broken|"
+    r"in pieces|in fragments)|now a mangled|ruined (?:steel|blade|weapon))\b", re.I)
+
+
+def premature_blows(text: str, blows: list[dict] | None) -> list[str]:
+    """Sentences that land a blow on a turn where the engine only DECLARED the fight.
+
+    The first swing opens the encounter and stops — "Battle is joined … nothing has
+    landed yet" — and the swing itself is the player's on their first combat turn.
+    Measured on the first live replay (2026-09-18): the tell said exactly that, and the
+    beat read "Your strike catches the blade's spine with a jarring crack … The heavy
+    blade is now a mangled, useless weight in his grip" — a sunder narrated as done
+    before any die was rolled, and the next beat inherited a broken sword nobody broke.
+    Fires only when the turn's blows are all `joined` and none rolled.
+    """
+    blows = [b for b in (blows or []) if isinstance(b, dict)]
+    if not blows or not all(b.get("joined") for b in blows):
+        return []
+    return [s for s in _sentences(unquoted(text)) if _BLOW_LANDS.search(s)]
+
+
+def cut_premature_blows(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
+    """The backstop under `swing-not-yet-struck`: the landing sentences are cut and the
+    declaration stands in their place once. Returns (text, the sentences cut)."""
+    early = premature_blows(text, blows)
+    if not early:
+        return text, []
+    kept = [s for s in _sentences(text) if s not in set(early)]
+    tell = next((str(b.get("tell") or "") for b in (blows or []) if b.get("tell")), "")
+    if tell and tell not in kept:
+        kept.append(tell)
+    return " ".join(kept).strip(), early
+
+
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
@@ -926,6 +965,21 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             f"Rewrite {handed[0]!r} so that {striker} is the one swinging and the "
             f"player is the one the blow is aimed at; the outcome stays exactly what "
             f"the tells say. Keep the rest.",
+            weight=3,
+        ))
+
+    # 0f. The fight was only declared this turn, and the prose landed the blow anyway.
+    #     Weight 3, the same family: an outcome that has not happened yet.
+    early = premature_blows(text, blows)
+    if early:
+        out.findings.append(Finding(
+            "swing-not-yet-struck",
+            f"the fight was joined this turn and no blow was rolled, but the prose lands "
+            f"one: {early[0][:90]!r}",
+            f"Nothing has landed yet: the fight has only just been joined, and the first "
+            f"blow is still to be struck — the dice have not been rolled. Rewrite "
+            f"{early[0]!r} so the two square off and the blow is COMING, not landed: no "
+            f"weapon breaks, nothing is cut, nobody staggers. Keep the rest.",
             weight=3,
         ))
 
@@ -2399,8 +2453,21 @@ def least_recently_used(said: dict | None, key: str, size: int) -> int:
     return pick
 
 
+_VERB_AFTER_NAME = re.compile(r"\{name\} (\w+)\{(s|es)\}")
+
+
 def _fill(line: str, name: str, subj: str, obj: str, poss: str) -> str:
     plural = subj == "they"
+    # A verb that follows the NAME agrees with the name, not with the pronoun: "The
+    # warrior takes it … they are on the ground" is a singular they; "The warrior take
+    # it" (measured live 2026-09-18, a promoted man with they/them pronouns) is not.
+    # The templates write `{name} take{s}`; the name-following tokens are rewritten
+    # here to their own number so nobody has to author two of every line.
+    last = (name.split() or [""])[-1]
+    name_plural = last.lower().endswith("s") and not last[:1].isupper() and len(last) > 3
+    line = _VERB_AFTER_NAME.sub(
+        lambda m: "{name} " + m.group(1) + ("" if name_plural else m.group(2)), line)
+    line = line.replace("{name} {is_}", "{name} " + ("are" if name_plural else "is"))
     words = {
         "name": name, "subj": subj, "Subj": subj[:1].upper() + subj[1:], "obj": obj,
         "poss": poss,
@@ -2478,6 +2545,30 @@ def press_the_death(text: str, deaths: list[dict],
         else:
             text = _append_before_hand_back(text, line)
     return text, added
+
+
+_ITEM_FATE = re.compile(
+    r"\b(?:broken|breaks|destroyed|in pieces|in fragments|shatter\w*|splinter\w*|snap\w*|"
+    r"crack\w*|ruined|mangled|dented|unmarked|hardness|useless|falls apart|comes apart|"
+    r"buckle\w*|split\w*)\b", re.I)
+
+
+def item_fate_on_the_page(text: str, item: str) -> bool:
+    """Whether the prose says what became of a struck item.
+
+    Measured on the third live replay (2026-09-18): the engine's tell read "stranger's
+    club takes 15 through hardness 5 (0/10 left): destroyed — in pieces", and the beat
+    said the wood "groaned under the force of your impact" and nothing more. Under
+    intents-first the tell is not printed, so the player never learned the club was
+    gone. Same shape as `death_on_the_page`: the item named in a sentence with fate
+    language, or a sentence with fate language and no other item in it."""
+    stem = (str(item or "").split() or [""])[-1].lower()
+    if not stem:
+        return False
+    for s in _sentences(unquoted(text)):
+        if _ITEM_FATE.search(s) and re.search(rf"\b{re.escape(stem)}s?\b", s, re.I):
+            return True
+    return False
 
 
 def _append_before_hand_back(text: str, line: str) -> str:

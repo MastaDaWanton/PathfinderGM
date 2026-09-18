@@ -3400,6 +3400,12 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
     if scene is None:
         return
     ops = {str(o).lower() for o in (resolved_ops or ())}
+    # A fight that opened by a swing (`_ensure_encounter`, no `begin_encounter` op in
+    # the list) is a fight all the same: the subject becomes the opponent, or the
+    # anchor writes "you are still waiting for a challenger" into the beat that
+    # squares the two off (measured, second live replay 2026-09-18).
+    if getattr(scene, "in_encounter", False) and scene.thread.get("subject"):
+        ops = ops | {"begin_encounter"}
     if ops & {"begin_encounter", "travel"}:
         # The fight IS the engagement now — and the person it was with survives it as
         # the opponent, so a plan's target can be checked against them and the brief
@@ -4068,7 +4074,59 @@ def inject_company(raw_intents, player_text: str, scene):
 _PROMOTED_CAP = 4
 
 
-def promote_cast(scene, added) -> list[str]:
+# The sentence that makes somebody the player's opponent-to-be: they step up, square
+# off, draw, come forward. Read against the person's own phrase within the sentence.
+# Measured on the second live replay (2026-09-18): "a challenger" bound to "the woman in
+# the shadows" — the one person promoted from the insult beat, who had merely recoiled
+# — while "the man in the scarred leather vest … the predatory grin deepens … tensing as
+# if ready to spring" was never promoted at all, because four scenery extras had used
+# the cap. The sunder and the killing blow both went to the woman.
+_CHALLENGES = re.compile(
+    r"(?:steps? (?:forward|up|in|into the (?:circle|ring|open))|squares? (?:off|up)|"
+    r"faces? you|comes? forward|pushes? (?:to the front|through the crowd)|"
+    r"draws? (?:a|an|his|her|their|the) \w+|(?:his|her|their) hand (?:goes|drops|rests|"
+    r"falls) to (?:a|the|his|her|their) (?:\w+ )?(?:hilt|blade|sword|club|weapon|axe|"
+    r"dagger|knife)|meets? your (?:gaze|eyes|stare)|ready to spring|tens(?:es|ing) as if|"
+    r"grin\w* (?:deepens|widens|spreads)|cracks? (?:his|her|their) knuckles|"
+    r"rolls? (?:his|her|their) shoulders|challenges? you|accepts? (?:the|your) challenge|"
+    r"answers? (?:the|your) challenge|spits? (?:at your feet|in the dirt)|"
+    r"lunges?|swings?|strikes?|charges?|comes? at you)", re.I)
+
+
+def challengers(beat: str, phrases) -> list[str]:
+    """The cast phrases whose sentence in the beat carries a challenge cue."""
+    if not beat:
+        return []
+    from .narration import unquoted
+
+    out: list[str] = []
+    last_named: str | None = None
+    for sentence in re.split(r"(?<=[.!?])\s+", unquoted(beat)):
+        low = sentence.lower()
+        named = [p for p in phrases
+                 if (ws := [w for w in _name_words(p) if len(w) >= 3])
+                 and all(re.search(rf"\b{re.escape(w)}", low) for w in ws)]
+        if _CHALLENGES.search(sentence):
+            # The sentence's own people, else the pronoun's antecedent: "The man in
+            # the scarred leather vest … the grin deepens. He shifts his weight, tensing
+            # as if ready to spring" puts the cue one sentence after the name.
+            who = named or ([last_named] if last_named and _PRONOUN_SUBJECT.search(sentence)
+                            else [])
+            for p in who:
+                if p not in out:
+                    out.append(p)
+        if named:
+            last_named = named[-1]
+        elif _CAST_INTRO.search(sentence):
+            # Somebody NOT in the list was named here: a pronoun in the next sentence
+            # is theirs, not the last listed person's. Measured: "He … ready to
+            # spring" bound to the woman two sentences back while the man of the
+            # sentence between them was the one tensing.
+            last_named = None
+    return out
+
+
+def promote_cast(scene, added, beat: str = "") -> list[str]:
     """A person the ledger notes becomes a person the engine holds.
 
     The ruling, after the library beat: the place held but "there should have
@@ -4100,9 +4158,20 @@ def promote_cast(scene, added) -> list[str]:
     # the dice know about one.
     wanted = []
     for phrase in added:
+        # A bare plural role — "weary porters", "haggling traders", "nearby merchants"
+        # — is scenery: it stays in the ledger for the prose to keep consistent and
+        # never becomes ONE body with a plural name and 4 hp (the "local guards"
+        # actor of the 2026-09-18 roster). A counted group arrives through
+        # `_CAST_GROUP` with its count and is promoted body by body.
+        if counts.get(phrase, 1) == 1 and _plural_role(phrase):
+            continue
         wanted.extend([phrase] * max(1, counts.get(phrase, 1)))
+    # The people the beat put in front of the player go first and go over the cap:
+    # the cap is about crowds, and the man who squared off is not the crowd.
+    fronted = challengers(beat, wanted)
+    wanted.sort(key=lambda p: p not in fronted)
     for phrase in wanted:
-        if len(standing) + len(made) >= _PROMOTED_CAP:
+        if len(standing) + len(made) >= _PROMOTED_CAP and phrase not in fronted:
             break
         template = "guildhand"
         for cue, name in _TEMPLATE_CUES:
@@ -4128,13 +4197,25 @@ def promote_cast(scene, added) -> list[str]:
                 break
         made.append(phrase)
         refs.append(actor.ref)
-    bind_thread(scene, refs)
+    bind_thread(scene, refs, beat)
     return made
+
+
+def _plural_role(phrase: str) -> bool:
+    """"weary porters" → True; "man in the leather apron", "boss" → False."""
+    head = _role_head(phrase)
+    if head in ("men", "women", "people", "folk", "guardsmen", "clansmen", "swordsmen",
+                "fishermen", "watchmen"):
+        return True
+    if not head or not head.endswith("s") or head in ("boss",):
+        return False
+    singular = head[:-1] if not head.endswith("ies") else head[:-3] + "y"
+    return bool(_ROLE_WORD.fullmatch(singular))
 
 
 # --- The engagement: who the player is dealing with, as a ref ---------------------------
 
-def bind_thread(scene, promoted: list[str] | None = None) -> str | None:
+def bind_thread(scene, promoted: list[str] | None = None, beat: str = "") -> str | None:
     """Give the standing thread's subject a ref, when the scene can say whose it is.
 
     The thread's subject was a free phrase — "a challenger", "him", "the stranger" —
@@ -4164,10 +4245,24 @@ def bind_thread(scene, promoted: list[str] | None = None) -> str | None:
             t["ref"] = a.ref
             scene.thread = t
             return a.ref
-    if promoted and len(promoted) == 1 and promoted[0] in scene.actors:
-        t["ref"] = promoted[0]
+    # Only while the engagement is fresh. Measured on the first live replay: "a
+    # challenger" was still the subject three turns and one fight later, and the one
+    # man promoted from the Continue beat — a watchman with a torch — was bound as
+    # the challenger the player had waited for.
+    if not promoted or int(t.get("age", 0) or 0) > 1:
+        return None
+    live = [r for r in promoted if r in scene.actors]
+    if beat:
+        # With the beat in hand, the one bound is the one the beat put in front of the
+        # player — "steps forward", "squares off", "the grin deepens" — and nobody
+        # else, however few were promoted. The woman in the shadows recoiled; she is
+        # not the challenger.
+        fronted = challengers(beat, [scene.actors[r].name for r in live])
+        live = [r for r in live if scene.actors[r].name in fronted]
+    if len(live) == 1:
+        t["ref"] = live[0]
         scene.thread = t
-        return promoted[0]
+        return live[0]
     return None
 
 
@@ -4272,8 +4367,12 @@ _STRIKES = (r"(?:lunges?|swings?|strikes?|stabs?|slashes?|thrusts?|hacks?|charge
             r"lashes? out|comes? at|drives?|smashes?|punches?|kicks?|shoves?|grabs?|"
             r"seizes?|tackles?|swipes?|jabs?|clubs?|bashes?|slams?|cuts?|brings? "
             r"(?:\w+\s+){0,3}down|throws? (?:\w+\s+){0,3}at|attacks?|rushes?)")
+# The whole sentence, not a window: measured live 2026-09-18 on the first replay, "He
+# lunges, his weight shifting forward as he brings the notched broadsword in a
+# desperate, overhead arc aimed at your shoulder" put 100 characters between the verb
+# and "your", and an 80-character window let the fight go unopened again.
 _STRIKES_AT_YOU = re.compile(
-    r"\b" + _STRIKES + r"\b(?:[^.!?]{0,80}?)\b(?:you|your)\b", re.I)
+    r"\b" + _STRIKES + r"\b(?:[^.!?]*?)\b(?:you|your)\b", re.I)
 # What turns a blow into a threat, a feint, or somebody else's: these within four
 # words before the verb, and the sentence opens no fight. "coils his muscles, waiting
 # for you" (beat 31 of the ring fight) must not; "he lunges … as he tries to overwhelm
@@ -4343,7 +4442,13 @@ def attacked_by(scene, gm_beat: str) -> list[tuple[str, str]]:
             striker = last_named
         if named_here:
             last_named = named_here[-1]
-        if striker is None or striker in seen:
+        if striker is None:
+            # A blow at the player with nobody the code can name behind it. Not opened
+            # on a guess — but said, so the turn log shows the sentence that was read
+            # and left rather than a silence that looks like nothing happened.
+            out.append((None, sentence.strip()))
+            continue
+        if striker in seen:
             continue
         seen.add(striker)
         out.append((striker, sentence.strip()))
@@ -4394,15 +4499,18 @@ def aim_at_the_holder(raw_intents, player_text: str, scene) -> list | None:
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
     text = redact_speech(player_text or "")
-    if not _AT_THE_THING.search(text):
+    at_thing = _AT_THE_THING.search(text)
+    # The sunder the player asked for is set whether or not anybody is engaged: on the
+    # first live replay the plan came back a plain attack on the right man, and the
+    # "sunder" in the player's own sentence reached nobody (the manoeuvre correction
+    # only ever REMOVES a manoeuvre the player did not ask for).
+    wants_sunder = bool(MANOEUVRE_CUES["sunder"].search(text))
+    if not at_thing and not wants_sunder:
         return raw_intents
     engaged = engaged_refs(scene)
-    if len(engaged) != 1:
-        return raw_intents
     actors = getattr(scene, "actors", {}) or {}
     pc = scene.pc() if hasattr(scene, "pc") else None
     pc_ref = getattr(pc, "ref", "pc")
-    wants_sunder = bool(MANOEUVRE_CUES["sunder"].search(text))
     changed = False
     out = []
     for raw in raw_intents:
@@ -4414,9 +4522,9 @@ def aim_at_the_holder(raw_intents, player_text: str, scene) -> list | None:
         target = raw.get("target")
         aimed_at_a_thing = (not target or target not in actors
                             or actors[target].has_state("role.bystander"))
-        if aimed_at_a_thing:
+        if at_thing and aimed_at_a_thing and len(engaged) == 1:
             raw["target"] = engaged[0]
-            raw["because"] = (f"the player struck at the {_AT_THE_THING.search(text).group(1)} "
+            raw["because"] = (f"the player struck at the {at_thing.group(1)} "
                               f"{actors[engaged[0]].name} is holding")
             changed = True
         params = dict(raw.get("params") or {})

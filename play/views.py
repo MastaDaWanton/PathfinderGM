@@ -1733,7 +1733,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            judgement.promote_cast(c.scene, introduced)
+            judgement.promote_cast(c.scene, introduced, beat=text)
             # Ruskin's write-back: a card the beat carried is marked mentioned, and
             # its urgency starts again from here. The cooldown falls out of it.
             cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))
@@ -1751,6 +1751,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # the order on to the player.
             struck = judgement.attacked_by(c.scene, text)
             struck_lines: list[str] = []
+            for sentence in [s for r, s in struck if r is None]:
+                c.turn_log.append({"kind": "npc-opener", "ref": None,
+                                   "sentence": sentence[:300], "opened": False,
+                                   "note": "a blow at the player with no striker the "
+                                           "code could name"})
+            struck = [(r, s) for r, s in struck if r is not None]
             for n, (ref, sentence) in enumerate(struck):
                 if n == 0:
                     outs = agent.engine.struck_first(ref)
@@ -1781,6 +1787,23 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             c.history.append({"role": "assistant", "content": text})
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+            # What became of a struck item, when the beat did not say. Read off the
+            # tell's own words (law three): "…'s club takes 15 through hardness 5
+            # (0/10 left): destroyed — in pieces." Measured on the third live replay:
+            # the club was in pieces and the beat said the wood "groaned".
+            for o in outcomes:
+                m = re.search(r"'s (\w[\w ]*?) takes \d+ through hardness", o.tell or "")
+                if m and not narration_mod.item_fate_on_the_page(text, m.group(1)):
+                    line = plain_tell(next(
+                        s for s in re.split(r"(?<=[.!?])\s+", o.tell)
+                        if "through hardness" in s))
+                    pc = c.scene.pc()
+                    if pc is not None:
+                        line, _ = narration_mod.pc_to_second_person(line, pc.name)
+                    c.transcript.append({"who": "gm", "text": line,
+                                         "kind": "consequence"})
+                    repairs.append(f"the item's fate left off the page: said what became "
+                                   f"of the {m.group(1)}")
     elif outcomes:
         try:
             text, attempt = agent.narrate_outcome(narration, outcomes, player_input)

@@ -107,6 +107,16 @@ def test_the_beat_that_swings_names_its_striker_and_the_beat_that_waits_does_not
     assert judgement.attacked_by(
         market, "The man in the leather apron says, 'I'll strike you down.' He threatens "
                 "to lunge at you.") == []
+    # Measured on the first live replay (2026-09-18): a hundred characters between the
+    # verb and "your", and an 80-character window let the fight go unopened again.
+    live = ("The man in the leather apron's face turns purple. He lunges, his weight "
+            "shifting forward as he brings the notched broadsword in a desperate, "
+            "overhead arc aimed at your shoulder, seeking to force you back against the "
+            "nearest stall.")
+    assert [r for r, _ in judgement.attacked_by(market, live)] == [apron.ref]
+    # A blow with nobody the code can name behind it is reported, not guessed at.
+    assert judgement.attacked_by(market, "Someone lunges at you from the crowd.") == \
+        [(None, "Someone lunges at you from the crowd.")]
 
 
 def test_struck_first_opens_the_fight_from_their_side_and_rolls_their_blow(market):
@@ -323,3 +333,146 @@ def test_the_award_line_names_the_fallen_as_people():
     assert xp._definite("desperate man") == "the desperate man"
     assert xp._definite("Drenn Ironvale") == "Drenn Ironvale"
     assert xp._definite("the stranger") == "the stranger"
+
+
+# --- Measured on the first live replay, 2026-09-18 ------------------------------------------
+
+def test_a_verb_after_the_name_agrees_with_the_name_not_the_pronoun():
+    """"The warrior take it on the side of the head and their knees go first" shipped
+    for a promoted man with they/them pronouns: the name is singular, the pronoun is
+    a singular they, and the two take different verb forms."""
+    death = {"name": "warrior", "margin": 1, "hp_max": 4, "family": "bludgeoning",
+             "heft": "light", "subj": "they", "obj": "them", "poss": "their"}
+    line = narration.death_line(death, said={})
+    assert "The warrior take " not in line and "The warrior is " in line or "takes" in line \
+        or "warrior" in line
+    assert "warrior take it" not in line and "warrior stand one" not in line
+    guards = dict(death, name="the guards")
+    line = narration.death_line(guards, said={})
+    assert "guards takes" not in line and "guards is " not in line
+
+
+def test_a_stale_thread_does_not_bind_to_whoever_turns_up_later(market):
+    """"a challenger", three turns and one fight later, was bound to a watchman with a
+    torch promoted from a Continue beat."""
+    judgement.update_thread(market, "I wait for a challenger")
+    for _ in range(3):
+        judgement.update_thread(market, "I look around")
+    assert market.thread.get("age") == 3
+    added = judgement.note_cast(market, "A man with a heavy staff appears.", turn=9)
+    judgement.promote_cast(market, added)
+    assert not market.thread.get("ref")
+
+
+def test_the_sunder_the_player_asked_for_is_set_even_when_nobody_is_engaged(market):
+    warrior = instantiate("guildhand", scene=market, name="warrior")
+    market.add(warrior)
+    raw = [{"op": "attack", "actor": "pc", "target": warrior.ref,
+            "params": {"full_attack": False}}]
+    fixed = judgement.aim_at_the_holder(raw, "I strike the weapon and sunder it", market)
+    assert fixed[0]["target"] == warrior.ref
+    assert fixed[0]["params"]["manoeuvre"] == "sunder"
+
+
+def test_a_blow_is_not_landed_on_the_turn_the_fight_is_only_declared():
+    """The tell: "Battle is joined … nothing has landed yet". The beat: "Your strike
+    catches the blade's spine with a jarring crack … The heavy blade is now a mangled,
+    useless weight in his grip." The next beat inherited a sword nobody broke."""
+    blows = [{"attacker": "", "pc": True, "joined": True,
+              "tell": "Battle is joined: you square off against the warrior."}]
+    prose = ("Your strike catches the blade's spine with a jarring crack, the metal "
+             "groaning as you force the edge to buckle. He is thrown back by the momentum. "
+             "The heavy blade is now a mangled, useless weight in his grip. What do you do?")
+    early = narration.premature_blows(prose, blows)
+    assert len(early) == 2
+    fixed, cut = narration.cut_premature_blows(prose, blows)
+    assert "mangled" not in fixed and "catches the blade" not in fixed
+    assert "Battle is joined" in fixed and "What do you do?" in fixed
+    assert narration.review(prose, blows=blows).findings[0].kind == "swing-not-yet-struck"
+    # Once a blow has rolled, landing language is the dice being reported.
+    rolled = [{"attacker": "Kesst Vayr", "pc": True, "tell": "You hit the warrior."}]
+    assert narration.premature_blows(prose, rolled) == []
+
+
+# --- Measured on the second live replay, 2026-09-18 ------------------------------------------
+
+INSULT_BEAT = ("The merchant's grip on his iron tightens. Even the woman in the shadows "
+               "seems to recoil at the sheer audacity of the remark. The man in the "
+               "scarred leather vest doesn't react with a shout; instead, the predatory "
+               "grin on his face deepens. He shifts his weight, tensing as if ready to "
+               "spring, and the heavy blade at his side catches the market's dim light.")
+
+
+def test_the_challenger_is_promoted_over_the_cap_and_is_who_the_thread_binds_to(market):
+    """Four scenery extras had used the cap, so the man who squared off was never on
+    the board; and "a challenger" bound to the woman in the shadows, the one person
+    promoted from the beat, who had recoiled. The sunder and the killing blow went to
+    her."""
+    for n in range(judgement._PROMOTED_CAP - 1):
+        a = instantiate("guildhand", scene=market, name=f"trader {n}")
+        market.add(a)
+        a.add_condition("bystander")
+    judgement.update_thread(market, "I wait for a challenger")
+    added = judgement.note_cast(market, INSULT_BEAT, turn=3)
+    assert "woman in the shadows" in added and "man in the scarred leather" in added
+    made = judgement.promote_cast(market, added, beat=INSULT_BEAT)
+    assert "man in the scarred leather" in made, "the challenger goes in over the cap"
+    man = next(a for a in market.actors.values() if "scarred" in a.name)
+    assert market.thread.get("ref") == man.ref
+    # With the beat in hand, a lone promoted person who did NOT square off binds nothing.
+    market.thread = {"doing": "waiting for", "subject": "a challenger", "age": 0}
+    woman = instantiate("guildhand", scene=market, name="woman in the shadows")
+    market.add(woman)
+    judgement.bind_thread(market, [woman.ref], beat=INSULT_BEAT)
+    assert not market.thread.get("ref")
+
+
+def test_a_bare_plural_role_is_scenery_and_not_one_body_with_a_plural_name(market):
+    """"weary porters", "haggling traders", "nearby merchants" each became a single
+    4-hp actor — the "local guards" of the 2026-09-18 roster — and one of them was
+    handed a fight the model meant for a man who was not on the board."""
+    added = judgement.note_cast(
+        market, "Weary porters shoulder past haggling traders; a scribe shouts.", turn=1)
+    made = judgement.promote_cast(market, added)
+    assert made == ["scribe"]
+    assert judgement._plural_role("weary porters") and judgement._plural_role("men")
+    assert not judgement._plural_role("man in the leather apron")
+    # A counted group still arrives as bodies.
+    added = judgement.note_cast(market, "A pair of guards step in.", turn=2)
+    made = judgement.promote_cast(market, added)
+    assert len(made) == 2
+
+
+def test_a_fight_opened_by_a_swing_turns_the_thread_into_the_opponent(market):
+    """The anchor wrote "You have not let a challenger out of your sight; you are still
+    waiting for them" into the beat in which the two squared off, because the fight
+    had opened through the attack op and no `begin_encounter` op was in the list."""
+    thug = instantiate("thug", scene=market, name="the challenger")
+    market.add(thug)
+    judgement.update_thread(market, "I wait for a challenger")
+    judgement.bind_thread(market, [thug.ref])
+    engine = Engine(market, Dice(seed=2))
+    engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": thug.ref}]))
+    assert market.in_encounter
+    judgement.update_thread(market, "I strike the weapon", ["attack"])
+    assert market.thread == {"opponent": thug.ref}
+    assert judgement.thread_brief(market) == ""
+
+
+def test_the_beat_must_say_what_became_of_the_struck_item():
+    """Third live replay: the tell read "stranger's club takes 15 through hardness 5
+    (0/10 left): destroyed — in pieces" and the beat said the wood "groaned under the
+    force of your impact". The club was gone and the player was never told."""
+    groaned = ("You drive your strength into a strike aimed at the stranger's weapon, the "
+               "wood and metal groaning under the force of your impact. What do you do?")
+    assert not narration.item_fate_on_the_page(groaned, "club")
+    said = "The club comes apart in his hands, the head spinning off into the dirt."
+    assert narration.item_fate_on_the_page(said, "club")
+    assert not narration.item_fate_on_the_page("His shield is dented.", "club")
+    # And the views wire it as a consequence line read off the tell.
+    import inspect
+
+    from play import views
+
+    src = inspect.getsource(views._finish)
+    assert "item_fate_on_the_page" in src and "through hardness" in src
