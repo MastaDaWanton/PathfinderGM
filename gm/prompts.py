@@ -1250,11 +1250,70 @@ EARLIER_BEATS = 2
 EARLIER_CHARS = 1400
 
 
+def scene_now(scene) -> str:
+    """The scene as it stands this moment, derived from engine state, for the END of
+    the prose prompt.
+
+    Measured 2026-09-17 with a screenshot beside it: two dead in the square, the crowd
+    scattering, and the beat opened "The market of Vyrakon is a cacophony of commerce".
+    The facts were in the brief — in its middle, under the world, the place, the cast.
+    Every tradition that beat this derives the description from state at the moment of
+    writing rather than carrying it as prose (Inform's room descriptions; a MUD's corpse
+    is an object in the room), and every shipped LLM narrator puts its load-bearing note
+    LAST, immediately before generation, where *Lost in the Middle* found attention
+    highest (docs/narrator-guards.md D6). So: the dead here, who is hostile or friendly,
+    whether a fight is running, what the crowd just saw, the standing thread — one
+    block, assembled from the same functions the brief uses so the two cannot
+    disagree, placed after the tells. Empty when nothing is notable, so a quiet town
+    is not told it is quiet every turn.
+    """
+    if scene is None:
+        return ""
+    from rules import states as _states
+
+    from . import judgement as _judgement
+
+    facts: list[str] = []
+    actors = getattr(scene, "actors", {}) or {}
+    if getattr(scene, "in_encounter", False):
+        facts.append("a fight is running")
+    dead = [a.name for a in actors.values()
+            if not a.is_pc and a.name and (a.hp < 0 or a.has_state("state.down.dead"))]
+    if dead:
+        facts.append(f"dead on the ground here: {', '.join(dead)}")
+    down = [a.name for a in actors.values()
+            if not a.is_pc and a.name and a.is_down and a.name not in dead]
+    if down:
+        facts.append(f"down but alive: {', '.join(down)}")
+    moods: dict[str, list[str]] = {}
+    for a in actors.values():
+        if a.is_pc or a.is_down or not a.name:
+            continue
+        mood = _states.attitude_of(a)
+        if mood and mood != "indifferent":
+            moods.setdefault(mood, []).append(a.name)
+    for mood in ("hostile", "unfriendly", "friendly", "helpful"):
+        if mood in moods:
+            facts.append(f"{mood} towards the player: {', '.join(moods[mood])}")
+    heat = getattr(scene, "heat", None) or {}
+    if heat.get("note"):
+        facts.append(f"what the crowd just saw: {heat['note']}")
+    thread = getattr(scene, "thread", None) or {}
+    if thread.get("subject"):
+        facts.append(f"the player is {thread.get('doing', 'engaged with')} "
+                     f"{thread['subject']}")
+    if not facts:
+        return ""
+    return ("THE SCENE AS IT STANDS NOW (engine facts, this moment — the passage "
+            "describes this, not an ordinary day here): " + "; ".join(facts) + ".")
+
+
 def call_prose_messages(briefing_scene: str, history: list[dict], player_input: str,
                         tells: list[str], in_combat: bool = False,
                         enemy: str | None = None,
                         earlier: list[str] | None = None,
-                        ledger: list[dict] | None = None) -> list[dict]:
+                        ledger: list[dict] | None = None,
+                        scene_now_block: str = "", pull: str = "") -> list[dict]:
     """Write the whole turn, after the dice.
 
     The *call-one* briefing and examples, not the consequence ones, because this is being
@@ -1281,11 +1340,17 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     # to bigger ones, which meant the prompt grew after the budget had already decided
     # it fitted — the tells and up to two earlier beats arriving behind the check. The
     # head and the tail are assembled here and handed to `pack` as what they really are.
+    # The two blocks that go LAST, after the tells: the scene as it stands this moment
+    # (`scene_now`) and the one open matter nearest to hand (`rules.cards.thread_to_pull`).
+    # Last on purpose — the industry's author's-note slot, and the position *Lost in
+    # the Middle* measured as best attended after the very start.
     final = {
         "role": "user",
         "content": (scene + f"The player said: {player_input}\n\n"
                     + (f"What the engine decided:\n{said}" if said
-                       else "The engine decided nothing mechanical this turn.")),
+                       else "The engine decided nothing mechanical this turn.")
+                    + (f"\n\n{scene_now_block}" if scene_now_block else "")
+                    + (f"\n\n{pull}" if pull else "")),
     }
     return call_one_messages(
         briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,

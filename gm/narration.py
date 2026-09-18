@@ -750,10 +750,37 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            known_names: set[str] | None = None, earlier: list[str] | None = None,
            min_chars: int = 0, max_chars: int = 0, alone: bool = False,
            pronouns: str = '', others: tuple = (), gender: str = '',
-           state: dict | None = None, deaths: list[dict] | None = None) -> Review:
+           state: dict | None = None, deaths: list[dict] | None = None,
+           pull: dict | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0d. The one open matter nearest to hand has gone unmentioned too long, and this
+    #     beat did not carry it either. `pull` is `rules.cards.thread_to_pull`'s pick —
+    #     chosen in code by criteria count, never by asking the model (Drama Llama let a
+    #     model judge salience and its authors reported the triggers misfiring) — and it
+    #     is only handed over out of fights, so this cannot cost a rewrite mid-combat.
+    #     The hint names the matter and one fact of it; no deterministic backstop,
+    #     because an appended anchor sentence would be the formula this file has just
+    #     stopped writing twice over.
+    if pull and pull.get("urgent"):
+        low = (text or "").lower()
+        keys = [str(k).lower() for k in pull.get("keys") or [] if len(str(k)) >= 4]
+        names = [str(n).lower() for n in pull.get("people") or [] if len(str(n)) >= 3]
+        carried = any(re.search(r"\b" + re.escape(k) + r"\w{0,2}\b", low) for k in keys) \
+            or any(n in low for n in names)
+        if not carried:
+            out.findings.append(Finding(
+                "drops-the-thread",
+                f"{pull.get('title', '')!r} has not come up for {pull.get('since', 0)} turns",
+                f"The player has an open matter that has not come up for many turns: "
+                f"{pull.get('title', '')} — {pull.get('fact', '')}. Work one concrete "
+                f"sign of it into this scene where it fits — somebody here who knows "
+                f"of it, a detail that recalls it, a road toward it — in a sentence or "
+                f"two. Do not resolve it, do not add a roll, and change nothing else.",
+                weight=2,
+            ))
 
     # 0a. The engine killed somebody and the prose has not said so. Weight 3, like the
     #     contradiction it is the mirror of: a death that did not happen and a death

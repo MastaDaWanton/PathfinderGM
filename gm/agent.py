@@ -753,7 +753,8 @@ class GMAgent:
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
                rewrite: bool = True, backed=(),
-               deaths: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               deaths: list[dict] | None = None,
+               pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -802,7 +803,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
-                deaths=deaths)
+                deaths=deaths, pull=pull)
             repairs += p_repairs
             attempts += p_attempts
 
@@ -891,13 +892,18 @@ class GMAgent:
         # deterministic backstop (`press_the_death`), and a kill is nearly always in
         # a fight, where the retry is gated off anyway.
         "recurring-phrase",
+        # An open matter the beat should have let show. An appended anchor would be
+        # the formula again, so the rewrite is the only repair; the finding is only
+        # ever raised out of fights (`views` hands the pick over out of fights only).
+        "drops-the-thread",
     })
 
     def polish(self, text: str, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                scene_brief: str = "",
                extra_known: set[str] | None = None,
-               deaths: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               deaths: list[dict] | None = None,
+               pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -921,7 +927,7 @@ class GMAgent:
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
                 gender=self._pc_gender(), state=self._body_count(),
-                deaths=deaths,
+                deaths=deaths, pull=pull,
             )
 
         review = _review(text)
@@ -1048,7 +1054,9 @@ class GMAgent:
     # --- Call 2 -------------------------------------------------------------------------
 
     def narrate_turn(self, outcomes: list, player_input: str, brief: str,
-                     earlier: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+                     earlier: list[str] | None = None, *,
+                     scene_now: str = "",
+                     pull: dict | None = None) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
 
         The other half of `intents_first`. Here the prose call is the only one there is,
@@ -1073,7 +1081,10 @@ class GMAgent:
         messages = prompts.call_prose_messages(
             brief, [], player_input, tells, in_combat=fighting,
             enemy=self._current_enemy(), earlier=earlier,
-            ledger=getattr(self, "ledger", None))
+            ledger=getattr(self, "ledger", None),
+            # Last in the prompt, after the tells: the scene this moment and the one
+            # open matter nearest to hand (docs/narrator-guards.md D6, D7).
+            scene_now_block=scene_now, pull=str((pull or {}).get("text") or ""))
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
@@ -1160,7 +1171,7 @@ class GMAgent:
                        else narration_mod.MIN_SCENE_CHARS),
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=True,
-            backed=claims_the_engine_backs(outcomes), deaths=deaths)
+            backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull)
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
         # by the death's own axes and never the same one twice running. What it adds

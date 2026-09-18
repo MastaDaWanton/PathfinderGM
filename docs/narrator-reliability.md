@@ -330,6 +330,44 @@ justified the old skip). Re-scored against the same sixty narrations: one turn f
 converter output flags nothing. The class is detected *and* deterministically repaired,
 no model call spent.
 
+## The narrator measured against itself (2026-09-17)
+
+"Nothing here scores whether the prose is any *good*" stood at the bottom of this file
+until the player quoted the prose back: "they are unmade", the phrase the narrator used
+"almost every single time I 1 punch an enemy". It was ours — `press_the_death`'s one
+top-rung sentence, appended after grooming, four times byte-identical in one eleven-beat
+save. The whole account, the two prior-art sweeps and the design are in
+`docs/narrator-guards.md`; this section is the numbers.
+
+The instrument first. The report above could call a run 96% clean with openings at 7% and
+never see a phrase recurring in a quarter of its beats, because every check read openings
+or whole sentences. Two measures that see it, both from the literature and both a few
+lines: the **self-repetition score** (Salkar et al., AACL 2022 — the share of a beat's
+four-word phrases that also appear in another beat of the same run) and the **gzip
+compression ratio** (Shaib et al., 2024 — original over compressed, so higher is samer,
+reported beside length). The audit prints both, with the phrases that recur most.
+
+**Before**, the shipped narrator (gemma-4 12B), `--script long --turns 60`, one run on a
+quiet GPU:
+
+| | value |
+|---|---|
+| clean | 58/60 (96%) — 2 × `narrator-in-first-person`, one of them caused by our own thread anchor |
+| length | mean 1,060 chars, median 985 |
+| openings | 7% share the commonest |
+| **self-repetition** | **0.132** |
+| **gzip ratio** | **2.88** |
+| commonest four-word phrase | "the transition from the" — **12 of 53 beats** |
+| next | "to your left the" 9, "the silence of the" 7, "the weight of the" 6, "the ground beneath your boots" 6, "he says his voice" 6 |
+
+Against that baseline the new `recurring-phrase` finding was calibrated before it shipped:
+at "a six-word phrase shared with any of the last eight beats" it would have fired on 29 of
+56 beats, most of them a beat honestly continuing the scene of the one before it; at two of
+eight, plus four words in three of twelve, 17 of 56 — every one of them a tic.
+
+**After**: the same script, model and machine, run once the guards were in. Reported below
+when the run has finished; a number that is not there yet is not a number.
+
 ## Still open
 
 - 50 turns per script per model is a baseline, not a release gate, and not enough to put

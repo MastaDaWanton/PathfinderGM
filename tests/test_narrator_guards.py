@@ -326,3 +326,160 @@ def test_the_said_store_survives_a_save(tmp_path):
         again = cm.current()
         assert again.scene.said == walked
         cm._LIVE.clear()
+
+
+# --- the scene as it stands now, last in the prompt -------------------------------------
+
+
+class _Body:
+    def __init__(self, name, *, pc=False, hp=10, down=False, dead=False, states=()):
+        self.name, self.is_pc, self.hp, self.is_down = name, pc, hp, down or dead
+        self._states = set(states) | ({"state.down.dead"} if dead else set())
+
+    def has_state(self, tag: str) -> bool:
+        return any(s == tag or s.startswith(tag + ".") for s in self._states)
+
+
+class _Scene:
+    def __init__(self, actors, *, fight=False, heat=None, thread=None):
+        self.actors, self.in_encounter = actors, fight
+        self.heat, self.thread, self.at = heat or {}, thread or {}, "market"
+
+
+def test_a_quiet_town_gets_no_scene_block():
+    """Empty when nothing is notable, so a quiet town is not told it is quiet."""
+    from gm import prompts
+
+    s = _Scene({"pc": _Body("Kesst", pc=True), "c1": _Body("the smith")})
+    assert prompts.scene_now(s) == ""
+
+
+def test_the_scene_block_names_the_dead_the_hostile_and_the_fight():
+    """Measured with a screenshot: two dead in the square, the crowd scattering, and the
+    beat opened on "a cacophony of commerce". The facts were in the brief's middle; this
+    puts them last, assembled from state at the moment of writing."""
+    from gm import prompts
+
+    s = _Scene({"pc": _Body("Kesst", pc=True),
+                "c7": _Body("the man", dead=True, hp=-9),
+                "c8": _Body("the guards", states=("attitude.hostile",))},
+               fight=True,
+               heat={"note": "the player just killed the man in front of onlookers"},
+               thread={"subject": "the crier", "doing": "watching"})
+    block = prompts.scene_now(s)
+    assert block.startswith("THE SCENE AS IT STANDS NOW")
+    for fact in ("a fight is running", "dead on the ground here: the man",
+                 "hostile towards the player: the guards", "in front of onlookers",
+                 "watching the crier"):
+        assert fact in block, fact
+    assert not any(ch.isdigit() for ch in block)
+
+
+def test_the_two_blocks_go_last_in_the_prose_prompt():
+    """After the tells, where the shipped narrators put their author's note."""
+    from gm import prompts
+
+    msgs = prompts.call_prose_messages(
+        "WORLD: Test.", [], "I look around.", ["The smith nods."],
+        scene_now_block="THE SCENE AS IT STANDS NOW: a fight is running.",
+        pull="STILL OPEN, NEAREST TO HAND: Find the salt — ask the harbourmaster.")
+    last = msgs[-1]["content"]
+    assert last.index("What the engine decided") < last.index("THE SCENE AS IT STANDS NOW")
+    assert last.rstrip().endswith("ask the harbourmaster.")
+
+
+# --- one thread to pull, chosen in code ---------------------------------------------------
+
+
+def _table():
+    from rules import cards
+    from rules.engine import Scene
+
+    s = Scene()
+    s.at = "market"
+    quest = cards.Card(id="q-salt", title="Find the missing salt",
+                       facts=["Marra asked for word of the salt."],
+                       keys=cards.keys_from("Find the missing salt", "Marra asked for word"),
+                       tags=(cards.TAG_QUEST,), people=["c2"], kind="quest",
+                       objectives=[{"text": "Ask the harbourmaster where the salt went",
+                                    "done": False}], giver="c2", reward="a season's salt")
+    strain = cards.Card(id="strain-vyrakon", title="What is wrong in Vyrakon",
+                        facts=["Border tolls have doubled since the spring."],
+                        keys=cards.keys_from("border tolls doubled spring"),
+                        tags=(cards.TAG_STRAIN,), place="market")
+    cards.open_card(s, quest, turn=0)
+    cards.open_card(s, strain, turn=0)
+    return s, cards
+
+
+def test_the_pick_is_the_card_most_of_the_scene_points_at():
+    """Ruskin's criteria count: the strain card is pinned here and the player's line
+    hits its keys (2); the quest is merely open (1)."""
+    s, cards = _table()
+    ranked = cards.salience(s, recent=[], player_text="I ask about the border tolls.",
+                            turn=3)
+    assert [c.id for _, _, c in ranked] == ["strain-vyrakon", "q-salt"]
+    assert ranked[0][1] == ["here", "spoken"] and ranked[1][1] == ["open"]
+    pull = cards.thread_to_pull(s, recent=[], player_text="I ask about the border tolls.",
+                                turn=3)
+    assert pull["title"] == "What is wrong in Vyrakon" and not pull["urgent"]
+
+
+def test_a_quiet_quest_gains_urgency_and_is_named_without_a_number():
+    s, cards = _table()
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12)
+    assert pull["title"] == "Find the missing salt"
+    assert "open" in pull["why"] and "quiet" in pull["why"] and "urgent" in pull["why"]
+    assert pull["since"] == 12
+    assert "Ask the harbourmaster" in pull["text"] and "for a while" in pull["text"]
+    assert not any(ch.isdigit() for ch in pull["text"])
+
+
+def test_time_alone_raises_nothing():
+    """An old situation from another town is not a candidate because it is old."""
+    s, cards = _table()
+    s.at = "docks"
+    for c in cards.load(s):
+        pass
+    ranked = cards.salience(s, recent=[], player_text="I look at the boats.", turn=12)
+    assert [c.id for _, _, c in ranked] == ["q-salt"], "only the open quest qualifies"
+
+
+def test_a_mention_is_written_back_and_the_urgency_starts_again():
+    s, cards = _table()
+    carried = cards.note_mentions(
+        s, "The harbourmaster spits. 'Salt? The salt went north with the toll-men.'",
+        turn=11)
+    assert carried == ["Find the missing salt"]
+    assert cards.find(s, "q-salt").mentioned == 11
+    ranked = {c.id: why for _, why, c in cards.salience(
+        s, recent=[], player_text="I look around.", turn=12)}
+    assert "quiet" not in ranked["q-salt"] and "urgent" not in ranked["q-salt"]
+    # And the matter that has NOT come up is now the one nearest to hand: the town's
+    # own strain, pinned here and twelve turns unmentioned, outscores the quest that
+    # was just talked about. That is the write-back moving the urgency.
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12)
+    assert pull["title"] == "What is wrong in Vyrakon" and pull["urgent"]
+    # One key is a coincidence.
+    assert cards.note_mentions(s, "You buy a pinch of salt for the road.", turn=13) == []
+
+
+def test_review_asks_for_a_dropped_thread_only_when_urgent_and_uncarried():
+    pull = {"title": "Find the missing salt", "fact": "Ask the harbourmaster where the "
+            "salt went", "keys": ["find", "missing", "salt", "harbourmaster"],
+            "people": ["Marra"], "since": 12, "urgent": True}
+    quiet = "The smith hammers on. Rain starts. What do you do?"
+    r = narration.review(quiet, pull=pull)
+    f = next(f for f in r.findings if f.kind == "drops-the-thread")
+    assert f.weight == 2 and "harbourmaster" in f.fix_hint
+    carried = "The smith hammers on. 'Marra was asking after you,' he says. What do you do?"
+    assert "drops-the-thread" not in {f.kind for f in narration.review(carried, pull=pull).findings}
+    assert "drops-the-thread" not in {
+        f.kind for f in narration.review(quiet, pull=dict(pull, urgent=False)).findings}
+
+
+def test_mentioned_survives_the_card_round_trip():
+    from rules import cards
+
+    c = cards.Card(id="x", title="A matter", mentioned=7)
+    assert cards.Card.from_dict(c.as_dict()).mentioned == 7

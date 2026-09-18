@@ -99,6 +99,10 @@ class Card:
     objectives: list[dict] = field(default_factory=list)   # [{"text": str, "done": bool}]
     giver: str = ""                                     # an actor ref, or a name
     reward: str = ""                                    # in the world's words, no number
+    # The transcript turn the prose last carried this card (named one of its people or
+    # hit two of its keys) — Ruskin's write-back, so a matter's urgency starts again
+    # from the beat that mentioned it. Zero until it ever has been.
+    mentioned: int = 0
 
     def as_dict(self) -> dict:
         return {
@@ -111,6 +115,7 @@ class Card:
             "grants": [dict(g) for g in self.grants],
             "kind": self.kind, "objectives": [dict(o) for o in self.objectives],
             "giver": self.giver, "reward": self.reward,
+            "mentioned": self.mentioned,
         }
 
     @classmethod
@@ -134,6 +139,7 @@ class Card:
             objectives=[{"text": str(o.get("text", "")), "done": bool(o.get("done"))}
                         for o in d.get("objectives") or [] if isinstance(o, dict)],
             giver=str(d.get("giver") or ""), reward=str(d.get("reward") or ""),
+            mentioned=int(d.get("mentioned", 0) or 0),
         )
 
     def is_(self, query: str) -> bool:
@@ -161,9 +167,25 @@ def keys_from(*texts: str) -> list[str]:
     return out
 
 
+def _keys_of(card: Card) -> list[str]:
+    """The card's keys, plus the words of its open objectives.
+
+    What a quest is about is what is left to do on it: "Ask the harbourmaster where the
+    salt went" makes *harbourmaster* a key whether or not the title or a fact ever said
+    it. Measured by the first write-back test — a beat in which the harbourmaster
+    talked about the salt did not count as carrying the salt quest, because the
+    objective's words were not keys."""
+    if not card.objectives:
+        return list(card.keys)
+    extra = keys_from(*[str(o.get("text", "")) for o in card.objectives
+                        if not o.get("done")])
+    return list(card.keys) + [k for k in extra if k not in card.keys]
+
+
 def _hits(card: Card, haystack: str) -> int:
     low = haystack.lower()
-    return sum(1 for k in card.keys if re.search(r"\b" + re.escape(k) + r"\w{0,2}\b", low))
+    return sum(1 for k in _keys_of(card)
+               if re.search(r"\b" + re.escape(k) + r"\w{0,2}\b", low))
 
 
 # --- the table --------------------------------------------------------------------------------
@@ -454,6 +476,130 @@ def _title_from_errand(errand: str) -> str:
     text = re.sub(r"^You came (?:to|for|because|out to|in out of the weather to|looking for)\s+",
                   "", text, flags=re.I)
     return (text[:1].upper() + text[1:])[:70] if text else ""
+
+
+# --- the one open matter nearest to hand -------------------------------------------------------
+#
+# How long an open matter may go unmentioned before it starts to press, and before the
+# prose is asked for it. Booth's Director shape — a quiet stretch raises the pressure —
+# with constants that are ours rather than a shooter's, read off the sixty-turn script:
+# a quest taken at turn ten and untouched for a third of the session is the failure.
+QUIET_TURNS = 6
+URGENT_TURNS = 10
+
+
+def salience(scene, *, recent, player_text: str = "", tells=(),
+             turn: int = 0) -> list[tuple[int, list[str], Card]]:
+    """Every live, visible card scored by how many of the scene's facts point at it.
+
+    Ruskin's rule selection (Valve, GDC 2012), adopted whole: the score is the NUMBER
+    of criteria that hold — "the simplest one imaginable" — so the card the scene points
+    at from several directions beats the card it merely mentions. The criteria: pinned
+    to this place; one of its people present; its keys in what the player just said or
+    the engine just decided; its keys in the last few beats; an objective still open;
+    and how long since the prose last carried it, a point past QUIET_TURNS and another
+    past URGENT_TURNS. A card nothing but time points at is not a candidate — an old
+    situation from another town does not get raised because it is old. Ties go to the
+    card most recently touched, deterministic where Valve chose random, so a test can
+    pin the pick. Never the model's judgement: Drama Llama let a model decide which
+    storylet was live and its authors reported the triggers misfiring
+    (docs/narrator-guards.md).
+    """
+    here = str(getattr(scene, "at", "") or "")
+    actors = getattr(scene, "actors", {}) or {}
+    window = " ".join(str(b) for b in list(recent or [])[-SCAN_BEATS:])
+    now = " ".join([str(player_text or "")] + [str(t) for t in (tells or ())])
+    out: list[tuple[int, list[str], Card]] = []
+    for c in load(scene):
+        if not c.live or c.secret:
+            continue
+        why: list[str] = []
+        if c.place and c.place == here:
+            why.append("here")
+        if any(r in actors for r in c.people):
+            why.append("present")
+        if _hits(c, now):
+            why.append("spoken")
+        if _hits(c, window):
+            why.append("recent")
+        if c.kind == "quest" and any(not o.get("done") for o in c.objectives):
+            why.append("open")
+        since = int(turn) - int(c.mentioned or c.touched or 0)
+        if since >= QUIET_TURNS:
+            why.append("quiet")
+        if since >= URGENT_TURNS:
+            why.append("urgent")
+        if set(why) - {"quiet", "urgent"}:
+            out.append((len(why), why, c))
+    out.sort(key=lambda t: (-t[0], -t[2].touched, t[2].id))
+    return out
+
+
+def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
+                   turn: int = 0) -> dict | None:
+    """The one open matter nearest to hand: the prose prompt's last block, and the
+    facts `gm.narration.review` polices it with.
+
+    One, never the list. A model asked for N things answers in parallel (CLAUDE.md's
+    five-factions lesson), and SillyTavern's inclusion groups exist because one entry
+    firing beats five. The text is a fact with one detail attached — the open objective
+    if there is one, else the latest thing that happened — and carries no number.
+    Returns None when nothing scores, which is most quiet turns.
+    """
+    ranked = salience(scene, recent=recent, player_text=player_text, tells=tells,
+                      turn=turn)
+    if not ranked:
+        return None
+    _score, why, c = ranked[0]
+    actors = getattr(scene, "actors", {}) or {}
+    people = getattr(scene, "people", None) or actors
+    names = [(actors[r].name if r in actors else people[r].name if r in people else r)
+             for r in c.people]
+    open_objective = next((str(o.get("text", "")) for o in c.objectives
+                           if not o.get("done")), "")
+    fact = open_objective or (c.facts[-1] if c.facts else "")
+    since = int(turn) - int(c.mentioned or c.touched or 0)
+    text = ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
+            f"show where it fits, never to resolve for the player): {c.title}"
+            + (f" — {fact}" if fact else "") + "."
+            + (" It has not come up for a while." if "quiet" in why else ""))
+    return {"id": c.id, "title": c.title, "fact": fact, "keys": _keys_of(c),
+            "people": names, "since": since, "urgent": "urgent" in why, "why": why,
+            "text": text}
+
+
+def note_mentions(scene, text: str, turn: int = 0) -> list[str]:
+    """Which live cards this beat carried, marked `mentioned` — the write-back.
+
+    A card is carried when the prose names one of its people or hits two of its keys;
+    one key is a coincidence ("salt" in a market). Speech counts: a character talking
+    about the matter is the matter coming up.
+    """
+    cards = load(scene)
+    if not cards or not text:
+        return []
+    actors = getattr(scene, "actors", {}) or {}
+    people = getattr(scene, "people", None) or actors
+    low = " ".join(str(text).split()).lower()
+    carried: list[str] = []
+    for c in cards:
+        if not c.live:
+            continue
+        named = False
+        for r in c.people:
+            a = actors.get(r)
+            if a is None and hasattr(people, "get"):
+                a = people.get(r)
+            name = (a.name if a is not None else r).lower()
+            if name and len(name) >= 3 and name in low:
+                named = True
+                break
+        if named or _hits(c, low) >= 2:
+            c.mentioned = int(turn)
+            carried.append(c.title)
+    if carried:
+        save(scene, cards)
+    return carried
 
 
 def from_world(world, place_id: str = "") -> list[Card]:

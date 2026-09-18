@@ -1506,9 +1506,22 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         # narrated", the model learns the template (docs/narrator-guards.md D4).
         earlier = [narration_mod.strip_added(b["text"], b.get("added"))
                    for b in c.transcript[-8:] if b["who"] == "gm"]
+        # Last in the prompt, after the tells (docs/narrator-guards.md D6, D7): the
+        # scene as the engine holds it this moment, and — out of fights only, so it
+        # can never cost a rewrite mid-combat — the one open matter nearest to hand,
+        # chosen in code by how many of the scene's facts point at it.
+        from rules import cards as cards_mod
+
+        pull = None
+        if not c.scene.in_encounter:
+            pull = cards_mod.thread_to_pull(
+                c.scene, recent=[b["text"] for b in c.transcript[-4:]],
+                player_text=player_input, tells=[o.tell for o in outcomes],
+                turn=len(c.transcript))
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
-                resolution.outcomes, player_input, brief, earlier)
+                resolution.outcomes, player_input, brief, earlier,
+                scene_now=prompts.scene_now(c.scene), pull=pull)
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first
@@ -1522,6 +1535,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         c.turn_log.append({
             "kind": "prose",
             "chars": len(text or ""),
+            # Which open matter was put in front of the model, if any, so an audit
+            # can say how often the beat carried it.
+            "pull": str((pull or {}).get("title") or ""),
             "repairs": list(repairs or []),
             "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
                           "model": a.model, "note": (a.note or "")[:300],
@@ -1610,6 +1626,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # be attacked, addressed or found again.
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
             judgement.promote_cast(c.scene, introduced)
+            # Ruskin's write-back: a card the beat carried is marked mentioned, and
+            # its urgency starts again from here. The cooldown falls out of it.
+            cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))
             # And whoever the beat says stopped watching is in the fight, with their
             # kind: "the second guard draws" is a second guard on the initiative.
             for ref, side in judgement.joiners(c.scene, text):
