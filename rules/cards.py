@@ -490,11 +490,16 @@ def _title_from_errand(errand: str) -> str:
 # turns; the audit's "has not come up for 14 turns" was seven.
 QUIET_TURNS = 12
 URGENT_TURNS = 20
-# A matter the beat just carried is left alone for about two turns of play — Valve's
-# "don't say this if it's been said in the last N" and SillyTavern's Cooldown. Without
-# it the first sixty-turn run pulled the same card on consecutive turns eight times:
-# the beat mentioned it, so its words were in the recent window, so it scored again.
-COOLDOWN_TURNS = 4
+# A matter the beat has carried rests until it has gone quiet — Valve's "don't say this
+# if it's been said in the last N", SillyTavern's Cooldown, Booth's relax phase. The
+# first sixty-turn run pulled the same card on consecutive turns eight times: the beat
+# mentioned it, so its words were in the recent window, so it scored again. A four-entry
+# rest fixed that and was still too eager: on the second run the player's quest was
+# pulled on thirty of sixty turns, the beat carried it on five, and two of the five were
+# forced (a whisker that chimes, a texture a sound "oddly mirrors"). A card that has
+# surfaced once is not pulled again until QUIET_TURNS have passed since the beat last
+# carried it; a card that has never surfaced is pulled until it does.
+REST_TURNS = QUIET_TURNS
 
 _PROPER = re.compile(r"[A-Z][A-Za-z'’-]{3,}")
 
@@ -593,7 +598,8 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     time. The world's ambient cards — a town's strain, a guild's description — qualify
     only when spoken of or recently in the prose: they are the brief's business already,
     and pulling them for being pinned to the town turned fifty of fifty beats toward
-    faction politics nobody had raised. A card carried within COOLDOWN_TURNS rests.
+    faction politics nobody had raised. A card the prose has carried rests for
+    REST_TURNS after the last time it did.
     Ties go to the card most recently touched, deterministic where Valve chose random,
     so a test can pin the pick. Never the model's judgement: Drama Llama let a model
     decide which storylet was live and its authors reported the triggers misfiring
@@ -607,7 +613,7 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     for c in load(scene):
         if not c.live or c.secret:
             continue
-        if c.mentioned and int(turn) - int(c.mentioned) < COOLDOWN_TURNS:
+        if c.mentioned and int(turn) - int(c.mentioned) < REST_TURNS:
             continue
         names = _card_names(c, scene)
         ident = identity_keys(c, names)

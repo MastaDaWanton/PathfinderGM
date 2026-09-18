@@ -432,9 +432,14 @@ any criterion but time. The world's ambient cards — a town's strain, a guild's
 — qualify only when spoken of or recently in the prose; they are the brief's business
 already. So a quiet town pulls nothing, which is most turns.
 
-**D12. A matter the beat just carried rests.** Four transcript entries, about two turns
-of play (Valve's "not if it has been said in the last N", SillyTavern's Cooldown). Quiet
-is twelve entries and urgent twenty, stated in the unit they are counted in.
+**D12. A matter the beat has carried rests until it has gone quiet.** Valve's "not if it
+has been said in the last N", SillyTavern's Cooldown, Booth's relax phase. First cut as a
+four-entry rest, which stopped the consecutive-turn repeats and was still too eager: the
+second run (below) pulled the player's quest on thirty of sixty turns, the beat carried it
+on five, and two of the five were forced. A card that has surfaced once is not pulled
+again until twelve entries have passed since the beat last carried it; one that has never
+surfaced is pulled until it does. Quiet is twelve entries and urgent twenty, stated in the
+unit they are counted in.
 
 **D13. The rewrite is for quests.** `drops-the-thread` is raised only for an urgent,
 uncarried card of kind `quest`. A task the player took on and has not heard of for ten
@@ -449,6 +454,45 @@ call keeps the generous timeout a cold load needs; the fallback gets 120 seconds
 other), stops after three consecutive turns that could not reach the model rather than
 burning the script against a server that is not there, reports the narrator's own prose
 apart from the page, and counts the pulls it sent.
+
+## The second run, and what sixty turns can and cannot say
+
+Same script, model and machine, with D9–D14 in. **All sixty turns completed, 59 clean**
+(one `invented-name` that survived two repairs), no crash, no fallback stall, the six award
+lines filed as engine lines, `recurring-phrase` fired seven times live and all seven
+rewrites were accepted, four prose turns lost both models to the deflection detector and
+shipped the engine's lines.
+
+The repetition number did not move. Like for like — the narrator's own beats, the
+engine's lines set aside in all three:
+
+| | baseline | run 1 (58 turns) | run 2 |
+|---|---|---|---|
+| self-repetition | 0.121 | 0.098 | 0.133 |
+| by thirds | 0.103 / 0.111 / 0.053 | 0.057 / 0.083 / 0.071 | 0.042 / 0.044 / 0.097 |
+| split-half, same run | 0.054 / 0.047 | 0.049 / 0.051 | 0.036 / 0.062 |
+| gzip ratio | 2.87 | 2.88 | 2.88 |
+| commonest four-gram | "the transition from the" 12 | "the transition from the" 11 | three tied at 8 |
+
+Three runs straddle the baseline and the two halves of one run differ by as much as two
+runs do. **Sixty turns cannot resolve a difference of 0.03, and no claim about overall
+repetition is made here.** What the runs do show is a distinction the design had not
+drawn: the phrase check catches a *dense* tic — three of the last twelve beats — and
+demonstrably rewrote seven of them, while the run's commonest phrases are *diffuse*, eight
+of fifty-six beats, one in seven, which a three-in-twelve rule sees only when they cluster.
+Lowering the threshold to two in twelve was calibrated against the baseline and fired on
+nearly half its beats, most of them a scene honestly continuing. That is the DRY author's
+warning arriving as a measurement: the model "can of course still repeat itself by
+paraphrasing", and a detector on exact phrases has a floor. The mechanisms that would reach
+below it are at the sampler (DRY, XTC), which Ollama does not expose, and prompt-side
+requests for variety, which this record refuses on the evidence.
+
+What did move is what the player quoted. The four-of-four death line, the four-of-fifty-three
+anchor, the award line as narration: gone, and the tests hold them gone. The quest that the
+model took up in this run was worked into eight of sixty beats — "the trail of the Sphinx
+Whisker stretches out behind you", a guard repeating its name — and forced in two ("the
+rhythmic chime of the Sphinx Whisker", a whisker that makes a sound), which is what D12's
+longer rest is for; its effect is unmeasured until the next run.
 
 ## Refused, with reasons
 

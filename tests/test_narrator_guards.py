@@ -462,25 +462,35 @@ def test_time_alone_raises_nothing():
     assert [c.id for _, _, c in ranked] == ["q-salt"], "only the open quest qualifies"
 
 
-def test_a_mention_is_written_back_and_the_matter_rests():
-    """The write-back, and the cooldown it feeds. A card the beat just carried is
-    marked mentioned, loses its urgency, and is not pulled again for about two turns
-    of play — the first run pulled the same card eight times running because the beat
-    that mentioned it put its words in the window that scored it."""
+def test_a_mention_is_written_back_and_the_matter_rests_until_quiet():
+    """The write-back, and the rest it feeds. A card the beat has carried is marked
+    mentioned and is not pulled again until it has gone quiet. The first run pulled the
+    same card eight times running because the beat that mentioned it put its words in
+    the window that scored it; a four-entry rest fixed that and the second run still
+    pulled the player's quest on thirty of sixty turns for five carries, two of them
+    forced. A matter that has surfaced once can wait until it is missed."""
     s, cards = _table()
     carried = cards.note_mentions(
         s, "The harbourmaster spits. 'Salt? The salt went north with the toll-men.'",
         turn=11)
     assert carried == ["Find the missing salt"]
     assert cards.find(s, "q-salt").mentioned == 11
-    # Resting: nothing else is the player's matter here, so nothing is pulled.
-    assert cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12) is None
-    # Past the cooldown it is back, and no longer quiet.
-    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=16)
+    # Resting: nothing else is the player's matter here, so nothing is pulled — not the
+    # next turn, and not three turns of play later either.
+    for turn in (12, 16, 22):
+        assert cards.thread_to_pull(s, recent=[], player_text="I look around.",
+                                    turn=turn) is None, turn
+    # Once it has gone quiet it is back, and says so.
+    pull = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=24)
     assert pull["title"] == "Find the missing salt"
-    assert "quiet" not in pull["why"] and not pull["urgent"]
+    assert "quiet" in pull["why"] and "for a while" in pull["text"] and not pull["urgent"]
+    # A matter that has NEVER surfaced is pulled until it does: a second quest, fresh.
+    cards.open_quest(s, title="Carry word to the mill", objectives=["Find the miller"],
+                     giver="c2", reward="a sack of flour")
+    fresh = cards.thread_to_pull(s, recent=[], player_text="I look around.", turn=12)
+    assert fresh is not None and fresh["title"] == "Carry word to the mill"
     # One identity word is a coincidence.
-    assert cards.note_mentions(s, "You buy a pinch of salt for the road.", turn=17) == []
+    assert cards.note_mentions(s, "You buy a pinch of salt for the road.", turn=25) == []
 
 
 def test_identity_is_the_title_the_objectives_the_people_and_the_names_in_the_facts():

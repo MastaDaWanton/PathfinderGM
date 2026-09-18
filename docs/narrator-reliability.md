@@ -385,9 +385,33 @@ The prose improved and the page got worse, and the difference was one line: the
 watcher's story award ("You gain 200 XP for moving a matter along: …"), filed on the
 transcript as narration, shown back to the model as its own, and the run's most repeated
 phrase at seven beats. The phrase it was all for held at eleven because the live check
-was reading four beats, not twelve. Both are corrected (`narrator-guards.md` D9), along
-with the pull's over-selection (fifty of fifty turns carried one) — D10 to D13 — and the
-run with those in is the next row of this table.
+was reading four beats, not twelve. Both were corrected (`narrator-guards.md` D9), along
+with the pull's over-selection (fifty of fifty turns carried one) — D10 to D13.
+
+**After, second run** — with those in. Sixty of sixty turns, **59 clean** (one
+`invented-name`), no crash, no fallback stall, `recurring-phrase` fired seven times live
+and every rewrite was accepted. Like for like, the narrator's own beats with the engine's
+lines set aside in all three:
+
+| | baseline | run 1 | run 2 |
+|---|---|---|---|
+| self-repetition | 0.121 | 0.098 | **0.133** |
+| split-half of the same run | 0.054 / 0.047 | 0.049 / 0.051 | 0.036 / 0.062 |
+| gzip ratio | 2.87 | 2.88 | 2.88 |
+| turns clean | 58/60 | — (crashed at 59) | 59/60 |
+
+Three runs straddle the baseline and two halves of one run differ by as much as two runs
+do: **sixty turns cannot resolve a change of 0.03 in this number, and none is claimed.**
+What the runs settle is narrower and real — the four-of-four death line, the repeated
+anchor and the award-as-narration are gone and tested gone; the phrase check catches a
+tic dense enough to sit in three of twelve beats and not one that recurs in one of seven,
+which is the floor of an exact-phrase detector (`narrator-guards.md`, "The second run").
+
+## Still open
+
+- Whether the prose is any *good* is still not a number here. What is: whether it is
+  true, whether it is the same, and whether the engine's lines and the narrator's are
+  being measured apart.
 
 ## Still open
 
