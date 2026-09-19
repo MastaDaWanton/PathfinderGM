@@ -65,9 +65,21 @@ campaign after players objected.
   from inside a brothel on "the current transaction is a private matter" and paid 200 XP;
   such an advance is now logged as refused.
 
-## Not measured live
+## Measured live, four runs on a copy of the `masta` save
 
-Groups 5 and 6 were built after the four live replays of the day and are covered by
-unit tests and the suite (3,581 tests, all passing). The live check owed: "who runs this town" on
-the `masta` copy with the offer off and on; `/cheat I gain 2000 experience`; a giver in
-the room across three quiet turns.
+`/gm who runs this town?` → `/gm tell me anyway` → the same question again →
+`/cheat I gain 2000 experience`.
+
+| Run | Result |
+|---|---|
+| 1 | **500**: the sheet refuses an untrained Knowledge (local) roll. The Core Rulebook caps an untrained check at DC 10, under rumour's DC 15 — untrained means the character does not know, not that the app falls over. Caught. |
+| 2 | The answer still named "an old veterans' league that holds significant shadow power": it came from the NARRATOR's brief, which the out-of-character call inherits. `gm_search.redact` added. |
+| 3 | Still there: World Bible weaves a settlement's facts into its own paragraphs, and the Governance section restated what the league does. `gm_search.scrub` added — a sentence carrying two distinctive words of a withheld fact goes; the paragraph stays. |
+| 4 | **The ruling, working.** "The town is governed by a local reeve … the day-to-day administration is handled by tax-farmers … — Some of what the town keeps, your character has not learned. Ask around in play: Diplomacy, an hour or four, and it can be tried again." Then "tell me anyway": "there is a shadow power in the form of an old veterans' league that no one in office will cross." Then the same question again: withheld once more, the roll remembered — PF1e's "Try Again: No". |
+
+`/cheat I gain 2000 experience`: "You gain 2,000 XP for the author's word (2,465 of
+2,000 for level 2). Enough to advance — it will settle with a night's rest", read in
+code, the author's number kept, no model call. It did nothing twice on 2026-09-18.
+
+Still owed live: a giver in the room across three quiet turns (item 7), and the
+`knowledge_offer` rule turned on so the answer offers rather than only naming the route.

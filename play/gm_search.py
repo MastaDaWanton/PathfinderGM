@@ -305,6 +305,63 @@ def _ordered_facts(facts: dict, keys: tuple[str, ...],
     return first + rest
 
 
+_SCRUB_STOP = frozenset("""the and that with from into this their there which they them then have been
+were will would could shall should about after before over under nobody anyone everyone
+office will cross old very more most some such than when where while who whom whose""".split())
+
+
+def hidden_words(facts: dict, allow: frozenset) -> list[set[str]]:
+    """For each fact the character may not know, its distinctive words — the handle by
+    which the export's OWN PROSE restates it. Measured live 2026-09-19: with the Shadow
+    Power line gone, the Governance paragraph still said what the veterans' league does,
+    because World Bible weaves a settlement's facts into its sections."""
+    out = []
+    for k, v in (facts or {}).items():
+        if tier_of(k) in allow:
+            continue
+        words = {w for w in re.findall(r"[a-z']{4,}", str(v).lower())
+                 if w.strip("'") not in _SCRUB_STOP}
+        if len(words) >= 2:
+            out.append(words)
+    return out
+
+
+def scrub(text: str, facts: dict, allow: frozenset) -> str:
+    """Cut the sentences that carry a withheld fact — two of its distinctive words in
+    one sentence — from prose the character IS shown. Keeps the rest of the paragraph."""
+    handles = hidden_words(facts, allow)
+    if not handles or not text:
+        return text
+    kept = []
+    for s in re.split(r"(?<=[.!?])\s+", str(text)):
+        low = s.lower()
+        if any(sum(1 for w in h if w in low) >= 2 for h in handles):
+            continue
+        kept.append(s)
+    return " ".join(kept).strip()
+
+
+def redact(text: str, allow: frozenset = frozenset({PUBLIC}), facts: dict | None = None) -> str:
+    """The narrator's brief with what the character would not know removed.
+
+    The brief carries the town's Shadow Power and Tension for the NARRATOR, and the
+    out-of-character call inherits it — measured live 2026-09-19: with the dossier
+    tiered, the first `/gm` answer still said "an old veterans' league that holds
+    significant shadow power", from the brief. A fact line is `  Key: value`; the
+    place's own paragraphs restate its facts, so their sentences are scrubbed too."""
+    out = []
+    for line in str(text or "").splitlines():
+        m = re.match(r"^\s*([A-Z][A-Za-z' -]{2,40}):\s", line)
+        if m and tier_of(m.group(1)) not in allow:
+            continue
+        if facts:
+            line = scrub(line, facts, allow)
+            if not line.strip():
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def withheld_from(facts: dict, allow: frozenset) -> list[tuple[str, str]]:
     """The (key, tier) pairs `allow` kept out — what the GM knows and did not say."""
     return [(k, tier_of(k)) for k in facts if tier_of(k) not in allow]
@@ -347,7 +404,7 @@ def passages(world, hits: list[Hit], question: str = "",
         for k, v in _ordered_facts(h.facts, keys, allow):
             body.append(f"      {k}: {' '.join(str(v).split())}")
         if h.prose:
-            body.append("      " + " ".join(h.prose.split())[:600])
+            body.append("      " + scrub(" ".join(h.prose.split()), h.facts or {}, allow)[:600])
         if h.text and not h.facts:
             body.append("      " + " ".join(h.text.split())[:600])
         lines.append("\n".join([head] + _fit(body, per)))
@@ -405,6 +462,7 @@ def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET,
         if title and tier_of(title) not in allow:
             continue
         text = " ".join(" ".join(s.get("paragraphs", [])).split())
+        text = scrub(text, dict(getattr(location, "facts", {}) or {}), allow)
         if text:
             body.append(f"  {title + ': ' if title else ''}{text[:600]}")
     return "\n".join(lines + _fit(body, budget))

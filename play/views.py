@@ -1400,6 +1400,7 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # `knowledge_offer` rule on, the GM offers them instead, and "tell me anyway"
     # hands over what was withheld last time.
     from rules import houserules as _hr
+    from rules.sheet import IllegalSheet
 
     said_mem = c.scene.said
     allow = {gm_search.PUBLIC}
@@ -1413,12 +1414,23 @@ def _ask_the_gm(c, engine, question: str) -> str:
     if gm_search.RUMOUR not in allow and pc is not None:
         key = f"knows:{place_key}:rumour"
         if key not in said_mem:
-            roll = engine.dice.d20(pc.skill_modifiers("knowledge (local)"),
-                                   label="Knowledge (local), rumour", visibility="hidden")
-            said_mem[key] = bool(roll.total >= 15)
+            try:
+                roll = engine.dice.d20(pc.skill_modifiers("knowledge (local)"),
+                                       label="Knowledge (local), rumour", visibility="hidden")
+                said_mem[key] = bool(roll.total >= 15)
+            except IllegalSheet:
+                # Untrained. The Core Rulebook caps an untrained Knowledge check at
+                # DC 10 and rumour is DC 15: an untrained character does not know the
+                # town's rumours, and this is the rule saying so, not a fault. Found
+                # live (2026-09-18) as a 500 on the first `/gm` of the replay.
+                said_mem[key] = False
         if said_mem.get(key):
             allow.add(gm_search.RUMOUR)
     allow = frozenset(allow)
+    # The narrator's brief carries the town's Shadow Power for the narrator; the
+    # out-of-character call gets it with the character's tiers only.
+    brief = gm_search.redact(brief, allow,
+                             facts=dict(getattr(c.location, "facts", {}) or {}))
     # What the world's own record holds on what was asked (docs/gm-questions.md). Names
     # are found, not matched, by a BM25 index over the world alone; "here" and "this
     # town" are the place the engine knows, and get its whole record as the GM's notes.

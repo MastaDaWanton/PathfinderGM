@@ -55,6 +55,31 @@ def test_facts_are_tiered_by_key_and_the_dossier_keeps_the_hidden_ones(world):
     assert ("Shadow Power", "hidden") in kept
 
 
+def test_the_narrators_brief_is_redacted_for_the_out_of_character_call(world, vormoor):
+    """Measured live 2026-09-19 with the dossier already tiered: the first `/gm`
+    answer still said "an old veterans' league that holds significant shadow power" —
+    it came from the narrator's brief, which the out-of-character call inherits."""
+    from gm import prompts
+
+    town = world.by_name("Vormoor", kind="CITY")
+    brief = prompts.scene_brief(world, vormoor, town, [])
+    assert "  Shadow Power:" in brief, "the narrator keeps it"
+    redacted = gm_search.redact(brief, frozenset({"public"}), facts=dict(town.facts))
+    assert "Shadow Power:" not in redacted and "Tension:" not in redacted
+    assert "Formal Power:" in redacted
+    # And the export's own paragraphs restate the fact: the Governance section says
+    # what the veterans' league does. The sentence goes; the paragraph stays.
+    assert "veteran" not in redacted.lower()
+    assert "veteran" not in gm_search.dossier(world, town, "who runs this town").lower()
+    assert "Governance:" in gm_search.dossier(world, town, "who runs this town")
+    assert "Shadow Power:" in gm_search.redact(brief, frozenset({"public", "rumour", "hidden"}))
+    import inspect
+
+    from play import views
+
+    assert "brief = gm_search.redact(brief, allow," in inspect.getsource(views._ask_the_gm)
+
+
 def test_a_persons_secret_leaves_the_passages_unless_allowed(world):
     hits = gm_search.search(world, "who is Drenn Ironvale")
     shown = gm_search.passages(world, hits, "who is Drenn Ironvale")
@@ -75,6 +100,10 @@ def test_the_gm_path_rolls_once_offers_by_the_table_rule_and_hands_over_on_the_w
     assert "_hr.knowledge_offer()" in src
     assert "tell me anyway" in src
     assert 'said_mem["gm:withheld"]' in src
+    # Untrained is not a fault: the first live `/gm` of the replay was a 500 because
+    # the sheet refuses an untrained Knowledge (local) roll — and the Core Rulebook
+    # caps an untrained check at DC 10, under rumour's 15. The character does not know.
+    assert "except IllegalSheet:" in src and "said_mem[key] = False" in src
 
 
 def test_the_table_settings_exist_with_the_defaults_the_ruling_asked_for():
