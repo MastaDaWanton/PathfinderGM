@@ -1733,7 +1733,25 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            judgement.promote_cast(c.scene, introduced, beat=text)
+            judgement.promote_cast(c.scene, introduced, beat=text, world=c.world)
+            # A name given in play renames the panel: "call me Kael" from an unnamed
+            # person here makes him Kael from now on (2026-09-18: he called himself
+            # "the stranger", our placeholder, because nothing held a name).
+            for ref, given in judgement.apply_introductions(c.scene, text):
+                repairs.append(f"{ref} gave the name {given}: the panel shows it now")
+            # And a face for whoever arrived faceless: a newly booked person whose
+            # sentences carry no appearance at all gets the world's own line for their
+            # people appended, as fact, so the next beat cannot re-invent them.
+            for phrase in introduced:
+                who = next((a for a in c.scene.actors.values() if a.name == phrase), None)
+                if who is None or not getattr(who, "appearance", ""):
+                    continue
+                if narration_mod.faceless(text, phrase):
+                    text = text.rstrip() + f" {narration_mod.definite(phrase).capitalize()}: " \
+                        f"{who.appearance}"
+                    ours.append(f"{narration_mod.definite(phrase).capitalize()}: {who.appearance}")
+                    repairs.append(f"faceless arrival: described the {phrase} from the "
+                                   f"world's own body line")
             # Ruskin's write-back: a card the beat carried is marked mentioned, and
             # its urgency starts again from here. The cooldown falls out of it.
             cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))

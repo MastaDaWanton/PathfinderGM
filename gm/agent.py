@@ -645,6 +645,20 @@ class GMAgent:
         """
         names = {a.name for a in self.engine.scene.actors.values()}
         names |= {a.heritage for a in self.engine.scene.actors.values() if a.heritage}
+        # And the race — the homebrew card sits in `race` with `heritage` blank, and
+        # "Asura" was struck as an invented person (2026-09-18) — plus the true names
+        # the scene holds behind its descriptors, so a stranger giving his name is not
+        # un-named in his own line.
+        for a in self.engine.scene.actors.values():
+            if a.race:
+                names.add(str(a.race).title())
+                names.add(str(a.race))
+            doc = a._race_doc() if hasattr(a, "_race_doc") else None
+            if doc and doc.get("name"):
+                names.add(str(doc["name"]))
+            if getattr(a, "true_name", ""):
+                names.add(a.true_name)
+                names |= set(a.true_name.split())
         try:
             world = self.world
             names |= {e.name for e in world.entities.values()}
@@ -889,6 +903,18 @@ class GMAgent:
         if leaked:
             repairs.append(f"option menu leaked into prose: cut {len(leaked)} "
                            f"sentence(s)")
+        # A name somebody gives is the one the world holds for them — settled BEFORE
+        # the un-namer, which struck "Kaelen" inside the stranger's own introduction
+        # (2026-09-18). The expected names are the true names behind the descriptors.
+        expected = {}
+        for a in self.engine.scene.actors.values():
+            if not a.is_pc and getattr(a, "true_name", "") and a.true_name != a.name:
+                for w in narration_mod._name_stems(a.name) if hasattr(narration_mod, "_name_stems") else []:
+                    expected[w] = a.true_name
+                expected.setdefault((str(a.name).split() or [""])[-1].lower(), a.true_name)
+        text, settled = narration_mod.settle_introductions(text, expected)
+        if settled:
+            repairs.append(f"the name given is the world's: {', '.join(settled)}")
         known = self._known_names() | extra
         text, unnamed = narration_mod.unname_strangers(text, known)
         if unnamed:
@@ -935,6 +961,17 @@ class GMAgent:
                                                  self._other_names())
         if swapped:
             repairs.append(f"wrong body: replaced {', '.join(swapped)}")
+        # The player is never "the beast" in narration when everyone else here is a
+        # person: the noun can only mean them, and their name is what it becomes.
+        if pc is not None:
+            people_only = all(
+                (a.from_template in ("guildhand", "watchman", "thug", "") or a.world_entity_id
+                 or (a._race_doc() or {}).get("type", "humanoid") in ("humanoid", "outsider", ""))
+                and int((a.abilities or {}).get("int", 10) or 10) > 2
+                for a in self.engine.scene.actors.values() if not a.is_pc)
+            text, beasts = narration_mod.creature_nouns_for_pc(text, pc.name, people_only)
+            if beasts:
+                repairs.append(f"the player called a creature: replaced {', '.join(beasts)}")
         # Nobody left standing means nobody "presses forward". Measured: the engine
         # printed "The fight is over" under prose that had officials regaining their
         # composure and pressing forward — combatants the scene never contained. The

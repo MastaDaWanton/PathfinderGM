@@ -419,6 +419,14 @@ class Actor:
     world_entity_id: str | None = None
     world_people_id: str | None = None
     heritage: str = ""
+    # The name behind the descriptor, and what a stranger would see. `name` is what the
+    # panel shows — "the stranger sharing the step" until he gives it — and `true_name`
+    # is the one he gives, drawn at spawn or promotion from the world's own pools
+    # (`rules/names.py`). Measured 2026-09-18: asked his name, an NPC called himself
+    # "the stranger" — our placeholder — because nothing held a real one, and the woman
+    # in the doorway was never described because nothing held a face.
+    true_name: str = ""
+    appearance: str = ""
     # Where this character was before the first turn. The id alone; the
     # modifiers, tags and ties are read live off the document.
     background: str = ""
@@ -3599,6 +3607,7 @@ def to_dict(actor: Actor) -> dict:
         "world_entity_id": actor.world_entity_id, "world_people_id": actor.world_people_id,
         "at": actor.at,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
+        "true_name": actor.true_name, "appearance": actor.appearance,
         "background": actor.background,
         "background_ties": list(actor.background_ties or []),
         "gender": actor.gender,
@@ -3946,6 +3955,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         # heal for saves that predate the field would have fired on all of them.
         at=str(data.get("at") or ""),
         heritage=data.get("heritage", ""),
+        true_name=str(data.get("true_name", "") or ""),
+        appearance=str(data.get("appearance", "") or ""),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),
         race=data.get("race", "human"),

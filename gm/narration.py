@@ -388,6 +388,139 @@ _PLACE_BEFORE = re.compile(r"\b(?:of|into|near|toward|towards)\s+$", re.I)
 _CAP_TOKEN_BEFORE = re.compile(r"([A-Z][a-zA-Z'’-]{2,})\s+$")
 
 
+# --- names given in play, faces owed on arrival, the player never a beast --------------
+
+# Somebody giving their name, inside their own speech. The name is the capitalised
+# word or two right after the phrase.
+_INTRODUCES = re.compile(
+    r"(?i:\bcall me|\bmy name is|\bmy name's|\bthe name's|\bthe name is|\bthey call me|"
+    r"\bI am called|\bI'm called|\bname is|\bI am|\bI'm|\byou can call me|\bfolk call me|"
+    r"\bknown as)\s+((?:[A-Z][a-zA-Z'’-]+)(?:\s+[A-Z][a-zA-Z'’-]+)?)", re.U)
+_NOT_A_GIVEN_NAME = frozenset({
+    "The", "A", "An", "Not", "No", "Just", "Only", "Here", "Sorry", "Afraid", "Nobody",
+    "Someone", "Something", "Sure", "Fine", "Done", "Yours", "Mine", "Your", "His",
+    "Her", "Their", "Nothing", "Listening", "Waiting", "Leaving", "Going", "Coming",
+})
+
+
+def introductions(text: str) -> list[tuple[str, str]]:
+    """(speaker head word or "", name) for each name somebody gives in this beat.
+
+    The speaker is the person the sentence (or the one before, for a bare quotation)
+    names outside the quotation: "The stranger shrugs. 'Call me Kael.'" → ("stranger",
+    "Kael"). Measured 2026-09-18: asked his name, an unnamed man said "Let's call it
+    the stranger" — our placeholder — and when a model DID give a name ("Kaelen") the
+    un-namer struck it inside his own line.
+    """
+    out: list[tuple[str, str]] = []
+    if not text:
+        return out
+    sentences = _sentences(text)
+    for i, s in enumerate(sentences):
+        for m in _INTRODUCES.finditer(s):
+            name = m.group(1).strip()
+            if name.split()[0] in _NOT_A_GIVEN_NAME:
+                continue
+            # Inside speech, or it is the narrator's own sentence about somebody.
+            before = s[:m.start()]
+            if before.count('"') % 2 == 0 and before.count("'") % 2 == 0 \
+                    and "“" not in before and "‘" not in before:
+                continue
+            # Who is speaking: the last capitalised-or-role word outside the quotes,
+            # in this sentence then the one before.
+            outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
+            # The first role word outside the quotes ("stranger", "woman", "guard"),
+            # else the noun right after an article. Lazy import: judgement imports
+            # this module.
+            from .judgement import _ROLE_WORD
+
+            role = _ROLE_WORD.search(outside)
+            if role:
+                head = role.group(0).lower()
+            else:
+                after = re.search(r"\b(?:the|a|an)\s+([a-z]{3,})\b", outside.lower())
+                head = after.group(1) if after else ""
+            out.append((head, name))
+    return out
+
+
+def settle_introductions(text: str, expected: dict[str, str]) -> tuple[str, list[str]]:
+    """The name a person gives is the one the world holds for them.
+
+    `expected` maps a speaker's head word ("stranger") to their true name. A given name
+    that differs — the model's guess at a pool it was never shown — is replaced with the
+    true one throughout the beat; one that matches is left. Returns (text, swaps)."""
+    swaps: list[str] = []
+    if not text or not expected:
+        return text, swaps
+    for head, given in introductions(text):
+        true = expected.get(head) or (expected.get("") if len(expected) == 1 else "")
+        if not true or given == true or given.lower() == true.lower():
+            continue
+        if given.split()[0] == true.split()[0]:
+            continue
+        text = re.sub(rf"\b{re.escape(given)}\b", true, text)
+        swaps.append(f"{given} -> {true}")
+    return text, swaps
+
+
+_CREATURE_NOUNS = re.compile(
+    r"\b(the|this|that)\s+(beast|creature|monster|monstrosity|thing|abomination|brute|"
+    r"fiend|demon|devil|animal|horror)\b", re.I)
+
+
+def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool) -> tuple[str, list[str]]:
+    """"The beast" for the player's character becomes their name.
+
+    Measured 2026-09-18 (a homebrew asura at 70 hp with a blank body line): the NPC
+    plan's motive and the miss beat both called the player "the beast", from nothing in
+    any document. When everybody else in the scene is a person — no animal, no summoned
+    thing — a creature noun can only mean the player, and the player is referred to by
+    name or as "you", never by a creature noun the race document does not use. Left
+    alone when a creature is present: then the noun may well be its own."""
+    if not text or not pc_name or not others_are_people:
+        return text, []
+    swapped: list[str] = []
+
+    def _swap(m):
+        swapped.append(m.group(2).lower())
+        return pc_name
+
+    # Narration only: a man who SAYS "you beast" is in character, and his line is his.
+    parts = re.split(r'("[^"]*"|“[^”]*”|\'[^\']*\')', text)
+    out = []
+    for i, part in enumerate(parts):
+        out.append(part if i % 2 else _CREATURE_NOUNS.sub(_swap, part))
+    return "".join(out), swapped
+
+
+_APPEARANCE = re.compile(
+    r"\b(?:hair|eyes?|face|scar\w*|beard\w*|tall|short|thin|broad|heavy|lean|gaunt|"
+    r"stocky|wiry|skin|grey|gray|dark|pale|old|young|weathered|lined|hooded|cloak\w*|"
+    r"coat|apron|tunic|robes?|dress|shawl|boots|hands?|jaw|nose|teeth|tusks?|ears?|"
+    r"braid\w*|bald|stubble|freckl\w*|tattoo\w*|limp\w*|hunch\w*|squint\w*|"
+    r"one-eyed|missing|ring\w*|leather|fur|feather\w*|scales?|horns?|snout|muzzle|"
+    r"whiskers|paws?|claws?|fangs?|wings?|tail)\b", re.I)
+
+
+def faceless(text: str, phrase: str) -> bool:
+    """Whether a newly booked person appears with no appearance at all: none of the
+    sentences naming them carry a word for what they look like or wear.
+
+    "The woman is not described at all" (2026-09-18): a paragraph on the room, of the
+    woman only her gaze and manner. The body checks stop the WRONG body; this is the one
+    that requires a body."""
+    words = [w for w in re.findall(r"[a-z]+", str(phrase or "").lower()) if len(w) >= 3]
+    if not words:
+        return False
+    head = words[-1]
+    about = [s for s in _sentences(unquoted(text))
+             if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
+    if not about:
+        return False
+    return not any(_APPEARANCE.search(s) for s in about)
+
+
 def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     """Replace first-appearance invented people with an unnamed descriptor.
 

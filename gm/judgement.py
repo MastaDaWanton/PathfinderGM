@@ -4333,7 +4333,48 @@ def challengers(beat: str, phrases) -> list[str]:
     return out
 
 
-def promote_cast(scene, added, beat: str = "") -> list[str]:
+def apply_introductions(scene, beat: str) -> list[tuple[str, str]]:
+    """A name given in play becomes the panel's name for that person.
+
+    From `narration.introductions`: the speaker's head word finds the unnamed actor
+    here (a descriptor name — lowercase, or "the …"); their display name becomes the
+    name given, their true name too if none was held. A named person "introducing"
+    themselves again changes nothing. Returns [(ref, name)] for the log."""
+    from .narration import introductions
+
+    if scene is None or not beat:
+        return []
+    out: list[tuple[str, str]] = []
+    for head, given in introductions(beat):
+        for ref, a in (getattr(scene, "actors", {}) or {}).items():
+            if a.is_pc:
+                continue
+            name = str(a.name or "")
+            named_already = name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an "))
+            if named_already:
+                continue
+            words = _name_words(name)
+            if head and head not in words:
+                continue
+            if not head:
+                # No speaker named: only when exactly one unnamed person stands here.
+                unnamed = [x for x in scene.actors.values() if not x.is_pc
+                           and not (str(x.name)[:1].isupper()
+                                    and not str(x.name).lower().startswith(("the ", "a ", "an ")))]
+                if len(unnamed) != 1 or unnamed[0].ref != ref:
+                    continue
+            a.name = given
+            if not getattr(a, "true_name", ""):
+                a.true_name = given
+            for e in scene.cast:
+                if e.get("ref") == ref:
+                    e["who"] = given
+            out.append((ref, given))
+            break
+    return out
+
+
+def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     """A person the ledger notes becomes a person the engine holds.
 
     The ruling, after the library beat: the place held but "there should have
@@ -4396,6 +4437,17 @@ def promote_cast(scene, added, beat: str = "") -> list[str]:
         from rules import states
 
         actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
+        # A name behind the descriptor and a face beside it, from the world's own
+        # pools and bodies (rules/names.py) — the panel keeps showing the descriptor
+        # until the name is given in play.
+        if world is not None:
+            from rules import names as names_mod
+
+            taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
+            taken += [a.name for a in scene.actors.values()]
+            actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
+            actor.appearance = names_mod.appearance_for(world, scene.location_id,
+                                                        ref=actor.ref)
         if getattr(scene, "grid", None) is not None:
             scene.place_by_zone([actor.ref])
         for e in scene.cast:

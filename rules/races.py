@@ -371,6 +371,32 @@ def body_line(doc: dict) -> str:
              and not t.startswith(("sense.", "move.", "natural."))]
     if extra:
         parts.append("; ".join(extra))
+    if not parts:
+        # An unconverted homebrew card — the asura of the 2026-09-18 play-test, with
+        # 59 evolutions and `effects: []` — rendered an EMPTY body line, so its bite,
+        # claws, tail and extra arms never reached the narrator and it wrote "the
+        # beast". Its type, its size and the evolutions it lists by name are facts
+        # the card already states.
+        kind = str(doc.get("type") or "").strip()
+        size = str(doc.get("size") or "").strip()
+        if kind or size:
+            parts.append(f"a {size} {kind}".replace("  ", " ").strip())
+        evos = []
+        for e in doc.get("evolutions") or []:
+            if not isinstance(e, dict):
+                continue
+            name = str(e.get("id") or "").replace("-", " ")
+            choice = str(e.get("choice") or "")
+            if name and name not in ("improved damage", "improved natural armor",
+                                     "ability increase", "skilled", "magic attacks",
+                                     "improved natural armour"):
+                evos.append(f"{name} ({choice})" if choice else name)
+        seen: list[str] = []
+        for e in evos:
+            if e not in seen:
+                seen.append(e)
+        if seen:
+            parts.append("plainly: " + ", ".join(seen[:10]))
     return "; ".join(parts)
 
 

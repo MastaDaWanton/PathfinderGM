@@ -897,7 +897,11 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             lines.append(
                 f"  {ref} — {actor.name}, the player's character{being}. Narrate to them "
                 f"as 'you'; when someone speaks about them, {actor.pronouns}.{body} "
-                f"{actor.heritage} {actor.class_data.get('name', '')} {actor.level}, "
+                # The heritage, or the race document's own name when the sheet's
+                # heritage is blank — a homebrew race sits in `race` and the line
+                # rendered "  Fighter 1" with nothing before it (2026-09-18).
+                f"{actor.heritage or (race_doc or {}).get('name') or actor.race} "
+                f"{actor.class_data.get('name', '')} {actor.level}, "
                 f"{actor.hp}/{actor.hp_max} hp.{_states_of(actor)}{bodily}{history}{seen}"
             )
             # The jars, by id. `use_item` takes the id and nothing else in the brief
@@ -946,7 +950,17 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # the creature the engine is holding.
             mood = states.attitude_of(actor)
             feels = f" {actor.name} is {mood} towards the player." if mood else ""
-            lines.append(f"  {ref} — {actor.name}. {note}.{feels}{_states_of(actor)}")
+            # The name behind the descriptor and the face beside it, as facts: asked
+            # his name, he gives THIS one (never "the stranger", never one made up),
+            # and a first description uses THIS body. Both from the world's own
+            # material (rules/names.py); a resident's Appearance fact is their own.
+            given = str(getattr(actor, "true_name", "") or "").strip()
+            names_it = (f" If asked their name they give it: {given}."
+                        if given and given.lower() != str(actor.name).lower() else "")
+            face = str(getattr(actor, "appearance", "") or "").strip()
+            looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
+            lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}"
+                         f"{_states_of(actor)}")
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,

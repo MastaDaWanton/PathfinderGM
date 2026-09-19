@@ -7981,6 +7981,25 @@ class Engine:
             actor = instantiate(template, scene=self.scene, name=name,
                                 world_entity_id=from_entity_id, index=n)
             self.scene.add(actor)
+            # A true name behind a descriptor, and a face, from the world's pools
+            # (rules/names.py); a resident keeps their own name and their own
+            # Appearance fact. Nothing here reaches the panel until given in play.
+            if self.world is not None:
+                from . import names as names_mod
+
+                if from_entity_id:
+                    actor.appearance = names_mod.resident_appearance(self.world,
+                                                                     from_entity_id)
+                    actor.true_name = actor.name
+                elif not actor.true_name:
+                    taken = [a.true_name for a in self.scene.actors.values()
+                             if getattr(a, "true_name", "")]
+                    taken += [a.name for a in self.scene.actors.values()]
+                    actor.true_name = names_mod.true_name(
+                        self.world, self.scene.location_id, actor.ref, taken)
+                    if not actor.appearance:
+                        actor.appearance = names_mod.appearance_for(
+                            self.world, self.scene.location_id, ref=actor.ref)
             made.append({"ref": actor.ref, "name": actor.name})
             # Someone who arrives mid-fight rolls in. Without this they were on the
             # board but not in the order, so they never took a turn and the fight could
