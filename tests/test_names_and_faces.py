@@ -113,6 +113,35 @@ def test_a_person_who_arrives_faceless_is_found_and_the_worlds_body_line_stands_
     assert names_mod.resident_appearance(world, drenn.id) == drenn.facts["Appearance"]
 
 
+def test_a_bare_quoted_answer_to_the_question_is_an_introduction(world, step):
+    """Group-3 replay, 2026-09-18: asked his name, the stranger answered '"Gorvothor
+    Kragnir," he grunts' — the world's own name, from the brief — and the panel kept
+    "stranger", because a bare quoted name is not one of the introduction phrases."""
+    added = judgement.note_cast(step, "A stranger shares the step with you.", turn=1)
+    judgement.promote_cast(step, added, world=world)
+    stranger = next(a for a in step.actors.values() if a.name == "stranger")
+    beat = (f"The stranger takes a slow breath before speaking. \"{stranger.true_name},\" "
+            f"he grunts, finally. He does not look up. What do you do?")
+    assert narration.introductions(beat) == []
+    assert narration.introductions(beat, asked_for_name=True) == [("stranger", stranger.true_name)]
+    renamed = judgement.apply_introductions(step, beat, "I ask the stranger for his name")
+    assert renamed == [(stranger.ref, stranger.true_name)] and stranger.name == stranger.true_name
+    # Not asked, a quoted capitalised word is not somebody's name.
+    assert judgement.apply_introductions(step, '"Vormoor," he grunts.', "I wait") == []
+
+
+def test_looking_somebody_over_owes_a_face_and_old_actors_get_names(world, step):
+    woman = instantiate("guildhand", scene=step, name="woman in the doorway")
+    step.add(woman)
+    assert judgement.examined("I look the woman in the doorway over carefully", step) == woman.ref
+    assert judgement.examined("I look around the market", step) is None
+    # A save from before the fields existed: named here, once, deterministically.
+    assert not woman.true_name
+    named = judgement.name_the_nameless(step, world)
+    assert named == [woman.ref] and woman.true_name and woman.appearance
+    assert judgement.name_the_nameless(step, world) == []
+
+
 def test_the_view_appends_the_face_when_the_beat_left_it_out():
     import inspect
 
@@ -120,7 +149,7 @@ def test_the_view_appends_the_face_when_the_beat_left_it_out():
 
     src = inspect.getsource(views._finish)
     assert "narration_mod.faceless(text, phrase)" in src
-    assert "apply_introductions(c.scene, text)" in src
+    assert "apply_introductions(c.scene, text, player_input)" in src
 
 
 # --- 13c: the player is never a beast; the homebrew body is a body -------------------------

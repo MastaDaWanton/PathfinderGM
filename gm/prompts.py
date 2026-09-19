@@ -955,7 +955,12 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # and a first description uses THIS body. Both from the world's own
             # material (rules/names.py); a resident's Appearance fact is their own.
             given = str(getattr(actor, "true_name", "") or "").strip()
-            names_it = (f" If asked their name they give it: {given}."
+            # Measured on the group-3 replay (2026-09-18): shown the name, the
+            # narrator used it in the very next beat — "Soren's eyes narrow" — for a
+            # woman nobody had asked. The name is what they GIVE; until then the prose
+            # calls them by their description.
+            names_it = (f" If asked their name they give it: {given} — until they give "
+                        f"it, call them '{actor.name}', never by that name."
                         if given and given.lower() != str(actor.name).lower() else "")
             face = str(getattr(actor, "appearance", "") or "").strip()
             looks = f" Looks (fact, use it when they are first described): {face}" if face else ""

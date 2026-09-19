@@ -1599,6 +1599,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         # whole turn — and it writes it knowing what the dice did. Runs whether or not
         # there are tells, because a `narrate_only` turn with no prose is a blank page
         # and most town turns are `narrate_only`.
+        # Everyone here has a name behind their descriptor and a face before the
+        # brief is written — including the people a save holds from before the
+        # fields existed (c11 'woman', c16 'woman' on the 2026-09-18 save).
+        judgement.name_the_nameless(c.scene, c.world)
         brief = prompts.scene_brief(c.world, c.scene, c.location,
                                     _recent_events(c.world, c.location),
                                     here=agent.engine.here(),
@@ -1737,7 +1741,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).
-            for ref, given in judgement.apply_introductions(c.scene, text):
+            for ref, given in judgement.apply_introductions(c.scene, text, player_input):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             # And a face for whoever arrived faceless: a newly booked person whose
             # sentences carry no appearance at all gets the world's own line for their
@@ -1752,6 +1756,17 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                     ours.append(f"{narration_mod.definite(phrase).capitalize()}: {who.appearance}")
                     repairs.append(f"faceless arrival: described the {phrase} from the "
                                    f"world's own body line")
+            # And the one the player looked over: "I look the woman in the doorway
+            # over carefully" owes a face whether or not she is new here.
+            looked = judgement.examined(player_input, c.scene)
+            if looked and looked in c.scene.actors:
+                who = c.scene.actors[looked]
+                if getattr(who, "appearance", "") and narration_mod.faceless(text, who.name):
+                    line = f"{narration_mod.definite(who.name).capitalize()}: {who.appearance}"
+                    text = text.rstrip() + " " + line
+                    ours.append(line)
+                    repairs.append(f"looked over and not described: added {who.name}'s "
+                                   f"face from the world's own body line")
             # Ruskin's write-back: a card the beat carried is marked mentioned, and
             # its urgency starts again from here. The cooldown falls out of it.
             cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))

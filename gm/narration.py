@@ -403,7 +403,16 @@ _NOT_A_GIVEN_NAME = frozenset({
 })
 
 
-def introductions(text: str) -> list[tuple[str, str]]:
+# A name given bare, in quotes, as the whole of the answer: '"Gorvothor Kragnir," he
+# grunts' (measured on the group-3 replay, 2026-09-18). Read only when the player asked
+# for a name, so a quoted place or oath is not somebody introducing themselves.
+_BARE_NAME_ANSWER = re.compile(
+    r"[\"'“‘]\s*([A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-]+)?)[.,]?\s*[\"'”’]\s*"
+    r"(?:he|she|they|the \w+)\s+(?:says?|grunts?|mutters?|answers?|replies|offers?|"
+    r"growls?|rasps?|murmurs?|finally says|says at last)", re.U)
+
+
+def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, str]]:
     """(speaker head word or "", name) for each name somebody gives in this beat.
 
     The speaker is the person the sentence (or the one before, for a bare quotation)
@@ -441,6 +450,16 @@ def introductions(text: str) -> list[tuple[str, str]]:
                 after = re.search(r"\b(?:the|a|an)\s+([a-z]{3,})\b", outside.lower())
                 head = after.group(1) if after else ""
             out.append((head, name))
+    if asked_for_name and not out:
+        from .judgement import _ROLE_WORD
+
+        for i, s in enumerate(sentences):
+            m = _BARE_NAME_ANSWER.search(s)
+            if not m or m.group(1).split()[0] in _NOT_A_GIVEN_NAME:
+                continue
+            outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
+            role = _ROLE_WORD.search(outside)
+            out.append((role.group(0).lower() if role else "", m.group(1).strip()))
     return out
 
 
@@ -616,6 +635,19 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
                 replacement = replacement[0].upper() + replacement[1:]
         stripped = re.sub(r"['’]s$", "", matched)
         replacement += poss if matched.endswith(("'s", "’s")) and stripped else ""
+        # The article already in front is looked at. "the Reeve's men" → "the the
+        # stranger men" shipped (2026-09-18, item 11): the descriptor carries its own
+        # article, and a possessive after an article drops the owner and keeps the
+        # noun — "the men are trying to contain it". Without an article the owner
+        # becomes the descriptor's: "the stranger's men". Never "the the".
+        article = re.search(r"\b(?:the|a|an)\s+$", text[:start], re.I)
+        if article and matched.endswith(("'s", "’s")):
+            tail = end + (1 if text[end:end + 1] == " " else 0)
+            edits.append((article.end(), tail, ""))
+            continue
+        if article:
+            edits.append((article.start(), end, replacement))
+            continue
         edits.append((start, end, replacement))
 
     out = text
@@ -976,7 +1008,12 @@ _BLOW_LANDS = re.compile(
     # The group-2 replay's phrasing of a sunder that had not happened: "the shock of
     # his weapon's destruction … his empty hands … where the blade used to be".
     r"weapon'?s destruction|destruction of (?:his|her|their) (?:weapon|blade|club)|"
-    r"empty hands|where the (?:blade|weapon|club) used to be|in ruins|shards of)\b", re.I)
+    r"empty hands|where the (?:blade|weapon|club) used to be|in ruins|shards of|"
+    # The group-3 replay's landing on a declaring turn: "the impact of your fist
+    # against his heavy jaw … He staggers back".
+    r"impact of your|your (?:fist|blow|strike|punch) (?:against|lands|connects|catches|"
+    r"finds|meets)|as you strike|staggers? back|head snap\w* (?:back|to the side)|"
+    r"reels? (?:back|from))\b", re.I)
 
 
 def premature_blows(text: str, blows: list[dict] | None) -> list[str]:

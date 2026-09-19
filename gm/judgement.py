@@ -4333,7 +4333,72 @@ def challengers(beat: str, phrases) -> list[str]:
     return out
 
 
-def apply_introductions(scene, beat: str) -> list[tuple[str, str]]:
+_ASKS_A_NAME = re.compile(r"\b(?:your|his|her|their|the)\s+name\b|\bwho are you\b|"
+                          r"\bwhat (?:are|do) (?:you|they|I) call\w*\b|\bname\?", re.I)
+_EXAMINES = re.compile(
+    r"\bI\s+(?:look|looks|study|studies|examine|examines|size up|sizes up|inspect|"
+    r"inspects|watch|watches|eye|eyes|take in|takes in|appraise|appraises|scrutini[sz]e)\s+"
+    r"(?:at\s+|over\s+|closely\s+at\s+)?(?:the|this|that|a|an)?\s*([a-z][a-z' -]{2,40}?)"
+    r"(?:\s+(?:over|up and down|closely|carefully|more closely))?(?=[,.!?;]|\s+(?:and|as|"
+    r"while|for)\b|$)", re.I)
+
+
+def examined(player_text: str, scene) -> str | None:
+    """The ref of the present person the player is looking over, or None.
+
+    "I look the woman in the doorway over carefully" (group-3 replay, 2026-09-18) came
+    back as posture and stillness and not one thing a stranger would see. The arrival
+    check covers only newly booked people; this covers the ones already here."""
+    if scene is None or not player_text:
+        return None
+    m = _EXAMINES.search(redact_speech(player_text))
+    if not m:
+        return None
+    words = _name_words(m.group(1))
+    if not words:
+        return None
+    best, score = None, 0
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if a.is_pc:
+            continue
+        shared = len(words & _name_words(a.name))
+        if shared > score:
+            best, score = ref, shared
+    return best
+
+
+def name_the_nameless(scene, world) -> list[str]:
+    """Every person here without a true name gets one, and a face — the actors a save
+    holds from before the fields existed (c11 'woman', c16 'woman' on the play-test
+    save had neither). Returns the refs named."""
+    if scene is None or world is None:
+        return []
+    from rules import names as names_mod
+
+    done = []
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if a.is_pc or getattr(a, "true_name", ""):
+            continue
+        name = str(a.name or "")
+        descriptor = not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
+        if a.world_entity_id:
+            a.true_name = a.name
+            if not a.appearance:
+                a.appearance = names_mod.resident_appearance(world, a.world_entity_id)
+            continue
+        if not descriptor:
+            a.true_name = a.name
+            continue
+        taken = [x.true_name for x in scene.actors.values() if getattr(x, "true_name", "")]
+        taken += [x.name for x in scene.actors.values()]
+        a.true_name = names_mod.true_name(world, scene.location_id, ref, taken)
+        if not a.appearance:
+            a.appearance = names_mod.appearance_for(world, scene.location_id, ref=ref)
+        done.append(ref)
+    return done
+
+
+def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[str, str]]:
     """A name given in play becomes the panel's name for that person.
 
     From `narration.introductions`: the speaker's head word finds the unnamed actor
@@ -4345,32 +4410,46 @@ def apply_introductions(scene, beat: str) -> list[tuple[str, str]]:
     if scene is None or not beat:
         return []
     out: list[tuple[str, str]] = []
-    for head, given in introductions(beat):
-        for ref, a in (getattr(scene, "actors", {}) or {}).items():
-            if a.is_pc:
-                continue
-            name = str(a.name or "")
-            named_already = name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an "))
-            if named_already:
-                continue
-            words = _name_words(name)
-            if head and head not in words:
-                continue
-            if not head:
-                # No speaker named: only when exactly one unnamed person stands here.
-                unnamed = [x for x in scene.actors.values() if not x.is_pc
-                           and not (str(x.name)[:1].isupper()
-                                    and not str(x.name).lower().startswith(("the ", "a ", "an ")))]
-                if len(unnamed) != 1 or unnamed[0].ref != ref:
-                    continue
-            a.name = given
-            if not getattr(a, "true_name", ""):
-                a.true_name = given
-            for e in scene.cast:
-                if e.get("ref") == ref:
-                    e["who"] = given
-            out.append((ref, given))
-            break
+    # The raw line, not the redacted one: "I ask the stranger for his name" is reported
+    # speech, and the redactor blanks exactly the words that ask.
+    asked = bool(_ASKS_A_NAME.search(player_text or ""))
+    actors = getattr(scene, "actors", {}) or {}
+
+    def _unnamed(a) -> bool:
+        name = str(a.name or "")
+        return not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
+
+    asked_words = _name_words(redact_speech(player_text or ""))
+    for head, given in introductions(beat, asked_for_name=asked):
+        # Whose name it is, in order of certainty: the person the world holds THIS
+        # name for (the brief gave it to them); the unnamed person the speaker's
+        # head word names; the unnamed person the player addressed; the only unnamed
+        # person here. Measured on the second group-3 replay (2026-09-18): six
+        # descriptor-named people in the room, "'Gorvothor Kragnir,' he says" with no
+        # role word in the sentence, and the panel kept "stranger".
+        who = next((a for a in actors.values() if not a.is_pc
+                    and str(getattr(a, "true_name", "")).lower() == given.lower()), None)
+        if who is None and head:
+            who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
+                        and head in _name_words(a.name)), None)
+        if who is None:
+            addressed = [a for a in actors.values() if not a.is_pc and _unnamed(a)
+                         and asked_words & _name_words(a.name)]
+            if len(addressed) == 1:
+                who = addressed[0]
+        if who is None:
+            unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
+            if len(unnamed) == 1:
+                who = unnamed[0]
+        if who is None or not _unnamed(who):
+            continue
+        who.name = given
+        if not getattr(who, "true_name", ""):
+            who.true_name = given
+        for e in scene.cast:
+            if e.get("ref") == who.ref:
+                e["who"] = given
+        out.append((who.ref, given))
     return out
 
 
