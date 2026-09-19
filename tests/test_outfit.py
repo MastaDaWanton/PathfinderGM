@@ -48,7 +48,11 @@ def test_the_catalogue_prices_the_tables_and_the_purse_is_the_wall(client):
     assert any(g["key"] == "rope" and g["unit"] == "ft" for g in cat["gear"])
     cid = _make(client)
     state = client.get(f"/api/outfit/{cid}").json()
-    assert state["purse_gp"] > 0 and "longsword" in state["weapons"]
+    # A purse and their hands. The class kits were deleted on 2026-09-19 (item 24): the
+    # book grants one outfit worth 10 gp or less and nothing else, so a new fighter arrives
+    # here with 3d6x10 gp and an unarmed strike, and everything they carry is bought here.
+    assert state["purse_gp"] > 0 and state["weapons"] == ["unarmed"]
+    assert state["armour"] == "none" and state["shield"] == "none"
     # A basket over the purse buys nothing and names the shortfall.
     r = client.post(f"/api/outfit/{cid}/buy", data=json.dumps({"buys": [
         {"kind": "armour", "key": "full plate", "count": 1}]}), content_type="application/json")

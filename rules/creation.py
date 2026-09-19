@@ -101,34 +101,24 @@ OUTFITS: dict[str, str] = {
 }
 DEFAULT_OUTFIT = "traveler's outfit"
 
-# What a first-level character of each class walks out the door holding.
+# What a first-level character walks out the door holding: an outfit, and their own hands.
 #
-# Everything here is drawn from the *small* core tables the sheet validates against —
-# eleven weapons, eight armours, four shields — because `equipped` is refused outside
-# them. That costs some book flavour: the barbarian's greataxe becomes a greatsword, the
-# cleric's mace a quarterstaff, the ranger's longbow a shortbow, "scale mail" its nearest
-# listed armour. The nearest-legal substitution lives here, in one place, and the test
-# walks every kit through `from_dict` so a kit naming unknown gear is a failing test
-# rather than a corrupt character on disk.
-KITS: dict[str, dict] = {
-    "barbarian": {"weapons": ["greatsword", "dagger"], "armour": "studded leather"},
-    "bard":      {"weapons": ["rapier", "dagger"], "armour": "leather"},
-    "cleric":    {"weapons": ["quarterstaff", "light crossbow"], "armour": "chain shirt",
-                  "shield": "heavy shield"},
-    "druid":     {"weapons": ["quarterstaff", "club"], "armour": "leather",
-                  "shield": "heavy shield"},
-    "fighter":   {"weapons": ["longsword", "dagger", "light crossbow"],
-                  "armour": "chain shirt", "shield": "heavy shield"},
-    "monk":      {"weapons": ["quarterstaff", "unarmed"], "armour": "none"},
-    "paladin":   {"weapons": ["longsword", "dagger"], "armour": "chain shirt",
-                  "shield": "heavy shield"},
-    "ranger":    {"weapons": ["longsword", "shortbow", "dagger"], "armour": "leather"},
-    "rogue":     {"weapons": ["rapier", "dagger", "shortbow"], "armour": "leather"},
-    "sorcerer":  {"weapons": ["quarterstaff", "light crossbow", "dagger"],
-                  "armour": "none"},
-    "wizard":    {"weapons": ["quarterstaff", "light crossbow", "dagger"],
-                  "armour": "none"},
-}
+# Eleven hand-written class kits stood here until 2026-09-19, when the player asked for
+# them to go — "remove the starting items from classes and give them extra starting gold,
+# we have the outfitter now". Removing them is a return to the Core Rulebook rather than a
+# nerf, and the arithmetic says so: starting wealth was ALREADY rolled per class
+# (`starting_purse` below), so a character was getting the book's full wealth *and* a free
+# kit on top. A fighter's kit priced at 172 gp against an average roll of 175 — the "extra
+# gold" the player asked for is the gold that was always there and had been quietly
+# pre-spent on somebody else's choices.
+#
+# What the book actually grants is one line: "each character begins play with an outfit
+# worth 10 gp or less" — which is `OUTFITS` above, and is kept. Everything else is now
+# bought at the outfitter, which is the step between the sheet and the road.
+#
+# Nothing else in the app granted gear, and a homebrew class never had a kit at all, so
+# this also ends an inconsistency: the eleven shipped classes were the only ones the rule
+# did not apply to.
 
 # How many level-≤1 spells a new caster writes down. The wizard's is a formula, so it is
 # resolved against the built Intelligence; `None` means the class picks nothing at
@@ -573,7 +563,13 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # first attack with a knife they never chose, never saw in their inventory, and
     # rightly said they were not carrying. Every creature has an unarmed strike; no
     # homebrew class has a dagger until somebody writes one down.
-    kit = KITS.get(cid, {"weapons": ["unarmed"], "armour": "none"})
+    # Their hands, and whatever their body came with. Every creature has an unarmed
+    # strike; a race built with claws or a bite carries them by name. The old fallback for
+    # a class with no kit was a dagger, and a Blood Bending player met it mid-fight: the
+    # panel opened their first attack with a knife they never chose, never saw in their
+    # inventory, and rightly said they were not carrying. That fallback is now the rule.
+    own = [str(w.get("key")) for w in (race.get("weapons") or []) if w.get("key")]
+    weapons = own + ["unarmed"] if own else ["unarmed"]
     outfit = OUTFITS.get(cid, DEFAULT_OUTFIT)
     hp = max(1, max_hit_die(cls["hit_die"]) + con_mod)  # max die at 1st, the kind rule
     sheet = {
@@ -592,14 +588,12 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "abilities": abilities,
         "ranks": {s: 1 for s in picked},
         "feats": feats_named,
-        # The body's own weapons beside the kit's: a race built with claws or a bite
-        # carries them by name, and the sheet builds the die by size when asked.
-        "weapons": list(kit["weapons"])
-                   + [str(w.get("key")) for w in (race.get("weapons") or [])
-                      if w.get("key") and str(w.get("key")) not in kit["weapons"]],
-        "equipped": kit["weapons"][0],
-        "armour": kit.get("armour", "none"),
-        "shield": kit.get("shield", "none"),
+        "weapons": weapons,
+        "equipped": weapons[0],
+        # Unarmoured and unshielded out of the forge. Both are bought at the outfitter now,
+        # out of a purse that was always large enough for them.
+        "armour": "none",
+        "shield": "none",
         # Worn *and* carried, because those are two different questions and the sheet
         # asks both: the `body` slot is what the equipment page draws on the figure,
         # and `goods` is the answer to "what am I carrying".

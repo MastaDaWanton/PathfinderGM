@@ -414,9 +414,15 @@ CLASS_SCHEMA: list[Section] = [
                                 "something you are not trained with",
                        help="Groups (simple, martial, exotic) or single weapons by name.",
                        example="simple, martial"),
-            ClassField("starting_wealth", "Starting wealth", consumer="",
-                       help="Recorded only — nothing in the app rolls starting gold yet, "
-                            "and a character is created with a kit rather than a purse.",
+            ClassField("starting_wealth", "Starting wealth",
+                       consumer="rules/creation.py:starting_purse → the purse a new "
+                                "character is forged with, and spends at the outfitter",
+                       help="Rolled, not averaged: \"5d6 x 10 gp\" is five dice at the "
+                            "forge, because a fixed 35 gp for every fighter is a "
+                            "different game from one where the dice decide whether you "
+                            "can afford the breastplate. This is a character's whole "
+                            "starting gear budget — since 2026-09-19 nothing is granted "
+                            "beyond an outfit worth 10 gp or less.",
                        example="3d6 x 10 gp"),
         ]),
 

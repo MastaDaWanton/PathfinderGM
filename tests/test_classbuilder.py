@@ -111,7 +111,11 @@ def test_a_field_nothing_reads_says_so_rather_than_implying_otherwise():
     authored class lose them on a round trip, and describing them as read would be a lie
     the author only discovers in play."""
     unread = {f.name for f in cb.registry_fields() if not f.consumer}
-    assert unread == {"source", "alignment", "starting_wealth"}
+    # `starting_wealth` left this set on 2026-09-19. It had been described as read by
+    # nothing since the field was written, and that was already false — `starting_purse`
+    # has rolled it at the forge since 2026-09-07 — so the bench was telling authors their
+    # wealth line did nothing while the forge was quietly rolling it (item 24).
+    assert unread == {"source", "alignment"}
     for f in cb.registry_fields():
         assert f.help or f.type in ("table", "paths"), f"{f.name} tells the author nothing"
 

@@ -47,7 +47,7 @@ martial class" scaffold uses none of them.
 | `skill_ranks` | number | yes | `rules/creation.py:build`, `rules/leveling.py:gains_at`. Before Intelligence. |
 | `class_skills` | list | no | `rules/sheet.py` — the +3 trained bonus. |
 | `proficiencies` | list | no | `rules/sheet.py:is_proficient`. Groups (`simple`, `martial`, `exotic`) or single weapons by name. |
-| `starting_wealth` | text | no | **Nothing.** No starting gold is rolled; a new character is given a kit. |
+| `starting_wealth` | text | no | `rules/creation.py:starting_purse` → the purse the forge fills, rolled rather than averaged. Since 2026-09-19 it is the character's whole gear budget: the class kits are gone and the book's one grant — an outfit worth 10 gp or less — is all that comes free. |
 
 ### The level table — `levels`
 

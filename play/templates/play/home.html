@@ -1814,6 +1814,14 @@ function paneCharacters() {
           ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}">${
             c.active ? "Go to the table" : "Play as " + esc(c.name)
           }</button>` : ""}
+          <!-- Back to the shop on purpose. The outfitter was reachable only on the way
+               out of the forge, so a character who did not spend their purse then had no
+               way back to it — and since 2026-09-19 the purse is the WHOLE gear budget
+               (the class kits are gone, item 24), which makes an unspent one a character
+               with nothing but their hands. -->
+          ${c.playable && !c.unreadable ? `<button class="quiet"
+            data-outfit="${esc(c.id)}" data-outfit-world="${esc(c.world_source || "")}"
+            title="Spend what is left of their purse">Outfit</button>` : ""}
           ${c.active ? "" : `<button class="quiet danger"
             data-remove="${esc(c.id)}" data-name="${esc(c.name)}"
             title="Take them off the roster">Delete</button>`}
@@ -2483,6 +2491,16 @@ document.addEventListener("click", async e => {
     } catch (err) {
       if (!blockedByModel(err)) { const el = $("#err"); if (el) el.textContent = err.message; }
     }
+    return;
+  }
+
+  // Back to the outfitter for a character already on the roster. Same page the forge
+  // sends you to, reached on purpose rather than only on the way past (item 24).
+  const outfit = e.target.closest("[data-outfit]");
+  if (outfit) {
+    const world = outfit.dataset.outfitWorld || "";
+    location.href = `/outfit/?character=${encodeURIComponent(outfit.dataset.outfit)}` +
+      (world ? `&world=${encodeURIComponent(world)}` : "");
     return;
   }
 
