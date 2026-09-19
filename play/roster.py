@@ -92,6 +92,9 @@ class Entry:
             "id": self.id, "name": self.name, "status": self.status,
             "created": self.created, "died": self.died, "epitaph": self.epitaph,
             "turns_played": self.turns_played, "unreadable": "",
+            # Which world they were forged in, so the roster can send them back to the
+            # outfitter with the same shelf the forge used (item 24, 2026-09-19).
+            "world_source": self.world_source,
         }
         try:
             a = self.actor

@@ -196,11 +196,17 @@ def test_all_the_problems_arrive_at_once():
     assert len(problems) >= 3
 
 
-def test_every_kit_survives_the_sheet_validator():
-    """The kits name gear from the small core tables because `equipped` is refused
-    outside them. This walks all eleven through `from_dict`, so a kit naming unknown
-    gear is a failing test rather than a corrupt character on disk."""
-    for cid in creation.KITS:
+def test_a_new_character_leaves_the_forge_with_a_purse_and_their_hands():
+    """This walked `creation.KITS` — eleven hand-written class kits — until 2026-09-19,
+    when the player asked for them to go: "remove the starting items from classes and give
+    them extra starting gold, we have the outfitter now".
+
+    Removing them is the Core Rulebook rather than a nerf, and the arithmetic is why:
+    starting wealth was ALREADY rolled per class, so a character was getting the book's
+    full wealth *and* a free kit on top. A fighter's kit priced at 172 gp against an
+    average roll of 175. What the book grants is one line — "each character begins play
+    with an outfit worth 10 gp or less" — and that is `OUTFITS`, which stays."""
+    for cid in ("fighter", "wizard", "cleric", "rogue", "monk"):
         built, problems = creation.build({
             "name": f"Kit test {cid}", "race": "elf", "class": cid, "pronouns": "she/her",
             "abilities": {"str": 14, "dex": 14, "con": 12, "int": 10,
@@ -209,7 +215,25 @@ def test_every_kit_survives_the_sheet_validator():
             "spellbook": creation.starter_spells(cid, int_mod=1),
         })
         assert problems == [], (cid, problems)
-        from_dict(built["sheet"])
+        sheet = built["sheet"]
+        assert sheet["weapons"] == ["unarmed"], cid
+        assert sheet["equipped"] == "unarmed" and sheet["armour"] == "none"
+        assert sheet["shield"] == "none"
+        # The outfit, and the purse to buy the rest with.
+        assert sheet["goods"] and sum(sheet["purse"].values()) > 0, cid
+        from_dict(sheet)
+    assert not hasattr(creation, "KITS"), "the kits are gone, not merely unused"
+
+
+def test_a_body_that_came_with_weapons_keeps_them():
+    """The one thing that is not bought: a race built with claws or a bite carries them
+    because they are part of it. No SHIPPED race has natural weapons — this is a homebrew
+    body's path — so the check is on the code rather than on a character."""
+    import inspect
+
+    src = inspect.getsource(creation.build)
+    assert 'own = [str(w.get("key")) for w in (race.get("weapons") or [])' in src
+    assert 'weapons = own + ["unarmed"] if own else ["unarmed"]' in src
 
 
 # --- through the wire -----------------------------------------------------------------------
