@@ -1350,6 +1350,28 @@ function paneRules() {
         ? "The seams are showing, which is the point."
         : "Just the game."}</em>
     </button>
+    <h2 style="margin-top:22px">What the GM may tell you</h2>
+    <p>Asked out of character, the GM answers what your character would know. The
+      town's secrets — who really runs it, what a person hides — are not that. Off, the
+      GM keeps them and names the way to find out in play. On, it offers: "your character
+      wouldn't know this yet — say the word if you want it anyway."</p>
+    <button class="card pick ${r.knowledge_offer ? "on" : ""}" data-hbknow="1"
+            style="max-width:340px">
+      <h3>${r.knowledge_offer ? "Offer what I don't know — on" : "Offer what I don't know — off"}</h3>
+      <em>${r.knowledge_offer
+        ? "The GM asks before it tells you what your character has not learned."
+        : "Find it out in play, or ask around."}</em>
+    </button>
+    <h2 style="margin-top:22px">When a scene turns to intimacy</h2>
+    <p>Fade: the narrator says that time passes and picks the scene up afterwards — a
+      transition, not a stall. Explicit: it writes the scene.</p>
+    <button class="card pick ${r.content === "explicit" ? "on" : ""}" data-hbcontent="1"
+            style="max-width:340px">
+      <h3>${r.content === "explicit" ? "Explicit" : "Fade to black"}</h3>
+      <em>${r.content === "explicit"
+        ? "The scene is written as it happens."
+        : "Time passes; the scene resumes after."}</em>
+    </button>
     <div id="ruleserr"></div>`;
 }
 
@@ -2489,6 +2511,10 @@ document.addEventListener("click", async e => {
   if (core) { await setHouseRule({ core_races: RULES.rules.core_races === false }); return; }
   const gmv = e.target.closest("[data-hbgmview]");
   if (gmv) { await setHouseRule({ gm_view: !RULES.rules.gm_view }); return; }
+  const know = e.target.closest("[data-hbknow]");
+  if (know) { await setHouseRule({ knowledge_offer: !RULES.rules.knowledge_offer }); return; }
+  const cont = e.target.closest("[data-hbcontent]");
+  if (cont) { await setHouseRule({ content: RULES.rules.content === "explicit" ? "fade" : "explicit" }); return; }
   const imp = e.target.closest("[data-importraces]");
   if (imp) {
     imp.disabled = true;

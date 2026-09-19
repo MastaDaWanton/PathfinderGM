@@ -3552,11 +3552,17 @@ def repair_bare_spawns(raw_intents, player_text: str):
 # --- The scene thread: what the player is engaged in between ops ----------------------
 
 _THREAD_VERBS = re.compile(
-    r"\bI\s+(?:(follow|tail|shadow|track|pursue)|"
+    r"\b(?:I\s+|and\s+)(?:(follow|tail|shadow|track|pursue)|"
     r"(talk to|question|interrogate|speak (?:to|with)|ask|approach|"
     r"walk (?:up )?to|greet|browse|buy from|chat with)|"
     r"(watch|observe|study|keep an eye on)|"
-    r"(wait for|look for|search for))\s+(.{3,60}?)\s*[.!?]?$", re.I)
+    r"(wait for|look for|search for)|"
+    # A standing piece of work: "I work the bellows", "and run the machine". The
+    # ruling's own example (2026-09-18) — "if I am running a machine and a fight
+    # breaks out … I will be running the machine" — and the first Continue replay,
+    # where "work the bellows for the smith" set no thread at all.
+    r"(work|run|operate|tend|mind|man|pump|crank|row|steer|hold|guard|haul|dig|stir|"
+    r"sit at|stand at|keep working|go on working))\s+(.{3,60}?)\s*[.!?]?$", re.I)
 # The Continue button's own instruction counts as a continue — measured live: the
 # thread was empty, Continue arrived with no constraint at all, and a bread stall
 # became a library between beats.
@@ -3564,7 +3570,7 @@ _THREAD_CONTINUES = re.compile(
     r"^\s*(?:i\s+)?(?:continue|keep(?:\s+(?:going|following|watching|at it))?|"
     r"carry on|press on|stay (?:on|with) (?:them|him|her|it)|"
     r"take no action\b)", re.I)
-_THREAD_DOINGS = ("following", "talking to", "watching", "waiting for")
+_THREAD_DOINGS = ("following", "talking to", "watching", "waiting for", "working at")
 # What cannot be the subject of an engagement: a question word opening it, or the
 # player's own first person anywhere in it. See `update_thread`.
 _THREAD_CLAUSE = re.compile(
@@ -3638,8 +3644,8 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
     # and not with "them into the market".
     m = _THREAD_VERBS.search(text)
     if m:
-        which = next(i for i in range(1, 5) if m.group(i))
-        subject = m.group(5).strip()
+        which = next(i for i in range(1, 6) if m.group(i))
+        subject = m.group(6).strip()
         sw = _THREAD_WHERE.search(subject)
         if sw:
             subject = subject[:sw.start()].strip() or subject
@@ -4835,6 +4841,38 @@ _A_THING = frozenset({
     "sign", "post", "pole", "plank", "board", "wood", "rock", "stone", "pebble",
     "armor", "armour", "helm", "helmet", "cloak", "belt", "purse", "pouch", "bag",
 })
+
+
+_CHEAT_XP = re.compile(r"(\d[\d,]*)\s*(?:xp|experience(?: points?)?|exp)\b", re.I)
+_CHEAT_COIN = re.compile(r"(\d[\d,]*)\s*(gold|gp|silver|sp|copper|cp|platinum|pp)\b", re.I)
+
+
+def cheat_intents(wish: str, scene) -> list[dict]:
+    """The author's wish as intents, read in code where the wish is a number.
+
+    "/cheat I gain 2000 experience" did nothing twice (2026-09-18, items 1 and 20):
+    no op carried experience, so the model had nothing to plan. Detected mechanically
+    first — an amount of experience is an `xp` op, an amount of coin a `give` of the
+    denomination — and only a wish these do not read goes to the model."""
+    if scene is None or not wish:
+        return []
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return []
+    out: list[dict] = []
+    m = _CHEAT_XP.search(wish)
+    if m:
+        out.append({"op": "xp", "because": "the author's word",
+                    "params": {"amount": int(m.group(1).replace(",", "")),
+                               "reason": "the author's word"}})
+    m = _CHEAT_COIN.search(wish)
+    if m:
+        denom = {"gold": "gp", "silver": "sp", "copper": "cp", "platinum": "pp"}.get(
+            m.group(2).lower(), m.group(2).lower())
+        out.append({"op": "give", "because": "the author's word",
+                    "params": {"item": denom, "count": int(m.group(1).replace(",", "")),
+                               "to": pc.ref}})
+    return out
 
 
 def names_a_thing(phrase: str) -> bool:

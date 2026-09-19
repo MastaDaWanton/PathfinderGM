@@ -686,6 +686,21 @@ def _apply_cards(c, p: dict) -> bool:
         if tuple(ch.get("was") or ()) != (card.stage, card.clock):
             continue
         if ch["action"] == "advance":
+            # The fact has to be ABOUT the card: one of its identity words or one of
+            # its people in the sentence. Measured 2026-09-18: a town's water-rights
+            # strain card was advanced from inside a brothel on "the current
+            # transaction is a private matter", and again on "the warrior's blade is
+            # shattered", and paid 200 XP each time. A watcher that can advance any card
+            # on any sentence is a card that advances every turn.
+            fact = str(ch.get("fact") or "")
+            names = cards_mod._card_names(card, c.scene)
+            about = (cards_mod._hits(card, fact) >= 1 or cards_mod._names_in(names, fact)
+                     or cards_mod._identity_hits(cards_mod.identity_keys(card, names), fact) >= 1)
+            if not about:
+                c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                                   "action": "refused", "fact": fact[:200],
+                                   "why": "the fact is not about this card"})
+                continue
             cards_mod.touch(c.scene, card.id, ch["fact"], turn=turn, tick=True)
             c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
                                "action": "advance", "fact": ch["fact"]})

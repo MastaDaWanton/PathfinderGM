@@ -954,14 +954,14 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # his name, he gives THIS one (never "the stranger", never one made up),
             # and a first description uses THIS body. Both from the world's own
             # material (rules/names.py); a resident's Appearance fact is their own.
-            given = str(getattr(actor, "true_name", "") or "").strip()
-            # Measured on the group-3 replay (2026-09-18): shown the name, the
-            # narrator used it in the very next beat — "Soren's eyes narrow" — for a
-            # woman nobody had asked. The name is what they GIVE; until then the prose
-            # calls them by their description.
-            names_it = (f" If asked their name they give it: {given} — until they give "
-                        f"it, call them '{actor.name}', never by that name."
-                        if given and given.lower() != str(actor.name).lower() else "")
+            # The true name is NOT shown. Measured twice (the group-3 and group-4
+            # replays, 2026-09-18): shown the name, even with "until they give it,
+            # call them by their description", the narrator used it anyway — "Soren's
+            # eyes narrow", "the woman beside you, Kael Throk". So the model never sees
+            # it: when the person introduces themselves the model's own guess is
+            # replaced with the world's name in code (`narration.settle_introductions`)
+            # and the panel is renamed (`judgement.apply_introductions`).
+            names_it = ""
             face = str(getattr(actor, "appearance", "") or "").strip()
             looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}"
@@ -1368,6 +1368,13 @@ def scene_now(scene) -> str:
             whose = f" ({owner.name}'s)" if owner is not None else ""
             said.append(f"{rec.get('name')}{whose}")
         facts.append("lying on the ground here, and nothing else is: " + "; ".join(said))
+    # What was agreed in this room, as the engine wrote it when the coin moved: the
+    # negotiation and the payment had left the context window and nothing carried the
+    # agreement forward (2026-09-18, item 22 — docs/memory-policy.md's gap in its most
+    # concrete form). Cleared when the party moves rooms.
+    agreed = [str(a) for a in ((getattr(scene, "said", None) or {}).get("agreements") or [])]
+    if agreed:
+        facts.append("WHAT WAS AGREED here (fact, still standing): " + "; ".join(agreed[-3:]))
     thread = getattr(scene, "thread", None) or {}
     if thread.get("subject"):
         facts.append(f"the player is {thread.get('doing', 'engaged with')} "
@@ -1455,7 +1462,25 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     return call_one_messages(
         briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,
         examples=(CARRY_ON_EXAMPLES if player_input == CARRY_ON else None),
-        extra_briefing=PROSE_AFTER_EXTRA, player_message=final, ledger=ledger)
+        extra_briefing=PROSE_AFTER_EXTRA + content_line(), player_message=final,
+        ledger=ledger)
+
+
+def content_line() -> str:
+    """The table's content setting as one line of the prose briefing (item 22).
+
+    The app had taken no position, so whether a paid encounter happened was whatever
+    the guards did by accident. Now it is the table's: "fade" is a designed transition —
+    time passes, the scene resumes after — and "explicit" writes the scene. Read live,
+    so a change on the shelf page holds from the next beat."""
+    from rules import houserules
+
+    if houserules.content() == "explicit":
+        return ("\nThis table permits adult content: when a scene turns to intimacy, "
+                "write it plainly and go on with the scene.\n")
+    return ("\nWhen a scene turns to intimacy, fade to black: say in one sentence that "
+            "time passes, then pick the scene up afterwards — never stall it, never "
+            "replace what the people were doing with the room's weather.\n")
 
 
 CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.

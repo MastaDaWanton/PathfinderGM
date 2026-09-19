@@ -112,8 +112,16 @@ def test_the_dossier_is_the_whole_record_of_the_place_with_the_asked_fact_first(
     vormoor = world.by_name("Vormoor", kind="CITY")
     notes = gm_search.dossier(world, vormoor, "who runs this town")
     assert notes.startswith("THE GM'S NOTES ON VORMOOR")
+    # Every PUBLIC fact; the hidden ones stay with the GM. Measured 2026-09-18 (item
+    # 9): the first `/gm` answer of the session handed over "a shadow power in the form
+    # of an old veterans' league" because this wrote every fact and put Shadow Power
+    # among the first four for any "who runs" question.
     for key in vormoor.facts:
-        assert f"  {key}:" in notes, key
+        if gm_search.tier_of(key) == "public":
+            assert f"  {key}:" in notes, key
+        else:
+            assert f"  {key}:" not in notes, key
+    assert "Shadow Power" in vormoor.facts and "  Shadow Power:" not in notes
     first_fact = notes.split("\n")[1]
     assert first_fact.startswith("  Formal Power:") or first_fact.startswith("  Governance:")
     assert "Places inside it: the well, the market, the guildhall" in notes

@@ -62,7 +62,11 @@ def test_a_promoted_person_carries_a_true_name_and_a_face_and_the_brief_says_bot
     assert stranger.true_name and stranger.true_name != "stranger"
     assert stranger.appearance and ":" in stranger.appearance
     brief = prompts.scene_brief(world, step, None, [])
-    assert f"If asked their name they give it: {stranger.true_name}" in brief
+    # The true name is NOT in the brief: shown it, the narrator used it before it was
+    # given ("Soren's eyes narrow", "the woman beside you, Kael Throk" — two replays).
+    # The model's own guess is replaced with it in code when the person introduces
+    # themselves.
+    assert stranger.true_name not in brief
     assert "Looks (fact, use it when they are first described):" in brief
     # The panel still shows the descriptor until the name is given in play.
     assert stranger.name == "stranger"

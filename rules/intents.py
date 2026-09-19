@@ -442,6 +442,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "eat": ((), ("actor",), "hidden"),
     "drink": ((), ("actor",), "hidden"),
     "narrate_only": ((), (), "hidden"),
+    # Experience awarded outright: the GM's story award for a matter the fights do not
+    # pay, and the author's own hand through `/cheat I gain 2000 experience` — which
+    # did nothing twice on 2026-09-18 because no op carried experience at all
+    # (item 1/20). Hidden, so the cheat may use it; the engine's `award_xp` is the one
+    # writer.
+    "xp": (("amount",), ("reason",), "hidden"),
 }
 
 VISIBILITIES = ("player", "hidden")

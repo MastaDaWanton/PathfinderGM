@@ -32,10 +32,13 @@ sentences. No module read either.
   (`promote_cast`, with the world) and at spawn (`Engine._bring_in`); the people a save
   holds from before the fields existed are named once on the next turn
   (`name_the_nameless`). The panel shows the descriptor until the name is given.
-- **The brief** says, per person: "If asked their name they give it: X — until they give
-  it, call them 'the stranger', never by that name" and "Looks (fact, use it when they
-  are first described): …". Race and true names join the known names, so a given name
-  survives the un-namer.
+- **The brief** says, per person: "Looks (fact, use it when they are first described):
+  …". The true name is NOT shown: measured on two replays, shown the name — even with
+  "until they give it, call them by their description" — the narrator used it anyway
+  ("Soren's eyes narrow", "the woman beside you, Kael Throk"). The model never sees it;
+  its own guess is replaced with the world's name in code when the person introduces
+  themselves. Race and true names join the known names, so a given name survives the
+  un-namer.
 - **A name given in play** (`narration.introductions`: "call me X", "my name is X", or,
   when the player asked, a bare quoted answer — '"Gorvothor Kragnir," he grunts') is
   settled to the world's own name before the un-namer runs (`settle_introductions`) and

@@ -1282,6 +1282,8 @@ class Scene:
         if actor.is_pc:
             self.at = place_id
             self.cast = []
+            # What was agreed here is a fact of this room; the next room starts clean.
+            self.said.pop("agreements", None)
         return actor
 
     def settle_relations(self) -> list[str]:
@@ -7150,6 +7152,30 @@ class Engine:
         # on top of a dais they were not on.
         self.scene.settle_levels()
         self.scene.resync_zones()
+
+    def _op_xp(self, intent: Intent, partial: dict) -> Outcome:
+        """Experience awarded outright, through the one writer (`award_xp`).
+
+        The GM's story award for a matter no fight paid, and the author's hand:
+        "/cheat I gain 2000 experience" did nothing twice on 2026-09-18 because no op
+        carried experience — the cheat is a plan like any other and had nothing to
+        plan. The amount is a number the author or the GM states; `keep_the_authors_
+        numbers` stamps a cheat's as theirs."""
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "There is nobody here to award experience to.")
+        try:
+            amount = int(intent.params.get("amount") or 0)
+        except (TypeError, ValueError):
+            amount = 0
+        if amount <= 0:
+            return self._refuse(intent, "An experience award needs an amount above zero.")
+        reason = " ".join(str(intent.params.get("reason") or "").split()) or "the GM's award"
+        line = self.award_xp(pc, amount, reason).strip()
+        return Outcome(intent_id=intent.id, op="xp",
+                       effects=[{"ref": pc.ref, "kind": "xp", "amount": amount,
+                                 "total": int(pc.xp)}],
+                       tell=line, because=intent.because)
 
     def _op_end_encounter(self, intent: Intent, partial: dict) -> Outcome:
         """Stop the fight. The GM's call: they run, they yield, you get clear."""

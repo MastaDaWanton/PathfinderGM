@@ -138,7 +138,11 @@ def test_the_rules_endpoint_round_trips(client):
                           "ability_cap": 18, "pronoun_sets": [],
                           # The Core seven offered beside a world's races, and the
                           # Race Builder's standard tier as the forge's ceiling.
-                          "core_races": True, "race_rp": 10, "gm_view": False}
+                          "core_races": True, "race_rp": 10, "gm_view": False,
+                          # The 2026-09-18 rulings: the GM does not offer what the
+                          # character does not know unless the table says so, and a
+                          # scene turning to intimacy fades unless the table says so.
+                          "knowledge_offer": False, "content": "fade"}
     assert d["tiers"][-2]["points"] == 100 and d["tiers"][-1]["points"] == 0   # Unlimited last
     assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40, 0]   # Unlimited last
 
@@ -148,7 +152,11 @@ def test_the_rules_endpoint_round_trips(client):
     assert r.status_code == 200
     assert r.json()["rules"] == {"point_buy": 100, "magic_stacking": True,
                                  "ability_cap": 18, "pronoun_sets": [],
-                                 "core_races": True, "race_rp": 10, "gm_view": False}
+                                 "core_races": True, "race_rp": 10, "gm_view": False,
+                          # The 2026-09-18 rulings: the GM does not offer what the
+                          # character does not know unless the table says so, and a
+                          # scene turning to intimacy fades unless the table says so.
+                          "knowledge_offer": False, "content": "fade"}
 
     # The race tier and the Core-seven switch come back too. Measured 2026-09-07: the
     # 20 and 40 RP buttons on the Rulesets bench could be pressed and never held,

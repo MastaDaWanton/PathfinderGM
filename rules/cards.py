@@ -630,7 +630,10 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
         if c.kind == "quest" and any(not o.get("done") for o in c.objectives):
             why.append("open")
         since = int(turn) - int(c.mentioned or c.touched or 0)
-        if since >= QUIET_TURNS:
+        # A card whose person is standing here goes quiet in two turns, not twelve:
+        # the giver in the room is the matter nearest to hand, and two quiet turns is
+        # the push the play-test asked for (item 7).
+        if since >= QUIET_TURNS or (present and since >= 2):
             why.append("quiet")
         if since >= URGENT_TURNS:
             why.append("urgent")
@@ -670,6 +673,16 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
             f"show where it fits, never to resolve for the player): {c.title}"
             + (f" — {fact}" if fact else "") + "."
             + (" It has not come up for a while." if "quiet" in why else ""))
+    # The person it belongs to is standing here: they reach for the player. A named
+    # giver sat in the "In the scene" list for many turns and was never named in prose
+    # (2026-09-18, item 7) — presence was a listing, and a listing makes nothing happen.
+    if "present" in why:
+        actors = getattr(scene, "actors", {}) or {}
+        who = next((actors[r].name for r in c.people if r in actors), "")
+        if who:
+            text += (f" {who} is standing here and has a reason to speak of it: they "
+                     f"approach the player and say the first word about it — in their "
+                     f"own words, in this beat.")
     return {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
             "keys": identity_keys(c, names), "people": names, "since": since,
             "urgent": "urgent" in why, "why": why, "text": text}

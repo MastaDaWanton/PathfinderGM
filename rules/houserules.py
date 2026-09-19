@@ -69,7 +69,22 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             "race_rp": 10,
             # The table's own debugging view of the quest schemes running — what fired
             # and why. Off by default: it shows the GM's secrets, and is never the brief.
-            "gm_view": False}
+            "gm_view": False,
+            # Whether `/gm` may OFFER what the character does not know. Ruled
+            # 2026-09-18 (docs/playtest-2026-09-18.md, item 9): the information should
+            # be available, but only after the player is asked. Off: hidden facts stay
+            # hidden and `/gm` names the in-play route (ask around). On: "Your
+            # character wouldn't know this yet — say the word if you want it anyway."
+            # The known trade-off, accepted with the ruling: the offer itself tells the
+            # player a secret exists. Public facts are answered either way; rumour-grade
+            # facts ride a secret Knowledge (local) roll, once, PF1e's "Try Again: No".
+            "knowledge_offer": False,
+            # What the narrator does when a scene turns to intimacy: "fade" — say that
+            # time passes and resume after, a designed transition rather than a stall —
+            # or "explicit". The app had taken no position (item 22) and the outcome was
+            # whatever the guards happened to do. Fade is the default; explicit is the
+            # table's to turn on.
+            "content": "fade"}
 
 # What the character forge offers everybody. Two, because that is what the table asked
 # for: "male and female should be the only options default".
@@ -152,6 +167,15 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
         current["core_races"] = bool(updates["core_races"])
     if "gm_view" in updates:
         current["gm_view"] = bool(updates["gm_view"])
+    if "knowledge_offer" in updates:
+        current["knowledge_offer"] = bool(updates["knowledge_offer"])
+    if "content" in updates:
+        want = str(updates["content"] or "").strip().lower()
+        if want not in ("fade", "explicit"):
+            problems.append(f"{updates['content']!r} is not a content setting; it is "
+                            f"'fade' or 'explicit'.")
+        else:
+            current["content"] = want
     if "race_rp" in updates:
         from . import races as races_mod
 
@@ -204,6 +228,16 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
     if not problems:
         _path().write_text(json.dumps(current, indent=2), encoding="utf-8")
     return active(), problems
+
+
+def knowledge_offer() -> bool:
+    """Whether `/gm` may offer what the character does not know (item 9's ruling)."""
+    return bool(active().get("knowledge_offer", False))
+
+
+def content() -> str:
+    """"fade" or "explicit": what the narrator does when a scene turns to intimacy."""
+    return str(active().get("content", "fade") or "fade")
 
 
 def gm_view() -> bool:

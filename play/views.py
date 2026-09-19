@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from gm import (client, judgement, ledger as ledger_mod,
                 narration as narration_mod, prompts, watcher)
-from gm.agent import GMAgent
+from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
 from rules.intents import IntentError
@@ -1393,6 +1393,32 @@ def _ask_the_gm(c, engine, question: str) -> str:
         c.world, c.scene, c.location, _recent_events(c.world, c.location),
         here=engine.here(), known=engine.places())
     found = "\n".join(gm_answers.look_up(c, engine, question))
+    # What the character would know (2026-09-18, item 9). Public facts are answered.
+    # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
+    # Core Rulebook's "common rumour", "Try Again: No" — recorded on the scene so
+    # re-asking is fruitless. Hidden facts never reach the model; with the table's
+    # `knowledge_offer` rule on, the GM offers them instead, and "tell me anyway"
+    # hands over what was withheld last time.
+    from rules import houserules as _hr
+
+    said_mem = c.scene.said
+    allow = {gm_search.PUBLIC}
+    if re.search(r"\b(?:tell me anyway|yes,? tell me|say it anyway|go on,? tell me|"
+                 r"i want (?:to know|it) anyway|spoil it)\b", question, re.I) \
+            and said_mem.get("gm:withheld"):
+        allow |= {gm_search.RUMOUR, gm_search.HIDDEN}
+        question = str(said_mem.get("gm:withheld_question") or question)
+    pc = c.scene.pc()
+    place_key = str(getattr(c.location, "id", "") or "")
+    if gm_search.RUMOUR not in allow and pc is not None:
+        key = f"knows:{place_key}:rumour"
+        if key not in said_mem:
+            roll = engine.dice.d20(pc.skill_modifiers("knowledge (local)"),
+                                   label="Knowledge (local), rumour", visibility="hidden")
+            said_mem[key] = bool(roll.total >= 15)
+        if said_mem.get(key):
+            allow.add(gm_search.RUMOUR)
+    allow = frozenset(allow)
     # What the world's own record holds on what was asked (docs/gm-questions.md). Names
     # are found, not matched, by a BM25 index over the world alone; "here" and "this
     # town" are the place the engine knows, and get its whole record as the GM's notes.
@@ -1404,13 +1430,32 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # The place the party stands in is the default subject of a question that names
     # nobody: "who guards the gate" found a town called Dustgate; the gate meant was this
     # one. A proper name with hits is the one case the notes are left out.
-    notes = (gm_search.dossier(c.world, c.location, question)
+    notes = (gm_search.dossier(c.world, c.location, question, allow=allow)
              if (here or not hits or not gm_search.proper_noun(question)) else "")
     if not hits and not found and not here:
         unknown = gm_search.unfiled(c.world, question)
         if unknown:
             return gm_search.nothing_filed(question, unknown, notes)
-    record = gm_search.passages(c.world, hits, question)
+    record = gm_search.passages(c.world, hits, question, allow=allow)
+    # What was kept back, and the line that says so.
+    kept: list[str] = []
+    if c.location is not None and notes:
+        kept += [k for k, _t in gm_search.withheld_from(
+            dict(getattr(c.location, "facts", {}) or {}), allow)]
+    for h in hits:
+        kept += [k for k, _t in gm_search.withheld_from(h.facts or {}, allow)]
+    withheld_note = ""
+    if kept and gm_search.HIDDEN not in allow:
+        said_mem["gm:withheld"] = sorted(set(kept))
+        said_mem["gm:withheld_question"] = question
+        if _hr.knowledge_offer():
+            withheld_note = ("\n  — There is more here your character wouldn't know yet. "
+                             "Say the word (\"tell me anyway\") if you want it, or find "
+                             "it out in play: ask around (Diplomacy, an hour or four).")
+        else:
+            withheld_note = ("\n  — Some of what the town keeps, your character has not "
+                             "learned. Ask around in play: Diplomacy, an hour or four, "
+                             "and it can be tried again.")
     try:
         reply = client.chat(
             prompts.out_of_character_messages(brief, question, found,
@@ -1437,7 +1482,7 @@ def _ask_the_gm(c, engine, question: str) -> str:
     used = _sources_used(hits, said)
     sourced = ("\n  — from the world's record: "
                + "; ".join(f"{h.name} ({h.kind})" for h in used)) if used else ""
-    return "The GM, out of character:\n  " + said + sourced
+    return "The GM, out of character:\n  " + said + sourced + withheld_note
 
 
 def _cheat(c, wish: str, shown: str):
@@ -1458,6 +1503,22 @@ def _cheat(c, wish: str, shown: str):
             status=400)
     c.transcript.append({"who": "player", "text": shown})
     agent = GMAgent(c.world, c.engine())
+    # A wish that is a number is read in code: "/cheat I gain 2000 experience" did
+    # nothing twice (items 1 and 20) because no op carried experience and the model
+    # had nothing to plan. What the code reads never goes to the model.
+    written = judgement.cheat_intents(wish, c.scene)
+    if written:
+        try:
+            intents = judgement.keep_the_authors_numbers(
+                agent.engine.validate(written, origin="author:cheat",
+                                      origin_name="the author's word"), wish)
+            plan = TurnPlan(narration="", intents=intents,
+                            repairs=["cheat: read in code, the author's number kept"])
+            return _advance(c, agent, "", plan, f"(the author writes: {wish})")
+        except IntentError as exc:
+            c.transcript.pop()
+            return JsonResponse({"error": f"That could not be turned into anything the "
+                                          f"engine can do. {exc}"}, status=502)
     try:
         plan = agent.plan_cheat(wish, location=c.location,
                                 recent_events=_recent_events(c.world, c.location))
@@ -1571,6 +1632,19 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     judgement.update_thread(c.scene, player_input,
                             [o.op for o in resolution.outcomes])
     judgement.note_heat(c.scene, resolution.outcomes, player_input)
+    # Coin that changed hands is an agreement the room remembers, written by the engine
+    # from its own tell and the player's own "for …" — never by the model. Read back
+    # into the scene block until the party moves rooms (item 22).
+    for o in resolution.outcomes:
+        m = re.search(r"^(.+?) hands (.+?) (\d+) × (gp|sp|cp|pp)\b", o.tell or "")
+        if m and player_input and player_input != CARRY_ON:
+            tail = re.search(r"\bfor\s+([^.!?]{3,80})", judgement.redact_speech(player_input), re.I)
+            line = f"{m.group(1)} paid {m.group(2)} {m.group(3)} {m.group(4)}" \
+                   + (f" for {tail.group(1).strip()}" if tail else "")
+            agreed = list(c.scene.said.get("agreements") or [])
+            if line not in agreed:
+                agreed.append(line)
+            c.scene.said["agreements"] = agreed[-5:]
     # Bodies age out on their own: two turns' grace to loot and mourn, then the
     # scene lets them go whether or not the player ever says the word "leave".
     swept = agent.engine.tidy_the_fallen()

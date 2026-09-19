@@ -265,10 +265,49 @@ def search(world, question: str, limit: int = 3, threshold: float = THRESHOLD) -
     return hits
 
 
-def _ordered_facts(facts: dict, keys: tuple[str, ...]) -> list[tuple[str, str]]:
+# --- what the character would know ------------------------------------------------------
+#
+# The export marks hiddenness in three places (2026-09-18, item 9): every character
+# carries a `Secret`, the world a foundational secret, cards may be `secret`. Settlement
+# facts carry no flag, so the tier is by key: what the town says of itself is public;
+# what is whispered is rumour; what somebody keeps is hidden. PF1e already encodes the
+# split — Knowledge (local): rulers and laws DC 10, common rumour DC 15, hidden
+# organisations DC 20, "Try Again: No"; finding out is Diplomacy (gather information),
+# 1d4 hours, retryable — and the Alexandrian names the error this prevents ("Preempting
+# Investigation"). An unknown key is public: the world's own record is mostly the kind
+# of thing anybody in the town could tell you.
+HIDDEN_KEYS = frozenset({
+    "secret", "secrets", "shadow power", "hidden power", "true power", "conspiracy",
+    "underworld", "black market", "what is hidden", "hidden", "the truth",
+})
+RUMOUR_KEYS = frozenset({
+    "tension", "volatility", "rivals", "turning point", "limitations", "weakness",
+    "weaknesses", "rumour", "rumours", "rumor", "rumors", "gossip", "scandal",
+    "fault lines", "unrest",
+})
+PUBLIC, RUMOUR, HIDDEN = "public", "rumour", "hidden"
+
+
+def tier_of(key: str) -> str:
+    k = " ".join(str(key or "").split()).lower()
+    if k in HIDDEN_KEYS:
+        return HIDDEN
+    if k in RUMOUR_KEYS:
+        return RUMOUR
+    return PUBLIC
+
+
+def _ordered_facts(facts: dict, keys: tuple[str, ...],
+                   allow: frozenset = frozenset({PUBLIC})) -> list[tuple[str, str]]:
+    facts = {k: v for k, v in facts.items() if tier_of(k) in allow}
     first = [(k, facts[k]) for k in keys if k in facts]
     rest = [(k, v) for k, v in facts.items() if k not in dict(first)]
     return first + rest
+
+
+def withheld_from(facts: dict, allow: frozenset) -> list[tuple[str, str]]:
+    """The (key, tier) pairs `allow` kept out — what the GM knows and did not say."""
+    return [(k, tier_of(k)) for k in facts if tier_of(k) not in allow]
 
 
 def _fit(lines: list[str], budget: int) -> list[str]:
@@ -285,7 +324,7 @@ def _fit(lines: list[str], budget: int) -> list[str]:
 
 
 def passages(world, hits: list[Hit], question: str = "",
-             budget: int = PASSAGE_BUDGET) -> str:
+             budget: int = PASSAGE_BUDGET, allow: frozenset = frozenset({PUBLIC})) -> str:
     """What the model is shown of the hits: name, kind, where, the facts the question is
     about first, and a little prose. Labelled from the row — the source is the code's
     to state, not the model's to guess."""
@@ -305,7 +344,7 @@ def passages(world, hits: list[Hit], question: str = "",
     for h in hits:
         head = f"  * {h.name} — {h.kind}" + (f", in {h.parent}" if h.parent else "") + "."
         body: list[str] = []
-        for k, v in _ordered_facts(h.facts, keys):
+        for k, v in _ordered_facts(h.facts, keys, allow):
             body.append(f"      {k}: {' '.join(str(v).split())}")
         if h.prose:
             body.append("      " + " ".join(h.prose.split())[:600])
@@ -315,7 +354,8 @@ def passages(world, hits: list[Hit], question: str = "",
     return "\n".join(lines)
 
 
-def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET) -> str:
+def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET,
+            allow: frozenset = frozenset({PUBLIC})) -> str:
     """The GM's notes on where the party stands: the whole record of the place, the fact
     the question is about first, then who lives there and what is inside it."""
     if world is None or location is None:
@@ -331,7 +371,7 @@ def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET) -
     lines = [f"THE GM'S NOTES ON {location.name.upper()} ({str(location.kind or 'place').lower()}"
              + (f", within {within}" if within else "") + "):"]
     body: list[str] = []
-    for k, v in _ordered_facts(dict(getattr(location, "facts", {}) or {}), keys):
+    for k, v in _ordered_facts(dict(getattr(location, "facts", {}) or {}), keys, allow):
         body.append(f"  {k}: {' '.join(str(v).split())}")
     # The short, load-bearing lines before the long prose, so the budget never eats
     # them: what is inside the place, who lives here, and the land it sits in.
@@ -350,7 +390,8 @@ def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET) -
         if p.kind == "WORLD":
             continue
         pf = dict(getattr(p, "facts", {}) or {})
-        chosen = [(k, pf[k]) for k in ("Formal Power", "Governance", "Tension") if k in pf]
+        chosen = [(k, pf[k]) for k in ("Formal Power", "Governance", "Tension")
+                  if k in pf and tier_of(k) in allow]
         if chosen:
             body.append(f"  {p.name}: " + " ".join(f"{k}: {' '.join(str(v).split())}"
                                                     for k, v in chosen)[:400])
@@ -361,6 +402,8 @@ def dossier(world, location, question: str = "", budget: int = DOSSIER_BUDGET) -
                   in wanted else 1)
     for s in sections:
         title = str(s.get("title") or s.get("heading") or "").strip()
+        if title and tier_of(title) not in allow:
+            continue
         text = " ".join(" ".join(s.get("paragraphs", [])).split())
         if text:
             body.append(f"  {title + ': ' if title else ''}{text[:600]}")
