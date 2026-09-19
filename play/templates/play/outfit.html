@@ -139,7 +139,7 @@ function rowsFor(kind, rows, filter) {
       : (r.unit ? `${r.per} ${r.unit}` : "");
     const have = ME && (kind === "weapon" ? ME.weapons.includes(r.key) : kind === "armour" ? ME.armour === r.key : kind === "shield" ? ME.shield === r.key : false);
     return `<tr class="${have ? "have" : ""}"><td>${esc(r.name)}${have ? " · carried" : ""}</td><td class="note">${esc(detail)}</td>
-      <td class="n">${gp(r.cost_gp)}</td>
+      <td class="n">${Number(r.cost_gp) ? gp(r.cost_gp) : "free"}</td>
       <td class="n"><button class="tiny" data-less="${esc(id)}">−</button> ${n} <button class="tiny" data-more="${esc(id)}">+</button></td></tr>`;
   }).join("")}</table>${list.length > shown.length ? `<p class="note">${list.length - shown.length} more — narrow the search.</p>` : ""}`;
 }

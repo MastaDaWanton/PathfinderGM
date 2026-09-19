@@ -427,6 +427,15 @@ class Actor:
     # in the doorway was never described because nothing held a face.
     true_name: str = ""
     appearance: str = ""
+    # Whether a beat has ever said what this person looks like. Reported 2026-09-19:
+    # "Drenn Ironvale and the merchant are in scene without having been described." Four
+    # writers put people into a scene — the opening companion, the keeper behind a
+    # counter, a scheme's cast, the `spawn` op — and the face check covered none of them,
+    # because it only ever ran over the phrases booked from THIS turn's prose. So the
+    # condition it was meant to ask is held here instead of inferred: not described yet,
+    # for as long as that is true, and the first beat in which they act, speak or are
+    # addressed owes the description.
+    described: bool = False
     # Where this character was before the first turn. The id alone; the
     # modifiers, tags and ties are read live off the document.
     background: str = ""
@@ -3608,6 +3617,7 @@ def to_dict(actor: Actor) -> dict:
         "at": actor.at,
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "true_name": actor.true_name, "appearance": actor.appearance,
+        "described": bool(actor.described),
         "background": actor.background,
         "background_ties": list(actor.background_ties or []),
         "gender": actor.gender,
@@ -3957,6 +3967,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         heritage=data.get("heritage", ""),
         true_name=str(data.get("true_name", "") or ""),
         appearance=str(data.get("appearance", "") or ""),
+        described=bool(data.get("described", False)),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),
         race=data.get("race", "human"),

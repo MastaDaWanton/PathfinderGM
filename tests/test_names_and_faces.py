@@ -147,12 +147,17 @@ def test_looking_somebody_over_owes_a_face_and_old_actors_get_names(world, step)
 
 
 def test_the_view_appends_the_face_when_the_beat_left_it_out():
+    """The loop that does this widened on 2026-09-19 (item 32): it used to run over the
+    phrases `note_cast` booked from this turn's prose, which is why the keeper behind the
+    counter and the opening companion were never checked. The condition is now held on
+    the actor (`described`) and asked of everybody present, so the call this test pins is
+    `settle_descriptions` — see tests/test_small_true_things.py."""
     import inspect
 
     from play import views
 
     src = inspect.getsource(views._finish)
-    assert "narration_mod.faceless(text, phrase)" in src
+    assert "judgement.settle_descriptions(c.scene, text, player_input)" in src
     assert "apply_introductions(c.scene, text, player_input)" in src
 
 

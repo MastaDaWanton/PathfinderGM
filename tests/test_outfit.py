@@ -40,7 +40,10 @@ def test_the_catalogue_prices_the_tables_and_the_purse_is_the_wall(client):
     cat = outfit_views.catalogue()
     names = {w["key"] for w in cat["weapons"]}
     assert {"longsword", "dagger", "longbow"} <= names
-    assert all(w["cost_gp"] > 0 for w in cat["weapons"])
+    # Priced, which since 2026-09-19 includes the four the rulebook prints free: a club
+    # at 0 gp is on the shelf, a weapon with no price at all is not (item 24).
+    assert all(w["cost_gp"] >= 0 for w in cat["weapons"])
+    assert {"club", "quarterstaff", "sling"} <= names
     assert {a["key"] for a in cat["armour"]} >= {"leather", "chain shirt", "full plate"}
     assert any(g["key"] == "rope" and g["unit"] == "ft" for g in cat["gear"])
     cid = _make(client)

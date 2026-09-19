@@ -1696,7 +1696,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # The prose sees the cards in play, never the
                                     # GM's secret ones.
                                     recent=[b["text"] for b in c.transcript[-4:]],
-                                    turn=len(c.transcript))
+                                    turn=len(c.transcript),
+                                    # The one turn a true name is shown: the turn the
+                                    # player asks for it (2026-09-19, item 31).
+                                    names_for=judgement.names_asked_for(c.scene,
+                                                                        player_input))
         # The model's own recent prose — the narrator's beats only, with the sentences
         # WE appended to them (a death line, a thread anchor) taken back out. Shown its
         # own backstop or the engine's award line as "what you narrated", the model
@@ -1835,30 +1839,43 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # "the stranger", our placeholder, because nothing held a name).
             for ref, given in judgement.apply_introductions(c.scene, text, player_input):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
-            # And a face for whoever arrived faceless: a newly booked person whose
-            # sentences carry no appearance at all gets the world's own line for their
-            # people appended, as fact, so the next beat cannot re-invent them.
-            for phrase in introduced:
-                who = next((a for a in c.scene.actors.values() if a.name == phrase), None)
+            # And a face for anybody this beat used and did not describe — not only
+            # whoever arrived in it. The condition is "not described yet", held on the
+            # actor (`described`), so the keeper behind the counter, the opening
+            # companion, a scheme's cast and everyone promoted on an earlier turn are
+            # covered as well as a fresh arrival (2026-09-19, item 32: "Drenn Ironvale
+            # and the merchant are in scene without having been described"). The line is
+            # the world's own — the resident's Appearance fact, or their people's body
+            # line — so the next beat cannot re-invent them.
+            owed = set(judgement.settle_descriptions(c.scene, text, player_input))
+            # The one the player looked over owes a face too, whether or not she is new
+            # here: "I look the woman in the doorway over carefully".
+            looked = judgement.examined(player_input, c.scene)
+            if looked and looked in c.scene.actors and narration_mod.faceless(text, c.scene.actors[looked].name):
+                owed.add(looked)
+            # One appended line a beat, and never the same sentence twice. Measured live
+            # 2026-09-19 (run 4 of the group-7 check): the beat ended with "The woman:
+            # Orc: Powerfully built, prominent lower tusks…" and then "The girl with the
+            # cup: Orc: Powerfully built, prominent lower tusks…" — identical, because the
+            # export gives the Orc people exactly ONE body sentence and there is nothing
+            # to vary. The backstop is a floor, not an appendix: whoever is still owed one
+            # gets it on the beat they next act in, and the person the player LOOKED at is
+            # taken first because they asked.
+            for ref in ([looked] if looked in owed else []) + sorted(owed - {looked}):
+                who = c.scene.actors.get(ref)
                 if who is None or not getattr(who, "appearance", ""):
                     continue
-                if narration_mod.faceless(text, phrase):
-                    text = text.rstrip() + f" {narration_mod.definite(phrase).capitalize()}: " \
-                        f"{who.appearance}"
-                    ours.append(f"{narration_mod.definite(phrase).capitalize()}: {who.appearance}")
-                    repairs.append(f"faceless arrival: described the {phrase} from the "
-                                   f"world's own body line")
-            # And the one the player looked over: "I look the woman in the doorway
-            # over carefully" owes a face whether or not she is new here.
-            looked = judgement.examined(player_input, c.scene)
-            if looked and looked in c.scene.actors:
-                who = c.scene.actors[looked]
-                if getattr(who, "appearance", "") and narration_mod.faceless(text, who.name):
-                    line = f"{narration_mod.definite(who.name).capitalize()}: {who.appearance}"
-                    text = text.rstrip() + " " + line
-                    ours.append(line)
-                    repairs.append(f"looked over and not described: added {who.name}'s "
-                                   f"face from the world's own body line")
+                line = f"{narration_mod.definite(who.name).capitalize()}: {who.appearance}"
+                if who.appearance in text:
+                    # Their people's line is already on the page. Not marked described —
+                    # it may have been said of somebody else — but not said twice either.
+                    continue
+                text = text.rstrip() + " " + line
+                ours.append(line)
+                who.described = True
+                repairs.append(f"nobody stands here undescribed: added {who.name}'s "
+                               f"face from the world's own body line")
+                break
             # Ruskin's write-back: a card the beat carried is marked mentioned, and
             # its urgency starts again from here. The cooldown falls out of it.
             cards_mod.note_mentions(c.scene, text, turn=len(c.transcript))

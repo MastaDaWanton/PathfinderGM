@@ -106,10 +106,20 @@ def test_costs_are_normalised_to_gold():
     assert weapons.get("handwraps")["cost_gp"] == pytest.approx(0.1)   # 1 sp
 
 
-def test_a_weapon_with_no_price_is_none_rather_than_zero():
-    """A club costs nothing and a siege engine's price may simply be absent. Zero would
-    read as free."""
-    assert weapons.get("club")["cost_gp"] is None
+def test_free_and_unpriced_are_different_numbers():
+    """This test used to read "a weapon with no price is None rather than zero", on the
+    reasoning that "zero would read as free". Zero DOES read as free, and a club IS free —
+    the Core Rulebook prints "—" in its Cost column, as it does for the quarterstaff, the
+    sling and the wooden stake. Conflating the two cost the outfitter a whole shelf:
+    measured 2026-09-19, the shop stocked no club, quarterstaff or sling, because it skips
+    anything costing nothing — while three of the eleven class kits hand out a quarterstaff
+    and one a club (docs/playtest-2026-09-18.md item 24).
+
+    So `0.0` means free and anything may sell it; `None` means the source never said and
+    nothing may. The siege engine's absent price is still None."""
+    assert weapons.get("club")["cost_gp"] == 0.0
+    assert weapons.get("quarterstaff")["cost_gp"] == 0.0
+    assert weapons.get("stingchuck")["cost_gp"] is None
 
 
 def test_special_qualities_are_a_list():

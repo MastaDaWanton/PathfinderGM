@@ -170,6 +170,27 @@ def _hit_dice(actor) -> int:
     return 1
 
 
+# Asked outright for their name, who answers. Not a check in the book — the Core Rulebook
+# has no roll for "what are you called" — so the track answers instead of a die, which is
+# the whole point of having a track: indifferent is the default and a stranger with no
+# reason to care will still tell you their name, while somebody who has no time for you or
+# wants you gone will not. A refusal was reported as a bug on 2026-09-19 ("stranger on the
+# stairs refuses to give his name") and the player's own earlier ruling was that refusing
+# is fine — what was wrong was that it happened for no reason and could not be changed.
+# Now it is a fact about the creature and Diplomacy moves it.
+TELLS_NAME_FROM = "indifferent"
+
+
+def tells_their_name(actor) -> bool:
+    """Does this creature give their name for the asking?
+
+    Indifferent or better, yes. Unfriendly or hostile, no — and `influence` is the
+    documented way through, which is what makes the refusal actionable rather than a
+    dead end.
+    """
+    return step_of(of(actor)) >= step_of(TELLS_NAME_FROM)
+
+
 def said(who: str, was: str, now: str) -> str:
     """The tell, in words and never in numbers — the third law.
 
