@@ -173,9 +173,11 @@ def test_a_band_of_twelve_raiders_books_twelve_and_puts_raiders_on_the_board(sce
     assert made and bodies
     assert all(a.from_template == "raider" for a in bodies)
     assert all(a.hp > 20 for a in bodies), "a Raider, not a 4-hp guildhand"
-    # The cap still holds the BOARD, and the fiction's number is still on the books for
-    # item 33's unit to read.
-    assert len(bodies) == judgement._PROMOTED_CAP
+    # Group 8 left this as four bodies against twelve in the prose and said the cap was the
+    # real tension. Group 9 resolved it the way the record said it would: ONE unit of twelve
+    # (item 33, tests/test_the_crowd.py). The ledger's number is what the unit is formed from.
+    assert len(bodies) == 1
+    assert bodies[0].troop is not None and bodies[0].troop.members == 12
     assert "raider ×12" in judgement.cast_brief(scene)
 
 

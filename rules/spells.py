@@ -862,6 +862,23 @@ def _is_the_spells_own(spec: dict) -> bool:
             and str(spec.get("recipient") or "target") in ("target", "area"))
 
 
+_COUNTED_TARGETS = re.compile(r"\b(?:one|two|three|four|five|a single|up to \d+|\(\d+\)|"
+                              r"\(up to \d+\))\b", re.I)
+
+
+def _counts_its_targets(spell) -> bool:
+    """Does this spell name a NUMBER of creatures, rather than filling an area?
+
+    A troop rule, and the corpus can answer it: "creature touched (1)", "creatures (up to
+    5)", "one living creature". An area spell has no target line at all, and a spell whose
+    target line names no number ("all allies within 30 ft") is not a counted target either.
+    """
+    line = str(getattr(spell, "targets", "") or "").strip()
+    if not line:
+        return False
+    return bool(_COUNTED_TARGETS.search(line))
+
+
 def casting_plan(spell, caster_level: int) -> dict:
     """What the engine has to roll and apply to cast this spell once, at this level.
 
@@ -887,7 +904,15 @@ def casting_plan(spell, caster_level: int) -> dict:
     different damage.
     """
     plan = {"dice": "", "kind": "", "damage_type": "untyped", "lethality": "lethal",
-            "save": "", "save_effect": "", "riders": [], "note": ""}
+            "save": "", "save_effect": "", "riders": [], "note": "",
+            # Whether this spell fills an AREA or picks out a number of creatures. Both
+            # come off the spell's own text and both are troop rules (item 33): a troop
+            # "takes half again as much damage (+50%) from spells or effects that affect an
+            # area" and is "immune to any spell or effect that targets a specific number of
+            # creatures". Fireball's area is "20-foot-radius spread" and magic missile's
+            # target is "creatures (up to 5)", so the corpus can already tell them apart.
+            "area": bool(str(getattr(spell, "area", "") or "").strip()),
+            "targets_counted": _counts_its_targets(spell)}
     specs = effects_at(spell, caster_level)
 
     def take(core: dict) -> None:

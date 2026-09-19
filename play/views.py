@@ -204,6 +204,12 @@ def _state(c) -> dict:
                  "side": next((s for s, refs in (c.scene.sides or {}).items()
                                if r in refs), ""),
                  "size": a.size, "squares": grid.size_squares(a.size),
+                 # A crowd held as one actor: how many are still standing out of how many
+                 # arrived, so the token can say "17 of 24" and read as many people rather
+                 # than one big creature (item 33). Absent for every ordinary creature.
+                 **({"members": int(a.troop.members),
+                     "members_max": int(a.troop.members_max)}
+                    if getattr(a, "troop", None) is not None else {}),
                  "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
                  "conditions": [x.name for x in a.conditions]}
                 for r, a in c.scene.actors.items()

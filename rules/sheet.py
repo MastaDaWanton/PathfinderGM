@@ -19,6 +19,7 @@ import re
 
 from . import goods
 from . import houserules
+from . import troops as _troops
 from .activeeffect import ActiveEffect
 from .dice import Modifier, stack
 from .tables import (
@@ -232,6 +233,13 @@ def pronouns_for_gender(gender: str) -> str:
     return _PRONOUNS_FOR.get(said, "")
 
 
+# The rungs a creature passes on the way down, cleared together whenever something
+# overtakes them. Named once because it is written twice — by `apply_hp_state`'s own death
+# threshold and by a unit breaking up — and the three laws' ratchet counts literal condition
+# keys for exactly this reason: two copies of a ladder is how one of them goes stale.
+_DOWN_THE_LADDER = ("dying", "stable", "unconscious", "disabled")
+
+
 @dataclass
 class Actor:
     ref: str
@@ -285,6 +293,13 @@ class Actor:
     # abilities in self-inflicted non-lethal damage, and without a separate pool that
     # payment was indistinguishable from being stabbed.
     nonlethal: int = 0
+    # A crowd held as ONE actor: the member template, how many are still standing, and the
+    # morale score that says whether they run (`rules/troops.py`). Asked for 2026-09-19 —
+    # "a crowd of people should be spawned as a single unit with the combined hp of all its
+    # members". Hit points are the 13th Age mob's shared pool, so the ordinary hit-point
+    # machinery does the accounting and `take_damage` only has to say how many that killed.
+    # `None` for every ordinary creature, which is nearly all of them.
+    troop: object | None = None
     # Base land speed in feet, before armour. 30 is a human's; Small races and dwarves
     # have 20. Nothing needed this until the grid arrived — zones have no distance — so a
     # sheet written before this defaults rather than failing to load.
@@ -2086,6 +2101,13 @@ class Actor:
             self.nonlethal += taken
         else:
             self.hp -= taken
+        # A unit's pool is its members: every member's worth of damage takes one of them
+        # off their feet, with the excess cascading (13th Age's mob). One writer, here,
+        # because this is the one place hit points leave an actor — attrition applied
+        # anywhere else could double-count or miss a blow (`rules/troops.settle`).
+        fell = _troops.settle(self.troop, self.hp) if self.troop is not None else 0
+        if self.troop is not None:
+            self.size = _troops.size_for(self.troop.members or 1)
         return {
             "rolled": rolled, "type": normalise_damage_type(dtype),
             # Reported even when they did nothing, because the visible bookkeeping is the
@@ -2097,6 +2119,9 @@ class Actor:
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
             "nonlethal_threshold": self.nonlethal_threshold,
+            # How many of a unit that blow took off their feet, and how many are left.
+            "fell": fell,
+            "members": int(self.troop.members) if self.troop is not None else 0,
         }
 
     # --- gear -------------------------------------------------------------------------
@@ -2754,14 +2779,25 @@ class Actor:
         not what the rules say and not what a player would expect to happen to them.
         """
         changed = []
+        # Where the bottom is. For a body it is -Con, with the dying rungs above it; for a
+        # CROWD it is zero, and there are no rungs at all — Pathfinder's troop subtype:
+        # "reducing a troop to 0 hit points or fewer causes it to break up, effectively
+        # destroying the troop". There is no dying, no stabilising and no round-by-round
+        # loss, because what has been reduced is a formation and not a body. Measured live
+        # 2026-09-19: the last beat of a twelve-raider fight read "raiders is bleeding out."
+        #
+        # One threshold rather than a second death path, so the sentence that writes `dead`
+        # is still written once. A parallel branch was the first version and the three laws'
+        # ratchet caught it: two copies of a ladder is how one of them goes stale.
         con = self.ability_score("con")
-        if self.hp <= -con and not self.has_condition("dead"):
+        floor = 0 if self.troop is not None else -con
+        if self.hp <= floor and not self.has_condition("dead"):
             # `disabled` belongs on the list and was missing from it. Most deaths never
             # stop at exactly 0 hit points, so nobody had ever been disabled and then
             # killed — until drowning, which walks a body down the ladder one rung a
             # round (0, then -1, then dead) and left a corpse that was still "conscious,
             # and a standard action costs a hit point".
-            for gone in ("dying", "stable", "unconscious", "disabled"):
+            for gone in _DOWN_THE_LADDER:
                 self.remove_condition(gone)
             self.add_condition("dead", source="hit points")
             changed.append("dead")
@@ -3618,6 +3654,7 @@ def to_dict(actor: Actor) -> dict:
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "true_name": actor.true_name, "appearance": actor.appearance,
         "described": bool(actor.described),
+        "troop": actor.troop.as_dict() if actor.troop is not None else None,
         "background": actor.background,
         "background_ties": list(actor.background_ties or []),
         "gender": actor.gender,
@@ -3968,6 +4005,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         true_name=str(data.get("true_name", "") or ""),
         appearance=str(data.get("appearance", "") or ""),
         described=bool(data.get("described", False)),
+        troop=_troops.Troop.from_dict(data.get("troop")),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),
         race=data.get("race", "human"),

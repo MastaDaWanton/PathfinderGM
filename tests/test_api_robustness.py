@@ -245,22 +245,27 @@ def test_a_refused_turn_leaves_no_creatures_standing():
     # A list that PASSES validation and raises at RESOLUTION — the only kind that
     # can half-apply. Stage 7 made every refusal validate can foresee a validate-time
     # one and every other a printed sentence, so the list has to change under itself
-    # to reach a raise at all: the spawn projects ten refs the attack may name, the
+    # to reach a raise at all: the spawn projects four refs the attack may name, the
     # travel then walks the party out of their room, and the attack finds its target
     # "not on the board at resolution time" — the one floor validate cannot see past.
+    #
+    # Four rather than ten since 2026-09-19: a spawn of five or more now arrives as ONE
+    # troop with the combined hit points of its members (item 33, `rules/troops.py`), so a
+    # count of ten would leave one actor standing and prove nothing about a half-applied
+    # list. Four bodies half-apply exactly as well as ten did.
     other = next(p for p in engine.places() if p.id != engine.here().id)
     raw = [{"op": "spawn", "because": "the ambush",
-            "params": {"template": "thug", "count": 10, "zone": "engaged"}},
+            "params": {"template": "thug", "count": 4, "zone": "engaged"}},
            {"op": "travel", "because": "away", "params": {"place": other.name}},
            {"op": "attack", "actor": "pc", "target": "c1", "because": "the swing"}]
     with pytest.raises((IntentError, ValueError, KeyError)):
         engine.run(engine.validate(raw))
-    # The ten thugs and the player. Whoever keeps the room the travel walked into is
+    # The four thugs and the player. Whoever keeps the room the travel walked into is
     # standing in it too (`rules/keepers.py`) and is not one of the ghosts, so they are
     # not counted among them.
     ghosts = [r for r, a in scene.people.items()
               if not keepers.is_keeper(a.world_entity_id or "")]
-    assert len(ghosts) == 11, (
+    assert len(ghosts) == 5, (
         "the probe no longer reproduces a half-applied list; find one that does")
 
     scene.restore(before)
@@ -391,12 +396,15 @@ def test_the_turn_comes_back_to_the_player_from_any_slot():
     scene = Scene(location_id="5bbd0c40345f")
     scene.add(load_pc("fixtures/pc-kesst.json"))
     engine = Engine(scene, Dice(seed=5))
+    # Four thugs, not ten: since 2026-09-19 a spawn of five or more arrives as one troop
+    # with a shared pool (item 33), and this test wants several separate creatures in the
+    # initiative so the parked slot can be any of them.
     engine.run(engine.validate([
         {"op": "spawn", "because": "the crowd",
-         "params": {"template": "thug", "count": 10, "zone": "engaged"}},
+         "params": {"template": "thug", "count": 4, "zone": "engaged"}},
         {"op": "begin_encounter", "because": "the ambush",
          "params": {"sides": {"you": ["pc"],
-                              "them": [f"c{i}" for i in range(1, 11)]}}}]))
+                              "them": [f"c{i}" for i in range(1, 5)]}}}]))
 
     class _Campaign:
         def __init__(self, scene):

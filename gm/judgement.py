@@ -897,6 +897,36 @@ def opponent_count(player_text: str) -> int:
     return 1
 
 
+_NUMBER_IN = re.compile(r"\b(?:\d{1,2}|" + "|".join(_NUMBER_WORDS) + r")\b", re.I)
+# What a beat hangs off the end of a description and is no part of who they are: "the twelve
+# raiders COMING UP THE ROAD", "the guards STANDING BY THE GATE". A participle clause is a
+# thing they are doing, and a creature named for it keeps doing it forever.
+_DOING_SOMETHING = re.compile(
+    r"\s+(?:coming|going|walking|running|standing|waiting|approaching|closing|moving|"
+    r"heading|riding|marching|charging|advancing|gathered|blocking|guarding|watching)\b.*$",
+    re.I)
+
+
+def _without_the_count(phrase: str) -> str:
+    """"twelve raiders coming up the road" → "raiders". What is left is who they are.
+
+    A name is not a head-count and not a stage direction. Both halves measured: the ledger
+    held a person called "twelve soldier" (item 30) and a live spawn produced one creature
+    called "twelve raiders coming up the road" (item 33's own check).
+    """
+    text = " ".join(str(phrase or "").split())
+    text = _DOING_SOMETHING.sub("", text)
+    words = text.split()
+    while words and (words[0].lower() in _NUMBER_WORDS or words[0].isdigit()
+                     or words[0].lower() in ("a", "an", "the", "some")):
+        # "a pair of guards" is a collective phrase and `split_collective_name` reads it
+        # properly downstream — stripping "pair" here left "of guards", which is nobody.
+        if len(words) > 1 and words[1].lower() == "of":
+            break
+        words = words[1:]
+    return " ".join(words) or text
+
+
 def _touches_ref(raw: dict, refs: list[str]) -> bool:
     """Does this intent name one of these refs anywhere — actor, target, or `opposed_by`?
     The test for what to drop when the person it reaches for does not exist."""
@@ -1275,9 +1305,18 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
 
     minted = next_ref(scene)
 
+    # As many as the phrase says, and the number is not part of their name. Measured live
+    # 2026-09-19: "I charge the twelve raiders coming up the road" spawned ONE creature
+    # called "twelve raiders coming up the road" with 29 hit points — the "twelve soldier"
+    # family of bug at a site nobody had checked. `opponent_count` is the reader the fight
+    # injector already uses, and at five and up the engine forms one unit of them
+    # (`troops.UNIT_FROM`, item 33) rather than a dozen bodies.
+    count = max(1, opponent_count(victim_phrase) if _NUMBER_IN.search(victim_phrase)
+                else opponent_count(player_text))
+    spawn_name = _without_the_count(victim_phrase)
     out = [{"op": "spawn", "because": f"the {victim_phrase} the player is attacking "
                                       f"was described but never created",
-            "params": {"template": template, "count": 1, "name": victim_phrase}}]
+            "params": {"template": template, "count": count, "name": spawn_name}}]
     for raw in raw_intents:
         raw = dict(raw) if isinstance(raw, dict) else raw
         if _aims_wrong(raw):
@@ -4949,6 +4988,7 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     promoted civilians so a crowd scene does not flood the panel. The entry
     remembers its ref, so clearing the ledger walks its people off with it.
     """
+    from rules import troops as troops_mod
     from rules.bestiary import instantiate
 
     if scene is None or not added:
@@ -4974,8 +5014,33 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     # A group is bodies, plural. "a group of six men" that promotes one actor is
     # the same lie as a pair of guards being one guard: the fiction says six and
     # the dice know about one.
+    # A crowd the prose booked arrives as ONE unit with the combined hit points of its
+    # members, not as four bodies standing in for twelve (item 33). This is where the cap
+    # stopped fighting the fiction: "a band of twelve raiders" is a unit of twelve.
+    units: list[str] = []
+    for phrase in list(added):
+        n = int(counts.get(phrase, 1) or 1)
+        if n < troops_mod.UNIT_FROM:
+            continue
+        unit = troops_mod.form(template_for(phrase, _pc_level(scene)), n, scene=scene,
+                               name=phrase if _plural_role(phrase) else "")
+        scene.add(unit, zone=zones.get(phrase, "near"))
+        from rules import states
+
+        unit.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
+        if getattr(scene, "grid", None) is not None:
+            scene.place_by_zone([unit.ref])
+        for e in scene.cast:
+            if e.get("who") == phrase and not e.get("ref"):
+                e["ref"] = unit.ref
+                break
+        made.append(phrase)
+        refs.append(unit.ref)
+        units.append(phrase)
     wanted = []
     for phrase in added:
+        if phrase in units:
+            continue
         # A bare plural role — "weary porters", "haggling traders", "nearby merchants"
         # — is scenery: it stays in the ledger for the prose to keep consistent and
         # never becomes ONE body with a plural name and 4 hp (the "local guards"
