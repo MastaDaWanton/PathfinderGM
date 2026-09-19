@@ -952,6 +952,70 @@ def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
     return " ".join(kept).strip(), wrong
 
 
+# A sentence in which somebody DOES something: a person as its subject and a verb that
+# is not merely being. The events of a beat, as against its weather.
+_STATIVE = re.compile(
+    r"^\s*(?:the |a |an )?(?:[\w'’-]+\s+){0,4}?(?:he|she|they|you|\w+)\s+"
+    r"(?:is|are|was|were|seems?|remains?|stands?|hangs?|lingers?|stays?|looks?|feels?|"
+    r"appears?|sits?|lies?|waits?)\b", re.I)
+_PERSON_TOKEN = re.compile(r"\b(?:he|she|they|you|his|her|their|your)\b", re.I)
+
+
+def action_sentences(text: str, names=()) -> list[str]:
+    """The sentences of a beat in which a person does something.
+
+    Measured in the brothel (2026-09-18): every prose turn was under the length floor
+    and went to `polish`, whose drafts replaced HER ACTIONS with atmosphere — "The woman
+    continues her work…" → "The timberer's rhythmic thud…"; "her hands steady on your
+    tunic as she works to discard the layers between you" → "Steam rises… The woman
+    with the basin remains a shadow". A rewrite for length or repetition must keep the
+    events of the draft; these are the events. A sentence about somebody with a verb
+    that is not merely being, outside quotation."""
+    out = []
+    heads = {str(n).split()[-1].lower() for n in (names or ()) if str(n).strip()}
+    # The cast's role words count as somebody too: "The smith does not look up" is a
+    # person acting with no pronoun in the sentence. Lazy import: judgement imports
+    # this module.
+    from .judgement import _ROLE_WORD
+
+    for s in _sentences(unquoted(text)):
+        low = s.lower()
+        about = (bool(_PERSON_TOKEN.search(s)) or bool(_ROLE_WORD.search(s))
+                 or any(re.search(rf"\b{re.escape(h)}\b", low) for h in heads))
+        stative = _STATIVE.match(s)
+        # "The smith does not look up from the tongs" matched on "not look": a denial
+        # or an auxiliary before the verb is somebody doing something.
+        if stative and re.search(r"\b(?:does|do|did|not|never|goes? on|keeps?)\b",
+                                 s[:stative.end()], re.I):
+            stative = None
+        if not about or stative or s.rstrip().endswith("?"):
+            continue
+        if len(re.findall(r"[A-Za-z']+", s)) < 4:
+            continue
+        out.append(s)
+    return out
+
+
+def actions_kept(draft: str, candidate: str, names=()) -> float:
+    """The share of the draft's action sentences the candidate still carries — by the
+    same sentence, or by two of its content words within one sentence."""
+    events = action_sentences(draft, names)
+    if not events:
+        return 1.0
+    cand = unquoted(candidate).lower()
+    kept = 0
+    for s in events:
+        if s in candidate:
+            kept += 1
+            continue
+        words = [w for w in re.findall(r"[a-z']{4,}", s.lower())
+                 if w not in {"that", "with", "from", "into", "your", "their", "this",
+                              "there", "which", "them", "then", "have", "been", "were"}]
+        if sum(1 for w in words if w in cand) >= max(2, len(words) // 2):
+            kept += 1
+    return kept / len(events)
+
+
 # Fire doing damage to a thing or a body, in the prose — not lamplight, not a hearth
 # described: wood smouldering, hair singed, steel glowing where a blow landed.
 _FIRE_DAMAGE = re.compile(
@@ -1366,7 +1430,13 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         mine = opening_of(_sentences(text)[0] if _sentences(text) else "")
         recent = [opening_of(_sentences(e)[0]) for e in earlier[-6:] if _sentences(e)]
         same = sum(1 for o in recent if o and o == mine)
-        if mine and same >= 2:
+        # The only other person in a two-person room is what every beat opens on,
+        # and that is not a formula: measured in the brothel (2026-09-18), "the woman" /
+        # "the girl" fired this on nearly every beat, each a content-losing rewrite.
+        the_only_other = (len(others or ()) <= 2 and mine in {
+            opening_of(f"the {str(o).split()[-1]}") for o in (others or ()) if str(o).strip()
+        } | {opening_of(str(o)) for o in (others or ()) if str(o).strip()})
+        if mine and same >= 2 and not the_only_other:
             out.findings.append(Finding(
                 "formulaic-opening", f"{same} recent turns also open {mine!r}",
                 f"You have opened {same + 1} turns in a row with {mine!r}. Start this one "
@@ -1389,6 +1459,12 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     #     paragraph leaves a hole where a sentence was.
     if earlier:
         tics = recurring_phrases(text, earlier)
+        # A phrase that is the only other person's own handle is not a tic when the
+        # room holds two: "the woman with the" recurs because she is here.
+        if len(others or ()) <= 2:
+            heads = {str(o).split()[-1].lower() for o in (others or ()) if str(o).strip()}
+            tics = [(p, n) for p, n in tics
+                    if not any(re.search(rf"\b{re.escape(h)}\b", p) for h in heads)]
         if tics:
             named = "; ".join(repr(p) for p, _ in tics[:3])
             out.findings.append(Finding(

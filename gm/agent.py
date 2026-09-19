@@ -120,6 +120,16 @@ class GMAgent:
         reason to have one — and it inherits the final rejection, so it starts warned
         rather than fresh.
         """
+        # Continue is a directive, never an utterance. The ruling (2026-09-18): "my
+        # character should keep doing whatever he is doing and the scene should move
+        # forward without any addition from me." So no plan is asked of the model at
+        # all: the player's standing action holds (a legal delay in a fight; the NPC
+        # loop then runs), the prose call is shown the standing action as a fact, and
+        # the directive's own text never reaches the planner as the player's words —
+        # measured before this, it came back as `say` of "in their own words…", `give`
+        # of "scene on" three times, and `use_item potion_of_rest_01`.
+        if player_input == prompts.CARRY_ON:
+            return self._continue_plan()
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
@@ -509,6 +519,22 @@ class GMAgent:
                   "because": f"the author wrote: {wish}"}]),
             attempts=attempts, rejections=rejections)
 
+    def _continue_plan(self) -> TurnPlan:
+        """The plan for a Continue press, written in code: the player holds their
+        standing action and the scene moves. One `narrate_only`, no model call.
+
+        In a fight this is the player's legal delay — 1e's delay action, taking no
+        action and letting the order run — and `views._finish` then hands the round to
+        the NPC loop, which acts with dice; out of a fight the prose call is shown the
+        standing action as a fact and the world advances a beat (the engaged NPC goes
+        on, `attacked_by` may open a fight from what they do, the watcher ticks)."""
+        intents = self.engine.validate([{
+            "op": "narrate_only",
+            "because": "the player holds their standing action; the scene moves on"}])
+        return TurnPlan(narration="", intents=intents,
+                        repairs=["continue: no plan asked of the model — the player's "
+                                 "standing action holds and the world moves a beat"])
+
     def npc_turn(self, ref: str, location=None, recent_events=None,
                  max_attempts: int = 3) -> TurnPlan:
         """Act for one creature on its own initiative.
@@ -724,6 +750,14 @@ class GMAgent:
                     chunks.append(str(s if isinstance(s, str) else s.get("text", "")))
             for chunk in chunks:
                 found |= set(GMAgent._CAPITALISED.findall(chunk))
+                # Every word the world uses, in lowercase: a capitalised token is
+                # invented only if its lowercase form appears nowhere in the world's
+                # text. "the Reeve's men" was struck (2026-09-18, item 11) because the
+                # export says "reeve" in lowercase and the model title-cased it — the
+                # same class as the Council/Elders false positives, 27 of 31 flags.
+                # `invented_names` lowercases what it is handed, so these plain words
+                # are allowed by the same comparison the names are.
+                found |= {w for w in re.findall(r"[a-z][a-z'-]{3,}", chunk.lower())}
         except Exception:
             pass
         # And the things the game itself ships. "Hypericum" and "Wolfweed" were reported
@@ -851,7 +885,8 @@ class GMAgent:
         cast = " ".join(a.name for a in self.engine.scene.actors.values())
         text = narration_mod.strip_example_cast(text, f"{player_input} {cast}")
         if claims:
-            text, claim_repairs, claim_attempts = self._repair_outcome_claims(text, backed)
+            text, claim_repairs, claim_attempts = self._repair_outcome_claims(
+                text, backed, restrained=self._anyone_held())
             repairs += claim_repairs
             attempts += claim_attempts
 
@@ -1062,6 +1097,18 @@ class GMAgent:
         review = _review(text)
         if review.ok:
             return text, [], []
+        # Less is not wrong. A draft short of the floor whose only faults are its
+        # length and a missing hand-back (which has a free backstop) ships at its own
+        # length when it carries events: measured in the brothel (2026-09-18), every
+        # prose turn was under 800 characters and went to this rewrite, and the rewrite
+        # is where the woman's actions became the timberer's mallet. The floor is for
+        # prose that is WRONG, not for prose that is shorter than asked.
+        kinds = {f.kind for f in review.findings}
+        cast_names = self._other_names()
+        if kinds <= {"too-short", "no-hand-back"} and \
+                len(narration_mod.action_sentences(text, cast_names)) >= 3:
+            return text, [f"kept at its own length: {', '.join(sorted(kinds))} only, "
+                          f"and the draft carries its events"], []
 
         def _rewrite(complaint: str, note: str):
             reply = client.chat(
@@ -1099,8 +1146,12 @@ class GMAgent:
 
         def _accept(candidate: str) -> bool:
             after = _review(candidate)
+            # And it must keep the events of the draft: a rewrite that scored better
+            # by replacing what people DID with what the air smelled of is the one
+            # measured in the brothel, and it is refused here whatever its score.
             return bool(candidate) and after.score < review.score \
-                and not ({f.kind for f in after.findings} - was)
+                and not ({f.kind for f in after.findings} - was) \
+                and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6
 
         if _accept(fixed):
             return fixed, review.as_log(), attempts
@@ -1125,11 +1176,17 @@ class GMAgent:
         pc = self.engine.scene.pc()
         return pc.name if pc else ""
 
+    def _anyone_held(self) -> bool:
+        """Whether anybody here is grappled, pinned or entangled — the only state in
+        which prose about slipping free is a claim about a check nobody rolled."""
+        return any(a.has_state("state.held")
+                   for a in self.engine.scene.actors.values())
+
     # --- Check 4's repair ---------------------------------------------------------------
 
-    def _repair_outcome_claims(self, narration: str,
-                               backed=()) -> tuple[str, list[str], list[Attempt]]:
-        claims = find_outcome_claims(narration, backed=backed)
+    def _repair_outcome_claims(self, narration: str, backed=(),
+                               restrained: bool = True) -> tuple[str, list[str], list[Attempt]]:
+        claims = find_outcome_claims(narration, backed=backed, restrained=restrained)
         if not claims:
             return narration, [], []
 
@@ -1162,7 +1219,7 @@ class GMAgent:
                 attempts.append(Attempt("repair", 0.0, self.model, note=f"failed: {exc}"))
                 fixed = ""
 
-            if fixed and not find_outcome_claims(fixed, backed=backed):
+            if fixed and not find_outcome_claims(fixed, backed=backed, restrained=restrained):
                 narration = narration.replace(claim.sentence, fixed)
                 repairs.append(f"{claim.why}: {claim.sentence!r} -> {fixed!r}")
             else:
@@ -1174,7 +1231,7 @@ class GMAgent:
         # came from — which is how "your blade bites into the joint" reached a live
         # transcript while the pattern for it sat in rules/intents.py, matching. Spans
         # cannot miss: the match position is in the current string by construction.
-        narration, force_cut = cut_outcome_claims(narration)
+        narration, force_cut = cut_outcome_claims(narration, restrained=restrained)
         for gone in force_cut:
             repairs.append(f"still claiming an outcome after repair: cut {gone!r}")
 

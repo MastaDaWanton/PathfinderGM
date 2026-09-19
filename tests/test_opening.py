@@ -145,7 +145,7 @@ def test_writing_instructions_are_not_things_the_character_knows():
     world, town = a_world()
     known = opening.what_you_know(world, town)
     assert "Bleak" not in known
-    assert "A drowned coast" in known
+    assert "a drowned coast" in known
 
 
 def test_the_worlds_own_names_are_never_restyled():

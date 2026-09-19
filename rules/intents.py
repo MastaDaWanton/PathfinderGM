@@ -1398,7 +1398,14 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
     return frozenset(backed)
 
 
-def find_outcome_claims(narration: str, backed=()) -> list[OutcomeClaim]:
+# A denial in the words before an escape verb: "doesn't pull away", "without breaking
+# free", "never slips loose". Read over the forty characters before the match.
+_NEGATED = re.compile(
+    r"\b(?:doesn't|does not|didn't|did not|not|never|without|nor|no longer|fails? to|"
+    r"cannot|can't|couldn't|could not|unable to|instead of)\s+(?:\w+\s+){0,3}$", re.I)
+
+
+def find_outcome_claims(narration: str, backed=(), restrained: bool = True) -> list[OutcomeClaim]:
     """Every place the narration asserts a mechanical result the engine never reached.
 
     This is what makes the architecture's central promise true. "A persuasive model
@@ -1415,7 +1422,16 @@ def find_outcome_claims(narration: str, backed=()) -> list[OutcomeClaim]:
     for rx, why in OUTCOME_RE:
         if why in allowed:
             continue
+        # An escape is a claim only when somebody is HELD — a grapple, a pin, an
+        # entanglement on the books — and only when it is asserted, not denied.
+        # Measured in the brothel (2026-09-18): "She doesn't pull away; instead … she
+        # works to discard the layers between you" matched `pull … away`, negated, in a
+        # room where nobody held anybody, and the sentence was cut.
+        if why == "states an escape" and not restrained:
+            continue
         for m in rx.finditer(narration or ""):
+            if why == "states an escape" and _NEGATED.search(narration[max(0, m.start() - 40):m.start()]):
+                continue
             claims.append(
                 OutcomeClaim(
                     pattern=rx.pattern, why=why, text=_sentence_around(narration, m.start()),
@@ -1435,7 +1451,7 @@ def _sentence_around(text: str, index: int) -> str:
     return text[start + 1:end].strip()
 
 
-def cut_outcome_claims(text: str) -> tuple[str, list[str]]:
+def cut_outcome_claims(text: str, restrained: bool = True) -> tuple[str, list[str]]:
     """The text with every outcome-claiming sentence removed, by character span.
 
     The backstop behind the targeted repair, and it exists because the repair's
@@ -1445,7 +1461,7 @@ def cut_outcome_claims(text: str) -> tuple[str, list[str]]:
     in this file, matching. Spans cannot miss: the match position is in the current
     string by construction.
     """
-    claims = find_outcome_claims(text or "")
+    claims = find_outcome_claims(text or "", restrained=restrained)
     if not claims:
         return text, []
 

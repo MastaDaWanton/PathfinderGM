@@ -295,6 +295,53 @@ def drawn_from_the_place(text: str, prose: str, skeleton: str) -> list[str]:
     return sorted((words(text) & words(prose)) - words(skeleton))
 
 
+def _close(a: str, b: str) -> bool:
+    """One letter off, or the same first four letters within a letter of length."""
+    a, b = a.lower(), b.lower()
+    if a == b:
+        return False
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) >= 4 and len(b) >= 4 and a[:4] == b[:4]:
+        return True
+    if len(a) == len(b):
+        return sum(1 for x, y in zip(a, b) if x != y) == 1
+    longer, shorter = (a, b) if len(a) > len(b) else (b, a)
+    for i in range(len(longer)):
+        if longer[:i] + longer[i + 1:] == shorter:
+            return True
+    return False
+
+
+def repair_near_misses(text: str, allowed: set[str], *names: str) -> tuple[str, list[str]]:
+    """A name written one letter wrong is the real name, substituted before the checks.
+
+    Measured 2026-09-18 on the `masta` opening: the model wrote "Maste"; the invented-name
+    check counted it as a name from outside the material and the who-the-player-is check
+    found no "Masta" — two rejections from one slip, and an 802-character draft fell to
+    the template. The player: "very bare and short". Returns (text, swaps)."""
+    swaps: list[str] = []
+    real = {n for n in list(allowed) + [str(x) for x in names if x] if n and n[:1].isupper()}
+    real |= {w for n in real for w in n.split() if w[:1].isupper() and len(w) >= 4}
+    if not real or not text:
+        return text, swaps
+    # Every capitalised token, sentence starts included — "Maste sits on the step"
+    # opened the draft, and `invented_names` skips a sentence start on purpose. A
+    # token that IS a real name (case-blind) or a common word is left alone.
+    from gm.narration import _NOT_A_NAME
+
+    known_low = {r.lower() for r in real}
+    for tok in dict.fromkeys(re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", text)):
+        low = tok.lower()
+        if low in known_low or low in _NOT_A_NAME:
+            continue
+        match = next((r for r in sorted(real) if _close(tok, r)), None)
+        if match:
+            text = re.sub(rf"\b{re.escape(tok)}\b", match, text)
+            swaps.append(f"{tok} -> {match}")
+    return text, swaps
+
+
 def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
              prose: str = "", skeleton: str = "",
              suggestions: list[str] | None = None,
@@ -427,6 +474,8 @@ def write(campaign, situation, skeleton: str,
     best: tuple[str, list[str], list[str]] | None = None
     try:
         draft, offered = _ask(messages, cfg)
+        draft, _ = repair_near_misses(draft, allowed, pc.name if pc is not None else "",
+                                      place.name if place is not None else "")
         found = check(draft, offered)
         if draft and not found:
             return narration.destutter(draft), offered, []
@@ -438,6 +487,8 @@ def write(campaign, situation, skeleton: str,
                          {"role": "user", "content": "Rewrite it. What is wrong:\n"
                                                      + "\n".join(f"- {p}" for p in found)}]
             draft, offered = _ask(messages, cfg)
+            draft, _ = repair_near_misses(draft, allowed, pc.name if pc is not None else "",
+                                          place.name if place is not None else "")
             found = check(draft, offered)
             if draft and not found:
                 return narration.destutter(draft), offered, []

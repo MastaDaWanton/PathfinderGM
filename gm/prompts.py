@@ -1243,36 +1243,49 @@ CARRY_ON = ("I take no action. Carry the scene on from where it stopped: if I as
 # So Continue is shown what it looks like: nobody acts, nothing new arrives, the place
 # and the people already here go on. Every one ends by handing the turn back, and none
 # of them opens a door.
+# RULING 2026-09-18 (docs/playtest-2026-09-18.md, item 23): "Continue should work as I
+# have nothing to add and continue the scene, not as nobody does anything. My character
+# should keep doing whatever he is doing and the scene should move forward without any
+# addition from me … if I keep hitting continue the fight should play out further and
+# further, even coming to an end, having the authorities called." The three examples
+# that stood here demonstrated the inverse — "nobody fills the gap", "he waits", "nothing
+# has been decided either" — and, measured in the brothel, the model wrote exactly that
+# seven beats running. These show a standing action HELD while the world moves a beat:
+# the person in front of the player goes on with what they were doing and the next thing
+# happens; none shows a stalled room.
 CARRY_ON_EXAMPLES: list[dict] = [
     {
         "player": CARRY_ON,
         "reply": {"narration": (
-            "Nobody fills the gap. The woman with the tally-stick goes back to her "
-            "counting, one bead at a time, and the man who had been about to speak "
-            "closes his mouth and looks at his hands instead. Somewhere behind you a "
-            "child is being told twice to stand still. The quiet does not break so "
-            "much as thin out, the way it does when people decide separately that "
-            "whatever it was is over. The one who stopped to watch is still watching, "
-            "and has not moved from where they were. What do you do?")},
+            "You keep the bellows going, the same slow stroke, and the coals answer with "
+            "the same dull orange. Behind you the argument by the gate has stopped being "
+            "an argument: the taller man has the other by the front of his coat, and the "
+            "first punch lands wet. The smith does not look up from the tongs. Somebody "
+            "in the yard shouts for the watch, and somebody else shouts that there is no "
+            "watch on a rest-day, and the two on the floor go on hitting each other in "
+            "the dust between the anvil and the trough. What do you do?")},
     },
     {
         "player": CARRY_ON,
         "reply": {"narration": (
-            "He takes his time about it. 'That depends who is asking,' he says at "
-            "last, and he does not look up from the strap he is working. 'And you have "
-            "not said.' The rain has got into the ruts and the water is going the wrong "
-            "way down the middle of them, and two of his people have stopped pretending "
-            "not to listen. He waits. He is not going to say the next part first. "
-            "What do you do?")},
+            "He takes his time about it, but he does answer. 'Two days,' he says, still "
+            "working the strap. 'The cart comes on the third, and it comes with men on "
+            "it.' He tests the buckle, finds it holds, and sets the harness on the rail "
+            "beside the other two. His girl comes out with the pail and stops when she "
+            "sees you, then goes on to the trough as if she had not. The rain has got "
+            "into the ruts. 'If you are still here on the third,' he says, 'stand where "
+            "I can see you.' What do you do?")},
     },
     {
         "player": CARRY_ON,
         "reply": {"narration": (
-            "The line shuffles forward a pace and stops again. Whatever is happening at "
-            "the front of it is still happening, and still not being explained back "
-            "down the length of it. The old man ahead of you shifts his weight off the "
-            "bad leg and says, to nobody, that this is not how it usually goes. Nothing "
-            "has come apart. Nothing has been decided either. What do you do?")},
+            "You stay where you are on the step and eat. The line at the gate moves; "
+            "whatever was holding it has been settled or given up on, and the carts go "
+            "through one after another with the guard waving each on without looking. "
+            "The woman beside you finishes her bread, brushes her hands, and stands. "
+            "'They will want the square cleared by noon,' she says, to you, and goes "
+            "down the steps toward the market. Two of the guard come up the street the "
+            "other way, and one of them is already looking at you. What do you do?")},
     },
 ]
 

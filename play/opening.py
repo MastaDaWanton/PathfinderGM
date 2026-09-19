@@ -275,7 +275,15 @@ def _clause(text: str) -> str:
     opposite of grounding them. A capital mid-list is a much smaller cost than a
     people whose name this app spells differently from every other page in it.
     """
-    return " ".join(str(text or "").split()).rstrip(" .;,")
+    out = " ".join(str(text or "").split()).rstrip(" .;,")
+    # The one exception the reasoning above allows: a leading ARTICLE is nobody's
+    # name, and "Vormoor keeps to A local reeve confirmed by…" shipped in the opening
+    # of the 2026-09-18 play-test. "A", "An", "The" and "Its" alone are lowered; every
+    # other first word keeps the export's case.
+    first = out.split(" ", 1)[0] if out else ""
+    if first in ("A", "An", "The", "Its", "Their", "Some", "Several", "Mostly"):
+        out = first.lower() + out[len(first):]
+    return out
 
 
 def what_you_know(world, place) -> str:

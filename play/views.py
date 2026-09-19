@@ -1632,7 +1632,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier,
-                scene_now=prompts.scene_now(c.scene), pull=pull,
+                # On Continue the standing action is a fact of the beat, last in the
+                # prompt with the scene as it stands (the ruling, 2026-09-18).
+                scene_now=(prompts.scene_now(c.scene)
+                           + (("\n\n" + judgement.standing_action(c.scene))
+                              if player_input == CARRY_ON and judgement.standing_action(c.scene)
+                              else "")),
+                pull=pull,
                 claim=str(getattr(agent, "false_claim", "") or ""))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []

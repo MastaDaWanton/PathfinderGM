@@ -1156,7 +1156,11 @@ def test_the_thread_survives_a_continue():
     judgement.update_thread(s, "I watch the tall stranger by the well")
     assert s.thread["doing"] == "watching"
     judgement.update_thread(s, "I punch him", ["begin_encounter"])
-    assert s.thread == {}                            # the fight IS the engagement
+    # The fight IS the engagement: no subject for the anchor or the brief — but the
+    # standing action is kept for Continue ("if I am running a machine and a fight
+    # breaks out … I will be running the machine", the ruling of 2026-09-18).
+    assert "subject" not in s.thread and "doing" not in s.thread
+    assert s.thread["standing"]["doing"] == "watching"
 
 
 def test_walking_away_ends_the_engagement():

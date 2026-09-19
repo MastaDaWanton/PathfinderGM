@@ -3615,7 +3615,17 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         # mid-fight. Measured 2026-09-18: clearing the thread here lost the challenger
         # the moment the fight began, and the first attack went to the wrong man.
         ref = scene.thread.get("ref") if "begin_encounter" in ops else None
-        scene.thread = {"opponent": ref} if ref and ref in scene.actors else {}
+        # The standing action survives the fight as a fact for Continue: "if I am
+        # running a machine and a fight breaks out … I will be running the machine"
+        # (the ruling, 2026-09-18). Not as the subject — the anchor and the brief stay
+        # silent mid-fight — but as `standing`, which `standing_action` reads.
+        held = {k: scene.thread[k] for k in ("doing", "subject") if scene.thread.get(k)}
+        if scene.thread.get("standing") and not held:
+            held = dict(scene.thread["standing"])
+        new = {"opponent": ref} if ref and ref in scene.actors else {}
+        if held and "begin_encounter" in ops:
+            new["standing"] = held
+        scene.thread = new
         return
     text = " ".join(str(player_text or "").split())
     # The place used to be read out of the player's own sentence here and written to
@@ -3679,6 +3689,24 @@ def update_thread(scene, player_text: str, resolved_ops=None) -> None:
         scene.thread["age"] = int(scene.thread.get("age", 0)) + 1
         if scene.thread["age"] > 6:
             scene.thread = {}
+
+
+def standing_action(scene) -> str:
+    """The player's standing action as a sentence of fact for a Continue beat, or "".
+
+    From the thread's own doing and subject ("waiting for a challenger", "talking to
+    the woman"), or the `standing` a fight kept. Continue means this holds — the ruling
+    of 2026-09-18 — and the world moves a beat around it."""
+    t = getattr(scene, "thread", None) or {}
+    doing = str(t.get("doing") or (t.get("standing") or {}).get("doing") or "").strip()
+    subject = str(t.get("subject") or (t.get("standing") or {}).get("subject") or "").strip()
+    if not subject:
+        return ""
+    return (f"THE PLAYER'S STANDING ACTION (fact): they go on {doing or 'engaged with'} "
+            f"{subject}, exactly as before — do not drop it, do not change it, do not add "
+            f"an action they did not take. THE WORLD MOVES ONE BEAT: the people here go on "
+            f"with what they were doing and the next thing happens — an answer, a step, a "
+            f"blow, an arrival, a consequence. Nobody merely waits.")
 
 
 def thread_brief(scene, where: str = "") -> str:

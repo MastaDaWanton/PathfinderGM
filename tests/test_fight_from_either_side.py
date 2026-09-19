@@ -186,7 +186,8 @@ def test_the_thread_binds_to_the_one_promoted_challenger_and_survives_the_fight(
     judgement.update_thread(market, "I tell him to come at me")
     assert market.thread["ref"] == challenger.ref
     judgement.update_thread(market, "I strike", ["begin_encounter", "attack"])
-    assert market.thread == {"opponent": challenger.ref}, "the fight keeps its opponent"
+    assert market.thread["opponent"] == challenger.ref, "the fight keeps its opponent"
+    assert "subject" not in market.thread, "and the anchor stays silent mid-fight"
     assert judgement.engaged_refs(market) == [challenger.ref]
 
 
@@ -455,7 +456,7 @@ def test_a_fight_opened_by_a_swing_turns_the_thread_into_the_opponent(market):
     engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": thug.ref}]))
     assert market.in_encounter
     judgement.update_thread(market, "I strike the weapon", ["attack"])
-    assert market.thread == {"opponent": thug.ref}
+    assert market.thread["opponent"] == thug.ref and "subject" not in market.thread
     assert judgement.thread_brief(market) == ""
 
 
