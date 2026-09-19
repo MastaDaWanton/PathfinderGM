@@ -75,6 +75,17 @@ COIN = {"gp": 1.0, "sp": 0.1, "cp": 0.01}
 # exceptions, because nothing in the sheet marks them.
 FINESSE_BY_NAME = {"rapier", "whip", "spiked chain"}
 
+# Four weapons print a dash in the Cost column — they cost nothing, because they are a
+# stick, a strap and a sharpened stake (Core Rulebook Table 6-4, confirmed against
+# d20pfsrd's weapon tables 2026-09-19: club, quarterstaff, sling and wooden stake all
+# read "—"). The workbook's cost cell for them is empty, and an empty cell also means
+# "the source does not say" for firearms and siege engines, so the two cases cannot be
+# told apart by parsing. Named here instead: free is a fact about these four, not a
+# property of a blank cell. It matters downstream — the outfitter would not stock an item
+# it could not price, so five class kits were built from weapons the shop could not sell
+# (docs/playtest-2026-09-18.md item 24).
+FREE_BY_NAME = {"club", "quarterstaff", "sling", "wooden stake"}
+
 
 def slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower()).strip("-")
@@ -124,10 +135,15 @@ def parse_specials(raw: str) -> list[str]:
     return out
 
 
-def parse_cost(raw: str) -> float | None:
+def parse_cost(raw: str, free: bool = False) -> float | None:
+    """The price in gp, `0.0` for a weapon the rulebook prints free, `None` for unknown.
+
+    The three answers are distinct on purpose: `None` means the source did not say and
+    nothing may sell it, `0.0` means it costs nothing and a shop may hand it over.
+    """
     m = RE_COST.search(clean(raw))
     if not m:
-        return None
+        return 0.0 if free else None
     return round(float(m.group(1).replace(",", "")) * COIN[m.group(2).lower()], 2)
 
 
@@ -239,8 +255,10 @@ def build(src: Path) -> dict:
             "traits": specials,
             "range_ft": parse_number(row.get("range", ""), RE_RANGE),
             "weight_lb": parse_number(row.get("weight", ""), RE_WEIGHT),
-            "cost_gp": parse_cost(row.get("cost", "")),
-            "cost_text": row.get("cost", ""),
+            "cost_gp": parse_cost(row.get("cost", ""),
+                                  free=name.strip().lower() in FREE_BY_NAME),
+            "cost_text": row.get("cost", "") or ("—" if name.strip().lower() in FREE_BY_NAME
+                                                 else ""),
             "misfire": row.get("misfire", ""),
             "capacity": row.get("capacity", ""),
             "crew": row.get("crew", ""),

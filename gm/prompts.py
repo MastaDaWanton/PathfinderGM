@@ -733,7 +733,7 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
-                known=(), recent=None, secret=False, turn=0) -> str:
+                known=(), recent=None, secret=False, turn=0, names_for=None) -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -961,7 +961,20 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # it: when the person introduces themselves the model's own guess is
             # replaced with the world's name in code (`narration.settle_introductions`)
             # and the panel is renamed (`judgement.apply_introductions`).
+            # ...with one exception, and it is the turn the player asks. Then the name
+            # goes in as the thing he says, for that turn and that person only
+            # (`judgement.names_asked_for`), because a model with no name to give
+            # refuses — which is how "the stranger" stayed "the stranger" for several
+            # scenes (2026-09-19). An empty value means his attitude refuses: said as a
+            # fact too, so the refusal is his and not the prompt's silence.
             names_it = ""
+            if names_for and ref in names_for:
+                given = str(names_for[ref] or "").strip()
+                names_it = (f" ASKED HIS NAME THIS TURN (fact — he answers with THIS name "
+                            f"and no other, in his own words): {given}." if given else
+                            f" ASKED HIS NAME THIS TURN (fact): he will not give it — "
+                            f"{actor.name} is {states.attitude_of(actor) or 'unfriendly'} "
+                            f"towards the player. He deflects; he does not invent one.")
             face = str(getattr(actor, "appearance", "") or "").strip()
             looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}"

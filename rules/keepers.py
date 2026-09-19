@@ -285,5 +285,20 @@ def staff(engine):
     actor.notes = (f"{title[:1].upper()}{title[1:]} at {where}"
                    + (f", in {town}" if town else "") + "."
                    + kin_note(scene, actor, at))
+    # And a face, here, because nothing downstream can find them one: a keeper's
+    # `world_entity_id` is the synthetic `keeper:<place>`, so `names.resident_appearance`
+    # looks it up, finds no such resident and returns "". Drenn Ironvale therefore had no
+    # appearance, no Looks clause in the brief, and nothing for the description check to
+    # enforce even once it ran over everybody (2026-09-19, item 32). Their people's own
+    # body line is the right answer: they are a local, and the name they carry was drawn
+    # from the local stock already. Their name IS their name — they are not a stranger
+    # keeping it back — so `true_name` is stamped too, or `name_the_nameless` would draw
+    # a second one for somebody already introduced.
+    from . import names as names_mod
+
+    actor.true_name = name
+    if not actor.appearance:
+        actor.appearance = names_mod.appearance_for(engine.world, scene.location_id,
+                                                   ref=actor.ref or wid)
     scene.add(actor)
     return actor

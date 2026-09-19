@@ -39,7 +39,11 @@ def catalogue() -> dict:
                          key=lambda kv: (rank.get(str(kv[1].get("prof", "simple")), 3),
                                          str(kv[1].get("name", kv[0])).lower())):
         cost = w.get("cost_gp")
-        if cost in (None, "", 0) or w.get("prof") == "exotic" and float(cost) > 100:
+        # `None` means the source never gave a price and nothing may sell it; `0.0` means
+        # the rulebook prints a dash and the thing is free. Those were one case here, so
+        # the shop refused to stock a club, a quarterstaff or a sling — and five class
+        # kits were built from exactly those (docs/playtest-2026-09-18.md item 24).
+        if cost in (None, "") or w.get("prof") == "exotic" and float(cost) > 100:
             continue
         arms.append({"key": key, "name": w.get("name", key), "cost_gp": round(float(cost), 2),
                      "damage": w.get("damage", ""), "type": w.get("type", ""),
@@ -65,7 +69,7 @@ def _price(kind: str, key: str) -> tuple[float, dict] | None:
     key = " ".join(str(key or "").split()).lower()
     if kind == "weapon":
         w = weapons_mod.all_weapons().get(key)
-        if w and w.get("cost_gp") not in (None, "", 0):
+        if w and w.get("cost_gp") not in (None, ""):
             return float(w["cost_gp"]), dict(w)
     elif kind == "armour":
         a = ARMOUR.get(key)

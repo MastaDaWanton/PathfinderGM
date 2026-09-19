@@ -4415,13 +4415,24 @@ def name_the_nameless(scene, world) -> list[str]:
             continue
         name = str(a.name or "")
         descriptor = not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
+        # Everybody leaves this loop with a face, whatever else is true of them. Item 32
+        # (2026-09-19) turned on a hole here: a person carrying a real name and no world
+        # id — a scheme's cast member, the opening companion when the roll gives a named
+        # one — fell out at the `not descriptor` line before anything looked for an
+        # appearance, and a keeper's synthetic `keeper:<place>` id resolves to no resident
+        # so `resident_appearance` answered "". No appearance means no `Looks` clause in
+        # the brief and nothing for the description check to require. Their people's own
+        # body line is the fallback under both.
         if a.world_entity_id:
             a.true_name = a.name
             if not a.appearance:
-                a.appearance = names_mod.resident_appearance(world, a.world_entity_id)
+                a.appearance = (names_mod.resident_appearance(world, a.world_entity_id)
+                                or names_mod.appearance_for(world, scene.location_id, ref=ref))
             continue
         if not descriptor:
             a.true_name = a.name
+            if not a.appearance:
+                a.appearance = names_mod.appearance_for(world, scene.location_id, ref=ref)
             continue
         taken = [x.true_name for x in scene.actors.values() if getattr(x, "true_name", "")]
         taken += [x.name for x in scene.actors.values()]
@@ -4430,6 +4441,108 @@ def name_the_nameless(scene, world) -> list[str]:
             a.appearance = names_mod.appearance_for(world, scene.location_id, ref=ref)
         done.append(ref)
     return done
+
+
+def settle_descriptions(scene, beat: str, player_text: str = "") -> list[str]:
+    """Mark whoever this beat described, and return the refs it still owes a face.
+
+    The rule, from item 32 (2026-09-19): the first beat in which an undescribed person
+    acts, speaks or is addressed must say what they look like. Before this, the check ran
+    over the phrases `note_cast` booked from *this turn's* prose and nothing else, so a
+    keeper behind a counter, a scheme's cast, the opening companion and everyone promoted
+    on an earlier turn could be referred to for the rest of the campaign with no sentence
+    describing them — which is exactly what happened to Drenn Ironvale.
+
+    Someone the beat describes is marked and never asked again. Someone the beat uses
+    without describing is returned, and the caller appends their own line: the resident's
+    Appearance fact, or their people's body line, both already on the actor.
+    """
+    from .narration import faceless
+
+    if scene is None or not beat:
+        return []
+    addressed = _name_words(redact_speech(player_text or ""))
+    owed: list[str] = []
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if a.is_pc or getattr(a, "described", False):
+            continue
+        name = str(a.name or "")
+        here = _mentions(beat, name)
+        if not here and not (addressed & _name_words(name)):
+            continue
+        if here and not faceless(beat, name):
+            # The beat did the job: a sentence about them carries a body word.
+            a.described = True
+            continue
+        owed.append(ref)
+    return owed
+
+
+def _mentions(beat: str, name: str) -> bool:
+    """Is this person in the beat at all — by the last word of their name, as `faceless`
+    finds them? `faceless` answers False both for "described" and for "not there", so the
+    two cases have to be told apart before one of them is treated as the other."""
+    words = [w for w in re.findall(r"[a-z]+", str(name or "").lower()) if len(w) >= 3]
+    if not words:
+        return False
+    return bool(re.search(rf"\b{re.escape(words[-1])}s?\b", beat, re.I))
+
+
+def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
+    """Who the player just asked for a name, and the name each of them gives.
+
+    The regression this exists for (2026-09-19, "stranger on the stairs refuses to give
+    his name"): every promoted person carries a true name drawn from the world's own
+    pools, and the brief deliberately never shows it — shown the name, the narrator used
+    it before anybody had asked ("Soren's eyes narrow"). The half that was never built is
+    the other direction. Asked outright, the model had no name to give and did the only
+    thing left to it.
+
+    So the name is handed over on exactly the turn it is asked for, to exactly the person
+    asked, and never otherwise. The value is the name they give, or `""` when their
+    attitude refuses (`attitude.tells_their_name`) — a refusal the player can do something
+    about, which is what was asked for.
+
+    Who was asked, in the same order of certainty `apply_introductions` uses: the unnamed
+    person whose descriptor the player's own words name, else the only unnamed person
+    here. Never the whole room: "what is your name" with six strangers standing about is
+    a question to nobody in particular, and handing out six names is how the brief leaked
+    them in the first place.
+    """
+    from rules import attitude as attitude_mod
+
+    if scene is None or not player_text:
+        return {}
+    # The raw line, as `apply_introductions` reads it and for the same reason: the
+    # question is speech, and the redactor blanks exactly the words that ask.
+    if not _ASKS_A_NAME.search(player_text):
+        return {}
+    actors = getattr(scene, "actors", {}) or {}
+
+    def _unnamed(a) -> bool:
+        name = str(a.name or "")
+        return not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
+
+    words = _name_words(redact_speech(player_text))
+    here = [a for a in actors.values() if not a.is_pc and _unnamed(a)
+            and getattr(a, "true_name", "") and a.true_name != a.name]
+    # The BEST match, not every match, and the same rule `examined` uses. Measured live
+    # 2026-09-19 on a copy of the `masta` save: "I turn to the woman in the corner and ask
+    # her what her name is" matched both the woman in the corner and the woman, so two
+    # names were offered and the beat ended with a second stranger volunteering hers to
+    # nobody. One score short of the top is not who was asked.
+    scored = sorted(((len(words & _name_words(a.name)), a) for a in here),
+                    key=lambda pair: -pair[0])
+    asked: list = []
+    if scored and scored[0][0]:
+        top = scored[0][0]
+        best = [a for n, a in scored if n == top]
+        # A tie is a question to nobody in particular: two women, "what is your name", and
+        # there is no answering it without choosing for the player.
+        asked = best if len(best) == 1 else []
+    elif len(here) == 1:
+        asked = here
+    return {a.ref: (a.true_name if attitude_mod.tells_their_name(a) else "") for a in asked}
 
 
 def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[str, str]]:
@@ -4454,15 +4567,25 @@ def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[s
         return not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
 
     asked_words = _name_words(redact_speech(player_text or ""))
+    # The person the player asked, if they asked anybody: the most certain answer there is,
+    # and the one that was missing. Measured live 2026-09-19: asked for her name, the woman
+    # in the corner said "you may call me Gorvothor" — and the panel kept "woman in the
+    # corner". `introductions` read the speaker's head word as "low" (out of "a low,
+    # resonant grind"), her true name is "Gorvothor Kragnir" so the equality below missed
+    # the partial, and both women here answered to "woman", so every remaining branch
+    # declined. The ref was known all along; nothing asked for it.
+    was_asked = [actors[r] for r in names_asked_for(scene, player_text) if r in actors]
     for head, given in introductions(beat, asked_for_name=asked):
-        # Whose name it is, in order of certainty: the person the world holds THIS
+        # Whose name it is, in order of certainty: the person the player asked; the one the world holds THIS
         # name for (the brief gave it to them); the unnamed person the speaker's
         # head word names; the unnamed person the player addressed; the only unnamed
         # person here. Measured on the second group-3 replay (2026-09-18): six
         # descriptor-named people in the room, "'Gorvothor Kragnir,' he says" with no
         # role word in the sentence, and the panel kept "stranger".
-        who = next((a for a in actors.values() if not a.is_pc
-                    and str(getattr(a, "true_name", "")).lower() == given.lower()), None)
+        who = was_asked[0] if len(was_asked) == 1 else None
+        if who is None:
+            who = next((a for a in actors.values() if not a.is_pc
+                        and str(getattr(a, "true_name", "")).lower() == given.lower()), None)
         if who is None and head:
             who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
                         and head in _name_words(a.name)), None)

@@ -408,7 +408,12 @@ _NOT_A_GIVEN_NAME = frozenset({
 # for a name, so a quoted place or oath is not somebody introducing themselves.
 _BARE_NAME_ANSWER = re.compile(
     r"[\"'“‘]\s*([A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-]+)?)[.,]?\s*[\"'”’]\s*"
-    r"(?:he|she|they|the \w+)\s+(?:says?|grunts?|mutters?|answers?|replies|offers?|"
+    # "the woman in the corner says", not only "the woman says". A one-word descriptor was
+    # all this read, so the line the engine itself appends on 2026-09-19 — '"Gorvothor
+    # Kragnir," the woman in the corner says.' — was not recognised as an answer and the
+    # panel kept the descriptor. Measured live, run 3 of the group-7 check.
+    r"(?:he|she|they|the \w+(?:\s+\w+){0,4})\s+"
+    r"(?:says?|grunts?|mutters?|answers?|replies|offers?|"
     r"growls?|rasps?|murmurs?|finally says|says at last)", re.U)
 
 
@@ -461,6 +466,44 @@ def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, st
             role = _ROLE_WORD.search(outside)
             out.append((role.group(0).lower() if role else "", m.group(1).strip()))
     return out
+
+
+def give_the_name(text: str, offers: list[tuple[str, str]]) -> tuple[str, list[str]]:
+    """Asked outright, a beat that still gives no name gets the engine's own line.
+
+    The deterministic backstop under item 31 (2026-09-19). The brief now carries the name
+    on the turn it is asked for, but a rewrite losing must not be the end of the road —
+    46% of everything the reviewer caught used to ship anyway for exactly that reason. So
+    if the name is nowhere in the beat, the man says it himself in one plain sentence.
+
+    `offers` is [(descriptor, name)] for the people who are willing (the unwilling get no
+    line: their refusal is the fact, and the brief already told the model so). A name
+    already in the beat is left alone — the model gave it, and its own sentence is better
+    than ours.
+    """
+    added: list[str] = []
+    if not text or not offers:
+        return text, added
+    for descriptor, name in offers:
+        first = str(name or "").split()[0] if name else ""
+        if not first or re.search(rf"\b{re.escape(first)}\b", text):
+            continue
+        who = str(descriptor or "").strip() or "he"
+        lead = who if who.lower().startswith(("the ", "a ", "an ")) else f"the {who}"
+        said = f'"{name}," {lead} says.'
+        # Before the hand-back, not after it: a beat that already ends by asking the
+        # player what they do reads badly with an answer bolted on behind the question.
+        sentences = _sentences(text.rstrip())
+        if sentences and sentences[-1].rstrip().endswith("?"):
+            sentences.insert(len(sentences) - 1, said)
+            text = " ".join(sentences)
+        else:
+            text = text.rstrip()
+            if text and text[-1] not in ".!?\"'”’":
+                text += "."
+            text += " " + said
+        added.append(name)
+    return text, added
 
 
 def settle_introductions(text: str, expected: dict[str, str]) -> tuple[str, list[str]]:

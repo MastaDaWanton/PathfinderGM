@@ -950,6 +950,20 @@ class GMAgent:
         text, settled = narration_mod.settle_introductions(text, expected)
         if settled:
             repairs.append(f"the name given is the world's: {', '.join(settled)}")
+        # Asked for his name and the beat gave none: he says it himself. The brief was
+        # told the name this turn, through the `names_for` argument the view fills from
+        # `names_asked_for`; this is the backstop under that — a model with nothing to
+        # give refuses, and a refusal
+        # for no reason is the bug reported on 2026-09-19. Only the willing get a line —
+        # `names_asked_for` returns "" for anyone whose attitude refuses.
+        offers = []
+        for ref, given in judgement.names_asked_for(self.engine.scene, player_input).items():
+            who = self.engine.scene.actors.get(ref)
+            if given and who is not None:
+                offers.append((str(who.name), given))
+        text, told = narration_mod.give_the_name(text, offers)
+        if told:
+            repairs.append(f"asked and not answered: {', '.join(told)} gives their name")
         known = self._known_names() | extra
         text, unnamed = narration_mod.unname_strangers(text, known)
         if unnamed:
