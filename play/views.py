@@ -1700,7 +1700,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # The one turn a true name is shown: the turn the
                                     # player asks for it (2026-09-19, item 31).
                                     names_for=judgement.names_asked_for(c.scene,
-                                                                        player_input))
+                                                                        player_input),
+                                    # And the world's answer when the player went looking
+                                    # for somebody who is not here (item 29).
+                                    absent=judgement.absent_answer(c.scene, c.world,
+                                                                   player_input))
         # The model's own recent prose — the narrator's beats only, with the sentences
         # WE appended to them (a death line, a thread anchor) taken back out. Shown its
         # own backstop or the engine's award line as "what you narrated", the model

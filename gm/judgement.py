@@ -147,6 +147,27 @@ def redact_speech(text: str) -> str:
     return "".join(out)
 
 
+def narration_quotes_blanked(text: str) -> str:
+    """A GM beat with every line of dialogue blanked out, the same length.
+
+    The narrator's own side of the beat, which is the only part that puts people in the
+    room. `redact_speech` is the same idea for the PLAYER's input, and the length is
+    preserved for the same reason: the offsets are used afterwards — `note_cast` reads
+    spans out of the beat and asks `zone_of_mention` about them, and a shortened string
+    would point those at the wrong words.
+
+    Both quote conventions, because the narrator uses both. Apostrophes inside a word are
+    not openers: "the guard's" must not blank the rest of the paragraph.
+    """
+    line = str(text or "")
+    out = list(line)
+    for m in re.finditer(r'"[^"]*"|“[^”]*”|(?<![A-Za-z])\'[^\']*\'(?![A-Za-z])', line):
+        for i in range(m.start(), m.end()):
+            if not out[i].isspace():
+                out[i] = " "
+    return "".join(out)
+
+
 # --- What the player's words indicate -------------------------------------------------
 
 # Deliberately narrow. A false positive here costs the player a turn, so every cue has to
@@ -370,7 +391,15 @@ _INVENTED_REF = re.compile(r"^[a-z][a-z_]{2,}[ _-]?\d*$", re.I)
 # first the dog came out a watchman.
 _TEMPLATE_CUES = (
     (re.compile(r"\b(dog|hound|mastiff)\b", re.I), "guard dog"),
-    (re.compile(r"\b(watch|watchman|watchmen|guard|guards|soldier)\b", re.I), "watchman"),
+    (re.compile(r"\b(watch|watchman|watchmen|guard|guards|guardsman|guardsmen|"
+                r"soldiers?|sentr(?:y|ies)|militia)\b", re.I), "watchman"),
+    # The armed-stranger words with no block of their own in the corpus. A 13-hp thug is
+    # the right scale for a brawler in a market; the corpus's answers for these words are
+    # a CR 3 gnoll bruiser and a gillman knife-fighter, which is why `template_for` will
+    # not take them (item 30, measured 2026-09-19).
+    (re.compile(r"\b(thugs?|toughs?|brutes?|bruisers?|ruffians?|brawlers?|bravos?|"
+                r"cutthroats?|mercenar(?:y|ies)|sellswords?|swordsm[ae]n|duellists?|"
+                r"fighters?|warriors?|veterans?|hulks?|challengers?)\b", re.I), "thug"),
     # Civilians the cast ledger introduces fight like the commoners they are —
     # promoting "the Kelvaxian merchant" into a warrior statblock would make
     # every shopkeeper a bruiser.
@@ -378,6 +407,64 @@ _TEMPLATE_CUES = (
                 r"barkeep|bartender|peddler|farmer|fisherman|beggar|urchin|"
                 r"scribe|artisan)\b", re.I), "guildhand"),
 )
+
+
+def _pc_level(scene) -> int:
+    """The player's level, for the CR band a newcomer is chosen in. One is the answer for
+    a scene with no player in it (a test, an NPC-only view) and the floor everywhere."""
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    try:
+        return max(1, int(getattr(pc, "level", 1) or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def template_for(phrase: str, level: int = 1, floor: str = "guildhand") -> str:
+    """The stat block a person the prose introduced walks on with.
+
+    Four hand-written cues were the whole vocabulary, so a raider became a 4-hp guildhand
+    with a club while a Raider at 29 hp sat in the corpus, reachable by `spawn` today and
+    by nothing else (2026-09-19, item 30). `npcs.choose` bands by CR and already has a
+    townsfolk floor, so the corpus answers — but only when the block it picks IS this role.
+
+    That last condition is the whole of the care here, and it was measured before it was
+    written: asked at level 1, the chooser answers "bruiser" with a **gnoll** bruiser at
+    CR 3, "fighter" with a *gillman* knife-fighter, "veteran" with a veteran *buccaneer*
+    and "merchant" with a Tian merchant *sailor*. Matching one word and dragging a species
+    in is worse than the floor — a CR 3 gnoll walking out of a market crowd is not the
+    fiction anybody wrote. So the pick stands only when its id is the role word itself
+    (raider, brigand, bandit, guard, watchman), and everything else keeps the floor the
+    cues already gave: a dog for a dog, a watchman for the watch, a thug for a brawler.
+
+    `floor` is what nothing matching at all means -- `guildhand` for somebody the prose
+    introduced into a room, `thug` for somebody the fiction described arriving in the
+    middle of the player's own action. Four copies of that cue loop existed before this,
+    and CLAUDE.md's rule about grepping for every copy of a rule applies: they all come
+    through here now.
+    """
+    from rules import npcs
+
+    phrase = str(phrase or "")
+    # The animal cue first and unconditionally: "the guard dog" contains "guard", and the
+    # corpus answers "guard dog" with a Guard. It is a dog.
+    for cue, name in _TEMPLATE_CUES:
+        if cue.search(phrase):
+            floor = name
+            break
+    if floor == "guard dog":
+        return floor
+    head = _role_head(phrase)
+    if not head:
+        return floor
+    # Singular, because a block is one creature: "raiders" finds nothing, "raider" finds
+    # the Raider.
+    for word in (head, head[:-1] if head.endswith("s") else head):
+        if not word:
+            continue
+        got = npcs.choose(word, max(1, int(level or 1))) or {}
+        if str(got.get("id") or "").lower() == word:
+            return str(got["id"])
+    return floor
 
 
 def _can_be_fought(actor) -> bool:
@@ -729,11 +816,10 @@ def inject_fight(raw_intents, player_text: str, scene):
                 "because": "there is nobody left standing to fight"}]
         return raw_intents
 
-    template = "thug"
-    for cue, name in _TEMPLATE_CUES:
-        if cue.search(player_text or ""):
-            template = name
-            break
+    # The corpus answers where it has a block for the role word itself, and `thug` is the
+    # floor: these are people the fiction described arriving in the middle of the player's
+    # own action, not shopkeepers (`template_for`, item 30).
+    template = template_for(player_text or "", _pc_level(scene), floor="thug")
     # As many as the player's own sentence says. The measured failure: "I move
     # towards the group of guards and clansmen and get ready to fight" spawned
     # exactly one watchman, and the player fought a crowd one man at a time,
@@ -765,9 +851,18 @@ def inject_fight(raw_intents, player_text: str, scene):
     ]
 
 
+# Every number word prose actually writes, because a stated count is not a guess. Measured
+# 2026-09-19: "a band of twelve raiders" had no entry for **twelve**, so the number was
+# neither read nor stripped and the ledger booked a person literally called "twelve
+# soldier" (item 30). The teens and the tens are in for the same reason; `score` is twenty
+# and `dozen` was already here.
 _NUMBER_WORDS = {"two": 2, "both": 2, "pair": 2, "couple": 2, "three": 3,
                  "few": 3, "several": 3, "four": 4, "five": 5, "six": 6,
-                 "seven": 7, "eight": 8, "dozen": 12}
+                 "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+                 "twelve": 12, "dozen": 12, "thirteen": 13, "fourteen": 14,
+                 "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+                 "nineteen": 19, "twenty": 20, "score": 20, "thirty": 30,
+                 "forty": 40, "fifty": 50}
 _COLLECTIVE = re.compile(
     r"\b(group|gang|mob|pack|band|crowd|squad|patrol|bunch)\b", re.I)
 _PLURAL_FOES = re.compile(
@@ -802,7 +897,20 @@ def opponent_count(player_text: str) -> int:
     return 1
 
 
-def repair_unknown_refs(raw_intents, player_text: str, scene):
+def _touches_ref(raw: dict, refs: list[str]) -> bool:
+    """Does this intent name one of these refs anywhere — actor, target, or `opposed_by`?
+    The test for what to drop when the person it reaches for does not exist."""
+    if not isinstance(raw, dict):
+        return False
+    targets = raw.get("target")
+    targets = targets if isinstance(targets, list) else [targets]
+    opposed = (raw.get("params") or {}).get("opposed_by") or {}
+    named = [raw.get("actor"), *targets,
+             opposed.get("ref") if isinstance(opposed, dict) else None]
+    return any(isinstance(r, str) and r in refs for r in named)
+
+
+def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
     """Create the people the GM was already talking about, instead of losing the turn.
 
     The recurring failure: the player writes "two guild bravos come round the corner",
@@ -840,11 +948,32 @@ def repair_unknown_refs(raw_intents, player_text: str, scene):
     if not invented or any(r.get("op") == "spawn" for r in raw_intents):
         return None
 
-    template = "thug"
-    for cue, name in _TEMPLATE_CUES:
-        if cue.search(player_text or ""):
-            template = name
-            break
+    # Whose word were they created on? The narration describing people arriving is an
+    # arrival, and this repair exists for it. The PLAYER naming somebody is a question, and
+    # the world can answer it: "I turn to find the mayor" made a 13-hp Warrior-1 called
+    # *mayor* in a town that has no mayor at all (2026-09-19, item 29). So when the invented
+    # ref is a word out of the player's own sentence and the world places that person
+    # elsewhere or nowhere, nobody is created; the op is dropped and the engine prints the
+    # world's answer (`narrate_only`'s `not_here`, which `_op_narrate_only` tells).
+    sought = person_sought(player_text)
+    if sought and world is not None:
+        from rules import scope as scope_mod
+
+        for ref in invented:
+            word = re.sub(r"[\d_-]+", " ", ref).strip().lower()
+            if not word or not (_name_words(word) & _name_words(sought)):
+                continue
+            found = scope_mod.look_for(world, sought, scene,
+                                       getattr(scene, "location_id", None))
+            if found.get("scope") in (scope_mod.ELSEWHERE, scope_mod.NOWHERE):
+                kept = [dict(r) for r in raw_intents
+                        if not _touches_ref(r, invented)]
+                kept.append({"op": "narrate_only",
+                             "because": "the player looked for somebody who is not here",
+                             "params": {"not_here": found["line"]}})
+                return kept
+
+    template = template_for(player_text or "", _pc_level(scene), floor="thug")
 
     # How many, from how many the GM itself named. Not from the player's sentence: the
     # player does not decide how many enemies are round the corner.
@@ -1138,11 +1267,9 @@ def repair_misaimed_attack(raw_intents, player_text: str, scene):
     if not any(_aims_wrong(raw) for raw in raw_intents):
         return None
 
-    template = "thug"
-    for cue, name in _TEMPLATE_CUES:
-        if cue.search(victim_phrase) or cue.search(player_text):
-            template = name
-            break
+    template = template_for(victim_phrase, _pc_level(scene), floor="")
+    if not template:
+        template = template_for(player_text, _pc_level(scene), floor="thug")
 
     from rules.bestiary import next_ref
 
@@ -1720,12 +1847,12 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
         swap = living[0]
         out = [dict(r, target=swap) if r in targets_dead else r for r in raw_intents]
         return out
-    template = None
-    for cue, name in _TEMPLATE_CUES:
-        if cue.search(player_text or ""):
-            template = name
-            break
-    if template is None:
+    # No floor on purpose: nothing recognised in the player's words means nobody new, and
+    # the blow stands as kicking the fallen. The words the corpus knows now reach here too
+    # ("the raiders keep coming" finds a Raider), which is the same widening item 30 asked
+    # for everywhere else.
+    template = template_for(player_text or "", _pc_level(scene), floor="")
+    if not template:
         return None                       # kicking the fallen: let it stand
     from rules.bestiary import next_ref
 
@@ -3538,12 +3665,7 @@ def repair_bare_spawns(raw_intents, player_text: str):
                         params["template"] = str(params.pop(said))
                         break
             if not params.get("template"):
-                template = "thug"
-                for cue, name in _TEMPLATE_CUES:
-                    if cue.search(player_text or ""):
-                        template = name
-                        break
-                params["template"] = template
+                params["template"] = template_for(player_text or "", floor="thug")
             r = dict(r, params=params)
         out.append(r)
     return out
@@ -3750,6 +3872,17 @@ def player_departs(player_text: str) -> bool:
 
 # --- The cast ledger: people the prose introduced, held as scene state ----------------
 
+# How many bodies a beat's prose may put on the board. The cap is about the PANEL and the
+# board — four promoted civilians standing is a scene, twelve is a flood — and it is not a
+# claim about the fiction: the ledger keeps the number the prose said (`_SAID_CAP`), so
+# `cast_brief` tells the model twelve raiders when twelve arrived. Item 33 is what resolves
+# the tension properly: twelve raiders are one unit of twelve, not twelve actors.
+_PROMOTED_CAP = 4
+# What a ledger entry may say arrived. High, because it is a record and not a roster; a
+# number past this is prose being rhetorical ("a thousand of them"), not a head-count.
+_SAID_CAP = 60
+
+
 _CAST_ROLES = ("servants?|apprentices?|"
                "merchants?|traders?|vendors?|stall ?keepers?|shopkeepers?|"
                "guards?|guardsmen|guardsman|watchmen|watchman|watchwoman|"
@@ -3764,11 +3897,21 @@ _CAST_ROLES = ("servants?|apprentices?|"
                # sunder went to a named resident who happened to be standing there.
                "brutes?|bruisers?|ruffians?|challengers?|veterans?|hulks?|giants?|"
                "drunks?|dockhands?|sailors?|"
+               # The words prose uses for armed strangers arriving, none of which were
+               # here. Measured 2026-09-19: "a band of twelve raiders" booked NOTHING —
+               # no ledger entry, no actor, not even a mention in `cast_brief` — while
+               # the bestiary has shipped a Raider at 29 hp all along (item 30). And
+               # `figures?`, because the reported beat's own words were "a line of
+               # figures silhouetted against the gray morning light", which matched
+               # nothing, so there was never a booked word for the next beat to
+               # contradict.
+               "raiders?|brigands?|bandits?|reavers?|marauders?|outlaws?|looters?|"
+               "sellswords?|cutthroats?|deserters?|pirates?|bravos?|riders?|figures?|"
                "men|man|women|woman|boys?|girls?|people|folk")
 # A crowd is people. Counted where the prose counts them, capped by the same
 # reading the fight injector uses for an uncounted group.
 _CAST_GROUP = re.compile(
-    r"\b(?:group|band|gang|pack|knot|circle|cluster|party|"
+    r"\b(?:group|band|gang|pack|knot|circle|cluster|party|column|line|row|score|"
     r"pair|trio|handful)\s+of\s+(?:\w+\s+){0,2}(?:" + _CAST_ROLES + r")\b",
     re.I)
 # Any-case adjectives, in any order: "an elderly Kelvaxian vendor" has the
@@ -3782,9 +3925,17 @@ _CAST_GROUP = re.compile(
 # resolved to a bystander, and a boy died. One optional article-led phrase: an optional
 # participle or material or colour, then one noun, so "in the doorway watches" stops
 # at the doorway and never books the verb.
+# The words that can only be a QUALITY of the thing, never the thing. Named as a set as
+# well as in the pattern, because the pattern can stop on one of them: "a man in a heavy,
+# grease-stained leather apron" has a comma where the pattern wants the noun, so the tail
+# came out " in a heavy" and the ledger booked a person called **man in a heavy** (measured
+# live 2026-09-19). A description that ends on an adjective is not a description; the tail
+# is dropped and the man is a man.
+_TAIL_ADJECTIVES = ("leather", "iron", "steel", "red", "black", "grey", "gray", "white",
+                    "blue", "green", "brown", "dark", "heavy", "ragged", "torn", "fine",
+                    "plain", "long", "short", "broad")
 _CAST_TAIL = (r"(\s+(?:in|with)\s+(?:a|an|the)\s+"
-              r"(?:(?:[a-z]+(?:ed|en)|leather|iron|steel|red|black|grey|gray|white|"
-              r"blue|green|brown|dark|heavy|ragged|torn|fine|plain|long|short|broad)"
+              r"(?:(?:[a-z]+(?:ed|en)|" + "|".join(_TAIL_ADJECTIVES) + r")"
               r"\s+)?[a-z]+)?")
 _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
@@ -3921,9 +4072,19 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
     beat are read into `scene.cast`; the brief feeds them back as fact. Capped,
     deduplicated on the role's head word, and never containing anyone who is
     already a real actor.
+
+    **Narration only.** Found live 2026-09-19 during group 7's check (item 34): the beat
+    said, of the woman the player was asking her name, *"Most just call me the stranger"* —
+    and a new person called **stranger** was booked and promoted onto the board, out of her
+    own words about herself. What a character SAYS is not what the room contains: a person
+    talked about is not a person present, and even a genuine announcement ("'Three raiders
+    are coming!' he shouts") is a warning about people who have not arrived yet. The prose
+    puts people in the room; dialogue does not. The blanked span keeps its length, so every
+    offset below — the group spans, `zone_of_mention` — still lines up with the original.
     """
     if scene is None or not gm_beat:
         return []
+    gm_beat = narration_quotes_blanked(gm_beat)
     real = " ".join(a.name.lower() for a in scene.actors.values())
     real_names = {a.name.lower() for a in scene.actors.values()}
     heads = {str(e.get("who", "")).split()[-1].lower() for e in scene.cast}
@@ -3955,8 +4116,12 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
             continue
         heads.add(head)
         spans.append(m.span())
+        # The ledger records what the prose said — twelve is twelve. The cap belongs to
+        # promotion, where bodies are made, not to the record of what arrived: clamping
+        # here meant nothing downstream could ever know the fiction said twelve, and
+        # `cast_brief` then told the model four (item 30). Item 33's unit reads this number.
         scene.cast.append({"who": role, "turn": int(turn),
-                           "count": max(1, min(n, _PROMOTED_CAP)),
+                           "count": max(1, min(n, _SAID_CAP)),
                            "zone": zone_of_mention(gm_beat, *m.span())})
         added.append(role)
     for m in _CAST_INTRO.finditer(gm_beat):
@@ -4009,6 +4174,14 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         # so two men with different descriptions are two men. The head stays the
         # role word: it is what the dedup and the fight cues read.
         tail = " ".join((m.group(2) or "").split())
+        # A description cut off mid-phrase is not a description. Measured live 2026-09-19:
+        # "a man in a heavy, grease-stained leather apron" booked a person called **man in
+        # a heavy**, because the comma stood where the pattern wanted the noun. The comma is
+        # the signal and the word is not: "the man in the scarred leather" ends on the same
+        # word list and is a whole description, which the first version of this cut.
+        if tail and tail.split()[-1].lower() in _TAIL_ADJECTIVES \
+                and gm_beat[m.end():m.end() + 1] in (",", "-"):
+            tail = ""
         if tail:
             who = f"{who} {tail}"
         # Dedup on the head word ONLY for a bare repeat. "the man" after "desperate
@@ -4035,14 +4208,89 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
     return added
 
 
+# The armed-stranger words, as one family. Inside a family a beat may not rename anybody:
+# soldiers do not become raiders between one paragraph and the next, which is what the
+# player reported on 2026-09-19 ("they were initially described as soldiers and then became
+# raiders"). Across families it is left alone — a merchant who turns out to be a thug is a
+# turn of the story, not a slip of the pen.
+_ARMED_FAMILY = frozenset({
+    "soldier", "soldiers", "raider", "raiders", "brigand", "brigands", "bandit", "bandits",
+    "reaver", "reavers", "marauder", "marauders", "outlaw", "outlaws", "looter", "looters",
+    "mercenary", "mercenaries", "sellsword", "sellswords", "warrior", "warriors",
+    "fighter", "fighters", "swordsman", "swordsmen", "guard", "guards", "guardsman",
+    "guardsmen", "watchman", "watchmen", "thug", "thugs", "brute", "brutes", "ruffian",
+    "ruffians", "tough", "toughs", "bruiser", "bruisers", "pirate", "pirates",
+    "cutthroat", "cutthroats", "deserter", "deserters", "bravo", "bravos", "rider",
+    "riders", "figure", "figures",
+})
+
+
+def hold_the_booked_word(scene, text: str) -> tuple[str, list[str]]:
+    """A band the ledger booked keeps the word it was booked under.
+
+    The drift was held by nothing at all: one sentence of prompt text in `cast_brief`
+    ("keep them consistent, do not re-introduce them") and no mechanical check anywhere.
+    Measured on the reported turn — the scene opened on "the soldiers ahead of you" and by
+    the next beat they were raiders, with nothing comparing the second word to the first.
+
+    Narrow on purpose. It fires only when the ledger holds exactly ONE armed group, the
+    beat uses a DIFFERENT armed word, and that word is booked nowhere — so a beat naming
+    both soldiers and raiders is describing two bands and is left alone, and so is a beat
+    introducing the first of anything. Speech is untouched: a character may call them
+    whatever they like.
+    """
+    entries = [e for e in (getattr(scene, "cast", None) or [])
+               if _role_head(str(e.get("who", ""))) in _ARMED_FAMILY]
+    if not text or len(entries) != 1:
+        return text, []
+    booked = _role_head(str(entries[0].get("who", "")))
+    booked_all = {_role_head(str(e.get("who", ""))) for e in (getattr(scene, "cast", None) or [])}
+    booked_all |= {str(a.name).lower() for a in (getattr(scene, "actors", {}) or {}).values()}
+    swapped: list[str] = []
+    # Narration only, never a line of dialogue — the same split `creature_nouns_for_pc`
+    # uses, and for the same reason: his words are his.
+    parts = re.split(r'("[^"]*"|“[^”]*”|\'[^\']*\')', text)
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2:
+            out.append(part)
+            continue
+        for word in sorted(_ARMED_FAMILY, key=len, reverse=True):
+            if word == booked or word in booked_all:
+                continue
+            if not re.search(rf"\b{word}\b", part, re.I):
+                continue
+            # Plural for plural, singular for singular: the booked word carries its own
+            # number, and "the raiders" must not become "the soldier".
+            replacement = booked
+            if word.endswith("s") and not booked.endswith("s"):
+                replacement = booked + "s"
+            elif not word.endswith("s") and booked.endswith("s"):
+                replacement = booked[:-1]
+            part = re.sub(rf"\b{word}\b", replacement, part, flags=re.I)
+            swapped.append(f"{word} -> {replacement}")
+        out.append(part)
+    return "".join(out), swapped
+
+
 def cast_brief(scene) -> str:
     """The ledger as a line of fact for the prose call, or ""."""
     entries = getattr(scene, "cast", None) or []
     if not entries:
         return ""
-    names = "; ".join(str(e.get("who")) for e in entries if e.get("who"))
-    return (f"ALSO PRESENT, introduced earlier (fact, keep them consistent, do "
-            f"not re-introduce them): {names}.")
+    # With the number the prose said, which the ledger holds again since item 30: a band of
+    # twelve is twelve in the fiction whatever the board can hold, and the model was being
+    # told four. The word is the word they were booked under — `hold_the_booked_word`
+    # repairs a beat that renames them, and this is what it repairs to.
+    bits = []
+    for e in entries:
+        who = str(e.get("who") or "")
+        if not who:
+            continue
+        n = int(e.get("count", 1) or 1)
+        bits.append(f"{who} ×{n}" if n > 1 else who)
+    return (f"ALSO PRESENT, introduced earlier (fact, keep them consistent, keep the "
+            f"same word for them, do not re-introduce them): {'; '.join(bits)}.")
 
 
 # A bystander the prose has just put into the fight. The verbs are the ones a beat
@@ -4312,7 +4560,6 @@ def inject_company(raw_intents, player_text: str, scene):
                         "zone": "engaged"}}] + list(raw_intents)
 
 
-_PROMOTED_CAP = 4
 
 
 # The sentence that makes somebody the player's opponent-to-be: they step up, square
@@ -4365,6 +4612,87 @@ def challengers(beat: str, phrases) -> list[str]:
             # sentence between them was the one tensing.
             last_named = None
     return out
+
+
+# The player going to look for somebody. Verbs of seeking and addressing, because both
+# assume the person is there: "I turn to find the mayor" and "I ask the mayor for a reward"
+# were the same turn on 2026-09-19, and the second is the one that produced a 13-hp Warrior
+# called *mayor*.
+_LOOKS_FOR = re.compile(
+    r"\bI\s+(?:turn\s+to\s+find|turn\s+to|look\s+for|looks\s+for|search\s+for|seek\s+out|"
+    r"seek|find|approach|approaches|go\s+to|walk\s+up\s+to|speak\s+to|speaks\s+to|"
+    r"talk\s+to|talks\s+to|ask|asks|address|addresses|call\s+for|calls\s+for|summon|"
+    r"summons|look\s+around\s+for)\s+"
+    r"(?:the|a|an|my|to\s+the)?\s*([A-Za-z][A-Za-z' -]{2,40}?)"
+    r"(?=[,.!?;]|\s+(?:and|about|for|to|if|that|what|where|who|whether|why|how)\b|$)",
+    re.I)
+
+
+def person_sought(player_text: str) -> str:
+    """The person the player's own sentence goes looking for, or "".
+
+    Read off the player's words, not the model's: item 29 is about *whose word* somebody
+    exists on. The narration describing people arriving is an arrival and legitimate; the
+    player naming somebody is a question, and a question may be answered "no".
+    """
+    m = _LOOKS_FOR.search(redact_speech(player_text or ""))
+    if not m:
+        return ""
+    phrase = " ".join(m.group(1).split())
+    # "the mayor of the town" is the mayor; "the stranger his name" is the stranger. The
+    # capture runs to the next clause word, and neither tail is part of who they are.
+    phrase = re.split(r"\s+(?:of|his|her|their|its|my|your)\s+", phrase, maxsplit=1)[0]
+    return phrase.strip(" -'")
+
+
+def absent_answer(scene, world, player_text: str, location_id: str | None = None) -> str:
+    """The world's own sentence for a person the player named who is not here, or "".
+
+    Empty for the two cases that are nobody's problem: they ARE here (much the commonest),
+    and the phrase names nobody the world could rule on ("the man", "somebody"). Otherwise
+    one of scope's two refusals, which the brief states as fact before the prose is written
+    and the engine prints as a refusal if an op tried to reach them.
+    """
+    from rules import scope as scope_mod
+
+    phrase = person_sought(player_text)
+    if not phrase:
+        return ""
+    where = location_id if location_id is not None else getattr(scene, "location_id", None)
+    found = scope_mod.look_for(world, phrase, scene, where)
+    return str(found.get("line") or "")
+
+
+def answer_the_absent(raw_intents, player_text: str, scene, world=None):
+    """The world's answer is stated on every turn the player looks for somebody absent.
+
+    Measured live 2026-09-19, twice: with the fact in the brief the model stopped inventing
+    the mayor — and then said nothing about him either. "I find the mayor and grab him by
+    the collar" came back as a plain `narrate_only` and a paragraph about the room, so the
+    reported half of the bug was fixed and the *asked* half was not: the ruling was that
+    the game should say the player could not find them.
+
+    `repair_unknown_refs` can only answer when the model reached for a ref; this answers
+    whether it did or not, which is the difference between a behaviour and a rule. The
+    sentence rides on `narrate_only`'s `not_here` — stamped onto the one the plan already
+    wrote, or appended — and `_op_narrate_only` prints it.
+    """
+    if not isinstance(raw_intents, list) or scene is None or world is None:
+        return raw_intents
+    if any(isinstance(r, dict) and (r.get("params") or {}).get("not_here")
+           for r in raw_intents):
+        return raw_intents
+    said = absent_answer(scene, world, player_text)
+    if not said:
+        return raw_intents
+    out = [dict(r) if isinstance(r, dict) else r for r in raw_intents]
+    for raw in out:
+        if isinstance(raw, dict) and str(raw.get("op", "")).lower() == "narrate_only":
+            raw["params"] = dict(raw.get("params") or {}, not_here=said)
+            return out
+    return out + [{"op": "narrate_only",
+                   "because": "the player looked for somebody who is not here",
+                   "params": {"not_here": said}}]
 
 
 _ASKS_A_NAME = re.compile(r"\b(?:your|his|her|their|the)\s+name\b|\bwho are you\b|"
@@ -4623,10 +4951,16 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     """
     from rules.bestiary import instantiate
 
-    if scene is None or not added or getattr(scene, "in_encounter", False):
-        # Mid-fight, bystanders stay prose: joining a battle takes the spawn op's
-        # initiative bookkeeping, not a quiet walk-on.
+    if scene is None or not added:
         return []
+    # Mid-fight they used to stay prose — "joining a battle takes the spawn op's
+    # initiative bookkeeping, not a quiet walk-on" — and the consequence, measured
+    # 2026-09-19, was that a band arriving mid-battle put **zero** bodies on the board,
+    # which is exactly the turn where it matters most (item 30). They arrive now, and the
+    # bookkeeping rule is kept rather than broken: they walk on as bystanders, in the room
+    # and outside the initiative, and the two doors into a fight that already exist take
+    # them from there — `joiners` when the beat says they draw, `attacked_by` when the beat
+    # says they strike. Nobody is quietly inserted into the order.
     # The cap counts the promoted civilians STANDING, not the ledger entries that
     # still remember them. Measured 2026-09-18: the ledger is cleared after every
     # fight and the actors are not, so the count restarted at zero while nine
@@ -4657,12 +4991,7 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     for phrase in wanted:
         if len(standing) + len(made) >= _PROMOTED_CAP and phrase not in fronted:
             break
-        template = "guildhand"
-        for cue, name in _TEMPLATE_CUES:
-            if cue.search(phrase):
-                template = name
-                break
-        actor = instantiate(template, scene=scene, name=phrase)
+        actor = instantiate(template_for(phrase, _pc_level(scene)), scene=scene, name=phrase)
         # Through the door. The fallback that wrote `scene.actors` directly would now
         # write into a derived view and vanish; `add` stamps the place and the zone —
         # the zone the prose put them in, so the map lays them out where the words did.

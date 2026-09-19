@@ -733,7 +733,8 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
-                known=(), recent=None, secret=False, turn=0, names_for=None) -> str:
+                known=(), recent=None, secret=False, turn=0, names_for=None,
+                absent: str = "") -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -827,6 +828,15 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     seen = _judgement.heat_brief(scene)
     if seen:
         lines.append("\n" + seen)
+
+    # The player went looking for somebody who is not here, and the world has an answer.
+    # Stated before the cast, as fact, because the failure was a model answering a question
+    # the world had already answered: "I turn to find the mayor" produced "The mayor stands
+    # before you, his heavy woolen cloak still smelling of woodsmoke" in a town whose
+    # authority is a reeve and which has no mayor at all (2026-09-19, item 29).
+    if absent:
+        lines.append(f"\nWHO THE PLAYER LOOKED FOR AND IS NOT HERE (fact, and the beat "
+                     f"says so — nobody arrives to satisfy the sentence): {absent}")
 
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():

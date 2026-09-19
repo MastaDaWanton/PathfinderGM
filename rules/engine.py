@@ -2242,6 +2242,14 @@ class Engine:
     # narrate_only ---------------------------------------------------------------------
 
     def _op_narrate_only(self, intent: Intent, partial: dict) -> Outcome:
+        # Ordinarily a narrate_only turn carries no tell, which is the point of it. The one
+        # exception is the world's answer to a person the player looked for and who is not
+        # here: there is no ref to hang a refusal on — that is exactly what is being said —
+        # so the sentence rides here, and the narrator is fed a fact rather than left to
+        # conjure somebody to satisfy the sentence (2026-09-19, item 29).
+        said = " ".join(str(intent.params.get("not_here") or "").split())
+        if said:
+            return self._refuse(intent, said)
         return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                        tell="", because=intent.because)
 
