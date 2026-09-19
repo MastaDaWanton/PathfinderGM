@@ -99,6 +99,35 @@ def award_for_fallen(scene, pc) -> tuple[int, list[str]]:
             if got:
                 total += got
                 names.append(_definite(foe.name))
+    # And the crowds, whose members die one at a time. A unit pays for the members who
+    # FELL, whether or not the rest are still standing and whether or not they ran: eight
+    # raiders dead and four fled is not mercy, and paying nothing for it is the answer the
+    # player would notice first (item 33, 2026-09-19). A unit wiped out is caught above by
+    # its hit points, so it is counted here only for what the loop did not already pay.
+    from . import troops as troops_mod
+
+    for ref, foe in (scene.actors or {}).items():
+        unit = getattr(foe, "troop", None)
+        if unit is None or ref in mine or foe.is_pc:
+            continue
+        if not (foe.hp > 0 and not foe.is_down) and ref in {
+                r for s, refs in scene.sides.items() if pc.ref not in refs for r in refs}:
+            continue                      # already paid for as a fallen actor
+        owed = troops_mod.xp_owed(unit)
+        if owed:
+            total += owed
+            names.append(f"{unit.fallen} of {_definite(foe.name)}")
+    # A unit that ROUTED is no longer in the scene to be asked — it left the board with its
+    # survivors — so the engine wrote the debt down where the scene remembers things
+    # (`Engine._rout`), and this is where it is settled.
+    for gone in (scene.said.get("routed_xp") or []) if getattr(scene, "said", None) else []:
+        if not isinstance(gone, dict):
+            continue
+        owed = max(0, int(gone.get("xp", 0) or 0))
+        if owed:
+            total += owed
+            names.append(f"{int(gone.get('fallen', 0) or 0)} of "
+                         f"{_definite(str(gone.get('who') or 'them'))}")
     return total, names
 
 

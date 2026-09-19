@@ -350,6 +350,12 @@
   #map .token.ally { fill: #6fc276; stroke: #1f4a26; }
   #map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
   #map .token.down { opacity: .35; }
+  /* A crowd held as one actor (item 33). Hatched rather than solid, and dashed at the
+     edge, because a filled 3x3 block reads as one big creature — the whole point is that
+     it is many people standing together. The colour still says which side they are on. */
+  #map .token.unit { stroke-dasharray: 4 3; stroke-width: 1.5; }
+  #map .token.unit.foe { fill: url(#unithatch-foe); }
+  #map .token.unit.bystander { fill: url(#unithatch-quiet); }
   #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
                   pointer-events: none; }
   .maplegend { margin-top: 4px; }
@@ -2339,13 +2345,19 @@ function renderMap(s) {
     // the level selector saying "not who you are looking at" rather than "not there".
     const mine = (a.at.length > 2 ? a.at[2] : 0) === MAP_LEVEL;
     const ghost = mine ? "" : " offlevel";
-    parts.push(`<rect class="token${side}${down ? " down" : ""}${ghost}"
+    // A crowd is many people, and a plain filled block of nine squares reads as one big
+    // creature (item 33). The unit gets a hatched fill and its count on the glyph, so a
+    // 3x3 of townsfolk cannot be mistaken for a giant.
+    const unit = a.members != null;
+    parts.push(`<rect class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}"
       x="${c * CELL + 2}" y="${r * CELL + 2}"
       width="${n * CELL - 4}" height="${n * CELL - 4}" rx="3">
       <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
+        unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
         a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></rect>`);
     parts.push(`<text class="tok" x="${(c + n / 2) * CELL}" y="${
-      (r + n / 2) * CELL + 4}">${esc(a.name.slice(0, 1).toUpperCase())}</text>`);
+      (r + n / 2) * CELL + 4}">${unit ? a.members
+        : esc(a.name.slice(0, 1).toUpperCase())}</text>`);
   }
 
   // The same board, drawn two ways. Both read the one geometry payload and both write
@@ -2356,7 +2368,18 @@ function renderMap(s) {
                      { turn: MAP_TURN, level: MAP_LEVEL,
                        reach: !!(STATE.scene && STATE.scene.in_encounter) })
     : `<svg id="map" viewBox="0 0 ${g.width * CELL} ${g.height * CELL}"
-         preserveAspectRatio="xMidYMid meet">${parts.join("")}</svg>`;
+         preserveAspectRatio="xMidYMid meet"><defs>
+         <pattern id="unithatch-foe" width="6" height="6" patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(45)">
+           <rect width="6" height="6" fill="#7d1a14"></rect>
+           <line x1="0" y1="0" x2="0" y2="6" stroke="#e0261e" stroke-width="3"></line>
+         </pattern>
+         <pattern id="unithatch-quiet" width="6" height="6" patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(45)">
+           <rect width="6" height="6" fill="#d9d2c2"></rect>
+           <line x1="0" y1="0" x2="0" y2="6" stroke="#f7f2e6" stroke-width="3"></line>
+         </pattern>
+       </defs>${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
   const picker = levels.length > 1
     ? `<div class="levelpick"><span class="sub">Looking at</span>${levels.map(v =>

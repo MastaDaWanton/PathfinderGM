@@ -1531,7 +1531,12 @@ def test_a_crowd_is_people():
     # `cast_brief` told the model four (item 30). The cap now lives where bodies are made.
     assert s.cast[0]["count"] == 6
     judgement.promote_cast(s, added)
-    assert len([a for a in s.actors.values() if not a.is_pc]) == 4
+    # ONE unit of six since 2026-09-19, not four bodies standing in for six: a crowd of five
+    # or more arrives as a troop with the combined hit points of its members, which is what
+    # finally settled the cap's argument with the fiction (item 33, tests/test_the_crowd.py).
+    bodies = [a for a in s.actors.values() if not a.is_pc]
+    assert len(bodies) == 1
+    assert bodies[0].troop is not None and bodies[0].troop.members == 6
 
     # A group and a singleton in one beat are three people, not four.
     s2 = Scene()

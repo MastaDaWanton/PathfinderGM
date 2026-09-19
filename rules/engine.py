@@ -28,6 +28,7 @@ from . import ingredients as ing_mod
 from . import resources
 from . import states
 from . import survival
+from . import troops as troops_mod
 from . import water
 from . import worldclass
 from . import grid as gridmod
@@ -2751,6 +2752,19 @@ class Engine:
             # knows even less about than it knows the target. `rules/position.py`.
             atk_mods = atk_mods + position_mod.attack_mods(
                 self.scene, actor, defender, weapon)
+
+            # A crowd makes no attack roll. Pathfinder's troop subtype: instead of attacks,
+            # "they deal automatic damage to any creature within reach or whose space they
+            # occupy at the end of their move, with no attack roll needed." It also solves a
+            # real engine problem the player would have met immediately — twelve raiders
+            # would otherwise be twelve NPC turns and twelve rolls a round.
+            if state["stage"] == "attack" and getattr(actor, "troop", None) is not None:
+                state["tells"].append(
+                    f"{actor.name} are all around {defender.name} — no single blow to "
+                    f"parry, and no roll to make.")
+                state["hit_total"] = 0
+                state["crit"] = False
+                state["stage"] = "damage"
 
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(
@@ -6071,7 +6085,19 @@ class Engine:
                 state["tells"].append(
                     f"{target.name} recovers {healed} hit points.")
             elif amount > 0:
+                # A crowd is immune to a spell that picks out a number of creatures and
+                # takes half again from one that fills an area — both troop rules, both
+                # answered by the spell's own text (item 33). The immunity is stated rather
+                # than silent: a caster who wastes a slot on it must be told why.
+                unit = getattr(target, "troop", None)
+                if unit is not None and plan.get("targets_counted"):
+                    state["tells"].append(
+                        f"{spell.name} picks out single creatures, and {target.name} is a "
+                        f"crowd: it finds no one target among them and is wasted.")
+                    state["i"] += 1
+                    continue
                 hit = self._apply_damage(target, amount, plan["damage_type"],
+                                         traits=("area",) if plan.get("area") else (),
                                          lethality=plan["lethality"])
                 hit["origin"] = f"spell:{spell.id}"
                 state["effects"].append(hit)
@@ -6932,6 +6958,10 @@ class Engine:
         # floor and nobody picked it up.
         coin = self._settle_treasure()
         total, names = xp_mod.award_for_fallen(self.scene, pc)
+        # Paid once. The routed units' debt is remembered on the scene because they are gone
+        # from it (`_rout`), and a second fight in the same room must not pay for the first
+        # one's dead a second time.
+        self.scene.said.pop("routed_xp", None)
         if not total:
             # A fight that killed something and paid nothing has to say so. Silence
             # reads as "this fight was not worth anything", and the real reason is
@@ -8011,6 +8041,24 @@ class Engine:
         from .bestiary import instantiate  # local import: bestiary is data, not core
 
         made = []
+        # A crowd arrives as ONE actor with the combined hit points of its members — the
+        # troop (item 33, 2026-09-19). Five and up, because below that they arrive as
+        # themselves and `split_collective_name`'s ruling about a pair of guards still
+        # holds. A named individual is never a unit: "Drenn Ironvale" times eight is eight
+        # of somebody, which is not a thing the fiction ever means.
+        if int(count) >= troops_mod.UNIT_FROM and not from_entity_id:
+            unit = troops_mod.form(template, int(count), scene=self.scene, name=name or "")
+            self.scene.add(unit)
+            made.append({"ref": unit.ref, "name": unit.name,
+                         "members": int(unit.troop.members)})
+            if self.scene.in_encounter:
+                init = self.dice.d20(unit.initiative_modifiers(),
+                                     label=f"{unit.name} initiative", visibility="hidden")
+                self.scene.initiative.append((unit.ref, init.total))
+                self.scene.initiative.sort(key=lambda t: -t[1])
+                self.scene.sides.setdefault(
+                    side or ("pc" if unit.is_pc else "them"), []).append(unit.ref)
+            return made
         for n in range(max(1, int(count))):
             actor = instantiate(template, scene=self.scene, name=name,
                                 world_entity_id=from_entity_id, index=n)
@@ -8176,13 +8224,86 @@ class Engine:
 
     def _land(self, pk: Packet) -> dict:
         target = self.scene.actors[pk.target]
-        d = target.take_damage(pk.amount, pk.dtype, pk.traits, pk.lethality)
+        amount = pk.amount
+        # "A troop takes half again as much damage (+50%) from spells or effects that affect
+        # an area" — the rule that makes a fireball feel right against a crowd, and the
+        # reason a caster has something better to do than pick members off one at a time.
+        # Applied before the packet lands, because it multiplies what was DEALT: the same
+        # order `take_damage` gives vulnerability, and for the same reason.
+        unit = getattr(target, "troop", None)
+        if unit is not None:
+            mult = troops_mod.damage_multiplier(unit, pk.traits)
+            if mult != 1.0:
+                amount = int(amount * mult)
+        d = target.take_damage(amount, pk.dtype, pk.traits, pk.lethality)
         effect = self._describe_damage(target, d, pk.lethality)
+        if unit is not None:
+            effect.update(self._unit_took_it(target, d))
         if pk.notes:
             effect["intercepted"] = pk.notes
             through = guards_mod.describe(pk.notes)
             effect["note"] = f"{effect['note']}, {through}" if effect["note"] else through
         return effect
+
+    def _unit_took_it(self, target: Actor, d: dict) -> dict:
+        """What a blow did to a crowd: how many fell, and whether the rest ran.
+
+        Both halves in one place, because they are one event to the player — "three raiders
+        go down; the nine still standing scatter and run" is one sentence. The attrition
+        itself is already done (`Actor.take_damage` is the one writer); this is the morale
+        check on top of it, and the check is the one moment a unit needs dice of its own.
+
+        Basic D&D's rule, unchanged: 2d6 against the morale score, higher and they run, and
+        the two moments are the first death and half the group down. Pathfinder has no
+        general morale rule, which is why its troops can only be destroyed — and "run away
+        and scatter" is what was asked for.
+        """
+        unit = target.troop
+        fell = int(d.get("fell", 0) or 0)
+        out: dict = {"fell": fell, "members": int(unit.members),
+                     "members_max": int(unit.members_max)}
+        tell = troops_mod.tell_of(unit, target.name, fell)
+        moment = troops_mod.owes_a_check(unit, fell)
+        if moment and unit.members > 0:
+            roll = self.dice.roll(troops_mod.MORALE_DICE,
+                                  label=f"{target.name} morale ({moment})",
+                                  visibility="hidden")
+            if not troops_mod.morale_holds(unit, roll.total, moment):
+                out["routed"] = True
+                tell = f"{tell} {troops_mod.rout_tell(target.name, unit)}".strip()
+                self._rout(target)
+        if tell:
+            out["unit_note"] = tell
+        return out
+
+    def _rout(self, target: Actor) -> None:
+        """A unit whose morale broke leaves the board and the fight.
+
+        The survivors scatter, which is the request's own word. They are not killed and they
+        are not spared either: `troops.xp_owed` pays for the ones who fell, because eight
+        dead and four fled is not mercy and paying nothing for it would be the answer the
+        player would notice first.
+        """
+        if self.scene.in_encounter:
+            for refs in (self.scene.sides or {}).values():
+                if target.ref in refs:
+                    refs.remove(target.ref)
+            self.scene.initiative = [(r, v) for r, v in self.scene.initiative
+                                     if r != target.ref]
+        self.scene.positions.pop(target.ref, None)
+        # The debt outlives them. They are about to leave the scene, and the experience for
+        # the ones who died has not been paid yet — a fight's XP settles on the way OUT of
+        # an encounter — so the amount is remembered where the scene remembers things.
+        owed = troops_mod.xp_owed(target.troop)
+        if owed:
+            ledger = list(self.scene.said.get("routed_xp") or [])
+            ledger.append({"who": str(target.name), "fallen": int(target.troop.fallen),
+                           "xp": int(owed)})
+            self.scene.said["routed_xp"] = ledger
+        # Off the board through the one destroyer, which takes the relational state with
+        # them (guards at either end, wards, compulsions). They ran; they are not a body
+        # lying here, and leaving them in the scene at 1 hp would make them a target.
+        self.scene.remove(target.ref)
 
     def _describe_damage(self, target: Actor, d: dict, lethality: str) -> dict:
         return {
