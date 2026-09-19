@@ -126,11 +126,22 @@ KITS: dict[str, dict] = {
 }
 
 
+# The collective words prose writes, and every number word it writes them with. Measured
+# 2026-09-19 (item 30): "a band of twelve raiders" read as four, because the number words
+# stopped at six and the collectives at "bunch" — so "a line of figures" and "a column of
+# soldiers" were not collectives at all, and twelve was neither read nor stripped, leaving
+# the ledger holding a person called "twelve soldier".
 _COLLECTIVE_NAME = re.compile(
-    r"^(?:a\s+|the\s+)?(pair|couple|duo|two|trio|three|four|five|six|group|band|"
-    r"gang|mob|pack|squad|patrol|crowd|bunch)\s+of\s+(.+)$", re.I)
+    r"^(?:a\s+|the\s+)?(pair|couple|duo|two|trio|three|four|five|six|seven|eight|nine|"
+    r"ten|eleven|twelve|dozen|score|group|band|gang|mob|pack|squad|patrol|crowd|bunch|"
+    r"knot|circle|cluster|party|column|line|row|handful|throng|host|swarm)\s+of\s+(.+)$",
+    re.I)
 _COLLECTIVE_COUNTS = {"pair": 2, "couple": 2, "duo": 2, "two": 2, "trio": 3,
-                      "three": 3, "four": 4, "five": 5, "six": 6}
+                      "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+                      "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+                      "dozen": 12, "score": 20, "handful": 4, "knot": 4, "circle": 4,
+                      "cluster": 4, "party": 4, "column": 6, "line": 4, "row": 4,
+                      "throng": 8, "host": 8}
 
 
 # The four ways a body moves that this engine has a vocabulary for. Deliberately the same
@@ -201,6 +212,16 @@ def split_collective_name(name: str) -> tuple[int, str]:
         return 1, str(name or "")
     count = _COLLECTIVE_COUNTS.get(m.group(1).lower(), 4)
     plural = m.group(2).strip()
+    # "a band of twelve raiders": the collective word says four and the prose says twelve,
+    # and the prose wins — a stated number is not a guess (item 30, 2026-09-19). Stripped
+    # from the name as well, or the caller holds a creature called "twelve raider", which
+    # is what the ledger held on the reported turn.
+    lead = plural.split()[0].lower() if plural.split() else ""
+    if lead.isdigit() or lead in _COLLECTIVE_COUNTS:
+        said = int(lead) if lead.isdigit() else _COLLECTIVE_COUNTS[lead]
+        rest = " ".join(plural.split()[1:])
+        if rest:
+            count, plural = said, rest
     singular = {"wolves": "wolf", "thieves": "thief", "knives": "knife"}.get(
         plural.lower())
     if singular is None:

@@ -984,7 +984,11 @@ def test_an_attack_on_a_corpse_spawns_the_fight_the_fiction_describes():
     fixed = judgement.redirect_attacks_off_corpses(
         raw, "i charge at them and punch the closest guard", scene)
     assert fixed is not None
-    assert fixed[0]["op"] == "spawn" and fixed[0]["params"]["template"] == "watchman"
+    # A Guard out of the corpus since 2026-09-19, not the hand-written 11-hp watchman:
+    # `judgement.template_for` asks `npcs.choose` first and takes its pick when the block
+    # IS the role word (item 30). The watchman remains the floor for guard-shaped words the
+    # corpus has no block for.
+    assert fixed[0]["op"] == "spawn" and fixed[0]["params"]["template"] == "guard"
     assert fixed[1]["target"] not in (body.ref,)
 
     # No opposition named: kicking the fallen is a thing a player may mean.
@@ -1480,7 +1484,7 @@ def test_a_noted_person_stands_in_the_scene():
     """The ruling after the library beat: the place held but 'there should have
     been a stranger' — the ledger knew about him and the engine did not, so he
     could not be attacked, addressed, or found again. Newly noted cast promote
-    to living civilians (armed roles get the watchman statline), capped at four,
+    to living civilians (armed roles get an armed statline), capped at four,
     and walking away takes them off the board with the ledger."""
     from rules.engine import Scene
     from rules.sheet import load_pc
@@ -1495,7 +1499,7 @@ def test_a_noted_person_stands_in_the_scene():
     assert any("stranger" in n for n in names)
     assert any("guard" in n for n in names)
     guard = next(a for a in s.actors.values() if "guard" in a.name)
-    assert guard.from_template == "watchman"
+    assert guard.from_template == "guard",         "the corpus has a Guard at CR 1; the watchman is the floor, not the answer"
 
     # The ledger empties; the people stay. `clear_cast` used to depart the promoted
     # civilians because a room had no way to keep them — it does now, and it is the
@@ -1522,7 +1526,10 @@ def test_a_crowd_is_people():
         s, "You find them: a group of six men and women gathered in a circle, "
            "their armor heavy with the marks of use.", turn=1)
     assert added == ["man"]                      # not "six man", not the phrase
-    assert s.cast[0]["count"] == 4               # six, capped at the promotion cap
+    # Six, as the prose said. This read 4 until 2026-09-19: the promotion cap was applied
+    # at BOOKING, so nothing downstream could know the fiction had said six and
+    # `cast_brief` told the model four (item 30). The cap now lives where bodies are made.
+    assert s.cast[0]["count"] == 6
     judgement.promote_cast(s, added)
     assert len([a for a in s.actors.values() if not a.is_pc]) == 4
 

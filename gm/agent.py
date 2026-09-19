@@ -328,6 +328,11 @@ class GMAgent:
                 # resolved with no `say` at all, which is the whole failure the op
                 # exists to end. Detect mechanically, repair with a targeted call.
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
+                # And the world's answer when the player looked for somebody who is not
+                # here, stated whether or not the plan reached for them (item 29). Last,
+                # because it reads the player's own sentence and competes with nothing.
+                raw = judgement.answer_the_absent(raw, player_input, self.engine.scene,
+                                                  self.world)
                 data = dict(data, intents=raw)
                 intents = self.engine.validate(raw)
             except IntentError as exc:
@@ -336,7 +341,8 @@ class GMAgent:
                 # is repaired in code instead of asked about again.
                 if exc.check == "refs":
                     amended = judgement.repair_unknown_refs(
-                        data.get("intents"), player_input, self.engine.scene)
+                        data.get("intents"), player_input, self.engine.scene,
+                        world=self.world)
                     if amended:
                         try:
                             intents = self.engine.validate(amended)
@@ -964,6 +970,12 @@ class GMAgent:
         text, told = narration_mod.give_the_name(text, offers)
         if told:
             repairs.append(f"asked and not answered: {', '.join(told)} gives their name")
+        # A band the ledger booked keeps the word it was booked under: soldiers do not
+        # become raiders between one paragraph and the next (2026-09-19, item 30). Before
+        # the un-namer, which works on names rather than roles.
+        text, drifted = judgement.hold_the_booked_word(self.engine.scene, text)
+        if drifted:
+            repairs.append(f"the word they were booked under: {', '.join(drifted)}")
         known = self._known_names() | extra
         text, unnamed = narration_mod.unname_strangers(text, known)
         if unnamed:

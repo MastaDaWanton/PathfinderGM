@@ -441,7 +441,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # week could never actually be answered — only run out.
     "eat": ((), ("actor",), "hidden"),
     "drink": ((), ("actor",), "hidden"),
-    "narrate_only": ((), (), "hidden"),
+    # `not_here` is written by code, never by the model: the world's own answer for a
+    # person the player looked for who is not here (`judgement.repair_unknown_refs`,
+    # item 29). It travels on `narrate_only` because there is no ref to hang it on — that
+    # is the whole point — and `_op_narrate_only` tells it, so the narrator dresses a fact
+    # instead of conjuring somebody to satisfy the sentence.
+    "narrate_only": ((), ("not_here",), "hidden"),
     # Experience awarded outright: the GM's story award for a matter the fights do not
     # pay, and the author's own hand through `/cheat I gain 2000 experience` — which
     # did nothing twice on 2026-09-18 because no op carried experience at all
@@ -489,8 +494,9 @@ PARAM_ALIASES = {
 # Params only code writes, never the model: accepted by validation, left out of the
 # "takes" list a rejection shows the model, so it is never taught to reach for them.
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
-# printed question.
-CODE_ONLY_PARAMS = frozenset({"undecided"})
+# printed question; `not_here` is the world's answer for a person the player looked for
+# who is not here, which the engine prints instead of anybody being created (item 29).
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here"})
 
 ENGINE_OWNED_PARAMS = {
     "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",
