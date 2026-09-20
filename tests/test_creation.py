@@ -126,7 +126,11 @@ def test_a_new_character_has_the_money_their_class_declares():
     market" handed over Steel, a Steel Crossguard and Tin to a character with nothing in
     their pockets. Four classes had no figure at all; they live in `tables.CLASSES` and
     now carry the Core Rulebook's."""
-    for cid, low, high in (("fighter", 50, 300), ("wizard", 30, 180),
+    # The bands are the book's dice: fighter 5d6x10, wizard 2d6x10, rogue and cleric
+    # 4d6x10. The wizard's read 30..180 until 2026-09-20 — the stub in `tables.CLASSES`
+    # said 3d6x10, which is not what the Starting Character Wealth table says, and the
+    # class document written from that table corrected it (item 27).
+    for cid, low, high in (("fighter", 50, 300), ("wizard", 20, 120),
                            ("rogue", 40, 240), ("cleric", 40, 240)):
         seen = set()
         for _ in range(40):
