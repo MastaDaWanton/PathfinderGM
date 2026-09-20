@@ -592,6 +592,32 @@ def delete_character(request):
 
 
 @require_POST
+def character_choices(request):
+    """What the character being drafted may actually take: feats and spells.
+
+    Asked from the forge's second page on every change that could move the answer — a
+    race, a class, an ability score — because all three are read by prerequisites. It
+    builds nothing and saves nothing; `creation` embodies the draft, asks it, and throws
+    the body away.
+
+    Separate from `create_character` on purpose: this must answer for a draft that is
+    still illegal in half a dozen ways (no name, no skills yet), and `build` correctly
+    refuses those. A page that could only ask its question about a finished character
+    would be no help at all while the character is being made.
+    """
+    from rules import creation
+
+    body = read_body(request)
+    want = str(body.get("want") or "").strip().lower()
+    out: dict = {}
+    if want in ("", "feats"):
+        out["feats"] = creation.feat_choices(body)
+    if want in ("", "spells"):
+        out["spells"] = creation.spell_choices(body)
+    return JsonResponse(out)
+
+
+@require_POST
 def create_character(request):
     """Make a character, or say everything wrong with the attempt at once.
 

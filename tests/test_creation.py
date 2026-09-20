@@ -115,8 +115,18 @@ def test_an_elfs_fixed_int_pays_for_skill_ranks_too():
     assert built["sheet"]["abilities"]["int"] == 20
     # 2 class + 5 Int, no human rank: seven, where the raw read allowed six.
     assert len(built["sheet"]["ranks"]) == 7
-    # And 3 + 5 spells, where the raw read allowed 3 + 4.
-    assert len(built["sheet"].get("spellbook") or []) == 8
+    # And 3 + 5 FIRST-LEVEL spells, where the raw read allowed 3 + 4. Counted by level
+    # since 2026-09-20: a wizard's cantrips are granted by the book rather than chosen —
+    # "a wizard begins play with a spellbook containing all 0-level wizard spells" — so
+    # the whole book is now those eight plus every orison. The forge used to demand the
+    # lot as typed ids, and a player who typed only their first-level picks got a wizard
+    # with no cantrips at all.
+    from rules import spells as _spells
+
+    book = built["sheet"].get("spellbook") or []
+    first = [s for s in book if _spells.get(s).lists.get("wizard") == 1]
+    assert len(first) == 8, first
+    assert len(book) > 8, "the granted cantrips are missing from the book"
 
 
 def test_a_new_character_has_the_money_their_class_declares():
@@ -644,11 +654,16 @@ def test_a_caster_may_not_walk_out_with_an_empty_spellbook():
     """Thessaly Corr again: a Wizard 1 with three level-0 and two level-1 slots, save DCs
     of 13 and 14, and no spells at all to put in them — 66 turns of a character who could
     not take her own turn. Only wizard, sorcerer and bard declare a cap; everybody else
-    prepares from the class list and is never asked."""
+    prepares from the class list and is never asked.
+
+    Since 2026-09-20 a wizard's cantrips are granted rather than asked for, so the book is
+    never literally empty for one — which is why the refusal counts the spells they CHOSE.
+    Without that it stopped firing altogether and a wizard could walk out having picked no
+    first-level spell at all, which is most of the original defect back again."""
     _, problems = creation.build(spec(
         **{"class": "wizard"}, race="human", bonus_ability="int",
         skills=["spellcraft"], feats=["toughness", "dodge"], spellbook=[]))
-    assert any("begins knowing spells" in p for p in problems)
+    assert any("begins knowing spells" in p for p in problems), problems
 
     _, problems = creation.build(spec(
         **{"class": "wizard"}, race="human", bonus_ability="int",

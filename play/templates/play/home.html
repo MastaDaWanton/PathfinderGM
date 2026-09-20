@@ -1867,18 +1867,194 @@ function featName(fid) {
   return found ? found.name : fid;
 }
 
+// A fragment rather than part of the pane, so typing repaints only this box: rendering
+// the whole pane on every keystroke throws the caret out of the very input being typed in.
+//
+// It reads `FORGE.choices` — what the SERVER said this character qualifies for — and not
+// `FORGE.opts.feats`, which is all 1,474. That was a real defect for about an hour on
+// 2026-09-20: the page rendered the guided list correctly and then the first keystroke
+// repainted this box from the unguided one, so searching "power" offered feats needing a
+// Leadership score of 13. Two implementations of one question, which is the thing
+// CLAUDE.md says to grep for.
 function featMatches() {
-  // A fragment rather than part of paneForge, so typing can repaint only this box:
-  // re-rendering the whole pane on every keystroke throws the caret out of the input.
+  const got = FORGE.choices && FORGE.choices.feats;
+  if (!got || !got.ready) return "";
   const q = (FORGE.featq || "").trim().toLowerCase();
-  if (q.length < 2) return `<p class="note">Type two letters to search. Chosen feats
-    sit above as buttons — click one to take it back off.</p>`;
-  const hits = FORGE.opts.feats.filter(x =>
-    !FORGE.form.feats.includes(x.id) && x.name.toLowerCase().includes(q)).slice(0, 24);
-  if (!hits.length) return `<p class="note">No feat matches “${esc(FORGE.featq)}”.</p>`;
-  return `<div class="featlist">${hits.map(x => `
-    <button class="featrow" data-craddfeat="${esc(x.id)}"><b>${esc(x.name)}</b>${
-      x.prereq ? `<span>${esc(x.prereq)}</span>` : ""}</button>`).join("")}</div>`;
+  const pool = FORGE.showShutFeats
+    ? [...got.open, ...got.shut].sort((a, b) => a.name.localeCompare(b.name))
+    : got.open;
+  const hits = pool.filter(x => !FORGE.form.feats.includes(x.id)
+    && (!q || x.name.toLowerCase().includes(q)));
+  const shown = hits.slice(0, 60);
+  if (!shown.length) return `<p class="note">Nothing matches “${esc(FORGE.featq || "")}”.
+    ${FORGE.showShutFeats ? "" : "Tick the box above to see what they cannot take yet."}</p>`;
+  return `<div class="featlist">${shown.map(x => `
+    <button class="featrow" ${x.unmet ? "disabled" : `data-craddfeat="${esc(x.id)}"`}
+      title="${esc(x.text || "")}">
+      <b>${esc(x.name)}</b>
+      <span>${x.unmet
+        ? esc("needs " + [...x.unmet, ...(x.unknown || [])].join(", "))
+        : esc((x.types || []).join(", "))}</span>
+    </button>`).join("")}</div>${hits.length > shown.length
+      ? `<p class="note">${hits.length - shown.length} more — narrow the search.</p>` : ""}`;
+}
+
+// --- page two: what this character may actually take ---------------------------------
+
+// The draft's answer is cached against the things that can move it. A race, a class and
+// the six scores are what prerequisites read, and feats already taken can open others —
+// so those are the signature, and nothing else refetches.
+function choicesKey(f) {
+  return JSON.stringify([f.race, f.class, f.choices, f.abilities,
+                         [...f.feats].sort(), f.background]);
+}
+
+async function loadChoices() {
+  const f = FORGE.form, key = choicesKey(f);
+  if (FORGE.choicesFor === key && FORGE.choices) return FORGE.choices;
+  FORGE.choicesLoading = true;
+  const box = $("#choicesbody"); if (box) box.innerHTML = `<p class="note">Working out
+    what ${esc(f.name || "they")} can take…</p>`;
+  let d = null;
+  try {
+    const r = await fetch("/api/character/choices", {
+      method: "POST", headers: { "Content-Type": "application/json",
+        "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: JSON.stringify({ ...f, world: (FORGE && FORGE.world) || "" }),
+    });
+    // Same defence `forgeSubmit` documents: a server error answers with Django's HTML
+    // page, and `await r.json()` on that throws inside an async handler where nothing
+    // sees it — the page would simply never fill in.
+    const text = await r.text();
+    try { d = JSON.parse(text); }
+    catch (err) { d = null; }
+  } catch (err) { d = null; }
+  FORGE.choicesLoading = false;
+  FORGE.choices = d; FORGE.choicesFor = d ? key : "";
+  render();
+  return d;
+}
+
+function featPicker() {
+  const { form: f, opts } = FORGE;
+  const fb = featBudget(f, opts);
+  const got = FORGE.choices && FORGE.choices.feats;
+  if (!got) return `<p class="note">Working out which feats ${esc(f.name || "they")}
+    qualifies for…</p>`;
+  if (!got.ready) return `<p class="note">Choose a race and a class first — a feat's
+    prerequisites are read against the finished character.</p>`;
+  return `
+    <div class="budget ${f.feats.length > fb ? "over" : ""}">
+      <span>one for everyone${f.race === "human" ? ", one for a human" : ""}${
+        f.class === "fighter" ? ", one for a fighter" : ""}</span>
+      <b>${f.feats.length} / ${fb}</b></div>
+    <div style="margin:6px 0 10px">${f.feats.map(fid => `
+      <button class="quiet" data-crunfeat="${esc(fid)}" title="remove">
+        ${esc(featName(fid))} ✕</button>`).join(" ")
+      || `<span class="note">None chosen yet.</span>`}</div>
+    <p class="note"><b>${got.open.length}</b> of ${got.open.length + got.shut.length}
+      feats are open to ${esc(f.name || "them")} right now. The rest need something they
+      do not have yet.</p>
+    <input type="text" id="featsearch" data-cr="featsearch" value="${esc(FORGE.featq || "")}"
+      placeholder="Narrow the list — armour, dodge, spell…" autocomplete="off">
+    <label class="note" style="display:block;margin:6px 0">
+      <input type="checkbox" data-crshowshut ${FORGE.showShutFeats ? "checked" : ""}>
+      Show the ones they cannot take yet, and why</label>
+    <div id="featmatches">${featMatches()}</div>`;
+}
+
+function spellPicker() {
+  const { form: f } = FORGE;
+  const got = FORGE.choices && FORGE.choices.spells;
+  if (!got || !got.ready) return "";
+  const slotLine = Object.entries(got.slots || {}).sort()
+    .map(([lvl, n]) => `<b>${n}</b> at level ${lvl}`).join(", ");
+  // A cleric chooses nothing here and still has slots. Saying so is half of what was
+  // asked for, and staying silent made the page look broken for every prepared caster.
+  if (!got.casts) {
+    if (!got.prepares) return "";
+    return `<h2 class="sect">Spells</h2>
+      <p class="note">On the first day ${esc(f.name || "they")} will cast ${slotLine}.
+      A ${esc(f.class)} prepares from the whole ${esc(f.class)} list rather than from a
+      book of spells known, so there is nothing to choose here — what they carry is
+      chosen at the table each morning.</p>`;
+  }
+  const granted = got.granted || [];
+  const chosen = f.spellbook.filter(id => !granted.some(g => g.id === id));
+  return `
+    <h2 class="sect">Spells</h2>
+    ${slotLine ? `<p class="note">On the first day ${esc(f.name || "they")} will cast
+      ${slotLine}. Knowing a
+      spell and having it prepared are different things — these are what they KNOW; what
+      they prepare is chosen at the table each morning.</p>` : ""}
+    ${granted.length ? `<div class="budget"><span>granted, not chosen — every level 0
+      ${esc(f.class)} spell</span><b>${granted.length}</b></div>
+      <p class="note">${granted.slice(0, 8).map(s => esc(s.name)).join(", ")}${
+        granted.length > 8 ? `, and ${granted.length - 8} more` : ""}. The book opens with
+        all of them; the number below is the first-level allowance alone.</p>` : ""}
+    <div class="budget ${chosen.length > got.cap ? "over" : ""}">
+      <span>level ${got.choose_level} ${esc(f.class)} spells to choose</span>
+      <b>${chosen.length} / ${got.cap}</b></div>
+    <div style="margin:6px 0 10px">${chosen.map(id => {
+      const s = (got.choose || []).find(x => x.id === id);
+      return `<button class="quiet" data-crunspell="${esc(id)}" title="remove">
+        ${esc(s ? s.name : id)} ✕</button>`; }).join(" ")
+      || `<span class="note">None chosen yet.</span>`}</div>
+    <input type="text" id="spellsearch" data-cr="spellsearch" value="${esc(FORGE.spellq || "")}"
+      placeholder="Narrow the ${(got.choose || []).length} spells — shield, missile, charm…"
+      autocomplete="off">
+    <div id="spellmatches">${spellMatches()}</div>`;
+}
+
+// Its own fragment, for the reason `featMatches` gives: repainting the whole pane on
+// every keystroke throws the caret out of the input being typed in.
+function spellMatches() {
+  const { form: f } = FORGE;
+  const got = FORGE.choices && FORGE.choices.spells;
+  if (!got || !got.casts || !got.ready) return "";
+  const q = (FORGE.spellq || "").trim().toLowerCase();
+  const hits = (got.choose || []).filter(s => !f.spellbook.includes(s.id)
+    && (!q || s.name.toLowerCase().includes(q)));
+  const shown = hits.slice(0, 60);
+  if (!shown.length) return `<p class="note">Nothing matches “${esc(FORGE.spellq || "")}”.</p>`;
+  return `<div class="featlist">${shown.map(s => `
+    <button class="featrow" data-craddspell="${esc(s.id)}" title="${esc(s.text || "")}">
+      <b>${esc(s.name)}</b><span>${esc(s.school || "")}</span></button>`).join("")}</div>${
+    hits.length > shown.length
+      ? `<p class="note">${hits.length - shown.length} more — narrow the search.</p>` : ""}`;
+}
+
+function paneForgeChoices() {
+  const { opts, form: f } = FORGE;
+  return `<div class="forge">
+    <button class="quiet" data-crpage="who">← back to who they are</button>
+    <h2 class="sect">What ${esc(f.name || "they")} can take</h2>
+    <div id="choicesbody">
+      ${featPicker()}
+      ${(opts.domains || []).length && f.class === "cleric" ? `
+        <h2 class="sect">Domains</h2>
+        <div class="budget ${(f.domains || []).length !== (opts.domains_wanted || 2) ? "over" : ""}">
+          <span>a cleric takes ${opts.domains_wanted || 2}</span>
+          <b>${(f.domains || []).length} / ${opts.domains_wanted || 2}</b></div>
+        <div style="margin:6px 0 10px">${(f.domains || []).map(d => `
+          <button class="quiet" data-crundomain="${esc(d)}" title="remove">
+            ${esc(d)} ✕</button>`).join(" ")
+          || `<span class="note">None chosen yet.</span>`}</div>
+        <input type="text" id="domainsearch" data-cr="domainsearch"
+          value="${esc(FORGE.domainq || "")}" autocomplete="off"
+          placeholder="Search all ${opts.domains.length} domains — Healing, War, Luck…">
+        <div id="domainmatches">${domainMatches()}</div>
+        <p class="note">A domain grants its own spells and one extra slot at every spell
+          level you can cast. No deity is asked for: what your cleric believes is read from
+          the world and her own people.</p>` : ""}
+      ${spellPicker()}
+    </div>
+    <div id="forgeproblems"></div>
+    <div style="display:flex;gap:12px;margin-top:18px">
+      <button class="go" data-crsubmit="begin">Create &amp; outfit →</button>
+      <button class="quiet" data-crsubmit="">Create for the roster</button>
+    </div>
+  </div>`;
 }
 
 function domainMatches() {
@@ -1973,7 +2149,17 @@ function spellCap(f, opts) {
   return spec;
 }
 
+// The forge is two pages, because what a character may TAKE is decided by what they
+// ARE. Reported 2026-09-20: "You should move these to a page of their own and show a
+// list of feats that only includes feats they meet the prerequisites for. People do not
+// usually know the feats without looking through them so the process needs guiding."
+// Prerequisites read finished scores, so the race, the class and the abilities have to
+// be settled before the question can even be asked honestly.
 function paneForge() {
+  return FORGE.page === "choices" ? paneForgeChoices() : paneForgeWho();
+}
+
+function paneForgeWho() {
   const { opts, form: f } = FORGE;
   const race = opts.races.find(r => r.id === f.race);
   const cls = opts.classes.find(c => c.id === f.class);
@@ -2159,49 +2345,12 @@ function paneForge() {
         <input type="checkbox" data-crskill="${esc(s)}" ${
           f.skills.includes(s) ? "checked" : ""}> ${esc(s)}</label>`).join("")}</div>
 
-    <h2 class="sect">Feats</h2>
-    <div class="budget ${f.feats.length > fb ? "over" : ""}">
-      <span>one for everyone${f.race === "human" ? ", one for a human" : ""}${
-        f.class === "fighter" ? ", one for a fighter" : ""}</span>
-      <b>${f.feats.length} / ${fb}</b></div>
-    <div style="margin:6px 0 10px">${f.feats.map(fid => `
-      <button class="quiet" data-crunfeat="${esc(fid)}" title="remove">
-        ${esc(featName(fid))} ✕</button>`).join(" ")
-      || `<span class="note">None chosen yet.</span>`}</div>
-    <input type="text" id="featsearch" data-cr="featsearch" value="${esc(FORGE.featq || "")}"
-      placeholder="Search all ${opts.feats.length} feats — Power Attack, Toughness…"
-      autocomplete="off">
-    <div id="featmatches">${featMatches()}</div>
-
-    ${(opts.domains || []).length && f.class === "cleric" ? `
-      <h2 class="sect">Domains</h2>
-      <div class="budget ${(f.domains || []).length !== (opts.domains_wanted || 2) ? "over" : ""}">
-        <span>a cleric takes ${opts.domains_wanted || 2}</span>
-        <b>${(f.domains || []).length} / ${opts.domains_wanted || 2}</b></div>
-      <div style="margin:6px 0 10px">${(f.domains || []).map(d => `
-        <button class="quiet" data-crundomain="${esc(d)}" title="remove">
-          ${esc(d)} ✕</button>`).join(" ")
-        || `<span class="note">None chosen yet.</span>`}</div>
-      <input type="text" id="domainsearch" data-cr="domainsearch"
-        value="${esc(FORGE.domainq || "")}" autocomplete="off"
-        placeholder="Search all ${opts.domains.length} domains — Healing, War, Luck…">
-      <div id="domainmatches">${domainMatches()}</div>
-      <p class="note">A domain grants its own spells and one extra slot at every spell
-        level you can cast. No deity is asked for: what your cleric believes is read from
-        the world and her own people.</p>` : ""}
-
-    ${sc ? `<h2 class="sect">Spells known</h2>
-      <div class="budget ${f.spellbook.length > sc ? "over" : ""}">
-        <span>level 0-1 ${esc(f.class)} spells</span><b>${f.spellbook.length} / ${sc}</b></div>
-      <input type="text" data-cr="spellstext" value="${esc(f.spellbook.join(", "))}"
-        placeholder="By id, comma-separated — magic-missile, shield…">
-      <p class="note">The Spells bench can filter the list to level 1 ${esc(f.class)} spells.</p>` : ""}
-
     <div id="forgeproblems"></div>
     <div style="display:flex;gap:12px;margin-top:18px">
-      <button class="go" data-crsubmit="begin">Create &amp; outfit →</button>
-      <button class="quiet" data-crsubmit="">Create for the roster</button>
+      <button class="go" data-crpage="choices">Spells &amp; feats →</button>
     </div>
+    <p class="note">What they can take depends on the race, the class and the scores
+      above, so those are asked first.</p>
   </div>`;
 }
 
@@ -2289,9 +2438,11 @@ document.addEventListener("input", e => {
     if (box) box.innerHTML = domainMatches();
     return;
   }
-  // The comma list parses on input and renders on submit, so typing is never fought.
-  if (key === "spellstext") {
-    f.spellbook = e.target.value.split(",").map(s => s.trim()).filter(Boolean); return;
+  if (key === "spellsearch") {
+    FORGE.spellq = e.target.value;
+    const box = $("#spellmatches");
+    if (box) box.innerHTML = spellMatches();
+    return;
   }
 });
 
@@ -2423,7 +2574,8 @@ document.addEventListener("click", async e => {
     const first = STATE.worlds.find(w => w.playable);
     const worldId = WORLD ? WORLD.id : (playing ? playing.id : (first ? first.id : ""));
     const opts = await (await fetch("/api/create/options" + (worldId ? `?world=${encodeURIComponent(worldId)}` : ""))).json();
-    FORGE = { opts, form: forgeDefaults(opts), world: worldId };
+    FORGE = { opts, form: forgeDefaults(opts), world: worldId, page: "who",
+              choices: null, choicesFor: "", showShutFeats: false };
     render(); return;
   }
   if (e.target.closest("[data-unforge]")) { FORGE = null; render(); return; }
@@ -2491,6 +2643,29 @@ document.addEventListener("click", async e => {
     const unfeat = e.target.closest("[data-crunfeat]");
     if (unfeat) {
       f.feats = f.feats.filter(x => x !== unfeat.dataset.crunfeat);
+      render(); return;
+    }
+    const page = e.target.closest("[data-crpage]");
+    if (page) {
+      FORGE.page = page.dataset.crpage;
+      render();
+      // The answer depends on the race, the class and the scores, so it is asked on
+      // arrival rather than kept from whatever the draft looked like last time.
+      if (FORGE.page === "choices") await loadChoices();
+      return;
+    }
+    const showshut = e.target.closest("[data-crshowshut]");
+    if (showshut) { FORGE.showShutFeats = showshut.checked; render(); return; }
+    const addspell = e.target.closest("[data-craddspell]");
+    if (addspell) {
+      f.spellbook = [...new Set([...f.spellbook, addspell.dataset.craddspell])];
+      render();
+      const s = $("#spellsearch"); if (s) { s.focus(); s.select(); }
+      return;
+    }
+    const unspell = e.target.closest("[data-crunspell]");
+    if (unspell) {
+      f.spellbook = f.spellbook.filter(x => x !== unspell.dataset.crunspell);
       render(); return;
     }
     const adddomain = e.target.closest("[data-cradddomain]");

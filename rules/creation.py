@@ -380,6 +380,44 @@ def options(world_id: str = "") -> dict:
     }
 
 
+def place_racial_adjustments(payload: dict, race, abilities: dict) -> list[str]:
+    """Apply a race's adjustments to `abilities` in place; return what was wrong.
+
+    One pick per `choose` entry of the race document — a human's one "+2 any", the Race
+    Builder's standard "+2 physical, +2 mental, -2 any" a world's people is drafted with.
+    `bonus_ability` is the old single-pick spelling and still answers the first slot.
+
+    Pulled out of `build` on 2026-09-20 when the forge's own choices page needed the same
+    finished scores to ask "which feats does this character qualify for". A second copy of
+    this loop would be a rule with two homes, and the one that drifted would be the one
+    the player sees: the forge showing a cap of three where the server grants four is the
+    exact disagreement `spellCap` already carries a comment about.
+    """
+    picks = payload.get("choices")
+    if not isinstance(picks, list):
+        picks = [payload.get("bonus_ability")] if payload.get("bonus_ability") else []
+    picks = [str(p or "").strip().lower() for p in picks]
+    problems: list[str] = []
+    if not race:
+        return problems
+    pools = {"physical": races_mod.PHYSICAL, "mental": races_mod.MENTAL}
+    for i, c in enumerate(race.get("choose") or []):
+        pool = pools.get(c["from"], races_mod.ABILITIES)
+        pick = picks[i] if i < len(picks) else ""
+        where = "any ability" if c["from"] == "any" else f"a {c['from']} ability"
+        if pick not in pool:
+            problems.append(f"A {race['name'].lower()} puts {c['amount']:+d} on "
+                            f"{where} — say which ability ({', '.join(pool)}).")
+        elif pick in picks[:i]:
+            problems.append(f"Each of a {race['name'].lower()}'s adjustments lands "
+                            f"on a different ability; {pick} is named twice.")
+        else:
+            abilities[pick] += int(c["amount"])
+    for ab, mod in (race.get("mods") or {}).items():
+        abilities[ab] += mod
+    return problems
+
+
 def build(payload: dict) -> tuple[dict | None, list[str]]:
     """One character from one form, or every problem at once.
 
@@ -497,26 +535,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # document — a human's one "+2 any", the Race Builder's standard "+2 physical,
     # +2 mental, -2 any" a world's people is drafted with. `bonus_ability` is the old
     # single-pick spelling and still answers the first slot.
-    picks = payload.get("choices")
-    if not isinstance(picks, list):
-        picks = [payload.get("bonus_ability")] if payload.get("bonus_ability") else []
-    picks = [str(p or "").strip().lower() for p in picks]
+    problems.extend(place_racial_adjustments(payload, race, abilities))
     if race:
-        pools = {"physical": races_mod.PHYSICAL, "mental": races_mod.MENTAL}
-        for i, c in enumerate(race.get("choose") or []):
-            pool = pools.get(c["from"], races_mod.ABILITIES)
-            pick = picks[i] if i < len(picks) else ""
-            where = "any ability" if c["from"] == "any" else f"a {c['from']} ability"
-            if pick not in pool:
-                problems.append(f"A {race['name'].lower()} puts {c['amount']:+d} on "
-                                f"{where} — say which ability ({', '.join(pool)}).")
-            elif pick in picks[:i]:
-                problems.append(f"Each of a {race['name'].lower()}'s adjustments lands "
-                                f"on a different ability; {pick} is named twice.")
-            else:
-                abilities[pick] += int(c["amount"])
-        for ab, mod in (race.get("mods") or {}).items():
-            abilities[ab] += mod
         if houserules.race_rp() and races_mod.rp(race) > houserules.race_rp():
             problems.append(
                 f"{race['name']} is a {races_mod.rp(race)} RP race and this table "
@@ -597,6 +617,19 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # --- spells known ----------------------------------------------------------------
     spellbook = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
     cap_spec = SPELLS_KNOWN.get(cid)
+    # A wizard's cantrips are a GRANT, not a choice — "a wizard begins play with a
+    # spellbook containing all 0-level wizard spells" — so they are added here rather
+    # than asked for. The forge used to demand the whole book as typed ids, which meant
+    # a player who typed their three first-level spells and pressed the button got a
+    # wizard with no cantrips at all: a caster who cannot take a turn without spending a
+    # slot. Granted after the player's list and deduplicated, so a book that already
+    # names them is unchanged and the first-level count below is unaffected.
+    if cid == "wizard":
+        from . import spells as _spells_lib
+
+        cantrips = [s.id for s in _spells_lib.all_spells().values()
+                    if isinstance(s.lists, dict) and s.lists.get(cid) == 0]
+        spellbook = list(dict.fromkeys(spellbook + sorted(cantrips)))
     if spellbook and cap_spec is None:
         problems.append(f"A {cid or 'non-caster'} picks no spells at creation.")
     elif cap_spec is not None:
@@ -620,7 +653,11 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         # played, three level-0 and two level-1 slots, save DCs of 13 and 14 — and no
         # spells at all to put in them. Classes that prepare from the whole class list
         # rather than a book declare no cap and are not asked.
-        if cap and not spellbook:
+        # `counted`, not the whole book: since a wizard's cantrips are granted above, the
+        # book is never empty for one, and asking "did you choose anything" has to mean
+        # the spells they actually chose. Without this the refusal stopped firing and a
+        # wizard could walk out having picked no first-level spell at all.
+        if cap and not counted:
             problems.append(
                 f"A {cid} begins knowing spells: choose up to {cap}.")
         from . import spells as spells_lib
@@ -722,3 +759,160 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     if problems:
         return {}, problems
     return {"sheet": sheet, "warnings": warnings}, []
+
+
+# --- what this character can actually take -------------------------------------------------
+
+def _provisional(payload: dict):
+    """An Actor built from a half-finished forge draft, for asking what it qualifies for.
+
+    Prerequisites read FINISHED scores — Power Attack wants Strength 13 after the race is
+    applied — so the only honest way to answer "can they take this" is to build the body
+    and ask it. `build` already does exactly that for feat legality once the sheet exists;
+    this is the same move one step earlier, while the player is still choosing.
+
+    Returns None when the draft has not said enough yet: the page then says so, rather
+    than offering a list that will change under the player's hands.
+    """
+    race = _races_for(str(payload.get("world", "") or "")).get(
+        str(payload.get("race", "")).strip().lower())
+    cid = str(payload.get("class", "")).strip().lower()
+    cls = classes_mod.get(cid)
+    if not race or not cls:
+        return None
+    raw = payload.get("abilities") or {}
+    abilities = {}
+    for ab in ("str", "dex", "con", "int", "wis", "cha"):
+        try:
+            abilities[ab] = int(raw.get(ab, 10))
+        except (TypeError, ValueError):
+            abilities[ab] = 10
+    # The same adjustment `build` applies, through the same function, so the page and the
+    # server can never disagree about the scores a prerequisite is read against.
+    place_racial_adjustments(payload, race, abilities)
+    picked = [str(s).strip().lower() for s in (payload.get("skills") or [])]
+    try:
+        return from_dict({
+            "name": str(payload.get("name") or "Someone"), "kind": "pc",
+            "class": cid, "level": 1, "race": race["id"],
+            "size": race["size"], "speed": race["speed"],
+            "abilities": abilities,
+            "ranks": {s: 1 for s in picked if s in SKILLS},
+            "feats": [str(f) for f in (payload.get("feats") or [])],
+            "background": str(payload.get("background", "")).strip().lower(),
+            "hp": 1, "hp_max": 1,
+        })
+    except Exception:      # noqa: BLE001 — a draft too broken to embody offers no choices
+        return None
+
+
+def feat_choices(payload: dict) -> dict:
+    """Every feat this draft could take, and why the rest are shut.
+
+    The forge offered a search box over all 1,474 by name, which is the wrong question
+    asked of the wrong person — reported 2026-09-20: "People do not usually know the feats
+    without looking through them so the process needs guiding." A first-level fighter
+    qualifies for 145 of them, measured, which is a list somebody can actually read.
+
+    Both halves come back. `open` is what they qualify for; `shut` is the rest with the
+    missing prerequisite named, because a list showing only what you can have today hides
+    the ladder you are climbing — and Pathbuilder's answer, "show what you qualify for",
+    works precisely because the rest stays visible behind it.
+    """
+    actor = _provisional(payload)
+    if actor is None:
+        return {"ready": False, "open": [], "shut": []}
+    open_: list[dict] = []
+    shut: list[dict] = []
+    for feat in feats_mod.all_feats().values():
+        verdict = feats_mod.meets(actor, feat)
+        row = {"id": feat.id, "name": feat.name,
+               "types": [str(t) for t in (feat.types or [])],
+               "text": str(feat.benefit or feat.description or "")[:400]}
+        # Mythic feats are never open, whatever their prerequisites say. `feats.NOT_YET`
+        # already treats a `mythic_tier` condition as uncheckable, so 155 of the 158 are
+        # shut for the right reason — but three (Extra Mythic Power, Mythic Paragon,
+        # Potent Surge) state no prerequisite at all and were being offered to a
+        # first-level character in a game that has no mythic tiers to spend. Measured
+        # 2026-09-20 while building this page.
+        if "mythic" in {t.lower() for t in (feat.types or [])}:
+            verdict = {"ok": False, "unmet": ["a mythic tier, which this game has none of"],
+                       "unknown": []}
+        if verdict["ok"]:
+            open_.append(row)
+        else:
+            # `unmet` was read and failed; `unknown` this app could not parse. They are
+            # different answers and the page says which — an unreadable prerequisite is
+            # the app's shortcoming, not the character's, and `feats.meets` is careful
+            # to keep them apart for exactly that reason.
+            row["unmet"] = [str(x) for x in verdict["unmet"]]
+            row["unknown"] = [str(x) for x in verdict["unknown"]]
+            shut.append(row)
+    open_.sort(key=lambda r: r["name"])
+    shut.sort(key=lambda r: r["name"])
+    return {"ready": True, "open": open_, "shut": shut}
+
+
+def spell_choices(payload: dict) -> dict:
+    """What this draft's caster is GRANTED, what they CHOOSE, and out of which list.
+
+    Three things the forge never said, and each is a standing complaint on D&D Beyond's
+    own builder forums: which spells arrive granted rather than chosen, that only the
+    levels you can actually cast should be offered, and what your slots are while you
+    choose. A wizard here was shown "level 0-1 wizard spells 0 / 28" and a box asking for
+    comma-separated ids.
+    """
+    from . import spells as spells_lib
+
+    actor = _provisional(payload)
+    cid = str(payload.get("class", "")).strip().lower()
+    cap_spec = SPELLS_KNOWN.get(cid)
+    out: dict = {"ready": actor is not None, "casts": cap_spec is not None,
+                 "prepares": False,
+                 "granted": [], "choose": [], "cap": 0, "chosen": 0, "slots": {},
+                 "choose_level": 1}
+    if actor is None:
+        return out
+    # The slots this character will have on day one, from the same function the play
+    # table reads, so the number here is the number there. Answered for EVERY caster,
+    # not only the ones with a book to fill: a cleric chooses no spells at the forge and
+    # still wants to know what she will be able to cast, which is half of what was asked
+    # for — "filling spell slots for the first session should be easy and intuitive".
+    try:
+        out["slots"] = {str(k): int(v) for k, v in casting.slots_for(actor).items()}
+    except Exception:      # noqa: BLE001 — a draft that cannot answer says nothing
+        out["slots"] = {}
+    if cap_spec is None:
+        # Casts, but prepares from the whole class list rather than from a book of known
+        # spells — cleric, druid, paladin. Nothing to choose here; the choosing happens
+        # each morning at the table, and the page says so rather than staying silent.
+        out["prepares"] = bool(out["slots"])
+        return out
+    int_mod = (int(actor.abilities.get("int", 10)) - 10) // 2
+    out["cap"] = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
+
+    def _row(sp) -> dict:
+        return {"id": sp.id, "name": sp.name, "level": sp.lists.get(cid),
+                "school": str(sp.school or ""),
+                "text": str(sp.description or "")[:300]}
+
+    mine = [s for s in spells_lib.all_spells().values()
+            if isinstance(s.lists, dict) and s.lists.get(cid) is not None]
+    if cid == "wizard":
+        # "A wizard begins play with a spellbook containing all 0-level wizard spells …
+        # plus three 1st-level spells of her choice … for each point of Intelligence
+        # bonus." The cantrips are granted and the cap is the first-level allowance
+        # alone — which is what `build` already counts and the old panel did not say.
+        out["granted"] = sorted((_row(s) for s in mine if s.lists.get(cid) == 0),
+                                key=lambda r: r["name"])
+        out["choose"] = sorted((_row(s) for s in mine if s.lists.get(cid) == 1),
+                               key=lambda r: r["name"])
+    else:
+        # Sorcerer and bard know cantrips and first-level spells alike, and both count
+        # against the one cap.
+        out["choose"] = sorted((_row(s) for s in mine if s.lists.get(cid) in (0, 1)),
+                               key=lambda r: (r["level"], r["name"]))
+    picked = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
+    granted = {r["id"] for r in out["granted"]}
+    out["chosen"] = len([p for p in picked if p not in granted])
+    return out
