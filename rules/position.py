@@ -104,6 +104,35 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
 
     mods: list[Modifier] = []
 
+    with_whom = flanking_with(scene, actor, defender, weapon)
+    if with_whom:
+        mods.append(Modifier(FLANKING_BONUS, f"flanking with {with_whom}", "flanking"))
+
+    if _level(here) - _level(there) >= HIGHER_GROUND_SQUARES:
+        mods.append(Modifier(HIGHER_GROUND_BONUS, "higher ground"))
+    return mods
+
+
+def flanking_with(scene, actor, defender, weapon=None) -> str:
+    """The name of the ally this attacker is flanking the defender with, or "".
+
+    Pulled out of `attack_mods` when sneak attack needed the same answer for a different
+    purpose (`rules/precision.py`): flanking is one of the two ways a rogue's dice come
+    out, and a second copy of this loop would be a rule with two homes — the thing
+    CLAUDE.md records as having shipped a corrected consequence rule and a stale one side
+    by side. The +2 and the sneak dice now read the same fact.
+
+    `weapon` is optional exactly as it is on `attack_mods`, and means the same thing
+    there: no weapon named is treated as melee, because flanking requires threatening
+    the target and a bow does not.
+    """
+    grid = getattr(scene, "grid", None)
+    if grid is None:
+        return ""
+    here = scene.positions.get(actor.ref)
+    there = scene.positions.get(defender.ref)
+    if here is None or there is None or not _melee(weapon):
+        return ""
     for ref, other in scene.actors.items():
         if ref in (actor.ref, defender.ref) or other.is_down:
             continue
@@ -114,12 +143,8 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
             continue                      # flanking is a fact about one plane
         if flanking(tuple(here[:2]), tuple(ally[:2]),
                     tuple(there[:2]), defender.size):
-            mods.append(Modifier(FLANKING_BONUS, f"flanking with {other.name}", "flanking"))
-            break
-
-    if _level(here) - _level(there) >= HIGHER_GROUND_SQUARES:
-        mods.append(Modifier(HIGHER_GROUND_BONUS, "higher ground"))
-    return mods
+            return str(other.name)
+    return ""
 
 
 def cover_of(scene, actor, defender) -> str:

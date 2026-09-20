@@ -223,22 +223,31 @@ def test_the_player_rolls_their_own_to_hit_and_their_own_damage(fight, scene):
         engine,
         [{"op": "attack", "actor": "pc", "target": "c1",
           "because": "she has run out of talking"}],
-        faces=[15, 4],          # to-hit, then damage (15 hits without threatening)
+        # To-hit, then the sneak dice, then damage. Kesst is a ROGUE, and since sneak
+        # attack was wired up (2026-09-20) her dice come out against a target who has
+        # not acted — the same flat-footed fact this attack already reads for AC. The
+        # extra prompt is the feature, so the faces grew rather than the behaviour
+        # changing back.
+        faces=[15, 3, 4],
     )
     assert [p["label"] for p in prompts] == [
-        "Attack with rapier", "Damage (rapier)",
+        "Attack with rapier", "Sneak attack (1d6)", "Damage (rapier)",
     ]
+    by_label = {p["label"]: p for p in prompts}
     # The to-hit prompt shows the terms and what to beat; the damage prompt shows a d6.
     assert prompts[0]["dc"] == 10                      # guildhand AC, flat-footed
     assert {b["source"] for b in prompts[0]["breakdown"]} == {"BAB", "Dex (Finesse)"}
-    assert prompts[1]["die"] == "1d6"
-    assert (prompts[1]["min"], prompts[1]["max"]) == (1, 6)
-    assert [b["source"] for b in prompts[1]["breakdown"]] == ["Str"]
+    damage = by_label["Damage (rapier)"]
+    assert damage["die"] == "1d6"
+    assert (damage["min"], damage["max"]) == (1, 6)
+    # The sneak dice ride the damage roll as a named term, so the player can see where
+    # the extra came from and argue with it.
+    assert [b["source"] for b in damage["breakdown"]] == ["Str", "sneak attack (1d6)"]
 
     o = res.outcomes[0]
     assert o.verdict == "hit"
     assert all(r.visibility == "player" for r in o.rolls)
-    assert scene.get("c1").hp == 4 - 5                 # 4 on the die, +1 Str
+    assert scene.get("c1").hp == 4 - 8                 # 4 on the die, +1 Str, +3 sneak
 
 
 def test_a_missed_attack_never_asks_for_damage(fight):
@@ -259,7 +268,7 @@ def test_a_full_attack_at_bab_zero_is_still_one_attack(fight):
     res, prompts = play_through(
         engine, [{"op": "attack", "actor": "pc", "target": "c1",
                   "params": {"full_attack": True}}],
-        faces=[15, 4],
+        faces=[15, 3, 4],       # and the rogue's sneak dice between them
     )
     assert len([p for p in prompts if p["label"].startswith("Attack")]) == 1
 
@@ -279,14 +288,18 @@ def test_a_critical_threat_asks_the_player_to_confirm_it(fight, scene):
     the step a person forgets mid-fight. The confirmation is the player's roll too."""
     res, prompts = play_through(
         engine, [{"op": "attack", "actor": "pc", "target": "c1"}],
-        faces=[19, 15, 7],       # threat, confirm, damage (2d6 on a x2 crit)
+        faces=[19, 15, 3, 7],    # threat, confirm, sneak dice, damage (2d6 on a x2 crit)
     )
     assert [p["label"] for p in prompts] == [
-        "Attack with rapier", "Confirm critical (rapier)", "Damage (rapier — CRITICAL)",
+        "Attack with rapier", "Confirm critical (rapier)", "Sneak attack (1d6)",
+        "Damage (rapier — CRITICAL)",
     ]
-    assert prompts[2]["die"] == "2d6"
-    # Str is multiplied by the crit multiplier along with the dice.
-    assert [b["source"] for b in prompts[2]["breakdown"]] == ["Str x2"]
+    crit = prompts[3]
+    assert crit["die"] == "2d6"
+    # Str is multiplied by the crit multiplier along with the dice — and the sneak dice
+    # are NOT: "the extra damage is not multiplied". The x2 on one source and not the
+    # other is the whole rule, visible in the player's own breakdown.
+    assert [b["source"] for b in crit["breakdown"]] == ["Str x2", "sneak attack (1d6)"]
     assert "critically hits" in res.outcomes[0].tell
 
 
