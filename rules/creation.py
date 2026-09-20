@@ -158,6 +158,42 @@ def die_label(spec) -> str:
     return f"d{spec}" if isinstance(spec, (int, float)) or str(spec).isdigit() else str(spec)
 
 
+def _domains_mod():
+    from . import domains as domains_mod
+
+    return domains_mod
+
+
+def _domain_menu() -> list[dict]:
+    """Every domain with a sample of what it grants, for the forge's picker."""
+    mod = _domains_mod()
+    out = []
+    for name in mod.names():
+        first = mod.spells_of(name, 1)
+        out.append({"name": name, "spells": len(mod.spells_of(name)),
+                    "first": first[0].replace("-", " ") if first else ""})
+    return out
+
+
+def starter_domains(cid: str) -> list[str]:
+    """A legal opening pair of domains for a class that takes them, or [].
+
+    The same shape and the same reason as `starter_spells` below: a cleric with no domains
+    is refused, the way a wizard with an empty book is refused, so every "build every class"
+    caller needs a legal pick to hand. The player's own choice is the point — this is the
+    default a test or a script uses, not a recommendation.
+    """
+    from . import domains as domains_mod
+
+    if str(cid or "").strip().lower() != "cleric":
+        return []
+    names = domains_mod.names()
+    # Two that the corpus definitely carries, by name rather than by position, so a corpus
+    # that grows or reorders does not change what a default cleric gets.
+    wanted = [n for n in ("Healing", "Protection", "War", "Good") if n in names]
+    return (wanted + names)[:domains_mod.HOW_MANY]
+
+
 def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list[str]:
     """A legal opening spellbook for a class that needs one.
 
@@ -178,12 +214,28 @@ def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list
     if count is not None:
         cap = min(cap, count)
     out = []
+    # A wizard's book opens with EVERY 0-level spell, and the Intelligence-scaled number
+    # applies to the first-level ones only: "A wizard begins play with a spellbook
+    # containing all 0-level wizard spells (except those from her prohibited school or
+    # schools, if any) plus three 1st-level spells of her choice… for each point of
+    # Intelligence bonus." Measured 2026-09-19: a new wizard's book held one orison and
+    # five first-level spells, so most of a wizard's actual repertoire — the cantrips they
+    # cast all day — was missing (item 25).
+    #
+    # Only the wizard. A sorcerer and a bard KNOW a small number at every level, cantrips
+    # included, and the cap is the whole of it for them.
+    if cid == "wizard":
+        out += [sid for sid, sp in sorted(spells_lib.all_spells().items())
+                if sp.lists.get(cid) == 0]
     for sid, sp in sorted(spells_lib.all_spells().items()):
         level = sp.lists.get(cid)
-        if level is None or level > 1:
+        if level is None or level > 1 or sid in out:
+            continue
+        if cid == "wizard" and level == 0:
             continue
         out.append(sid)
-        if len(out) >= cap:
+        if len([s for s in out if spells_lib.all_spells()[s].lists.get(cid) != 0
+                or cid != "wizard"]) >= cap:
             break
     return out
 
@@ -303,6 +355,11 @@ def options(world_id: str = "") -> dict:
         # The table runs to whatever the ceiling allows. With no ceiling the budget is
         # the only wall left, so the payload stops at the highest score this budget
         # could actually buy — a counter offering a 40 nobody can afford is noise.
+        # The domains a cleric picks from, all 153 of them, derived from the corpus
+        # (`rules/domains.py`). The forge offers them on the same screen as the spells and
+        # one step ahead, because a domain decides part of what can be prepared (item 27).
+        "domains": _domain_menu(),
+        "domains_wanted": _domains_mod().HOW_MANY,
         "point_costs": point_costs_to(_reachable_cap()),
         "point_budget": houserules.point_budget(),
         "ability_cap": houserules.ability_cap(),
@@ -525,6 +582,18 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"That is {len(feat_ids)} feats against {feat_budget} "
                         f"(one, plus one for a human, plus one for a fighter).")
 
+    # --- domains ----------------------------------------------------------------------
+    # A cleric picks two, on the same screen that prepares her spells and one step ahead of
+    # it, because a domain decides part of what she can prepare. No deity step and no
+    # alignment gate: the ruling, 2026-09-19, was "grab whatever the belief system of the
+    # world is and let that be enough. dont worry about the gods or the alignment" — and
+    # the world's own Metaphysics fact says why that is enough.
+    from . import domains as domains_mod
+
+    picked_domains = [" ".join(str(d).split()).title()
+                      for d in (payload.get("domains") or []) if str(d).strip()]
+    problems += domains_mod.problems(picked_domains, cid)
+
     # --- spells known ----------------------------------------------------------------
     spellbook = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
     cap_spec = SPELLS_KNOWN.get(cid)
@@ -532,8 +601,20 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"A {cid or 'non-caster'} picks no spells at creation.")
     elif cap_spec is not None:
         cap = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
-        if len(spellbook) > cap:
-            problems.append(f"That is {len(spellbook)} spells against {cap} known.")
+        # A wizard's cap counts the FIRST-level spells only. The book grants "all 0-level
+        # wizard spells plus three 1st-level spells of her choice… for each point of
+        # Intelligence bonus", so counting the cantrips against it refused a legal opening
+        # book of 35 orisons and six spells as "38 spells against 4 known" (item 25).
+        # Everybody else's cap is the whole of what they know, cantrips included.
+        counted = spellbook
+        if cid == "wizard":
+            from . import spells as spells_lib
+
+            every = spells_lib.all_spells()
+            counted = [sid for sid in spellbook
+                       if (every[sid].lists.get(cid) if sid in every else 1) != 0]
+        if len(counted) > cap:
+            problems.append(f"That is {len(counted)} spells against {cap} known.")
         # And at least one. A wizard with an empty book is a character who cannot take
         # their own turn: found on the roster as Thessaly Corr, a Wizard 1 with 66 turns
         # played, three level-0 and two level-1 slots, save DCs of 13 and 14 — and no
@@ -606,6 +687,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     }
     if spellbook:
         sheet["spellbook"] = spellbook
+    if picked_domains:
+        sheet["domains"] = picked_domains
 
     # The proof of the whole exercise: the dict must load as an Actor before anything is
     # saved, so a creation bug is a refusal here rather than a corrupt file on disk.

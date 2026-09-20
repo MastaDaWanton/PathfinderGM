@@ -1881,6 +1881,24 @@ function featMatches() {
       x.prereq ? `<span>${esc(x.prereq)}</span>` : ""}</button>`).join("")}</div>`;
 }
 
+function domainMatches() {
+  // The same shape as `featMatches`, and for the same reason: 153 domains is a search box,
+  // not a list, and repainting the whole pane on every keystroke throws the caret out.
+  const q = (FORGE.domainq || "").trim().toLowerCase();
+  const all = FORGE.opts.domains || [];
+  const taken = FORGE.form.domains || [];
+  const want = FORGE.opts.domains_wanted || 2;
+  if (taken.length >= want) return `<p class="note">Two chosen. Click one above to take it
+    back off.</p>`;
+  const hits = all.filter(d => !taken.includes(d.name) &&
+    (!q || d.name.toLowerCase().includes(q))).slice(0, 24);
+  if (!hits.length) return `<p class="note">No domain matches “${esc(FORGE.domainq || "")}”.</p>`;
+  return `<div class="featlist">${hits.map(d => `
+    <button class="featrow" data-cradddomain="${esc(d.name)}"><b>${esc(d.name)}</b>
+      <span>${d.spells} spell${d.spells === 1 ? "" : "s"}${
+        d.first ? ` · ${esc(d.first)} at 1st` : ""}</span></button>`).join("")}</div>`;
+}
+
 // The same two rows as `sheet.pronouns_for_gender`. A house-rule set is its own answer:
 // "ze/hir" is both what somebody is and what they are called, which is why it is offered
 // as a gender rather than as a second question.
@@ -1893,7 +1911,7 @@ function forgeDefaults(opts) {
     // made before backgrounds existed has none, and the forge must still build one.
     background: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    skills: [], feats: [], spellbook: [], paths: [],
+    skills: [], feats: [], spellbook: [], domains: [], paths: [],
   };
 }
 
@@ -2155,6 +2173,23 @@ function paneForge() {
       autocomplete="off">
     <div id="featmatches">${featMatches()}</div>
 
+    ${(opts.domains || []).length && f.class === "cleric" ? `
+      <h2 class="sect">Domains</h2>
+      <div class="budget ${(f.domains || []).length !== (opts.domains_wanted || 2) ? "over" : ""}">
+        <span>a cleric takes ${opts.domains_wanted || 2}</span>
+        <b>${(f.domains || []).length} / ${opts.domains_wanted || 2}</b></div>
+      <div style="margin:6px 0 10px">${(f.domains || []).map(d => `
+        <button class="quiet" data-crundomain="${esc(d)}" title="remove">
+          ${esc(d)} ✕</button>`).join(" ")
+        || `<span class="note">None chosen yet.</span>`}</div>
+      <input type="text" id="domainsearch" data-cr="domainsearch"
+        value="${esc(FORGE.domainq || "")}" autocomplete="off"
+        placeholder="Search all ${opts.domains.length} domains — Healing, War, Luck…">
+      <div id="domainmatches">${domainMatches()}</div>
+      <p class="note">A domain grants its own spells and one extra slot at every spell
+        level you can cast. No deity is asked for: what your cleric believes is read from
+        the world and her own people.</p>` : ""}
+
     ${sc ? `<h2 class="sect">Spells known</h2>
       <div class="budget ${f.spellbook.length > sc ? "over" : ""}">
         <span>level 0-1 ${esc(f.class)} spells</span><b>${f.spellbook.length} / ${sc}</b></div>
@@ -2175,7 +2210,7 @@ async function forgeSubmit(begin) {
   // Never `begin` here: the outfitting step comes between the sheet and the road, so
   // the character goes onto the roster and the outfit page begins the game itself.
   const payload = { ...f, begin: false, world: (FORGE && FORGE.world) || "" };
-  delete payload.featstext; delete payload.spellstext;
+  delete payload.featstext; delete payload.spellstext; delete payload.domainsearch;
   const say = lines => { $("#forgeproblems").innerHTML = `<div class="problems">${
     lines.map(p => `<div>${esc(p)}</div>`).join("")}</div>`; };
 
@@ -2246,6 +2281,12 @@ document.addEventListener("input", e => {
     FORGE.featq = e.target.value;
     const box = $("#featmatches");
     if (box) box.innerHTML = featMatches();
+    return;
+  }
+  if (key === "domainsearch") {
+    FORGE.domainq = e.target.value;
+    const box = $("#domainmatches");
+    if (box) box.innerHTML = domainMatches();
     return;
   }
   // The comma list parses on input and renders on submit, so typing is never fought.
@@ -2450,6 +2491,18 @@ document.addEventListener("click", async e => {
     const unfeat = e.target.closest("[data-crunfeat]");
     if (unfeat) {
       f.feats = f.feats.filter(x => x !== unfeat.dataset.crunfeat);
+      render(); return;
+    }
+    const adddomain = e.target.closest("[data-cradddomain]");
+    if (adddomain) {
+      f.domains = [...new Set([...(f.domains || []), adddomain.dataset.cradddomain])];
+      render();
+      const box = $("#domainsearch"); if (box) { box.focus(); box.select(); }
+      return;
+    }
+    const undomain = e.target.closest("[data-crundomain]");
+    if (undomain) {
+      f.domains = (f.domains || []).filter(x => x !== undomain.dataset.crundomain);
       render(); return;
     }
     const up = e.target.closest("[data-abup]");

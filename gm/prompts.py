@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 
 from gm import ledger as ledger_mod
+from rules import spells as _spells_mod
 from rules import states
 from rules.intents import AMOUNT_OPS, OPS as _OPS
 from rules.tables import DC_BANDS, MANEUVERS
@@ -1021,6 +1022,34 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 f'"to": "<ref>"}}}} and let the engine resolve it):')
             for name in usable:
                 lines.append(f"  {name}")
+
+    # And what they can cast, which the brief said NOTHING about until 2026-09-19 — not
+    # the spells, not the slots, not even that the character is a caster (item 25). With
+    # no spell facts at all the model had nothing to be held to, so "I cast wall of flame"
+    # came back as a wall of flame: a level 5 spell, from a level 1 cleric, out of slots
+    # the panel still showed as full.
+    if pc is not None:
+        from rules import casting as _casting
+
+        if _casting.is_caster(pc):
+            left = [f"level {lvl}: {_casting.slots_left(pc, lvl)} of {total}"
+                    for lvl, total in sorted(_casting.slots_for(pc).items())]
+            prepared = []
+            for sid, count in sorted((pc.prepared or {}).items()):
+                try:
+                    prepared.append(f"{_spells_mod.get(sid).name}"
+                                    + (f" x{count}" if int(count) > 1 else ""))
+                except KeyError:
+                    continue
+            lines.append(
+                f"\nWHAT {pc.name.upper()} CAN CAST (fact — a spell not on this line is "
+                f"NOT cast, whatever the beat says; if they cast one, emit "
+                f'{{"op": "cast", "params": {{"spell": "<id>", "at": "<ref>"}}}} and let '
+                f"the engine spend the slot):")
+            lines.append("  Prepared today: " + (", ".join(prepared) or "nothing"))
+            lines.append("  Slots left: " + (", ".join(left) or "none"))
+            lines.append(f"  Caster level {_casting.caster_level(pc)}, highest spell level "
+                         f"{_casting.highest_spell_level(pc)}.")
 
     if recent_events:
         lines.append("\nWHAT THIS PLACE REMEMBERS:")

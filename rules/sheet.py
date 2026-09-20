@@ -442,6 +442,12 @@ class Actor:
     # in the doorway was never described because nothing held a face.
     true_name: str = ""
     appearance: str = ""
+    # The two domains a cleric took at creation, by name ("Healing", "War"). The lists
+    # they grant are derived from the corpus rather than authored (`rules/domains.py`):
+    # 153 domains across 452 spells carry their own name and level. Empty for everybody
+    # else, and for a cleric made before this existed. Asked for 2026-09-19: "oh i had
+    # forgotten domains those need chosen at creation as well."
+    domains: list = field(default_factory=list)
     # Whether a beat has ever said what this person looks like. Reported 2026-09-19:
     # "Drenn Ironvale and the merchant are in scene without having been described." Four
     # writers put people into a scene — the opening companion, the keeper behind a
@@ -3437,7 +3443,7 @@ def _background_sheet(actor: Actor) -> dict | None:
 
 def _spell_sheet(actor: Actor) -> dict | None:
     """The spellcasting half of the sheet, or None for everybody who does not cast."""
-    from . import casting, spells as spells_mod
+    from . import casting, domains as domains_mod, spells as spells_mod
 
     if not casting.is_caster(actor):
         return None
@@ -3473,8 +3479,54 @@ def _spell_sheet(actor: Actor) -> dict | None:
                    "left": casting.slots_left(actor, lvl),
                    "dc": casting.save_dc(actor, lvl)}
                   for lvl, total in sorted(casting.slots_for(actor).items())],
+        # The two a cleric took, and the extra slot each spell level gets because of them:
+        # "one domain spell slot for each level of cleric spell she can cast" (item 27).
+        # Shown as its own row rather than added into the count, because only a domain
+        # spell may go in it.
+        "domains": [{"name": name,
+                     "spells": [{"id": sid, "level": lvl}
+                                for lvl in sorted(casting.slots_for(actor))
+                                for sid in domains_mod.spells_of(name, lvl)]}
+                    for name in domains_mod.of(actor)],
+        "domain_slots": [{"level": lvl, "max": n} for lvl, n
+                         in sorted(casting.domain_slots_for(actor).items())],
         "known": known,
+        # And everything they may CHOOSE from, which for a list-caster is not the same
+        # thing at all. Reported 2026-09-19: "this spells panel should show a list of all
+        # known spells as well" — the panel offered a `+` only on rows already in the book,
+        # so a cleric saw a wizard's empty-book message for the life of the character
+        # (item 26). Grouped by spell level and capped per level, because a cleric's
+        # castable part is 179 spells: the page folds it and searches it rather than
+        # printing all of it, and `total` is what the fold says it is hiding.
+        "choose_from": _choosable(actor),
     }
+
+
+# How many of a level to send before the page starts saying "and N more". High enough that
+# a wizard's whole book and a druid's orisons arrive complete, low enough that the payload
+# for a Cleric 1 is a page and not a book.
+_CHOOSE_PAGE = 60
+
+
+def _choosable(actor: Actor) -> list[dict]:
+    """Every spell this caster may prepare or learn right now, by level."""
+    from . import casting, spells as spells_mod
+
+    out = []
+    reach = casting.highest_spell_level(actor)
+    for level, spells in casting.known_spells(actor, up_to=reach).items():
+        shown = spells[:_CHOOSE_PAGE]
+        out.append({
+            "level": level,
+            "total": len(spells),
+            "castable": casting.can_cast_level(actor, level),
+            "spells": [{"id": sp.id, "name": sp.name, "school": sp.school,
+                        "range": sp.range, "duration": sp.duration,
+                        "save": sp.saving_throw,
+                        "prepared": casting.prepared_count(actor, sp.id)}
+                       for sp in shown],
+        })
+    return out
 
 
 def _reachable_spells(actor: Actor, data: dict) -> list[str]:
@@ -3654,6 +3706,7 @@ def to_dict(actor: Actor) -> dict:
         "heritage": actor.heritage, "race": actor.race, "pronouns": actor.pronouns,
         "true_name": actor.true_name, "appearance": actor.appearance,
         "described": bool(actor.described),
+        "domains": list(actor.domains or []),
         "troop": actor.troop.as_dict() if actor.troop is not None else None,
         "background": actor.background,
         "background_ties": list(actor.background_ties or []),
@@ -4005,6 +4058,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         true_name=str(data.get("true_name", "") or ""),
         appearance=str(data.get("appearance", "") or ""),
         described=bool(data.get("described", False)),
+        domains=list(data.get("domains") or []),
         troop=_troops.Troop.from_dict(data.get("troop")),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),

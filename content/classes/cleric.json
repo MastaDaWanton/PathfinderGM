@@ -1,0 +1,39 @@
+{
+  "id": "cleric",
+  "name": "Cleric",
+  "hit_die": 8,
+  "bab": "three_quarter",
+  "good_saves": ["fort", "will"],
+  "skill_ranks": 2,
+  "starting_wealth": "4d6 x 10 gp",
+  "proficiencies": ["simple", "light armor", "medium armor", "shields"],
+  "class_skills": [
+    "appraise", "craft", "diplomacy", "heal", "knowledge (arcana)",
+    "knowledge (history)", "knowledge (nobility)", "knowledge (planes)",
+    "knowledge (religion)", "linguistics", "profession", "sense motive", "spellcraft"
+  ],
+  "summary": "Prepares from the whole cleric list, channels energy, and takes two domains.",
+  "levels": [
+    {"level": 1, "grants": ["aura", "channel energy 1d6", "domains", "orisons",
+                            "spontaneous casting"]},
+    {"level": 2, "grants": []},
+    {"level": 3, "grants": ["channel energy 2d6"]},
+    {"level": 4, "grants": []},
+    {"level": 5, "grants": ["channel energy 3d6"]},
+    {"level": 6, "grants": []},
+    {"level": 7, "grants": ["channel energy 4d6"]},
+    {"level": 8, "grants": []},
+    {"level": 9, "grants": ["channel energy 5d6"]},
+    {"level": 10, "grants": []},
+    {"level": 11, "grants": ["channel energy 6d6"]},
+    {"level": 12, "grants": []},
+    {"level": 13, "grants": ["channel energy 7d6"]},
+    {"level": 14, "grants": []},
+    {"level": 15, "grants": ["channel energy 8d6"]},
+    {"level": 16, "grants": []},
+    {"level": 17, "grants": ["channel energy 9d6"]},
+    {"level": 18, "grants": []},
+    {"level": 19, "grants": ["channel energy 10d6"]},
+    {"level": 20, "grants": []}
+  ]
+}
