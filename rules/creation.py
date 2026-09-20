@@ -826,8 +826,14 @@ def feat_choices(payload: dict) -> dict:
     shut: list[dict] = []
     for feat in feats_mod.all_feats().values():
         verdict = feats_mod.meets(actor, feat)
-        row = {"id": feat.id, "name": feat.name,
-               "types": [str(t) for t in (feat.types or [])],
+        types = [str(t) for t in (feat.types or [])]
+        # 148 feats share a display name with their mythic namesake — `feats.by_name`
+        # already has to prefer the ordinary one for exactly this reason. Listed side by
+        # side with the shut ones showing, that put two rows called "Acrobatic" on the
+        # screen, which reads as a glitch even though the second says what it needs.
+        name = (f"{feat.name} (mythic)" if "mythic" in {t.lower() for t in types}
+                else feat.name)
+        row = {"id": feat.id, "name": name, "types": types,
                "text": str(feat.benefit or feat.description or "")[:400]}
         # Mythic feats are never open, whatever their prerequisites say. `feats.NOT_YET`
         # already treats a `mythic_tier` condition as uncheckable, so 155 of the 158 are

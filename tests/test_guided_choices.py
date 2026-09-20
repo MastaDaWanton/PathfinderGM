@@ -214,3 +214,79 @@ def test_a_non_caster_is_told_nothing_about_spells():
     got = creation.spell_choices(FIGHTER)
     assert got["casts"] is False and got["prepares"] is False
     assert not got["slots"]
+
+
+# --- browsing without typing -------------------------------------------------------------
+
+def _page() -> str:
+    from pathlib import Path
+
+    return Path("play/templates/play/home.html").read_text(encoding="utf-8")
+
+
+def test_the_lists_can_be_browsed_without_typing_a_word():
+    """Reported 2026-09-20, after the first version of this page shipped: "because a
+    player wont necessarily know the names of feats and spell they need to be able to find
+    it without typing anything. keep the typing as an option but make a better way."
+
+    The first cut capped the list at 60 rows and said "narrow the search", which is the
+    one instruction a player who does not know the names cannot follow.
+
+    Nielsen Norman settles the shape, and it is not infinite scroll: that "is less suited
+    to support specific tasks such as finding a particular item" and "results in a lack of
+    landmarks to help users orient themselves, whereas with pagination, users may remember
+    the page that an item was on". What makes a long list findable in the same research is
+    filters and a visible count — so the chips do the real work and the pages carry the
+    browsing, and the search box stays as one way in among three.
+    """
+    page = _page()
+    assert "function pager(" in page and "function chips(" in page
+    assert "data-crchip" in page and "data-crpagemove" in page
+    assert "PAGE_ROWS = 40" in page, "NN/g's ceiling for a filtered listing page"
+    # The typing stays.
+    assert 'id="featsearch"' in page and 'id="spellsearch"' in page
+
+
+def test_changing_the_filter_returns_to_the_first_page():
+    """Page four of a list that just became eleven items long is an empty screen, which
+    reads as a broken page rather than an emptied filter."""
+    page = _page()
+    for line in ("FORGE.featType = FORGE.featType === key ? \"\" : key;",
+                 "FORGE.spellSchool = FORGE.spellSchool === key ? \"\" : key;"):
+        assert line in page
+    assert page.count("FORGE.featPage = 1") >= 3, "chip, search and the shut-list toggle"
+    assert page.count("FORGE.spellPage = 1") >= 2
+
+
+def test_the_counts_the_chips_show_come_from_the_whole_reachable_list():
+    """A count that moves as you type is not a landmark. The chips are counted over
+    everything the character could reach, before the search narrows anything."""
+    page = _page()
+    assert "// Counted over everything this character could reach" in page
+
+
+def test_the_everything_chip_is_a_headcount_and_not_a_sum_of_the_others():
+    """A feat can carry two types and is counted under both, so adding the per-type chips
+    up is not how many feats there are: with the shut list showing, the "everything" chip
+    read **1476** where 1,474 feats exist. Measured in the browser 2026-09-20. The
+    per-type numbers were right; only their sum was not a headcount."""
+    page = _page()
+    assert "function chips(counts, active, kind, total)" in page
+    assert "const all = total;" in page
+    assert 'chips(counts, kind, "feat", pool.length)' in page
+    assert 'chips(counts, kind, "spell", pool.length)' in page
+
+
+def test_a_mythic_feat_says_so_in_its_name():
+    """148 feats share a display name with their mythic namesake — `feats.by_name` already
+    has to prefer the ordinary one for exactly this reason. With the shut list showing,
+    that put two rows called "Acrobatic" on screen, which reads as a glitch even though the
+    second says what it needs. Seen in the browser 2026-09-20; 148 duplicate names down to
+    9, and the nine that remain are the corpus's own."""
+    got = creation.feat_choices(FIGHTER)
+    names = [r["name"] for r in got["open"] + got["shut"]]
+    assert "Acrobatic (mythic)" in names and "Acrobatic" in names
+    import collections
+
+    dupes = [n for n, c in collections.Counter(names).items() if c > 1]
+    assert len(dupes) < 20, dupes

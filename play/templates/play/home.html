@@ -399,6 +399,22 @@
              border-bottom: 1px solid rgba(201,168,106,.10); cursor: pointer;
              color: var(--ink); font-size: 14px; }
   .featrow:last-child { border-bottom: 0; }
+  /* The chips are the browsing, the pager is the landmark. Both sit outside the scrolling
+     list box on purpose: a filter that scrolls away with the results is a filter nobody
+     finds twice. */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chips .chip {
+    cursor: pointer; font: 400 12.5px/1 var(--body); padding: 5px 10px; border-radius: 2px;
+    color: var(--dim); background: rgba(201,168,106,.05);
+    border: 1px solid rgba(201,168,106,.18);
+  }
+  .chips .chip b { color: var(--gold); font-weight: 600; margin-left: 5px; }
+  .chips .chip:hover { background: rgba(201,168,106,.12); color: var(--ink); }
+  .chips .chip.on { color: var(--ink); border-color: var(--gold-dim);
+                    background: linear-gradient(#2a2114, #1a140c); }
+  .pager { display: flex; align-items: center; gap: 14px; margin: 8px 0 2px; }
+  .pager button.quiet { padding: 5px 12px; font-size: 12.5px; }
+  .pager .note { margin: 0; }
   .featrow:hover { background: rgba(201,168,106,.08); }
   .featrow b { color: var(--gold); font-weight: 600; white-space: nowrap; }
   .featrow span { color: var(--dim); font-size: 12.5px; font-style: italic; }
@@ -1876,27 +1892,79 @@ function featName(fid) {
 // repainted this box from the unguided one, so searching "power" offered feats needing a
 // Leadership score of 13. Two implementations of one question, which is the thing
 // CLAUDE.md says to grep for.
+// How many rows a page holds. Nielsen Norman's product-listing research puts the workable
+// ceiling at "fewer than 40 per page" when there are good filters and a clear count, and
+// all three of those are here: the chips, this number, and the total printed above.
+const PAGE_ROWS = 40;
+
+// Chips and pages rather than a search box alone. Reported 2026-09-20: "because a player
+// wont necessarily know the names of feats and spell they need to be able to find it
+// without typing anything."
+//
+// NN/g settles the shape. Infinite scrolling "is less suited to support specific tasks
+// such as finding a particular item" and "results in a lack of landmarks to help users
+// orient themselves, whereas with pagination, users may remember the page that an item
+// was on" — and the three alternatives it recommends are a load-more button, integrated
+// pagination, and traditional pages. What actually makes a long list findable, in the
+// same research, is filters and a visible count, so the chips do the real work and the
+// pages carry the browsing.
+function pager(total, page, kind) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_ROWS));
+  if (pages <= 1) return "";
+  const at = Math.min(Math.max(1, page), pages);
+  return `<div class="pager">
+    <button class="quiet" data-crpagemove="${kind}:${at - 1}" ${at <= 1 ? "disabled" : ""}
+      >← previous</button>
+    <span class="note">page ${at} of ${pages}</span>
+    <button class="quiet" data-crpagemove="${kind}:${at + 1}" ${at >= pages ? "disabled" : ""}
+      >next →</button>
+  </div>`;
+}
+
+// `total` is passed rather than summed from `counts`, because a feat can carry two types
+// and is counted under both — summing them said "everything 1476" where 1,474 feats
+// exist. Measured in the browser 2026-09-20. The per-type numbers are right as they are;
+// it is only their sum that is not a headcount.
+function chips(counts, active, kind, total) {
+  const all = total;
+  const one = (key, label, n) => `<button class="chip ${
+    (active || "") === key ? "on" : ""}" data-crchip="${kind}:${esc(key)}"
+    >${esc(label)} <b>${n}</b></button>`;
+  return `<div class="chips">${one("", "everything", all)}${
+    Object.entries(counts).sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => one(k, k, n)).join("")}</div>`;
+}
+
 function featMatches() {
   const got = FORGE.choices && FORGE.choices.feats;
   if (!got || !got.ready) return "";
   const q = (FORGE.featq || "").trim().toLowerCase();
-  const pool = FORGE.showShutFeats
+  const pool = (FORGE.showShutFeats
     ? [...got.open, ...got.shut].sort((a, b) => a.name.localeCompare(b.name))
-    : got.open;
-  const hits = pool.filter(x => !FORGE.form.feats.includes(x.id)
+    : got.open).filter(x => !FORGE.form.feats.includes(x.id));
+  // Counted over everything this character could reach, so the chip numbers do not
+  // shuffle about as the search narrows — a count that moves is not a landmark.
+  const counts = {};
+  for (const x of pool) for (const t of (x.types || ["other"])) counts[t] = (counts[t] || 0) + 1;
+  const kind = FORGE.featType || "";
+  const hits = pool.filter(x => (!kind || (x.types || []).includes(kind))
     && (!q || x.name.toLowerCase().includes(q)));
-  const shown = hits.slice(0, 60);
-  if (!shown.length) return `<p class="note">Nothing matches “${esc(FORGE.featq || "")}”.
+  const page = Math.min(Math.max(1, FORGE.featPage || 1),
+                        Math.max(1, Math.ceil(hits.length / PAGE_ROWS)));
+  const shown = hits.slice((page - 1) * PAGE_ROWS, page * PAGE_ROWS);
+  if (!hits.length) return `${chips(counts, kind, "feat", pool.length)}<p class="note">Nothing here${
+    q ? ` matches “${esc(FORGE.featq)}”` : ""}.
     ${FORGE.showShutFeats ? "" : "Tick the box above to see what they cannot take yet."}</p>`;
-  return `<div class="featlist">${shown.map(x => `
+  return `${chips(counts, kind, "feat", pool.length)}
+    <p class="note">${hits.length} to look through${kind ? ` in ${esc(kind)}` : ""}.</p>
+    <div class="featlist">${shown.map(x => `
     <button class="featrow" ${x.unmet ? "disabled" : `data-craddfeat="${esc(x.id)}"`}
       title="${esc(x.text || "")}">
       <b>${esc(x.name)}</b>
       <span>${x.unmet
         ? esc("needs " + [...x.unmet, ...(x.unknown || [])].join(", "))
         : esc((x.types || []).join(", "))}</span>
-    </button>`).join("")}</div>${hits.length > shown.length
-      ? `<p class="note">${hits.length - shown.length} more — narrow the search.</p>` : ""}`;
+    </button>`).join("")}</div>${pager(hits.length, page, "feat")}`;
 }
 
 // --- page two: what this character may actually take ---------------------------------
@@ -2013,15 +2081,29 @@ function spellMatches() {
   const got = FORGE.choices && FORGE.choices.spells;
   if (!got || !got.casts || !got.ready) return "";
   const q = (FORGE.spellq || "").trim().toLowerCase();
-  const hits = (got.choose || []).filter(s => !f.spellbook.includes(s.id)
+  const pool = (got.choose || []).filter(s => !f.spellbook.includes(s.id));
+  // School is the axis a caster actually thinks in — "something to hurt them with" is
+  // evocation, "something to get past the guard" is illusion or enchantment — which is
+  // why it is the chip rather than, say, the source book.
+  const counts = {};
+  for (const s of pool) {
+    const k = s.school || "other";
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  const kind = FORGE.spellSchool || "";
+  const hits = pool.filter(s => (!kind || (s.school || "other") === kind)
     && (!q || s.name.toLowerCase().includes(q)));
-  const shown = hits.slice(0, 60);
-  if (!shown.length) return `<p class="note">Nothing matches “${esc(FORGE.spellq || "")}”.</p>`;
-  return `<div class="featlist">${shown.map(s => `
+  const page = Math.min(Math.max(1, FORGE.spellPage || 1),
+                        Math.max(1, Math.ceil(hits.length / PAGE_ROWS)));
+  const shown = hits.slice((page - 1) * PAGE_ROWS, page * PAGE_ROWS);
+  if (!hits.length) return `${chips(counts, kind, "spell", pool.length)}<p class="note">Nothing here${
+    q ? ` matches “${esc(FORGE.spellq)}”` : ""}.</p>`;
+  return `${chips(counts, kind, "spell", pool.length)}
+    <p class="note">${hits.length} to look through${kind ? ` in ${esc(kind)}` : ""}.</p>
+    <div class="featlist">${shown.map(s => `
     <button class="featrow" data-craddspell="${esc(s.id)}" title="${esc(s.text || "")}">
       <b>${esc(s.name)}</b><span>${esc(s.school || "")}</span></button>`).join("")}</div>${
-    hits.length > shown.length
-      ? `<p class="note">${hits.length - shown.length} more — narrow the search.</p>` : ""}`;
+    pager(hits.length, page, "spell")}`;
 }
 
 function paneForgeChoices() {
@@ -2428,6 +2510,7 @@ document.addEventListener("input", e => {
   // caret out of the very input being typed in.
   if (key === "featsearch") {
     FORGE.featq = e.target.value;
+    FORGE.featPage = 1;        // a narrowed list has different pages
     const box = $("#featmatches");
     if (box) box.innerHTML = featMatches();
     return;
@@ -2440,6 +2523,7 @@ document.addEventListener("input", e => {
   }
   if (key === "spellsearch") {
     FORGE.spellq = e.target.value;
+    FORGE.spellPage = 1;
     const box = $("#spellmatches");
     if (box) box.innerHTML = spellMatches();
     return;
@@ -2575,7 +2659,8 @@ document.addEventListener("click", async e => {
     const worldId = WORLD ? WORLD.id : (playing ? playing.id : (first ? first.id : ""));
     const opts = await (await fetch("/api/create/options" + (worldId ? `?world=${encodeURIComponent(worldId)}` : ""))).json();
     FORGE = { opts, form: forgeDefaults(opts), world: worldId, page: "who",
-              choices: null, choicesFor: "", showShutFeats: false };
+              choices: null, choicesFor: "", showShutFeats: false,
+              featType: "", featPage: 1, spellSchool: "", spellPage: 1 };
     render(); return;
   }
   if (e.target.closest("[data-unforge]")) { FORGE = null; render(); return; }
@@ -2655,7 +2740,37 @@ document.addEventListener("click", async e => {
       return;
     }
     const showshut = e.target.closest("[data-crshowshut]");
-    if (showshut) { FORGE.showShutFeats = showshut.checked; render(); return; }
+    if (showshut) {
+      FORGE.showShutFeats = showshut.checked;
+      FORGE.featPage = 1;            // the set changed under the pages
+      render(); return;
+    }
+    const chip = e.target.closest("[data-crchip]");
+    if (chip) {
+      const [kind, key] = chip.dataset.crchip.split(":");
+      // Pressing the chip already on turns it off, so "everything" is always one click
+      // away without hunting for it.
+      if (kind === "feat") {
+        FORGE.featType = FORGE.featType === key ? "" : key;
+        FORGE.featPage = 1;
+      } else {
+        FORGE.spellSchool = FORGE.spellSchool === key ? "" : key;
+        FORGE.spellPage = 1;
+      }
+      render(); return;
+    }
+    const pagemove = e.target.closest("[data-crpagemove]");
+    if (pagemove) {
+      const [kind, to] = pagemove.dataset.crpagemove.split(":");
+      if (kind === "feat") FORGE.featPage = parseInt(to, 10);
+      else FORGE.spellPage = parseInt(to, 10);
+      render();
+      // Back to the top of the list that just changed, or page two begins wherever the
+      // reader's eye happened to be resting.
+      const box = $(kind === "feat" ? "#featmatches" : "#spellmatches");
+      if (box) box.scrollIntoView({ block: "start" });
+      return;
+    }
     const addspell = e.target.closest("[data-craddspell]");
     if (addspell) {
       f.spellbook = [...new Set([...f.spellbook, addspell.dataset.craddspell])];
