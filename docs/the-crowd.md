@@ -116,7 +116,7 @@ a *"third raider"* as individuals alongside the unit. That is `note_cast` doing 
 sentences that single people out of a crowd, and a leader stepping forward is legitimate
 fiction. Worth watching in play rather than pre-emptively suppressing.
 
-## Not done here, and why
+## Not done here, and why — the blocks, now done (2026-09-20)
 
 **The corpus's own 22 troop-subtype blocks** (a goblin troop at 52 hp, an imperial infantry
 troop at 126) still spawn as ordinary actors. Their `subtype` is stripped before the Actor is
@@ -125,6 +125,16 @@ and its member count is nowhere in the data, so giving them attrition would mean
 number per block. The troop *rules* without the attrition would leave a readout saying "1 of
 1". Left alone rather than half-built, and recorded here so the next person does not read the
 gap as an oversight.
+
+> **Built as group 16** (`docs/published-troops.md`). The paragraph above is right that the
+> count is not in the block and wrong that it is nowhere: it is in the **subtype**, as a band
+> — "approximately 12 to 30 creatures" — and as a footprint, "a 20-foot-by-20-foot square".
+> Twenty feet is four squares, so the stated footprint is sixteen squares, and `size_for`
+> puts one person in each. Sixteen is where the published rule and this app's own ruling
+> agree; a member's share is the pool over sixteen, and the count falls out of the block's
+> own hit points from there. Nothing is invented per block, and the goblin troop this note
+> names arrives as thirteen goblins of four hit points. There are **23** of these blocks, not
+> 22.
 
 **Swarms** (41 blocks) are a different mechanic — damage reduction against weapons, distraction,
 area-only vulnerability — and are not a crowd of people. Nothing here touches them.

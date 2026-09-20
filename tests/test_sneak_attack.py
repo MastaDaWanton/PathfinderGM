@@ -148,7 +148,10 @@ def test_a_crowd_has_no_single_guard_to_slip_past():
     s, _e, rogue, _a, foe = _board()
     from rules import troops
 
-    foe.troop = troops.form("guildhand", 12, scene=s)
+    # A Troop, not `form` — `form` returns the ACTOR that carries one, and assigning an
+    # Actor here would have passed this test while meaning nothing.
+    foe.troop = troops.Troop(member="goblin", member_name="goblin", member_hp=4,
+                             member_xp=10, members=12, members_max=12)
     dice, why = precision.applies(s, rogue, foe, MELEE, flat_footed=True)
     assert dice == "" and "crowd" in why
 
@@ -240,3 +243,21 @@ def test_a_fighter_swinging_gets_no_extra_dice_and_no_mention_of_them():
     rogue.char_class = "fighter"
     _res, asked = _swing(e, rogue, foe)
     assert not any("Sneak attack" in l for l in asked), asked
+
+
+def test_the_reason_is_given_once_a_swing_and_keeps_the_name_it_was_given():
+    """Both measured live on 2026-09-20, fighting a published goblin troop: every blow
+    printed "Troop, goblin is a crowd - there is no single guard to slip past" TWICE,
+    because the damage stage is re-entered on each resume and the tell was unguarded; and
+    `capitalize()` had lowercased the rest of the name, turning "Troop, Goblin" into
+    "Troop, goblin"."""
+    from rules import troops
+
+    s, e, rogue, _a, foe = _board()
+    foe.name = "Troop, Goblin"
+    foe.troop = troops.Troop(member="goblin", member_name="goblin", member_hp=4,
+                             member_xp=10, members=12, members_max=12)
+    res, _asked = _swing(e, rogue, foe)
+    said = " ".join(o.tell for o in res.outcomes)
+    assert said.count("no single guard to slip past") == 1, said
+    assert "Troop, goblin" not in said, said

@@ -264,7 +264,42 @@ def instantiate(
     data["world_entity_id"] = world_entity_id
     actor = from_dict(data, ref=_next_ref(scene))
     _assemble_kit(actor, data)
+    # `raw`, not `found`: `lookup` drops `subtype` with the rest of `_NOT_ON_THE_SHEET`,
+    # so the one field that says "this is a crowd" is gone by the time `found` is built.
+    # The same arrangement `Actor._creature_doc` uses, and for the same reason.
+    _form_if_a_troop(actor, raw_block(key) or {})
     return actor
+
+
+def _form_if_a_troop(actor, doc: dict) -> None:
+    """A stat block carrying the troop subtype arrives as a unit, not as one creature.
+
+    The twenty blocks the corpus ships spawned as ordinary actors until 2026-09-20, which
+    `docs/the-crowd.md` recorded as left alone on purpose: "a published troop's hit points
+    ARE the unit's pool and its member count is nowhere in the data". The count is not in
+    the block — it is in the SUBTYPE, as a band and a footprint — so `troops.from_block`
+    derives it from the block's own hit points without inventing anything per block.
+
+    The published pool is kept exactly as written. Only the member count, a member's share
+    of the pool and the footprint are added, which is what the readout and the attrition
+    need; the block's attacks, saves and armour class are already the unit's own.
+    """
+    from . import troops as troops_mod
+
+    if not troops_mod.is_a_published_troop(doc):
+        return
+    pool = max(1, int(actor.hp_max or actor.hp or 1))
+    members, member_hp = troops_mod.from_block(pool)
+    actor.troop = troops_mod.Troop(
+        member=str(getattr(actor, "from_template", "") or ""),
+        member_name=troops_mod.one_of(str(doc.get("name") or actor.name)),
+        member_hp=member_hp,
+        # The block's XP is what the whole unit is worth; a member's share is what
+        # `xp_owed` pays for the ones who actually fell when the rest run.
+        member_xp=int(int(getattr(actor, "xp_value", 0) or 0) / max(1, members)),
+        members=members, members_max=members,
+        morale=troops_mod.MORALE_DEFAULT)
+    actor.size = troops_mod.size_for(members)
 
 
 def _assemble_kit(actor, data: dict) -> None:
@@ -451,6 +486,39 @@ def raw(key: str) -> dict | None:
     return imported().get(key) or imported().get(key.replace(" ", "-"))
 
 
+# Names the corpus files index-style: "Troop, Goblin" rather than "Goblin Troop", which
+# imports as `troop-goblin`. Three of the twenty-three troop blocks are named this way and
+# were reachable ONLY by that spelling — a spawn asking for "goblin troop", which is what
+# anybody would write, found nothing. Measured 2026-09-20 while driving a published troop
+# through the app.
+#
+# One swap, not a search: the leading word moves to the end. That is the whole of the
+# transform the corpus applies, so undoing it needs nothing cleverer.
+def _index_order(key: str) -> str:
+    """"goblin-troop" -> "troop-goblin", so an index-style name answers to its plain one."""
+    parts = [p for p in str(key or "").replace(" ", "-").split("-") if p]
+    if len(parts) < 2:
+        return ""
+    return "-".join([parts[-1]] + parts[:-1])
+
+
+def raw_block(key: str) -> dict | None:
+    """The imported stat block a name means, before `lookup` trims it for the sheet.
+
+    The ONE place that decides what a creature name resolves to. `instantiate` needs the
+    untrimmed document as well — `subtype` is stripped by `_NOT_ON_THE_SHEET`, and it is
+    the field that says "this is a crowd" — and doing that resolution twice is how a
+    lookup and its caller come to disagree, which is the rule CLAUDE.md records about
+    copies of a rule. Written after exactly that: a published goblin troop spawned as one
+    creature because the alias below was known here and not to the caller.
+    """
+    key = (key or "").strip().lower()
+    store = imported()
+    return (store.get(key)
+            or store.get(key.replace(" ", "-"))
+            or store.get(_index_order(key)))
+
+
 def lookup(key: str) -> dict | None:
     """A creature by name, hand-written first.
 
@@ -460,7 +528,7 @@ def lookup(key: str) -> dict | None:
     key = (key or "").strip().lower()
     if key in TEMPLATES:
         return TEMPLATES[key]
-    raw = imported().get(key) or imported().get(key.replace(" ", "-"))
+    raw = raw_block(key)
     if raw is None:
         return None
     data = {k: v for k, v in raw.items() if k not in _NOT_ON_THE_SHEET}
