@@ -628,6 +628,10 @@ though the ground has not changed — it is what leaves the people of the old ro
 and without it they follow the party around. Somebody who comes along is named in
 "with", by ref: {"op": "travel", "params": {"place": "the gate", "with": ["c2"]}}.
 Everyone not named stays where they are.
+ONE travel a turn. Name where the party ENDS UP, never the route they walk to get there:
+a plan carrying a second travel has the second one refused, and the party stops at the
+first. If reaching somewhere means passing through another place first, travel to that
+place this turn and go on the next.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
@@ -771,7 +775,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             lines.append(f"  THE PLACES HERE (the only ones that exist): "
                          f"{', '.join(p.name for p in known)}. To move between them use "
                          f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
-                         f"Anything else is refused.")
+                         f"Anything else is refused, and so is a SECOND travel in the "
+                         f"same plan — one journey a turn.")
         # And the roads out. Named for the same reason the places are: a model told only
         # about the room it is in reconstructs the rest of the world from earlier beats,
         # and "we set out for Zhilgoroth" is refused if Zhilgoroth has no road. The

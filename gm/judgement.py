@@ -3982,8 +3982,19 @@ _CAST_GROUP = re.compile(
 _TAIL_ADJECTIVES = ("leather", "iron", "steel", "red", "black", "grey", "gray", "white",
                     "blue", "green", "brown", "dark", "heavy", "ragged", "torn", "fine",
                     "plain", "long", "short", "broad")
+# The adjective slot before the noun. It was a closed list plus -ed/-en, and the list is
+# what decided whether a description survived whole: "a porter with a scarred forearm"
+# kept its forearm because "scarred" ends in -ed, and "a man with a distinctive satchel"
+# was booked as **man with a distinctive** because "distinctive" matched nothing. Measured
+# live 2026-09-20, where one man collected three cards partly on the strength of it.
+#
+# Morphology rather than more vocabulary, for the reason CLAUDE.md gives about chasing
+# words: the endings below are adjective-forming, and the slot stays NARROW on purpose —
+# widening it to any word lets a verb in, because "a man with a sword lunges" would read
+# "sword" as the adjective and "lunges" as the noun.
+_ADJECTIVE_ENDINGS = r"[a-z]+(?:ed|en|ive|ous|ful|less|ish|ing)"
 _CAST_TAIL = (r"(\s+(?:in|with)\s+(?:a|an|the)\s+"
-              r"(?:(?:[a-z]+(?:ed|en)|" + "|".join(_TAIL_ADJECTIVES) + r")"
+              r"(?:(?:" + _ADJECTIVE_ENDINGS + r"|" + "|".join(_TAIL_ADJECTIVES) + r")"
               r"\s+)?[a-z]+)?")
 _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
@@ -4111,6 +4122,50 @@ def zone_of_mention(beat: str, start: int, end: int) -> str:
     return "near"
 
 
+def _refers_back(who: str, head: str, this_beat: set[str],
+                 booked_by_head: dict[str, list[str]]) -> bool:
+    """Whether a DEFINITE mention is somebody the ledger already holds (item 36).
+
+    Heim's familiarity condition is the account: an indefinite noun phrase creates a new
+    file card, a definite refers to one that exists. `scene.cast` is that ledger, so the
+    article is the evidence the head-word dedup never read — which is why one man could
+    collect three cards.
+
+    Three grounds, each measured rather than supposed (live, 2026-09-20):
+
+    * the role word was booked by THIS beat — "shouting at a merchant … divided by the
+      shouting merchant", the turn item 36 was reported from;
+    * the ledger holds that role BARE — "merchant" booked, then "the merchant with the
+      satchel": a bare card is a person nobody described yet, and a definite describing
+      them is the description arriving, not a second body;
+    * the description shares a word with a booked one of the same role — "a porter with a
+      scarred forearm" then "the porter with the scarred forearm".
+
+    And the case it must refuse, which is the whole reason this is not just "same head":
+    "desperate man" booked, then "the man in the leather apron". Same role, no shared
+    description, nothing bare — two men, and skipping the second is exactly how the man
+    who swung first at the player was never put on the board (2026-09-18, item 16b).
+    """
+    booked = booked_by_head.get(head) or []
+    if not booked:
+        return False
+    if head in this_beat:
+        return True
+    if any(b.strip() == head for b in booked):
+        return True
+    # The role word is dropped from both sides along with the stop words: it is what
+    # they already have in common, and leaving it in would make every pair of phrases
+    # sharing a role "the same person" — which is the dedup this replaces.
+    def _describing(phrase: str) -> set[str]:
+        return {w for w in phrase.lower().split()
+                if w != head and w not in _NOT_AN_ADJECTIVE}
+
+    mine = _describing(who)
+    if not mine:
+        return False
+    return any(mine & _describing(b) for b in booked)
+
+
 def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
     """People the narration introduced become ledger entries, mechanically.
 
@@ -4172,6 +4227,16 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
                            "count": max(1, min(n, _SAID_CAP)),
                            "zone": zone_of_mention(gm_beat, *m.span())})
         added.append(role)
+    # The role words THIS beat has booked, for the definite-reference rule below. Seeded
+    # from the group loop above, which books in the same beat: a band booked as "twelve
+    # raiders" is who "the raiders" means two sentences later.
+    this_beat = {_role_head(w) for w in added}
+    # And every phrase already on the ledger, filed under its role word, so a definite
+    # can be compared with the people who share it.
+    booked_by_head: dict[str, list[str]] = {}
+    for e in scene.cast:
+        booked_by_head.setdefault(_role_head(str(e.get("who", ""))), []).append(
+            str(e.get("who", "")).lower())
     for m in _CAST_INTRO.finditer(gm_beat):
         # A phrase already claimed by a group is not a second person: "a group
         # of six men" registered the group AND "group of six men" as somebody.
@@ -4241,6 +4306,31 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
             continue
         if (head in heads or head in real) and len(who.split()) == 1:
             continue
+        # One person, booked twice under two descriptions (item 36). Measured live
+        # 2026-09-19: the ledger came back holding **merchant** and **shouting
+        # merchant**, both at turn 82, out of one beat that wrote "he is currently
+        # shouting at A merchant" and then "his attention is divided by THE shouting
+        # merchant". The head-word dedup lets a second description through on purpose —
+        # that is how the man who swung first got onto the board (2026-09-18) — so it
+        # could not tell these apart from the words alone.
+        #
+        # The article can. Heim's novelty/familiarity condition is the standing account
+        # and its own metaphor is this very ledger: an indefinite noun phrase creates a
+        # new file card, a definite refers to one that exists ("File Change Semantics
+        # and the Familiarity Theory of Definiteness", 1983). So an indefinite always
+        # books, and a definite whose role word THIS BEAT has already booked is the same
+        # person mentioned again.
+        #
+        # Held to the one beat deliberately, and the 2026-09-18 fix is why: "desperate
+        # man" booked a turn earlier and "the man in the leather apron" now is two men,
+        # and skipping the second is the exact defect that kept him off the board. Heim
+        # allows a novel definite to be accommodated, which across beats is the common
+        # case — a definite naming a head nobody booked still books here, unchanged.
+        if m.group(0).split()[0].lower() == "the" \
+                and _refers_back(who, head, this_beat, booked_by_head):
+            continue
+        this_beat.add(head)
+        booked_by_head.setdefault(head, []).append(who.lower())
         heads.add(head)
         phrases.add(who.lower())
         scene.cast.append({"who": who, "turn": int(turn),
