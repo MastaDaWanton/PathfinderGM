@@ -297,8 +297,26 @@ def test_a_save_from_before_the_grid_still_loads(tmp_path, settings):
     c = campaign_mod.begin_with(load_pc("fixtures/pc-kesst.json"))
     c.save()
     back = campaign_mod.Campaign.load(c.path())
-    assert back.scene.grid is None
-    assert not back.scene.has_grid
+    # A campaign begun today HAS ground, because the party is standing somewhere and the
+    # map is drawn from wherever that is (item 28, 2026-09-19). What this test is for is
+    # the save shape: a file written before grids existed still loads, and one written
+    # with a grid comes back with it whole.
+    assert back.scene.grid is not None and back.scene.has_grid
+    assert back.scene.grid.width > 0 and back.scene.grid.height > 0
+    # And the half this test is really for: a save written before grids existed has no
+    # `grid` key at all. It still loads — and since 2026-09-19 it is HEALED on the way in,
+    # because the map is derived from wherever the party is standing and an old save says
+    # where that is (item 28). `Grid.from_dict` still answers None for the missing key;
+    # what puts ground under an old character is the load's own `place_party`.
+    import json
+
+    raw = json.loads(c.path().read_text(encoding="utf-8"))
+    raw["scene"].pop("grid", None)
+    c.path().write_text(json.dumps(raw), encoding="utf-8")
+    campaign_mod._LIVE.clear()
+    old = campaign_mod.Campaign.load(c.path())
+    assert old.scene.grid is not None, "an old save gets the map everybody else has"
+    assert old.scene.at, "and it is the ground of the place they were standing in"
 
 
 def test_speed_survives_a_save():

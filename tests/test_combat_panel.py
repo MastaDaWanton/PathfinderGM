@@ -175,13 +175,20 @@ def test_a_fight_lays_the_ground_it_promised(fight):
     assert abs(px - fx) + abs(py - fy) >= 2
 
 
-def test_the_ground_goes_with_the_fight(fight):
+def test_the_ground_stays_when_the_fight_ends(fight):
+    """This asserted the opposite until 2026-09-19 — "the ground goes with the fight" —
+    and the player overturned it: "a map should be displayed at all times" (item 28). The
+    ground belongs to the PLACE; what goes with the fight is the tactical layer above it.
+    The grid is cleared where it is replaced instead, when the party arrives somewhere
+    else."""
     client, cm = fight
     scene = cm.current().scene
     e = cm.current().engine()
     e.run(e.validate([{"op": "end_encounter", "params": {}}]))
-    assert scene.grid is None
-    assert not scene.positions
+    assert scene.grid is not None, "the room did not stop existing"
+    assert "pc" in scene.positions, "and the player is still standing in it"
+    # The fight's own state is what ended.
+    assert scene.initiative == [] and scene.sides == {} and not scene.in_encounter
 
 
 def test_a_grid_the_gm_already_laid_is_kept(tmp_path):

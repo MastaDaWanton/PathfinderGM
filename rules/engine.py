@@ -1112,12 +1112,12 @@ class Scene:
         self.acted = set()
         self.attacked = set()
         self.sides = {}
-        # The battlefield goes with the fight. `begin_encounter` lays a grid when none
-        # exists, and the side panel's own words are "there is no grid outside a fight";
-        # here rather than only in the end_encounter *op*, because most fights end by
-        # a side emptying inside the NPC-turn loop, which calls this directly.
-        self.grid = None
-        self.positions.clear()
+        # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
+        # ground belongs to the place, the party is standing on it before and after, and
+        # "a map should be displayed at all times" was the request. What goes is the
+        # tactical layer above it — initiative, sides, and the things a fight conjured.
+        # The grid is cleared where it is replaced instead, when the party arrives
+        # somewhere else (`Engine.place_party`).
         # The fog goes with the map it was drawn on. A manifestation kept past the grid
         # that held its squares is a bank of fog with no location, and the next fight
         # would lay a fresh grid without it — the squares would be gone and the thing
@@ -1407,12 +1407,16 @@ class Resolution:
 # out of the dark, the GM tried to name them, was refused, and never thought to create
 # them — it spent five attempts guessing at refs that could not exist. A rejection that
 # names the way out turns a lost turn into a repair.
+# Four hand-written templates were the whole vocabulary offered here, while 7,133 stat
+# blocks sat loaded and reachable (item 28, 2026-09-19). The hint no longer lists them:
+# `rules/roster.py` tells the brief who THIS place would hold, with the template beside
+# each, and the four are named here only as the floor for a scene with no place in it.
 _SPAWN_HINT = (
     ' If a PERSON or creature new to the scene should be in it, create them first with '
-    '{"op": "spawn", "params": {"template": "thug", "count": 2}} — the templates are '
-    "guildhand, watchman, thug and guard dog — and use the refs it returns. A thing "
-    "(a weapon, a table, a door) is never spawned: a blow at a weapon is an attack on "
-    "the person holding it."
+    '{"op": "spawn", "params": {"template": "thug", "count": 2}} and use the refs it '
+    "returns. Take the template from WHO THIS PLACE WOULD HOLD above where there is one; "
+    "guildhand, watchman, thug and guard dog always exist. A thing (a weapon, a table, a "
+    "door) is never spawned: a blow at a weapon is an attack on the person holding it."
 )
 
 # A spawn named after an object. Measured 2026-09-18: a thug named "weapon", 13 hp,
@@ -4158,6 +4162,7 @@ class Engine:
         # walked out of, so the cast ledger stays too. The third and last writer of
         # `Actor.at`, and it only ever writes the party's own place.
         pc = self.scene.pc()
+        was_at = self.scene.at
         self.scene.at = target.id
         if pc is not None:
             pc.at = target.id
@@ -4165,6 +4170,68 @@ class Engine:
             if not a.at:
                 a.at = target.id
         self.staff_the_place()
+        # New room, new ground — and only when the room is actually new. The map belongs to
+        # the PLACE, so arriving somewhere else discards the old one and derives this one;
+        # arriving where you already are keeps what is down, because this path also runs on
+        # every load, and re-deriving there threw away everything laid ON the map. Measured
+        # by the suite within the hour: a fog cloud survived a restart and its squares did
+        # not (`test_a_fog_cloud_survives_closing_the_app`).
+        if was_at != target.id:
+            self.scene.grid = None
+            self.scene.positions.clear()
+        self.lay_the_ground()
+
+    def lay_the_ground(self, even_nowhere: bool = False, place: bool = True) -> bool:
+        """The map of wherever the party is standing. Laid on arrival, not on violence.
+
+        Reported 2026-09-19: *"A map should be displayed at all times."* The grid existed
+        only inside a fight by construction — laid by `_lay_battlefield` from the two doors
+        a fight comes in by, cleared by `end_encounter`, and gated again in the view and in
+        the browser, which printed "No ground is mapped. A grid is laid out when a fight
+        starts."
+
+        Nothing was missing to derive one. `floorplan.for_place` is a pure function of the
+        place id, its terrain and the world's authored shape, and all three are available
+        on every turn; its scatter is a SHA-seeded LCG rather than `random`, so the market
+        has the same stalls every time anybody stands in it and none of it is saved. What
+        was absent was POSITIONS — and the zone word (`engaged`/`near`/`far`) is on every
+        actor at all times, which is exactly what `place_by_zone` reads.
+
+        This is what every virtual tabletop does: the map is the room, and the fight adds
+        the tactical layer on top of the same ground rather than conjuring ground of its
+        own. Returns whether it laid anything.
+        """
+        # `even_nowhere` is the fight's door. A scene with no place is one that has not
+        # been put anywhere yet — the map tray says so rather than drawing a blank field —
+        # but a brawl still has to happen on ground, and `floorplan.for_place("")` falls
+        # through to open ground the way every fight used to get.
+        if self.scene.grid is not None or not (self.scene.at or even_nowhere):
+            return False
+        from . import floorplan, places as places_mod
+
+        authored = getattr(self.here(), "shape", None)
+        self.scene.grid = floorplan.for_place(
+            self.scene.at, places_mod.terrain_of(self.scene.at), authored)
+        # The player first and everyone else around them, because `place_by_zone` measures
+        # from the PC. A quarter of the way in, the same spot a fight would have put them,
+        # and never off the board — a ten-foot alley is two squares wide.
+        # `place=False` is the fight's door again: `_lay_battlefield` is about to lay the
+        # PC's side, the foes at their own distances and the bystanders around them, and
+        # placing anybody here first would measure them from a PC who is about to move.
+        # Measured by the suite: a servant standing `engaged` came out two squares away
+        # rather than one, because the player was re-placed after they were.
+        pc = self.scene.pc()
+        if pc is None or not place:
+            return True
+        if pc.ref not in self.scene.positions:
+            x = max(0, min(self.scene.grid.width - 1, self.scene.grid.width // 4))
+            self.scene.positions[pc.ref] = self._clear_square(
+                (x, self.scene.grid.height // 2), pc.size)
+        unplaced = [r for r in self.scene.actors
+                    if r != pc.ref and r not in self.scene.positions]
+        if unplaced:
+            self.scene.place_by_zone(unplaced)
+        return True
 
     def staff_the_place(self):
         """Somebody behind the counter, where the party is standing (`rules/keepers.py`).
@@ -7103,8 +7170,17 @@ class Engine:
         has not already put one down; combatants without positions are placed by
         their zones, the player's side on the left and everyone else a zone's worth
         of squares away. One helper for both doors a fight comes in by —
-        `begin_encounter`, and the swing that auto-starts one."""
-        if self.scene.grid is not None:
+        `begin_encounter`, and the swing that auto-starts one.
+
+        Since 2026-09-19 the ground is usually already down — `lay_the_ground` puts it
+        there when the party arrives, because "a map should be displayed at all times"
+        (item 28) — so this lays one only when there is none, and gets on with the part
+        that is actually about a FIGHT: drawing the sides. Anybody already standing
+        somewhere keeps where they were standing, which is the better fiction as well as
+        the cheaper code: the man at the counter is at the counter when the brawl starts,
+        not teleported into a line."""
+        self.lay_the_ground(even_nowhere=True, place=False)
+        if self.scene.grid is None:
             return
         from . import floorplan, places as places_mod
 
@@ -7119,8 +7195,6 @@ class Engine:
         # the authored shape; a generated or founded place carries None and derives, as
         # every place did before.
         authored = getattr(self.here(), "shape", None)
-        self.scene.grid = floorplan.for_place(
-            self.scene.at, places_mod.terrain_of(self.scene.at), authored)
         mid = self.scene.grid.height // 2
         # A quarter of the way in, and never off the board. The literal 4 was safe while
         # every room was at least twelve squares wide; it stopped being safe the day a
@@ -7129,6 +7203,17 @@ class Engine:
         # alley is gone" — their narrow-room rule had been made unreachable by this app's
         # own floor — and this is the half of that fix which is not the floor.
         pc_side, foe_row = max(1, min(4, self.scene.grid.width // 4)), 0
+        # The fight lays out its own combatants, even where they were already standing.
+        #
+        # This is the one place the geometry is load-bearing: a zone word and a stated
+        # distance are claims about the fight ("I loose an arrow at him from 200 feet"),
+        # and an idle position from standing about in the room is not. Measured by the
+        # suite the hour the map became permanent: with everyone pre-placed on arrival the
+        # bowshot opened at forty feet, because the loop below skips anybody who already
+        # has a square. Bystanders keep where they were standing — they are the half of
+        # the room that is not the fight.
+        for ref in [r for refs in sides.values() for r in refs]:
+            self.scene.positions.pop(ref, None)
         for side, refs in sides.items():
             has_pc = any(self.scene.actors[r].is_pc for r in refs
                          if r in self.scene.actors)

@@ -838,6 +838,21 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
         lines.append(f"\nWHO THE PLAYER LOOKED FOR AND IS NOT HERE (fact, and the beat "
                      f"says so — nobody arrives to satisfy the sentence): {absent}")
 
+    # Who this place would hold, if anybody new appears. Not a claim that they are here —
+    # `WHO IS HERE` below is the only such claim — but the roster the model picks from
+    # instead of inventing, read off the place's own staffing, the open matters' people and
+    # the world's residents (`rules/roster.py`, item 28). The four hand-written templates
+    # this replaces were the whole vocabulary on offer while 7,133 stat blocks sat loaded.
+    if scene is not None and getattr(scene, "at", ""):
+        from rules import roster as roster_mod
+
+        pc_here = scene.pc() if hasattr(scene, "pc") else None
+        could = roster_mod.who_would_be_here(
+            scene, world, level=int(getattr(pc_here, "level", 1) or 1))
+        line = roster_mod.brief_line(could)
+        if line:
+            lines.append("\n" + line)
+
     lines.append("\nWHO IS HERE (these refs are the only ones that exist):")
     for ref, actor in scene.actors.items():
         # Somebody hiding in the house is not in the room the character can see. The
