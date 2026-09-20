@@ -2267,11 +2267,13 @@ function renderMap(s) {
   const g = s.scene.grid;
   if (!g) {
     $("#mapwrap").innerHTML = "";
-    // A blank tray reads as broken. There is no grid outside a fight, and saying so
-    // is the difference between "nothing here" and "nothing happened".
+    // A blank tray reads as broken, so it says why. Since 2026-09-19 the ground is laid
+    // when the party ARRIVES somewhere rather than when a fight starts (item 28), so this
+    // is now the rare case — a scene with nowhere in it yet, between worlds or before the
+    // party has been placed.
     $("#maptrayinner").innerHTML =
-      `<div class="empty">No ground is mapped. A grid is laid out when a fight
-       starts, or when the GM puts one down.</div>`;
+      `<div class="empty">No ground is mapped yet. The map is drawn from wherever the
+       party is standing, as soon as they are standing somewhere.</div>`;
     return;
   }
 
