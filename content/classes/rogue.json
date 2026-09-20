@@ -1,0 +1,41 @@
+{
+  "id": "rogue",
+  "name": "Rogue",
+  "hit_die": 8,
+  "bab": "three_quarter",
+  "good_saves": ["ref"],
+  "skill_ranks": 8,
+  "starting_wealth": "4d6 x 10 gp",
+  "proficiencies": ["simple", "hand crossbow", "rapier", "sap", "shortbow", "short sword",
+                    "light armor"],
+  "class_skills": [
+    "acrobatics", "appraise", "bluff", "climb", "craft", "diplomacy",
+    "disable device", "disguise", "escape artist", "intimidate",
+    "knowledge (dungeoneering)", "knowledge (local)", "linguistics", "perception",
+    "perform", "profession", "sense motive", "sleight of hand", "stealth",
+    "swim", "use magic device"
+  ],
+  "summary": "Sneak attack every other level, a talent every other level, and the skills to find what is not offered.",
+  "levels": [
+    {"level": 1, "grants": ["sneak attack 1d6", "trapfinding"]},
+    {"level": 2, "grants": ["evasion", "rogue talent"]},
+    {"level": 3, "grants": ["sneak attack 2d6", "trap sense +1"]},
+    {"level": 4, "grants": ["rogue talent", "uncanny dodge"]},
+    {"level": 5, "grants": ["sneak attack 3d6"]},
+    {"level": 6, "grants": ["rogue talent", "trap sense +2"]},
+    {"level": 7, "grants": ["sneak attack 4d6"]},
+    {"level": 8, "grants": ["improved uncanny dodge", "rogue talent"]},
+    {"level": 9, "grants": ["sneak attack 5d6", "trap sense +3"]},
+    {"level": 10, "grants": ["advanced talents", "rogue talent"]},
+    {"level": 11, "grants": ["sneak attack 6d6"]},
+    {"level": 12, "grants": ["rogue talent", "trap sense +4"]},
+    {"level": 13, "grants": ["sneak attack 7d6"]},
+    {"level": 14, "grants": ["rogue talent"]},
+    {"level": 15, "grants": ["sneak attack 8d6", "trap sense +5"]},
+    {"level": 16, "grants": ["rogue talent"]},
+    {"level": 17, "grants": ["sneak attack 9d6"]},
+    {"level": 18, "grants": ["rogue talent", "trap sense +6"]},
+    {"level": 19, "grants": ["sneak attack 10d6"]},
+    {"level": 20, "grants": ["master strike", "rogue talent"]}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "fighter",
+  "name": "Fighter",
+  "hit_die": 10,
+  "bab": "full",
+  "good_saves": ["fort"],
+  "skill_ranks": 2,
+  "starting_wealth": "5d6 x 10 gp",
+  "proficiencies": ["simple", "martial", "light armor", "medium armor", "heavy armor",
+                    "shields", "tower shields"],
+  "class_skills": [
+    "climb", "craft", "handle animal", "intimidate", "knowledge (dungeoneering)",
+    "knowledge (engineering)", "profession", "ride", "survival", "swim"
+  ],
+  "summary": "A bonus feat at first level and every even level, and training that makes armour and one weapon group his own.",
+  "levels": [
+    {"level": 1, "grants": ["bonus feat"]},
+    {"level": 2, "grants": ["bonus feat", "bravery +1"]},
+    {"level": 3, "grants": ["armor training 1"]},
+    {"level": 4, "grants": ["bonus feat"]},
+    {"level": 5, "grants": ["weapon training 1"]},
+    {"level": 6, "grants": ["bonus feat", "bravery +2"]},
+    {"level": 7, "grants": ["armor training 2"]},
+    {"level": 8, "grants": ["bonus feat"]},
+    {"level": 9, "grants": ["weapon training 2"]},
+    {"level": 10, "grants": ["bonus feat", "bravery +3"]},
+    {"level": 11, "grants": ["armor training 3"]},
+    {"level": 12, "grants": ["bonus feat"]},
+    {"level": 13, "grants": ["weapon training 3"]},
+    {"level": 14, "grants": ["bonus feat", "bravery +4"]},
+    {"level": 15, "grants": ["armor training 4"]},
+    {"level": 16, "grants": ["bonus feat"]},
+    {"level": 17, "grants": ["weapon training 4"]},
+    {"level": 18, "grants": ["bonus feat", "bravery +5"]},
+    {"level": 19, "grants": ["armor mastery"]},
+    {"level": 20, "grants": ["bonus feat", "weapon mastery"]}
+  ]
+}
