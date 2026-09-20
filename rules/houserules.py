@@ -135,6 +135,17 @@ def active() -> dict:
             pass
         out["core_races"] = bool(raw.get("core_races", DEFAULTS["core_races"]))
         out["gm_view"] = bool(raw.get("gm_view", False))
+        # The same omission again, found by the live check that groups 5 and 6 still
+        # owed (2026-09-20): `set_active` wrote `knowledge_offer` and `content`, the
+        # file on disk read `"knowledge_offer": true`, and this whitelist handed back
+        # the default — so the shelf toggle could be pressed and never held, and the
+        # content setting could not be changed at all. Exactly what the comment six
+        # lines above records for `race_rp`; adding a key here is part of adding a
+        # rule, which is CLAUDE.md's "when you fix a rule, grep for every copy of it".
+        out["knowledge_offer"] = bool(raw.get("knowledge_offer", False))
+        said = str(raw.get("content", "") or "").strip().lower()
+        if said in ("fade", "explicit"):
+            out["content"] = said
         # Re-read the same way it is written. `set_active` validated these on the way in,
         # and a key this function does not name is silently dropped — which is the point
         # of the whitelist and was why a saved set came back as the defaults.

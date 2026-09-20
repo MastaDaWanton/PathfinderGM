@@ -308,3 +308,44 @@ def test_unlimited_race_tier_accepts_any_race_on_the_bench(isolated):
         assert not any("RP race" in p for p in problems), problems
     finally:
         path.unlink()
+
+
+# --- every rule survives the round trip ---------------------------------------------------
+
+def test_knowledge_offer_and_content_are_read_back_after_they_are_written(isolated):
+    """Measured live 2026-09-20, the check groups 5 and 6 still owed: the shelf toggle
+    was pressed, `house-rules.json` on disk read `"knowledge_offer": true`, and the very
+    next `/gm` answer still printed the OFF line — "Some of what the town keeps, your
+    character has not learned" instead of the offer.
+
+    `set_active` wrote both keys and `active()`'s whitelist read back neither, so the
+    rule could be pressed and never held and `content` could not be changed at all.
+    This is the second time that exact omission shipped; the test below is the one that
+    stops a third."""
+    rules, problems = houserules.set_active({"knowledge_offer": True, "content": "explicit"})
+    assert problems == []
+    assert rules["knowledge_offer"] is True and rules["content"] == "explicit"
+    # Read back from the file, which is where the live run diverged from the unit tests.
+    assert houserules.knowledge_offer() is True
+    assert houserules.content() == "explicit"
+    assert houserules.active()["knowledge_offer"] is True
+
+
+def test_no_rule_can_be_written_that_active_refuses_to_read(isolated):
+    """The general form of the defect above, and of the `race_rp` one before it
+    (2026-09-07, "pressed and never held"). `active()` whitelists what it reads; adding
+    a rule to DEFAULTS without adding it there makes a setting that silently does
+    nothing. Rather than name the keys, write a non-default value for every one of them
+    and require it to survive — so the next rule added is covered the day it is added."""
+    # A value for each key that is NOT its default, in the shape the rule accepts.
+    others = {"point_buy": 100, "magic_stacking": True, "ability_cap": 25,
+              "pronoun_sets": ["ze/hir"], "core_races": False, "race_rp": 40,
+              "gm_view": True, "knowledge_offer": True, "content": "explicit"}
+    assert set(others) == set(houserules.DEFAULTS), (
+        "a house rule exists with no round-trip value here; add one")
+    for key, value in others.items():
+        assert value != houserules.DEFAULTS[key], key      # the test would prove nothing
+        rules, problems = houserules.set_active({key: value})
+        assert problems == [], (key, problems)
+        assert rules[key] == value, f"{key} was written and came back {rules[key]!r}"
+        assert houserules.active()[key] == value, f"{key} does not survive re-reading"

@@ -81,5 +81,48 @@ campaign after players objected.
 2,000 for level 2). Enough to advance — it will settle with a night's rest", read in
 code, the author's number kept, no model call. It did nothing twice on 2026-09-18.
 
-Still owed live: a giver in the room across three quiet turns (item 7), and the
-`knowledge_offer` rule turned on so the answer offers rather than only naming the route.
+## The two that were still owed, run 2026-09-20 — and the rule that was never in effect
+
+Both were driven on a seeded copy of the `masta` save. The save carries no live card at
+all, so item 7's situation was built rather than replayed: one open errand card whose
+person is `c19`, "woman in the corner", already in the scene's cast, with `touched` two
+transcript turns back — quiet by the NEW rule (present and since >= 2) and nowhere near
+the old twelve, so the run exercises the rule item 7 added and not the one it replaced.
+
+**The giver in the room (item 7): works.** `thread_to_pull` picked the card at five
+criteria (`here, present, recent, open, quiet`) and wrote the giver sentence. On the
+second of three quiet turns the narrator acted on it, in her own words and unprompted:
+
+> From the corner, the shadow moves. The woman in the corner stands … 'I have a task for
+> a traveler who knows how to move unseen. I need a name carried to the well.'
+
+On 2026-09-18 a named giver sat in the "In the scene" list for many turns and was never
+named in prose. Presence was a listing; it is now a thing that happens.
+
+**`knowledge_offer` (item 9): failed, and the reason was not in this code at all.** The
+shelf toggle was pressed, `house-rules.json` on disk read `"knowledge_offer": true`, and
+the very next `/gm` answer still printed the OFF line. `houserules.active()` whitelists
+the keys it reads back, and neither `knowledge_offer` nor `content` had ever been added
+to it — `set_active` wrote both, `active()` returned the defaults. So the rule could be
+pressed and never held, and **`content` could not be changed at all**: a table setting
+explicit got fade, and the button reverted because the server answered with the default
+it had just dropped.
+
+This is the second time that omission shipped. The comment six lines above the fix records
+the first, for `race_rp` and `core_races` on 2026-09-07 — "pressed and never held". Both
+keys are now read back the way they are written, and the test that matters is not the one
+naming them: `test_no_rule_can_be_written_that_active_refuses_to_read` writes a non-default
+value for **every** key in `DEFAULTS` and requires each to survive, so the next rule added
+is covered the day it is added rather than the day a play-test catches it.
+
+Re-run after the fix, both directions:
+
+| Rule | The answer's last line |
+|---|---|
+| `knowledge_offer` **on** | "— There is more here your character wouldn't know yet. Say the word (\"tell me anyway\") if you want it, or find it out in play: ask around (Diplomacy, an hour or four)." |
+| `knowledge_offer` **off** | "— Some of what the town keeps, your character has not learned. Ask around in play: Diplomacy, an hour or four, and it can be tried again." |
+| `content` | explicit and fade both POST, hold, and read back |
+
+The wider lesson is the one CLAUDE.md already states and this pass proves twice over: a
+feature can be correct in its own file, unit-tested, merged, and still not be in effect —
+which is why "verify in the running app" is a law and not a courtesy.
