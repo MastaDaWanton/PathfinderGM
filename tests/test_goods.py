@@ -402,7 +402,10 @@ def test_every_class_walks_out_dressed():
             "abilities": {"str": 12, "dex": 12, "con": 12, "int": 12,
                           "wis": 12, "cha": 12},
             "skills": [], "feats": [], "paths": cid.get("paths", [])[:1],
-                "spellbook": creation.starter_spells(cid["id"]),
+            "spellbook": creation.starter_spells(cid["id"]),
+            # A cleric takes two domains at creation since 2026-09-19 and is refused
+            # without them, the way a wizard with an empty book is refused (item 27).
+            "domains": creation.starter_domains(cid["id"]),
         })
         assert problems == [], (cid["id"], problems)
         actor = from_dict(built["sheet"])

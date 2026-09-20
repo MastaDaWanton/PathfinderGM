@@ -3563,11 +3563,20 @@ def inject_cast(raw_intents, player_text: str, scene) -> list:
     if not casting.is_caster(pc):
         return raw_intents
 
-    # What they could actually cast right now. Prepared for a wizard, known for a
-    # sorcerer; `knows` answers both, and the book is the vocabulary.
+    # What they could reach at all. `casting.known_spells` answers it for every kind of
+    # caster — the book a wizard carries, the repertoire a sorcerer knows, the whole class
+    # list for a cleric or druid whose god is the book.
+    #
+    # This read `pc.spellbook + pc.prepared` until 2026-09-19, and both are empty for the
+    # life of a cleric, so a cleric's declaration never became an intent: "I cast wall of
+    # flame" fell through to prose, and the engine's own refusal — "Flame Strike is a level
+    # 5 spell and Ted is a level 1 cleric" — was never reached (item 25). The vocabulary is
+    # what a caster may CHOOSE from; whether they prepared it is the engine's question, and
+    # the answer reaches the player as a sentence instead of a spell they did not cast.
     said = player_text.lower()
-    reachable = list(getattr(pc, "spellbook", []) or []) + list(
-        (getattr(pc, "prepared", {}) or {}))
+    reachable = [sp.id for level in casting.known_spells(
+        pc, up_to=casting.highest_spell_level(pc)).values() for sp in level]
+    reachable += [s for s in (getattr(pc, "prepared", {}) or {}) if s not in reachable]
     best = ""
     for sid in reachable:
         try:

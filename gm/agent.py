@@ -60,6 +60,10 @@ PRIMARY_TIMEOUT = 600
 FALLBACK_TIMEOUT = 120
 
 
+# The opening of a cast tell: "Ted casts Cure Light Wounds (caster level 1; …)".
+_CAST_TELL = re.compile(r"\bcasts ([A-Z][^(.,]*)")
+
+
 class GMAgent:
     def __init__(self, world, engine, role: str = "narrator"):
         self.world = world
@@ -853,6 +857,7 @@ class GMAgent:
                pull: dict | None = None,
                claim: str = "",
                blows: list[dict] | None = None,
+               cast: list[str] | None = None,
                fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
@@ -998,6 +1003,14 @@ class GMAgent:
         if handed:
             repairs.append(f"wrong hands: cut {len(handed)} sentence(s) that gave the "
                            f"player somebody else's blow")
+        # And a spell the engine did not cast: cut, the same shape and for the same reason.
+        # The engine is the only thing that casts a spell, so prose asserting one it did
+        # not cast is asserting an outcome that never happened — measured on the player's
+        # own screen, a level 1 cleric's "wall of flame at 6th level" with the slots panel
+        # still reading full afterwards (item 25).
+        text, uncast = narration_mod.cut_uncast_spells(text, cast)
+        if uncast:
+            repairs.append(f"a spell nobody cast: cut {len(uncast)} sentence(s)")
         # And a blow landed on the turn the fight was only declared: cut, the
         # declaration standing in its place.
         text, early = narration_mod.cut_premature_blows(text, blows)
@@ -1440,7 +1453,8 @@ class GMAgent:
             max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
             player_input=player_input, brief=brief, hand_back=True, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
-            claim=claim, blows=self._blows_from(outcomes))
+            claim=claim, blows=self._blows_from(outcomes),
+            cast=self._cast_from(outcomes))
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -1496,6 +1510,23 @@ class GMAgent:
                     "subj": subj or "they", "obj": obj or "them", "poss": poss,
                 })
         return deaths
+
+    def _cast_from(self, outcomes) -> list[str]:
+        """The spells the engine actually cast this turn, by name.
+
+        Read off the outcomes rather than the intents: an intent that was refused at
+        resolution did not cast anything, and it is what HAPPENED that the prose may
+        assert (item 25).
+        """
+        out = []
+        for o in outcomes or []:
+            if str(getattr(o, "op", "")) != "cast":
+                continue
+            # The cast tell opens "Ted casts Cure Light Wounds (caster level 1; …)".
+            m = _CAST_TELL.search(str(getattr(o, "tell", "") or ""))
+            if m:
+                out.append(" ".join(m.group(1).split()))
+        return out
 
     def _blows_from(self, outcomes: list) -> list[dict]:
         """Who struck this turn, from the attack outcomes that rolled — the reviewer's
@@ -1588,7 +1619,7 @@ class GMAgent:
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
-            blows=self._blows_from(outcomes))
+            blows=self._blows_from(outcomes), cast=self._cast_from(outcomes))
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

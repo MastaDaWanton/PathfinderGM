@@ -274,6 +274,26 @@ def slots_for(actor) -> dict[int, int]:
     return out
 
 
+def domain_slots_for(actor) -> dict[int, int]:
+    """The extra slot a cleric's domains give at each spell level above orisons.
+
+    The Core Rulebook: "A cleric also gets one domain spell slot for each level of cleric
+    spell she can cast, from 1st on up. Each day, a cleric can prepare one of the spells
+    from her two domains in that slot." Orisons get none.
+
+    Held apart from `slots_for` rather than added into it, because a domain slot is not
+    interchangeable with an ordinary one — only a domain spell may go in it, and spontaneous
+    cure conversion may never spend it (`casting.sacrifice_for` skips it for that reason).
+    The panel shows it as its own row for the same reason: a cleric who sees "4 of 4" and
+    can only use three of them for what she wants has been told something false.
+    """
+    from . import domains as domains_mod
+
+    if not domains_mod.of(actor):
+        return {}
+    return {level: 1 for level in slots_for(actor) if level > 0}
+
+
 def save_dc(actor, spell_level: int) -> int:
     """10 + the spell's level + the caster's ability modifier.
 
@@ -313,6 +333,99 @@ def knows(actor, spell) -> bool:
     if data.get("prepare_from") in ("spellbook", "known"):
         return spell.id in actor.spellbook
     return True
+
+
+def known_spells(actor, up_to: int | None = None) -> dict[int, list]:
+    """Every spell this caster may choose from, by spell level.
+
+    One function for the three things that all needed the same answer and each had their
+    own (or, in two cases, none): the Spells panel's list, `judgement.inject_cast`'s
+    vocabulary, and the brief. What "known" means is the class's own business —
+
+      * a **wizard** or **sorcerer**: the book or the repertoire they carry, and nothing
+        else. A wizard who loses the book has lost the spells.
+      * a **cleric**, **druid**, **paladin** or **ranger**: the whole class list, because
+        their god or the wild is the book. 1,143 spells for a cleric, of which 179 are
+        castable at level 1 — which is why the panel folds by level and the caller passes
+        `up_to`.
+
+    Reported 2026-09-19 as "this spells panel should show a list of all known spells as
+    well": the panel offered a `+` only on rows already in the book, so a list-caster saw
+    a wizard's empty-book message for the life of the character.
+    """
+    data = caster_data(actor)
+    if not data:
+        return {}
+    from . import spells as spells_mod
+
+    out: dict[int, list] = {}
+    everything = spells_mod.all_spells()
+    if data.get("prepare_from") in ("spellbook", "known"):
+        chosen = [everything.get(sid) for sid in (actor.spellbook or [])]
+        for spell in [s for s in chosen if s is not None]:
+            lvl = spell_level_for(actor, spell)
+            if lvl is not None and (up_to is None or lvl <= up_to):
+                out.setdefault(lvl, []).append(spell)
+    else:
+        want = str(data.get("list") or "").lower()
+        for spell in everything.values():
+            lvl = level_on_list(spell, want)
+            if lvl is not None and (up_to is None or lvl <= up_to):
+                out.setdefault(lvl, []).append(spell)
+    for lvl in out:
+        out[lvl].sort(key=lambda s: str(s.name).lower())
+    return dict(sorted(out.items()))
+
+
+# The spells a divine caster may reach for without having prepared them. The Core
+# Rulebook: "A good cleric… can spontaneously cast a cure spell in place of a prepared
+# spell of the same level or higher" — the prepared spell is lost and the cure is cast
+# instead. A druid has the same exception for summon nature's ally.
+#
+# Alignment is deliberately not consulted. The player's own ruling, 2026-09-19: "grab
+# whatever the belief system of the world is and let that be enough. don't worry about the
+# gods or the alignment." The book's good/evil split decides cure versus INFLICT, and with
+# no alignment in play the healing half is the one that ships — which is also the half the
+# player asked for: "may use a slot at any time for a healing spell of that slot level".
+CONVERTS_TO = {
+    "cleric": ("cure ",),
+    "druid": ("summon nature's ally", "summon natures ally"),
+}
+
+
+def converts_spontaneously(actor, spell) -> bool:
+    """Whether this caster may cast this spell without having prepared it."""
+    data = caster_data(actor)
+    starts = CONVERTS_TO.get(str(data.get("list") or "").lower())
+    if not starts or spell is None:
+        return False
+    name = str(getattr(spell, "name", "")).strip().lower()
+    return any(name.startswith(s) for s in starts)
+
+
+def sacrifice_for(actor, spell_level: int) -> str:
+    """The prepared spell that would be given up to convert, or "".
+
+    "A prepared spell of the same level or higher", and the cheapest one that qualifies, so
+    converting never costs a fifth-level slot while a first-level one is sitting there. A
+    domain slot is never spent this way — the book says so, and a domain spell is the one
+    thing a cleric prepared *for* a reason.
+    """
+    best, best_level = "", None
+    for sid, count in (actor.prepared or {}).items():
+        if int(count) < 1 or str(sid).startswith("domain:"):
+            continue
+        try:
+            from . import spells as spells_mod
+
+            level = spell_level_for(actor, spells_mod.get(str(sid)))
+        except KeyError:
+            continue
+        if level is None or level < int(spell_level):
+            continue
+        if best_level is None or level < best_level:
+            best, best_level = str(sid), level
+    return best
 
 
 def prepared_count(actor, spell_id: str) -> int:

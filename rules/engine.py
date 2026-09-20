@@ -6047,9 +6047,28 @@ class Engine:
                 return self._refuse(
                     intent, f"{actor.name} has no {pool} left, so {spell.name} is not "
                             f"cast. What was cast before it stands.")
-            if casting.caster_data(actor).get("prepare_from") == "spellbook":
-                casting.unprepare(actor, spell.id, 1)
+            # The prepared copy is spent with the slot — for every prepared caster, not
+            # only the ones who prepare from a book (item 25).
+            converted = ""
+            if casting.caster_data(actor).get("kind") == "prepared" and level > 0:
+                if casting.prepared_count(actor, spell.id) > 0:
+                    casting.unprepare(actor, spell.id, 1)
+                else:
+                    # Spontaneous conversion: the cure is cast and the prepared spell that
+                    # paid for it is gone. Said out loud, because a player whose shield of
+                    # faith silently vanished would be right to call it a bug.
+                    given = casting.sacrifice_for(actor, level)
+                    if given:
+                        casting.unprepare(actor, given, 1)
+                        try:
+                            lost = spells_mod.get(given).name
+                        except KeyError:
+                            lost = given
+                        converted = (f"{actor.name} gives up {lost} to cast "
+                                     f"{spell.name} instead.")
             state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
+            if converted:
+                state["tells"].append(converted)
         pool = casting.slot_pool(level)
 
         targets = intent.targets() or ([intent.params["at"]] if intent.params.get("at")
@@ -6715,10 +6734,26 @@ class Engine:
                 f"cast: {spell.name} is not in {actor.name}'s spellbook.",
                 "legality", index,
             )
-        if data.get("prepare_from") == "spellbook" and \
-                casting.prepared_count(actor, spell.id) < 1 and level > 0:
+        # Every PREPARED caster, not only the ones who prepare from a book. This read
+        # `prepare_from == "spellbook"` until 2026-09-19, so the check fired for wizards and
+        # for nobody else — and a cleric, druid, paladin or ranger prepares nothing, ever,
+        # which is the chain behind "spellcasting is broken in general" (item 25). With no
+        # prepared spells a cleric's vocabulary was empty, `inject_cast` bowed out, no
+        # `cast` op was ever emitted, and the nine checks below and above it — including the
+        # caster-level one that refuses a level 5 spell to a level 1 cleric — were never
+        # reached at all. The gate was working; nothing ever knocked on it.
+        unprepared = casting.prepared_count(actor, spell.id) < 1
+        # ...with the one exception the book names: a cure spell may be cast in place of a
+        # prepared spell of the same level or higher, which is what keeps a cleric useful
+        # when the day's preparation did not anticipate the wound (`casting.CONVERTS_TO`).
+        may_convert = (casting.converts_spontaneously(actor, spell)
+                       and bool(casting.sacrifice_for(actor, level)))
+        if data.get("kind") == "prepared" and unprepared and level > 0 and not may_convert:
             raise IntentError(
-                f"cast: {actor.name} did not prepare {spell.name} today.",
+                f"cast: {actor.name} did not prepare {spell.name} today."
+                + (f" A cure spell may be cast in place of a prepared spell of that "
+                   f"level or higher, and {actor.name} has none prepared to give up."
+                   if casting.converts_spontaneously(actor, spell) else ""),
                 "legality", index,
             )
         if casting.slots_left(actor, level) < 1:

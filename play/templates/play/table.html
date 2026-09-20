@@ -371,6 +371,14 @@
              border: 1px solid #2e261c; background: #1a1610; color: var(--gold);
              cursor: pointer; padding: 0; letter-spacing: 0; }
   .prepbtn:disabled { opacity: .3; cursor: default; }
+  /* The search over a caster's own list. A cleric chooses from 179 castable spells at
+     first level, and a list that long is unusable without one (item 26). */
+  .findbox { width: 100%; padding: 4px 7px; margin-bottom: 8px; font: inherit;
+             font-size: 12px; background: #16120d; color: var(--ink);
+             border: 1px solid #332a1e; border-radius: 3px; }
+  .cols details > summary { cursor: pointer; padding: 5px 0; font: 600 12px var(--display);
+                            letter-spacing: .04em; color: #cbb98f; }
+  .cols details > summary small { color: var(--dim); font-weight: 400; letter-spacing: 0; }
   .prepcount { min-width: 14px; text-align: center; color: var(--dim);
                font-variant-numeric: tabular-nums; }
   .prepcount.has { color: var(--accent); }
@@ -3732,13 +3740,71 @@ function tabSpells(s) {
         <div class="t"><span>Casting ability</span><b>${esc(sp.ability.toUpperCase())}</b></div>
         <div class="t"><span>Highest spell</span><b>Level ${sp.highest}</b></div>
       </div>
+      ${(sp.domain_slots || []).length ? `
+        <h3 style="margin-top:12px">Domain slots</h3>
+        <div class="terms">${sp.domain_slots.map(d => `
+          <div class="t"><span>Level ${d.level}</span><b>${d.max}</b></div>`).join("")}</div>
+        <p class="note">One a level, and only a domain spell goes in it.</p>` : ""}
+      ${(sp.domains || []).length ? `
+        <h3 style="margin-top:12px">Domains</h3>
+        <div class="terms">${sp.domains.map(d => `
+          <div class="t"><span>${esc(d.name)}</span>
+            <b>${d.spells.length} <small>spell${d.spells.length === 1 ? "" : "s"}</small></b>
+          </div>`).join("")}</div>` : ""}
       ${sp.note ? `<div class="sub" style="margin-top:10px">${esc(sp.note)}</div>` : ""}
     </div>
     <div class="card">
       <h3>${sp.kind === "prepared" ? "Prepared today" : "Known"}</h3>
-      ${book || tabEmpty("Nothing in the book yet.")}
+      ${book || tabEmpty(sp.kind === "prepared"
+        ? "Nothing prepared yet — choose from the list beside this."
+        : "Nothing in the book yet.")}
+    </div>
+    <div class="card">
+      <h3>${sp.kind === "prepared" ? "What can be prepared" : "What can be learned"}</h3>
+      ${spellChoices(sp)}
     </div>
   </div>`;
+}
+
+// The third region, and the reported half of item 26: "this spells panel should show a
+// list of all known spells as well". A cleric prepares from the whole cleric list — 1,143
+// spells, of which 179 are castable at first level — so it is grouped by spell level,
+// searchable, and each level folds. A wizard's book needs none of that and gets the same
+// widget with nothing to hide.
+let SPELL_FIND = "";
+function spellChoices(sp) {
+  const groups = sp.choose_from || [];
+  if (!groups.length) return tabEmpty("Nothing on this caster's list yet.");
+  const find = SPELL_FIND.trim().toLowerCase();
+  return `
+    <input id="spellfind" class="findbox" type="search" placeholder="Find a spell…"
+           value="${esc(SPELL_FIND)}" autocomplete="off">
+    ${groups.map(g => {
+      const rows = g.spells.filter(s => !find || s.name.toLowerCase().includes(find));
+      // Levels they cannot cast yet are folded shut: they are there so a player can see
+      // what is coming, not so they can scroll past it every time.
+      const open = g.castable || find ? " open" : "";
+      const hidden = g.total - g.spells.length;
+      return `<details${open}><summary>Level ${g.level}
+        <small>${g.total} spell${g.total === 1 ? "" : "s"}${
+          g.castable ? "" : " · not yet"}</small></summary>
+        ${rows.map(s => `
+          <div class="spellrow">
+            <div class="spellname"><b>${esc(s.name)}</b>
+              <small>${esc([s.school, s.range, s.duration].filter(Boolean).join(" · "))}</small>
+            </div>
+            <div class="prep">
+              <span class="prepcount${s.prepared ? " has" : ""}">${s.prepared || ""}</span>
+              <button class="prepbtn" data-spell="${esc(s.id)}"
+                data-action="${sp.kind === "prepared" ? "prepare" : "learn"}"
+                title="${sp.kind === "prepared" ? "Prepare this" : "Add to the book"}"
+                ${g.castable ? "" : "disabled"}>+</button>
+            </div>
+          </div>`).join("") || `<p class="note">Nothing here matches.</p>`}
+        ${hidden > 0 && !find
+          ? `<p class="note">and ${hidden} more — search to find them.</p>` : ""}
+      </details>`;
+    }).join("")}`;
 }
 
 // --- Equipment ---
@@ -3844,6 +3910,17 @@ async function prepareSpell(spell, action) {
     alert(e.message);
   }
 }
+// The spell search redraws the list as it is typed. The value is kept in SPELL_FIND
+// rather than read off the node, because `drawSheet` replaces the node — and the caret is
+// put back at the end, which is where somebody typing expects it.
+document.addEventListener("input", e => {
+  const find = e.target.closest("#spellfind");
+  if (!find) return;
+  SPELL_FIND = find.value;
+  drawSheet();
+  const again = document.getElementById("spellfind");
+  if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+});
 document.addEventListener("change", e => {
   const input = e.target.closest(".slotinput");
   if (input) slotAction({action: "set", slot: input.dataset.slot,

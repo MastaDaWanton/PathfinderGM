@@ -995,6 +995,61 @@ def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
     return " ".join(kept).strip(), wrong
 
 
+ID = r"[A-Za-z][A-Za-z' -]{2,40}"
+# A spell being CAST in the prose — not mentioned, not asked about, not remembered. The
+# verb has to be finite and the caster has to be the player or the subject of the sentence:
+# "you cast X", "she speaks the words of X", "X blooms from his hands".
+_CASTS_IN_PROSE = re.compile(
+    r"\b(?:cast|casts|casting|invoke|invokes|speaks? the words of|utters? the|"
+    r"unleash|unleashes|conjure|conjures|calls? (?:down|up|forth))\s+"
+    r"(?:the\s+|a\s+|an\s+)?(" + ID + r")", re.I)
+
+
+def spells_claimed(text: str) -> list[str]:
+    """Every spell this beat says was cast, lower-cased and trimmed."""
+    out = []
+    for m in _CASTS_IN_PROSE.finditer(unquoted(str(text or ""))):
+        name = " ".join(m.group(1).split()).strip(" ,.;:!?").lower()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def cut_uncast_spells(text: str, cast: list[str] | None) -> tuple[str, list[str]]:
+    """Sentences claiming a spell the engine did not cast are cut. Returns (text, cut).
+
+    The deterministic backstop under item 25, and the same shape as `wrong-hands`: the
+    engine is the only thing that casts a spell, so prose asserting one it did not cast is
+    asserting an outcome that did not happen. Measured 2026-09-19 on the player's own
+    screen: a level 1 cleric's "wall of flame at 6th level", with the slots panel still
+    reading 3 of 3 and 4 of 4 afterwards — nothing was cast, and the beat said otherwise.
+
+    Narrow on purpose. A beat that casts what the engine cast is untouched; so is a
+    sentence that merely NAMES a spell without casting it ("he asks about magic missile"),
+    because `_CASTS_IN_PROSE` needs a casting verb and `unquoted` drops dialogue. The check
+    only runs when the engine cast something or the beat claims something.
+    """
+    claimed = spells_claimed(text)
+    if not claimed:
+        return text, []
+    really = {" ".join(str(c or "").split()).lower() for c in (cast or [])}
+    # A claim is honoured if the engine cast a spell whose name contains it or which
+    # contains it: the prose writes "cure light wounds" and "a cure", and both are the
+    # same event.
+    bad = [c for c in claimed
+           if not any(c in r or r in c for r in really if r)]
+    if not bad:
+        return text, []
+    cut, kept = [], []
+    for sentence in _sentences(text):
+        said = spells_claimed(sentence)
+        if said and any(s in bad for s in said):
+            cut.append(sentence)
+        else:
+            kept.append(sentence)
+    return " ".join(kept).strip(), cut
+
+
 # A sentence in which somebody DOES something: a person as its subject and a verb that
 # is not merely being. The events of a beat, as against its weather.
 _STATIVE = re.compile(

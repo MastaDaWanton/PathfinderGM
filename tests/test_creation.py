@@ -135,6 +135,9 @@ def test_a_new_character_has_the_money_their_class_declares():
                 skills=["climb"], feats=["toughness", "dodge"],
                 spellbook=(["mage-armor", "magic-missile", "shield"]
                            if cid == "wizard" else []),
+                # A cleric takes two domains at creation since 2026-09-19 and is refused
+                # without them, the way a wizard with an empty book is refused (item 27).
+                domains=creation.starter_domains(cid),
             ))
             assert problems == [], (cid, problems)
             gp = built["sheet"]["purse"].get("gp", 0)
@@ -213,6 +216,7 @@ def test_a_new_character_leaves_the_forge_with_a_purse_and_their_hands():
                           "wis": 10, "cha": 10},
             "skills": [], "feats": [],
             "spellbook": creation.starter_spells(cid, int_mod=1),
+            "domains": creation.starter_domains(cid),
         })
         assert problems == [], (cid, problems)
         sheet = built["sheet"]
@@ -422,6 +426,7 @@ def test_every_class_on_the_menu_can_actually_be_built():
             # A caster with an empty book cannot take their own turn, so the menu walk
             # gives each one a legal opening spellbook.
             "spellbook": creation.starter_spells(c["id"], int_mod=1),
+            "domains": creation.starter_domains(c["id"]),
             # A class that declares branches must have one chosen; one that declares
             # none must carry none. Taking the first offered exercises both sides.
             "paths": creation.leveling.paths_for(c["id"])[:1],
