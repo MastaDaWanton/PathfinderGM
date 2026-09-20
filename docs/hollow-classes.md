@@ -55,11 +55,16 @@ though it were the rule. The fighter's, rogue's and cleric's lines check out.
 This is the argument for the whole exercise: a table nobody has checked against its source
 is a table with an unknown number of these in it.
 
-## What is still a document and not a mechanic
+## What was still a document and not a mechanic — done 2026-09-20
 
 These tables say what a level **grants**, in the same shape the other eight classes use, and
 that is what the Class tab reads. Making sneak attack apply itself is a damage rule the
-engine has to run rather than a document it reads — it is the one item in this group that is
-not finished by writing a table down, and it is not claimed here. The table now says the
-rogue has it, at the right levels, which is the half that was missing from the screen the
+engine has to run rather than a document it reads — it was the one item in this group that
+was not finished by writing a table down, and it was not claimed here. The table said the
+rogue has it, at the right levels, which was the half that was missing from the screen the
 player photographed.
+
+**The other half landed as group 15**: `rules/precision.py`, `docs/sneak-attack.md`,
+`tests/test_sneak_attack.py`. The dice are read off the table written above rather than
+computed from the level, so this document is now the thing the mechanic obeys — which is
+the arrangement the whole group was for.

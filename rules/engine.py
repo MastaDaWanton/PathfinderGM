@@ -2867,6 +2867,28 @@ class Engine:
                     # damage DICE never multiply. Order is the whole fix.
                     dmg_mods = dmg_mods + [Modifier(state["rider_total"],
                                                     f"{rider_col} die ({rider})")]
+                # Sneak attack, on the same shelf and for the same reason: the rogue's
+                # extra damage "is not multiplied" on a critical hit, so it is added
+                # here, past `mult`, and never folded into the weapon's notation.
+                # `rules/precision.py` decides whether it applies at all.
+                sneak_dice, sneak_why = self._sneak_for(
+                    actor, defender, weapon, flat_footed=flat_footed)
+                if sneak_dice:
+                    if "sneak_total" not in state:
+                        sneak_roll = self._roll_or_suspend_stage(
+                            intent, actor, [], f"Sneak attack ({sneak_dice})",
+                            None, partial, state, sneak_dice)
+                        state["sneak_total"] = sneak_roll.total
+                        state["rolls"].append(sneak_roll.as_dict())
+                    dmg_mods = dmg_mods + [
+                        Modifier(state["sneak_total"], f"sneak attack ({sneak_dice})")]
+                    state["tells"].append(
+                        f"{actor.name} finds the opening — {sneak_why}.")
+                elif sneak_why:
+                    # The "why not" is worth saying: a rogue who never sees their dice
+                    # is owed the reason, and the narrator is told it as a fact of the
+                    # blow rather than as a rule that fired.
+                    state["tells"].append(sneak_why.capitalize() + ".")
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +
@@ -7247,6 +7269,40 @@ class Engine:
             effects=[{"kind": "initiative", "order": order, "law": list(law_in or [])}],
             tell=f"Initiative: {names}.{law_note}", because=intent.because,
         )
+
+    def _sneak_for(self, actor, defender, weapon, *, flat_footed: bool) -> tuple[str, str]:
+        """The sneak attack dice for this swing and why, or ("", why not).
+
+        The engine's half is only the two facts `precision` cannot see for itself: how far
+        apart they are standing, and whether the defender has concealment. Both are read
+        from the same places the attack roll reads them, so the dice and the to-hit can
+        never disagree about the board.
+        """
+        from . import position as position_mod, precision as precision_mod
+
+        distance_ft = None
+        here = self.scene.positions.get(getattr(actor, "ref", ""))
+        there = self.scene.positions.get(getattr(defender, "ref", ""))
+        if getattr(self.scene, "grid", None) is not None and here and there:
+            from .grid import distance_between
+
+            # Edge to edge, sizes included — the same measurement reach and range use, so
+            # a shot that is 30 feet for one rule is 30 feet for the other.
+            distance_ft = distance_between(
+                tuple(here[:2]), str(getattr(actor, "size", "medium") or "medium"),
+                tuple(there[:2]), str(getattr(defender, "size", "medium") or "medium"))
+        # Cover is not concealment in 1e — they are different rules with different
+        # sources — but total cover means there is nothing to aim at. The rogue's bar is
+        # concealment, so only what obscures counts.
+        #
+        # Asked as a PREFIX question, the first law: `state.hidden` covers invisibility
+        # and everything else anyone hides behind later, without this line being edited
+        # again. Matching "invisible" by name here is what the three-laws ratchet caught.
+        concealed = bool(defender.has_state("state.hidden")
+                         or position_mod.cover_of(self.scene, actor, defender) == "total")
+        return precision_mod.applies(
+            self.scene, actor, defender, weapon,
+            flat_footed=flat_footed, distance_ft=distance_ft, concealed=concealed)
 
     def _lay_battlefield(self, sides: dict) -> None:
         """The ground. The map tray has promised "a grid is laid out when a fight
