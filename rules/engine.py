@@ -1636,6 +1636,12 @@ class Engine:
         # attack op: a swing riding the same GM turn that opened the battle is
         # deferred to the player's own first combat turn, never resolved in prose.
         self._battle_joined = False
+        # Where the party's one journey this batch has left them, or "". One journey a
+        # turn (docs/playtest-2026-09-18.md item 35): a plan carrying five `travel` ops
+        # walked the party across town in a single turn and left them standing on the
+        # green while the prose described the market. Same shape as `_battle_joined`,
+        # and for the same reason — a fresh batch is a fresh question.
+        self._journeyed = ""
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -2105,8 +2111,10 @@ class Engine:
     def run(self, intents: list[Intent]) -> Resolution:
         # A fresh batch is a fresh question. Reset here and not in `resume`, because a
         # resume continues the same declared turn — a battle joined before the player
-        # was handed a die is still the battle this batch joined.
+        # was handed a die is still the battle this batch joined, and a journey already
+        # walked before a die was handed over is still this turn's one journey.
         self._battle_joined = False
+        self._journeyed = ""
         return self._tick_schemes(self._drive([i.as_dict() for i in intents], [], {}))
 
     def _tick_schemes(self, resolution: "Resolution") -> "Resolution":
@@ -4310,6 +4318,15 @@ class Engine:
         """
         from . import journey as journey_mod, places as places_mod
 
+        # One journey a turn, from this side too (item 35): a plan that walks across
+        # town and then takes the road out is the same defect wearing a longer coat,
+        # and this one costs days on the clock rather than minutes.
+        if self._journeyed:
+            return self._refuse(
+                intent, f"The party has already travelled this turn and is at "
+                        f"{self._journeyed}. One journey a turn — the road out is the "
+                        f"next turn's.")
+
         pc = self.scene.pc()
         want = " ".join(str(intent.params.get("to") or "").split())
         legs = journey_mod.legs_from(self.world, self.scene.location_id)
@@ -4372,6 +4389,11 @@ class Engine:
 
         if arrived:
             self.scene.location_id = leg.to_id
+            # A march between settlements is this turn's journey too (item 35), and a
+            # `travel` behind it would walk the party across the new town the moment it
+            # arrived. A road turned back from cost hours but moved nobody, so it does
+            # not spend the turn's journey.
+            self._journeyed = leg.to_name
         self.place_party()
 
         if not arrived:
@@ -4427,6 +4449,31 @@ class Engine:
         even there: they stay where they fell.
         """
         from . import keepers
+
+        # One journey a turn (item 35). A plan may name a whole route — measured
+        # 2026-09-19 on "I find the mayor and grab him by the collar", which came back
+        # as five travels: the guildhall, the market, the lane, the green, the upper
+        # floor. The engine ran them in order, the fifth was refused because its stairs
+        # are inside the guildhall, and the party ended standing on the GREEN while the
+        # prose described the market.
+        #
+        # The first is kept and the rest refused, rather than collapsing to the last,
+        # because that turn is exactly why: the destination the model meant was
+        # reachable only from a place earlier in its own list, and the engine has no
+        # route-finder to walk it there. Keeping the first preserves the invariant that
+        # the party only ever arrives somewhere it could legally reach from where it
+        # stood. The prior art wants the same thing from the other side — Inform's
+        # Misadventure and Safari Guide take ONE named room and derive the route
+        # themselves, and Angband and DCSS travel to one destination with the path
+        # computed and the walk interruptible. In every tradition the traveller names a
+        # destination and the system finds the way; here the model was handing over the
+        # way itself. The refusal names where the party now stands so the next turn can
+        # carry on from it, which is the roguelike's "repeat the command to resume".
+        if self._journeyed:
+            return self._refuse(
+                intent, f"The party has already travelled this turn and is at "
+                        f"{self._journeyed}. One journey a turn — the rest of the way "
+                        f"is the next turn's.")
 
         want = str(intent.params.get("biome") or "").strip().lower()
         place = " ".join(str(intent.params.get("place") or "").split())
@@ -4629,6 +4676,10 @@ class Engine:
                 self.scene.move(ref, going_to.id)
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
+            # The one journey this batch is spent. Set only where the party actually
+            # moved: a refused travel, or a travel to the ground already underfoot,
+            # costs the turn nothing and must not bar the real one behind it.
+            self._journeyed = going_to.name
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
             self.staff_the_place()
