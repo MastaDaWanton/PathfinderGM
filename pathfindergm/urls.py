@@ -53,6 +53,7 @@ urlpatterns = [
     path("api/resume", home_views.resume, name="resume"),
     path("api/create/options", home_views.creation_options, name="creation_options"),
     path("api/character/create", home_views.create_character, name="create_character"),
+    path("api/character/choices", home_views.character_choices, name="character_choices"),
     path("api/character/delete", home_views.delete_character,
          name="delete_character"),
     path("api/settings/models", home_views.model_settings,
