@@ -99,6 +99,76 @@ copy would have been a rule with two homes, and the one that drifted would be th
 player sees — the forge showing a cap of three where the server grants four, which
 `spellCap` already carries a comment about having happened once.
 
+## The second pass: browsing without typing
+
+The first cut shipped a search box, capped the list at 60 rows and said *"narrow the
+search"*. Reported straight back, and correctly:
+
+> "because a player wont necessarily know the names of feats and spell they need to be
+> able to find it without typing anything. keep the typing as an option but make a better
+> way either allowing for pages withing the list so they can go through all of them or if
+> there is a better way do that."
+
+"Narrow the search" is the one instruction a player who does not know the names cannot
+follow. The cap made the list unbrowsable at exactly the moment browsing was the point.
+
+**The prior art settles it, and it rules out the obvious answer.** Nielsen Norman's
+research on long listings: infinite scrolling *"is less suited to support specific tasks
+such as finding a particular item"* and *"results in a lack of landmarks to help users
+orient themselves, whereas with pagination, users may remember the page that an item was
+on"*
+([Infinite Scrolling: When to Use It, When to Avoid It](https://www.nngroup.com/articles/infinite-scrolling-tips/)).
+Its three recommended alternatives are a load-more button, integrated pagination, and
+traditional pages. And what actually makes such a list findable, in the same work, is
+**good filters and a clear count**, with pages held under about forty items
+([Alternatives to Pagination on Product-Listing Pages](https://www.nngroup.com/articles/alternatives-pagination-listing-pages/)).
+
+So: **chips do the real work and the pages carry the browsing**, with the search box kept
+as one way in among three.
+
+- **Feats** filter by type, because that is how the book groups them: *general 66, combat
+  37, metamagic 32, item creation 1* for a wizard.
+- **Spells** filter by school, because that is the axis a caster actually thinks in —
+  "something to hurt them with" is evocation, "something to get past the guard" is
+  illusion or enchantment: *transmutation 76, conjuration 30, divination 30, illusion 29,
+  abjuration 27, necromancy 21, enchantment 18, evocation 13*.
+- **Forty rows a page**, with "page 2 of 4" under the list.
+- Every chip carries its **count**, taken over everything the character can reach rather
+  than over the current search — a number that moves as you type is not a landmark.
+- Pressing the active chip turns it off, so "everything" is always one click away.
+- Changing a filter or the search returns to page one, because page four of a list that
+  just became eleven items long is an empty screen, and an empty screen reads as a broken
+  page rather than an emptied filter.
+
+Measured in the browser: paging moves (page 2 of 4, different first row), a chip narrows
+to 37 combat feats and resets the page, pressing it again restores 136, and picking a
+spell out of a filtered page keeps the filter. With the shut list showing it is 37 pages
+of 1,474; page 9,999 clamps to the last page rather than showing an empty screen.
+
+Two more the browser caught in this pass, both invisible to a unit test:
+
+- **"everything 1476"**, where 1,474 feats exist. A feat can carry two types and is
+  counted under both, so the per-type numbers were right and their *sum* was not a
+  headcount. The total is passed in now.
+- **Two rows called "Acrobatic"**, because 148 feats share a display name with their
+  mythic namesake — which is the same collision `feats.by_name` already has to resolve by
+  preferring the ordinary one. Mythic feats are suffixed "(mythic)" now; 148 duplicate
+  names down to 9, and the nine that remain are the corpus's own.
+
+## Not done here, and found while doing it
+
+**A spontaneous caster's two budgets are one budget.** `creation.SPELLS_KNOWN` gives a
+sorcerer `2` and a bard `4`, and the picker therefore offers 279 spells across levels 0
+and 1 against a single cap of two. By the book a 1st-level sorcerer knows **four cantrips
+and two 1st-level spells** — two separate allowances — so as it stands a player can spend
+both picks on cantrips and walk out with no first-level spell at all. That is a rules
+table, not a page: the cap needs to become a per-level figure before the picker can show
+it honestly, and every caster's table needs reading off its own page the way group 13 did
+for the class tables. Recorded rather than half-fixed, as item 42.
+
+The wizard is unaffected — its cantrips are granted whole and its cap is the first-level
+allowance alone, which is exactly the split this note is asking for everywhere else.
+
 ## Driven in the browser, end to end
 
 A wizard forged through the real page: feat picked by click (1/2), "missile" typed,
