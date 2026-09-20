@@ -2882,13 +2882,20 @@ class Engine:
                         state["rolls"].append(sneak_roll.as_dict())
                     dmg_mods = dmg_mods + [
                         Modifier(state["sneak_total"], f"sneak attack ({sneak_dice})")]
+                # Said once per swing. The damage stage is re-entered on every resume, so
+                # an unguarded append printed the line twice — measured live 2026-09-20
+                # fighting a goblin troop, where every blow said "there is no single guard
+                # to slip past" twice over.
+                if (sneak_dice or sneak_why) and not state.get("sneak_said"):
+                    state["sneak_said"] = True
                     state["tells"].append(
-                        f"{actor.name} finds the opening — {sneak_why}.")
-                elif sneak_why:
-                    # The "why not" is worth saying: a rogue who never sees their dice
-                    # is owed the reason, and the narrator is told it as a fact of the
-                    # blow rather than as a rule that fired.
-                    state["tells"].append(sneak_why.capitalize() + ".")
+                        f"{actor.name} finds the opening — {sneak_why}." if sneak_dice
+                        # The "why not" is worth saying: a rogue who never sees their
+                        # dice is owed the reason, and the narrator is told it as a fact
+                        # of the blow rather than as a rule that fired. Only the first
+                        # letter is raised: `capitalize()` lowercases the rest, and it
+                        # turned "Troop, Goblin" into "Troop, goblin".
+                        else sneak_why[:1].upper() + sneak_why[1:] + ".")
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +

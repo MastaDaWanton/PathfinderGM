@@ -51,6 +51,7 @@ fights to the death with no further checks.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 
 # Morale scores, Basic D&D's 2-12 scale. 8 is where the published bandits and raiders sit:
@@ -332,3 +333,104 @@ def rout_tell(name: str, troop: Troop) -> str:
     left = max(0, int(getattr(troop, "members", 0)))
     return (f"{who} breaks: the {left} still standing scatter and run."
             if left else f"{who} breaks.")
+
+
+# --- the corpus's own troop blocks -------------------------------------------------------
+
+# What the subtype says a crowd is, quoted from Archives of Nethys (read 2026-09-20,
+# aonprd.com/MonsterSubtypes.aspx?ItemName=Troop): "A troop of Small or Medium creatures
+# consists of approximately 12 to 30 creatures."
+#
+# `docs/the-crowd.md` recorded these blocks as deliberately left alone, because "a
+# published troop's hit points ARE the unit's pool and its member count is nowhere in the
+# data, so giving them attrition would mean inventing a number per block". The count is
+# not in the block — but it is in the RULES, as a band, and that is the half the note
+# missed. Nothing is invented per block: the band is the subtype's, and which number
+# inside it each block gets comes out of that block's own published hit points.
+PUBLISHED_MIN = 12
+PUBLISHED_MAX = 30
+# Sixteen, and the number is where the subtype's two statements meet this app's own ruling.
+# The subtype says "a single troop occupies a 20-foot-by-20-foot square"; twenty feet is
+# four squares, so the stated footprint is 4x4 = SIXTEEN squares. `size_for` puts one
+# person in each square — the player's ruling, which replaced the subtype's fixed size
+# band — so sixteen members is exactly the count at which the published footprint and this
+# app's ruling agree, and it sits inside the stated 12-to-30.
+#
+# A ceiling rather than a target: dividing the pool by it gives a member's share ROUNDED
+# UP, so the count that falls out is never more than sixteen and a published troop is
+# always the Gargantuan block the subtype describes.
+PUBLISHED_SQUARES = 16
+
+
+def from_block(pool_hp: int) -> tuple[int, int]:
+    """(members, member_hp) for a published troop block, from its hit points alone.
+
+    A member's share is the pool over the footprint, rounded up; the count is then what
+    `members_left` makes of the full pool, so the arithmetic that runs attrition in play is
+    the same arithmetic that sets the roster up — a block cannot start out disagreeing with
+    itself, and cannot overflow the square the subtype gives it.
+
+    Measured over the twenty troop blocks the corpus ships (2026-09-20): every one lands
+    between 13 and 16 members, inside the subtype's 12-to-30 and Gargantuan to a block,
+    with members worth 5 hit points in a cult rabble and 12 in a paladin troop. That spread
+    is the point — it comes from the blocks, not from here.
+    """
+    pool = max(1, int(pool_hp or 1))
+    member_hp = max(1, math.ceil(pool / PUBLISHED_SQUARES))
+    return members_left(pool, member_hp), member_hp
+
+
+def published_member_count_is_sane(members: int) -> bool:
+    """Whether a derived count sits inside the band the subtype states. Read by the test
+    that walks all twenty blocks, so a corpus re-import that breaks the assumption says
+    so instead of quietly shipping a troop of three."""
+    return PUBLISHED_MIN <= int(members) <= PUBLISHED_MAX
+
+
+def is_a_published_troop(doc: dict) -> bool:
+    """Whether a stat block carries the troop subtype.
+
+    The subtype is stripped before the Actor is built (`bestiary._NOT_ON_THE_SHEET`), so
+    this reads the document, which is where it survives.
+    """
+    if not isinstance(doc, dict):
+        return False
+    parts = {p.strip().lower()
+             for p in re.split(r"[,;]", str(doc.get("subtype") or "")) if p.strip()}
+    return "troop" in parts
+
+
+# What a published block's NAME says about its members, and when it says nothing useful.
+#
+# "Troop" is the only word that reliably means "this is a unit and not a person": strip it
+# and "Imperial Archers Troop" leaves an archer. The COLLECTIVE words below name a crowd
+# without naming anybody in it — a member of a Cult Rabble is not a "cult", and a member of
+# an Avalanche Legion is not an "avalanche" — so those answer with nothing at all, and
+# `tell_of` says "eight of them go down", which is true and reads properly. Deciding that a
+# member of a Cult Rabble is a "cultist" would be chasing vocabulary, which CLAUDE.md
+# records as the losing move; saying "of them" costs nothing and is never wrong.
+_UNIT_WORD = "troop"
+_COLLECTIVE = frozenset({"legion", "rabble", "phalanx", "swarm", "horde", "mob", "host",
+                         "company", "band", "infantry"})
+
+
+def one_of(block_name: str) -> str:
+    """A member's name out of the unit's published name, or "" when the name has none.
+
+    "Imperial Archers Troop" -> "imperial archer"; "Troop, Cultist" -> "cultist"; "Cult
+    Rabble" -> "" because a cult rabble is made of people the name never mentions.
+    """
+    words = [w.strip(",") for w in str(block_name or "").split() if w.strip(",")]
+    words = [w for w in words if w.lower() != _UNIT_WORD]
+    if not words:
+        return ""
+    # A company named after somebody is not a kind of person: "Irgal's Axe Troop" has
+    # members, and "irgal's axe" is not what one of them is called.
+    if any(w.lower().endswith(("'s", "’s")) for w in words):
+        return ""
+    if words[-1].lower() in _COLLECTIVE:
+        return ""
+    last = words[-1]
+    if len(last) > 3 and last.lower().endswith("s") and not last.lower().endswith("ss"):
+        words[-1] = last[:-1]
+    return " ".join(words).lower()
