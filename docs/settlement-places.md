@@ -36,12 +36,28 @@ a city is quartered, and `within` carries the shape.
 Not a category — a name. "civic" does not guarantee anybody keeping order, and a town with
 nowhere to be arrested to is a town the wanted state cannot reach.
 
-- **village** — the well
-- **town** — the gate, the guardhouse, the well
-- **city** — the gate, the guardhouse, the barracks, the well
+- **village** — the way in, the well
+- **town** — the gate, the guardhouse, the well, the guildhall
+- **city** — the gate, the guardhouse, the barracks, the well, the guildhall
 
 A village has no guardhouse on purpose: a hamlet of four hundred has a reeve and a horn,
 not a garrison, and inventing one would make every village a fort.
+
+**A village has a way in, since 2026-09-21.** Asked for at the table — "every city/town
+needs an entrance or two that is watched a village still has entry roads that are likely
+watched as well" — and measured before it was built: eight of Aurvantis's sixteen villages
+named no entrance of any kind, and a generated village's guaranteed set was a single well.
+A settlement nobody can be seen arriving at is also one the law cannot watch, because the
+warrant check in `_op_travel` asks whether the party is leaving by the way out.
+
+It is a road and not a gate, which is the history as well as the fiction: walls and
+ditches, "or sometimes just isolated gates, regulated trade and made collection of taxes
+easier", so an unwalled settlement's entrance is about who is arriving and what they are
+carrying rather than about defence.
+
+A village went from five places to six at the same time, and for a stated reason: the
+entrance is an addition rather than a replacement, and at five it crowded out one of the
+four categories a player always reaches for.
 
 ## The vocabulary
 
@@ -51,6 +67,7 @@ not a garrison, and inventing one would make every village a fort.
 | place | from | what reads it | what it is |
 |---|---|---|---|
 | the gate | town | travel | the way in and out |
+| the way in | village | travel | where the road reaches the first house, and whoever is watching it |
 | the guardhouse | town | wanted | where the watch is, and there are always more of them inside |
 | the guildhall | town | **nothing yet** | where the trades meet |
 | the library | town | **nothing yet** | where the records are kept |
@@ -123,10 +140,10 @@ not a garrison, and inventing one would make every village a fort.
 | the midden | town | **nothing yet** | where it all ends up |
 | the cistern | city | **nothing yet** | under the street, and older than it |
 
-## The ledger: 34 of 42 have no rule behind them
+## The ledger: 34 of 43 have no rule behind them
 
 8 are read by something today — the market and the merchants row by the trade
-rules, the smithy and the workshops by crafting, the gate by travel, the guardhouse, the
+rules, the smithy and the workshops by crafting, the gate and the way in by travel, the guardhouse, the
 gaol and the barracks by the wanted state. The other 34 are rooms with names,
 shapes and floor plans, which a scene can happen in and no rule consults.
 

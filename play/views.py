@@ -40,6 +40,31 @@ def _recent_events(world, location, limit=4):
     return world.events_touching(location.id if location else None)[:limit]
 
 
+def _where_the_ground_is(scene) -> tuple[str, str]:
+    """(the place's name, what that kind of place is made of) for the map tray.
+
+    Both read off the same two functions the floorplan itself uses, so the caption can
+    never describe a different place from the one drawn.
+    """
+    from rules import floorplan, places as places_mod
+
+    at = str(getattr(scene, "at", "") or "")
+    if not at:
+        return "", ""
+    name = at.rsplit(":", 1)[-1].replace("-", " ").strip()
+    try:
+        here = places_mod.find(places_mod.for_scene(None, at), at)
+        if here is not None and getattr(here, "name", ""):
+            name = str(here.name)
+    except Exception:      # noqa: BLE001 — a caption is never worth failing a turn over
+        pass
+    try:
+        about = str(floorplan.shape_for(at, places_mod.terrain_of(at)).about or "")
+    except Exception:      # noqa: BLE001
+        about = ""
+    return name, about
+
+
 def _grid_state(scene) -> dict | None:
     """The map, plus where the PC could actually go — or None when there is no map.
 
@@ -75,6 +100,13 @@ def _grid_state(scene) -> dict | None:
                          | {p[2] for p in scene.positions.values() if len(p) > 2}),
         "reachable": [],
     }
+    # WHERE this ground is. The tray said "The ground" and nothing else, so a player
+    # looking at a correct map of one place while the prose described another had no way
+    # to tell which of the two was lying — reported 2026-09-21 as "i am at a gate with
+    # wagons passing through ... this map is completely wrong", where the engine held the
+    # party at the well and drew the well faithfully. The shape's own `about` line already
+    # says what the place is made of; it had simply never been shown to anybody.
+    out["place"], out["about"] = _where_the_ground_is(scene)
     pc = scene.pc()
     if pc is not None and pc.ref in scene.positions and pc.can_act():
         routes = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,

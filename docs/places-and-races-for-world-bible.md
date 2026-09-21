@@ -227,8 +227,9 @@ axis, with no export regenerated.
 - A city is **not** a place — it is the settlement entity that places hang off.
 
 The consumer sizes a settlement by the `scale` the export already writes on it: a
-**village of five**, a **town of nine**, a **city of eighteen** rooms plus the square and
-four crossings that hold a city together. One number for a hamlet and a capital is what
+**village of six**, a **town of nine**, a **city of eighteen** rooms plus the square and
+four crossings that hold a city together. (A village was five until 2026-09-21, when it
+gained a guaranteed way in — see "every settlement has a way in" below.) One number for a hamlet and a capital is what
 made every settlement in every world the same six rooms, and it is gone. That ceiling is borrowed: Fate caps a scene at two to four zones and Inform's
 Recipe Book calls for "a small number of named positions". An open-ended list is free text
 wearing a tuple, and every extra place is somewhere a narrator can strand a player with
@@ -561,7 +562,16 @@ amount of data to keep stable across exports for very little gain.
 - **Do not author encounters, monsters, treasure or NPCs into a place.** Those come from
   the bestiary, the codex and the quest schemes on the consumer's side. A place is ground.
 - **Do not author a place per floor.** Say how many floors; let the consumer name them.
-- **Size a settlement by its own `scale`** — a village of five rooms, a town of nine, a
+- **Every settlement needs a way in, and please author it.** Asked for at the table on
+  2026-09-21: "every city/town needs an entrance or two that is watched a village still
+  has entry roads that are likely watched as well." Measured across the shipped exports
+  the same day: **eight of Aurvantis's sixteen villages name no entrance of any kind**,
+  and Fantasia ships no places at all for any of its 36 settlements. The consumer now
+  appends "the way in" to any settlement that names none, because a settlement nobody can
+  be seen arriving at is one the narrator invents a gate for and the law can never watch.
+  An authored entrance is better than a generated one: it can be a gate, a bridge, a
+  crossing or a quay, and it can be where the world says the road actually reaches.
+- **Size a settlement by its own `scale`** — a village of six rooms, a town of nine, a
   city of eighteen. One ceiling for every settlement is what this app did until
   2026-09-15, and it was wrong in the way that matters: Aurvantis ships 16 villages, 32
   towns and 16 cities and all 64 got the same six rooms, so a capital was a hamlet with a

@@ -4624,7 +4624,11 @@ class Engine:
         if moved and pc is not None:
             town = places_mod.location_of(was_place) or self.scene.location_id
             law = states.standing_with_the_law(pc, town)
-            at_gate = " ".join(going_to.name.split()).lower().removeprefix("the ") == "gate"
+            # Any way in or out, not the literal word "gate". `places.ENTRANCES` is the
+            # one list, so the generator and the law cannot disagree about what an
+            # entrance is — and a village, which has a road rather than a gate, was
+            # somewhere a warrant could never be enforced at all.
+            at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
             open_road = bool(want) and was_ground == places_mod.URBAN \
                 and going_to.terrain != places_mod.URBAN
             # A way past the watch that somebody showed you — a scheme's witness, a

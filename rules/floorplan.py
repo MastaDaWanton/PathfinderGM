@@ -96,6 +96,11 @@ BY_SPOT: dict[str, Shape] = {
                         about="a colonnade, and a dais at the end of it"),
     "the-gate": Shape(14, 10, None, clumps=4, clump_max=3, rise=4, rise_to=2,
                       about="the gatehouse either side, and the wall-walk over it"),
+    # A village's entrance: the road, and what stands beside it. Long rather than wide,
+    # because that is what a road reaching the first house looks like, and nothing to
+    # climb — an unwalled settlement's way in is watched from the ground.
+    "the-way-in": Shape(16, 8, None, clumps=3, clump_max=2, rough=2, vertical="none",
+                        about="the road in, the first houses, and whoever is watching it"),
     "the-back-streets": Shape(10, 16, None, clumps=8, clump_max=3, rough=6,
                               vertical="none", about="walls close on both sides, and what is left in them"),
     "the-workshops": Shape(12, 12, LOW, clumps=7, clump_max=2,

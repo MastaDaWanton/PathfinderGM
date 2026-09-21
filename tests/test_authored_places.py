@@ -145,7 +145,10 @@ def test_a_place_whose_id_carries_no_ground_is_dropped_rather_than_stood_on():
         _place(),
         _place(id="aaaabbbbcccc:no-ground-in-this-one", name="the yard"),
     ]))
-    assert [p.name for p in got] == ["the market"]
+    # The yard is gone, which is what this test is about. "the way in" is appended to any
+    # settlement that names no entrance (2026-09-21, item 46) and this one names only a
+    # market, so it arrives here too — it is not the dropped room coming back.
+    assert [p.name for p in got] == ["the market", "the way in"]
 
 
 def test_an_entirely_unusable_list_falls_back_to_generating():
