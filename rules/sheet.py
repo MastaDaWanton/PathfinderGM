@@ -4236,5 +4236,14 @@ def validate(actor: Actor) -> None:
             actor.notes += f"\n{note}"
     if actor.armour not in ARMOUR:
         raise IllegalSheet(f"{actor.name}: unknown armour {actor.armour!r}")
-    if actor.equipped and actor.equipped.lower() not in WEAPONS:
+    # A natural attack the body grants counts as a weapon here, because it is one
+    # everywhere else: `Actor.weapon` already falls through to `natural_weapon`, and
+    # `is_proficient` already answers yes for one. Only this check did not ask, so a race
+    # built with a bite or claws could be forged and then refused by its own sheet —
+    # `creation.build` puts them on deliberately ("a race built with claws or a bite
+    # carries them by name") and the character died at `validate` with "unknown weapon
+    # 'bite'". Reported 2026-09-21 as "what happened to the asura race?", whose bench
+    # document is the only one on the shelf and grants exactly that.
+    if actor.equipped and actor.equipped.lower() not in WEAPONS \
+            and actor.natural_weapon(actor.equipped) is None:
         raise IllegalSheet(f"{actor.name}: unknown weapon {actor.equipped!r}")
