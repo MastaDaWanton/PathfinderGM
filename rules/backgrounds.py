@@ -223,9 +223,14 @@ def bind(engine, actor) -> list[dict]:
                 where = str(got.get("name") or "")
                 filled[f"place{i}"] = got
         if tie.get("role"):
+            # `place=False`: a tie is a fact about the character's PAST, so it wants the
+            # world's name for somebody and not a body in the opening scene. Reported
+            # 2026-09-20 — "drenn ironvale is named has a part of my background but does
+            # not belong in the scene" — and reproduced on a clean scene, where binding
+            # the `apprenticed` background added Ariniel Thorne as a second actor.
             got = schemes_mod._role_for(engine, f"tie{i}",
                                         {"role": tie["role"], "level": "pc"},
-                                        filled, taken)
+                                        filled, taken, place=False)
             if got:
                 who = str(got.get("name") or "")
         says = str(tie.get("says") or "")
