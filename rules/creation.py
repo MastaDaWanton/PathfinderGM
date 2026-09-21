@@ -774,12 +774,22 @@ def _provisional(payload: dict):
     Returns None when the draft has not said enough yet: the page then says so, rather
     than offering a list that will change under the player's hands.
     """
-    race = _races_for(str(payload.get("world", "") or "")).get(
-        str(payload.get("race", "")).strip().lower())
+    # `races_mod.slug`, the same normalisation `build` uses. Two spellings of one rule is
+    # how a page comes to disagree with the server about what the player picked, and this
+    # file already carries that lesson twice.
+    offered = _races_for(str(payload.get("world", "") or ""))
+    race = offered.get(races_mod.slug(str(payload.get("race", ""))))
     cid = str(payload.get("class", "")).strip().lower()
     cls = classes_mod.get(cid)
-    if not race or not cls:
-        return None
+    if not race:
+        said = str(payload.get("race", "")).strip()
+        return (None, f"no race chosen yet" if not said else
+                f"{said!r} is not one of the races this world offers "
+                f"({', '.join(sorted(offered)[:6])}…)")
+    if not cls:
+        said = str(payload.get("class", "")).strip()
+        return (None, "no class chosen yet" if not said
+                else f"{said!r} is not a class this build knows")
     raw = payload.get("abilities") or {}
     abilities = {}
     for ab in ("str", "dex", "con", "int", "wis", "cha"):
@@ -801,9 +811,13 @@ def _provisional(payload: dict):
             "feats": [str(f) for f in (payload.get("feats") or [])],
             "background": str(payload.get("background", "")).strip().lower(),
             "hp": 1, "hp_max": 1,
-        })
-    except Exception:      # noqa: BLE001 — a draft too broken to embody offers no choices
-        return None
+        }), ""
+    except Exception as exc:      # noqa: BLE001
+        # The reason travels. A bare `return None` here printed "choose a race and a class
+        # first" at a player who had chosen both — reported 2026-09-20 as "its telling me
+        # to pick things ive already picked" — and left nothing to diagnose it with, which
+        # is the whole complaint about a swallowed exception.
+        return None, f"this draft could not be embodied to ask: {exc}"
 
 
 def feat_choices(payload: dict) -> dict:
@@ -819,9 +833,9 @@ def feat_choices(payload: dict) -> dict:
     the ladder you are climbing — and Pathbuilder's answer, "show what you qualify for",
     works precisely because the rest stays visible behind it.
     """
-    actor = _provisional(payload)
+    actor, why = _provisional(payload)
     if actor is None:
-        return {"ready": False, "open": [], "shut": []}
+        return {"ready": False, "why": why, "open": [], "shut": []}
     open_: list[dict] = []
     shut: list[dict] = []
     for feat in feats_mod.all_feats().values():
@@ -856,7 +870,7 @@ def feat_choices(payload: dict) -> dict:
             shut.append(row)
     open_.sort(key=lambda r: r["name"])
     shut.sort(key=lambda r: r["name"])
-    return {"ready": True, "open": open_, "shut": shut}
+    return {"ready": True, "why": "", "open": open_, "shut": shut}
 
 
 def spell_choices(payload: dict) -> dict:
@@ -870,10 +884,10 @@ def spell_choices(payload: dict) -> dict:
     """
     from . import spells as spells_lib
 
-    actor = _provisional(payload)
+    actor, why = _provisional(payload)
     cid = str(payload.get("class", "")).strip().lower()
     cap_spec = SPELLS_KNOWN.get(cid)
-    out: dict = {"ready": actor is not None, "casts": cap_spec is not None,
+    out: dict = {"ready": actor is not None, "why": why, "casts": cap_spec is not None,
                  "prepares": False,
                  "granted": [], "choose": [], "cap": 0, "chosen": 0, "slots": {},
                  "choose_level": 1}

@@ -290,3 +290,111 @@ def test_a_mythic_feat_says_so_in_its_name():
 
     dupes = [n for n, c in collections.Counter(names).items() if c > 1]
     assert len(dupes) < 20, dupes
+
+
+# --- "its telling me to pick things ive already picked" -----------------------------------
+
+def test_a_draft_that_cannot_be_asked_says_which_piece_is_missing():
+    """Reported 2026-09-20 with a screenshot of the choices page: "spells not showing up,
+    its telling me to pick things ive already picked."
+
+    Reproduced by driving the real page: choosing a world, then a race only that world has,
+    then a class, then changing the world — the race is silently unset and the class
+    survives, so the page said "Choose a race and a class first" at somebody who had
+    chosen a class. The sentence was true about the race and false about the class, and
+    named neither.
+
+    The reason travels now, and a bare `except` no longer swallows it."""
+    world = "aurvantis-campaign"
+    ok = {"name": "spree", "race": "human", "class": "fighter", "world": world,
+          "abilities": {"str": 15, "dex": 12, "con": 12, "int": 10, "wis": 10, "cha": 10},
+          "choices": ["str"]}
+    assert creation.feat_choices(ok)["why"] == ""
+
+    no_race = dict(ok); no_race.pop("race")
+    assert creation.feat_choices(no_race)["why"] == "no race chosen yet"
+
+    no_class = dict(ok); no_class.pop("class")
+    assert creation.feat_choices(no_class)["why"] == "no class chosen yet"
+
+    # The exact shape the player hit: a race from another world.
+    wrong_world = dict(ok, race="catfolk", world="pangrella-campaign")
+    why = creation.feat_choices(wrong_world)["why"]
+    assert "catfolk" in why and "this world offers" in why, why
+
+
+def test_the_race_is_normalised_the_way_build_normalises_it():
+    """`build` resolves a race with `races.slug`; this used to use `.strip().lower()`.
+    Two spellings of one rule is how a page comes to disagree with the server about what
+    the player picked, which this file already carries the lesson about twice."""
+    from pathlib import Path
+
+    src = Path("rules/creation.py").read_text(encoding="utf-8")
+    body = src.split("def _provisional(")[1].split("\ndef ")[0]
+    assert "races_mod.slug(" in body
+    assert ".strip().lower())" not in body.split("cid =")[0]
+
+
+def test_the_world_is_part_of_what_makes_the_answer_stale():
+    """The same race id can be legal in one world and unknown in the next, so a cached
+    answer keyed without the world is the previous world's answer."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "JSON.stringify([FORGE.world, f.race, f.class" in page
+
+
+def test_changing_the_world_says_it_dropped_the_race():
+    """Dropping it in silence is what made the next page's message look like a lie."""
+    from pathlib import Path
+
+    page = Path("play/templates/play/home.html").read_text(encoding="utf-8")
+    assert "FORGE.dropped" in page
+    assert "is not one of\n      this world's peoples" in page
+
+
+def test_a_race_whose_body_is_its_weapon_can_be_forged():
+    """Reported 2026-09-21: "what happened to the asura race?" — the only document on the
+    player's Races bench, an outsider that took bite, claws and slam as evolutions.
+
+    Forging one raised `IllegalSheet: unknown weapon 'bite'` out of `creation.build`, so
+    the character could not be made at all. `build` puts a race's natural attacks on the
+    sheet deliberately — "a race built with claws or a bite carries them by name" — and
+    `validate` checked the equipped one against `tables.WEAPONS` alone, where a bite has
+    never been.
+
+    Everything else already knew: `Actor.weapon` falls through to `natural_weapon`, and
+    `is_proficient` answers yes for one because it is the body. Only the validator did not
+    ask — a rule with one home too few.
+
+    And it was never only the bench: SIX shipped races grant claws (khyr-kor, xylthys,
+    brynkorovi, sulmari, zhilakai-of-fantasia, korvu), so every one of them was unforgeable
+    too. That is why this test walks the shipped list rather than the player's bench.
+    """
+    from rules import races
+    from rules.sheet import from_dict
+
+    # Only the ones this environment can actually offer: a shipped race belongs to a
+    # world, and a test run does not necessarily have every world on the shelf.
+    armed = []
+    for rid, doc in races.shipped().items():
+        if not (races.derive(doc).get("weapons") or []):
+            continue
+        world = str(doc.get("world") or "")
+        if rid in creation._races_for(world):
+            armed.append((rid, world))
+    assert armed, "no shipped race with a natural attack is reachable here"
+    for rid, world in sorted(armed):
+        built, problems = creation.build({
+            "name": "Spree", "race": rid, "class": "fighter", "world": world,
+            "gender": "woman", "pronouns": "she/her",
+            "choices": ["str", "int", "cha"], "skills": ["climb"], "feats": ["toughness"],
+            "abilities": {"str": 14, "dex": 12, "con": 12,
+                          "int": 10, "wis": 10, "cha": 10}})
+        assert problems == [], (rid, world, problems)
+        sheet = built["sheet"]
+        assert sheet["equipped"] not in ("", "unarmed"), (rid, sheet["weapons"])
+        actor = from_dict(sheet, ref="pc")
+        swing = actor.weapon(sheet["equipped"])
+        assert swing.get("natural") is True and swing.get("damage"), (rid, swing)
+        assert actor.is_proficient(sheet["equipped"]), rid

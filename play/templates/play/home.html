@@ -1973,7 +1973,10 @@ function featMatches() {
 // the six scores are what prerequisites read, and feats already taken can open others —
 // so those are the signature, and nothing else refetches.
 function choicesKey(f) {
-  return JSON.stringify([f.race, f.class, f.choices, f.abilities,
+  // The WORLD belongs in the key as much as the race does: it decides which races exist,
+  // so the same race id can be legal in one world and unknown in the next. Without it,
+  // changing the world reused the previous world's answer.
+  return JSON.stringify([FORGE.world, f.race, f.class, f.choices, f.abilities,
                          [...f.feats].sort(), f.background]);
 }
 
@@ -2009,8 +2012,11 @@ function featPicker() {
   const got = FORGE.choices && FORGE.choices.feats;
   if (!got) return `<p class="note">Working out which feats ${esc(f.name || "they")}
     qualifies for…</p>`;
-  if (!got.ready) return `<p class="note">Choose a race and a class first — a feat's
-    prerequisites are read against the finished character.</p>`;
+  if (!got.ready) return `<div class="problems"><div>${esc(got.why
+      || "this draft is not far enough along to ask")}</div></div>
+    <p class="note">A feat's prerequisites are read against the finished character, so the
+      race, the class and the six scores have to be settled before this page can answer.
+      Go back and fix what is named above.</p>`;
   return `
     <div class="budget ${f.feats.length > fb ? "over" : ""}">
       <span>one for everyone${f.race === "human" ? ", one for a human" : ""}${
@@ -2287,6 +2293,8 @@ function paneForgeWho() {
         FORGE.world === w.id ? "border-color:var(--accent);color:#f0dcae" : ""}">${esc(w.name)}</button>`).join("")}</div>
 
     <h2 class="sect">Race</h2>
+    ${FORGE.dropped ? `<div class="problems"><div>${esc(FORGE.dropped)} is not one of
+      this world's peoples, so it has been unset — choose again below.</div></div>` : ""}
     ${opts.races.some(r => r.of) ? `<p class="note">The peoples of
       ${esc(opts.races.find(r => r.of).of)} first — read off the world's own entries and
       priced from the Race Builder — then the Core Rulebook's own${opts.races.some(r => !r.of)
@@ -2670,8 +2678,17 @@ document.addEventListener("click", async e => {
     if (world) {
       // A different world offers different races; the rest of the form stands.
       FORGE.world = world.dataset.crworld;
+      const wasRace = FORGE.opts.races.find(r => r.id === f.race);
       FORGE.opts = await (await fetch(`/api/create/options?world=${encodeURIComponent(FORGE.world)}`)).json();
-      if (!FORGE.opts.races.some(r => r.id === f.race)) { f.race = ""; f.choices = []; f.heritage = ""; }
+      // Changing the world takes the old world's peoples away with it, and dropping the
+      // race in silence is how somebody ends up on the next page being told to choose a
+      // race they believe they chose — reported 2026-09-20 as "its telling me to pick
+      // things ive already picked", and reproduced: catfolk to "" with the class intact.
+      FORGE.dropped = "";
+      if (!FORGE.opts.races.some(r => r.id === f.race)) {
+        if (f.race) FORGE.dropped = (wasRace && wasRace.name) || f.race;
+        f.race = ""; f.choices = []; f.heritage = "";
+      }
       render(); return;
     }
     const info = e.target.closest("[data-crinfo]");
