@@ -44,11 +44,12 @@
   "the-green",
   "the-lane",
   "the-midden",
-  "the-sump"
+  "the-sump",
+  "the-way-in"
  ],
  "vertical_balance": {
-  "consumer_tables": "60 of 72",
-  "ratio": 0.833,
+  "consumer_tables": "60 of 73",
+  "ratio": 0.822,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {
@@ -97,7 +98,7 @@
  },
  "most_places": 18,
  "places_by_scale": {
-  "village": 5,
+  "village": 6,
   "town": 9,
   "city": 18
  },
@@ -122,6 +123,7 @@
  },
  "always_by_scale": {
   "village": [
+   "the way in",
    "the well"
   ],
   "town": [
@@ -281,6 +283,15 @@
    "name": "the gate",
    "about": "the way in and out",
    "smallest": "town",
+   "category": "civic",
+   "read_by": "travel",
+   "staffed": "",
+   "keeper": ""
+  },
+  {
+   "name": "the way in",
+   "about": "where the road reaches the first house, and whoever is watching it",
+   "smallest": "village",
    "category": "civic",
    "read_by": "travel",
    "staffed": "",
@@ -737,6 +748,7 @@
   "the-vaults",
   "the-warehouses",
   "the-warrens",
+  "the-way-in",
   "the-well",
   "the-west-crossing",
   "the-workshop-loft",

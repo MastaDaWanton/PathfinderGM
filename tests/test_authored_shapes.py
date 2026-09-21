@@ -64,7 +64,13 @@ def test_every_authored_place_carries_its_own_shape():
     got = [p for p in list(_places(AURVANTIS)) + list(_places(PANGRELLA))]
     # 931 at schema 1.5, from 456: the worlds were re-exported with settlements sized by
     # scale, so a village has five rooms and a city eighteen where both used to have six.
-    assert len(got) == 931, len(got)
+    #
+    # 939 since 2026-09-21. Eight of Aurvantis's sixteen villages name no way in, and a
+    # settlement that cannot be arrived at is one the narrator invents a gate for and the
+    # law can never watch (items 45 and 46), so `home_set` appends one. It carries its own
+    # shape like everything else here — which is what this test is actually about, and the
+    # reason the eight are counted rather than excluded.
+    assert len(got) == 939, len(got)
     assert all(p.shape is not None for p in got), [
         p.id for p in got if p.shape is None][:5]
 

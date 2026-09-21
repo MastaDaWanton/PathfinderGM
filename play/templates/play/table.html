@@ -2406,14 +2406,25 @@ function renderMap(s) {
       reach.size} squares within ${g.speed} ft</div>` : ""}${
       pools ? `<div class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</div>` : ""}`;
-  $("#mapwrap").innerHTML = `<h2>The ground <button class="mapopen" id="mapopen"
-      title="Open the map">⤢</button></h2>${svg}${legend}`;
+  // The place is named, not just drawn. A correct map of the well, while the prose is
+  // describing a gate, is indistinguishable from a broken map unless the tray says which
+  // place it is — reported 2026-09-21. `about` is the shape's own line about what that
+  // kind of place is made of, which is also what the plan was built from.
+  const whereHead = g.place ? `The ground · ${esc(g.place)}` : "The ground";
+  $("#mapwrap").innerHTML = `<h2>${whereHead} <button class="mapopen" id="mapopen"
+      title="Open the map">⤢</button></h2>${svg}${
+      g.about ? `<div class="sub maplegend">${esc(g.about)}</div>` : ""}${legend}`;
 
   // The same SVG at a readable size. The side panel's copy is 18px to the square and
   // legible only as a shape; a grid the player is meant to plan a move on has to be
   // something they can actually look at.
   if ($("#maptray").classList.contains("on")) {
-    $("#maptrayinner").innerHTML = svg + legend;
+    $("#maptrayinner").innerHTML = svg
+      + (g.about ? `<div class="sub maplegend">${esc(g.about)}</div>` : "") + legend;
+    // The expanded tray names the place in its own bar, for the same reason the panel
+    // does: a map nobody can name is a map nobody can check.
+    const bar = document.querySelector("#maptray .traybar b");
+    if (bar) bar.textContent = g.place ? `The ground · ${g.place}` : "The ground";
   }
 
   function cell(c, r, cls, inner = "") {

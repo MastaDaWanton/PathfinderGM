@@ -208,3 +208,145 @@ def test_the_roster_is_a_list_of_who_could_be_here_not_who_is(table):
     line = roster.brief_line(roster.who_would_be_here(scene, WORLD, level=1))
     assert "if somebody new appears" in line
     assert roster.brief_line([]) == ""
+
+
+def test_the_map_tray_names_the_place_it_is_drawing():
+    """Reported 2026-09-21: "i am at a gate with wagons passing through and a wagon off to
+    the side this map is completely wrong."
+
+    The map was right. The engine held the party at **the well** — a 5x5 place World Bible
+    authored, a wellhead and the ground worn round it — and drew exactly that. The prose
+    had wandered to a gate that does not exist in that town at all.
+
+    The tray said "The ground" and nothing else, so a correct map of one place beside prose
+    about another is indistinguishable from a broken map. It names the place now, and the
+    shape's own `about` line says what that kind of place is made of.
+    """
+    from play.views import _where_the_ground_is
+
+    class _Scene:
+        at = "abc~urban:the-well"
+
+    name, about = _where_the_ground_is(_Scene())
+    assert name == "the well"
+    assert "wellhead" in about, about
+
+    class _Gate:
+        at = "abc~urban:the-gate"
+
+    gate_name, gate_about = _where_the_ground_is(_Gate())
+    assert gate_name == "the gate" and "gatehouse" in gate_about
+
+    class _Nowhere:
+        at = ""
+
+    assert _where_the_ground_is(_Nowhere()) == ("", "")
+
+
+def test_the_caption_reads_the_same_shape_the_plan_was_drawn_from():
+    """One place, one answer: the caption must not be able to describe a different room
+    from the one on screen, which is what a second lookup would eventually do."""
+    from pathlib import Path
+
+    src = Path("play/views.py").read_text(encoding="utf-8")
+    body = src.split("def _where_the_ground_is(")[1].split("\ndef ")[0]
+    assert "floorplan.shape_for(" in body
+    assert "places_mod.terrain_of(" in body
+
+
+# --- every settlement has a way in, and somebody on it ------------------------------------
+
+def test_every_scale_of_settlement_has_a_way_in():
+    """Asked for 2026-09-21: "every city/town needs an entrance or two that is watched a
+    village still has entry roads that are likely watched as well."
+
+    Measured across the three shipped worlds before it was built: eight of Aurvantis's
+    sixteen villages named no entrance of any kind, and a generated village's guaranteed
+    set was a single well. Towns and cities were already given a gate; a village was given
+    nowhere to arrive at.
+    """
+    from rules import places
+
+    for scale in ("village", "town", "city"):
+        names = {p.name for p in places._settlement_set("abc123def456", scale, None)}
+        assert names & set(places.ENTRANCES), (scale, sorted(names))
+
+
+def test_an_authored_settlement_with_no_entrance_is_given_one():
+    """Vormoor's five authored places are a well, a market, a guildhall, a lane and a
+    green. The narrator put the player "under the gate" of a town that had none (item 45),
+    and the warrant check, which watches the way out, could never fire there.
+
+    A deliberate amendment to this module's "the author has spoken" rule, and the reason
+    it is not the same thing: a docks is a flourish, a way in is the difference between a
+    town somebody can arrive at and a town that is only ever an interior.
+    """
+    from rules import places
+    from play import library
+
+    world = library.world("aurvantis-campaign")
+    settlement = next(s for s in world.play["settlements"] if s["name"] == "Vormoor")
+    got = places.home_set(world.get(settlement["id"]))
+    names = [p.name for p in got]
+    assert "the way in" in names, names
+    # The author's own places are untouched and still come first.
+    assert names[:5] == ["the well", "the market", "the guildhall", "the lane", "the green"]
+
+
+def test_a_settlement_that_names_its_own_entrance_gets_nothing_added():
+    """The amendment is narrow: any entrance at all and the generator stays out of it."""
+    from rules import places
+    from play import library
+
+    world = library.world("pangrella-campaign")
+    for settlement in world.play["settlements"]:
+        got = places.home_set(world.get(settlement["id"]))
+        entrances = [p.name for p in got if p.name in places.ENTRANCES]
+        assert entrances, settlement["name"]
+        assert len([p for p in got if p.name == "the way in"]) <= 1, settlement["name"]
+
+
+def test_an_entrance_is_not_staffed_like_a_shop():
+    """The player asked for "an entrance or two that IS WATCHED", and the first attempt at
+    that put a keeper on the gate through `places.STAFFED`. The suite refused it in its
+    own words — `test_a_place_that_sells_nothing_gets_nobody`: "A keeper for every room
+    would put a person in every empty street. The gate is watched by the guardhouse, not
+    manned by a shopkeeper."
+
+    That is the right call and this test holds it. STAFFED is for places that sell
+    something or do something for money; watching a way in belongs to the law, which is a
+    different system — and the law reaches every entrance now (see below), where before it
+    could only ever find one called "gate"."""
+    from rules import places
+
+    for entrance in ("the gate", "the way in"):
+        assert entrance not in places.STAFFED, (
+            f"{entrance} is staffed like a shop; it is watched by the law instead")
+    # And a town does have somewhere the watch lives, which is what does the watching.
+    assert "the guardhouse" in places.STAFFED
+    assert "the guardhouse" in places.ALWAYS_BY_SCALE["town"]
+    assert "the guardhouse" in places.ALWAYS_BY_SCALE["city"]
+
+
+def test_the_law_watches_every_kind_of_entrance():
+    """The warrant check compared the place's name with the literal word "gate", so a
+    village — which has a road rather than a gate — was somewhere being wanted could never
+    be enforced. One list, read by the generator and the law alike."""
+    from pathlib import Path
+
+    from rules import places
+
+    src = Path("rules/engine.py").read_text(encoding="utf-8")
+    assert "in places_mod.ENTRANCES" in src
+    assert 'removeprefix("the ") == "gate"' not in src
+    assert "the way in" in places.ENTRANCES and "the gate" in places.ENTRANCES
+
+
+def test_the_way_in_has_ground_of_its_own():
+    """Without a shape it falls through to generic urban, and the map of a road would be
+    an anonymous square room."""
+    from rules import floorplan
+
+    shape = floorplan.shape_for("abc~urban:the-way-in", "urban")
+    assert shape.width > shape.height, "a road is longer than it is wide"
+    assert "road" in (shape.about or "")

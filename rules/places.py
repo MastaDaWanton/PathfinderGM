@@ -109,7 +109,12 @@ SCALES = ("village", "town", "city")
 # exactly what Fate's two-to-four zones and Inform's "small number of named positions" are
 # about, so a city is quartered instead: eighteen rooms plus a square and four crossings is
 # twenty-three places, and nothing on the board offers more than six ways on.
-PLACES_BY_SCALE = {"village": 5, "town": 9, "city": 18}
+# A village went from five to six on 2026-09-21, when it gained a guaranteed way in. The
+# entrance is an ADDITION and not a replacement: at five, two guaranteed places left three
+# slots for the four categories a player always reaches for — somewhere to buy, to sleep,
+# to be quiet, and where nobody is watching — and `test_every_settlement_has_the_four_a
+# _player_reaches_for` failed on the spot, which is the checker doing exactly its job.
+PLACES_BY_SCALE = {"village": 6, "town": 9, "city": 18}
 
 # (label, about, smallest scale, category, what reads it)
 #
@@ -132,6 +137,15 @@ SETTLEMENT_PLACES = (
     ("the merchants row", "the expensive street", "city", "trade", "market"),
     # --- who is in charge ------------------------------------------------------------
     ("the gate", "the way in and out", "town", "civic", "travel"),
+    # A village has no walls and still has a way in. Asked for 2026-09-21: "every
+    # city/town needs an entrance or two that is watched a village still has entry roads
+    # that are likely watched as well." The history is on the player's side — walls and
+    # ditches, "or sometimes just isolated gates, regulated trade and made collection of
+    # taxes easier", so an unwalled settlement's entrance is about who is coming and what
+    # they are carrying rather than about defence, which is why this is a road and not a
+    # gate.
+    ("the way in", "where the road reaches the first house, and whoever is watching it",
+     "village", "civic", "travel"),
     ("the guardhouse", "where the watch is, and there are always more of them inside",
      "town", "civic", "wanted"),
     ("the guildhall", "where the trades meet", "town", "civic", ""),
@@ -198,10 +212,24 @@ CATEGORY_CAP = {"hidden": 2, "faith": 3, "utility": 2, "transport": 2}
 # A village has no guardhouse on purpose: a hamlet of four hundred has a reeve and a horn,
 # not a garrison, and inventing one would make every village a fort.
 ALWAYS_BY_SCALE = {
-    "village": ("the well",),
+    # The way in comes first, and a village has one now. Measured 2026-09-21 across the
+    # three shipped worlds: eight of Aurvantis's sixteen villages had no entrance of any
+    # kind, and a village's guaranteed set was one well. A settlement nobody can be seen
+    # arriving at is also a settlement the LAW cannot watch — `_op_travel`'s warrant check
+    # asks whether the party is leaving by the gate, and in a place with none it has never
+    # once fired.
+    "village": ("the way in", "the well"),
     "town": ("the gate", "the guardhouse", "the well", "the guildhall"),
     "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall"),
 }
+
+# What counts as a way in or out of a settlement, in one place. Read by the guarantee in
+# `home_set` and by the engine's warrant check, so "is this the gate" cannot be answered
+# two ways — the check used to compare the place's name against the literal word "gate",
+# which no village could ever satisfy.
+ENTRANCES = ("the gate", "the way in", "the bridge", "the docks",
+             "the north crossing", "the east crossing",
+             "the south crossing", "the west crossing")
 # The guildhall joined the list 2026-09-16, and it was this app's own checker that put it
 # there. `the-patron` is a shipped scheme whose `books` step fires `at($hall)`, and a
 # settlement with no hall is one where that step never fires and the quest quietly stalls
@@ -280,6 +308,12 @@ STAFFED = {
                          ("teamster", "carter", "driver")),
     "the guardhouse": ("the watch", "the sergeant of the watch",
                        ("guard", "watch", "sergeant")),
+    # NOT the entrances. Staffing them was tried on 2026-09-21 and `test_a_place_that
+    # _sells_nothing_gets_nobody` refused it in its own words: "A keeper for every room
+    # would put a person in every empty street. The gate is watched by the guardhouse,
+    # not manned by a shopkeeper." STAFFED is for places that sell something or do
+    # something for money; a way in is watched by the law, which is a different system
+    # and the right one.
     "the barracks": ("the garrison", "the garrison sergeant",
                      ("guard", "officer", "soldier")),
     "the gaol": ("a gaoler", "the gaoler", ("jailer", "guard", "warden")),
@@ -783,6 +817,51 @@ def _build(location_id: str, terrain: str, table) -> tuple[Place, ...]:
     )
 
 
+def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Place, ...]:
+    """An authored settlement that names no entrance gets one appended.
+
+    This is a deliberate amendment to the rule stated at the top of this module — "six
+    authored rooms are what the town has, and adding a docks because the prose says
+    'port' would be the generator arguing with them" — and the reason it is not the same
+    thing is that an entrance is structural rather than decorative.
+
+    Measured 2026-09-21 on the shipped worlds: eight of Aurvantis's sixteen villages name
+    no way in, and Vormoor is one of them. Two things follow from that, and both were
+    reported from the table on the same day:
+
+    * the narrator invents one. Asked to describe a settlement, it wrote "you stand under
+      the gate" in a town whose only places are a well, a market, a guildhall, a lane and
+      a green (item 45) — because a settlement obviously has a way in, and the brief's
+      list said otherwise;
+    * the LAW cannot work. `_op_travel`'s warrant check watches the gate, so being wanted
+      in a village has never once shut anything.
+
+    A docks is a flourish; a way in is the difference between a town somebody can arrive
+    at and a town that is only ever an interior. The author's own places are untouched,
+    nothing is reordered, and a settlement that names any entrance — a gate, a bridge, a
+    crossing, the docks — gets nothing added.
+    """
+    if not _settled(location, ""):
+        return authored                      # a wild site is not arrived at by a road
+    named = {str(p.name or "").strip().lower() for p in authored}
+    if named & set(ENTRANCES):
+        return authored
+    label, about, _scale, _cat, _reads = next(
+        row for row in SETTLEMENT_PLACES if row[0] == "the way in")
+    spot = _slug(label)
+    place_id = f"{here}~{URBAN}:{spot}"
+    # It carries its own shape like every other place in an authored set does. Without
+    # one, three tests in `test_authored_shapes.py` raised on `p.shape.width` — the
+    # invariant is that a place in one of these tuples can always be laid out, and a
+    # generated addition is no exception to it.
+    from . import floorplan as floorplan_mod
+
+    return authored + (Place(
+        id=place_id, name=label, about=about, terrain=URBAN,
+        exits=tuple(p.id for p in authored[:1]), origin="generated",
+        shape=floorplan_mod.shape_for(place_id, URBAN)),)
+
+
 def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     """The location's own places — a settlement's rooms, or a wild site's reaches.
 
@@ -805,7 +884,7 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     # and nothing else changes.
     authored = _authored(location)
     if authored:
-        return authored
+        return _with_a_way_in(authored, here, location)
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
         return _settlement_set(here, scale_of(location), location)
