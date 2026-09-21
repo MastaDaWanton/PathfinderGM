@@ -278,3 +278,41 @@ def test_the_forge_page_renders_the_picker():
     assert 'data-crbackground=""' in page
     assert "bg.dataset.crbackground" in page
     assert "background: \"\"," in page, "the form has no background field to fill"
+
+
+def test_a_background_names_somebody_without_standing_them_in_the_scene():
+    """Reported at the table 2026-09-20, with the roster showing four in the scene:
+    "drenn ironvale is named has a part of my background but does not belong in the scene."
+
+    Reproduced on a clean scene — binding `apprenticed` turned one actor into two:
+
+        actors BEFORE bind: [('c1', 'Boop')]
+        actors AFTER bind:  [('c1', 'Boop'), ('c2', 'Ariniel Thorne')]
+
+    `bind` fills its ties through `schemes._role_for`, which is written for schemes that
+    mean to stand somebody in front of the player and ends in `scene.add(actor)`. A tie is
+    a fact about the character's PAST: it wants the world's name for somebody, not a body
+    with hit points in the opening scene. The person still exists in the world, and the
+    sentence still names them.
+    """
+    from rules import backgrounds
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from world.loader import load_cached
+
+    world = load_cached("fixtures/pangrella-campaign.json")
+    for bg in ("apprenticed", "gate-watch", "thief-taker"):
+        scene = Scene(location_id=world.play["settlements"][0]["id"])
+        pc = instantiate("guildhand", scene=scene, name="Boop")
+        pc.kind = "pc"
+        pc.background = bg
+        scene.add(pc)
+        engine = Engine(scene, Dice(seed=3), world=world)
+        engine.place_party()
+        bound = backgrounds.bind(engine, pc)
+        others = [a.name for a in scene.actors.values() if not a.is_pc]
+        assert others == [], (bg, others)
+        # And the tie still says who, which is the half that must survive.
+        assert bound and bound[0]["says"], bg
+        assert "$who" not in bound[0]["says"]

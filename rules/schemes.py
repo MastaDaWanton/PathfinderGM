@@ -489,13 +489,19 @@ def _cast_candidates(engine, anywhere: bool = False) -> list[dict]:
     return out
 
 
-def _role_for(engine, name: str, spec: dict, filled: dict, taken: set) -> dict | None:
+def _role_for(engine, name: str, spec: dict, filled: dict, taken: set,
+              place: bool = True) -> dict | None:
     """A person for the role: a cast member of this place when there is one (grounded,
     their own name and world id), else nobody in particular named by the role. Either
     way the numbers come from the codex chooser — a stat block by the role's words
     near the party's level, docs/npc-codex.md — and a cast member's block is remembered
     in `homebrew/npcs/` so they have the same numbers next time. Placed where the slot
-    says."""
+    says.
+
+    `place=False` asks the same question and puts nobody in the scene — the caller wants
+    the world's own name for somebody and not a body standing here. Backgrounds bind that
+    way; a scheme that means to introduce somebody does not.
+    """
     from . import npcs
     from .bestiary import instantiate
 
@@ -530,6 +536,15 @@ def _role_for(engine, name: str, spec: dict, filled: dict, taken: set) -> dict |
         got = npcs.choose(words, level, prefer_named=named) or {}
         actor = instantiate(str(got.get("id") or "guildhand"), scene=scene,
                             name=role or str(got.get("role") or "someone"))
+    if not place:
+        # A name out of the world, and nobody put anywhere. Backgrounds need this: a tie
+        # is about the PAST — "you fought where Drenn Ironvale took the bets" — and this
+        # function, written for schemes that mean to stand somebody in front of the
+        # player, was adding that person to the opening scene as a body with hit points.
+        # Reported at the table 2026-09-20: "drenn ironvale is named has a part of my
+        # background but does not belong in the scene."
+        return {"kind": "name", "ref": "", "name": actor.name,
+                "entity": actor.world_entity_id or ""}
     scene.add(actor)
     where = spec.get("at")
     if where and where.startswith("$") and where[1:] in filled and filled[where[1:]].get("id"):
