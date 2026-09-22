@@ -17,6 +17,7 @@ from typing import Any
 
 from . import biomes
 from . import goods
+from . import ontheway
 from . import casting
 from . import compulsion
 from . import consumables
@@ -309,6 +310,14 @@ class Scene:
     # how the ships were oriented, so the fight was noise before the boarding that decided
     # it. The band is what a player can hold in their head from prose alone.
     sea: dict = field(default_factory=dict)
+    # The road left unwalked, when a journey was stopped short of the far end:
+    # {"to", "to_name", "hours_left", "from"}. Stored rather than derived, like
+    # `founded` and for the same reason — how far along a road a party got is
+    # something that HAPPENED, and no amount of looking at the map recovers it.
+    # Without it, the second half of an interrupted journey would charge the whole
+    # road again, which makes being interrupted a punishment for the dice rather
+    # than an event (`rules/ontheway.py`).
+    road: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter.
@@ -4400,6 +4409,15 @@ class Engine:
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
 
+        # A road already half walked is half a road. `scene.road` is what an interrupted
+        # journey left behind, and it is only good for the road it was left on: setting
+        # out for somewhere else, or from somewhere else, is a new journey at full cost.
+        resumed = 0
+        if (self.scene.road.get("to") == leg.to_id
+                and self.scene.road.get("from") == self.scene.location_id):
+            resumed = max(0, int(self.scene.road.get("walked") or 0))
+            hours = max(1, hours - resumed)
+
         # The fight does not come with you, and neither does anybody who is not.
         fight_ended = bool(self.scene.initiative)
         if fight_ended:
@@ -4416,6 +4434,24 @@ class Engine:
         # The road, charged to the body first and the world's clock second — the order
         # `_op_venture` uses, because `pass_hours` can stop early and only it knows how
         # many hours were actually survived.
+        # The road's own check, watch by watch, stopping at the first thing that happens
+        # (`rules/ontheway.py`). The published procedure verbatim — four checks a day at
+        # 20% — over the ground the world says this route crosses. Rolled BEFORE the
+        # march so the march only charges the body for the hours actually walked: a
+        # party stopped at noon on day one has not paid for day three.
+        #
+        # Not at sea. A passage is not a march and this table is a road's; a ship's own
+        # trouble is `rules/ships.py`, which has its own.
+        met = None
+        if how != "sea":
+            met = ontheway.road(
+                self.dice, hours,
+                (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
+                int(getattr(pc, "level", 1) or 1) if pc is not None else 1)
+        stopped_short = met is not None
+        if stopped_short:
+            hours = ontheway.hours_walked(met, hours)
+
         toll_note = ""
         if how == "sea":
             # A passage is not a march. Nobody aboard is walking eight hours and camping
@@ -4431,14 +4467,36 @@ class Engine:
         if walked:
             toll_note = f" The road cost them: {walked}"
 
-        if arrived:
+        # A body that gave out did not meet anything: it turned back before the watch
+        # the dice picked. The road's check is for a party that was still walking.
+        if not arrived:
+            met, stopped_short = None, False
+
+        if arrived and not stopped_short:
             self.scene.location_id = leg.to_id
             # A march between settlements is this turn's journey too (item 35), and a
             # `travel` behind it would walk the party across the new town the moment it
             # arrived. A road turned back from cost hours but moved nobody, so it does
             # not spend the turn's journey.
             self._journeyed = leg.to_name
-        self.place_party()
+            # The road is behind them, whatever of it was walked on an earlier turn.
+            self.scene.road = {}
+            self.place_party()
+        elif stopped_short:
+            # Stopped on the road, which is a real place: the open ground this route
+            # crosses, outside the town they set out from. `travel` has reached that
+            # ground by biome since stage 8c and this is the same door — a party halted
+            # in open country can be fought, camped with, and walked on from.
+            self.scene.road = {"to": leg.to_id, "to_name": leg.to_name,
+                               "from": self.scene.location_id,
+                               "walked": resumed + hours}
+            self._journeyed = leg.to_name
+            ground = (leg.crosses[0] if leg.crosses else "") \
+                or places_mod.terrain_of(self.scene.at) or "plains"
+            out = places_mod.region_set(self.scene.location_id, ground)
+            self.place_party(out[0].id if out else "")
+        else:
+            self.place_party()
 
         if not arrived:
             bits = [f"The road to {leg.to_name} was longer than {pc.name if pc else 'the party'} "
@@ -4453,8 +4511,42 @@ class Engine:
                 because=intent.because,
             )
 
+        if stopped_short:
+            # The march is over for this turn, and the road remembers how much of it is
+            # still to walk. Whoever stopped it arrives by the one door creatures come
+            # in by, onto the open ground the party is now standing on.
+            made = self._bring_in(
+                met.template or "guildhand", count=met.count,
+                name=(met.creature or {}).get("name")
+                     or (met.words[0].title() if met.words else None))
+            for m in made:
+                self.scene.zones[m["ref"]] = "far"
+                self.scene.positions.pop(m["ref"], None)
+            if self.scene.grid is not None and self.scene.positions:
+                self.scene.place_by_zone([m["ref"] for m in made])
+            if met.aggressive and pc is not None and made:
+                self._ensure_encounter(pc.ref, target=made[0]["ref"])
+            bits = [f"{hours} hour{'s' if hours != 1 else ''} out of "
+                    f"{getattr(self.world.get(self.scene.location_id), 'name', 'town') if self.world else 'town'} "
+                    f"on the road to {leg.to_name}, and the road stops being yours.",
+                    ontheway.describe(met)]
+            if toll_note:
+                bits.append(toll_note.strip())
+            return Outcome(
+                intent_id=intent.id, op="journey",
+                effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
+                          "hours": hours, "arrived": False, "how": how, "left": left,
+                          "stopped_short": True, "met": met.kind,
+                          "place": self.scene.at}],
+                tell=" ".join(b for b in bits if b),
+                because=intent.because,
+            )
+
         bits = [f"{journey_mod.describe(leg, hours).capitalize()}, and {leg.to_name} "
                 f"is ahead of you."]
+        if resumed:
+            bits.append(f"The {resumed} hour{'s' if resumed != 1 else ''} of it already "
+                        f"behind them counted: only the rest was walked today.")
         if how == "derived":
             # Never a mileage the world did not state. The tell says how long it took,
             # which is true, and not how far it was, which nobody wrote down.
@@ -4668,6 +4760,51 @@ class Engine:
                                 f"arch. {how}")
                 law_line = (f"Your name is on the watch's lips in {town_name}: the "
                             f"guards at the gate look twice, and let you through.")
+
+        # THE WAY THERE, hop by hop, and whatever is on it.
+        #
+        # "i can say i go to the market and the narrator doesn't just put me in the
+        # market but describes all the places i needed to move through to get there"
+        # (2026-09-22). `Place.exits` has been the move vocabulary since this engine
+        # was written and nothing ever walked it: a travel was a single assignment
+        # however far across town it went, which is why "I head into the city" from the
+        # roadside landed in the market with the gate and the square never mentioned.
+        # `places.route` is the breadth-first walk; the destination is unchanged, so a
+        # crossing still costs ONE turn — the player was explicit that it must ("not
+        # that i have to spend four turns to get to the market").
+        #
+        # And every hop is checked (`rules/ontheway.py`), on the table for the ground
+        # that hop crosses, stopping at the first thing that happens — which is the
+        # request, and is also what the roguelikes do with a computed path: Angband and
+        # DCSS walk it until something disturbs you and then hand the keyboard back.
+        # The party stops where it was stopped, so the destination shrinks to that hop.
+        # A route that comes back empty — 40 of Aurvantis's 10,792 pairs, and any
+        # minted place the exits have not been wired for — falls back to the single
+        # step this door has always taken, checked once.
+        met = None
+        went_by: tuple[str, ...] = ()
+        meant_for = going_to.name
+        if moved:
+            level = int(getattr(pc, "level", 1) or 1) if pc is not None else 1
+            passed: list[str] = []
+            for hop_id in (places_mod.route(known, was_place, going_to.id)
+                           or (going_to.id,)):
+                hop = places_mod.find(known, hop_id) or going_to
+                if hop.terrain == places_mod.URBAN:
+                    met = ontheway.street(self.dice, level)
+                else:
+                    # Outside the walls is the road's table, and an hour of it: the
+                    # same hour this op charges below for crossing the wall.
+                    met = ontheway.road(self.dice, 1, hop.terrain, level)
+                if met is not None:
+                    going_to = hop
+                    break
+                passed.append(hop.name)
+            # The last hop of a quiet walk is the destination, and the tell names that
+            # separately. An interrupted walk stops somewhere that is now the
+            # destination, so everything in hand is a place passed through.
+            went_by = tuple(passed) if met is not None else tuple(passed[:-1])
+
         left: list[str] = []
         stayed_down: list[str] = []
         fight_ended = False
@@ -4745,14 +4882,48 @@ class Engine:
             # somebody keeps and nobody has kept it yet.
             self.staff_the_place()
 
+        # Whoever the walk ran into arrives by the one door creatures arrive by, onto
+        # the ground that has just been laid. After the move, never before: they are in
+        # the place the party stopped at, and `_bring_in` places them on its grid.
+        met_tell = ""
+        if met is not None:
+            met_tell = ontheway.describe(met, going_to.name)
+            made = self._bring_in(
+                met.template, count=met.count,
+                name=(met.creature or {}).get("name")
+                     or (met.words[0].title() if met.words else None))
+            for m in made:
+                self.scene.zones[m["ref"]] = "near"
+                self.scene.positions.pop(m["ref"], None)
+            if self.scene.grid is not None and self.scene.positions:
+                self.scene.place_by_zone([m["ref"] for m in made])
+            if met.kind == "cutpurse" and pc is not None and made:
+                met_tell += self._cutpurse(pc, self.scene.actors[made[0]["ref"]])
+            elif met.aggressive and pc is not None and made:
+                self._ensure_encounter(pc.ref, target=made[0]["ref"])
+
         note = str(intent.params.get("note") or "").strip()
         bits = []
         if not moved:
             bits.append(f"You are already at {going_to.name}.")
         if going_to.terrain != was_ground:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
+        if went_by:
+            # The places the walk actually crossed, said as fact. The narrator is asked
+            # to describe them (see `gm/prompts.scene_brief`) and can only do that if
+            # the engine says which ones they were — a model left to infer the route
+            # invents streets, which is the failure this whole module exists to stop.
+            bits.append(f"The way there ran through {_and_then(went_by)}.")
         if moved:
             bits.append(f"You are at {going_to.name} now.")
+        if met_tell:
+            bits.append(met_tell)
+        if met is not None and meant_for != going_to.name:
+            # Said plainly, because the player asked for somewhere else and needs to
+            # know they did not get there — the roguelike's "you were interrupted", and
+            # the thing that makes the next turn's repeat of the command make sense.
+            bits.append(f"You were making for {meant_for} and got no further than "
+                        f"{going_to.name}.")
         if fight_ended:
             bits.append("The fight is left behind." + xp_line)
         if stayed_down:
@@ -4768,10 +4939,41 @@ class Engine:
             intent_id=intent.id, op="travel",
             effects=[{"kind": "biome", "biome": going_to.terrain, "was": was_ground,
                       "left": left, "place": self.scene.at, "was_place": was_place,
-                      "fight_ended": fight_ended}],
+                      "fight_ended": fight_ended, "went_by": list(went_by),
+                      "met": met.kind if met is not None else ""}],
             tell=" ".join(bits),
             because=intent.because,
         )
+
+    def _cutpurse(self, pc, thief) -> str:
+        """A hand in the purse, resolved by the book and not by a flat chance.
+
+        "Sleight of Hand DC 20 to lift a small object from another person" — and the
+        mark's Perception is the opposed roll against it (Core Rulebook, Sleight of
+        Hand). Both rolls are the engine's and both are hidden: the player is not
+        offered a Perception popup, because being *asked* to roll Perception is itself
+        the tell that something is being taken, which is the oldest way there is to
+        ruin this encounter. What the player is told is what their character notices.
+
+        The coin moves through `goods.spend`, the one door money leaves a purse by, so
+        a thief cannot take copper that is not there.
+        """
+        take = self.dice.roll(ontheway.LIFT_DICE, label="a handful of small coin",
+                              visibility="hidden").total
+        lift = self.dice.d20(thief.skill_modifiers("sleight of hand"),
+                             label=f"{thief.name} Sleight of Hand", visibility="hidden")
+        spot = self.dice.d20(pc.skill_modifiers("perception"),
+                             label=f"{pc.name} Perception", visibility="hidden")
+        if lift.total < max(ontheway.LIFT_DC, spot.total):
+            return (" A hand is on your purse, and you have hold of the wrist it "
+                    "belongs to.")
+        purse, enough = goods.spend(pc.purse, take)
+        if not enough:
+            return (" A hand comes away from your purse with nothing in it: there is "
+                    "nothing in it to take.")
+        pc.purse = purse
+        return (f" They are gone into the crowd before you feel it, and your purse is "
+                f"{take} copper lighter.")
 
     def _too_busy_to_forage(self, actor) -> str:
         """Why this character cannot wander off looking for herbs, or "".
@@ -7021,6 +7223,15 @@ class Engine:
                                                  getattr(here, "shape", None),
                                                  getattr(here, "floors", ())):
             return ""
+        # A floor that a walk can legitimately reach IS reached, since 2026-09-22: the
+        # route-finder walks the stairs like any other exit, so market → guildhall →
+        # upstairs is a legal way up and refusing it would be refusing the fix. Measured
+        # on the live save the moment the router landed — "the upper floor of the
+        # guildhall" from the market came back refused with its own remedy (go through
+        # the guildhall) already available. This is the fifth travel of the item 35 turn,
+        # answered properly rather than capped.
+        if places_mod.route(self.places(), here.id, going_to.id):
+            return ""
         # One floor of a building, named from somewhere that is not the floor below it.
         building = places_mod.base_of(going_to.id)
         door = next((p.name for p in self.places() if p.id == building), "the way in")
@@ -8627,6 +8838,14 @@ class Engine:
 
 
 # --- (de)serialisation for the suspend/resume round trip --------------------------------
+
+def _and_then(names) -> str:
+    """"the square, the market and the lane" — the way there, in the order walked."""
+    got = [str(n) for n in names if str(n).strip()]
+    if len(got) <= 1:
+        return got[0] if got else ""
+    return ", ".join(got[:-1]) + f" and {got[-1]}"
+
 
 def _intent_from_dict(d: dict) -> Intent:
     return Intent(

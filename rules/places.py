@@ -1344,3 +1344,53 @@ def find(places, wanted: str) -> Place | None:
         if len(ending) == 1:
             return ending[0]
     return None
+
+
+def route(places, start: str, dest: str) -> tuple[str, ...]:
+    """The way from one place to another, hop by hop, or () if there is none.
+
+    The `exits` field has been the move vocabulary since this module was written and
+    nothing has ever walked it. Measured 2026-09-21, live: the party stood at the
+    roadside, said "I head into the city", and arrived at the market — a place two hops
+    away through the gate and the square — with the prose describing a single step. The
+    engine's own refusal for a multi-travel plan says why it cannot do better: "the
+    engine has no route-finder to walk it there".
+
+    This is that route-finder, and the tradition is unanimous about whose job it is.
+    Inform ships `the best route from X to Y`, and its Recipe Book examples (Misadventure,
+    Safari Guide) take ONE named room and derive the path themselves; Angband and DCSS
+    compute the path to a named destination and walk it, interruptibly. In every one of
+    them the traveller names a destination and the system finds the way. Here the model
+    was being asked to hand over the way itself, which is the one thing it cannot know.
+
+    Breadth-first, so the way returned is the shortest one, and ties break on the order
+    the exits were written — which is stable, because the places are generated from the
+    location's own durable id.
+
+    Returns the hops AFTER `start`, ending at `dest`. An unreachable destination gives
+    (), which is not the same as "no route exists to anywhere": measured across the two
+    shipped worlds, 40 of 10,792 place pairs in Aurvantis have no path at all and eight
+    exit links are one-way, so a caller that refused on () would refuse moves that work
+    today. The caller's floor is the direct step it already took.
+    """
+    by = {p.id: p for p in places or ()}
+    if start not in by or dest not in by or start == dest:
+        return ()
+    from collections import deque
+
+    came: dict[str, str] = {start: ""}
+    queue = deque([start])
+    while queue:
+        cur = queue.popleft()
+        if cur == dest:
+            break
+        for nxt in by[cur].exits:
+            if nxt in by and nxt not in came:
+                came[nxt] = cur
+                queue.append(nxt)
+    if dest not in came:
+        return ()
+    walk = [dest]
+    while came[walk[-1]]:
+        walk.append(came[walk[-1]])
+    return tuple(reversed(walk[:-1]))

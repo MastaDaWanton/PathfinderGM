@@ -258,6 +258,8 @@ class Campaign:
                 # A hull does not heal and a chase does not reset: both survive a reload.
                 "vessels": [dict(v) for v in self.scene.vessels],
                 "sea": dict(self.scene.sea),
+                # How much of an interrupted road is still to walk.
+                "road": dict(self.scene.road),
                 # WHICH place they are standing in, by id. The list of places is
                 # derived (rules.places.spots_for is deterministic and seeded off the
                 # location's own id), so there is nothing else here to save and no way
@@ -365,6 +367,7 @@ class Campaign:
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
             vessels=[dict(v) for v in (s.get("vessels") or [])],
             sea=dict(s.get("sea") or {}),
+            road=dict(s.get("road") or {}),
             at=str(s.get("at") or ""),
             minted=int(s.get("minted", 0) or 0),
             pending_intents=s.get("pending_intents", []),

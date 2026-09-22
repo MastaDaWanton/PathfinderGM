@@ -150,10 +150,27 @@ def _go(e, pc, where, **params):
     return e.run(e.validate([raw], origin="author:test"))
 
 
+def _all_the_way(e, pc, where, turns=20):
+    """Journey, and keep journeying, until the far end is reached.
+
+    A road is checked once a watch at the published 20% (`rules/ontheway.py`, and AoN's
+    "four times per day ... 20% chance each"), and a hit stops the march where it stood.
+    So a multi-day road is normally walked over several turns with something happening on
+    each of them — which is what overland travel is at a table, and which these tests are
+    not about. Each `run` is its own turn; one journey a turn still holds inside each.
+    """
+    was = e.scene.location_id
+    for _ in range(turns):
+        res = _go(e, pc, where)
+        if e.scene.location_id != was:
+            return res
+    raise AssertionError(f"{turns} turns on the road and still at {was}")
+
+
 def test_the_party_can_finally_leave_the_town():
     """The gap this file is named for. Twelve settlements ship; one was reachable."""
     s, e, pc = _party()
-    _go(e, pc, ROAD_TO)
+    _all_the_way(e, pc, ROAD_TO)
     assert s.location_id != ROAD_FROM
     assert s.at.startswith(s.location_id), "the party is standing somewhere in the new town"
 
@@ -163,7 +180,7 @@ def test_a_journey_costs_days_on_the_clock():
     meters thirst in hours."""
     s, e, pc = _party()
     assert s.clock_minutes == 0
-    _go(e, pc, ROAD_TO)
+    _all_the_way(e, pc, ROAD_TO)
     assert s.clock_minutes > 24 * 60, "a journey between towns took less than a day"
 
 
@@ -182,7 +199,7 @@ def test_the_fight_and_the_bystanders_do_not_come_along():
     journey sheds harder, because it is days rather than steps."""
     s, e, pc = _party()
     s.add(instantiate("guildhand", scene=s, name="a merchant"))
-    _go(e, pc, ROAD_TO)
+    _all_the_way(e, pc, ROAD_TO)
     assert "a merchant" not in [a.name for a in s.actors.values()]
 
 
@@ -197,7 +214,7 @@ def test_a_march_is_days_of_walking_and_not_a_sleepless_forced_one():
     walking: five days of road is five eight-hour marches and four nights.
     """
     s, e, pc = _party(hp=4)
-    _go(e, pc, ROAD_TO)
+    _all_the_way(e, pc, ROAD_TO)
     assert s.location_id != ROAD_FROM, "a frail traveller could not make a walked road"
     assert s.clock_minutes > 5 * journey.HOURS_PER_DAY * 60, \
         "the nights between the marches are not on the clock"
@@ -249,7 +266,7 @@ def test_a_way_past_the_watch_opens_the_road():
                                  source="scheme:test", origin="scheme:test",
                                  duration="until-dismissed",
                                  tags=("knows.way-past-gate",)))
-    _go(e, pc, ROAD_TO)
+    _all_the_way(e, pc, ROAD_TO)
     assert s.location_id != ROAD_FROM
 
 

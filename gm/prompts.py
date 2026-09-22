@@ -777,6 +777,31 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                          f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
                          f"Anything else is refused, and so is a SECOND travel in the "
                          f"same plan — one journey a turn.")
+            # What is NEXT DOOR, which is a different question from what exists, and
+            # became answerable on 2026-09-22 when `places.route` started walking the
+            # exits graph. The engine finds the way itself now, so the plan must name
+            # the destination and never the route — said here because the block above
+            # reads as a flat list of equally-near rooms, which is what produced plans
+            # of five travels in the first place (item 35).
+            near = [p.name for p in known if p.id in (here.exits or ())]
+            if near:
+                lines.append(
+                    f"  NEXT DOOR to {here.name}, and reached in one step: "
+                    f"{', '.join(near)}. Everywhere else here is further off and is "
+                    f"reached by walking through these — name the DESTINATION in the "
+                    f"travel and the engine walks the way, through every place between, "
+                    f"in one turn. Never plan the route yourself.")
+            # And what this ground looks like underfoot. The shape is what the tactical
+            # map is drawn from, so a narrator describing the market's stalls and the
+            # cart is describing the same market the player can climb on — which is the
+            # positional half of the 2026-09-22 request ("describes positionally where i
+            # am in the market what's around me").
+            from rules import floorplan as _floorplan
+
+            underfoot = _floorplan.describe(here.id, here.terrain, here.shape)
+            if underfoot:
+                lines.append(f"  UNDERFOOT at {here.name} (what is physically here, and "
+                             f"what the map is drawn from): {underfoot}.")
         # And the roads out. Named for the same reason the places are: a model told only
         # about the room it is in reconstructs the rest of the world from earlier beats,
         # and "we set out for Zhilgoroth" is refused if Zhilgoroth has no road. The
@@ -1503,6 +1528,28 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     prose at all is an empty page, and most town turns are `narrate_only`.
     """
     said = "\n".join(f"- {t}" for t in tells if t)
+    # An arrival is a different kind of paragraph from a beat, and it was being written
+    # as a beat. Asked for 2026-09-22: "describes all the places i needed to move
+    # through to get there then describes positionally where i am ... what's around me
+    # and where I can go ... then the buying and selling the sounds and smells and
+    # finally hone in on some specific action or actions that the PC sees or hears".
+    #
+    # Fired off the engine's own tell and not a flag, so it can never disagree with
+    # what happened: `_op_travel` says "You are at X now." and nothing else does.
+    # Deliberately NOT a five-sentence skeleton — this file's own rule is that the
+    # shape of a prompt becomes the shape of the output, and a numbered template would
+    # produce five identical arrivals. It names what the passage owes the player and
+    # leaves the sentences alone; the facts it draws on are all in the brief already
+    # (the way there in the tells, UNDERFOOT, NEXT DOOR, and the roster).
+    arriving = any(" now." in t and "You are at " in t for t in tells if t)
+    arrival = (
+        "THIS TURN THE PARTY ARRIVED SOMEWHERE. Walk them in: the places the engine "
+        "says the way ran through are places they passed through, in order, and each "
+        "is worth a clause; then where they are standing in this one and what is "
+        "within reach of them; then what is going on around them — the work, the "
+        "trade, the noise and the smell of it. End on ONE particular thing one "
+        "particular person is doing, close enough to speak to. Only places and people "
+        "the brief names." if arriving else "")
     # The scene as the player last read it, in front of the model that continues it.
     # This call had NO history at all — `[]` at the call site, and the opening was
     # never in the history either — and on the player's own first turn, 2026-09-05,
@@ -1527,6 +1574,7 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
         "content": (scene + f"The player said: {player_input}\n\n"
                     + (f"What the engine decided:\n{said}" if said
                        else "The engine decided nothing mechanical this turn.")
+                    + (f"\n\n{arrival}" if arrival else "")
                     + (f"\n\n{scene_now_block}" if scene_now_block else "")
                     + (f"\n\n{pull}" if pull else "")
                     + (f"\n\n{claim}" if claim else "")),
