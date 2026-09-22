@@ -110,13 +110,16 @@ model-writable params (parse pops engine-owned keys silently, so it could not
 join that set); a validate-time source check as the primary defence (the sampler
 enum is; stage 7 measured what a rejection teaches); GM fiat with no rule row.
 
-**Still open after stage 8** (do not read a passing probe as proof): **no route from a
-social check to an attitude** — the mind gate closed assertion, and spells, abilities,
-items and schemes still move the track, but `check` takes no target param and no rule
-row turns a Diplomacy or Intimidate success into a step, so talking somebody round is
-narrated and never recorded (`rules/effectspec.py` has said "no check in the app
-consults an attitude yet" since the spell import; the gate's refusal names those checks
-as the ordinary route because they do roll); the
+**Closed since this ledger was written**: the social route to an attitude. It reads as
+open below and it is not — `Engine._sway_subject` takes the intent's own `target` (never
+a param), `attitude.influence_dc`/`intimidate_dc` supply the book's DC,
+`attitude.steps_for(margin)` the steps, `COOLDOWN_MINUTES` the once-a-day limit, and
+`_set_attitude` is the one applicator. Proved end to end 2026-09-22 by
+`test_talking_them_round_is_a_real_route_and_not_a_promise`: indifferent → the player's
+own Diplomacy roll → friendly → `company` accepts them. **Check the code before trusting
+a "still open" line here** — this one cost a near-miss in a report.
+
+**Still open after stage 8** (do not read a passing probe as proof): the
 `_op_use_ability` instant-effects loop records no per-number origin (the outcome
 record carries `ability:<path>/<key>`); wards stamp `ward:<name>`, not a spell id;
 Point-Blank Shot's `when.range_ft` waits on the attack op passing range into the
