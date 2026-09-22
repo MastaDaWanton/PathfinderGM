@@ -346,3 +346,34 @@ class TestSomebodyWhoComesAlong:
         tell = " ".join(o.tell for o in res.outcomes)
         assert "'join' or 'leave'" in tell
         assert not who.has_state(states.TRAVELS_WITH_YOU)
+
+    def test_talking_them_round_is_a_real_route_and_not_a_promise(self):
+        """The refusal above tells the player to use Diplomacy, so the whole of that
+        route has to work — a refusal naming a fix that does not exist is worse than no
+        refusal. `docs/states-effects-tells.md`'s ledger still lists "no route from a
+        social check to an attitude" as open; it was closed on 2026-09-16 and the ledger
+        is stale. This is the proof, end to end: indifferent, talked round, comes along.
+        """
+        from rules import attitude as attitude_mod
+
+        s, e, pc = _party()
+        who = self._friend(s, e, mood="")           # nobody has said: indifferent
+        assert attitude_mod.of(who) == attitude_mod.DEFAULT
+        _run(e, {"op": "company", "actor": pc.ref, "because": "t",
+                 "params": {"who": who.ref}})
+        assert not who.has_state(states.TRAVELS_WITH_YOU), "indifferent does not come"
+
+        # The check the refusal names. `target` is the intent's own field and not a
+        # param — `check` takes no `target` param and `_sway_subject` reads
+        # `intent.targets()` — and talking somebody round is the PLAYER's roll, so it
+        # suspends and is resumed with a face, exactly as it does on the page.
+        _run(e, {"op": "check", "actor": pc.ref, "target": who.ref, "because": "t",
+                 "params": {"skill": "diplomacy"}})
+        assert s.awaiting and s.awaiting["label"] == "Diplomacy check"
+        e.resume(20)
+        assert attitude_mod.step_of(attitude_mod.of(who)) \
+            >= attitude_mod.step_of(attitude_mod.COMES_ALONG), attitude_mod.of(who)
+
+        _run(e, {"op": "company", "actor": pc.ref, "because": "t",
+                 "params": {"who": who.ref}})
+        assert who.has_state(states.TRAVELS_WITH_YOU)

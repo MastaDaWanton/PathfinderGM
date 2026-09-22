@@ -143,6 +143,48 @@ That was true until the route-finder landed and false the moment it did. It is C
 that rule exists for. Corrected, along with `venture`'s `parent` (which must now be where
 the party stands).
 
+## Audited against the three laws
+
+Done after the fact, against `.claude/skills/states-effects-tells`, and it found one real
+fault in this work and one stale claim in the contract itself.
+
+**One vocabulary.** `bond.knows-you` and `bond.travels-with-you` are constants in
+`rules/states.py` beside `role.guard` and `state.wanted`, and every reader asks
+`has_state(states.KNOWS_YOU)` — no site spells the tag. Not `TAGS` rows: those map
+condition keys to tags, and neither of these is a condition, which is the same reason
+`WANTED` and `BYSTANDER` are constants too.
+
+**The fault.** `_op_company`'s first cut read `states.attitude_of(who)` and compared the
+answer to `("friendly", "helpful")` — a reader matching attitude strings, which is
+precisely what law one forbids. The three-laws ratchet did not catch it and could not:
+it counts literal *condition* keys per file, and an attitude word is not one. Fixed to
+ask the track — `attitude.step_of(mood) < attitude.step_of(attitude.COMES_ALONG)` — with
+the threshold named once in `rules/attitude.py` where the rest of the track lives. Writes
+still take a key (`settle_attitude(who, "friendly", …)`), which is how every caller of
+the one applicator works; the law is about readers.
+
+**One applicator.** The bond is an `ActiveEffect` through `Actor.apply_effect`, removable
+by source, and the attitude moves through `Engine.settle_attitude` — added as the public
+name for `_set_attitude` rather than letting `backgrounds` reach for a private method,
+because a second copy of clear-then-add is exactly what that method's docstring exists to
+prevent. Nothing in `rules/ontheway.py` applies an effect at all; the cutpurse's coin
+leaves through `goods.spend`, the one door money leaves a purse by.
+
+**Severed tells.** `company` emits one. `acquaint` does **not**, and that is worth saying
+plainly: it applies an effect at campaign start, where there is no Outcome to carry a
+tell. It is the same shape `backgrounds.bind` has always had, and the fact reaches the
+narrator the way an attitude always has — as a stated fact in the brief rather than as a
+tell. Consistent with what is already there, and still an asymmetry with `_op_condition`.
+
+**And the contract's ledger was stale.** It listed "no route from a social check to an
+attitude" as open after stage 8. It has been closed since 2026-09-16 — `_sway_subject`
+takes the intent's own `target`, the book's DC and steps come from `rules/attitude.py`,
+and `_set_attitude` applies it. That matters here because `company`'s refusal *names* that
+route ("talk them round — that is a Diplomacy check"), and a refusal naming a fix that
+does not exist is worse than no refusal. Proved end to end rather than assumed:
+indifferent → the player's own Diplomacy roll → friendly → they come along. The skill's
+ledger is corrected.
+
 ## What is still open
 
 - Nothing makes a companion act on their own between turns. They speak because the

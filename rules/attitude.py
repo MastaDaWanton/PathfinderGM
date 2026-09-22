@@ -75,6 +75,18 @@ INTIMIDATE_DICE = "1d6"     # x10 minutes
 # the module docstring says why.
 LEVERS = ("diplomacy", "intimidate")
 
+# Where on the track somebody will walk out of here with you (`Engine._op_company`). The
+# book's own words decide it rather than a feel: friendly is "will chat, advise, offer
+# limited help", and going somewhere with you is the first of those; indifferent "doesn't
+# much care" and has no reason to leave their afternoon.
+#
+# Named HERE and compared with `step_of`, not spelled in the engine as a pair of literals.
+# That was the first cut and it is precisely the thing law one forbids — a reader matching
+# attitude strings instead of asking the vocabulary — caught auditing this work against
+# the contract rather than by any test, because the three-laws ratchet counts literal
+# CONDITION keys and an attitude word is not one.
+COMES_ALONG = "friendly"
+
 
 def of(actor, default: str = DEFAULT) -> str:
     """Where this creature sits on the track. Asked through the vocabulary, always."""

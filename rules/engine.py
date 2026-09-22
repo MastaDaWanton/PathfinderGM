@@ -5832,12 +5832,14 @@ class Engine:
         if who.is_down:
             return self._refuse(
                 intent, f"{who.name} is not going anywhere: they are down.")
-        mood = states.attitude_of(who)
-        if mood not in ("friendly", "helpful"):
+        from . import attitude as attitude_mod
+
+        mood = attitude_mod.of(who)
+        if attitude_mod.step_of(mood) < attitude_mod.step_of(attitude_mod.COMES_ALONG):
             return self._refuse(
-                intent, f"{who.name} is {mood or 'indifferent'} towards you and does "
-                        f"not walk out of here at your word. Talk them round first — "
-                        f"that is a Diplomacy check against them.")
+                intent, f"{who.name} is {mood} towards you and does not walk out of "
+                        f"here at your word. Talk them round first — that is a "
+                        f"Diplomacy check against them.")
         who.apply_effect(ActiveEffect(
             name="travels with you", kind="bond", key=f"{source}:travels",
             source=source, origin=source, duration="until-dismissed",
