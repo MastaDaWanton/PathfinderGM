@@ -231,6 +231,27 @@ there. The assertion is the containment it was written for — the merchant is n
 rather than the whole roster. An unseeded fixture that asserts a roster is a gate that lies
 occasionally, which is the trap `test_foraging_fills_the_satchel` already records.
 
+## And one the fix itself introduced
+
+Reported the same evening, with a screenshot: thirteen spells chosen and the budget
+reading **0 / 28**.
+
+The server's count was right — measured on that draft, 13 — and it was **stale**. The line
+this replaced counted `f.spellbook` in the browser and was live; making it read a number
+the server had computed froze it at the moment of the last `loadChoices`, and picking a
+spell does not refetch. The chips beside it render from the form, so the two halves of the
+same line disagreed.
+
+Counted from the form again, in both places that ask — the budget lines and the
+"allowance full" greying — with the spell levels taken from the rows the server did send,
+which do not change as you pick. Pinned by a test that forbids the page from reading the
+server's running total at all, because the staleness is the class of bug rather than the
+one line.
+
+Driven in the browser rather than read: a wizard at 5 / 8 dims, at 8 / 8 greys the forty
+rows on screen, at 9 / 8 turns alarm; a sorcerer shows "cantrips 4 / 4" beside "level 1
+spells 0 / 2", which is the exact case item 42 exists for.
+
 ## What is still open after this
 
 Everything `rules/classfeatures.py` lists as inert, and each is blocked on a thing that

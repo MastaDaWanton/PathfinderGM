@@ -2063,6 +2063,20 @@ function spellPicker() {
   }
   const granted = got.granted || [];
   const chosen = f.spellbook.filter(id => !granted.some(g => g.id === id));
+  // Counted HERE, from the form, not read off the server's running total. Reported
+  // 2026-09-22 with a screenshot: thirteen spells chosen and the budget reading
+  // "0 / 28". The server's own count is right — measured, 13 for that draft — but it is
+  // only as fresh as the last `loadChoices`, and picking a spell does not refetch.
+  // The old single line counted `f.spellbook` locally and was live; making it read a
+  // server number made it stale. The levels come from the rows the server DID send,
+  // which do not change as you pick.
+  const levelOf = {};
+  for (const s of (got.choose || [])) levelOf[s.id] = s.level;
+  const takenAt = {};
+  for (const id of chosen) {
+    const lvl = String(levelOf[id] ?? "1");
+    takenAt[lvl] = (takenAt[lvl] || 0) + 1;
+  }
   return `
     <h2 class="sect">Spells</h2>
     ${slotLine ? `<p class="note">On the first day ${esc(f.name || "they")} will cast
@@ -2078,7 +2092,7 @@ function spellPicker() {
       // One line per allowance, which is item 42: a single "n / m" across levels 0 and
       // 1 could not show that both picks had gone on cantrips and no first-level spell
       // had been taken at all.
-      const n = (got.chosen_by_level || {})[lvl] || 0;
+      const n = takenAt[lvl] || 0;
       const what = lvl === "0" ? `${esc(f.class)} cantrips`
                                : `level ${esc(lvl)} ${esc(f.class)} spells`;
       return `<div class="budget ${n > cap ? "over" : ""}${n < cap ? " short" : ""}">
@@ -2115,9 +2129,21 @@ function spellMatches() {
   const kind = FORGE.spellSchool || "";
   // A spell whose allowance is already full is still shown, greyed, rather than
   // vanishing: a list that changes length as you pick is one a player cannot learn.
+  // Counted from the form for the same reason the budget lines above are: a server
+  // number that only refreshes on `loadChoices` is stale the moment you pick anything,
+  // which is how the budget came to read "0 / 28" with thirteen spells on screen.
+  // Nothing in this file may read the server's running total for that reason.
+  const granted = got.granted || [];
+  const levelOf = {};
+  for (const s of (got.choose || [])) levelOf[s.id] = s.level;
+  const takenAt = {};
+  for (const id of f.spellbook.filter(x => !granted.some(g => g.id === x))) {
+    const lvl = String(levelOf[id] ?? "1");
+    takenAt[lvl] = (takenAt[lvl] || 0) + 1;
+  }
   const full = {};
   for (const [lvl, cap] of Object.entries(got.caps || {})) {
-    full[lvl] = ((got.chosen_by_level || {})[lvl] || 0) >= cap;
+    full[lvl] = (takenAt[lvl] || 0) >= cap;
   }
   const hits = pool.filter(s => (!kind || (s.school || "other") === kind)
     && (!q || s.name.toLowerCase().includes(q)));
