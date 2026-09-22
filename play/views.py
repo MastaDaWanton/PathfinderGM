@@ -1915,12 +1915,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 who = c.scene.actors.get(ref)
                 if who is None or not getattr(who, "appearance", ""):
                     continue
-                line = f"{narration_mod.definite(who.name).capitalize()}: {who.appearance}"
-                if who.appearance in text:
+                line = narration_mod.a_face_for(who.name, who.appearance)
+                if not line or who.appearance in text:
                     # Their people's line is already on the page. Not marked described —
                     # it may have been said of somebody else — but not said twice either.
                     continue
-                text = text.rstrip() + " " + line
+                # Where the person is first seen, not at the end of the beat. Reported
+                # 2026-09-22: "the description of Ashla is tagged to the end as an after
+                # thought ... if she was next to drenn she should have been described
+                # right after i saw drenn."
+                text = narration_mod.place_the_face(text, who.name, line)
                 ours.append(line)
                 who.described = True
                 repairs.append(f"nobody stands here undescribed: added {who.name}'s "

@@ -1392,15 +1392,26 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         if elsewhere:
             where, sentence = elsewhere[0]
             real = ", ".join(str(p) for p in places) or here
+            # Two repairs, because they are two faults. A place that exists is a
+            # place the party did not go to; a place that does NOT exist is a place
+            # nobody can go to, and the rewrite has to be told which it is or it
+            # relocates the beat to a second invention.
+            exists = where.lower().removeprefix("the ") in {
+                str(p).lower().removeprefix("the ") for p in places}
             out.findings.append(Finding(
                 "stands-elsewhere",
-                f"the passage puts the player in {where}, and they are at {here}: "
-                f"{sentence[:90]!r}",
-                f"The player is at {here}. They are not in {where} and did not go there "
-                f"— nothing moved them, and a beat that says otherwise makes the map, "
-                f"the panel and every later turn wrong. Rewrite {sentence!r} so it "
-                f"happens at {here}. The only places that exist here are: {real}. Keep "
-                f"the rest.",
+                f"the passage puts the player in {where}, and they are at {here}"
+                + ("" if exists else f" — and there is no {_bare(where)} in this place at all")
+                + f": {sentence[:90]!r}",
+                (f"The player is at {here}. They are not in {where} and did not go "
+                 f"there — nothing moved them, and a beat that says otherwise makes "
+                 f"the map, the panel and every later turn wrong."
+                 if exists else
+                 f"There is no {_bare(where)} here. It does not exist in this place and the "
+                 f"player cannot be in it, sit in it, or be led toward it. Do not "
+                 f"invent somewhere for the scene to happen in.")
+                + f" Rewrite {sentence!r} so it happens at {here}, which is where they "
+                  f"are. The only places that exist here are: {real}. Keep the rest.",
                 weight=3,
             ))
 
@@ -3670,6 +3681,11 @@ def _place_words() -> set[str]:
     return {w for w in words if len(w) > 2}
 
 
+def _bare(where: str) -> str:
+    """"the tavern" -> "tavern", for a sentence that supplies its own article."""
+    return " ".join(str(where or "").split()).removeprefix("the ").strip()
+
+
 def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, str]]:
     """Sentences that put the party in a place the engine does not have them in.
 
@@ -3709,6 +3725,33 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
     # and "the great square" is not read as "the square".
     candidates = sorted(_place_words() | known, key=len, reverse=True)
     out: list[tuple[str, str]] = []
+
+    # A place this settlement does NOT HAVE needs no "you are in it" to be an invention.
+    # Reported 2026-09-22, mid-session: the player said "we should find a place to sit
+    # inside the tavern" and the beat opened "The tavern is a squat, sturdy building of
+    # timber and stone, the air inside thick with the smell of roasting fat" — with the
+    # engine holding the party at the MARKET, and Vormoor's six places containing no
+    # tavern at all. The first cut of this guard missed it because it only read sentences
+    # that say the party is somewhere; this one establishes the place by describing it.
+    #
+    # So the two halves are judged differently, and they have to be. A place that exists
+    # here can be mentioned innocently — "you can see the market from here" — and only a
+    # standing claim is wrong. A place that is not here cannot be mentioned innocently
+    # at all: naming it IS the invention, which is what "THE PLACES HERE (the only ones
+    # that exist)" has meant in the brief since it was written.
+    absent = sorted((w for w in _place_words() if w not in known and w != standing),
+                    key=len, reverse=True)
+    for sentence in _sentences(unquoted(text)):
+        for word in absent:
+            # Not inside a longer word: "the old way-gate" is not a gate, and a hyphen
+            # is a word boundary as far as `\b` is concerned.
+            if re.search(r"(?<![-\w])the\s+" + re.escape(word) + r"(?![-\w])",
+                         sentence, re.I):
+                out.append((f"the {word}", sentence.strip()))
+                break
+        if out:
+            break
+
     for sentence in _sentences(unquoted(text)):
         if not _ABOUT_YOU.search(sentence):
             continue
@@ -3720,3 +3763,104 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
                 out.append((f"the {word}", sentence.strip()))
             break                # the longest match in this sentence decides it
     return out
+
+
+# --- a face, said where the person is actually seen ----------------------------------
+
+def _an(word: str) -> str:
+    return "an" if str(word)[:1].lower() in "aeiou" else "a"
+
+
+def a_face_for(name: str, appearance: str) -> str:
+    """The backstop's line about what somebody looks like, as a sentence.
+
+    Reported 2026-09-22, with the beat on screen: *"the description of Ashla is tagged to
+    the end as an after thought"*. It read
+
+        Ashla ironvale: Orc: Powerfully built, prominent lower tusks, thick hide…
+
+    and two things are wrong with that string before you even get to where it sits.
+
+    **The name was being mangled.** `definite(name).capitalize()` — and `capitalize()`
+    lowercases everything after the first letter, so "Ashla Ironvale" came out "Ashla
+    ironvale". CLAUDE.md records this exact method eating a name once already ("Troop,
+    Goblin"); this is the second time, in a different file.
+
+    **And the colon was doing two jobs.** `rules/names.appearance_for` returns the
+    people's name and their body line already joined by one — "Orc: Powerfully built…" —
+    so the label added a second, and the result reads as a stat block rather than as
+    something a person in the room would notice.
+
+    The body line's own case is left exactly as the export wrote it, for the reason
+    `opening._clause` records: lower-casing it reads better on "Powerfully built" and
+    turns "Korvu have four limbs" into "korvu have four limbs", which is this app
+    respelling one of the world's own names. A capital after a colon is the smaller cost.
+
+    A resident's own `Appearance` fact is free text and keeps the label form, because
+    there is no reliable sentence to make of "favors plain dress that makes their
+    occasional fine piece of jewelry impossible to miss" without writing it ourselves.
+    """
+    name = " ".join(str(name or "").split())
+    said = " ".join(str(appearance or "").split()).strip()
+    if not name or not said:
+        return ""
+    name = definite(name)
+    name = name[:1].upper() + name[1:]
+    people, sep, body = said.partition(": ")
+    if sep and body and 1 <= len(people.split()) <= 3:
+        return f"{name} is {_an(people)} {people}: {body}"
+    return f"{name}: {said}"
+
+
+def place_the_face(text: str, name: str, line: str) -> str:
+    """Put the face where the person is first seen, not at the end of the beat.
+
+    The other half of the same report: *"if she was next to drenn she should have been
+    described right after i saw drenn."* The backstop appended, always, so a person named
+    in the second sentence of a long paragraph got their description eight sentences
+    later, behind the hand-back — which reads as an afterthought because that is
+    structurally what it was.
+
+    It goes after the first sentence that names them. Falling back to the end only when
+    the beat never names them at all, which is the case the append was written for: a
+    person the prose used without ever calling them anything.
+
+    Sentence-level, not clause-level, on purpose. Splicing into the middle of somebody
+    else's sentence is how a repair turns into a rewrite, and the one rule this file
+    keeps everywhere is that a deterministic backstop may add a sentence and may cut one,
+    never edit one.
+    """
+    if not text or not line:
+        return text
+    # Most specific handle first. `_sentences_about` matches on STEMS, which is right for
+    # "the crier working through the notices" answering to "the crier" and wrong here:
+    # measured on the reported beat, "Ashla Ironvale" matched Drenn Ironvale's sentence
+    # on the shared surname, and the face landed before she had been mentioned at all.
+    # It happened to read correctly in that beat and would not in the next one.
+    whole = " ".join(str(name or "").split())
+    first_word = whole.split()[0] if whole.split() else ""
+    about: list[str] = []
+    for handle in (whole, first_word):
+        if len(handle) < 3:
+            continue
+        hit = re.compile(chr(92) + "b" + re.escape(handle) + chr(92) + "b", re.I)
+        about = [s for s in _SENTENCE.findall(unquoted(text)) if hit.search(s)]
+        if about:
+            break
+    if not about:
+        about = _sentences_about(unquoted(text), name)
+    if not about:
+        # Never named in the beat — the case the append was written for. Still not after
+        # the hand-back: a face that comes after "What do you do?" is an afterthought
+        # wherever the person was mentioned, which is the whole of the report.
+        closing = _closing_question(text)
+        if closing is not None:
+            head = text[:closing.start()].rstrip()
+            return (head + " " + line + " " + text[closing.start():].lstrip()).strip()
+        return text.rstrip() + " " + line
+    first = about[0].strip()
+    at = text.find(first)
+    if at < 0:
+        return text.rstrip() + " " + line
+    end = at + len(first)
+    return (text[:end].rstrip() + " " + line + " " + text[end:].lstrip()).rstrip()
