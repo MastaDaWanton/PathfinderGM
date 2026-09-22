@@ -2320,6 +2320,207 @@ def _sheet_vocabulary(pc) -> set[str]:
     return {w for b in bits for w in re.findall(r"[a-z][a-z'’-]{2,}", b.lower())}
 
 
+# The shape of producing a thing: taking it out, showing it, handing it over, putting it
+# on. The VERB is what makes this a claim about having something — "the crown is heavy"
+# is a sentence about a crown, and "I pull out my crown" is a claim that one is in the
+# folds of your coat.
+#
+# Production and display only, and a DEFINITE article only. Both are narrowings made
+# after measuring the first cut against a real sheet: a verb list that included offer,
+# give and place turned "I offer him a drink" into a delusion beat, and `a`/`an` is
+# somebody naming a kind of thing rather than asserting they have a particular one.
+# A guard that fires on an innocuous line costs more than the one it catches.
+_PRODUCE = re.compile(
+    r"\b(?:i\s+)?(?:pull|pulls|take|takes|draw|draws|produce|produces|fish|fishes|"
+    r"show|shows|display|displays|present|presents|brandish|brandishes|flash|flashes|"
+    r"unroll|unrolls|unfurl|unfurls|unwrap|unwraps|hand|hands|don|dons|wear|wears|"
+    # `hold` and `lift` only with a particle: "I hold up the crown" is a display and
+    # "I hold the rope" is a grip.
+    r"put|puts|holds?\s+(?:up|out|aloft)|lifts?\s+up)\b"
+    r"(?:\s+(?:out|up|over|down|forth|on|off|into|in|it|them|him|her|about))*"
+    r"\s+(?:to\s+\w+\s+|him\s+|her\s+|them\s+)?"
+    r"(?P<art>my|the|his|her|their|our)\s+"
+    r"(?P<thing>[a-z][a-z'’-]*(?:\s+[a-z][a-z'’-]*){0,2})", re.I)
+
+# Where a captured phrase stops being the thing and starts being the rest of the
+# sentence. "my crown and display it for all to see" is a crown.
+_PHRASE_END = frozenset({
+    "and", "or", "but", "then", "so", "as", "while", "before", "after", "if",
+    "to", "for", "with", "at", "in", "on", "into", "onto", "from", "of", "it",
+    "them", "him", "her", "all", "everyone", "up", "out", "over", "down", "off",
+    "aloft", "away", "aside", "across", "toward", "towards", "against", "beside",
+    "behind", "under", "above", "around", "through", "past", "by", "near", "when",
+})
+
+# Words that are never a possession claim even in that shape: parts of the body, and the
+# ways and directions a person takes. Not a content list — a player cannot "find a way
+# around" this one in any way that matters, because nothing follows from producing your
+# own hand.
+#
+# `_NOT_A_POSSESSION`, not `_NOT_A_THING`: the first cut of this used the latter name and
+# SHADOWED the abstract-noun set at the top of this file, which `_is_a_thing` reads — so
+# "I accept the offer" started minting an item again and a chair leg stopped being one.
+# Seven tests caught it. The abstract set is reused below rather than copied.
+_NOT_A_POSSESSION = frozenset({
+    "hand", "hands", "palm", "palms", "fist", "fists", "arm", "arms", "finger",
+    "fingers", "thumb", "head", "face", "eyes", "eye", "chin", "shoulder",
+    "shoulders", "chest", "foot", "feet", "leg", "legs", "back", "voice", "breath",
+    "weight", "tongue", "teeth", "hair", "body", "self", "attention", "gaze", "look",
+    "time", "care", "word", "words", "name", "hood", "way", "place", "seat", "step",
+    "ground", "distance", "silence", "peace", "temper", "guard", "ear", "ears",
+    "nose", "mouth", "lips", "knee", "knees", "elbow", "wrist", "waist", "hip",
+    # What is ON the body rather than carried: a character showing their scars is
+    # showing themselves.
+    "scar", "scars", "wound", "wounds", "skin", "blood", "tattoo", "tattoos",
+    "brand", "mark", "marks", "bruise", "bruises", "burn", "burns",
+    # Ways and directions. "I take the true road north" is a route, not a thing in a
+    # coat, and the first cut read it as a claim to own a road.
+    "road", "path", "way", "route", "trail", "street", "lane", "stairs", "stair",
+    "steps", "turn", "corner", "door", "gate", "north", "south", "east", "west",
+    "left", "right", "lead", "reins", "first", "last",
+})
+
+# Taking something FROM somewhere is acquiring it, not claiming to have had it — and
+# that is an action the engine already has doors for. "I take the bread from the stall"
+# is a `give` or a buy; it is not a man producing bread out of his coat.
+_FROM_SOMEWHERE = re.compile(r"^\s*(?:from|off|out of|in)\b", re.I)
+
+# The smallest word that can be matched against the sheet by containment, so "sword"
+# finds "longsword" and "axe" finds "battleaxe". Three, because the first cut used four
+# AND passed anything shorter as vouched — which let "the sealed jar" through on the
+# strength of "jar" being three letters, and the head noun is exactly the word that must
+# be checked.
+_STEM = 3
+
+
+def _vouched_for(word: str, vouched: set[str]) -> bool:
+    """Whether the sheet can account for this noun.
+
+    Containment both ways and not equality: a player who says "I draw my sword" with a
+    longsword on the sheet has drawn the thing they own, and the item this closes is
+    explicit that the check "has to be able to tell those apart on a sheet, not on a
+    word list".
+    """
+    word = word.strip().lower()
+    if not word:
+        return True
+    if word in vouched:
+        return True
+    return any(word in v or v in word for v in vouched if len(v) >= _STEM)
+
+
+def false_possession(player_text: str, scene) -> str:
+    """The thing the player says they produce that the sheet cannot account for, or "".
+
+    Item 37, reported 2026-09-20 with a screenshot. The player typed *"I pull out my
+    crown and display it for all to see"* and the narrator produced one — "you reach into
+    the folds of your traveler's outfit and produce the circlet … a heavy, brutal thing of
+    worked metal", the yard falling silent around it. Their note: **"I have no crown to
+    display."**
+
+    Measured the same day against a sheet carrying one club: `false_claim` caught "I am
+    the lost heir of the old kings" and caught NOTHING for "I pull out my crown", "I show
+    them my royal seal", "I hand him the deed to the mill" or "I draw my longsword". So
+    it was never about crowns: **any** gear the player named was conjured, a weapon they
+    had never bought included.
+
+    It is the possession half of a law this app already keeps for people. Group 8 built
+    `rules/scope.py` so nobody is created on the strength of a phrase; things kept no such
+    rule. The tradition is the same one that settled group 8 — Inform's parser looks
+    through what is in scope, and when nothing matches it refuses: *"You can't see any
+    such thing."* A noun does not enter play because somebody said it.
+
+    **Shape, then sheet**, exactly as `false_claim` works and for the reason the player
+    gave the first time: they would find a way around a word list, and they would. The
+    shape is producing/showing/handing/wearing; the sheet then decides, out of everything
+    it can vouch for — what is carried, worn, in the satchel, in the purse, and the props
+    this character is holding.
+
+    Returns the claim in the player's own words — "produce a crown you do not have" — so
+    it can travel the door that already exists: the Bluff the room rolls against
+    (`inject_false_claim`), the prose told it is false (`prompts.false_claim_block`), the
+    finding that catches prose making it true, and the crowd's reaction. The 2026-09-18
+    ruling was the player's own: *"It should read as my character being delusional and the
+    people should see it similarly."* A man who flourishes a crown he does not have is
+    exactly that act with a prop in it.
+    """
+    if scene is None or not player_text or "?" in player_text:
+        return ""
+    pc = scene.pc()
+    if pc is None:
+        return ""
+    # A sheet that cannot answer the question judges nothing. The same discipline as
+    # `fire_context` and `here` in the reviewer: a guard that guesses is worse than one
+    # that abstains, and this one's failure mode is turning "I draw my sword" into a
+    # delusion beat for a character whose gear simply could not be read.
+    if not hasattr(pc, "carried"):
+        return ""
+    vouched = _sheet_vocabulary(pc)
+    # What this character is holding by the props ledger, and what they have on: both are
+    # things the sheet vouches for and neither is in `carried()`.
+    for attr in ("equipped", "armour"):
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                          str(getattr(pc, attr, "") or "").lower())}
+    for rec in (getattr(scene, "props", None) or []):
+        if isinstance(rec, dict) and rec.get("held_by") == pc.ref:
+            vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                              str(rec.get("name") or "").lower())}
+    # `carried()` is "everything that could plausibly be damaged" — weapons, armour,
+    # worn slots — and a crown in the pack is not that. The goods ledger is what "am I
+    # carrying one" actually means, and it was the half this check could not see.
+    for name in (getattr(pc, "goods", None) or {}):
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}", str(name).lower())}
+    for iid, stock in (getattr(pc, "stock", None) or {}).items():
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                          f"{iid} {getattr(stock, 'base', '')}".lower())}
+
+    # The generic word for a slot the sheet has something in. A character in a chain
+    # shirt who says "I put on my armour" is putting on the armour they own, and the
+    # sheet spells it "chain shirt" — a containment match cannot bridge that and should
+    # not try to.
+    if str(getattr(pc, "armour", "") or "").strip().lower() not in ("", "none"):
+        vouched |= {"armour", "armor"}
+    if str(getattr(pc, "equipped", "") or "").strip():
+        vouched |= {"weapon", "blade", "arms"}
+
+    for m in _PRODUCE.finditer(str(player_text)):
+        phrase = " ".join(m.group("thing").split()).lower().strip()
+        if not phrase:
+            continue
+        words: list[str] = []
+        for w in re.findall(r"[a-z][a-z'’-]+", phrase):
+            if w in _PHRASE_END:
+                break
+            words.append(w)
+        if not words:
+            continue
+        phrase = " ".join(words)
+        # The head noun is the last word of the phrase — "royal seal", "deed to the
+        # mill" — and a claim is false only when NOTHING in it is accounted for. A
+        # player who says "my father's sword" with a sword on the sheet has one.
+        if any(w in _NOT_A_POSSESSION for w in words):
+            continue
+        # And an abstract noun is not a possession either — "I take the chance", "I
+        # accept the offer". `_is_a_thing` is this file's own answer to that question,
+        # reading the HEAD noun, and asking it here means one list rather than two.
+        if not _is_a_thing(phrase):
+            continue
+        # Taken FROM somewhere — checked against what the capture ran over as well as
+        # what follows it, since the phrase group may have swallowed the preposition.
+        rest = " ".join(m.group("thing").split()[len(words):]) + " "             + str(player_text)[m.end():]
+        if _FROM_SOMEWHERE.match(rest):
+            continue        # an action the engine has doors for, not a claim
+        if any(_vouched_for(w, vouched) for w in words):
+            continue
+        # Coin is its own question: the purse, not the pack.
+        if re.search(r"\b(?:coin|coins|gold|silver|copper|purse|money)\b", phrase):
+            if any(int(n) > 0 for n in (getattr(pc, "purse", None) or {}).values()):
+                continue
+        return f"produce {'a ' if m.group('art') in ('my', 'the') else ''}{phrase} " \
+               f"you do not have"
+    return ""
+
+
 def _denied(text: str, start: int) -> bool:
     """Whether the words just before `start` deny the thing: "I am NOT a god"."""
     return bool(re.search(r"\b(?:not|no|never|n't|hardly)\s+(?:a|an|the|even\s+a)?\s*$",
@@ -2411,7 +2612,14 @@ def false_claim(player_text: str, scene) -> str:
         if m and not shapeshifter and not _denied(text, m.start()):
             candidates.append(m.group(0))
     if not candidates:
-        return ""
+        # And the possession half of the same law (item 37). Routed through THIS
+        # function rather than beside it, because everything a false claim already
+        # travels — the Bluff the room rolls, the prose told to hold it false, the
+        # finding that catches prose making it true, the crowd's reaction — is exactly
+        # what a man flourishing a crown he does not have needs, and a second door
+        # would be a second copy of all of it. The item's own words: "The answer is
+        # already built and already ratified by the player — it just has the wrong door."
+        return false_possession(text, scene)
     return _as_they(candidates[0].strip())
 
 

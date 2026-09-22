@@ -806,6 +806,23 @@ class GMAgent:
         return tuple(a.name for a in self.engine.scene.actors.values()
                      if not a.is_pc and a.name)
 
+    def _here_name(self) -> str:
+        """The name of the place the party is standing in, as the engine holds it."""
+        try:
+            here = self.engine.here()
+        except Exception:      # noqa: BLE001 — a scene with no location has no answer
+            return ""
+        return str(getattr(here, "name", "") or "")
+
+    def _place_names(self) -> tuple:
+        """Every place that exists where the party is, by name — the same list the brief
+        states as "THE PLACES HERE (the only ones that exist)". Two readers of one fact:
+        the model is told them, and the review checks the prose against them."""
+        try:
+            return tuple(str(p.name) for p in self.engine.places() if p.name)
+        except Exception:      # noqa: BLE001
+            return ()
+
     def _body_count(self) -> dict:
         """Who is standing and who is whole, for the prose reviewer to check against.
 
@@ -1127,6 +1144,9 @@ class GMAgent:
                 gender=self._pc_gender(), state=self._body_count(),
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 fire_context=fire_context,
+                # Where the party actually is, and what places exist here, so a beat
+                # set in a gate this town does not have is caught (items 45 and 38).
+                here=self._here_name(), places=self._place_names(),
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter

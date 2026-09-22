@@ -1215,7 +1215,8 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            state: dict | None = None, deaths: list[dict] | None = None,
            pull: dict | None = None, heat: dict | None = None,
            claim: str = "", blows: list[dict] | None = None,
-           fire_context: str | None = None) -> Review:
+           fire_context: str | None = None,
+           here: str = "", places: tuple = ()) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -1380,6 +1381,27 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
                 f"place or the recent beats — so nothing smoulders, glows or is singed. "
                 f"Rewrite {lit[0]!r} without any fire or heat in it. Keep the rest.",
                 weight=2,
+            ))
+
+    # The prose standing somewhere the engine is not (items 45 and 38). Weight 3, with
+    # `contradicts-the-engine`: a beat set in a place the party is not in is not badly
+    # written, it is untrue, and every sentence after it inherits the error. Judged only
+    # when the caller could say where the party actually is.
+    if here:
+        elsewhere = stands_elsewhere(text, here=here, places=places)
+        if elsewhere:
+            where, sentence = elsewhere[0]
+            real = ", ".join(str(p) for p in places) or here
+            out.findings.append(Finding(
+                "stands-elsewhere",
+                f"the passage puts the player in {where}, and they are at {here}: "
+                f"{sentence[:90]!r}",
+                f"The player is at {here}. They are not in {where} and did not go there "
+                f"— nothing moved them, and a beat that says otherwise makes the map, "
+                f"the panel and every later turn wrong. Rewrite {sentence!r} so it "
+                f"happens at {here}. The only places that exist here are: {real}. Keep "
+                f"the rest.",
+                weight=3,
             ))
 
     wrong = contradicts_state(text, state)
@@ -3583,3 +3605,118 @@ def unanswered_speech(player_text: str, names=(), turn: int = 0) -> str:
     shape = _UNANSWERED[int(turn) % len(_UNANSWERED)]
     said = shape.format(who=who)
     return said[0].upper() + said[1:] + " What do you do?"
+
+
+# --- the prose standing somewhere the engine is not ---------------------------------
+
+# How a passage says the party is HERE, as opposed to mentioning somewhere. The verb has
+# to put them in it: "you are at the gate", "you step into the guildhall", "you find
+# yourself in the sewers". Deliberately narrow — "you can see the market from here" and
+# "the gate is watched" are both legitimate and neither is a claim about where anybody is.
+_STANDS_IN = (
+    r"\b(?:you|your party|the party)\s+"
+    r"(?:are|is|stand|stands|standing|step|steps|stepped|stepping|arrive|arrives|"
+    r"arrived|enter|enters|entered|reach|reaches|reached|emerge|emerges|emerged|"
+    r"find yourself|finds himself|finds herself|come|comes|came|walk|walks|walked|"
+    r"move|moves|moved|cross|crosses|crossed|climb|climbs|climbed|descend|descends|"
+    r"descended)\s+"
+    r"(?:up |down |back |out |now |then |finally |at last )*"
+    r"(?:in|into|at|to|onto|through|inside|within|upon)\s+"
+    r"(?:the\s+)?"
+)
+
+# The same claim with a transitive verb and no preposition: "you reach the upper floor",
+# "you enter the guildhall". Kept apart rather than folded in by making the preposition
+# optional, because an optional preposition also matches "you move the cart in the
+# market" — the verb list is what makes this a claim about arriving.
+#
+# Arrival verbs only. `cross` and `pass` are deliberately absent: "you cross the green
+# toward the well" is a passage through somewhere on the way to where you are, which the
+# route-finder now models and the tell now names — flagging it would make this guard
+# noisy, and a noisy guard is worth less than none.
+#
+# The subject is not required to be adjacent — "You climb the stairs and reach the upper
+# floor" is the measured item 38 sentence — so the caller checks that the sentence is
+# about the player at all before this pattern is tried.
+_ARRIVES_AT = r"\b(?:reach|reaches|reached|enter|enters|entered)\s+(?:the\s+)?"
+
+# Whether a sentence is about the player's own party at all. Without it the arrival
+# pattern above would read "the drover reaches the gate" as the player standing there.
+_ABOUT_YOU = re.compile(r"\b(?:you|your party|the party)\b", re.I)
+
+
+def _place_words() -> set[str]:
+    """Every place NAME this app can generate, lower-cased and without its article.
+
+    The app's own closed vocabulary, read from `rules/places.py` rather than typed here,
+    so a place kind added to the generator is covered the day it is added and there is no
+    second list to drift. It is the vocabulary the NARRATOR was taught by the brief —
+    "THE PLACES HERE (the only ones that exist): the well, the market, …" — which is why
+    a phrase drawn from it is a claim about a place and "the stalls" is not.
+    """
+    from rules import places as places_mod
+
+    words = set()
+    for row in places_mod.SETTLEMENT_PLACES:
+        words.add(str(row[0]).lower().removeprefix("the ").strip())
+    for label, _about in places_mod._WILD:
+        words.add(str(label).lower().removeprefix("the ").strip())
+    words.update(str(x).lower().removeprefix("the ").strip()
+                 for x in places_mod.ENTRANCES)
+    # And the ground a party GOES INTO, which is the other half of the vocabulary the
+    # brief teaches: a narrator who writes the player into sewers nobody ventured into
+    # has invented a place exactly as surely as one who writes them a gate.
+    words.update(str(k).lower().strip() for k in places_mod.VENTURES)
+    return {w for w in words if len(w) > 2}
+
+
+def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, str]]:
+    """Sentences that put the party in a place the engine does not have them in.
+
+    Item 45, reported 2026-09-21 with the map open: *"i am at a gate with wagons passing
+    through and a wagon off to the side this map is completely wrong."* The map was
+    right. The engine held the party at the WELL and drew it faithfully; the prose was
+    describing a gate, and Vormoor has no gate. Item 38 is the same defect from the other
+    end: a `travel` refused with "the stairs to it are inside the guildhall" and a beat
+    that then described climbing those stairs and reaching the landing.
+
+    **The check is against engine state, not against a list of forbidden words.** `here`
+    is `Scene.at`'s name and `places` is the set of places that exist in this location —
+    both facts the brief already states twice over ("The party is at the well. Not
+    anywhere else in Vormoor"). What the vocabulary supplies is only the ability to
+    recognise that a phrase IS a place claim.
+
+    Precision over recall, and this is the limit worth stating plainly: a place the app's
+    own generator could never name — "a work yard", "the counting house" — is not caught,
+    because catching it would mean deciding that an unknown noun phrase is a room rather
+    than a piece of scenery, and the player's standing objection to word lists is exactly
+    right about what happens next. What this catches is the narrator using THE APP'S OWN
+    place vocabulary for a place that is not here, which is every instance measured.
+
+    Returns `(place, sentence)` pairs.
+    """
+    if not text:
+        return []
+    known = {str(p).lower().removeprefix("the ").strip() for p in (places or ())}
+    standing = str(here or "").lower().removeprefix("the ").strip()
+    # Two sources, and the difference between them is the difference between the two
+    # items. A REAL place of this settlement that is not the one the party is in is item
+    # 38 — the prose walked somewhere the engine did not. A place from the app's own
+    # vocabulary that this settlement does not have at all is item 45 — the prose is
+    # standing somewhere that does not exist.
+    #
+    # Longest first, so "the upper floor of the guildhall" is not read as "the guildhall"
+    # and "the great square" is not read as "the square".
+    candidates = sorted(_place_words() | known, key=len, reverse=True)
+    out: list[tuple[str, str]] = []
+    for sentence in _sentences(unquoted(text)):
+        if not _ABOUT_YOU.search(sentence):
+            continue
+        for word in candidates:
+            if not (re.search(_STANDS_IN + re.escape(word) + r"\b", sentence, re.I)
+                    or re.search(_ARRIVES_AT + re.escape(word) + r"\b", sentence, re.I)):
+                continue
+            if word != standing:
+                out.append((f"the {word}", sentence.strip()))
+            break                # the longest match in this sentence decides it
+    return out
