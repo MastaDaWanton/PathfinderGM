@@ -838,7 +838,13 @@ def _bind_background(c) -> None:
     if pc is None or not getattr(pc, "background", ""):
         return
     try:
-        pc.background_ties = [b["says"] for b in backgrounds.bind(c.engine(), pc)]
+        engine = c.engine()
+        bound = backgrounds.bind(engine, pc)
+        pc.background_ties = [b["says"] for b in bound]
+        # And whoever the opening put beside them stops being a stranger, if the ties
+        # say this character is known here (`backgrounds.acquaint`). Nobody is added:
+        # the person is the one the situation already rolled.
+        backgrounds.acquaint(engine, pc, bound)
     except Exception:
         pc.background_ties = []
 

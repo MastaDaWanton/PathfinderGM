@@ -629,9 +629,11 @@ and without it they follow the party around. Somebody who comes along is named i
 "with", by ref: {"op": "travel", "params": {"place": "the gate", "with": ["c2"]}}.
 Everyone not named stays where they are.
 ONE travel a turn. Name where the party ENDS UP, never the route they walk to get there:
-a plan carrying a second travel has the second one refused, and the party stops at the
-first. If reaching somewhere means passing through another place first, travel to that
-place this turn and go on the next.
+the engine finds the way itself and walks every place between, in this one turn, and a
+plan carrying a second travel has the second one refused. The tell says which places the
+way ran through; describe them as passed through. Something may happen on the way and
+stop the party short of where they were going — when it does, the tell says so, and
+where they actually are is where they actually are.
 When the player searches the ground for herbs or useful growing things:
 {"op": "forage", "actor": "pc"}. The engine rolls against what actually grows there and
 puts what turns up in their satchel — do not decide what they find.
@@ -643,15 +645,24 @@ from then on: {"op": "found", "actor": "pc", "params": {"name": "Marra's house",
 in it is a separate travel. Ground the player goes INTO that is not a named place yet —
 the sewers, a cellar, a crypt, the rooftops, an alley, a cave, a mine, ruins, a tower —
 is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
-market"}}. The engine makes the ground (the same ground next time), charges the hours
-the way there costs, moves the party in, and decides whether anything lives there —
-never invent a destination and never travel to a place the list above does not name.
+market"}}. `parent` must be the place the party is STANDING in — you go down from where
+you are, and a venture is not a way to cross town. The engine makes the ground (the same
+ground next time), charges the hours the way there costs, moves the party in, and decides
+whether anything lives there — never invent a destination and never travel to a place the
+list above does not name.
 Leaving the town ALTOGETHER, for another settlement, is a different thing from travel and
 takes days: {"op": "journey", "actor": "pc", "params": {"to": "Zhilgoroth"}}. Only
 settlements the world has a road to can be named, the engine works out how long the road
 takes and charges the days to the clock and the body, and anybody not named in "with" is
 left behind. Say that they set out; do not say how far it is or how long it took — the
 engine answers both.
+When somebody here agrees to come along with the party — a friend, a guide, a hired
+sword — say so once and the engine remembers it: {"op": "company", "params": {"who":
+"c2"}}. From then on they move when the party moves, through every travel and every
+journey, without being named again; {"do": "leave"} ends it. Only somebody friendly or
+helpful will come, and the engine refuses anyone else — talk them round first. Somebody
+travelling with the party is a person in the scene with their own eyes: let them speak
+about what is around them.
 When somebody gives the party a task and the player takes it on, it is a quest:
 {"op": "quest", "params": {"title": "Find the missing salt", "objectives": ["Ask the
 harbourmaster where the salt went", "Bring word back to Marra"], "giver": "c2",
@@ -750,7 +761,15 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
         lines.append("Premise: " + "; ".join(f"{k} — {v}" for k, v in world.premise.items()))
 
     if location:
-        lines.append(f"\nHERE: {location.name}, a {location.scale or 'place'}.")
+        # The scale AND what it means. "a village" was all this said, and a model shown
+        # a bare word writes whatever size of place it happens to imagine — which is how
+        # a settlement of a few hundred acquires crowds to be lost in. `places.what_it_is`
+        # is the one composer; the opening and the panel print the same sentence.
+        from rules import places as _places_for_scale
+
+        lines.append(f"\nHERE: {location.name}, "
+                     f"{_places_for_scale.what_it_is(_places_for_scale.scale_of(location))
+                        or 'a place'}.")
         # Which part of it, and what leads out — stated the same way the cast is, because
         # it is the same rule. "WHO IS HERE (these refs are the only ones that exist)"
         # has grounded people since it was written; this file's own docstring has asked
@@ -1033,7 +1052,21 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                             f"towards the player. He deflects; he does not invent one.")
             face = str(getattr(actor, "appearance", "") or "").strip()
             looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
-            lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}"
+            # Who this person is TO the player. Both are facts the engine holds and the
+            # brief never carried, and without them the narrator writes every non-player
+            # as a stranger met just now — which is what the player found after four
+            # sessions with a local background on the sheet (2026-09-22). The travelling
+            # one is why a companion may speak about where the party has just arrived:
+            # they walked there too.
+            bond = ""
+            if actor.has_state(states.KNOWS_YOU):
+                bond += (f" {actor.name} KNEW the player before this game began — not a "
+                         f"stranger, and never introduced as one.")
+            if actor.has_state(states.TRAVELS_WITH_YOU):
+                bond += (f" {actor.name} TRAVELS WITH the player: they came here "
+                         f"together and they go on together. They have their own eyes "
+                         f"and their own opinions about what is around them.")
+            lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
                          f"{_states_of(actor)}")
 
     # What the player's class can actually do, by name. Without this the GM narrates a

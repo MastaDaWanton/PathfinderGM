@@ -2047,8 +2047,9 @@ function render(s, hold) {
     $("#sheet").innerHTML = `
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
-      ${s.scene.biome ? `<div class="biome" title="${esc(s.scene.biome_describe)}">
-        ${esc(s.scene.location)} · ${esc(s.scene.biome)} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
+      ${s.scene.biome ? `<div class="biome" title="${esc(s.scene.what_it_is || s.scene.biome_describe)}">
+        ${esc(s.scene.location)}${s.scene.scale ? ` · ${esc(s.scene.scale)}` : ""} · ${
+          esc(s.scene.biome)} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
       <div class="bar"><i style="width:${pct}%"></i>${
         temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
       <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${

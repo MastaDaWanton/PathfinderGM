@@ -173,6 +173,8 @@ def _game(world, town, cls: str = "ranger", seed=None, weapon: str = "",
 
     @dataclass
     class FakeScene:
+        actors = {}
+
         def pc(self):
             return FakePC()
 
@@ -386,9 +388,15 @@ def test_an_oxford_comma_does_not_become_two_conjunctions():
 
 def test_a_world_that_describes_nothing_still_opens_and_still_names_the_place():
     """The preface is what the place says about itself, so a place that says nothing
-    simply has none — and then the clock carries the name, as it always did."""
+    simply has none — and then the clock carries the name, as it always did.
+
+    And it still says what KIND of place it is, because the scale is a FIELD the export
+    has carried since 1.0 and not one of the facts an author may or may not have
+    written. A world that describes nothing still tells the player whether they are in
+    a village or a city."""
     world, town = a_world()
     town.facts.clear()
     assert opening.the_world_here(town) == ""
     text = opening.compose(_game(world, town), "a stranger here")
-    assert text.startswith("Evening in Averthorn.") or "in Averthorn." in text
+    assert "in Averthorn," in text
+    assert "a town of some thousands of people" in text

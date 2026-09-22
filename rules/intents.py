@@ -325,6 +325,16 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
     "found": (("name",), ("actor", "owner", "parent", "about"), "player"),
     "venture": (("kind",), ("actor", "parent", "name"), "player"),
+    # Somebody comes along, or stops coming. `who` is a ref that is here; `do` is
+    # "join" or "leave", and defaults to join.
+    #
+    # It exists because travel sheds everybody not named in `with`, so an NPC who
+    # agreed to come was left in the market the moment the party walked to the green
+    # — measured live 2026-09-22 ("Left behind: Drenn Ironvale") on a turn where the
+    # player had done nothing but cross a village. `with` was the only answer and it
+    # is the wrong shape: it asks the model to remember, every single move, who the
+    # party is, which is exactly the thing a language model does not do.
+    "company": (("who",), ("actor", "do", "note"), "player"),
     # Two ships and the distance between them. `do` is close / sheer off / ram / grapple
     # / board, and `with` names whoever goes across — the same word travel uses for the
     # people who come along, because a boarding party is a party.

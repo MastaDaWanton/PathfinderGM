@@ -31,6 +31,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 
+from rules import states
 from rules.dice import Dice
 
 # Fact keys carry different names between exports, so everything is looked up through a
@@ -458,7 +459,21 @@ def compose(campaign, standing: str) -> str:
     # Don Carson, *Environmental Storytelling*: "it is the physical space that does
     # much of the work of conveying the story."
     where = f"{here.when}"
-    where += f" in {place.name}." if place is not None else "."
+    if place is not None:
+        # WHAT KIND OF PLACE, said before anything else about it. Four sessions in,
+        # 2026-09-22: "I have never been aware that vormoor was a village. this should
+        # be one of the first things done when you are being dropped into a world." The
+        # scale was in the narrator's brief from the first turn and on no screen the
+        # player ever read. Nelson's overture is "who you are, exactly where you are,
+        # and what is going on", and a village of a few hundred where everyone knows
+        # everyone is a different *where* from a city of tens of thousands — it changes
+        # what the player expects to be able to do before they type anything.
+        from rules import places as _places
+
+        kind = _places.what_it_is(_places.scale_of(place))
+        where += f" in {place.name}{', ' + kind if kind else ''}."
+    else:
+        where += "."
     where += f" You are {here.where}"
     look = _first_fact(place, LOOK_KEYS)
     # Case left exactly as the export wrote it, for the reason `_clause` records:
@@ -476,6 +491,13 @@ def compose(campaign, standing: str) -> str:
     # "Has stopped to watch", not "has stopped working": half the people in the table
     # are not working — the old man ahead of you in a queue, the stranger sharing a
     # step — and the one verb has to fit all twelve.
+    # And whether that person is a stranger, read off the scene rather than worked out
+    # again here: `backgrounds.acquaint` has already put `bond.knows-you` on them if the
+    # character's ties say they are known in this town. Two derivations of one fact is
+    # the drift CLAUDE.md names, and this is the half the player reads.
+    knows_you = any(not a.is_pc and a.has_state(states.KNOWS_YOU)
+                    for a in (getattr(campaign.scene, "actors", None) or {}).values())
+    watcher = f"{watcher}, who has known you long enough" if knows_you else watcher
     edge = (f"{here.edge} {watcher} has stopped to watch." if here.edge
             else f"{watcher} is close enough to speak to.")
 

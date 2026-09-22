@@ -367,6 +367,29 @@ def population(scale: str) -> str:
         return "some thousands of people"
     return "tens of thousands of people, most of whom will never see you"
 
+
+def what_it_is(scale: str) -> str:
+    """"a village of a few hundred people, and everyone knows everyone".
+
+    Reported 2026-09-22, after four sessions in Vormoor: *"I have never been aware that
+    vormoor was a village. this should be one of the first things done when you are being
+    dropped into a world."* And they were right in a way that is measurable —
+    `population` above, which says exactly what a player wants to know here, had **no
+    production caller anywhere in the app**. One test read it. The scale reached the
+    narrator's brief ("HERE: Vormoor, a village.") and never reached the page or the
+    opening, so the model knew what kind of place it was and the player did not.
+
+    One composer, three readers — the opening, the brief and the panel — because three
+    sentences saying this three ways is the drift CLAUDE.md names.
+    """
+    scale = " ".join(str(scale or "").split()).lower()
+    if scale not in POPULATION_BY_SCALE:
+        # Not a scale this app prices. Say the word the world used and claim no size:
+        # a made-up population for a "hamlet" or a "district" is this app inventing a
+        # fact about somebody else's world.
+        return f"a {scale}" if scale else ""
+    return f"a {scale} of {population(scale)}"
+
 # The same for somewhere nobody lives. A ruin or a stretch of forest still needs more than
 # one place to stand, or "I go deeper in" is unrepresentable.
 _WILD = (
