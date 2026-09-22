@@ -158,3 +158,42 @@ class TestTheForgeShowsIt:
     def test_a_prepared_caster_says_so_rather_than_showing_an_empty_list(self):
         got = self._choices("cleric")
         assert got["prepares"] and not got["casts"]
+
+
+class TestTheCountIsLive:
+    """Reported 2026-09-22 with a screenshot: thirteen spells chosen and the budget
+    reading **0 / 28**.
+
+    The server's answer was right — measured on that draft, `chosen_by_level` came back
+    `{"1": 13}` — and it was STALE. `loadChoices` refetches when the class or the
+    abilities change, not when a spell is picked, so a budget that reads a server number
+    is frozen at the moment of the last fetch while the chips beside it render from the
+    form. The line this replaced counted `f.spellbook` locally and was live; making it
+    read a server number is what broke it.
+    """
+
+    def _page(self) -> str:
+        from pathlib import Path
+
+        return Path("play/templates/play/home.html").read_text(encoding="utf-8")
+
+    def test_the_budget_counts_the_form_and_not_the_last_fetch(self):
+        page = self._page()
+        assert "takenAt[lvl] = (takenAt[lvl] || 0) + 1" in page
+        assert "for (const id of chosen)" in page
+
+    def test_nothing_on_the_page_reads_the_servers_running_total(self):
+        """The whole class of bug, pinned: any reader of `chosen_by_level` in the page
+        is a number that stops updating the moment the player picks something."""
+        assert "chosen_by_level" not in self._page()
+
+    def test_the_server_still_answers_it_for_anybody_who_asks_once(self):
+        """It is not wrong, it is just not live — and `build` and the tests above read
+        it at a moment when it is exactly right."""
+        from rules import spells as spells_lib
+
+        firsts = sorted(s.id for s in spells_lib.all_spells().values()
+                        if isinstance(s.lists, dict) and s.lists.get("sorcerer") == 1)
+        got = creation.spell_choices(
+            _spec(**{"class": "sorcerer"}, spellbook=firsts[:2]))
+        assert got["chosen_by_level"] == {"1": 2}
