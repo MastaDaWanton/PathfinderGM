@@ -124,8 +124,35 @@ DEFAULT_OUTFIT = "traveler's outfit"
 # resolved against the built Intelligence; `None` means the class picks nothing at
 # creation (a cleric or druid prepares off the whole list every morning).
 SPELLS_KNOWN: dict[str, object] = {
-    "wizard": "3 + int_mod", "sorcerer": 2, "bard": 4,
+    "wizard": "3 + int_mod", "sorcerer": "table", "bard": "table",
 }
+
+
+def allowance(cid: str, level: int = 1, int_mod: int = 0) -> dict[int, int]:
+    """How many spells this class CHOOSES at each spell level — the picking budget.
+
+    Item 42: this was one number covering spell levels 0 and 1 together, so a sorcerer
+    could spend both picks on cantrips and begin play with no first-level spell at all.
+    The book gives two separate allowances, and so does this: `{0: 4, 1: 2}`.
+
+    Three answers, and each is the class's own rule rather than a shape imposed here:
+
+      wizard          `{1: 3 + Int mod}`. The cantrips are a GRANT — "a spellbook
+                      containing all 0-level wizard spells" — and a grant is not a
+                      choice, so it is not in the budget.
+      sorcerer, bard  their Spells Known table, by class level (`rules/casting.py`).
+      everyone else   `{}`. A cleric prepares from the whole list each morning.
+
+    `SPELLS_KNOWN` above is kept as the answer to "does this class pick spells at all",
+    which is what its three call sites actually ask; the numbers moved to the tables.
+    """
+    cid = str(cid or "").strip().lower()
+    spec = SPELLS_KNOWN.get(cid)
+    if spec is None:
+        return {}
+    if spec == "3 + int_mod":
+        return {1: max(0, 3 + int(int_mod))}
+    return casting.known_row(casting.CASTERS.get(cid, {}), int(level or 1))
 
 
 def max_hit_die(spec) -> int:
@@ -207,12 +234,20 @@ def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list
     """
     from . import spells as spells_lib
 
-    cap_spec = SPELLS_KNOWN.get(cid)
-    if cap_spec is None:
+    budget = allowance(cid, 1, int_mod)
+    if not budget:
         return []
-    cap = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
     if count is not None:
-        cap = min(cap, count)
+        # A caller asking for a short book gets the levels filled in order, so what it
+        # gets is still a LEGAL opening — never two cantrips and no first-level spell.
+        left = int(count)
+        trimmed = {}
+        for level in sorted(budget):
+            take = min(budget[level], max(0, left))
+            if take:
+                trimmed[level] = take
+            left -= take
+        budget = trimmed
     out = []
     # A wizard's book opens with EVERY 0-level spell, and the Intelligence-scaled number
     # applies to the first-level ones only: "A wizard begins play with a spellbook
@@ -227,15 +262,16 @@ def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list
     if cid == "wizard":
         out += [sid for sid, sp in sorted(spells_lib.all_spells().items())
                 if sp.lists.get(cid) == 0]
+    taken = {level: 0 for level in budget}
     for sid, sp in sorted(spells_lib.all_spells().items()):
         level = sp.lists.get(cid)
-        if level is None or level > 1 or sid in out:
+        if level is None or sid in out or level not in budget:
             continue
-        if cid == "wizard" and level == 0:
+        if taken[level] >= budget[level]:
             continue
         out.append(sid)
-        if len([s for s in out if spells_lib.all_spells()[s].lists.get(cid) != 0
-                or cid != "wizard"]) >= cap:
+        taken[level] += 1
+        if all(taken[lv] >= budget[lv] for lv in budget):
             break
     return out
 
@@ -633,21 +669,32 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     if spellbook and cap_spec is None:
         problems.append(f"A {cid or 'non-caster'} picks no spells at creation.")
     elif cap_spec is not None:
-        cap = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
-        # A wizard's cap counts the FIRST-level spells only. The book grants "all 0-level
-        # wizard spells plus three 1st-level spells of her choice… for each point of
-        # Intelligence bonus", so counting the cantrips against it refused a legal opening
-        # book of 35 orisons and six spells as "38 spells against 4 known" (item 25).
-        # Everybody else's cap is the whole of what they know, cantrips included.
-        counted = spellbook
-        if cid == "wizard":
-            from . import spells as spells_lib
+        # Counted PER SPELL LEVEL, which is item 42. One cap across levels 0 and 1 let a
+        # sorcerer spend both picks on cantrips and begin play unable to cast anything;
+        # it also could not express the wizard's rule, whose cantrips are a grant and
+        # whose cap is the first-level allowance alone (item 25 — a legal opening book of
+        # 35 orisons and six spells was refused as "38 spells against 4 known").
+        from . import spells as spells_lib
 
-            every = spells_lib.all_spells()
-            counted = [sid for sid in spellbook
-                       if (every[sid].lists.get(cid) if sid in every else 1) != 0]
-        if len(counted) > cap:
-            problems.append(f"That is {len(counted)} spells against {cap} known.")
+        budget = allowance(cid, 1, int_mod)
+        every = spells_lib.all_spells()
+        counted: dict[int, int] = {}
+        for sid in spellbook:
+            level = every[sid].lists.get(cid) if sid in every else 1
+            if level is None:
+                continue
+            counted[level] = counted.get(level, 0) + 1
+        granted = {int(x) for x in
+                   (casting.CASTERS.get(cid, {}).get("grants_levels") or ())}
+        for level, n in sorted(counted.items()):
+            if level in granted:
+                continue        # arrives whole; never counted against a budget
+            cap = int(budget.get(level, 0))
+            if n > cap:
+                what = "cantrips" if level == 0 else f"level {level} spells"
+                problems.append(f"That is {n} {what} against {cap} known."
+                                if cap else
+                                f"A {cid} picks no {what} at creation.")
         # And at least one. A wizard with an empty book is a character who cannot take
         # their own turn: found on the roster as Thessaly Corr, a Wizard 1 with 66 turns
         # played, three level-0 and two level-1 slots, save DCs of 13 and 14 — and no
@@ -657,9 +704,15 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         # book is never empty for one, and asking "did you choose anything" has to mean
         # the spells they actually chose. Without this the refusal stopped firing and a
         # wizard could walk out having picked no first-level spell at all.
-        if cap and not counted:
-            problems.append(
-                f"A {cid} begins knowing spells: choose up to {cap}.")
+        # And at least one AT EVERY LEVEL THEY GET. This was "at least one spell
+        # anywhere", which is precisely how item 42's defect stayed legal: a sorcerer
+        # who spent both picks on cantrips passed the check and began play unable to
+        # cast a single first-level spell. Now each allowance has to be opened.
+        for level, cap in sorted(budget.items()):
+            if cap and not counted.get(level):
+                what = "cantrips" if level == 0 else f"level {level} spells"
+                problems.append(
+                    f"A {cid} begins knowing spells: choose up to {cap} {what}.")
         from . import spells as spells_lib
 
         for sid in spellbook:
@@ -909,7 +962,12 @@ def spell_choices(payload: dict) -> dict:
         out["prepares"] = bool(out["slots"])
         return out
     int_mod = (int(actor.abilities.get("int", 10)) - 10) // 2
-    out["cap"] = (3 + int_mod) if cap_spec == "3 + int_mod" else int(cap_spec)
+    # One budget PER SPELL LEVEL (item 42). `cap` stays as the total, because the page
+    # shows a single "n of m" line and every existing caller reads it; `caps` is the
+    # answer that made a sorcerer with no first-level spell impossible.
+    budget = allowance(cid, int(getattr(actor, "level", 1) or 1), int_mod)
+    out["caps"] = {str(k): int(v) for k, v in sorted(budget.items())}
+    out["cap"] = sum(budget.values())
 
     def _row(sp) -> dict:
         return {"id": sp.id, "name": sp.name, "level": sp.lists.get(cid),
@@ -928,11 +986,21 @@ def spell_choices(payload: dict) -> dict:
         out["choose"] = sorted((_row(s) for s in mine if s.lists.get(cid) == 1),
                                key=lambda r: r["name"])
     else:
-        # Sorcerer and bard know cantrips and first-level spells alike, and both count
-        # against the one cap.
-        out["choose"] = sorted((_row(s) for s in mine if s.lists.get(cid) in (0, 1)),
+        # Sorcerer and bard choose at every level they know, and each level has its own
+        # allowance — "four 0-level spells AND two 1st-level spells".
+        out["choose"] = sorted((_row(s) for s in mine if s.lists.get(cid) in budget),
                                key=lambda r: (r["level"], r["name"]))
     picked = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
     granted = {r["id"] for r in out["granted"]}
-    out["chosen"] = len([p for p in picked if p not in granted])
+    chosen = [p for p in picked if p not in granted]
+    out["chosen"] = len(chosen)
+    # Per level too, so the page can say "cantrips 2 of 4" beside "level 1 spells 0 of 2"
+    # rather than one number that cannot show which allowance is unspent.
+    every = spells_lib.all_spells()
+    per: dict[str, int] = {}
+    for sid in chosen:
+        lvl = every[sid].lists.get(cid) if sid in every else None
+        if lvl is not None:
+            per[str(lvl)] = per.get(str(lvl), 0) + 1
+    out["chosen_by_level"] = per
     return out
