@@ -87,6 +87,11 @@ LEVERS = ("diplomacy", "intimidate")
 # CONDITION keys and an attitude word is not one.
 COMES_ALONG = "friendly"
 
+# The bottom of the track: somebody who will act against you. Named HERE, like the step
+# above, so no reader anywhere spells an attitude — the three-laws ratchet counts literal
+# keys per file and caught the first cut of the watch's recognition doing exactly that.
+HOSTILE = TRACK[0]
+
 
 def of(actor, default: str = DEFAULT) -> str:
     """Where this creature sits on the track. Asked through the vocabulary, always."""

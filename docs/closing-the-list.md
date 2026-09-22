@@ -173,14 +173,81 @@ abstract noun is not a possession either.
 and hold it low" into a delusion beat. A sheet that cannot answer the question now judges
 nothing — the same discipline as `fire_context` and `here` in the reviewer.
 
+## The smaller threads, closed the same day
+
+Each of these was recorded rather than built while the big items were in flight, and each
+had a reason. The reasons are what changed.
+
+**The street patrol now reads the warrant.** It shipped as a band that told a wanted
+character the watch was looking at faces and let nothing follow. The gate is still where a
+warrant is *enforced* — `docs/wanted.md`, reader one — and this is the second reader: what
+it adds is that the street stops being safe once your name is on the list. A clean name
+gets the ordinary patrol; a suspected one is looked at twice; a wanted one brings them
+straight at you, and they arrive hostile, which `_law_joins` already understands to mean
+every guard in that town is on the other side. No arrest, because there is no arrest in
+this app and inventing one here would be a rule with a single home.
+
+**The road's table has four bands.** It shipped with two and a note: *"a washed-out ford, a
+toll, weather that costs a day — all of those want mechanics that do not exist yet, and an
+authored line with no teeth behind it is worse than no line."* Both new bands use
+currencies the engine already had:
+
+| band | what it costs |
+|---|---|
+| weather | hours, charged to the clock and the body like any other hours on the road — and **not** added to the road's remembered progress, because sitting out a storm gets you no nearer |
+| toll | coin, *asked for* and never taken: the decision is the point, and an engine that deducted it would have made it a tax |
+
+Weather is the one meeting that brings nobody: the road itself is what stopped you, and a
+template drawn for it would have put a stranger in the rain with no reason to be there.
+
+**A venture rolls for the hours it charges.** Going into ground was the one journey in the
+game where the road was always empty — it charged the hours and checked nothing for them.
+It checks now, against the ground being *entered* rather than the town above it: what lives
+in the sewers is what the sewers hold.
+
+**A companion's bond reads the feeling it was granted for.** Nothing but the player's word
+ended it, so a friend walked on cheerfully after being given every reason not to. Somebody
+comes with you *because* they are friendly — 1e's own word for "will chat, advise, offer
+limited help" — so somebody who has stopped being friendly has stopped coming. One
+question, asked of the same track `company` asks, and the effect is removed by source so
+the bond and its contribution evaporate together. A mended temper is not a standing
+arrangement: they have to be asked again.
+
+**An arrival says the walk is behind them.** Measured live: the engine had the party AT the
+north crossing and the beat ended "You are moving toward the crossing". A passage that
+leaves them on their way contradicts the panel, the map and the next turn.
+
+### And two things the suite caught on the way
+
+The three-laws ratchet refused the first cut of the watch's recognition, which spelled
+`add_condition("hostile", …)` — a literal attitude key in the engine. It goes through
+`settle_attitude` now, with the bottom of the track named in `rules/attitude.py` beside the
+step a companion needs, so no reader anywhere spells an attitude.
+
+And `test_two_actors_in_two_places_survive_the_save` began failing intermittently: it
+asserted that only the player stands in the new room, and a travel now rolls the street's
+table against an unseeded campaign, so somebody the walk ran into may legitimately be
+there. The assertion is the containment it was written for — the merchant is not here —
+rather than the whole roster. An unseeded fixture that asserts a roster is a gate that lies
+occasionally, which is the trap `test_foraging_fills_the_satchel` already records.
+
 ## What is still open after this
 
-- The street patrol band knows nothing about a warrant; the gate is still the only place the
-  law is enforced.
-- The road's table has two bands. A washed-out ford or a toll wants mechanics that do not
-  exist, and an authored line with no teeth is worse than no line.
-- `venture` rolls nothing on the way in, though it charges the hours.
-- A companion carries no loyalty, and nothing but the player's word ends the bond.
-- The prose tense drifts on an arrival the engine has already completed ("you are moving
-  toward the crossing" after arriving).
-- Everything `classfeatures` lists as inert, above.
+Everything `rules/classfeatures.py` lists as inert, and each is blocked on a thing that
+does not exist rather than on effort:
+
+- **bravery, trap sense** — need a save DESCRIPTOR. `save` carries `save` and `dc` and
+  nothing else, and a descriptor supplied by the model would put a rule's trigger in the
+  narrator's hands, which the third law forbids. It waits for one that comes from a
+  document: a spell's descriptors, a hazard's row.
+- **trapfinding** — needs a trap-finding check to bonus.
+- **armour training** — needs a per-character adjustment channel for `max_dex` and `acp`,
+  which are read straight off the armour row at the point of use.
+- **weapon training** — needs weapon GROUPS, which the weapon table does not carry.
+- **rogue talent, arcane bond, arcane school** — are choices, not grants, and need a
+  level-up picker.
+
+And one that is nobody's fault: `backgrounds.acquaint` marks the single person the opening
+rolled, and declines to guess if a crowd is already standing there. That is the right
+answer for an opening and the wrong one for a saved game being healed, which no path
+currently takes.

@@ -346,3 +346,43 @@ class TestTheDoorThatWasNotWalked:
                "params": {"kind": "sewers", "parent": e.here().name}}
         e.run(e.validate([raw], origin="author:test"))
         assert s.at != "" and places_mod.terrain_of(s.at) == "underground"
+
+    def test_an_arrival_says_the_walk_is_behind_them(self):
+        """Measured live 2026-09-22: the engine had the party AT the north crossing and
+        the beat ended "You are moving toward the crossing". A passage that leaves them
+        on their way contradicts the panel, the map and the next turn."""
+        from gm import prompts
+
+        msgs = prompts.call_prose_messages(
+            "BRIEF", [], "i go to the market",
+            ["The way there ran through the square. You are at the market now."])
+        assert "They have ARRIVED" in msgs[-1]["content"]
+
+
+class TestGoingIntoGround:
+    """A venture charged the hours and rolled nothing for them, which made going into
+    ground the one journey in the game where the road was always empty."""
+
+    def _venture(self, e, pc, kind="sewers"):
+        raw = {"op": "venture", "actor": pc.ref, "because": "t",
+               "params": {"kind": kind, "parent": e.here().name}}
+        return e.run(e.validate([raw], origin="author:test"))
+
+    def test_the_way_in_is_checked_like_any_other_hours(self):
+        s, e, pc = _party()
+        e.dice = _Certain(e.dice, band=70)      # the road's travellers band
+        tell = " ".join(o.tell for o in self._venture(e, pc).outcomes)
+        assert "There are others" in tell or "not empty" in tell, tell
+
+    def test_a_quiet_way_in_says_nothing_extra(self):
+        s, e, pc = _party()
+        e.dice = _Quiet(e.dice)
+        tell = " ".join(o.tell for o in self._venture(e, pc).outcomes)
+        assert "There are others" not in tell
+
+    def test_the_ground_being_entered_is_what_is_rolled_against(self):
+        """Not the town above it: what lives in the sewers is what the sewers hold."""
+        s, e, pc = _party()
+        e.dice = _Quiet(e.dice)
+        self._venture(e, pc)
+        assert places_mod.terrain_of(s.at) == "underground"
