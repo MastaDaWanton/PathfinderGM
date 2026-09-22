@@ -4192,7 +4192,22 @@ class Engine:
                 raise ValueError(f"place_party: no place {place_id!r} here; the places "
                                  f"are {[p.id for p in known]}")
         else:
-            target = self.places()[0]
+            # Arriving means arriving AT the way in. Unnamed, this used to stand the
+            # party at `places()[0]` — whatever the world happened to list first, which in
+            # Vormoor is the well — so a character walking a week of road stepped straight
+            # into the middle of the town. Reported 2026-09-21: "why would walking onto
+            # town take me to the market it should be the streets or the entry square or
+            # something like that."
+            #
+            # `places.ENTRANCES` is the same list the law watches and the generator
+            # guarantees, so the door somebody arrives by is the door the warrant is
+            # checked at. A place with no entrance at all falls back to the first, which
+            # is what every location did before.
+            here_now = self.places()
+            target = next(
+                (p for p in here_now
+                 if " ".join(str(p.name or "").split()).lower() in places_mod.ENTRANCES),
+                here_now[0])
         # Placement is not movement. `move` unseats — drops the zone, the initiative
         # slot, the side — and refuses the PC mid-encounter; a save loaded mid-fight
         # from before places existed has all of those and must keep them. Nothing is
@@ -4707,6 +4722,19 @@ class Engine:
                 self.place_party(going_to.id)
             for ref in escorts:
                 self.scene.move(ref, going_to.id)
+            # New room, new ground — the rule `place_party` states and this door never
+            # kept. `Scene.move` changes where everybody is and touches no map, so
+            # travelling from the well to the market left the WELL's floor on screen with
+            # nobody standing on it: 5x5 and empty where the market is 12x12 with seven
+            # clumps of stalls. Reported 2026-09-21 as "the same map and the scale of the
+            # map is way too small", and it was the same map, literally.
+            #
+            # `place_party` is not called here on purpose — it is the party record's own
+            # writer and this path has already moved everybody. What is shared is the
+            # discard-and-derive, which is `lay_the_ground`'s whole job.
+            self.scene.grid = None
+            self.scene.positions.clear()
+            self.lay_the_ground()
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
             # The one journey this batch is spent. Set only where the party actually

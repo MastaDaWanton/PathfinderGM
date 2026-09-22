@@ -350,3 +350,70 @@ def test_the_way_in_has_ground_of_its_own():
     shape = floorplan.shape_for("abc~urban:the-way-in", "urban")
     assert shape.width > shape.height, "a road is longer than it is wide"
     assert "road" in (shape.about or "")
+
+
+def test_travelling_between_places_redraws_the_ground():
+    """Reported 2026-09-21, with the market's tray open: "the same map and the scale of
+    the map is way too small." It was the same map — literally the well's.
+
+    `place_party` has discarded the grid on arrival since group 11 ("New room, new
+    ground"), and `_op_travel` never went through it: `Scene.move` changes where everybody
+    stands and touches no map. So walking from the well to the market kept the well's 5x5
+    empty floor, where the market is 12x12 with nine clumps of stalls — and left the PC
+    with no position on it at all, so the panel offered nowhere to move to.
+    """
+    from play import library
+    from rules import places as places_mod
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+
+    world = library.world("aurvantis-campaign")
+    vormoor = next(s for s in world.play["settlements"] if s["name"] == "Vormoor")
+    scene = Scene(location_id=vormoor["id"])
+    pc = instantiate("guildhand", scene=scene, name="Spree")
+    pc.kind = "pc"
+    scene.add(pc)
+    engine = Engine(scene, Dice(seed=1), world=world)
+    engine.place_party()
+    first = (scene.grid.width, scene.grid.height)
+
+    engine.run(engine.validate(
+        [{"op": "travel", "actor": pc.ref, "because": "t",
+          "params": {"place": "the market"}}], origin="author:test"))
+
+    assert scene.at.endswith("the-market")
+    assert scene.grid is not None
+    assert (scene.grid.width, scene.grid.height) != first, "the old room's map stayed"
+    assert (scene.grid.width, scene.grid.height) == (12, 12), "not the market's own shape"
+    assert scene.grid.blocked, "the market's stalls are missing"
+    assert pc.ref in scene.positions, "the party is not standing on the new ground"
+
+
+def test_arriving_at_a_settlement_puts_the_party_at_its_way_in():
+    """Reported 2026-09-21: "why would walking onto town take me to the market it should
+    be the streets or the entry square or something like that."
+
+    Unnamed, `place_party` stood the party at `places()[0]` — whatever the world listed
+    first, the well in Vormoor — so a character finishing a week of road stepped straight
+    into the middle of town. The entrance is the same list the law watches, so the door
+    somebody arrives by is the door a warrant is checked at.
+    """
+    from play import library
+    from rules import places as places_mod
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+
+    world = library.world("aurvantis-campaign")
+    for name in ("Vormoor", "Halhollow"):
+        settlement = next(s for s in world.play["settlements"] if s["name"] == name)
+        scene = Scene(location_id=settlement["id"])
+        pc = instantiate("guildhand", scene=scene, name="Spree")
+        pc.kind = "pc"
+        scene.add(pc)
+        Engine(scene, Dice(seed=1), world=world).place_party()
+        here = places_mod.find(
+            places_mod.for_scene(world.get(settlement["id"]), scene.at), scene.at)
+        assert here is not None
+        assert here.name in places_mod.ENTRANCES, (name, here.name)
