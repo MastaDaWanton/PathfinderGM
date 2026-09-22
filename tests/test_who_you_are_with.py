@@ -377,3 +377,40 @@ class TestSomebodyWhoComesAlong:
         _run(e, {"op": "company", "actor": pc.ref, "because": "t",
                  "params": {"who": who.ref}})
         assert who.has_state(states.TRAVELS_WITH_YOU)
+
+    def test_a_companion_who_has_stopped_being_friendly_stops_coming(self):
+        """The loyalty the bond shipped without. Somebody comes with you BECAUSE they
+        are friendly — 1e's own word for "will chat, advise, offer limited help" — so
+        somebody who has stopped being friendly has stopped coming. One question, asked
+        of the same track `company` asks; not a second rule, and not a bond that
+        outlives the feeling it was granted for."""
+        s, e, pc = _party()
+        who = self._friend(s, e)
+        _run(e, {"op": "company", "actor": pc.ref, "because": "t",
+                 "params": {"who": who.ref}})
+        e.settle_attitude(who, "unfriendly", None, "they saw what you did")
+        far = next(p for p in e.places()
+                   if p.id != s.at and not p.described_only
+                   and places_mod.route(e.places(), s.at, p.id))
+        tell = " ".join(o.tell for o in _run(
+            e, {"op": "travel", "actor": pc.ref, "because": "t",
+                "params": {"place": far.name}}).outcomes)
+        assert not who.has_state(states.TRAVELS_WITH_YOU)
+        assert "does not come with you any more" in tell, tell
+
+    def test_and_the_bond_is_gone_rather_than_merely_ignored(self):
+        """Removed by source, so nothing has to remember to ask again — the effect and
+        its contribution evaporate together, which is the second law."""
+        s, e, pc = _party()
+        who = self._friend(s, e)
+        _run(e, {"op": "company", "actor": pc.ref, "because": "t",
+                 "params": {"who": who.ref}})
+        e.settle_attitude(who, "hostile", None, "t")
+        far = next(p for p in e.places()
+                   if p.id != s.at and not p.described_only
+                   and places_mod.route(e.places(), s.at, p.id))
+        _run(e, {"op": "travel", "actor": pc.ref, "because": "t",
+                 "params": {"place": far.name}})
+        e.settle_attitude(who, "friendly", None, "t")
+        assert not who.has_state(states.TRAVELS_WITH_YOU), \
+            "a mended temper is not a standing arrangement"

@@ -356,7 +356,13 @@ def test_two_actors_in_two_places_survive_the_save(tmp_path):
         again = cm.Campaign.load(path)
         assert again.scene.at == other.id
         assert again.scene.people[merchant].at == stall
-        assert set(again.scene.actors) == {"pc"}
+        # The merchant is not HERE — which is the containment this test is about. Not
+        # "only the PC is here": since 2026-09-22 a travel rolls the street's table
+        # (`rules/ontheway.py`) and `begin_with` leaves the campaign unseeded, so
+        # somebody the walk ran into may legitimately be standing in the new room.
+        # Asserting the whole roster made this a gate that lies occasionally, which is
+        # the trap `test_foraging_fills_the_satchel` already records.
+        assert merchant not in again.scene.actors
         assert again.scene.minted == minted
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["save_version"] == 2 and "people" in data["scene"]

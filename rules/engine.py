@@ -4480,6 +4480,16 @@ class Engine:
         stopped_short = met is not None
         if stopped_short:
             hours = ontheway.hours_walked(met, hours)
+            if met.kind == "weather":
+                # Weather is the one band that costs rather than blocks: the road turns
+                # against you and the hours go anyway, charged to the body like any
+                # other hours out there. Added to the walk so `_march` pays for them,
+                # and NOT added to what the road remembers — sitting out a storm does
+                # not get you closer to anywhere.
+                weathered = self.dice.roll(ontheway.WEATHER_HOURS,
+                                           label="how long it holds you",
+                                           visibility="hidden").total
+                hours += weathered
 
         toll_note = ""
         if how == "sea":
@@ -4518,7 +4528,10 @@ class Engine:
             # in open country can be fought, camped with, and walked on from.
             self.scene.road = {"to": leg.to_id, "to_name": leg.to_name,
                                "from": self.scene.location_id,
-                               "walked": resumed + hours}
+                               # Hours spent sitting out weather are hours, not
+                               # progress: they cost the clock and the body and move
+                               # nobody an inch nearer the far end.
+                               "walked": resumed + ontheway.hours_walked(met, hours)}
             self._journeyed = leg.to_name
             ground = (leg.crosses[0] if leg.crosses else "") \
                 or places_mod.terrain_of(self.scene.at) or "plains"
@@ -4554,10 +4567,10 @@ class Engine:
             # The march is over for this turn, and the road remembers how much of it is
             # still to walk. Whoever stopped it arrives by the one door creatures come
             # in by, onto the open ground the party is now standing on.
-            made = self._bring_in(
+            made = ([] if met.count < 1 else self._bring_in(
                 met.template or "guildhand", count=met.count,
                 name=(met.creature or {}).get("name")
-                     or (met.words[0].title() if met.words else None))
+                     or (met.words[0].title() if met.words else None)))
             for m in made:
                 self.scene.zones[m["ref"]] = "far"
                 self.scene.positions.pop(m["ref"], None)
@@ -4751,9 +4764,23 @@ class Engine:
         # 2026-09-22, the tell for crossing a village read "Left behind: Drenn
         # Ironvale". A companion is a state on the person (`_op_company`), and this is
         # the door that reads it.
-        escorts.extend(r for r, a in self.scene.actors.items()
-                       if r not in escorts and not a.is_pc
-                       and a.has_state(states.TRAVELS_WITH_YOU))
+        #
+        # And it reads the attitude with it, which is the loyalty the bond shipped
+        # without: somebody comes with you because they are friendly, so somebody who
+        # has stopped being friendly has stopped coming. One question, asked of the
+        # same track `_op_company` asks — not a second rule, and not a bond that
+        # outlives the feeling it was granted for.
+        from . import attitude as attitude_mod
+
+        fell_away: list[str] = []
+        for r, a in self.scene.actors.items():
+            if r in escorts or a.is_pc or not a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            if attitude_mod.step_of(attitude_mod.of(a))                     < attitude_mod.step_of(attitude_mod.COMES_ALONG):
+                a.remove_effects(source=f"company:{r}")
+                fell_away.append(a.name)
+                continue
+            escorts.append(r)
 
         pc = self.scene.pc()
         was_place = self.scene.at
@@ -4934,7 +4961,15 @@ class Engine:
         # the place the party stopped at, and `_bring_in` places them on its grid.
         met_tell = ""
         if met is not None:
-            met_tell = ontheway.describe(met, going_to.name)
+            # The watch reads the warrant here too, which is the half this band shipped
+            # without: the gate is where a warrant is enforced, and the street is where
+            # it stops being comfortable. One reader (`states.standing_with_the_law`),
+            # the same one the gate uses.
+            law_now = ""
+            if pc is not None:
+                law_now = states.standing_with_the_law(
+                    pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
+            met_tell = ontheway.describe(met, going_to.name, law=law_now)
             made = self._bring_in(
                 met.template, count=met.count,
                 name=(met.creature or {}).get("name")
@@ -4946,6 +4981,17 @@ class Engine:
                 self.scene.place_by_zone([m["ref"] for m in made])
             if met.kind == "cutpurse" and pc is not None and made:
                 met_tell += self._cutpurse(pc, self.scene.actors[made[0]["ref"]])
+            elif met.kind == "patrol" and law_now == "wanted" and made:
+                # Hostile, not arrested: there is no arrest in this app and inventing
+                # one here would be a rule with one home. What the warrant buys the
+                # watch is that they come for you — and `_law_joins` already knows that
+                # every guard in a town where you are wanted is on the other side.
+                from . import attitude as attitude_mod
+
+                for m in made:
+                    self.settle_attitude(self.scene.actors[m["ref"]],
+                                         attitude_mod.HOSTILE, None,
+                                         "the watch has your name")
             elif met.aggressive and pc is not None and made:
                 self._ensure_encounter(pc.ref, target=made[0]["ref"])
 
@@ -4978,6 +5024,8 @@ class Engine:
         bits.extend(dying_tells)
         if left:
             bits.append(f"Left behind: {', '.join(left)}.")
+        if fell_away:
+            bits.append(f"{', '.join(fell_away)} does not come with you any more.")
         if law_line:
             bits.append(law_line)
         if note:
@@ -5933,12 +5981,34 @@ class Engine:
         spec = places_mod.VENTURES[kind]
         hours = int(spec["hours"])
         toll_note = ""
+        way_in = ""
         if hours:
             toll = survival.pass_hours(actor, hours, self.dice, biome=head.terrain)
             self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
                                charge_body=False)
             if toll.checks:
                 toll_note = f" The way cost them: {survival_note(toll)}"
+            # And the way in is checked like any other hours on the move
+            # (`rules/ontheway.py`). A venture charged the hours and rolled nothing for
+            # them, which made going into ground the one journey in the game where the
+            # road was always empty — recorded when the table landed and closed here.
+            # The ground being entered is what is rolled against, not the town above it.
+            met = ontheway.road(self.dice, hours, head.terrain,
+                                int(getattr(actor, "level", 1) or 1))
+            if met is not None and met.count:
+                coming = self._bring_in(
+                    met.template or "guildhand", count=met.count,
+                    name=(met.creature or {}).get("name")
+                         or (met.words[0].title() if met.words else None))
+                for m in coming:
+                    self.scene.zones[m["ref"]] = "far"
+                    self.scene.positions.pop(m["ref"], None)
+                way_in = " " + ontheway.describe(met)
+                here_pc = self.scene.pc()
+                if met.aggressive and here_pc is not None and coming:
+                    self._ensure_encounter(here_pc.ref, target=coming[0]["ref"])
+            elif met is not None:
+                way_in = " " + ontheway.describe(met)
         # In through the one mover: the party goes, the escorts named come, the rest
         # stay — exactly what `travel` does, by way of it.
         travel = Intent(op="travel", actor=actor.ref, because=intent.because,
@@ -5950,7 +6020,7 @@ class Engine:
                     "fresh": fresh, "spots": [m.name for m in made[1:]]}] + list(moved.effects)
         tell = (f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
                 f"{parent.name}" + (f" — {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
-                + ". " + moved.tell + toll_note)
+                + ". " + moved.tell + toll_note + way_in)
         # Something may live here. Half the time, by the ground, from the bestiary.
         pc = self.scene.pc()
         level = getattr(pc, "level", 1) if pc is not None else 1

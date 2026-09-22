@@ -1582,7 +1582,8 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
         "within reach of them; then what is going on around them — the work, the "
         "trade, the noise and the smell of it. End on ONE particular thing one "
         "particular person is doing, close enough to speak to. Only places and people "
-        "the brief names." if arriving else "")
+        "the brief names. They have ARRIVED — the walk is behind them, and the passage "
+        "must not leave them still on their way there." if arriving else "")
     # The scene as the player last read it, in front of the model that continues it.
     # This call had NO history at all — `[]` at the call site, and the opening was
     # never in the history either — and on the player's own first turn, 2026-09-05,

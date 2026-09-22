@@ -75,13 +75,31 @@ STREET = (
     ("trouble", 100, ("thug", "bravo", "footpad"), 1),
 )
 
-# The road's two halves. A creature that the ground actually holds, or people using the
-# same road you are — a merchant's train, pilgrims, a patrol riding it. Both stop the
-# march; only the first can mean a fight.
+# The road's four bands. Two of them are people or things; two of them are the road
+# itself, and both of those were added only once there was something real behind them —
+# an authored line with no teeth is worse than no line, which is why the table shipped
+# with two bands and a note rather than four and a bluff.
+#
+#   creature     what the ground actually holds, from the bestiary
+#   travellers   people using the same road you are
+#   weather      the road turns against you: hours the clock and the body both pay
+#   toll         somebody is charging for the crossing, and the coin is the player's to
+#                hand over — a `give`, never a deduction the engine makes for them
 ROAD = (
-    ("creature", 60),
-    ("travellers", 100),
+    ("creature", 45),
+    ("travellers", 75),
+    ("weather", 90),
+    ("toll", 100),
 )
+
+# What weather costs when it stops you: hours spent going nowhere, charged to the body
+# like any other hours on the road. Two to five, so it is a lost afternoon and never a
+# lost week.
+WEATHER_HOURS = "1d4+1"
+
+# What a crossing costs, in copper. A toll is small: the point of it is the decision,
+# not the sum.
+TOLL_DICE = "2d10+20"
 
 # Creature types that come at you on sight, and the CR window around the party. Both are
 # `gathering`'s, named here rather than imported so that changing the foraging table does
@@ -179,6 +197,15 @@ def road(dice, hours: int, biome: str, level: int = 1) -> Meeting | None:
                                aggressive=row.get("creature_type") in AGGRESSIVE)
             # Ground the book does not stock is quiet ground, and the watch passes.
             kind = "travellers"
+        if kind == "weather":
+            # Nobody arrives. The road itself is the meeting, so no template is drawn
+            # and the caller brings nobody in.
+            return Meeting(kind="weather", roll=r, count=0, after=w)
+        if kind == "toll":
+            got = npcs.choose(["toll", "guard", "warden"],
+                              max(1, int(level or 1))) or {}
+            return Meeting(kind="toll", roll=r, words=("toll-keeper", "warden"),
+                           count=1, template=str(got.get("id") or "guildhand"), after=w)
         got = npcs.choose(["merchant", "guard", "traveler"],
                           max(1, int(level or 1))) or {}
         return Meeting(kind="travellers", roll=r, words=("merchant", "guard"), count=2,
@@ -198,8 +225,11 @@ def hours_walked(meeting: "Meeting | None", hours: int) -> int:
     return min(int(hours), int(meeting.after) * WATCH_HOURS)
 
 
-def describe(meeting: Meeting, where: str = "") -> str:
+def describe(meeting: Meeting, where: str = "", law: str = "") -> str:
     """The tell's clause: what stopped you, in the engine's own voice.
+
+    `law` is what this town's watch holds against the player (`states.standing_with_the_law`),
+    and only the patrol band reads it: a warrant changes what meeting the watch IS.
 
     The people are named as what they are and not by name — the engine has just created
     them and the narrator is the one who gets to introduce them. What this sentence owes
@@ -219,6 +249,17 @@ def describe(meeting: Meeting, where: str = "") -> str:
         return (f"A hand comes out{at}, and the mouth above it knows your face is new. "
                 f"You get no further.")
     if meeting.kind == "patrol":
+        # The watch reads the warrant, which is the one thing this band was missing when
+        # it shipped: a wanted character met the patrol, was told they were looking at
+        # faces, and nothing followed. The gate is still where a warrant is ENFORCED
+        # (docs/wanted.md, reader one) — this is the second reader, and what it adds is
+        # that the street stops being safe once your name is on the list.
+        if law == "wanted":
+            return (f"The watch comes down the road{at}, two of them, looking at faces "
+                    f"— and they have yours. They are coming straight for you.")
+        if law == "suspected":
+            return (f"The watch comes down the road{at}, two of them, looking at faces. "
+                    f"One of them looks at yours twice. You get no further.")
         return (f"The watch comes down the road{at}, two of them, looking at faces. "
                 f"You get no further.")
     if meeting.kind == "cutpurse":
@@ -234,4 +275,10 @@ def describe(meeting: Meeting, where: str = "") -> str:
                 f"The road is not empty: {article} {name} is on it, and it has not moved.")
     if meeting.kind == "travellers":
         return "There are others on this road, and they have stopped where you are."
+    if meeting.kind == "weather":
+        return ("The road turns against you — there is no walking through this. You "
+                "get off it and wait.")
+    if meeting.kind == "toll":
+        return ("Somebody is charging for this crossing, and they are standing in the "
+                "middle of it. Pay them or find another way.")
     return ""

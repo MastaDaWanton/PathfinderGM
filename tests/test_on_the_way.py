@@ -192,3 +192,63 @@ class TestWhatItSays:
         met = ontheway.street(_Fixed(1, 30))
         assert met is not None
         assert "None" not in ontheway.describe(met)
+
+
+class TestTheRestOfTheRoad:
+    """The two bands the table shipped without, and the reason it shipped without them:
+    "a washed-out ford, a toll, weather that costs a day — all of those want mechanics
+    that do not exist yet, and an authored line with no teeth behind it is worse than no
+    line". Both now have teeth the engine already had."""
+
+    def test_the_bands_still_cover_the_whole_die(self):
+        assert [hi for _k, hi in ontheway.ROAD][-1] == 100
+        for r in range(1, 101):
+            assert ontheway._band(ontheway.ROAD, r)
+
+    def test_weather_brings_nobody(self):
+        """The road itself is the meeting. A template drawn for it would have put a
+        stranger in the rain with no reason to be there."""
+        got = ontheway.road(_Fixed(5, 80), hours=6, biome="plains")
+        assert got is not None and got.kind == "weather"
+        assert got.count == 0 and not got.template
+
+    def test_a_toll_brings_somebody_to_pay(self):
+        got = ontheway.road(_Fixed(5, 95), hours=6, biome="plains")
+        assert got is not None and got.kind == "toll"
+        assert got.count == 1 and got.template
+
+    def test_what_it_costs_is_hours_and_what_it_asks_is_coin(self):
+        """Both are the engine's own currencies — `scene.advance` and `goods.spend` —
+        and neither is a number invented for this table."""
+        assert ontheway.WEATHER_HOURS and ontheway.TOLL_DICE
+
+    def test_the_toll_is_asked_for_and_never_taken(self):
+        """"Pay them or find another way" — the decision is the point of a toll, and an
+        engine that deducted the coin would have made it a tax."""
+        said = ontheway.describe(ontheway.Meeting(kind="toll", roll=95))
+        assert "Pay them" in said
+
+
+class TestTheWatchReadsTheWarrant:
+    """The half the patrol band shipped without: a wanted character met the watch, was
+    told they were looking at faces, and nothing followed."""
+
+    def test_a_clean_name_gets_the_ordinary_patrol(self):
+        said = ontheway.describe(ontheway.Meeting(kind="patrol", roll=80), law="")
+        assert "You get no further" in said and "coming straight for you" not in said
+
+    def test_a_suspected_name_is_looked_at_twice(self):
+        said = ontheway.describe(ontheway.Meeting(kind="patrol", roll=80),
+                                 law="suspected")
+        assert "twice" in said
+
+    def test_a_wanted_name_brings_them_at_you(self):
+        said = ontheway.describe(ontheway.Meeting(kind="patrol", roll=80), law="wanted")
+        assert "they have yours" in said and "coming straight for you" in said
+
+    def test_the_law_is_only_read_by_the_patrol(self):
+        """A beggar does not check your warrant."""
+        for kind in ("press", "squabble", "hawker", "beggar", "cutpurse", "trouble"):
+            plain = ontheway.describe(ontheway.Meeting(kind=kind, roll=1))
+            wanted = ontheway.describe(ontheway.Meeting(kind=kind, roll=1), law="wanted")
+            assert plain == wanted, kind
