@@ -4424,6 +4424,11 @@ class Engine:
             self.scene.end_encounter()
         escorts = [str(w) for w in (intent.params.get("with") or [])
                    if str(w) in self.scene.actors]
+        # And whoever travels with you, for the reason `_op_travel` gives: days on a
+        # road is the last place a companion should be silently dropped.
+        escorts += [r for r, a in self.scene.actors.items()
+                    if r not in escorts and not a.is_pc
+                    and a.has_state(states.TRAVELS_WITH_YOU)]
         keeping = {pc.ref if pc is not None else "", *escorts}
         left = [a.name for ref, a in list(self.scene.actors.items())
                 if ref not in keeping and not a.is_pc]
@@ -4497,6 +4502,16 @@ class Engine:
             self.place_party(out[0].id if out else "")
         else:
             self.place_party()
+
+        # Whoever came along comes along. `place_party` writes the PARTY's place — the
+        # PC and anybody who has no place at all — so an escort kept by `with` was left
+        # standing at the far end of a road they had just walked, present in the store
+        # and absent from the scene. Nobody noticed while `with` was the only way to be
+        # kept, because naming somebody in `with` on a journey is a thing that had never
+        # once happened in play.
+        for ref in escorts:
+            if ref in self.scene.people:
+                self.scene.move(ref, self.scene.at)
 
         if not arrived:
             bits = [f"The road to {leg.to_name} was longer than {pc.name if pc else 'the party'} "
@@ -4707,6 +4722,14 @@ class Engine:
                     f"travel: {w!r} names {len(matches)} people here; say which by "
                     f"ref: {', '.join(matches)}.", "refs")
             escorts.extend(matches)
+        # And whoever travels with you, without being named. `with` asked the model to
+        # remember who the party is on every single move, and it did not: measured live
+        # 2026-09-22, the tell for crossing a village read "Left behind: Drenn
+        # Ironvale". A companion is a state on the person (`_op_company`), and this is
+        # the door that reads it.
+        escorts.extend(r for r, a in self.scene.actors.items()
+                       if r not in escorts and not a.is_pc
+                       and a.has_state(states.TRAVELS_WITH_YOU))
 
         pc = self.scene.pc()
         was_place = self.scene.at
@@ -5741,6 +5764,91 @@ class Engine:
             out.append(who)
         return out
 
+    def _op_company(self, intent: Intent, partial: dict) -> Outcome:
+        """Somebody comes along, or stops coming.
+
+        Asked for 2026-09-22: *"if you are taveling together they should follow and
+        comment on the world around you."* They did not follow. `_op_travel` sheds every
+        non-PC not named in `with`, for the good reason its docstring gives — a
+        gatekeeper wounded in the city once followed the party to the forest and took an
+        NPC turn for the rest of the session — and `with` is the only way back in. That
+        shape asks the model to remember who the party is on every single move, which is
+        the one thing a language model reliably does not do: measured live the same day,
+        on a turn where the player crossed a village and the tell read "Left behind:
+        Drenn Ironvale".
+
+        So it is a state on the person instead, which is the first law: one vocabulary,
+        asked by prefix. `bond.travels-with-you` is granted here through the one
+        applicator, read by both movement doors, and dropped by `leave` or by the effect
+        being removed like any other.
+
+        **Who may come.** The attitude track decides, in its own words rather than a new
+        rule: 1e's `friendly` is somebody who "will chat, advise, offer limited help" and
+        `helpful` will "take risks to help". Walking somewhere with you is the first of
+        those. Anyone below it is refused with the fix named — talk them round, which is
+        a Diplomacy `check` the engine already resolves and already tracks the daily
+        limit on. Inform's Van Helsing (Recipe Book 7.13) is the same rule from the other
+        end: the follower is a property of the character, and the movement rule reads it.
+        """
+        do = str(intent.params.get("do") or "join").strip().lower()
+        if do not in ("join", "leave"):
+            # Printed, not raised: a resolution-time raise is a 502 with the player's
+            # sentence deleted, and the stage 7 ratchet says so. The fix is named, so a
+            # rewrite can land it.
+            return self._refuse(
+                intent, f"{do!r} is not a thing company does. It is 'join' or 'leave'.")
+        want = str(intent.params.get("who") or "").strip()
+        who = self.scene.actors.get(want)
+        if who is None:
+            matches = [r for r, a in self.scene.actors.items()
+                       if not a.is_pc and str(a.name).lower() == want.lower()]
+            if len(matches) > 1:
+                raise IntentError(
+                    f"company: {want!r} names {len(matches)} people here; say which by "
+                    f"ref: {', '.join(matches)}.", "refs")
+            who = self.scene.actors.get(matches[0]) if matches else None
+        if who is None:
+            here = [f"{r} ({a.name})" for r, a in self.scene.actors.items() if not a.is_pc]
+            return self._refuse(
+                intent, f"There is no {want or 'nobody'} here to come along."
+                        + (f" Here: {', '.join(here)}." if here else ""))
+        if who.is_pc:
+            return self._refuse(intent, "The player does not follow themselves.")
+
+        source = f"company:{who.ref}"
+        if do == "leave":
+            gone = who.remove_effects(source=source)
+            return Outcome(
+                intent_id=intent.id, op="company",
+                effects=[{"ref": who.ref, "kind": "company", "travels": False}],
+                tell=(f"{who.name} does not go on with you."
+                      if gone else f"{who.name} was not travelling with you."),
+                because=intent.because)
+
+        if who.has_state(states.TRAVELS_WITH_YOU):
+            return Outcome(
+                intent_id=intent.id, op="company", effects=[],
+                tell=f"{who.name} is already with you.", because=intent.because)
+        if who.is_down:
+            return self._refuse(
+                intent, f"{who.name} is not going anywhere: they are down.")
+        mood = states.attitude_of(who)
+        if mood not in ("friendly", "helpful"):
+            return self._refuse(
+                intent, f"{who.name} is {mood or 'indifferent'} towards you and does "
+                        f"not walk out of here at your word. Talk them round first — "
+                        f"that is a Diplomacy check against them.")
+        who.apply_effect(ActiveEffect(
+            name="travels with you", kind="bond", key=f"{source}:travels",
+            source=source, origin=source, duration="until-dismissed",
+            tags=(states.TRAVELS_WITH_YOU,)))
+        note = str(intent.params.get("note") or "").strip()
+        return Outcome(
+            intent_id=intent.id, op="company",
+            effects=[{"ref": who.ref, "kind": "company", "travels": True}],
+            tell=f"{who.name} comes with you from here." + (f" {note}" if note else ""),
+            because=intent.because)
+
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.
         Generated on entry from a seed off the parent's id (the roguelike answer), so the
@@ -5902,6 +6010,15 @@ class Engine:
                  + (f" for {cond.rounds_left} rounds." if cond.rounds_left else "."),
             because=intent.because,
         )
+
+    def settle_attitude(self, target, key: str, rounds: int | None = None,
+                        source: str = ""):
+        """The public name for the one attitude applicator, for callers outside this
+        class — `rules/backgrounds.acquaint` is the first. A second copy of
+        clear-then-add is the exact drift `_set_attitude`'s own docstring was written to
+        prevent, and a module reaching for a private method is how that copy gets made.
+        """
+        return self._set_attitude(target, key, rounds, source or "the engine")
 
     def _set_attitude(self, target, key: str, rounds: int | None, source: str):
         """Move a creature to one step of the track. The one applicator for an attitude.

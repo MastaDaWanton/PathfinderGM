@@ -20,6 +20,7 @@ from gm import (client, judgement, ledger as ledger_mod,
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
+from rules import places as places_mod
 from rules.intents import IntentError
 
 from . import campaign as campaign_mod
@@ -46,7 +47,7 @@ def _where_the_ground_is(scene) -> tuple[str, str]:
     Both read off the same two functions the floorplan itself uses, so the caption can
     never describe a different place from the one drawn.
     """
-    from rules import floorplan, places as places_mod
+    from rules import floorplan
 
     at = str(getattr(scene, "at", "") or "")
     if not at:
@@ -215,6 +216,13 @@ def _state(c) -> dict:
         "pc": pc.summary() if pc else None,
         "scene": {
             "location": c.location.name if c.location else "",
+            # What kind of place this is, in the words the opening and the brief use.
+            # Reported 2026-09-22 after four sessions in one town: "I have never been
+            # aware that vormoor was a village." The panel is where a fact like this
+            # has to live to stay known — an opening is read once.
+            "scale": (places_mod.scale_of(c.location) if c.location else ""),
+            "what_it_is": (places_mod.what_it_is(places_mod.scale_of(c.location))
+                           if c.location else ""),
             "biome": c.biome,
             "biome_describe": biomes.describe(c.biome),
             "round": c.scene.round,

@@ -40,6 +40,8 @@ from pathlib import Path
 
 from django.conf import settings
 
+from . import states
+
 # What a tie can reach for in the world. Deliberately the same vocabulary the quest
 # schemes fill their slots from (`rules/schemes.PLACE_KINDS`, its role words), because a
 # background that knows a trader and a scheme that wants one should mean the same person.
@@ -262,3 +264,50 @@ def groups() -> list[str]:
         if entry["group"] not in seen:
             seen.append(entry["group"])
     return seen
+
+
+def acquaint(engine, actor, bound: list[dict]) -> str:
+    """Make the person standing beside a local character somebody who knows them.
+
+    Reported 2026-09-22, four sessions in: *"if you have picked a background and are know
+    to the place you start then the person you start next to does not need to be a
+    stranger. they could be a friend or travel companion."*
+
+    They were right, and the shipped documents say so out loud: eleven of the fourteen
+    backgrounds tie the character to a place in the settlement the game opens in — "You
+    kept a pitch at $where and the neighbours still nod", "You grew up at $where and the
+    room still quietens when you come in", `knows.every-face-here` — and the opening put
+    a stranger beside every one of them. The text already knew (`campaign._standing`
+    stops saying "a stranger here" once ties are bound); the SCENE did not.
+
+    What this does NOT do is add anybody. That was reported as a defect on 2026-09-20 —
+    "drenn ironvale is named as part of my background but does not belong in the scene" —
+    and `bind` answers it with `place=False`, which stands. The person here is the one
+    the opening already rolled; what changes is who they are to the player.
+
+    Two facts, both through the one applicator each belongs to: the attitude track moves
+    to friendly (1e's own word for somebody who "will chat, advise, offer limited help"),
+    and `bond.knows-you` is the tag every reader asks by prefix. Returns their name, or
+    "" when nobody qualified — a character with no local tie keeps the stranger they had,
+    because being new somewhere is a legitimate way to start.
+    """
+    from .activeeffect import ActiveEffect
+
+    if actor is None or not any(str(b.get("where") or "").strip() for b in bound or []):
+        return ""
+    scene = getattr(engine, "scene", None)
+    if scene is None:
+        return ""
+    # Whoever the opening put within speaking distance, and only them: this runs once,
+    # before the first turn, when the scene holds the player and one other person.
+    beside = [a for a in scene.actors.values() if not a.is_pc and not a.is_down]
+    if len(beside) != 1:
+        return ""
+    who = beside[0]
+    doc = get(getattr(actor, "background", "")) or {}
+    source = f"background:{doc.get('id') or 'background'}"
+    who.apply_effect(ActiveEffect(
+        name="knows you", kind="bond", key=f"{source}:knows-you", source=source,
+        origin=source, duration="until-dismissed", tags=(states.KNOWS_YOU,)))
+    engine.settle_attitude(who, "friendly", None, source)
+    return str(who.name or "")

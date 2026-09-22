@@ -118,10 +118,29 @@ from __future__ import annotations
 #                   seven of them bystanders, every one a fightable target for the
 #                   planner and a candidate for a pronoun, and a boy at 4 hp died to a
 #                   thrown chunk of wood meant for the man who had drawn on the player.
+#   bond.knows-you   somebody who knew this character before the game started. Granted
+#                    at campaign start by `backgrounds.acquaint` when a background tie
+#                    bound a place in the settlement the game opens in — eleven of the
+#                    fourteen shipped backgrounds are local ("You kept a pitch at the
+#                    market and the neighbours still nod"), and the person standing
+#                    beside the player was a stranger in all fourteen. Reported
+#                    2026-09-22: "if you have picked a background and are know to the
+#                    place you start then the person you start next to does not need to
+#                    be a stranger."
+#
+#   bond.travels-with-you   somebody who comes when the party moves. Granted and lifted
+#                    by the `company` op, read by `_op_travel` and `_op_journey`, which
+#                    shed every non-PC not named in `with` — so before this, a friend
+#                    who agreed to come along was left standing in the market the moment
+#                    the player walked to the green. Inform's Van Helsing (Recipe Book
+#                    7.13, Traveling Characters) is the same rule from the other side:
+#                    an every-turn rule that routes the follower to the player's room.
 WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
 BYSTANDER = "role.bystander"
+KNOWS_YOU = "bond.knows-you"
+TRAVELS_WITH_YOU = "bond.travels-with-you"
 # The condition key that grants it — the one name every writer uses, so the tag has
 # one writer's vocabulary and `test_no_new_site_matches_a_condition_by_name` sees no
 # new literal.
