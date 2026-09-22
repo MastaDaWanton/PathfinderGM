@@ -76,11 +76,15 @@ class TestWhatItDoesNotFireOn:
     several of these are deliberate misses."""
 
     def test_seeing_somewhere_is_not_standing_in_it(self):
-        assert not _found("You can see the gate from here.")
+        """Of a place that EXISTS. Both of these named "the gate" until 2026-09-22, when
+        the rule tightened for places a settlement does not have — and Vormoor has no
+        gate, so they were quietly testing the wrong thing: a sentence that mentions a
+        place which is not here is an invention however innocent the grammar."""
+        assert not _found("You can see the guildhall from here.")
         assert not _found("The lane runs off toward the green.")
 
     def test_somebody_else_going_somewhere_is_not_the_player(self):
-        assert not _found("The drover reaches the gate and is waved through.")
+        assert not _found("The drover reaches the green and is waved through.")
 
     def test_crossing_on_the_way_is_passage_and_not_arrival(self):
         """The route-finder models passage now and the tell names it, so "you cross the
@@ -143,3 +147,59 @@ class TestTheVocabularyIsTheAppsOwn:
     @pytest.mark.parametrize("entrance", ["the gate", "the way in", "the docks"])
     def test_every_entrance_is_in_it(self, entrance):
         assert entrance.removeprefix("the ") in narration._place_words()
+
+
+class TestAPlaceThisSettlementDoesNotHaveAtAll:
+    """Reported mid-session 2026-09-22, with the party held at **the market**:
+
+        I say "we should find a place to sit inside the tavern, my legs are weary"
+        → "The tavern is a squat, sturdy building of timber and stone, the air inside
+           thick with the smell of roasting fat… Drenn sits across from you…"
+
+    Vormoor's places are the well, the market, the guildhall, the lane, the green, the
+    way in and the upper floor of the guildhall. **There is no tavern.** The engine never
+    moved anybody — the player's own note was "again no description of movement im just
+    in the tavern" — and the first cut of this guard missed it completely, because it
+    only read sentences that SAY the party is somewhere. This beat establishes the place
+    by describing it.
+
+    So the two halves are judged differently, and they have to be. A place that exists
+    here can be mentioned innocently and only a standing claim is wrong. A place that is
+    not here cannot be mentioned innocently at all: naming it IS the invention.
+    """
+
+    def test_the_reported_beat(self):
+        got = _found("The tavern is a squat, sturdy building of timber and stone, the "
+                     "air inside thick with the smell of roasting fat.", here="the market")
+        assert got and got[0][0] == "the tavern"
+
+    def test_being_led_toward_one_counts_too(self):
+        assert _found("Drenn leads you toward the tavern door.", here="the market")
+
+    def test_a_place_that_does_exist_is_still_judged_the_old_way(self):
+        """"The green is quiet today" is a true sentence about somewhere real, and only
+        a claim that the party is standing in it would be wrong."""
+        assert not _found("The green is quiet today, and the grass is trampled flat.",
+                          here="the market")
+        assert _found("You are at the green now.", here="the market")
+
+    def test_a_compound_word_is_not_a_place(self):
+        """Drenn's own line in that beat: "lost during a skirmish near the old
+        way-gate". A hyphen is a word boundary, so a naive check reads a gate there."""
+        assert not _found("It was lost during a skirmish near the old way-gate.",
+                          here="the market")
+
+    def test_the_repair_says_which_fault_it_is(self):
+        """A rewrite told only "they are not there" relocates the beat to a second
+        invention. It has to be told the place does not exist."""
+        r = narration.review("The tavern is a squat, sturdy building.",
+                             here="the market", places=PLACES)
+        note = [f for f in r.findings if f.kind == "stands-elsewhere"][0].fix_hint
+        assert "There is no tavern here" in note
+        assert "the market, which is where they are" in note
+
+    def test_and_the_article_is_not_doubled(self):
+        r = narration.review("The tavern is a squat, sturdy building.",
+                             here="the market", places=PLACES)
+        note = [f for f in r.findings if f.kind == "stands-elsewhere"][0].fix_hint
+        assert "no the tavern" not in note

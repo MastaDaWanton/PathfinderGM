@@ -317,7 +317,10 @@ def test_one_appended_face_a_beat_and_never_the_same_sentence_twice():
     from play import views
 
     src = inspect.getsource(views._finish)
-    assert "if who.appearance in text:" in src, "never the same sentence twice in one beat"
+    # The guard, not the whole line: 2026-09-22 added `not line or` in front of it when
+    # the face became a sentence rather than a label, and a test that pins an exact line
+    # fails on a change that keeps its rule.
+    assert "who.appearance in text" in src, "never the same sentence twice in one beat"
     assert src.count("face from the world's own body line") == 1
     body = src[src.index("nobody stands here undescribed") - 900:]
     assert "break" in body[:1400], "one appended line a beat"

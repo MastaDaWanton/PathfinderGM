@@ -252,6 +252,37 @@ Driven in the browser rather than read: a wizard at 5 / 8 dims, at 8 / 8 greys t
 rows on screen, at 9 / 8 turns alarm; a sorcerer shows "cantrips 4 / 4" beside "level 1
 spells 0 / 2", which is the exact case item 42 exists for.
 
+## And the tavern, which is item 45 again
+
+Reported mid-session, with the party held at **the market**:
+
+    I say "we should find a place to sit inside the tavern, my legs are weary"
+    → "The tavern is a squat, sturdy building of timber and stone, the air inside thick
+       with the smell of roasting fat… Drenn sits across from you…"
+
+Vormoor has six places and **none of them is a tavern**. The engine never moved anybody —
+the player's own note was *"again no description of movement im just in the tavern"* — and
+the guard written that morning missed it completely, because it only read sentences that
+*say* the party is somewhere. This beat establishes the place by describing it.
+
+So the two halves are judged differently now, and they have to be:
+
+| | rule |
+|---|---|
+| a place that **exists** here | can be mentioned innocently — "you can see the guildhall from here" — and only a standing claim is wrong |
+| a place that is **not here** | cannot be mentioned innocently at all: naming it **is** the invention, which is what "THE PLACES HERE (the only ones that exist)" has meant in the brief since it was written |
+
+The repair is told **which** fault it is, because a rewrite told only "they are not there"
+relocates the beat to a second invention: *"There is no tavern here. It does not exist in
+this place and the player cannot be in it, sit in it, or be led toward it."*
+
+One trap worth recording: Drenn's own line in that beat mentions "the old **way-gate**". A
+hyphen is a word boundary, so a naive check reads a gate there and flags the sentence. The
+match refuses a place inside a longer word.
+
+Two of the guard's own tests were quietly testing the wrong thing and had to be rewritten:
+both used "the gate" as an example of an *innocent* mention, in a town that has no gate.
+
 ## What is still open after this
 
 Everything `rules/classfeatures.py` lists as inert, and each is blocked on a thing that
