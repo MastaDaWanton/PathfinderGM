@@ -5767,6 +5767,19 @@ class Engine:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to go in from. "
                         f"From here you can reach {', '.join(p.name for p in known)}.")
+        # You go in from where you are standing. `_parent_place` resolves a NAME against
+        # every place in the settlement, and this op then moves the party to whatever it
+        # found — so a venture was a way to cross the whole town and go underground in
+        # one step, walking nothing. Caught live 2026-09-22: "I walk out to the way in,
+        # at the edge of town" came back as a venture into sewers minted off the way in,
+        # and the party went from the green to under the gate without passing through
+        # either. Movement is walked (item 48); this was the one door left that was not.
+        here_now = self.here()
+        if parent.id != here_now.id:
+            return self._refuse(
+                intent, f"You are at {here_now.name}, not {parent.name}: the way down is "
+                        f"there, not here. Travel to {parent.name} first — that is this "
+                        f"turn's journey — and go in from it.")
         made = places_mod.venture_set(parent, kind)
         head = made[0]
         # The same place the second time: the id is seeded off the parent, so a return

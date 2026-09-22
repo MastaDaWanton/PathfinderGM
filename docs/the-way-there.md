@@ -151,6 +151,19 @@ produce five identical arrivals. It names what the passage owes the player and l
 sentences alone. It fires off the engine's own tell rather than a flag, so it cannot
 disagree with what happened.
 
+## The door that was not walked
+
+Found by driving the player's own save through `/api/say`, not by a test. "I walk out to
+the way in, at the edge of town" came back as a *venture* into sewers minted off the way
+in — and the party went from the green to under the gate without passing through either.
+`_op_venture` resolved its `parent` by NAME against every place in the settlement and then
+moved the party to whatever it found, so going into ground was a way to cross the whole
+town and go underground in one step, walking nothing. The narration described both,
+because the prose follows the engine and the engine really had moved them.
+
+You go in from where you are standing now. The refusal names the fix: travel there first,
+and that is the turn's journey.
+
 ## What is still open
 
 - The patrol band knows nothing about the warrant. A wanted character who meets the watch

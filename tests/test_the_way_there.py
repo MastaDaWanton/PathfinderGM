@@ -314,3 +314,35 @@ class TestWhatTheNarratorIsTold:
         msgs = prompts.call_prose_messages("BRIEF", [], "i look around",
                                            ["The merchant says nothing."])
         assert "ARRIVED SOMEWHERE" not in msgs[-1]["content"]
+
+
+class TestTheDoorThatWasNotWalked:
+    """`venture` moved the party to a parent it resolved by NAME against every place in
+    the settlement — so going into ground was a way to cross the whole town and go
+    underground in one step, walking nothing.
+
+    Caught live 2026-09-22, driving the player's own save: "I walk out to the way in, at
+    the edge of town" came back as a venture into sewers minted off the way in, and the
+    party went from the green to under the gate without passing through either. The
+    narration described both, because the prose follows the engine and the engine had
+    genuinely moved them.
+    """
+
+    def test_you_go_in_from_where_you_are_standing(self):
+        s, e, pc = _party()
+        here = e.here()
+        elsewhere = next(p for p in e.places()
+                         if p.id != here.id and not p.described_only)
+        raw = {"op": "venture", "actor": pc.ref, "because": "t",
+               "params": {"kind": "sewers", "parent": elsewhere.name}}
+        res = e.run(e.validate([raw], origin="author:test"))
+        tell = " ".join(o.tell for o in res.outcomes)
+        assert s.at == here.id, "the party went underground somewhere it was not standing"
+        assert elsewhere.name in tell and "first" in tell, tell
+
+    def test_the_way_down_where_you_stand_still_opens(self):
+        s, e, pc = _party()
+        raw = {"op": "venture", "actor": pc.ref, "because": "t",
+               "params": {"kind": "sewers", "parent": e.here().name}}
+        e.run(e.validate([raw], origin="author:test"))
+        assert s.at != "" and places_mod.terrain_of(s.at) == "underground"
