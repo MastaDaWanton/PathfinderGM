@@ -215,15 +215,21 @@ def test_a_flier_cannot_leave_by_the_ceiling_instead_of_the_stairs():
     assert "ceiling" in refused.lower(), refused
 
 
-def test_a_floor_cannot_be_reached_without_the_stairs_to_it():
+def test_a_floor_is_reached_by_its_stairs_and_never_without_them():
     """Found by reading what the app offered a live campaign, not by a failing test.
 
     Standing in the market, the party was offered "the top floor of the temple" and could
-    simply be there. The place graph inside a settlement is deliberately a clique — "a
-    settlement is not a maze" — and `_op_travel` has always resolved a destination by NAME
-    among the places within reach rather than by walking exits, which was harmless while
-    every exit list held everything. Storeys are the first edges in this graph that mean
-    something, so floors are checked against them and ground level is left alone.
+    simply be there — "having passed through neither the temple nor its stairs". The place
+    graph inside a settlement is deliberately a clique ("a settlement is not a maze") and
+    `_op_travel` resolved a destination by NAME among the places within reach, which was
+    harmless while every exit list held everything. Storeys are the first edges in this
+    graph that mean something.
+
+    2026-09-22: the answer is no longer a refusal, because there is now a route-finder and
+    it walks the stairs like any other exit. The defect this protects against is unchanged
+    — arriving upstairs without going through the building — and the tell is what proves
+    it did not happen: the way there ran through the house, and the house's own stairs are
+    the only edge that carries the floor.
     """
     s, e, pc = _at_the_inn()
     s.at = MARKET
@@ -233,9 +239,25 @@ def test_a_floor_cannot_be_reached_without_the_stairs_to_it():
            "params": {"place": UPSTAIRS}}
     res = e.run(e.validate([raw], origin="author:test"))
     tell = " ".join(o.tell for o in res.outcomes)
-    assert "not reached from here" in tell, tell
-    assert HOUSE in tell, "the refusal does not say which door the stairs are behind"
-    assert s.at == MARKET, "the party teleported up a staircase it never entered"
+    assert s.at.endswith("^1") and HOUSE.replace("the ", "") in s.at
+    assert HOUSE in tell, "the party went up a staircase it never entered"
+    assert "ran through" in tell, tell
+
+
+def test_a_floor_with_no_way_to_it_is_still_refused_by_name():
+    """The floor of a building the party cannot walk to at all. The clique makes this
+    rare inside a town and it is the case the refusal was written for — it still says
+    which door the stairs are behind."""
+    from rules import places as places_mod
+
+    s, e, pc = _at_the_inn()
+    s.at = MARKET
+    e.place_party(s.at)
+    orphan = places_mod.Place(id=MARKET + "-elsewhere^1", name="the loft",
+                              about="", terrain="urban", exits=())
+    real = e.places
+    e.places = lambda: tuple(real()) + (orphan,)
+    assert e._not_by_the_stairs(e.here(), orphan)
 
 
 def test_the_ground_floor_of_a_town_is_still_a_clique():

@@ -27,10 +27,18 @@ there. Prior art agrees from the other side — Inform's Misadventure and Safari
 ONE named room and derive the route; Angband and DCSS travel toward one destination with
 the path computed and the walk interruptible. In every tradition the traveller names a
 destination and the system finds the way. Here the model was handing over the way itself.
+
+2026-09-22: the engine now HAS that route-finder (`places.route`), so one travel walks the
+whole way and a crossing still costs one turn. The cap is unchanged and these tests are
+unchanged in what they protect — one journey a turn — with one addition the router brought
+with it: the walk can be stopped short of the place it was aimed at, because every hop is
+checked against the street's table (`rules/ontheway.py`). So "the party is at the first
+place NAMED" is now "the party is at the first place named, or somewhere on the way to
+it", and never at the last.
 """
 from __future__ import annotations
 
-from rules import journey
+from rules import journey, places
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -91,7 +99,8 @@ def test_a_plan_of_five_travels_moves_the_party_once():
     res = _travels(e, pc, *route)
     assert s.at != was, "the first leg still happens"
     first = [p for p in e.places() if p.name == route[0]][0]
-    assert s.at == first.id, "the party is at the FIRST place named, not the last"
+    on_the_way = (first.id,) + places.route(e.places(), was, first.id)
+    assert s.at in on_the_way, "the party is on the way to the FIRST place named"
     tells = [o.tell for o in res.outcomes]
     assert "already travelled this turn" in " ".join(tells[1:])
 
@@ -103,7 +112,7 @@ def test_the_refusal_names_where_the_party_now_stands():
     route = _elsewhere(e, 2)
     res = _travels(e, pc, *route)
     refused = " ".join(o.tell for o in res.outcomes[1:])
-    assert route[0] in refused, refused
+    assert e.here().name in refused, refused
     assert "One journey a turn" in refused
 
 
