@@ -132,6 +132,71 @@ FOUR_LEVEL = [
 PROGRESSIONS = {"full": FULL_CASTER, "spontaneous_full": SPONTANEOUS_FULL,
                 "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL}
 
+# --- what a spontaneous caster KNOWS, which is a different table from what they cast ---
+#
+# Item 42 of the 2026-09-19 play-test: `creation.SPELLS_KNOWN` gave a sorcerer `2` and a
+# bard `4` as ONE cap covering spell levels 0 and 1 together, so the forge offered 279
+# spells across both levels against two picks — and a player could spend both on cantrips
+# and begin play with **no first-level spell at all**. The book gives both classes four
+# cantrips AND two 1st-level spells: two separate allowances.
+#
+#   "A sorcerer begins play knowing four 0-level spells and two 1st-level spells of her
+#    choice." (d20pfsrd, Sorcerer)
+#   "A bard begins play knowing four 0-level spells and two 1st-level spells of the
+#    bard's choice." (d20pfsrd, Bard)
+#
+# Typed out for all twenty levels rather than derived, for exactly the reason the slot
+# tables above are: it is not regular, and CLAUDE.md's warning that a table like this is
+# "90% right from memory" is why both were fetched from the SRD rather than recalled.
+# Row index is class level - 1; column index is spell level.
+SORCERER_KNOWN = [
+    [4, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+    [5, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+    [5, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    [6, 3, 1, 0, 0, 0, 0, 0, 0, 0],
+    [6, 4, 2, 0, 0, 0, 0, 0, 0, 0],
+    [7, 4, 2, 1, 0, 0, 0, 0, 0, 0],
+    [7, 5, 3, 2, 0, 0, 0, 0, 0, 0],
+    [8, 5, 3, 2, 1, 0, 0, 0, 0, 0],
+    [8, 5, 4, 3, 2, 0, 0, 0, 0, 0],
+    [9, 5, 4, 3, 2, 1, 0, 0, 0, 0],
+    [9, 5, 5, 4, 3, 2, 0, 0, 0, 0],
+    [9, 5, 5, 4, 3, 2, 1, 0, 0, 0],
+    [9, 5, 5, 4, 4, 3, 2, 0, 0, 0],
+    [9, 5, 5, 4, 4, 3, 2, 1, 0, 0],
+    [9, 5, 5, 4, 4, 4, 3, 2, 0, 0],
+    [9, 5, 5, 4, 4, 4, 3, 2, 1, 0],
+    [9, 5, 5, 4, 4, 4, 3, 3, 2, 0],
+    [9, 5, 5, 4, 4, 4, 3, 3, 2, 1],
+    [9, 5, 5, 4, 4, 4, 3, 3, 3, 2],
+    [9, 5, 5, 4, 4, 4, 3, 3, 3, 3],
+]
+
+BARD_KNOWN = [
+    [4, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+    [5, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    [6, 4, 0, 0, 0, 0, 0, 0, 0, 0],
+    [6, 4, 2, 0, 0, 0, 0, 0, 0, 0],
+    [6, 4, 3, 0, 0, 0, 0, 0, 0, 0],
+    [6, 4, 4, 0, 0, 0, 0, 0, 0, 0],
+    [6, 5, 4, 2, 0, 0, 0, 0, 0, 0],
+    [6, 5, 4, 3, 0, 0, 0, 0, 0, 0],
+    [6, 5, 4, 4, 0, 0, 0, 0, 0, 0],
+    [6, 5, 5, 4, 2, 0, 0, 0, 0, 0],
+    [6, 6, 5, 4, 3, 0, 0, 0, 0, 0],
+    [6, 6, 5, 4, 4, 0, 0, 0, 0, 0],
+    [6, 6, 5, 5, 4, 2, 0, 0, 0, 0],
+    [6, 6, 6, 5, 4, 3, 0, 0, 0, 0],
+    [6, 6, 6, 5, 4, 4, 0, 0, 0, 0],
+    [6, 6, 6, 5, 5, 4, 2, 0, 0, 0],
+    [6, 6, 6, 6, 5, 4, 3, 0, 0, 0],
+    [6, 6, 6, 6, 5, 4, 4, 0, 0, 0],
+    [6, 6, 6, 6, 5, 5, 4, 0, 0, 0],
+    [6, 6, 6, 6, 6, 5, 5, 0, 0, 0],
+]
+
+KNOWN_TABLES = {"sorcerer": SORCERER_KNOWN, "bard": BARD_KNOWN}
+
 # Which classes cast, off what, and from whose list.
 #
 # `prepared` casters fix their spells in the morning and a slot holds one named spell;
@@ -142,6 +207,12 @@ CASTERS: dict[str, dict] = {
     "wizard": {
         "ability": "int", "kind": "prepared", "progression": "full",
         "list": "wizard", "prepare_from": "spellbook",
+        # "A wizard begins play with a spellbook containing all 0-level wizard spells."
+        # A GRANT, not a choice: these levels arrive whole and are not counted against
+        # any picking budget (`creation.allowance`). Declared here rather than as a
+        # literal in the forge, so a homebrew class that grants its own cantrips says so
+        # in the same place it says everything else about how it casts.
+        "grants_levels": [0],
         "note": "A wizard prepares from the book they carry; losing it is losing the spells.",
     },
     "cleric": {
@@ -160,12 +231,12 @@ CASTERS: dict[str, dict] = {
     # what keeps `spellbook` meaning one thing in the save file.
     "sorcerer": {
         "ability": "cha", "kind": "spontaneous", "progression": "spontaneous_full",
-        "list": "sorcerer", "prepare_from": "known",
+        "list": "sorcerer", "prepare_from": "known", "known": "sorcerer",
         "note": "A sorcerer knows few spells and casts any of them from any slot.",
     },
     "bard": {
         "ability": "cha", "kind": "spontaneous", "progression": "six_level",
-        "list": "bard", "prepare_from": "known",
+        "list": "bard", "prepare_from": "known", "known": "bard",
         "note": "Six spell levels, known rather than prepared, off Charisma.",
     },
     "paladin": {
@@ -272,6 +343,36 @@ def slots_for(actor) -> dict[int, int]:
             continue
         out[level] = base + bonus_slots(mod, level)
     return out
+
+
+def spells_known(actor) -> dict[int, int]:
+    """How many spells this caster KNOWS at each spell level, or {} for the rest.
+
+    A different table from `slots_for`, and that is the whole of item 42: what a
+    spontaneous caster knows and what they can cast in a day are two progressions, and
+    folding them into one number let a 1st-level sorcerer spend both picks on cantrips
+    and start the game unable to cast anything at all.
+
+    Read through `caster_data`, so a homebrew class that declares
+    `casting: {"known": "sorcerer"}` — or its own table under a name in `KNOWN_TABLES` —
+    gets it without an edit here, exactly as `progression` already works.
+
+    Prepared casters answer {}: a wizard's book and a cleric's list are not this
+    question. The wizard's own first-level allowance is a formula and lives with the
+    rest of character creation.
+    """
+    return known_row(caster_data(actor), int(getattr(actor, "level", 0) or 0))
+
+
+def known_row(data: dict, level: int) -> dict[int, int]:
+    """The same answer for a class that has no actor yet — the forge, before a character
+    exists. Takes the `casting` block rather than a class id so a homebrew class's own
+    declaration is honoured by both doors."""
+    table = KNOWN_TABLES.get(str((data or {}).get("known") or ""))
+    if not table or int(level or 0) < 1:
+        return {}
+    row = table[min(int(level), len(table)) - 1]
+    return {lvl: n for lvl, n in enumerate(row) if n > 0}
 
 
 def domain_slots_for(actor) -> dict[int, int]:

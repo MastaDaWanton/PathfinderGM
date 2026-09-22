@@ -2450,6 +2450,15 @@ class Actor:
         race_doc = self._race_doc()
         if race_doc:
             out.extend(str(t) for t in race_doc.get("tags") or ())
+        # What the class table grants, by level, as tags (`rules/classfeatures.py`).
+        # Item 39: `precision.dice_for` was the ONLY thing in the app that read a class
+        # table's `grants`, so uncanny dodge, evasion, bravery and the rest were printed
+        # on the Class tab and read by nothing. Live-read like the feats above, so a
+        # corrected class table corrects every character of it.
+        from . import classfeatures as _classfeatures
+
+        out.extend(_classfeatures.tags_for(str(self.char_class or ""),
+                                           int(getattr(self, "level", 1) or 1)))
         # A stat block's own tags — the watchman's `role.guard` — read live off the
         # template the creature came from, the way a feat's are read off its document.
         if self.from_template:

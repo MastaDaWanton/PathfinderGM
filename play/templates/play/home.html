@@ -305,6 +305,14 @@
             color: var(--dim); font-size: 13px; }
   .budget b { color: var(--accent); }
   .budget.over b { color: var(--alarm); }
+  /* An allowance with picks still in it. Dim rather than alarming: an unspent budget is
+     the normal state of a form being filled in, and the thing the player has to be able
+     to SEE is which of the two lines is the unspent one (item 42). */
+  .budget.short b { color: var(--dim); }
+  /* A spell whose own allowance is full. Still listed, and still legible: a list that
+     changes length as you pick is one a player cannot learn. */
+  .featrow.shut { opacity: .45; }
+  .featrow.shut b { color: var(--dim); }
   .skillgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
                gap: 2px 16px; }
   .skillgrid label { display: flex; gap: 7px; align-items: center; padding: 3px 0;
@@ -2066,13 +2074,21 @@ function spellPicker() {
       <p class="note">${granted.slice(0, 8).map(s => esc(s.name)).join(", ")}${
         granted.length > 8 ? `, and ${granted.length - 8} more` : ""}. The book opens with
         all of them; the number below is the first-level allowance alone.</p>` : ""}
-    <div class="budget ${chosen.length > got.cap ? "over" : ""}">
-      <span>level ${got.choose_level} ${esc(f.class)} spells to choose</span>
-      <b>${chosen.length} / ${got.cap}</b></div>
+    ${Object.entries(got.caps || {}).sort().map(([lvl, cap]) => {
+      // One line per allowance, which is item 42: a single "n / m" across levels 0 and
+      // 1 could not show that both picks had gone on cantrips and no first-level spell
+      // had been taken at all.
+      const n = (got.chosen_by_level || {})[lvl] || 0;
+      const what = lvl === "0" ? `${esc(f.class)} cantrips`
+                               : `level ${esc(lvl)} ${esc(f.class)} spells`;
+      return `<div class="budget ${n > cap ? "over" : ""}${n < cap ? " short" : ""}">
+        <span>${what} to choose</span><b>${n} / ${cap}</b></div>`;
+    }).join("")}
     <div style="margin:6px 0 10px">${chosen.map(id => {
       const s = (got.choose || []).find(x => x.id === id);
       return `<button class="quiet" data-crunspell="${esc(id)}" title="remove">
-        ${esc(s ? s.name : id)} ✕</button>`; }).join(" ")
+        ${esc(s ? s.name : id)}${s && s.level === 0 ? " (cantrip)" : ""} ✕</button>`;
+      }).join(" ")
       || `<span class="note">None chosen yet.</span>`}</div>
     <input type="text" id="spellsearch" data-cr="spellsearch" value="${esc(FORGE.spellq || "")}"
       placeholder="Narrow the ${(got.choose || []).length} spells — shield, missile, charm…"
@@ -2097,6 +2113,12 @@ function spellMatches() {
     counts[k] = (counts[k] || 0) + 1;
   }
   const kind = FORGE.spellSchool || "";
+  // A spell whose allowance is already full is still shown, greyed, rather than
+  // vanishing: a list that changes length as you pick is one a player cannot learn.
+  const full = {};
+  for (const [lvl, cap] of Object.entries(got.caps || {})) {
+    full[lvl] = ((got.chosen_by_level || {})[lvl] || 0) >= cap;
+  }
   const hits = pool.filter(s => (!kind || (s.school || "other") === kind)
     && (!q || s.name.toLowerCase().includes(q)));
   const page = Math.min(Math.max(1, FORGE.spellPage || 1),
@@ -2107,8 +2129,11 @@ function spellMatches() {
   return `${chips(counts, kind, "spell", pool.length)}
     <p class="note">${hits.length} to look through${kind ? ` in ${esc(kind)}` : ""}.</p>
     <div class="featlist">${shown.map(s => `
-    <button class="featrow" data-craddspell="${esc(s.id)}" title="${esc(s.text || "")}">
-      <b>${esc(s.name)}</b><span>${esc(s.school || "")}</span></button>`).join("")}</div>${
+    <button class="featrow${full[String(s.level)] ? " shut" : ""}"
+            data-craddspell="${esc(s.id)}" title="${esc(s.text || "")}">
+      <b>${esc(s.name)}</b><span>${esc(s.school || "")}${
+        s.level === 0 ? " · cantrip" : ` · level ${s.level}`}${
+        full[String(s.level)] ? " · allowance full" : ""}</span></button>`).join("")}</div>${
     pager(hits.length, page, "spell")}`;
 }
 

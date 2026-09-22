@@ -129,6 +129,14 @@ def flanking_with(scene, actor, defender, weapon=None) -> str:
     grid = getattr(scene, "grid", None)
     if grid is None:
         return ""
+    # Improved uncanny dodge: "the character can no longer be flanked". Asked before the
+    # geometry, because it is an answer about the defender rather than about the map —
+    # and asked HERE rather than in `precision.py` so that the +2 to hit goes with the
+    # sneak dice. The book denies the flank itself, not just its consequence.
+    from . import classfeatures
+
+    if classfeatures.cannot_be_flanked(defender, actor):
+        return ""
     here = scene.positions.get(actor.ref)
     there = scene.positions.get(defender.ref)
     if here is None or there is None or not _melee(weapon):

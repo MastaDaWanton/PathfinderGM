@@ -2520,7 +2520,43 @@ class Engine:
             f"{actor.name} fails the {SAVES[save]} save by {-margin}."
         ]
 
+        # Evasion, and the shape of the rule is why it is read HERE rather than at the
+        # top: it is about "an attack that normally deals half damage on a successful
+        # save", and the only thing that knows whether this was such an attack is the
+        # branch — a `save` whose success branch says `damage: "half"`. Nothing else in
+        # the app can tell a fireball from a flat Reflex save against a closing door.
+        #
+        #   evasion           "If she makes a successful Reflex saving throw against an
+        #                     attack that normally deals half damage on a successful
+        #                     save, she instead takes no damage."
+        #   improved evasion  "...she still takes no damage on a successful Reflex
+        #                     saving throw ... henceforth she takes only half damage on
+        #                     a failed save."
+        #
+        # Both clauses of the armour and helpless restrictions live in
+        # `classfeatures.evades`, so this reads one answer.
+        from . import classfeatures
+
+        evasion = classfeatures.evades(actor) if save == "ref" else ""
+        halves_on_success = str(
+            (intent.params.get("on_success") or {}).get("damage") or "").strip().lower() == "half"
         dmg = branch.get("damage")
+        if dmg and evasion and halves_on_success and verdict == "success":
+            # Nothing at all, and the tell says which rule did it so the narrator can
+            # write somebody diving clear rather than a number being skipped.
+            tell_bits.append(f"{actor.name} takes nothing: they got clear of it entirely.")
+            dmg = None
+        elif dmg and evasion == "improved" and halves_on_success and verdict == "failure":
+            base = str(dmg)
+            dmg_roll = self.dice.roll(base, label="damage", visibility="hidden")
+            hit = self._apply_damage(actor, max(0, dmg_roll.total // 2),
+                                     branch.get("type", "untyped"))
+            effects.append(hit)
+            tell_bits.append(
+                f"{actor.name} takes {hit['amount']} ({hit['type']}, halved — they got "
+                f"part of the way clear)"
+                + (f" — {hit['note']}." if hit["note"] else "."))
+            dmg = None
         if dmg:
             half = str(dmg).strip().lower() == "half"
             if half:
@@ -2674,15 +2710,7 @@ class Engine:
         if intent.params.get("manoeuvre"):
             return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
 
-        # Flat-footed: a defender who has not acted yet loses Dex to AC. Outside an
-        # encounter nobody has acted, so the first blow of a fight lands against a
-        # flat-footed target — which is the common ambush case and is worth getting
-        # right, since it is usually several points of AC.
-        flat_footed = (
-            defender.has_condition("flat-footed")
-            or not self.scene.initiative
-            or not self._has_acted(defender.ref)
-        )
+        flat_footed = self._flat_footed(defender)
         # A creature floundering in water is easier to hit and keeps no guard: the book
         # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
         # about the DEFENDER's footing, so they are read here where the defender is known
@@ -3028,11 +3056,7 @@ class Engine:
         if defender.has_condition("stunned"):
             mods.append(Modifier(4, "target is stunned"))
 
-        flat_footed = (
-            defender.has_condition("flat-footed")
-            or not self.scene.initiative
-            or not self._has_acted(defender.ref)
-        )
+        flat_footed = self._flat_footed(defender)
         cmd_mods = defender.cmd_modifiers(
             flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
         cmd = sum(x.value for x in cmd_mods)
@@ -7650,6 +7674,37 @@ class Engine:
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
             effects=[{"kind": "initiative", "order": order, "law": list(law_in or [])}],
             tell=f"Initiative: {names}.{law_note}", because=intent.because,
+        )
+
+    def _flat_footed(self, defender) -> bool:
+        """Whether this defender has their guard down, for AC and for CMD alike.
+
+        A defender who has not acted yet loses Dex to AC. Outside an encounter nobody has
+        acted, so the first blow of a fight lands against a flat-footed target — the
+        common ambush case, and usually several points of AC.
+
+        ONE reader, because it was two: the attack path and the manoeuvre path each
+        carried their own copy of this expression, so a rule corrected in one would have
+        gone on shipping from the other. That is CLAUDE.md's "when you fix a rule, grep
+        for every copy of it", and the copy was found by going looking for it rather than
+        by anything failing.
+
+        And it asks uncanny dodge (`rules/classfeatures.py`), which is the fix item 39
+        called urgent: sneak attack keys off this answer, and the rule that stops a
+        4th-level rogue ever being caught flat-footed was printed on their sheet and read
+        by nothing.
+        """
+        from . import classfeatures
+
+        if not classfeatures.caught_flat_footed(defender):
+            # A condition somebody laid on them still counts: uncanny dodge stops you
+            # being CAUGHT off guard, it does not make a `flat-footed` condition
+            # somebody else applied evaporate.
+            return defender.has_condition("flat-footed")
+        return (
+            defender.has_condition("flat-footed")
+            or not self.scene.initiative
+            or not self._has_acted(defender.ref)
         )
 
     def _sneak_for(self, actor, defender, weapon, *, flat_footed: bool) -> tuple[str, str]:
