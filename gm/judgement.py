@@ -2507,7 +2507,8 @@ def false_possession(player_text: str, scene) -> str:
             continue
         # Taken FROM somewhere — checked against what the capture ran over as well as
         # what follows it, since the phrase group may have swallowed the preposition.
-        rest = " ".join(m.group("thing").split()[len(words):]) + " "             + str(player_text)[m.end():]
+        rest = (" ".join(m.group("thing").split()[len(words):]) + " "
+                + str(player_text)[m.end():])
         if _FROM_SOMEWHERE.match(rest):
             continue        # an action the engine has doors for, not a claim
         if any(_vouched_for(w, vouched) for w in words):

@@ -164,12 +164,57 @@ because the prose follows the engine and the engine really had moved them.
 You go in from where you are standing now. The refusal names the fix: travel there first,
 and that is the turn's journey.
 
+## A second look, 2026-09-23
+
+The three commits above each landed on a green suite. Read again the next day, end to
+end and with the engine driven rather than the tests re-run, six things were wrong that
+no test had been written for. `tests/test_second_look_at_the_way_there.py` records each
+with the measurement that found it; the short form:
+
+- **Weather on a wild hop crashed `travel`.** The meeting block called `_bring_in`
+  unguarded, and a weather meeting is count zero with no template: `_bring_in` reads
+  zero as one and asked the bestiary for a creature named "", which raises. Journey and
+  venture guarded on the count; travel did not. The three bring-ins are now one
+  (`_meet_on_the_way`), and weather costs its hours on a hop as it does on a road.
+- **A creature met on the way into a venture was created, fought and abandoned in one
+  tell.** The venture rolled its own check at the parent, opened the fight there, and
+  then moved the party in through `travel`, which ended the fight and shed the creature:
+  "You are at the cave now. The fight is left behind. Left behind: wolf. The road is not
+  empty…" — and the inner travel rolled its own hour on top. The venture now hands the
+  hours it charges to the one hop that reaches the new ground (`_hours_underway`), so the
+  check is made once and whatever it meets is in the cave with you.
+- **The generated way in had no handle on the inside.** `_with_a_way_in` gave the
+  entrance an exit to the first authored place and nothing an exit back: all eight
+  Aurvantis villages given a way in had it unreachable from every other place. Adjacency
+  runs both ways now.
+- **The road memory counted weather as progress.** The walked figure was taken off the
+  hours after the storm's hours had gone into them — twelve walked on a ten-hour road.
+  And a hit on the last watch, which ends where the road does, stood the party outside
+  the town they had left; it is an arrival now, with the meeting at the far end. Walking
+  back inside the walls forgets the road, and so does setting out on a different one.
+- **The warrant was read against the plan's destination, not the walk's.** A suspected
+  character stopped one hop short of the gate was told the guards looked twice and let
+  them through. The block runs after the walk now.
+- **`_journeyed` named the far town on a journey that did not reach it**, so the refusal
+  a second move got contradicted the tell before it.
+
+And one listed as a gap that was not one: "`company` never asks where the person is".
+`Scene.actors` is who is in the party's place, so somebody elsewhere is not an actor the
+op can see and the existing refusal fires. The test that found this out is kept as the
+record, so the next reading does not add the dead check this one nearly did.
+
+The same review found the absent-place rule in `stands_elsewhere` flagging "the edge of
+the market", "the approach of the carter" and "the bridge of her nose" a day after it
+shipped (`tests/test_a_place_word_is_not_always_a_place.py`), the face backstop still
+appending after the hand-back whenever the person was introduced by speaking, and
+`has_state` re-reading every race file from disk on every call — 5 ms and 29 files,
+under every modifier funnel — which predates all of this and is cached now
+(`tests/test_race_documents_are_read_once.py`).
+
 ## What is still open
 
-- The patrol band knows nothing about the warrant. A wanted character who meets the watch
-  in the street is told the watch is looking at faces and nothing follows from it. The gate
-  is still the only place the law is enforced (`docs/wanted.md`).
-- The road's table has two bands. A washed-out ford, a toll, weather that costs a day —
-  all of those want mechanics that do not exist yet, and an authored line with no teeth
-  behind it is worse than no line.
-- Nothing rolls for a `venture` into ground gone into, which has its own hours.
+- The road's table has four bands and two of them — weather and the toll — are the
+  thinnest things in it. The toll is asked for and never enforced; weather is hours and
+  nothing else.
+- A meeting on the last watch arrives at the far town's way in. Whether it should be
+  at the way in or a mile short of it is a question of taste this file does not settle.

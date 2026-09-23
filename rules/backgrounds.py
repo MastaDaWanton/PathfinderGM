@@ -291,6 +291,7 @@ def acquaint(engine, actor, bound: list[dict]) -> str:
     "" when nobody qualified — a character with no local tie keeps the stranger they had,
     because being new somewhere is a legitimate way to start.
     """
+    from . import attitude as attitude_mod
     from .activeeffect import ActiveEffect
 
     if actor is None or not any(str(b.get("where") or "").strip() for b in bound or []):
@@ -309,5 +310,9 @@ def acquaint(engine, actor, bound: list[dict]) -> str:
     who.apply_effect(ActiveEffect(
         name="knows you", kind="bond", key=f"{source}:knows-you", source=source,
         origin=source, duration="until-dismissed", tags=(states.KNOWS_YOU,)))
-    engine.settle_attitude(who, "friendly", None, source)
+    # To the step at which somebody walks out of here with you — the same named step
+    # `_op_company` asks for, because being known here is what makes a companion
+    # possible on turn one. Named through the track's own constant: the commit that
+    # introduced `COMES_ALONG` so that no reader spells an attitude spelled one here.
+    engine.settle_attitude(who, attitude_mod.COMES_ALONG, None, source)
     return str(who.name or "")

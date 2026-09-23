@@ -39,8 +39,10 @@ plays.
 """
 from __future__ import annotations
 
+import copy
 import json
 import re
+import time
 from pathlib import Path
 
 from django.conf import settings
@@ -440,33 +442,124 @@ def _read_folder(folder: Path) -> dict[str, dict]:
     return out
 
 
+# --- read once, and again the moment a file changes ------------------------------------
+#
+# `Actor.has_state` asks `standing_tags`, which asks `_race_doc`, which asks `document`
+# — and `document` parsed every race file in both folders and normalised every entry on
+# EVERY call. Measured 2026-09-23: 5 ms and 29 files per `has_state`, and `has_state` sits
+# under every modifier funnel in the game, so a fight with six actors was spending most of
+# its turn re-reading the same seven JSON files.
+#
+# The refusal to cache was deliberate and half right. The trap CLAUDE.md records is a
+# DERIVED cache in the user's data directory that outlives the install and answers
+# "fresh" from a timestamp. This is neither: it lives in the process, it is keyed on every
+# file's name, size and modification time, and the key is recomputed on every read — so a
+# race edited on the bench is seen on the next call, and nothing survives a restart.
+# What it costs is one directory listing and a stat per file, which is what a change
+# check has to cost.
+#
+# Callers get COPIES. The registry is shared between every actor in the process, and a
+# caller that pokes at the dict it was handed — the bench does — must not be editing
+# everybody's race.
+_CACHE: dict[str, tuple[tuple, object]] = {}
+
+
+# How long one look at the SHIPPED folder is trusted for. Measured after the cache
+# landed: the stat calls behind the signature were 1.6 ms of a 2.1 ms `has_state` on
+# Windows, nearly all of them the seven shipped files, so a check made on every call
+# would have kept most of the cost it was there to remove. The shipped folder is inside
+# the install and does not change under a running app; half a second is shorter than
+# any gap a developer editing it would notice, and unlike the trap CLAUDE.md records,
+# the answer expires on its own.
+#
+# The homebrew folder is NOT under this. The bench writes it and reads it back in the
+# same breath — `import_from_world` drafts a race and the next line offers it — and so do
+# eight tests. It is a handful of files at most, and a scandir of it is cheap.
+_SIGNATURE_TTL = 0.5
+_SIGNATURES: dict[str, tuple[float, tuple]] = {}
+
+
+def _signature(folder: Path, ttl: float = 0.0) -> tuple:
+    """(name, mtime, size) of every race file in the folder — what "has it changed"
+    means. Compared whole, so a file added, removed, or touched all count."""
+    now = time.monotonic()
+    seen = _SIGNATURES.get(str(folder))
+    if ttl and seen is not None and now - seen[0] < ttl:
+        return seen[1]
+    out = []
+    if folder.exists():
+        for path in sorted(folder.glob("*.json")):
+            try:
+                st = path.stat()
+            except OSError:
+                continue
+            out.append((path.name, st.st_mtime_ns, st.st_size))
+    sig = tuple(out)
+    _SIGNATURES[str(folder)] = (now, sig)
+    return sig
+
+
+def _normalised(folder: Path, ttl: float = 0.0) -> dict[str, dict]:
+    sig = _signature(folder, ttl)
+    hit = _CACHE.get(str(folder))
+    if hit is not None and hit[0] == sig:
+        return hit[1]
+    fresh = {k: normalise(v) for k, v in _read_folder(folder).items()}
+    _CACHE[str(folder)] = (sig, fresh)
+    return fresh
+
+
 def shipped() -> dict[str, dict]:
-    """The seven, from content/races. Read per call: a few files, and a stale cache in
-    the frozen app is the trap CLAUDE.md names."""
-    return {k: normalise(v) for k, v in _read_folder(_content_dir()).items()}
+    """The seven, from content/races."""
+    return copy.deepcopy(_normalised(_content_dir(), _SIGNATURE_TTL))
 
 
 def authored() -> dict[str, dict]:
     """What the table wrote or imported, homebrew/races."""
-    return {k: normalise(v) for k, v in _read_folder(homebrew_dir()).items()}
+    return copy.deepcopy(_normalised(homebrew_dir()))
 
 
 def all_races() -> dict[str, dict]:
-    """Shipped, then yours over the top, field by field — the registry's merge rule."""
-    out = shipped()
-    for k, v in authored().items():
+    """Shipped, then yours over the top, field by field — the registry's merge rule.
+
+    The one door, and the SAME dict back until a file changes: `get` and `document`
+    read through it, so a test that stands a race in front of the sheet by replacing
+    this function is honoured (`test_natural_attacks` does). Read-only by contract —
+    take `get`, which copies, to have something to edit."""
+    key = (_signature(_content_dir(), _SIGNATURE_TTL), _signature(homebrew_dir()))
+    hit = _CACHE.get("registry")
+    if hit is not None and hit[0] == key:
+        return hit[1]
+    out = dict(_normalised(_content_dir(), _SIGNATURE_TTL))
+    for k, v in _normalised(homebrew_dir()).items():
         out[k] = normalise({**out.get(k, {}), **v})
+    _CACHE["registry"] = (key, out)
     return out
 
 
 def get(race_id: str) -> dict | None:
-    return all_races().get(slug(race_id))
+    doc = all_races().get(slug(race_id))
+    return copy.deepcopy(doc) if doc else None
 
 
 def document(race_id: str) -> dict | None:
-    """The document as the sheet reads it: normalised, with what it computes filled in."""
-    doc = get(race_id)
-    return derive(doc) if doc else None
+    """The document as the sheet reads it: normalised, with what it computes filled in.
+
+    Derived once per race per registry: `derive` is the other half of the cost the
+    header measures, and it answers the same until the registry is rebuilt. Keyed on
+    the registry dict's identity, which is stable until a file changes and fresh on
+    every call when a test has replaced `all_races`."""
+    registry = all_races()
+    rid = slug(race_id)
+    derived = _CACHE.get("derived")
+    if derived is None or derived[0] is not registry:
+        derived = (registry, {})
+        _CACHE["derived"] = derived
+    if rid not in derived[1]:
+        doc = registry.get(rid)
+        derived[1][rid] = derive(doc) if doc else None
+    got = derived[1][rid]
+    return copy.deepcopy(got) if got else None
 
 
 # --- shape -----------------------------------------------------------------------------

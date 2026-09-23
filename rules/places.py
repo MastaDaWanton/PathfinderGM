@@ -860,9 +860,16 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
       in a village has never once shut anything.
 
     A docks is a flourish; a way in is the difference between a town somebody can arrive
-    at and a town that is only ever an interior. The author's own places are untouched,
-    nothing is reordered, and a settlement that names any entrance — a gate, a bridge, a
-    crossing, the docks — gets nothing added.
+    at and a town that is only ever an interior. Nothing is reordered, and a settlement
+    that names any entrance — a gate, a bridge, a crossing, the docks — gets nothing
+    added.
+
+    The one authored thing that changes is the first place's exits, which gain the way
+    in. Without that the entrance was a door with no handle on the inside: measured
+    2026-09-23 on Aurvantis, all eight villages given a way in had it unreachable from
+    every other place — `route` found no path, `travel` there fell back to a single
+    unwalked step, and the brief's NEXT DOOR line never listed it. An exit is adjacency,
+    and adjacency runs both ways.
     """
     if not _settled(location, ""):
         return authored                      # a wild site is not arrived at by a road
@@ -877,12 +884,16 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
     # one, three tests in `test_authored_shapes.py` raised on `p.shape.width` — the
     # invariant is that a place in one of these tuples can always be laid out, and a
     # generated addition is no exception to it.
+    from dataclasses import replace
+
     from . import floorplan as floorplan_mod
 
-    return authored + (Place(
-        id=place_id, name=label, about=about, terrain=URBAN,
-        exits=tuple(p.id for p in authored[:1]), origin="generated",
-        shape=floorplan_mod.shape_for(place_id, URBAN)),)
+    way = Place(id=place_id, name=label, about=about, terrain=URBAN,
+                exits=tuple(p.id for p in authored[:1]), origin="generated",
+                shape=floorplan_mod.shape_for(place_id, URBAN))
+    first = replace(authored[0],
+                    exits=tuple(authored[0].exits or ()) + (place_id,))
+    return (first,) + tuple(authored[1:]) + (way,)
 
 
 def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:

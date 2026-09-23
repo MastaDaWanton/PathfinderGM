@@ -3655,8 +3655,33 @@ _ARRIVES_AT = r"\b(?:reach|reaches|reached|enter|enters|entered)\s+(?:the\s+)?"
 # pattern above would read "the drover reaches the gate" as the player standing there.
 _ABOUT_YOU = re.compile(r"\b(?:you|your party|the party)\b", re.I)
 
+# "the <place> of" is a genitive and not a place: "the edge of the market", "the bridge
+# of her nose", "the keep of the coin". Every measured false positive but one had this
+# shape, so it is the general guard.
+_GENITIVE = r"(?!\s+of\b)"
 
-def _place_words() -> set[str]:
+# The one it did not have: "the green cloak". A few place words are also ordinary
+# modifiers in English, and for those a compound is not a mention of the place — where
+# for every other word it is ("the tavern door" is a tavern; "the market square" is a
+# market). Named, with the compound each was measured in, because a list of exceptions
+# with no reason is a list that grows:
+#   green   "the green cloak"   tower   "the tower shield"   cave   "the cave bear"
+_ALSO_A_MODIFIER = frozenset({"green", "tower", "cave"})
+
+# What may follow one of THOSE for the rule to read it as a place: the end of the
+# clause, a possessive, a verb of being or standing, a preposition, a conjunction.
+# Grammar, not content — the same kind of list as `judgement._PHRASE_END`.
+_AFTER_A_PLACE = (
+    r"(?=['’]s\b|\s*(?:[,.;:!?—–-]|$)|\s+(?:is|was|are|were|has|had|have|and|or|but|"
+    r"nor|where|which|that|whose|itself|here|there|now|then|again|at|in|on|by|to|for|"
+    r"from|with|near|beyond|behind|ahead|across|opposite|before|after|until|toward|"
+    r"towards|into|inside|outside|through|past|as|so|when|while|lies|lay|stands|"
+    r"stood|sits|sat|looms|loomed|waits|waited|rises|rose|opens|opened|beckons|comes|"
+    r"came|falls|fell|smells|sounds|looks|looked|seems|seemed|being|below|above|"
+    r"beneath|under|over|up|down|out|off)\b)")
+
+
+def _place_words(wild: bool = True) -> set[str]:
     """Every place NAME this app can generate, lower-cased and without its article.
 
     The app's own closed vocabulary, read from `rules/places.py` rather than typed here,
@@ -3664,14 +3689,21 @@ def _place_words() -> set[str]:
     second list to drift. It is the vocabulary the NARRATOR was taught by the brief —
     "THE PLACES HERE (the only ones that exist): the well, the market, …" — which is why
     a phrase drawn from it is a claim about a place and "the stalls" is not.
+
+    `wild=False` leaves out the wild reaches — "the edge", "the approach", "the heart of
+    it", "the high ground". They are names only at a wild site, where the caller's own
+    list of places supplies them, and plain English everywhere else: measured 2026-09-23,
+    the day after the absent-place rule shipped, "You stand at the edge of the market"
+    was a weight-3 finding telling the rewrite there is no edge here.
     """
     from rules import places as places_mod
 
     words = set()
     for row in places_mod.SETTLEMENT_PLACES:
         words.add(str(row[0]).lower().removeprefix("the ").strip())
-    for label, _about in places_mod._WILD:
-        words.add(str(label).lower().removeprefix("the ").strip())
+    if wild:
+        for label, _about in places_mod._WILD:
+            words.add(str(label).lower().removeprefix("the ").strip())
     words.update(str(x).lower().removeprefix("the ").strip()
                  for x in places_mod.ENTRANCES)
     # And the ground a party GOES INTO, which is the other half of the vocabulary the
@@ -3723,7 +3755,7 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
     #
     # Longest first, so "the upper floor of the guildhall" is not read as "the guildhall"
     # and "the great square" is not read as "the square".
-    candidates = sorted(_place_words() | known, key=len, reverse=True)
+    candidates = sorted(_place_words(wild=False) | known, key=len, reverse=True)
     out: list[tuple[str, str]] = []
 
     # A place this settlement does NOT HAVE needs no "you are in it" to be an invention.
@@ -3739,13 +3771,27 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
     # standing claim is wrong. A place that is not here cannot be mentioned innocently
     # at all: naming it IS the invention, which is what "THE PLACES HERE (the only ones
     # that exist)" has meant in the brief since it was written.
-    absent = sorted((w for w in _place_words() if w not in known and w != standing),
+    #
+    # And the naming has to be OF THE PLACE. The first cut read any "the <word>", and
+    # the day after it shipped (2026-09-23) it was flagging "the edge of the market",
+    # "the approach of the carter", "the bridge of her nose", "the keep of the coin"
+    # and "you look for the way in" — a weight-3 finding each, and a repair call
+    # telling the rewrite "There is no edge here". So the wild reaches are out (see
+    # `_place_words`), "the way in" is out because it is how anybody asks where a door
+    # is, and "the <word> of" is a genitive (`_GENITIVE`). A word that is also an
+    # ordinary modifier — "the green cloak" — has to be followed by something a place
+    # is followed by (`_ALSO_A_MODIFIER`, `_AFTER_A_PLACE`). "The tavern is", "inside
+    # the tavern.", "the tavern's door" and "the tavern door" are all still claims.
+    # Precision over recall, as above.
+    absent = sorted((w for w in _place_words(wild=False)
+                     if w not in known and w != standing and w != "way in"),
                     key=len, reverse=True)
     for sentence in _sentences(unquoted(text)):
         for word in absent:
             # Not inside a longer word: "the old way-gate" is not a gate, and a hyphen
             # is a word boundary as far as `\b` is concerned.
-            if re.search(r"(?<![-\w])the\s+" + re.escape(word) + r"(?![-\w])",
+            after = _AFTER_A_PLACE if word in _ALSO_A_MODIFIER else _GENITIVE
+            if re.search(r"(?<![-\w])the\s+" + re.escape(word) + r"(?![-\w])" + after,
                          sentence, re.I):
                 out.append((f"the {word}", sentence.strip()))
                 break
@@ -3837,19 +3883,33 @@ def place_the_face(text: str, name: str, line: str) -> str:
     # measured on the reported beat, "Ashla Ironvale" matched Drenn Ironvale's sentence
     # on the shared surname, and the face landed before she had been mentioned at all.
     # It happened to read correctly in that beat and would not in the next one.
+    #
+    # Positions are taken on a copy of the text with the SPEECH BLANKED to spaces of the
+    # same length, never on `unquoted()`: that collapses each quotation to one space, so
+    # a sentence found in it could not be found in the original once the person had
+    # said anything — and people are named when they speak. The first cut looked the
+    # sentence up with `find`, missed, and fell back to appending after the hand-back:
+    # the reported fault, for exactly the beats where somebody is introduced by talking.
+    # A period inside the blanked speech is blanked with it, so the sentence a span
+    # covers is the one the reader sees.
+    blank = _blanked(text)
+    spans = list(_SENTENCE.finditer(blank))
     whole = " ".join(str(name or "").split())
     first_word = whole.split()[0] if whole.split() else ""
-    about: list[str] = []
+    found = None
     for handle in (whole, first_word):
         if len(handle) < 3:
             continue
         hit = re.compile(chr(92) + "b" + re.escape(handle) + chr(92) + "b", re.I)
-        about = [s for s in _SENTENCE.findall(unquoted(text)) if hit.search(s)]
-        if about:
+        found = next((m for m in spans if hit.search(m.group(0))), None)
+        if found is not None:
             break
-    if not about:
-        about = _sentences_about(unquoted(text), name)
-    if not about:
+    if found is None:
+        about = _sentences_about(blank, name)
+        if about:
+            want = about[0].strip()
+            found = next((m for m in spans if m.group(0).strip() == want), None)
+    if found is None:
         # Never named in the beat — the case the append was written for. Still not after
         # the hand-back: a face that comes after "What do you do?" is an afterthought
         # wherever the person was mentioned, which is the whole of the report.
@@ -3858,9 +3918,11 @@ def place_the_face(text: str, name: str, line: str) -> str:
             head = text[:closing.start()].rstrip()
             return (head + " " + line + " " + text[closing.start():].lstrip()).strip()
         return text.rstrip() + " " + line
-    first = about[0].strip()
-    at = text.find(first)
-    if at < 0:
-        return text.rstrip() + " " + line
-    end = at + len(first)
+    end = found.end()
     return (text[:end].rstrip() + " " + line + " " + text[end:].lstrip()).rstrip()
+
+
+def _blanked(text: str) -> str:
+    """The narration with every quotation replaced by spaces of the same length, so a
+    position in the result is the same position in the original."""
+    return _QUOTED.sub(lambda m: " " * len(m.group(0)), text or "")

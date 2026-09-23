@@ -133,6 +133,25 @@ class TestWhereItGoes:
     def test_an_empty_line_changes_nothing(self):
         assert narration.place_the_face(BEAT, "Ashla Ironvale", "") == BEAT
 
+    def test_somebody_introduced_by_speaking_is_still_described_where_they_speak(self):
+        """Found 2026-09-23 reviewing the fix above: the naming sentence was looked up in
+        `unquoted()` prose, which collapses each quotation to a space, and then searched
+        for in the ORIGINAL with `find` — which missed whenever the person had said
+        anything, and fell back to appending after the hand-back. People are named
+        when they speak, so this was the common case wearing the reported fault."""
+        beat = ('Drenn nods. Ashla Ironvale says "we should go" and looks at the road. '
+                'What do you do?')
+        out = narration.place_the_face(beat, "Ashla Ironvale",
+                                       narration.a_face_for("Ashla Ironvale", BODY))
+        assert "looks at the road. Ashla Ironvale is an Orc" in out
+        assert out.rstrip().endswith("What do you do?")
+
+    def test_a_full_stop_inside_speech_does_not_cut_the_sentence(self):
+        beat = ('Ashla Ironvale says "We go. Now." and turns away. What do you do?')
+        out = narration.place_the_face(beat, "Ashla Ironvale",
+                                       narration.a_face_for("Ashla Ironvale", BODY))
+        assert '"We go. Now." and turns away. Ashla Ironvale is an Orc' in out
+
 
 class TestTheViewUsesIt:
     def test_the_page_no_longer_capitalises_the_name_away(self):

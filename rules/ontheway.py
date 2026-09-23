@@ -195,7 +195,10 @@ def road(dice, hours: int, biome: str, level: int = 1) -> Meeting | None:
                                template=str(row.get("id") or ""),
                                count=1, after=w,
                                aggressive=row.get("creature_type") in AGGRESSIVE)
-            # Ground the book does not stock is quiet ground, and the watch passes.
+            # Ground the book does not stock still has a road through it, and the
+            # check HIT: what is met is other travellers, never a None that would
+            # make a hit say nothing (`test_ground_the_book_does_not_stock_is_not_
+            # silently_empty`). This comment said the opposite until 2026-09-23.
             kind = "travellers"
         if kind == "weather":
             # Nobody arrives. The road itself is the meeting, so no template is drawn
