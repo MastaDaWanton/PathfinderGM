@@ -143,8 +143,12 @@ def name_for(place, world, taken: set[str] | frozenset[str] = frozenset()) -> st
 # --- standing them up ------------------------------------------------------------------------
 
 def wanted_at(place) -> tuple[str, tuple[str, ...]]:
-    """(what they are called, the words the codex is asked for) for this place."""
-    return places_mod.keeper_of(getattr(place, "name", "") or "")
+    """(what they are called, the words the codex is asked for) for this place.
+
+    By its kind when it has one: "the Driftwood Reach" is a tavern, and a tavern has
+    somebody behind the bar whatever it is called."""
+    kind = str(getattr(place, "kind", "") or "").strip()
+    return places_mod.keeper_of(f"the {kind}" if kind else (getattr(place, "name", "") or ""))
 
 
 def label_of(place_id: str) -> str:

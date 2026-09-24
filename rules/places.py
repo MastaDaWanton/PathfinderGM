@@ -577,15 +577,22 @@ class Place:
     # "an alley runs east" without minting a node, and keeps the pressure that would
     # otherwise force the enumeration back open.
     described_only: bool = False
+    # What a founded place IS when its name is its own: "the Driftwood Reach" is a
+    # `tavern`. One of `KINDS`, the settlement table's own labels, so a founded place
+    # is shaped, staffed and judged as its kind rather than as an unknown word. Empty
+    # for a generated or authored place, whose name is its kind already.
+    kind: str = ""
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "about": self.about,
                 "terrain": self.terrain, "exits": list(self.exits),
                 "described_only": self.described_only, "within": self.within,
-                "parent": self.parent, "owner": self.owner, "origin": self.origin}
+                "parent": self.parent, "owner": self.owner, "origin": self.origin,
+                "kind": self.kind}
 
 
 def from_dict(d: dict) -> Place:
+    kind = str(d.get("kind") or "").strip().lower()
     return Place(
         id=str(d.get("id") or ""), name=str(d.get("name") or ""),
         about=str(d.get("about") or ""), terrain=str(d.get("terrain") or ""),
@@ -593,8 +600,21 @@ def from_dict(d: dict) -> Place:
         described_only=bool(d.get("described_only")),
         within=str(d.get("within") or ""),
         parent=str(d.get("parent") or ""), owner=str(d.get("owner") or ""),
-        origin=str(d.get("origin") or ""),
+        origin=str(d.get("origin") or ""), kind=kind,
+        # Shaped as its kind, not as its name: derived here, like every shape a stored
+        # place has, so a save carries the kind and never the floor plan.
+        shape=shape_of_kind(kind, str(d.get("terrain") or "")),
     )
+
+
+def shape_of_kind(kind: str, terrain: str = ""):
+    """The floor plan of a place of this kind, or None for a place with no kind."""
+    if not kind:
+        return None
+    from . import floorplan as floorplan_mod
+
+    ground = str(terrain or "").strip().lower() or URBAN
+    return floorplan_mod.shape_for(f"x{SEP}{ground}:{_slug('the ' + kind)}", ground)
 
 
 # --- the id, and what it says ------------------------------------------------------------
@@ -1299,9 +1319,12 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
                 exits.append(q.id)
         if p.parent and p.parent in out and p.parent not in exits:
             exits.append(p.parent)
-        result[pid] = Place(id=p.id, name=p.name, about=p.about, terrain=p.terrain,
-                            exits=tuple(exits), described_only=p.described_only,
-                            parent=p.parent, owner=p.owner, origin=p.origin)
+        # Only the exits change. This rebuilt the Place field by field and dropped
+        # every field it did not name — `shape`, `floors`, `within`, and then `kind`
+        # the day it was added (2026-09-23) — so a town with one founded place lost
+        # the authored floor plans of all its others, and a founded tavern lost what
+        # made it a tavern the moment it was read back.
+        result[pid] = _replace(p, exits=tuple(exits))
     return tuple(result.values())
 
 
@@ -1317,7 +1340,7 @@ def child_id(parent_id: str, label: str) -> str:
 
 
 def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
-         owner: str = "", origin: str = "found") -> Place:
+         owner: str = "", origin: str = "found", kind: str = "") -> Place:
     """A new place made from `parent`. The id carries the parent; the ground is the
     parent's unless given. `exits` are wired by `with_founded` at read time."""
     ground = str(terrain or "").strip().lower() or parent.terrain
@@ -1326,8 +1349,67 @@ def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
         # A different ground under the same roof: the sewers under a town. The head of
         # the id says so, so `scene.biome` parses right when the party is down there.
         pid = f"{region_key(location_of(parent.id), ground)}:{_slug(parent.name)}/{_slug(label)}"
+    kind = str(kind or "").strip().lower().removeprefix("the ")
     return Place(id=pid, name=label, about=about, terrain=ground, exits=(),
-                parent=parent.id, owner=owner, origin=origin)
+                parent=parent.id, owner=owner, origin=origin, kind=kind,
+                shape=shape_of_kind(kind, ground))
+
+
+# --- a place the page needs ---------------------------------------------------------------
+#
+# Ruled 2026-09-23, reversing the item-45 rule that a place the narrator names and the
+# settlement does not list is an invention to be rewritten away: *"i dont mind it creating
+# a dock so long as it remembers that it has a dock and remembers the tavern it put there
+# ... what matters is the places being remembered, interesting, and at least make sense to
+# be where they are."* The picture behind it was Vormoor's own opening — a village rising
+# from the water on coral and driftwood stilts — beside a beat that had walked the player
+# to the docks. A dock there makes sense. So a place is founded rather than refused, IF it
+# makes sense, and this is the "makes sense": the kind has to be one the settlement table
+# knows, the settlement has to be big enough for it, and a kind that needs water needs
+# water. LambdaMOO's `@dig` is still the shape — a room exists because something created
+# it — the page is now allowed to be that something, through the one door.
+KINDS: dict[str, tuple] = {row[0].removeprefix("the "): row for row in SETTLEMENT_PLACES}
+
+# Kinds that stand on water, and the words a settlement is described with when it has
+# some. The generator's own cues (`IMPLIED`) are read first; these are the words a
+# tide-and-stilt village gets described with instead — Vormoor's export says "coral and
+# driftwood stilt-housing" and "water rights", and neither is a harbour word.
+WATER_KINDS = frozenset({"docks", "bridge"})
+_WATER_WORDS = frozenset({"water", "tide", "tides", "tidal", "stilt", "stilts", "coast",
+                          "coastal", "sea", "shore", "lake", "estuary", "marsh", "canal",
+                          "canals", "reef", "lagoon"})
+
+
+def fits_here(kind: str, location) -> str:
+    """Why a place of this kind cannot be founded in this settlement, or "" when it can.
+
+    A reason in words, because it becomes a refusal the plan can repair and a note the
+    reviewer can quote. One step of scale is allowed upward — a village may have a
+    town's inn — and not two: a village with a cathedral is the kind of place the
+    ruling said had to "at least make sense".
+    """
+    kind = " ".join(str(kind or "").split()).lower().removeprefix("the ")
+    row = KINDS.get(kind)
+    if row is None:
+        return (f"There is no such kind of place as {kind!r}. The kinds are: "
+                f"{', '.join(sorted(KINDS))}.")
+    name = str(getattr(location, "name", "") or "this place")
+    if location is None or not _settled(location, ""):
+        return f"{name} is not a settlement, and a {kind} is a settlement's place."
+    scale = scale_of(location)
+    have = SCALES.index(scale) if scale in SCALES else 0
+    need = SCALES.index(row[2]) if row[2] in SCALES else 0
+    if need > have + 1:
+        return f"A {scale} does not have a {kind}: that is a {row[2]}'s place."
+    if kind in WATER_KINDS:
+        facts = getattr(location, "facts", None) or {}
+        prose = getattr(location, "prose", "") or ""
+        text = " ".join([*(str(v) for v in facts.values()), str(prose)]).lower()
+        words = set(_WORDS.findall(text))
+        cues = next((c for c, spot in IMPLIED if spot[0] == f"the {kind}"), ())
+        if not (any(_cue_fires(c, text, words) for c in cues) or words & _WATER_WORDS):
+            return f"Nothing the world says about {name} puts water under a {kind}."
+    return ""
 
 
 def venture_set(parent: Place, kind: str) -> list[Place]:

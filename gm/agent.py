@@ -1110,15 +1110,47 @@ class GMAgent:
         "nobody-reacts",
     })
 
+    def _found_from_the_page(self, text: str) -> list[str]:
+        """A place the page made, before the reviewer reads the draft.
+
+        Ruled 2026-09-23: a place the narration establishes that the settlement does
+        not list is FOUNDED, not rewritten away — "what matters is the places being
+        remembered, interesting, and at least make sense to be where they are". Every
+        such place the engine can make sense of is made (`Engine.found_from_prose`),
+        and the review that follows sees it on the list. One a beat: a paragraph that
+        names three new buildings is still a paragraph that has wandered. Returns the
+        repair-log notes.
+        """
+        here = self._here_name()
+        if not here or not text:
+            return []
+        places = self._place_names()
+        real = {narration_mod._bare(p).lower() for p in places}
+        for where, sentence in narration_mod.stands_elsewhere(text, here=here,
+                                                              places=places):
+            if narration_mod._bare(where).lower() in real:
+                continue        # a real place walked to without moving: still item 38
+            try:
+                note, why = self.engine.found_from_prose(
+                    where, sentence,
+                    standing=narration_mod.claims_standing(sentence, where))
+            except Exception as exc:      # noqa: BLE001 — a founding is never worth a turn
+                return [f"a place the page made could not be kept: {exc}"]
+            if note:
+                return [note]
+            if why:
+                return [f"a place the page made was refused: {why}"]
+        return []
+
     def polish(self, text: str, earlier: list[str] | None = None,
-               min_chars: int = 0, max_chars: int = 0, player_input: str = "",
-               scene_brief: str = "",
-               extra_known: set[str] | None = None,
-               deaths: list[dict] | None = None,
-               pull: dict | None = None,
-               claim: str = "",
-               blows: list[dict] | None = None,
-               fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
+                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
+                scene_brief: str = "",
+                extra_known: set[str] | None = None,
+                deaths: list[dict] | None = None,
+                pull: dict | None = None,
+                claim: str = "",
+                blows: list[dict] | None = None,
+                fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -1133,6 +1165,8 @@ class GMAgent:
         backstop (a backstop repairs for free what the retry would chase) and the scene
         is not a fight (a second ~10s call mid-combat costs more than the finding).
         """
+        # The page may have made a place; the review below must see it on the list.
+        made = self._found_from_the_page(text)
         known = self._known_names() | (extra_known or set())
 
         def _review(t: str):
@@ -1155,7 +1189,7 @@ class GMAgent:
 
         review = _review(text)
         if review.ok:
-            return text, [], []
+            return text, made, []
         # Less is not wrong. A draft short of the floor whose only faults are its
         # length and a missing hand-back (which has a free backstop) ships at its own
         # length when it carries events: measured in the brothel (2026-09-18), every
@@ -1166,7 +1200,7 @@ class GMAgent:
         cast_names = self._other_names()
         if kinds <= {"too-short", "no-hand-back"} and \
                 len(narration_mod.action_sentences(text, cast_names)) >= 3:
-            return text, [f"kept at its own length: {', '.join(sorted(kinds))} only, "
+            return text, made + [f"kept at its own length: {', '.join(sorted(kinds))} only, "
                           f"and the draft carries its events"], []
 
         def _rewrite(complaint: str, note: str):
@@ -1190,7 +1224,7 @@ class GMAgent:
             fixed, attempt = _rewrite(review.complaint(), "; ".join(review.as_log()))
             attempts.append(attempt)
         except Exception as exc:
-            return text, [f"polish failed: {exc}"], [
+            return text, made + [f"polish failed: {exc}"], [
                 Attempt("polish", 0.0, self.model, note=str(exc)[:120])]
 
         # Scored, not counted. "One echo finding before, one after" threw away a rewrite
@@ -1213,7 +1247,7 @@ class GMAgent:
                 and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6
 
         if _accept(fixed):
-            return fixed, review.as_log(), attempts
+            return fixed, made + review.as_log(), attempts
 
         heaviest = max(review.findings, key=lambda f: f.weight)
         if (heaviest.kind in self._NO_BACKSTOP
@@ -1224,12 +1258,12 @@ class GMAgent:
                     f"retry, {heaviest.kind} only")
                 attempts.append(attempt)
                 if _accept(second):
-                    return second, review.as_log(), attempts
+                    return second, made + review.as_log(), attempts
             except Exception as exc:
                 attempts.append(Attempt("polish", 0.0, self.model,
                                         note=f"retry failed: {str(exc)[:100]}"))
 
-        return text, [f"unrepaired: {', '.join(review.as_log())}"], attempts
+        return text, made + [f"unrepaired: {', '.join(review.as_log())}"], attempts
 
     def _pc_name(self) -> str:
         pc = self.engine.scene.pc()

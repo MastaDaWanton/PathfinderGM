@@ -3718,6 +3718,20 @@ def _bare(where: str) -> str:
     return " ".join(str(where or "").split()).removeprefix("the ").strip()
 
 
+def claims_standing(sentence: str, where: str) -> bool:
+    """Whether this sentence puts the PARTY in the place, as opposed to mentioning it.
+
+    "You step into the tavern" is a standing claim; "The tavern is a squat building" is
+    not. The distinction decides what founding a place from the page does with the
+    party (`Engine.found_from_prose`): the first moves them, the second does not.
+    """
+    word = _bare(where)
+    if not word or not _ABOUT_YOU.search(sentence or ""):
+        return False
+    return bool(re.search(_STANDS_IN + re.escape(word) + r"\b", sentence, re.I)
+                or re.search(_ARRIVES_AT + re.escape(word) + r"\b", sentence, re.I))
+
+
 def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, str]]:
     """Sentences that put the party in a place the engine does not have them in.
 

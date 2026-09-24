@@ -5679,32 +5679,119 @@ class Engine:
                 return self._refuse(
                     intent, f"Nobody here is called {owner_ref} to hold it. The people "
                             f"here are {', '.join(f'{a.name} ({r})' for r, a in self.scene.actors.items() if not a.is_pc) or 'nobody'}.")
-        place = places_mod.mint(parent, name, str(intent.params.get("about") or "")[:120],
+        # What it IS, when the plan says: a kind the settlement table knows, and one
+        # that makes sense here (`places.fits_here`). A name that is itself a kind —
+        # "the docks" — needs no `kind` to say so.
+        kind = str(intent.params.get("kind") or "").strip().lower().removeprefix("the ")
+        if not kind and name.lower().removeprefix("the ") in places_mod.KINDS:
+            kind = name.lower().removeprefix("the ")
+        if kind:
+            location = self.world.get(self.scene.location_id) if self.world else None
+            why = places_mod.fits_here(kind, location)
+            if why:
+                return self._refuse(intent, why)
+        place = self.found_place(name, parent,
+                                 about=str(intent.params.get("about") or ""),
+                                 owner=owner, origin="found", kind=kind)
+        pc = self.scene.pc()
+        held = f", held by {owner.name}" if owner is not None else ""
+        what = f" It is a {kind}." if kind else ""
+        return Outcome(
+            intent_id=intent.id, op="found",
+            effects=[{"kind": "place", "id": place.id, "name": name,
+                      "parent": parent.id, "owner": place.owner, "is": kind}],
+            tell=f"{name} is a place now, off {parent.name}{held}.{what} "
+                 f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
+            because=intent.because)
+
+    def found_place(self, name: str, parent, about: str = "", owner=None,
+                    origin: str = "found", kind: str = ""):
+        """Mint a place off `parent` and remember it: the one door a place is made by.
+
+        Pulled out of `_op_found` when the page was given leave to make places too
+        (`found_from_prose`), so the plan's door and the page's door mint the same
+        thing — the record in `scene.founded`, the holder's effect, the place's card.
+        """
+        from . import cards as cards_mod
+        from . import places as places_mod
+        from .activeeffect import ActiveEffect
+
+        place = places_mod.mint(parent, name, str(about or "")[:120],
                                 owner=owner.ref if owner is not None else "",
-                                origin="found")
+                                origin=origin, kind=kind)
         self.scene.founded.append(place.as_dict())
         slug = place.id.rsplit("/", 1)[-1]
         if owner is not None:
             owner.apply_effect(ActiveEffect(
                 name=f"holds {name}", kind="situation", key=f"holds:{place.id}",
-                source=f"place:{place.id}", origin="found",
+                source=f"place:{place.id}", origin=origin,
                 duration="until-dismissed", tags=(f"holds.place.{slug}",)))
-        pc = self.scene.pc()
+        made = ("Made by the page" if origin == "narrated"
+                else f"Founded from {parent.name}")
         cards_mod.open_card(self.scene, cards_mod.Card(
             id=f"place-{slug}", title=f"{name}, off {parent.name}",
-            facts=[f"Founded from {parent.name}"
-                   + (f", held by {owner.name}" if owner is not None else "") + "."],
+            facts=[made + (f", held by {owner.name}" if owner is not None else "") + "."
+                   + (f" {str(about).strip()}" if about and origin == "narrated" else "")],
             tags=("situation.place", cards_mod.TAG_PLAY),
             people=[owner.ref] if owner is not None else [], place=place.id,
-            clock_max=6, origin="found"), turn=0)
-        held = f", held by {owner.name}" if owner is not None else ""
-        return Outcome(
-            intent_id=intent.id, op="found",
-            effects=[{"kind": "place", "id": place.id, "name": name,
-                      "parent": parent.id, "owner": place.owner}],
-            tell=f"{name} is a place now, off {parent.name}{held}. "
-                 f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
-            because=intent.because)
+            clock_max=6, origin=origin), turn=0)
+        return place
+
+    def found_from_prose(self, where: str, sentence: str, *,
+                         standing: bool = False) -> tuple[str, str]:
+        """A place the narration established, made real — or the reason it cannot be.
+
+        Ruled 2026-09-23, reversing item 45's answer: *"i dont mind it creating a dock so
+        long as it remembers that it has a dock and remembers the tavern it put there."*
+        Until then a beat that walked the party into a tavern Vormoor did not list was
+        sent back to be rewritten; now the tavern is founded off the place the party is
+        standing in, described as the page described it, and the party is moved into it
+        when the sentence put them there. Next turn it is on the list, next door, on the
+        map, and somebody is behind its bar.
+
+        Returns `(note, why)`: a note for the repair log when a place was made, or the
+        reason none was — which is what the reviewer's rewrite then says. Only a kind
+        the settlement table knows is made, and only where it makes sense
+        (`places.fits_here`); "the counting house of the Vardic league" stays a
+        rewrite, because a place the app cannot shape or staff is not one it can
+        remember properly.
+        """
+        from . import places as places_mod
+
+        kind = " ".join(str(where or "").split()).lower().removeprefix("the ")
+        if kind not in places_mod.KINDS:
+            return "", ""
+        known = self.places()
+        if places_mod.find(known, f"the {kind}") is not None:
+            return "", ""
+        here = self.here()
+        location = self.world.get(self.scene.location_id) if self.world else None
+        why = places_mod.fits_here(kind, location)
+        if why:
+            return "", why
+        if len(places_mod.children_of(self.scene.founded, here.id)) >= places_mod.MOST_CHILDREN:
+            return "", (f"{here.name} already has as many places hanging off it as one "
+                        f"place can hold.")
+        about = " ".join(str(sentence or "").split())
+        place = self.found_place(f"the {kind}", here, about=about, origin="narrated",
+                                 kind=kind)
+        note = f"a place the page made: {place.name}, off {here.name}"
+        pc = self.scene.pc()
+        if standing and pc is not None and not self.scene.in_encounter:
+            # The sentence stood them in it, so they are in it: the map and the panel
+            # follow the page for once, because the page has just been made true.
+            # Whoever travels with them comes; it is one step through a door.
+            self.scene.move(pc.ref, place.id)
+            for ref, a in list(self.scene.people.items()):
+                if not a.is_pc and a.has_state(states.TRAVELS_WITH_YOU):
+                    self.scene.move(ref, place.id)
+            self.scene.grid = None
+            self.scene.positions.clear()
+            self.lay_the_ground()
+            self.scene.settle_relations()
+            self.staff_the_place()
+            note += ", and the party is in it"
+        return note, ""
 
     # --- the sea ------------------------------------------------------------------------
 

@@ -323,7 +323,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "say": (("words",), ("actor", "to", "quoted"), "hidden"),
     "quest": (("title", "objectives"), ("actor", "giver", "reward", "about"), "player"),
     "quest_step": (("quest", "objective"), ("actor", "note"), "player"),
-    "found": (("name",), ("actor", "owner", "parent", "about"), "player"),
+    # `kind` is what the place IS when its name is its own — "the Driftwood Reach" is
+    # a tavern — one of `places.KINDS`; the engine refuses a kind that makes no sense
+    # where it is asked for (a cathedral in a village, docks with no water).
+    "found": (("name",), ("actor", "owner", "parent", "about", "kind"), "player"),
     "venture": (("kind",), ("actor", "parent", "name"), "player"),
     # Somebody comes along, or stops coming. `who` is a ref that is here; `do` is
     # "join" or "leave", and defaults to join.

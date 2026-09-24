@@ -642,14 +642,24 @@ behind the market as their own — is founded, from where they stand, and is a p
 from then on: {"op": "found", "actor": "pc", "params": {"name": "Marra's house",
 "owner": "c2"}}. `owner` is the ref of the person it belongs to, if it is somebody's;
 `parent` names the place it hangs off when that is not where the party stands. Standing
-in it is a separate travel. Ground the player goes INTO that is not a named place yet —
+in it is a separate travel.
+The same door makes a place the scene needs and the list above does not have — a
+tavern, the docks, a shrine, a smithy. Found it with its KIND, then travel to it:
+{"op": "found", "actor": "pc", "params": {"name": "the Driftwood Reach", "kind":
+"tavern", "about": "a squat, leaning structure of lashed-together beams"}}. The engine
+keeps it for good, with that description, and refuses a kind that makes no sense here
+(a cathedral in a village, docks where there is no water). The kinds are the settlement
+words: market, smithy, mill, workshops, tannery, brewery, warehouses, guildhall, library,
+keep, gaol, barracks, shrine, temple, graveyard, inn, tavern, bathhouse, theatre, arena,
+gardens, well, granary, stables, docks, bridge, lane, back streets, warrens.
+Ground the player goes INTO that is not a named place yet —
 the sewers, a cellar, a crypt, the rooftops, an alley, a cave, a mine, ruins, a tower —
 is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
 market"}}. `parent` must be the place the party is STANDING in — you go down from where
 you are, and a venture is not a way to cross town. The engine makes the ground (the same
 ground next time), charges the hours the way there costs, moves the party in, and decides
-whether anything lives there — never invent a destination and never travel to a place the
-list above does not name.
+whether anything lives there. Never travel to a place the list above does not name: a
+place that is not on it is FOUNDED first, and travelled to after.
 Leaving the town ALTOGETHER, for another settlement, is a different thing from travel and
 takes days: {"op": "journey", "actor": "pc", "params": {"to": "Zhilgoroth"}}. Only
 settlements the world has a road to can be named, the engine works out how long the road

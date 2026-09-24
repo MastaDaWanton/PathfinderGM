@@ -218,3 +218,39 @@ under every modifier funnel — which predates all of this and is cached now
   nothing else.
 - A meeting on the last watch arrives at the far town's way in. Whether it should be
   at the way in or a mile short of it is a question of taste this file does not settle.
+
+## A place the page makes, 2026-09-23
+
+Item 45's answer — a place the narrator names that the settlement does not list is an
+invention, to be rewritten away — was reversed at the table the same day it shipped:
+
+> *"i dont mind it creating a dock so long as it remembers that it has a dock and
+> remembers the tavern it put there. It will need to be able to create places that is not
+> a problem what matters is the places being remembered, interesting, and at least make
+> sense to be where they are."*
+
+The picture behind it was Vormoor's own opening, a village rising from the water on coral
+and driftwood stilts, beside a beat that had walked the player out to docks the export
+never listed. A dock there makes sense. So the rule is now LambdaMOO's `@dig` with the
+page allowed to hold the shovel, through the one door (`Engine.found_place`):
+
+- **The plan can found a place with a kind** — `{"op": "found", "params": {"name": "the
+  Driftwood Reach", "kind": "tavern", "about": "…"}}` — and travel to it after. `kind` is
+  one of the settlement table's own labels (`places.KINDS`), so the place is shaped as a
+  tavern and staffed as one whatever it is called.
+- **A place the prose establishes is founded before the reviewer reads the draft**
+  (`GMAgent._found_from_the_page` → `Engine.found_from_prose`), off the place the party is
+  standing in, described as the page described it. If the sentence stood the party in it,
+  they are moved into it, the ground is laid and the counter staffed; next turn it is on
+  the list, next door, on the map, and the guard no longer flags it. One a beat.
+- **"Makes sense" is `places.fits_here`**: the kind has to be one the table knows, the
+  settlement has to be within one step of the scale the table gives it (a village may have
+  an inn; a village with a cathedral is refused), and a kind that stands on water needs
+  water in the settlement's own facts — the generator's harbour cues, or the words a
+  tide-and-stilt village is described with. What fails this is still a rewrite, and the
+  rewrite is told why.
+
+`tests/test_a_place_the_page_made.py` pins all three halves of the ruling: remembered,
+makes sense, and interesting in the one way the engine can measure (shaped and staffed as
+its kind).
+
