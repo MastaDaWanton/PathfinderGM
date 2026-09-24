@@ -248,7 +248,13 @@ def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> C
     card.touched = int(turn)
     if card.stage == "open":
         card.stage = "moving"
-    if tick:
+    # A quest's clock is its objectives and `objective_done` is its only ticker.
+    # Reported 2026-09-23 with the quest log on screen: "Find Drenn Ironvale's lost
+    # Power leaf" showed FINISHED with both objectives unticked and no award paid,
+    # the moment the player had accepted it. Its giver is one of the card's people,
+    # so every tell that named Drenn — two of them the engine's own "is already a
+    # quest on the table" refusals — ticked a clock whose maximum was two.
+    if tick and card.kind != "quest":
         card.clock = min(card.clock_max, card.clock + 1)
         if card.clock >= card.clock_max:
             card.stage = "resolved"
@@ -286,6 +292,14 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
     for o in outcomes or []:
         tell = " ".join(str(getattr(o, "tell", "") or "").split())
         if not tell or len(tell) < 12:
+            continue
+        # A refusal is nothing happening (`Engine._refuse`), and nothing happening is
+        # not a fact about a situation. The same quest above carried "Find Drenn
+        # Ironvale's lost Power leaf is already a quest on the table." as its first
+        # fact, and so did the scheme's secret card beside it. Read off the status,
+        # not off "no effects": an outcome that happened and changed nothing still
+        # said something true.
+        if str(getattr(o, "status", "") or "") == "refused":
             continue
         low = tell.lower()
         for card in cards:

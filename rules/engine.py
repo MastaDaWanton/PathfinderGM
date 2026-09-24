@@ -8464,7 +8464,11 @@ class Engine:
         this only gives the shape a name. The tell is a fact the narrator dresses, and
         the claims scrubber will not let prose claim the thing that did not happen.
         """
-        return Outcome(intent_id=intent.id, op=intent.op, effects=[],
+        # `status="refused"`, so a reader can tell a refusal from an outcome that
+        # happened and simply changed nothing. `cards.touch_from_outcomes` needs to:
+        # "X is already a quest on the table" landed on the quest's card as its first
+        # FACT (2026-09-23), and a test double with no effects is not a refusal.
+        return Outcome(intent_id=intent.id, op=intent.op, status="refused", effects=[],
                        tell=" ".join(str(why).split()), because=intent.because)
 
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:

@@ -139,10 +139,17 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
     if not body:
         return ""
     # One line always, the second sometimes, so two people of one people do not read
-    # as twins.
+    # as twins — which was the whole of the variety until 2026-09-23, and most peoples
+    # ship one body line, so six orcs in one scene were the same sentence six times.
+    # What is theirs and not their people's is `rules/faces.py`, seeded like the name.
     lines = [body[0]]
     if len(body) > 1 and int(hashlib.sha256(f"{ref}|face".encode()).hexdigest()[:2], 16) % 2:
         lines.append(body[1])
+    from . import faces as faces_mod
+
+    own = faces_mod.details_for(" ".join(lines), ref, location_id)
+    if own:
+        lines.append(own)
     named = str(race.get("name") or people_name(world, pid) or "").strip()
     return (f"{named}: " if named else "") + " ".join(lines)
 
