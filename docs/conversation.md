@@ -83,3 +83,33 @@ never the number. The number is the player's, on the panel.
 `gm/judgement.py` (`hailed_by`), `gm/prompts.py` (the IN CONVERSATION block and the op),
 `play/views.py` (`talk_act`, the `talk` and `busy` payload), `play/templates/play/table.html`
 (the panel). Tests: `tests/test_in_conversation.py`, `tests/test_regard.py`.
+
+## People entering a conversation, 2026-09-24
+
+> *"an elder was brought into the scene mid conversation with no description of him coming
+> into the lane he just spawned in. I dont mind people entering a scene but they need to
+> enter in the prose as well ... the conversation would not continue as if nothing
+> happened."*
+
+Measured on that beat: Korgath's third quoted line ran to 600 characters and carried
+"it's" and "don't". The narration stripper capped a quotation at 300 and the ledger's own
+blanker read an apostrophe inside a word as the line's close, so both took the rest of his
+speech for narration; "the elder-quarter" booked an "elder"; promotion stood him in the
+lane; and the face backstop wrote his face into the middle of Korgath's sentence. Four
+changes: quotations up to 1,200 characters, apostrophes inside a single-quoted line are
+part of it, a role word before a hyphen is half a compound, and promotion refuses a
+person the narration only speaks OF (`judgement.present_in_scene`, conservative: a beat
+that shows them acting or placed here, or gives nothing to judge against, is a yes). The
+brief's conversation block asks for the arrival of anyone new to be written first and the
+talk to react to it.
+
+And a people is described once (`rules/faces.py`): the world's one sentence for what an
+orc is prints for the first orc described in a campaign; every later orc is "an Orc" and
+their own details.
+
+## Casting outside combat, 2026-09-24
+
+`/api/cast` runs the same declared `cast` intent the combat bar sends, from a Cast button
+and a target picker on every row of the Spells tab, fight or no fight. Off-turn in a
+fight it is refused; nothing else is.
+

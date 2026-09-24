@@ -161,7 +161,13 @@ def narration_quotes_blanked(text: str) -> str:
     """
     line = str(text or "")
     out = list(line)
-    for m in re.finditer(r'"[^"]*"|“[^”]*”|(?<![A-Za-z])\'[^\']*\'(?![A-Za-z])', line):
+    # An apostrophe INSIDE a single-quoted line — "don't", "it's", "guild's" — is part
+    # of the line, not its close: a close is an apostrophe not followed by a letter.
+    # Without that, `'If it's the leaf you want …'` matched nothing at all, the whole
+    # line stood as narration, and "the elder-quarter" in it booked an elder who was
+    # then stood in the lane (2026-09-24).
+    for m in re.finditer(r'"[^"]*"|“[^”]*”|'
+                         r'(?<![A-Za-z])\'(?:[^\']|\'(?=[A-Za-z]))*\'(?![A-Za-z])', line):
         for i in range(m.start(), m.end()):
             if not out[i].isspace():
                 out[i] = " "
@@ -4205,9 +4211,12 @@ _ADJECTIVE_ENDINGS = r"[a-z]+(?:ed|en|ive|ous|ful|less|ish|ing)"
 _CAST_TAIL = (r"(\s+(?:in|with)\s+(?:a|an|the)\s+"
               r"(?:(?:" + _ADJECTIVE_ENDINGS + r"|" + "|".join(_TAIL_ADJECTIVES) + r")"
               r"\s+)?[a-z]+)?")
+# `(?!-)`: a role word with a hyphen after it is the first half of a compound and not
+# a person — "the elder-quarter" is a quarter, "the guard-house" a house. Measured
+# 2026-09-24: an "elder" was booked and stood in the lane out of exactly that phrase.
 _CAST_INTRO = re.compile(
     r"\b(?:a|an|one|the)\s+((?:[A-Za-z'-]+\s+){0,3}"
-    r"(?:" + _CAST_ROLES + r"))\b" + _CAST_TAIL, re.I)
+    r"(?:" + _CAST_ROLES + r"))\b(?!-)" + _CAST_TAIL, re.I)
 _ROLE_WORD = re.compile(r"\b(?:" + _CAST_ROLES + r")\b", re.I)
 
 
@@ -5430,6 +5439,15 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
         # `_CAST_GROUP` with its count and is promoted body by body.
         if counts.get(phrase, 1) == 1 and _plural_role(phrase):
             continue
+        # Only somebody the page put IN the scene. A person merely spoken of — "the
+        # elder-quarter, where the elder keeps the oldest things" — is a mention, and
+        # a mention stays on the ledger without a body. Reported 2026-09-24: an elder
+        # named in Korgath's speech about another quarter was stood in the lane, mid-
+        # conversation, with no sentence of him arriving, and the talk went on as if
+        # he had always been there. The ruling: people may enter, but they enter in
+        # the prose, and the conversation reacts.
+        if not present_in_scene(beat, phrase):
+            continue
         wanted.extend([phrase] * max(1, counts.get(phrase, 1)))
     # The people the beat put in front of the player go first and go over the cap:
     # the cap is about crowds, and the man who squared off is not the crowd.
@@ -5470,6 +5488,51 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
         refs.append(actor.ref)
     bind_thread(scene, refs, beat)
     return made
+
+
+# How a beat puts somebody in the room, outside speech: they do something here, or the
+# sentence places them in it. Grammar, not content — the same kind of list the phrase
+# splitter keeps — and it is deliberately the loose half of a two-part test, since
+# `narration.action_sentences` already answers "does this person act in this beat".
+_PLACES_THEM_HERE = re.compile(
+    r"\b(?:comes?|coming|walks?|walking|enters?|entering|approach(?:es|ing)?|steps?|"
+    r"stepping|appears?|appearing|arrives?|arriving|push(?:es|ing)?|joins?|joining|"
+    r"emerges?|emerging|stands?|standing|sits?|sitting|leans?|leaning|waits?|waiting|"
+    r"kneels?|kneeling|crouch(?:es|ing)?|hunched|slumped|sprawled|lies|lying|"
+    r"looks? up|turns? to|watch(?:es|ing)?|is here|are here|there (?:is|are|sits|"
+    r"stands)|beside you|before you|"
+    r"in front of you|behind you|next to you|across from you|at your (?:side|elbow|"
+    r"shoulder))\b", re.I)
+
+
+def present_in_scene(beat: str, phrase: str) -> bool:
+    """Whether the beat, outside speech, puts this person in the room.
+
+    Conservative on purpose, and the 2026-09-18 lesson is why: skipping a person the
+    page put in the room is how the man who swung first was never put on the board.
+    So the answer is YES unless the beat says otherwise — no beat to judge against is
+    a yes; a person who acts or is placed here is a yes; and the only no is a person
+    who appears in the narration solely as somebody spoken OF: "the elder of the far
+    quarter", "the guards at the gate are sharp", or not in the narration at all,
+    only in somebody's line."""
+    from .narration import _sentences, action_sentences, unquoted
+
+    if not beat or not phrase:
+        return True
+    plain = unquoted(beat)
+    head = _role_head(phrase)
+    if not head:
+        return True
+    about = [s for s in _sentences(plain) if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
+    if not about:
+        return False                 # only ever inside speech
+    if action_sentences(plain, [phrase]):
+        return True
+    if any(_PLACES_THEM_HERE.search(s) for s in about):
+        return True
+    elsewhere = re.compile(rf"\b{re.escape(head)}s?\s+(?:of|at|in|beyond|across|over in)"
+                           rf"\s+the\s+\w+", re.I)
+    return not all(elsewhere.search(s) for s in about)
 
 
 def _plural_role(phrase: str) -> bool:

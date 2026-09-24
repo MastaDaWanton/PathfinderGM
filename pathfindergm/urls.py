@@ -36,6 +36,7 @@ urlpatterns = [
     path("api/resurrect", views.resurrect, name="resurrect"),
     path("api/say", views.say, name="say"),
     path("api/talk", views.talk_act, name="talk_act"),
+    path("api/cast", views.cast_act, name="cast_act"),
     path("api/roll", views.roll, name="roll"),
     # The face on its own, so the die can land before the narrator has finished. See
     # `views.roll_face` — it decides a number and changes nothing.

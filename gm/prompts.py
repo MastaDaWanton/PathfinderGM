@@ -1068,7 +1068,15 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                             f" ASKED HIS NAME THIS TURN (fact): he will not give it — "
                             f"{actor.name} is {states.attitude_of(actor) or 'unfriendly'} "
                             f"towards the player. He deflects; he does not invent one.")
-            face = str(getattr(actor, "appearance", "") or "").strip()
+            # The people's line once per campaign: after the first orc has been
+            # described, the next one is "an Orc" and what is different about them
+            # (rules/faces.py). Otherwise the narrator repeats the world's one
+            # sentence for every orc it meets — reported 2026-09-24.
+            from rules import faces as _faces
+
+            face = _faces.for_the_page(
+                str(getattr(actor, "appearance", "") or "").strip(),
+                _faces.people_seen_before(actor, scene.people.values()))
             looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
             # Who this person is TO the player. Both are facts the engine holds and the
             # brief never carried, and without them the narrator writes every non-player
@@ -1101,7 +1109,11 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 + ". They answer what the player says. Nobody else here joins in "
                   "unless the player turns to them. The player is still in this "
                   "conversation until they take their leave or walk away — do not end "
-                  "it for them, and do not have anyone in it ask the player to roll.")
+                  "it for them, and do not have anyone in it ask the player to roll. "
+                  "If somebody new comes into the scene, write their ARRIVAL first — "
+                  "who looks up, what they see coming, what the newcomer looks like — "
+                  "and let the conversation react to it; nobody appears mid-sentence "
+                  "as if they had always been there.")
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,

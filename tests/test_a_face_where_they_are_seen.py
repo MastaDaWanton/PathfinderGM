@@ -159,5 +159,7 @@ class TestTheViewUsesIt:
 
         views = Path("play/views.py").read_text(encoding="utf-8")
         assert "definite(who.name).capitalize()" not in views
-        assert "narration_mod.a_face_for(who.name, who.appearance)" in views
+        # `shown` since 2026-09-24: the people's line once per campaign, then the
+        # person's own details (`rules/faces.py`).
+        assert "narration_mod.a_face_for(who.name, shown)" in views
         assert "narration_mod.place_the_face(" in views

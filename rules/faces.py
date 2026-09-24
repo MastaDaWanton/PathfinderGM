@@ -29,6 +29,7 @@ people's name.
 from __future__ import annotations
 
 import hashlib
+import re
 
 # Years. Not a number — the narrator is never handed one — but where in a life.
 YEARS = (
@@ -129,3 +130,53 @@ def details_for(body: str, ref: str, location_id: str | None = None) -> str:
                [bits[0], bits[2], bits[3]]
     said = "; ".join(bits)
     return said[0].upper() + said[1:] + "."
+
+
+# --- a people described once -----------------------------------------------------------
+#
+# Reported 2026-09-24, on the second orc of the session: *"the description is the same
+# description for every other orc ever introduced."* The people's own line — the
+# world's one sentence for what an orc is — was printed in full for every orc, before the
+# details that are the person's own. A table GM says what an orc looks like once; after
+# that, "another orc" and what is different about this one. So the people's line is
+# shown for the FIRST person of that people described in a campaign, and every later one
+# gets the people's name and their own details only.
+
+def people_of(appearance: str) -> str:
+    """"Orc" for "Orc: Powerfully built… Old enough…", "" for a resident's free text."""
+    people, sep, _ = str(appearance or "").partition(": ")
+    return people.strip() if sep and 1 <= len(people.split()) <= 3 else ""
+
+
+def own_details(appearance: str) -> str:
+    """The person's own sentence — the last one — without the people's line."""
+    _, sep, body = str(appearance or "").partition(": ")
+    if not sep:
+        return ""
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", body.strip()) if p.strip()]
+    return parts[-1] if len(parts) > 1 else ""
+
+
+def for_the_page(appearance: str, people_seen: bool) -> str:
+    """What to print for this person: the whole line the first time their people is
+    described, the people's name and their own details after that."""
+    if not people_seen:
+        return str(appearance or "")
+    people, details = people_of(appearance), own_details(appearance)
+    if not people or not details:
+        return str(appearance or "")
+    return f"{people}: {details}"
+
+
+def people_seen_before(actor, everyone) -> bool:
+    """Whether another person of this people has already been described here."""
+    mine = people_of(getattr(actor, "appearance", ""))
+    if not mine:
+        return False
+    for other in everyone:
+        if other is actor or getattr(other, "is_pc", False):
+            continue
+        if getattr(other, "described", False) and \
+                people_of(getattr(other, "appearance", "")) == mine:
+            return True
+    return False

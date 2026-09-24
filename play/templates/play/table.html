@@ -2198,6 +2198,22 @@ function renderTalk(s) {
 }
 
 document.addEventListener("click", async e => {
+  const cast = e.target.closest(".castbtn");
+  if (cast) {
+    const row = cast.closest(".prep");
+    const pick = row && row.querySelector(".casttarget");
+    const at = pick ? pick.value : "";
+    const who = pick && pick.selectedIndex > 1 ? pick.options[pick.selectedIndex].text : "";
+    const label = `I cast ${cast.dataset.name}` + (at === "self" ? " on myself" :
+                  who ? ` at ${who}` : "");
+    cast.disabled = true;
+    try {
+      render(await post("/api/cast", { spell: cast.dataset.spell, at, label }));
+      const sheet = $("#sheetpanel");
+      if (sheet) { sheet.classList.remove("on"); sheet.setAttribute("aria-hidden", "true"); }
+    } catch (err) { flash(err.message || String(err)); cast.disabled = false; }
+    return;
+  }
   const ignore = e.target.closest("[data-ignore]");
   if (ignore) {
     try { render(await post("/api/talk", { do: "ignore", who: ignore.dataset.ignore })); }
@@ -3802,6 +3818,18 @@ function tabSpells(s) {
             <span class="prepcount${k.prepared ? " has" : ""}">${k.prepared}</span>
             <button class="prepbtn" data-spell="${esc(k.id)}" data-action="prepare"
                     title="Prepare">+</button>
+            <!-- Cast from here, fight or no fight (2026-09-24). The combat bar was the
+                 only door and it is hidden outside an encounter, so a wizard in a
+                 tavern had no way to cast light. The target is a person in the room,
+                 yourself, or nobody, and the intent goes to the engine as declared. -->
+            <select class="casttarget" data-spell="${esc(k.id)}" title="Target">
+              <option value="">nobody</option>
+              <option value="self">yourself</option>
+              ${((STATE && STATE.scene && STATE.scene.actors) || []).filter(a => !a.is_pc).map(a =>
+                `<option value="${esc(a.ref)}">${esc(a.name)}</option>`).join("")}
+            </select>
+            <button class="prepbtn castbtn" data-spell="${esc(k.id)}"
+                    data-name="${esc(k.name)}" title="Cast ${esc(k.name)}">Cast</button>
           </div>`}
       </div>`).join("")}`).join("");
 

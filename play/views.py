@@ -128,6 +128,55 @@ def talk_act(request):
     return JsonResponse(_state(c))
 
 
+@require_POST
+def cast_act(request):
+    """A spell cast from the Spells tab, fight or no fight.
+
+    Reported 2026-09-24: *"I have no way of casting spells outside of combat."* The
+    `cast` op never needed a fight — it spends the slot, sets the DC, runs the spell's
+    effects — but the only button that offered one was the combat bar, hidden outside an
+    encounter. This is the same declared intent by another door: the spell by id, the
+    target by ref ("self" for the caster, nothing for a spell with no target), through
+    `validate` and `run` and then the narrator, exactly as the combat panel does. In a
+    fight it is refused off-turn, as the combat panel would be.
+    """
+    body = read_body(request)
+    c = campaign_mod.current()
+    scene = c.scene
+    pc = scene.pc()
+    refusal = _cannot_act(pc, "cast")
+    if refusal:
+        return refusal
+    if scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    if scene.in_encounter and scene.current_ref() != pc.ref:
+        return JsonResponse({"error": "It is not your turn."}, status=409)
+    spell = str(body.get("spell") or "").strip()
+    if not spell:
+        return JsonResponse({"error": "Which spell?"}, status=400)
+    at = str(body.get("at") or "").strip()
+    params = {"spell": spell}
+    if at == "self":
+        params["at"] = pc.ref
+    elif at:
+        params["at"] = at
+    label = str(body.get("label") or f"I cast {spell}").strip()
+    engine = c.engine()
+    agent = GMAgent(c.world, engine)
+    _arm_cards(agent, c)
+    c.transcript.append({"who": "player", "text": label})
+    undo = scene.snapshot()
+    try:
+        resolution = engine.run(engine.validate(
+            [{"op": "cast", "actor": pc.ref, "because": "the spells tab",
+              "params": params}]))
+    except (IntentError, ValueError, KeyError) as exc:
+        scene.restore(undo)
+        c.transcript.pop()
+        return JsonResponse({"error": str(exc)}, status=400)
+    return _finish(c, agent, resolution, "", label, plan=None, hand_over=True)
+
+
 def _grid_state(scene) -> dict | None:
     """The map, plus where the PC could actually go — or None when there is no map.
 
@@ -1992,8 +2041,15 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 who = c.scene.actors.get(ref)
                 if who is None or not getattr(who, "appearance", ""):
                     continue
-                line = narration_mod.a_face_for(who.name, who.appearance)
-                if not line or who.appearance in text:
+                # The people's line once per campaign; after that this person's own
+                # details (rules/faces.py, "a people described once").
+                from rules import faces as faces_mod
+
+                shown = faces_mod.for_the_page(
+                    who.appearance,
+                    faces_mod.people_seen_before(who, c.scene.people.values()))
+                line = narration_mod.a_face_for(who.name, shown)
+                if not line or who.appearance in text or shown in text:
                     # Their people's line is already on the page. Not marked described —
                     # it may have been said of somebody else — but not said twice either.
                     continue

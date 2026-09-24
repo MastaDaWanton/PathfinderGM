@@ -36,9 +36,14 @@ _WORD = re.compile(r"[a-z']+")
 # wrong boundaries and "between you and me" leaked into narration — where the
 # first-person detector read it as the narrator having a body. An opener must follow
 # whitespace (or start); a closer must precede whitespace, punctuation or the end.
+# Up to 1,200 characters a quotation. It was 300, and measured 2026-09-24 on a beat
+# whose third quoted line ran to 600: the stripper left it standing as narration, the
+# cast ledger booked an "elder" out of Korgath's "the elder-quarter", promotion stood
+# him in the lane, and the face backstop wrote his face into the middle of Korgath's
+# own sentence. A long speech is still speech.
 _QUOTED = re.compile(
-    r"[\"“”‘][^\"“”]{0,300}?[\"“”]"
-    r"|(?:^|(?<=\s))'[^\n]{2,300}?'(?=$|[\s.,!?;:)\]])")
+    r"[\"“”‘][^\"“”]{0,1200}?[\"“”]"
+    r"|(?:^|(?<=\s))'[^\n]{2,1200}?'(?=$|[\s.,!?;:)\]])")
 _SENTENCE = re.compile(r"[^.!?]+[.!?]?")
 
 # Capitalised words that are not names.
