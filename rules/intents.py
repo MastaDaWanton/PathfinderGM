@@ -338,6 +338,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # is the wrong shape: it asks the model to remember, every single move, who the
     # party is, which is exactly the thing a language model does not do.
     "company": (("who",), ("actor", "do", "note"), "player"),
+    # The player ends a conversation, or refuses one. `who` is a ref, and without it
+    # the whole conversation ends; `do` is "leave" (take your leave) or "ignore" (do
+    # not answer somebody who spoke to you). A conversation ends this way, by walking
+    # out of the place, or by the other party leaving, falling or drawing — never by
+    # silence (2026-09-24).
+    "leave_talk": ((), ("actor", "who", "do"), "player"),
     # Two ships and the distance between them. `do` is close / sheer off / ram / grapple
     # / board, and `with` names whoever goes across — the same word travel uses for the
     # people who come along, because a boarding party is a party.

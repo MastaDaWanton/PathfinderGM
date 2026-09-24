@@ -54,7 +54,41 @@ DEFAULT = "indifferent"
 # Core Rulebook, Diplomacy: the DC to influence a creature's attitude, by the attitude it
 # starts at, before its Charisma modifier.
 INFLUENCE_DC = {"hostile": 25, "unfriendly": 20, "indifferent": 15,
-                "friendly": 10, "helpful": 0}
+                "friendly": 10, "helpful": 0, "devoted": 0}
+
+# Where a check can take somebody: helpful, the top of the book's track. The step above
+# it is not a check's to give (`moved` clamps here), it is regard's — see below.
+TOP_BY_CHECK = "helpful"
+
+# --- regard: how somebody stands towards the player over time ---------------------------
+#
+# Asked for 2026-09-24: *"their attitude toward me quantified ... I want to be able to
+# talk with them and increase that attitude until they Idolize/Love me."* The book's track
+# is a state a check or a spell sets for hours; it has no memory. Regard is the memory —
+# a score from 0 to 100 kept on the person as one effect (`set_regard`), which the track
+# falls back to when nothing is holding a step, and which the panel shows as a number.
+#
+# The shape is Stardew Valley's hearts and Persona's social ranks: a small gain for
+# talking, capped per day so a conversation cannot be farmed in an afternoon; a larger
+# gain or loss when a check actually lands; a gift counts. Bands are wide enough that a
+# step is a relationship and not a good roll, and `devoted` — the top — takes weeks of
+# being somebody's friend, which is what "idolize" ought to cost.
+REGARD_MAX = 100
+# (floor, step): the score at which each step begins. Indifferent starts at 35, so a
+# stranger — nobody has said anything and no regard is held — reads as indifferent.
+BANDS = ((0, "hostile"), (15, "unfriendly"), (35, "indifferent"),
+         (55, "friendly"), (75, "helpful"), (90, "devoted"))
+REGARD_PER_TALK = 2         # an exchange in conversation
+TALKS_A_DAY = 3             # ...and no more than this many count in a day
+REGARD_PER_STEP = 8         # a Diplomacy success, per step it moved them
+REGARD_LOST_ON_FAILURE = 5  # a Diplomacy failure by 5 or more
+REGARD_RESENTMENT = 5       # an Intimidate that worked: they are cowed, and they remember
+REGARD_GIFT = 3             # something handed over freely
+# The effect that holds the score: one key, one source, replaced whole on every change
+# so the one applicator is the only writer and `has_state(states.REGARD)` is the
+# question "has anybody's opinion of the player been recorded at all".
+REGARD_KEY = "regard"
+REGARD_SOURCE = "regard"
 
 # "A creature's attitude cannot be shifted more than two steps up in this way."
 MOST_STEPS_UP = 2
@@ -94,8 +128,104 @@ HOSTILE = TRACK[0]
 
 
 def of(actor, default: str = DEFAULT) -> str:
-    """Where this creature sits on the track. Asked through the vocabulary, always."""
-    return states.attitude_of(actor, default=default)
+    """Where this creature sits on the track. Asked through the vocabulary, always.
+
+    A step a check or a spell is holding answers first; with none held, the standing
+    relationship answers (`regard_of`), so a shift that has run out leaves somebody
+    where their history with the player puts them rather than back at indifferent."""
+    held = states.attitude_of(actor, default="")
+    if held:
+        return held
+    if actor is not None and actor.has_state(states.REGARD):
+        return band_of(regard_of(actor))
+    return default
+
+
+def _regard_effect(actor):
+    for e in getattr(actor, "effects", None) or ():
+        if getattr(e, "key", "") == REGARD_KEY and states.REGARD in (getattr(e, "tags", ()) or ()):
+            return e
+    return None
+
+
+def regard_of(actor) -> int:
+    """The score, 0 to 100. A person nobody has recorded an opinion for sits at the
+    floor of indifferent, which is where a stranger starts."""
+    e = _regard_effect(actor)
+    if e is None:
+        return floor_of(DEFAULT)
+    return max(0, min(REGARD_MAX, int(getattr(e, "amount", 0) or 0)))
+
+
+def band_of(regard: int) -> str:
+    """The step a score sits in."""
+    step = BANDS[0][1]
+    for floor, name in BANDS:
+        if int(regard) >= floor:
+            step = name
+    return step
+
+
+def floor_of(step: str) -> int:
+    """Where a step begins on the score."""
+    return next((floor for floor, name in BANDS if name == str(step or "").lower()),
+                BANDS[0][0])
+
+
+def set_regard(actor, value: int, source: str, *, payload: dict | None = None):
+    """The one writer. Replaces the effect whole, keeping the day-count payload unless
+    a new one is given, and returns the effect."""
+    from .activeeffect import ActiveEffect
+
+    old = _regard_effect(actor)
+    kept = dict(getattr(old, "payload", None) or {}) if old is not None else {}
+    if payload is not None:
+        kept.update(payload)
+    actor.remove_effects(source=REGARD_SOURCE)
+    eff = ActiveEffect(name="regard", kind="bond", key=REGARD_KEY, source=REGARD_SOURCE,
+                       origin=str(source or REGARD_SOURCE), duration="until-dismissed",
+                       amount=max(0, min(REGARD_MAX, int(value))),
+                       tags=(states.REGARD,), payload=kept)
+    actor.apply_effect(eff)
+    return eff
+
+
+def nudge_regard(actor, delta: int, source: str) -> tuple[int, int]:
+    """Move the score by `delta`; returns (before, after)."""
+    before = regard_of(actor)
+    after = max(0, min(REGARD_MAX, before + int(delta)))
+    if after != before or _regard_effect(actor) is None:
+        set_regard(actor, after, source)
+    return before, after
+
+
+def talked_today(actor, day: int) -> bool:
+    """Record one exchange today; True if it still counts towards regard.
+
+    The cap is per person per day — three exchanges — so a conversation is worth
+    having and cannot be farmed by saying "hello" thirty times."""
+    e = _regard_effect(actor)
+    payload = dict(getattr(e, "payload", None) or {}) if e is not None else {}
+    if int(payload.get("day", -1)) != int(day):
+        payload = {"day": int(day), "talks": 0}
+    if int(payload.get("talks", 0)) >= TALKS_A_DAY:
+        return False
+    payload["talks"] = int(payload.get("talks", 0)) + 1
+    set_regard(actor, regard_of(actor), "talk", payload=payload)
+    return True
+
+
+def regard_said(name: str, before: int, after: int) -> str:
+    """The tell for a change of standing, in words: a step crossed, or nothing.
+
+    The number is the panel's to show and never the narrator's to hear — the third law.
+    A change that stays within a step is carried on the outcome's effects and said
+    nowhere, because "Korgath thinks a little better of you" after every sentence is a
+    tic, and a step crossed is the one change worth a sentence."""
+    was, now = band_of(before), band_of(after)
+    if was == now:
+        return ""
+    return said(name, was, now)
 
 
 def step_of(name: str) -> int:
@@ -115,7 +245,9 @@ def moved(name: str, steps: int) -> str:
     at = step_of(name)
     if at < 0:
         at = step_of(DEFAULT)
-    return TRACK[max(0, min(len(TRACK) - 1, at + int(steps)))]
+    # Clamped at helpful, not at the end of the track: `devoted` is regard's to give.
+    top = step_of(TOP_BY_CHECK)
+    return TRACK[max(0, min(top, at + int(steps)))]
 
 
 def influence_dc(target) -> int:

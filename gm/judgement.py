@@ -5299,6 +5299,54 @@ def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[s
     return out
 
 
+def hailed_by(scene, beat: str) -> list[str]:
+    """Who, in this beat, spoke to the player: refs of the people whose quoted line
+    addresses "you".
+
+    The second way a conversation opens (2026-09-24): being spoken to. NPC speech is
+    prose, never an op, so the only record of it is the beat — a quoted span whose
+    sentence, outside the quotes, names a person here, and whose words are aimed at the
+    player. "'You're a long way from the interior,' he says" is a hail; "'Fine weather,'
+    the carter tells the drover" is not. Attribution reuses the head-word and name-word
+    matching the introductions use, in the same sentence or the one before.
+    """
+    from .narration import _QUOTED, _sentences, unquoted
+
+    if scene is None or not beat:
+        return []
+    actors = getattr(scene, "actors", {}) or {}
+    people = [(ref, a) for ref, a in actors.items() if not a.is_pc]
+    if not people:
+        return []
+    out: list[str] = []
+    sentences = _sentences(beat)
+    for i, s in enumerate(sentences):
+        for m in _QUOTED.finditer(s):
+            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", m.group(0), re.I):
+                continue
+            outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
+            words = _name_words(outside)
+            speaker = None
+            # A named person first, by any word of their name; then a descriptor by
+            # its role word ("the man", "the woman in the corner").
+            for ref, a in people:
+                mine = {w for w in _name_words(a.name) if len(w) >= 3}
+                if mine and mine & words:
+                    speaker = ref
+                    break
+            if speaker is None:
+                role = _ROLE_WORD.search(outside)
+                if role:
+                    head = role.group(0).lower()
+                    for ref, a in people:
+                        if head in _name_words(a.name):
+                            speaker = ref
+                            break
+            if speaker and speaker not in out:
+                out.append(speaker)
+    return out
+
+
 def _take_the_name(scene, who, given: str) -> None:
     """The name on the page becomes the one the panel shows AND the one the world holds
     for them. Both, because a page name that survived `settle_introductions` is either

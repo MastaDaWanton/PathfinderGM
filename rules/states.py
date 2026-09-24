@@ -222,12 +222,30 @@ TAGS: dict[str, tuple[str, ...]] = {
     "indifferent": ("attitude.indifferent",),
     "friendly":    ("attitude.friendly",),
     "helpful":     ("attitude.helpful",),
+    "devoted":     ("attitude.devoted",),
 }
 
 # The track in the book's order, worst to best. Ordered because the question asked of
 # it is nearly always a comparison — "friendly or better" — and a set cannot answer it.
+#
+# `devoted` is the step past the book's track, added 2026-09-24 for the player's ask —
+# "talk with them and increase that attitude until they Idolize/Love me". No check
+# reaches it: Diplomacy stops at helpful as the book says (`attitude.moved`), and only
+# regard, the standing relationship kept on the person (`attitude.regard_of`), climbs
+# there.
 ATTITUDES: tuple[str, ...] = (
-    "hostile", "unfriendly", "indifferent", "friendly", "helpful")
+    "hostile", "unfriendly", "indifferent", "friendly", "helpful", "devoted")
+
+# In conversation with the player: granted by `Engine.join_talk` when the player
+# addresses somebody or somebody addresses them, lifted by `leave_talk`, by walking
+# away, or by the person leaving, falling, or drawing. Read by the craft and rest
+# refusals, the brief, and the talk panel. A tag on the PERSON, not a flag on the
+# scene, so who is in the conversation is the same question as every other state.
+TALKING = "talk.with-you"
+# How somebody stands towards the player over time — the number the talk panel shows
+# and the baseline the attitude track falls back to when no check or spell is holding
+# a step. Held as one effect (`attitude.set_regard`) whose `amount` is the score.
+REGARD = "bond.regard"
 
 
 def attitude_of(actor, default: str = "") -> str:

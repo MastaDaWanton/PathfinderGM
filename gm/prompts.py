@@ -666,6 +666,14 @@ settlements the world has a road to can be named, the engine works out how long 
 takes and charges the days to the clock and the body, and anybody not named in "with" is
 left behind. Say that they set out; do not say how far it is or how long it took — the
 engine answers both.
+A conversation is a state the engine keeps: it opens when the player speaks to somebody
+or somebody speaks to them, and it ends ONLY when the player takes their leave, walks
+out of the place, or the other party leaves it — never because a turn went by in
+silence. The brief says who the player is IN CONVERSATION WITH; those people answer,
+and nobody else steps in unless the player turns to them. When the player says they
+take their leave, break off, or will not answer somebody: {"op": "leave_talk", "params":
+{"who": "c2", "do": "leave"}} ("ignore" when they refuse to answer). Nobody in a
+conversation ever asks the player to roll; a check comes only from what the player does.
 When somebody here agrees to come along with the party — a friend, a guide, a hired
 sword — say so once and the engine remembers it: {"op": "company", "params": {"who":
 "c2"}}. From then on they move when the party moves, through every travel and every
@@ -1078,6 +1086,22 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                          f"and their own opinions about what is around them.")
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
                          f"{_states_of(actor)}")
+        # Who the player is talking to, as a fact with a rule attached. The step is
+        # the vocabulary's word and the number stays on the panel: the narrator hears
+        # how somebody feels, never what they score (the third law).
+        from rules import attitude as _attitude
+
+        talking = [a for a in scene.actors.values()
+                   if not a.is_pc and a.has_state(states.TALKING)]
+        if talking:
+            lines.append(
+                "  IN CONVERSATION WITH: "
+                + "; ".join(f"{a.name} ({a.ref}), who is {_attitude.of(a)} towards the "
+                            f"player" for a in talking)
+                + ". They answer what the player says. Nobody else here joins in "
+                  "unless the player turns to them. The player is still in this "
+                  "conversation until they take their leave or walk away — do not end "
+                  "it for them, and do not have anyone in it ask the player to roll.")
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,

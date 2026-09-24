@@ -66,6 +66,68 @@ def _where_the_ground_is(scene) -> tuple[str, str]:
     return name, about
 
 
+def _talk_state(c) -> list[dict]:
+    """The conversation as the panel shows it: each person, their step, their regard."""
+    from rules import attitude as attitude_mod
+
+    try:
+        engine = c.engine()
+        return [{"ref": a.ref, "name": a.name,
+                 "attitude": attitude_mod.of(a),
+                 "regard": attitude_mod.regard_of(a),
+                 "regard_max": attitude_mod.REGARD_MAX}
+                for a in engine.talking_to()]
+    except Exception:      # noqa: BLE001 — a panel line is never worth failing a turn
+        return []
+
+
+def _busy_state(c) -> str:
+    pc = c.scene.pc()
+    if pc is None:
+        return ""
+    try:
+        return str(c.engine()._too_busy_to_forage(pc) or "")
+    except Exception:      # noqa: BLE001
+        return ""
+
+
+@require_POST
+def talk_act(request):
+    """The conversation's own button: take your leave, or refuse somebody.
+
+    Engine-only, on purpose — no model call, no roll. Everweave's Dialogue Mode is the
+    measured warning: exits that needed the model to notice them ended scenes too early
+    or not at all. The tell the engine writes goes straight to the page as the GM's
+    line, and the next spoken turn's narrator sees it in the outcomes as usual.
+    """
+    body = read_body(request)
+    c = campaign_mod.current()
+    scene = c.scene
+    pc = scene.pc()
+    refusal = _cannot_act(pc, "act")
+    if refusal:
+        return refusal
+    if scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    params = {"do": "ignore" if str(body.get("do", "")).lower() == "ignore" else "leave"}
+    if body.get("who"):
+        params["who"] = str(body.get("who"))
+    engine = c.engine()
+    undo = scene.snapshot()
+    try:
+        resolution = engine.run(engine.validate(
+            [{"op": "leave_talk", "actor": pc.ref, "because": "the talk panel",
+              "params": params}]))
+    except (IntentError, ValueError, KeyError) as exc:
+        scene.restore(undo)
+        return JsonResponse({"error": str(exc)}, status=400)
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    if tell:
+        c.transcript.append({"who": "gm", "text": tell})
+    c.save()
+    return JsonResponse(_state(c))
+
+
 def _grid_state(scene) -> dict | None:
     """The map, plus where the PC could actually go — or None when there is no map.
 
@@ -227,6 +289,13 @@ def _state(c) -> dict:
             "biome_describe": biomes.describe(c.biome),
             "round": c.scene.round,
             "in_encounter": c.scene.in_encounter,
+            # Who the player is in conversation with, and how each stands towards
+            # them — the talk panel (2026-09-24). The number is the player's to see;
+            # the narrator only ever hears the word.
+            "talk": _talk_state(c),
+            # Why the crafting hub is shut right now, or "": the engine's own sentence,
+            # so the greyed button and the refusal behind it cannot disagree.
+            "busy": _busy_state(c),
             "turn_ref": c.scene.current_ref(),
             "initiative": [
                 {"ref": r, "score": v,
@@ -1889,6 +1958,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # "the stranger", our placeholder, because nothing held a name).
             for ref, given in judgement.apply_introductions(c.scene, text, player_input):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
+            # Somebody who spoke to the player in this beat is in conversation with
+            # them from here, until the player takes their leave (2026-09-24). Through
+            # the engine's one door, so the panel and the refusals read the same state.
+            for ref in judgement.hailed_by(c.scene, text):
+                who = c.scene.actors.get(ref)
+                opened = c.engine().join_talk(who, how="they spoke to you") if who else ""
+                if opened:
+                    repairs.append(f"in conversation: {who.name} spoke to the player")
             # And a face for anybody this beat used and did not describe — not only
             # whoever arrived in it. The condition is "not described yet", held on the
             # actor (`described`), so the keeper behind the counter, the opening

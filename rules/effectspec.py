@@ -149,7 +149,7 @@ VOCAB: dict[str, list[dict]] = {
     # 1e's attitude track, in the book's own order. Diplomacy moves a creature along it
     # and charm, calm emotions and the whole enchantment family set it outright.
     "attitude": [{"id": k, "name": k.title()} for k in (
-        "hostile", "unfriendly", "indifferent", "friendly", "helpful")],
+        "hostile", "unfriendly", "indifferent", "friendly", "helpful", "devoted")],
 
     "side": [{"id": k, "name": n} for k, n in (
         ("caster", "The caster"), ("target", "The target"),

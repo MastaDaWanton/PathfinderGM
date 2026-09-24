@@ -2146,6 +2146,10 @@ class Engine:
             return resolution
         from . import schemes as schemes_mod
 
+        # Whoever is no longer in a fit state to be talked to leaves the conversation,
+        # said: a person who walked out, went down or drew is not somebody the player
+        # has to take their leave of.
+        resolution.outcomes.extend(self._settle_talk())
         try:
             extra = schemes_mod.tick(self, resolution.outcomes)
         except Exception as exc:  # noqa: BLE001 — a scheme must never take the turn down
@@ -2305,6 +2309,14 @@ class Engine:
             # the engine did not decide.
             return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                            tell="", because=intent.because)
+        # Speaking in a room with one other person in it is speaking to them. Decided
+        # here, once, rather than asked of the model: the injector that makes this op
+        # names a `to` only when the player's words name somebody.
+        if heard is None and speaker is not None and speaker.is_pc:
+            others = [a for r, a in self.scene.actors.items()
+                      if not a.is_pc and self.scene.conscious(r)]
+            if len(others) == 1:
+                heard = others[0]
         at = f" to {heard.name}" if heard is not None else ""
         # Quoted speech is quoted; reported speech is reported. "I ask her if she
         # wants to pay for my services" is not a sentence the character said, and a
@@ -2312,13 +2324,42 @@ class Engine:
         # somebody's mouth.
         said = (f'{who} says{at}: "{words}"' if intent.params.get("quoted")
                 else f"{who} speaks{at}, to the effect that {words}")
+        effects = [{"kind": "said", "who": intent.actor or "",
+                    "to": heard.ref if heard is not None else "",
+                    "words": words}]
+        # A conversation, and what it does to the standing between them. Addressing
+        # somebody opens it; being addressed by them opens it from their side. The
+        # exchange counts towards regard (`attitude.talked_today`), capped per day,
+        # and the tell says so only when a step is crossed — the third law: the
+        # narrator hears the change in words, never a number.
+        from . import attitude as attitude_mod
+
+        bits = [said]
+        if heard is not None and speaker is not None and speaker.is_pc \
+                and not heard.is_pc:
+            opened = self.join_talk(heard, how="you spoke to them")
+            if opened:
+                bits.append(opened)
+            day = int(self.scene.clock_minutes) // (24 * 60)
+            if (not self.scene.in_encounter
+                    and attitude_mod.step_of(attitude_mod.of(heard))
+                    > attitude_mod.step_of(attitude_mod.HOSTILE)
+                    and attitude_mod.talked_today(heard, day)):
+                before, after = attitude_mod.nudge_regard(
+                    heard, attitude_mod.REGARD_PER_TALK, "talk")
+                effects.append({"kind": "regard", "ref": heard.ref,
+                                "from": before, "to": after})
+                warmed = attitude_mod.regard_said(heard.name, before, after)
+                if warmed:
+                    bits.append(warmed)
+        elif speaker is not None and not speaker.is_pc and heard is not None \
+                and heard.is_pc:
+            opened = self.join_talk(speaker, how="they spoke to you")
+            if opened:
+                bits.append(opened)
         return Outcome(
             intent_id=intent.id, op=intent.op, status="resolved",
-            effects=[{"kind": "said", "who": intent.actor or "",
-                      "to": (str(intent.params.get("to") or "") if heard is not None
-                             else ""),
-                      "words": words}],
-            tell=said, because=intent.because)
+            effects=effects, tell=" ".join(bits), because=intent.because)
 
     # check ------------------------------------------------------------------------------
 
@@ -2484,26 +2525,41 @@ class Engine:
         from . import attitude as attitude_mod
 
         was = attitude_mod.of(target)
+        # What the check does to the standing between them, over and above the shift
+        # it buys for the hour (`rules/attitude.py`, regard): a success is remembered
+        # by the step, a bad failure costs, and being cowed is resented.
+        regard_effects: list[dict] = []
+
+        def _remember(delta: int) -> None:
+            before, after = attitude_mod.nudge_regard(target, delta, f"{skill} check")
+            regard_effects.append({"kind": "regard", "ref": target.ref,
+                                   "from": before, "to": after})
+
         if skill == "intimidate":
             if margin < 0:
                 return f"{target.name} does not scare.", []
             minutes = self.dice.roll(attitude_mod.INTIMIDATE_DICE,
                                      label="cowed for", visibility="hidden").total * 10
-            now, rounds = "friendly", _to_rounds(minutes, "minute")
+            now, rounds = attitude_mod.COMES_ALONG, _to_rounds(minutes, "minute")
+            _remember(-attitude_mod.REGARD_RESENTMENT)
         else:
             # The attempt is spent whether or not it worked: the limit is on trying.
             self.scene.swayed[target.ref] = int(self.scene.clock_minutes)
             steps = attitude_mod.steps_for(margin)
             now = attitude_mod.moved(was, steps)
+            if steps < 0:
+                _remember(-attitude_mod.REGARD_LOST_ON_FAILURE)
+            elif steps > 0:
+                _remember(attitude_mod.REGARD_PER_STEP * steps)
             if not steps or now == was:
-                return attitude_mod.said(target.name, was, was), []
+                return attitude_mod.said(target.name, was, was), regard_effects
             hours = self.dice.roll(attitude_mod.SHIFT_DICE, label="for",
                                    visibility="hidden").total
             rounds = _to_rounds(hours, "hour")
         cond = self._set_attitude(target, now, rounds, because or f"{skill} check")
         return (attitude_mod.said(target.name, was, now),
                 [{"ref": target.ref, "kind": "condition", "condition": now,
-                  "rounds_left": cond.rounds_left}])
+                  "rounds_left": cond.rounds_left}] + regard_effects)
 
     # save --------------------------------------------------------------------------------
 
@@ -3281,6 +3337,7 @@ class Engine:
 
         self.scene.initiative = rolls
         self.scene.round = 1
+        self.end_talk("a fight starts")
         sides = {"pc": pc_side, "them": [r for r in them if r in standing]}
         self.scene.sides = sides
         self.scene.acted = {initiator}
@@ -4442,6 +4499,8 @@ class Engine:
 
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
+        # Setting out is walking away, whatever the road then does.
+        parted = self.end_talk("walked away")
 
         # A road already half walked is half a road. `scene.road` is what an interrupted
         # journey left behind, and it is only good for the road it was left on: setting
@@ -4624,6 +4683,8 @@ class Engine:
 
         bits = [f"{journey_mod.describe(leg, hours).capitalize()}, and {leg.to_name} "
                 f"is ahead of you."]
+        if parted:
+            bits.insert(0, parted)
         if met is not None:
             # Met on the last watch: the road ended at the same time.
             bits.append(ontheway.describe(met))
@@ -5005,6 +5066,9 @@ class Engine:
             # The road remembers only while you are on it.
             if self.scene.road and going_to.terrain == places_mod.URBAN:
                 self.scene.road = {}
+            # Walking out is walking away: the conversation ends, and the tell says
+            # they were left mid-sentence if no leave was taken (2026-09-24).
+            parted = self.end_talk("walked away")
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
             self.staff_the_place()
@@ -5058,6 +5122,8 @@ class Engine:
 
         note = str(intent.params.get("note") or "").strip()
         bits = []
+        if moved and parted:
+            bits.append(parted)
         if not moved:
             bits.append(f"You are already at {going_to.name}.")
         if going_to.terrain != was_ground:
@@ -5177,6 +5243,10 @@ class Engine:
         if self.scene.in_encounter:
             return ("You are in a fight. Foraging is an hour on your hands and knees "
                     "at the very least — end the encounter first.")
+        talking = self.talking_to()
+        if talking:
+            return (f"You are talking with {', '.join(a.name for a in talking)}. "
+                    f"Take your leave first.")
 
         # Unconscious company is not company, and neither is your own reflection.
         here = [a for ref, a in self.scene.actors.items()
@@ -6012,6 +6082,110 @@ class Engine:
             out.append(who)
         return out
 
+    # --- in conversation -----------------------------------------------------------------
+    #
+    # Ruled 2026-09-24: a conversation is a state you are in only while directly speaking
+    # to somebody or being spoken to, and it ends only when you take your leave, walk
+    # away on purpose, or the other party leaves it — never by silence. Everweave's
+    # Dialogue Mode is the cautionary example: exits were implicit, scenes ended too
+    # early or not at all, and NPCs called for skill checks on their own; the studio ended
+    # up shipping a mode that bypasses the whole thing. So the state here is engine-held
+    # (`states.TALKING` on the person, through the one applicator), the exit is one op
+    # and one button, and nobody in it ever asks the player for a roll.
+
+    def talking_to(self) -> list:
+        """Who the player is in conversation with: here, conscious, holding the tag."""
+        return [a for r, a in self.scene.actors.items()
+                if not a.is_pc and self.scene.conscious(r) and a.has_state(states.TALKING)]
+
+    def join_talk(self, who, how: str = "") -> str:
+        """Bring somebody into the conversation; the tell, or "" if they were in it."""
+        if who is None or who.is_pc or who.has_state(states.TALKING):
+            return ""
+        who.apply_effect(ActiveEffect(
+            name="in conversation", kind="bond", key="talk", source="talk",
+            origin=str(how or "talk"), duration="until-dismissed",
+            tags=(states.TALKING,)))
+        return (f"{who.name} is talking to you." if "they" in str(how)
+                else f"You are in conversation with {who.name}.")
+
+    def end_talk(self, why: str = "", who=None) -> str:
+        """End the conversation, for one person or everybody; the tell, or "" if there
+        was none to end."""
+        # Everybody holding the tag, wherever they now stand — not the room. Walking
+        # away calls this after the party has moved, when the person left behind is
+        # no longer in `scene.actors`; read the room and nobody would be found to
+        # leave mid-sentence, and `_settle_talk` would say "no longer here" instead.
+        gone = ([who] if who is not None else
+                [a for a in self.scene.people.values() if not a.is_pc])
+        gone = [a for a in gone if a is not None and a.has_state(states.TALKING)]
+        for a in gone:
+            a.remove_effects(source="talk")
+        if not gone:
+            return ""
+        names = ", ".join(a.name for a in gone)
+        if why == "walked away":
+            return f"You leave {names} mid-sentence."
+        if why == "a fight starts":
+            return f"The talk with {names} is over: it has come to blows."
+        return f"The conversation with {names} is over."
+
+    def _settle_talk(self) -> list:
+        """Whoever cannot be talked to any more leaves the conversation, said.
+
+        Not here, down, dead, or hostile: none of those is somebody the player has to
+        take their leave of. Runs at the end of every batch, so a person who walked
+        out during an NPC turn is gone from the panel before the next beat."""
+        out = []
+        for ref, a in list(self.scene.people.items()):
+            if a.is_pc or not a.has_state(states.TALKING):
+                continue
+            here = ref in self.scene.actors and self.scene.conscious(ref)
+            from . import attitude as attitude_mod
+
+            hostile = attitude_mod.of(a) == attitude_mod.HOSTILE
+            if here and not hostile:
+                continue
+            a.remove_effects(source="talk")
+            why = ("has turned hostile" if hostile else
+                   "is no longer here" if ref not in self.scene.actors else "is down")
+            out.append(Outcome(intent_id="", op="talk",
+                               effects=[{"kind": "talk", "ref": ref, "left": True}],
+                               tell=f"{a.name} {why}; the conversation with them is over.",
+                               because=""))
+        return out
+
+    def _op_leave_talk(self, intent: Intent, partial: dict) -> Outcome:
+        """The player ends a conversation, or refuses one.
+
+        `do: "ignore"` is the refusal: somebody spoke to you and you do not answer.
+        Either way the exit is the player's own act and costs nothing — no roll, no
+        model call from the button — which is the whole of the lesson above."""
+        do = str(intent.params.get("do") or "leave").strip().lower()
+        want = str(intent.params.get("who") or "").strip()
+        who = None
+        if want:
+            who = self.scene.actors.get(want)
+            if who is None:
+                match = [a for r, a in self.scene.actors.items()
+                         if not a.is_pc and str(a.name).lower() == want.lower()]
+                who = match[0] if len(match) == 1 else None
+            if who is None or not who.has_state(states.TALKING):
+                return self._refuse(intent, f"You are not in conversation with "
+                                            f"{want}.")
+        talking = [who] if who is not None else self.talking_to()
+        if not talking:
+            return self._refuse(intent, "You are not in conversation with anybody.")
+        names = ", ".join(a.name for a in talking)
+        for a in talking:
+            a.remove_effects(source="talk")
+        tell = (f"You do not answer {names}, and they can see it." if do == "ignore"
+                else f"You take your leave of {names}.")
+        return Outcome(
+            intent_id=intent.id, op="leave_talk",
+            effects=[{"kind": "talk", "ref": a.ref, "left": True} for a in talking],
+            tell=tell, because=intent.because)
+
     def _op_company(self, intent: Intent, partial: dict) -> Outcome:
         """Somebody comes along, or stops coming.
 
@@ -6299,6 +6473,16 @@ class Engine:
         rule, grep for every copy of it", applied before there was a copy to grep for.
         """
         target.clear_states("attitude")
+        if rounds is None:
+            # A shift with no end is a fact about the relationship, not a mood for
+            # the hour: the standing regard follows it to the floor of that step, so
+            # the step does not evaporate the moment something else clears the tag.
+            # A background's "knows you" lands friendly this way; a guard who has
+            # read the warrant lands hostile this way.
+            from . import attitude as attitude_mod
+
+            if attitude_mod.band_of(attitude_mod.regard_of(target)) != key:
+                attitude_mod.set_regard(target, attitude_mod.floor_of(key), source)
         return target.add_condition(key, rounds, source=source)
 
     # What a natural weapon does past its damage. The rider tags a race grants —
@@ -7882,6 +8066,7 @@ class Engine:
         order.sort(key=lambda t: -t[1])
         self.scene.initiative = order
         self.scene.round = 1
+        self.end_talk("a fight starts")
         # Nobody has acted at the top of round one, so everyone is flat-footed until
         # their first turn comes round.
         self.scene.acted = set()
@@ -8185,6 +8370,12 @@ class Engine:
             to_ref = pc.ref if pc else None
         taker = self.scene.actors.get(to_ref) if to_ref else None
         giver = self.scene.actors.get(from_ref) if from_ref else None
+        # A gift is remembered. Something handed to a person by the player with no
+        # price on it moves their regard (`rules/attitude.py`); recorded here, once,
+        # and carried on the outcome so the log sees it. Nothing in the fiction is
+        # claimed by it — the narrator gets no number.
+        a_gift = (taker is not None and not taker.is_pc and giver is not None
+                  and giver.is_pc and not intent.params.get("price"))
 
         # "merchants stuff" is not an item — measured live: the model proposed a
         # give of exactly that phrase with no giver, and the world-never-runs-out
@@ -8328,13 +8519,25 @@ class Engine:
             tell = f"{what} changes hands."
         if giver is not None and not moved:
             tell = f"{giver.name} has no {item} to give."
+        effects = [{"ref": (taker or giver).ref if (taker or giver) else "",
+                    "kind": "give", "item": denom or item, "count": moved,
+                    "purse": dict(taker.purse) if taker else {},
+                    "goods": dict(taker.goods) if taker else {}}]
+        if a_gift and moved:
+            # Only once something actually changed hands. The narrator hears a step
+            # crossed in words, or nothing; the log sees the numbers.
+            from . import attitude as attitude_mod
+
+            before, after = attitude_mod.nudge_regard(taker, attitude_mod.REGARD_GIFT,
+                                                      "a gift")
+            effects.append({"kind": "regard", "ref": taker.ref, "from": before,
+                            "to": after})
+            warmed = attitude_mod.regard_said(taker.name, before, after)
+            if warmed:
+                tell = f"{tell} {warmed}"
 
         return Outcome(
-            intent_id=intent.id, op="give",
-            effects=[{"ref": (taker or giver).ref if (taker or giver) else "",
-                      "kind": "give", "item": denom or item, "count": moved,
-                      "purse": dict(taker.purse) if taker else {},
-                      "goods": dict(taker.goods) if taker else {}}],
+            intent_id=intent.id, op="give", effects=effects,
             tell=tell, because=intent.because,
         )
 
@@ -8810,6 +9013,11 @@ class Engine:
         actor = self.scene.actors.get(who) if who else None
         if actor is None:
             raise IntentError("rest: nobody here to rest", "refs")
+        talking = self.talking_to()
+        if talking and actor.is_pc:
+            return self._refuse(
+                intent, f"You are mid-sentence with "
+                        f"{', '.join(a.name for a in talking)}. Take your leave first.")
 
         # Sleeping on enough experience is how a level arrives: "once i have enough
         # Exp sleeping should initiate the leveling process." Before the rest itself,
