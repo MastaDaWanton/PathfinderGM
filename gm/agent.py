@@ -975,7 +975,11 @@ class GMAgent:
                 for w in narration_mod._name_stems(a.name) if hasattr(narration_mod, "_name_stems") else []:
                     expected[w] = a.true_name
                 expected.setdefault((str(a.name).split() or [""])[-1].lower(), a.true_name)
-        text, settled = narration_mod.settle_introductions(text, expected)
+        text, settled = narration_mod.settle_introductions(
+            text, expected,
+            # What the story has already said: a name the player was told earlier is
+            # not swapped out for the pool's when its bearer finally says it.
+            established=" ".join(str(b) for b in (earlier or [])))
         if settled:
             repairs.append(f"the name given is the world's: {', '.join(settled)}")
         # Asked for his name and the beat gave none: he says it himself. The brief was

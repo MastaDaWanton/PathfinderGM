@@ -5275,14 +5275,40 @@ def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[s
                 who = unnamed[0]
         if who is None or not _unnamed(who):
             continue
-        who.name = given
-        if not getattr(who, "true_name", ""):
-            who.true_name = given
-        for e in scene.cast:
-            if e.get("ref") == who.ref:
-                e["who"] = given
+        _take_the_name(scene, who, given)
+        out.append((who.ref, given))
+    # And the narrator's own naming in passing — "The man—Korgath Varn—takes a slow
+    # pull of his ale" (2026-09-24). Outside speech, so `introductions` skips it by
+    # design; the head word finds the unnamed person the same way. A name somebody
+    # here already carries is not taken twice.
+    from .narration import named_in_apposition
+
+    for head, given in named_in_apposition(beat):
+        if any(str(a.name).lower() == given.lower() for a in actors.values()):
+            continue
+        who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
+                    and head in _name_words(a.name)), None)
+        if who is None:
+            unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
+            if len(unnamed) == 1:
+                who = unnamed[0]
+        if who is None:
+            continue
+        _take_the_name(scene, who, given)
         out.append((who.ref, given))
     return out
+
+
+def _take_the_name(scene, who, given: str) -> None:
+    """The name on the page becomes the one the panel shows AND the one the world holds
+    for them. Both, because a page name that survived `settle_introductions` is either
+    the pool's own or one the story established first, and a true name left behind it
+    would have the next introduction swap the story's name back out."""
+    who.name = given
+    who.true_name = given
+    for e in scene.cast:
+        if e.get("ref") == who.ref:
+            e["who"] = given
 
 
 def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:

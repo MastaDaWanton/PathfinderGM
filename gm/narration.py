@@ -506,12 +506,20 @@ def give_the_name(text: str, offers: list[tuple[str, str]]) -> tuple[str, list[s
     return text, added
 
 
-def settle_introductions(text: str, expected: dict[str, str]) -> tuple[str, list[str]]:
+def settle_introductions(text: str, expected: dict[str, str],
+                         established: str = "") -> tuple[str, list[str]]:
     """The name a person gives is the one the world holds for them.
 
     `expected` maps a speaker's head word ("stranger") to their true name. A given name
     that differs — the model's guess at a pool it was never shown — is replaced with the
-    true one throughout the beat; one that matches is left. Returns (text, swaps)."""
+    true one throughout the beat; one that matches is left. Returns (text, swaps).
+
+    Unless the story already holds the name. `established` is the earlier beats: a name
+    the player has already been told — Drenn naming "Korgath Varn" as the man to find
+    (2026-09-24) — is a fact of the story now, and swapping it for the pool's "Kael
+    Sorek" when the man finally says it would contradict the beat that sent the player
+    to him. The world's name yields to the story's, and `apply_introductions` then
+    makes the story's name the one the world holds."""
     swaps: list[str] = []
     if not text or not expected:
         return text, swaps
@@ -521,9 +529,60 @@ def settle_introductions(text: str, expected: dict[str, str]) -> tuple[str, list
             continue
         if given.split()[0] == true.split()[0]:
             continue
+        # Word-bounded on both sides and nothing stricter: a name inside single-quoted
+        # speech is preceded by an apostrophe, and the first cut's lookbehind refused
+        # exactly the beat that established it.
+        if established and re.search(r"(?<!\w)" + re.escape(given) + r"(?!\w)",
+                                     established, re.I):
+            continue
         text = re.sub(rf"\b{re.escape(given)}\b", true, text)
         swaps.append(f"{given} -> {true}")
     return text, swaps
+
+
+# The narrator naming somebody in passing, outside any speech: "The man—Korgath
+# Varn—takes a slow pull of his ale", "the woman, Marra Tull, looks up", "a man named
+# Korgath Varn". Reported 2026-09-24 with the panel on screen — "I am supposedly
+# speaking with korgath Varn but he is not scene or Man did not update to Korgath" —
+# on exactly the first of those sentences. `introductions` reads names GIVEN, inside
+# speech, and skips the narrator's own sentence about somebody on purpose; this is the
+# other way a page names a person, and it was read by nothing.
+_A_NAME = r"(?P<name>[A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-]+){0,2})"
+_A_HEAD = r"(?P<head>(?:[a-z][a-z'’-]*\s+){0,4}?[a-z][a-z'’-]*)"
+# Case-sensitive on purpose — the name is what carries the capitals — so the article is
+# spelled both ways rather than the whole pattern being case-blind.
+_THE = r"\b(?:[Tt]he|[Tt]his|[Tt]hat)\s+"
+_A_OR_THE = r"\b(?:[Tt]he|[Aa]n?|[Tt]his|[Tt]hat)\s+"
+_APPOSITIONS = (
+    re.compile(_THE + _A_HEAD + r"\s*[—–]\s*" + _A_NAME + r"\s*[—–]"),
+    re.compile(_THE + _A_HEAD + r"\s*,\s*" + _A_NAME + r"\s*,"),
+    re.compile(_A_OR_THE + _A_HEAD + r"\s+(?:named|called|known as)\s+" + _A_NAME + r"\b"),
+)
+
+
+def named_in_apposition(text: str) -> list[tuple[str, str]]:
+    """(role head word, name) for each person the narration names in passing.
+
+    The head has to carry a role word — man, woman, guard, merchant — so "the market,
+    Vormoor's heart," is not a merchant called Vormoor. Speech is left out: what a
+    character says about somebody is `introductions`' business, or nobody's.
+    """
+    out: list[tuple[str, str]] = []
+    if not text:
+        return out
+    from .judgement import _ROLE_WORD
+
+    plain = unquoted(text)
+    for pattern in _APPOSITIONS:
+        for m in pattern.finditer(plain):
+            name = " ".join(m.group("name").split())
+            if name.split()[0] in _NOT_A_GIVEN_NAME:
+                continue
+            roles = _ROLE_WORD.findall(m.group("head"))
+            if not roles:
+                continue
+            out.append((roles[-1].lower(), name))
+    return out
 
 
 _CREATURE_NOUNS = re.compile(
