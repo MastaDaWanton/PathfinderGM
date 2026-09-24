@@ -371,6 +371,10 @@
              border: 1px solid #2e261c; background: #1a1610; color: var(--gold);
              cursor: pointer; padding: 0; letter-spacing: 0; }
   .prepbtn:disabled { opacity: .3; cursor: default; }
+  /* The Cast button is a word, not a glyph: it takes its own width, and the target
+     picker beside it stays small enough for the row. */
+  .castbtn { width: auto; padding: 0 8px; margin-left: 4px; }
+  .casttarget { max-width: 120px; margin-left: 6px; font-size: 12px; }
   /* The search over a caster's own list. A cleric chooses from 179 castable spells at
      first level, and a list that long is unusable without one (item 26). */
   .findbox { width: 100%; padding: 4px 7px; margin-bottom: 8px; font: inherit;
