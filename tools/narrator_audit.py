@@ -171,11 +171,93 @@ SCRIPTS = {
 }
 
 
+# --- the replay corpus ---------------------------------------------------------------------
+#
+# `--record FILE` writes one JSON line per turn: the save as it stood BEFORE the turn
+# (trimmed to what a detector needs — the scene, the recent beats), every model call the
+# turn made with its full raw reply, and what the turn added to the transcript and the
+# turn log. tests/test_replay_corpus.py runs the detectors over those raw replies, so real
+# model prose is measured on every suite run without a model (2026-09-25). Recorded here,
+# in the harness, rather than by a hook in the shipped app: nothing in the player's build
+# can write a corpus.
+
+RECORD_VERSION = 1
+
+# The agent methods a model call can come from, innermost first; the first found on the
+# stack names the call's role.
+_ROLES = ("_rewrite", "polish", "narrate_turn", "narrate_outcome", "npc_turn",
+          "plan_cheat", "plan_turn", "write", "answer")
+
+
+def _role_of_caller() -> str:
+    import inspect
+
+    names = [f.function for f in inspect.stack()[2:40]]
+    return next((r for r in _ROLES if r in names), names[0] if names else "?")
+
+
+class _Recorder:
+    def __init__(self, path: Path, script: str, model: str):
+        import hashlib
+        import subprocess
+
+        self.path = path
+        self.calls: list[dict] = []
+        self.hashlib = hashlib
+        try:
+            sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                                 text=True, cwd=Path(__file__).resolve().parents[1]).stdout.strip()
+        except OSError:
+            sha = ""
+        self.head = {"v": RECORD_VERSION, "git": sha, "script": script, "model": model}
+
+    def wrap(self, chat):
+        def recorded(messages, model, *a, **kw):
+            started = time.monotonic()
+            reply = chat(messages, model, *a, **kw)
+            self.calls.append({
+                "role": _role_of_caller(), "model": model,
+                "prompt_sha256": self.hashlib.sha256(
+                    json.dumps(messages, sort_keys=True).encode("utf-8")).hexdigest()[:16],
+                "schema": bool(kw.get("schema")), "json": bool(kw.get("as_json")),
+                "seconds": round(time.monotonic() - started, 2),
+                "raw": getattr(reply, "text", ""),
+            })
+            return reply
+        return recorded
+
+    @staticmethod
+    def trimmed(save_text: str) -> dict:
+        """The save a detector needs: the scene whole, the recent beats, no history."""
+        d = json.loads(save_text)
+        d["transcript"] = (d.get("transcript") or [])[-8:]
+        d["history"] = (d.get("history") or [])[-6:]
+        d["turn_log"] = []
+        return d
+
+    def write(self, n: int, said: str, before: dict, c, was: int, log_was: int):
+        row = dict(self.head, turn=n, player=said, save_before=before, calls=self.calls,
+                   added_transcript=c.transcript[was:],
+                   added_turn_log=(getattr(c, "turn_log", None) or [])[log_was:])
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        self.calls = []
+
+
 def audit(turns: int, script: str, world: str, character: str,
-          model: str = "") -> dict:
+          model: str = "", record: str = "") -> dict:
     tally: collections.Counter = collections.Counter()
     rows: list[dict] = []
     lines = SCRIPTS[script]
+
+    recorder = None
+    real_chat = None
+    if record:
+        from gm import client as gm_client
+
+        recorder = _Recorder(Path(record), script, model)
+        real_chat = gm_client.chat
+        gm_client.chat = recorder.wrap(real_chat)
 
     # Swap the narrator for this run only, in memory. The user's own models.json is not
     # touched: an audit that rewrites the player's settings is an audit nobody runs twice.
@@ -207,6 +289,8 @@ def audit(turns: int, script: str, world: str, character: str,
             # turn actually wrote can be recovered afterwards.
             was = len(before.transcript)
             log_was = len(getattr(before, "turn_log", None) or [])
+            snapshot = (recorder.trimmed(before.path().read_text(encoding="utf-8"))
+                        if recorder else None)
             started = time.monotonic()
             # Answer anything the engine is waiting on first. A fight suspends for the
             # player's d20, and `/api/say` correctly refuses while a roll is pending —
@@ -331,8 +415,14 @@ def audit(turns: int, script: str, world: str, character: str,
                          "pull": pull})
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
+            if recorder:
+                recorder.write(n, said, snapshot, c, was, log_was)
         cm._LIVE.clear()
     modelcfg.for_role = real_for_role
+    if recorder:
+        from gm import client as gm_client
+
+        gm_client.chat = real_chat
 
     clean = sum(1 for r in rows if not r["faults"])
     pulls = [r["pull"] for r in rows if r.get("pull")]
@@ -462,11 +552,13 @@ def main() -> None:
     ap.add_argument("--model", default="",
                     help="narrate with this model instead of the configured one")
     ap.add_argument("--json", default="", help="write the full run here")
+    ap.add_argument("--record", default="",
+                    help="append each turn to this JSONL replay-corpus file")
     args = ap.parse_args()
 
     print(f"narrator audit: {args.turns} turns of '{args.script}'\n")
     result = audit(args.turns, args.script, args.world, args.character,
-                   args.model)
+                   args.model, record=args.record)
 
     turns = result["turns"] or 1
     print(f"\n{result['clean']}/{turns} turns clean "

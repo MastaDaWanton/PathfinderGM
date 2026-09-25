@@ -1,0 +1,18 @@
+{
+ "drafts": 63,
+ "plans": 52,
+ "bad_plan_json": 0,
+ "faults": {
+  "invented-name": 3,
+  "third-person-pc": 4
+ },
+ "firings": {
+  "attacked_by named": 0,
+  "drafts with speech": 16,
+  "hailed_by": 0,
+  "introductions": 0,
+  "note_cast booked": 30,
+  "stands_elsewhere": 3,
+  "unname_strangers struck": 3
+ }
+}
