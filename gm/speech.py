@@ -90,24 +90,48 @@ def spans(text: str) -> list[tuple[int, int]]:
     return out
 
 
+def _end_of(text: str, a: int, b: int) -> int | None:
+    """Where the sentence-ending mark of a quotation stands — the "!" of `"Enough!"` —
+    or None when the line does not end a sentence (`'Go home,' the guard says`)."""
+    k = b - 1
+    while k > a and (text[k] in "\"'“”‘’" or text[k].isspace()):
+        k -= 1
+    if not (k > a and text[k] in ".!?"):
+        return None
+    # And only when a new sentence follows. `Ashla says "We go. Now." and turns away.`
+    # is one sentence: the line's full stop is hers, and the narration carries on.
+    rest = text[b:].lstrip(" \t")
+    if rest and not (rest[0].isupper() or rest[0] == "\n"):
+        return None
+    return k
+
+
 def blanked(text: str) -> str:
-    """`text` with every quotation's characters turned to spaces, the same length."""
+    """`text` with every quotation's characters turned to spaces, the same length —
+    except the mark that ends the sentence, which stays where it stands.
+
+    Kept because the sentence splitters read this: `He yells, "Enough!" The crowd gasps.`
+    blanked whole is ONE sentence, and a cut aimed at the yell took the crowd with it
+    (measured 2026-09-25)."""
     text = str(text or "")
     out = list(text)
     for a, b in spans(text):
+        keep = _end_of(text, a, b)
         for k in range(a, b):
-            if not out[k].isspace():
+            if k != keep and not out[k].isspace():
                 out[k] = " "
     return "".join(out)
 
 
 def unquoted(text: str) -> str:
-    """`text` with each quotation replaced by one space: the narrator's own words."""
+    """`text` with each quotation replaced by one space — and its sentence-ending mark,
+    when it had one, so the sentences around it still split where they did."""
     text = str(text or "")
     parts, at = [], 0
     for a, b in spans(text):
         parts.append(text[at:a])
-        parts.append(" ")
+        keep = _end_of(text, a, b)
+        parts.append(" " if keep is None else f" {text[keep]} ")
         at = b
     parts.append(text[at:])
     return "".join(parts)

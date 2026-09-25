@@ -35,7 +35,13 @@ _WORD = re.compile(r"[a-z']+")
 # Where the speech is: `gm/speech.py`, the one scanner every pass here reads. The
 # rule that lived here capped a quotation at 300 then 1,200 characters, opened on
 # a curly single quote and closed only on a double one — see that module.
-_SENTENCE = re.compile(r"[^.!?]+[.!?]?")
+# A sentence. A title's full stop does not end one ("Dr. Varn"), a run of terminators is
+# one end ("..." and "?!" were each split into empty sentences), and the closing quote
+# stays with the sentence it closes — left at the front of the next one, "' The merchant
+# nods" read as speech opening (2026-09-25).
+_SENTENCE = re.compile(
+    r"(?:\b(?:Mr|Mrs|Ms|Dr|St|Mt|Capt|Sgt|Lt|Col|Prof)\.|[^.!?])+"
+    r"(?:[.!?]+[\"'”’]?)?")
 
 # Capitalised words that are not names.
 # The nouns a place is named with. A capitalised token beside one of these — "the
@@ -307,8 +313,11 @@ REGURGITATED_SHARE = 40
 def _same_words(sentence: str) -> str:
     """A sentence reduced to its words, so a re-quoting with the punctuation moved —
     "'And the guards at the main gate are. '" for "…and the guards at the main gate
-    are…" — is the same sentence."""
-    return " ".join(re.findall(r"[a-z0-9']+", (sentence or "").lower()))
+    are…" — is the same sentence. A quote mark at the edge of a word is not part of it:
+    since the sentence splitter keeps a closing quote with its sentence (2026-09-25),
+    "head.'" and "head." must still be one word."""
+    words = re.findall(r"[a-z0-9']+", (sentence or "").lower())
+    return " ".join(w.strip("'") for w in words if w.strip("'"))
 
 
 def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]:
@@ -1101,14 +1110,9 @@ def cut_uncast_spells(text: str, cast: list[str] | None) -> tuple[str, list[str]
            if not any(c in r or r in c for r in really if r)]
     if not bad:
         return text, []
-    cut, kept = [], []
-    for sentence in _sentences(text):
-        said = spells_claimed(sentence)
-        if said and any(s in bad for s in said):
-            cut.append(sentence)
-        else:
-            kept.append(sentence)
-    return " ".join(kept).strip(), cut
+    cut = [sentence for sentence in _sentences(text)
+           if (said := spells_claimed(sentence)) and any(s in bad for s in said)]
+    return _cut_sentences(text, cut), cut
 
 
 # A sentence in which somebody DOES something: a person as its subject and a verb that
@@ -1212,13 +1216,50 @@ def fire_from_nowhere(text: str, context: str = "") -> list[str]:
     return out
 
 
+def _without(text: str, spans: list[tuple[int, int]]) -> str:
+    """`text` with each (start, end) span removed and nothing else touched.
+
+    Measured 2026-09-25: the cutting passes rebuilt the beat as `" ".join(kept)`, so
+    one cut sentence flattened every paragraph break in the beat, and cutting the
+    lightning-scorched oak out of `…scorched. "Stand fast," she says` left `scorched. "`
+    with a stray space inside the quotation. The spaces after a removed span go with it;
+    a paragraph break stays where it was.
+    """
+    out = text
+    for a, b in sorted(spans, reverse=True):
+        while b < len(out) and out[b] in " \t":
+            b += 1
+        out = out[:a] + out[b:]
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out.strip()
+
+
+def _cut_sentences(text: str, flagged: list[str]) -> str:
+    """Remove the sentences a detector flagged, found where they really stand.
+
+    A detector that reads `unquoted(text)` returns sentences with their dialogue gone,
+    and the cutters then looked for them among the RAW sentences — so a flagged sentence
+    that carried a line of speech never matched and was silently never cut. The beat is
+    split on `speech.blanked`, which keeps every offset, so each flagged sentence maps
+    back to its exact span in the original, speech and all.
+    """
+    want = {" ".join(f.split()) for f in flagged if f and f.strip()}
+    if not want:
+        return text
+    blank = speech.blanked(text)
+    spans = [m.span() for m in _SENTENCE.finditer(blank)
+             if " ".join(m.group(0).split()) in want
+             or " ".join(text[m.start():m.end()].split()) in want]
+    return _without(text, spans) if spans else text
+
+
 def cut_fire_from_nowhere(text: str, context: str = "") -> tuple[str, list[str]]:
     """The backstop under `fire-from-nowhere`: the sentences go. Returns (text, cut)."""
     gone = fire_from_nowhere(text, context)
     if not gone:
         return text, []
-    kept = [s for s in _sentences(text) if s not in set(gone)]
-    return " ".join(kept).strip(), gone
+    return _cut_sentences(text, gone), gone
 
 
 # A blow LANDING, in the prose: the verbs a beat uses when steel meets something.
@@ -1262,11 +1303,11 @@ def cut_premature_blows(text: str, blows: list[dict] | None) -> tuple[str, list[
     early = premature_blows(text, blows)
     if not early:
         return text, []
-    kept = [s for s in _sentences(text) if s not in set(early)]
+    out = _cut_sentences(text, early)
     tell = next((str(b.get("tell") or "") for b in (blows or []) if b.get("tell")), "")
-    if tell and tell not in kept:
-        kept.append(tell)
-    return " ".join(kept).strip(), early
+    if tell and tell not in out:
+        out = f"{out} {tell}".strip()
+    return out, early
 
 
 def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None,
@@ -2167,7 +2208,7 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
     pattern = re.compile("|".join(re.escape(n) for n in names), re.I)
     just_died = re.compile("|".join(re.escape(n) for n in fresh if n and len(n) >= 3),
                            re.I) if any(n and len(n) >= 3 for n in fresh) else None
-    kept, cut = [], []
+    cut, spans = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
         hit = pattern.search(s)
@@ -2186,24 +2227,20 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
             opener = speech.first_opening(s)
             if opener is None or hit.start() < opener:
                 cut.append(s.strip())
-                continue
-        kept.append(s.strip())
+                spans.append(m.span())
     if not cut:
         return text, []
-    return " ".join(kept), cut
+    return _without(text, spans), cut
 
 
 def strip_leaked_options(text: str) -> tuple[str, list[str]]:
     """Drop sentences where the option menu leaked into the narration."""
     if not text:
         return text or "", []
-    kept, cut = [], []
-    for m in _SENTENCE.finditer(text):
-        s = m.group(0)
-        (cut if _LEAKED_OPTIONS.search(s) else kept).append(s.strip())
-    if not cut:
+    hits = [m for m in _SENTENCE.finditer(text) if _LEAKED_OPTIONS.search(m.group(0))]
+    if not hits:
         return text, []
-    return " ".join(kept), cut
+    return _without(text, [m.span() for m in hits]), [m.group(0).strip() for m in hits]
 
 
 def cut_phantom_opposition(text: str) -> tuple[str, list[str]]:
@@ -2216,17 +2253,12 @@ def cut_phantom_opposition(text: str) -> tuple[str, list[str]]:
     """
     if not text:
         return text or "", []
-    kept, cut = [], []
-    for m in _SENTENCE.finditer(text):
-        s = m.group(0)
-        if _PHANTOM_OPPOSITION.search(s) and not speech.opens(s) \
-                and '"' not in s and "“" not in s:
-            cut.append(s.strip())
-            continue
-        kept.append(s.strip())
-    if not cut:
+    hits = [m for m in _SENTENCE.finditer(text)
+            if _PHANTOM_OPPOSITION.search(m.group(0)) and not speech.opens(m.group(0))
+            and '"' not in m.group(0) and "“" not in m.group(0)]
+    if not hits:
         return text, []
-    return " ".join(kept), cut
+    return _without(text, [m.span() for m in hits]), [m.group(0).strip() for m in hits]
 
 
 # An ally the player has not got. Measured in the tavern: the killing blow came back as
