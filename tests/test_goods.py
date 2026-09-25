@@ -17,6 +17,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import parse_all
 from rules.sheet import from_dict, load_pc, to_dict
+from pagesource import table_source
 
 
 # --- money -----------------------------------------------------------------------------
@@ -324,7 +325,7 @@ def test_the_sheet_carries_the_six_scores_and_what_the_class_grants():
 def test_the_defense_tab_actually_renders_them():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert 'class="abilities"' in page
     assert "s.class_features" in page
 
@@ -361,7 +362,7 @@ def test_every_race_the_forge_offers_has_traits_on_the_sheet():
 def test_the_feats_tab_renders_traits_and_class_features():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert "Racial traits" in page and "s.traits.map" in page
     assert "Class features" in page
 

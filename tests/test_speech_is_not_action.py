@@ -21,6 +21,7 @@ quote into `say` before any verb lookup happens at all. In neither can a word in
 speech reach the command table. See docs/speech-vs-action.md.
 """
 from gm import judgement
+from pagesource import table_source
 
 
 SPEECH = [
@@ -261,8 +262,7 @@ def test_the_page_tells_speech_and_action_apart():
     claim it either."""
     from pathlib import Path
 
-    src = (Path(__file__).resolve().parents[1] / "play" / "templates" / "play"
-           / "table.html").read_text(encoding="utf-8")
+    src = table_source()
     assert "const said = s => esc(s)" in src
     assert 'class="said"' in src and 'class="did"' in src
     # The transcript renders through it, not through the bare escaper.

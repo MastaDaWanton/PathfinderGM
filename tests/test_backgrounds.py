@@ -21,6 +21,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import from_dict, to_dict
 from world import loader
+from pagesource import table_source
 
 WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
 TOWN = "5bbd0c40345f"
@@ -229,8 +230,7 @@ def test_the_sheet_pane_draws_it():
 
     from django.conf import settings
 
-    page = Path(settings.BASE_DIR, "play", "templates", "play", "table.html").read_text(
-        encoding="utf-8")
+    page = table_source()
     assert "b.past" in page, "the sheet's background pane does not draw the chosen past"
     assert "b.past.ties" in page, "the ties — the whole point — are not on the pane"
 

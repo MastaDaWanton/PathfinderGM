@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from gm import narration
+from pagesource import table_source
 
 
 # --- what counts as outsourcing -------------------------------------------------------
@@ -195,7 +196,7 @@ def test_continue_shows_the_player_nothing_they_did_not_say():
     assert '"who": "player", "text": shown' in view
     assert '"who": "player", "text": text' not in view
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert 'id="carryon"' in page
     assert "takeTurn({carry_on: true}, false)" in page
 

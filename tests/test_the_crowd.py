@@ -30,6 +30,7 @@ from rules.engine import Engine, Scene
 from rules.guards import Packet
 from rules.sheet import from_dict, load_pc, to_dict
 from world import loader
+from pagesource import table_source
 
 WORLD = loader.load_cached("fixtures/aurvantis-campaign.json")
 VORMOOR = WORLD.by_name("Vormoor", kind="CITY").id
@@ -322,7 +323,7 @@ def test_the_map_is_told_how_many_are_standing():
 
     src = inspect.getsource(views._state)
     assert '"members": int(a.troop.members)' in src
-    html = open("play/templates/play/table.html", encoding="utf-8").read()
+    html = table_source()
     assert "still standing" in html, "the tooltip says how many of how many"
     assert "token.unit" in html, "a crowd is hatched, not a solid block"
     assert "unithatch-foe" in html

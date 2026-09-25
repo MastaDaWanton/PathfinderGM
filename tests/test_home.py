@@ -19,6 +19,7 @@ from django.test import Client, override_settings
 
 from play import library
 from rules.sheet import load_pc
+from pagesource import served
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def test_the_table_moved_rather_than_vanished(client):
 
 def test_the_table_links_back_to_the_shelf(client):
     """The request this page exists to answer: reachable from play, both ways."""
-    table = client.get("/play/").content.decode()
+    table = served(client, "/play/")
     assert 'href="/"' in table
     assert 'href="/craft/"' in table
 

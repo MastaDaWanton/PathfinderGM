@@ -1,5 +1,26 @@
 from django.conf import settings
-from django.contrib.staticfiles.views import serve as static_serve
+import mimetypes
+
+from django.contrib.staticfiles.views import serve as _serve
+
+# Django's static view takes a file's type from `mimetypes`, which on Windows reads the
+# registry — and on some machines the registry says `.js` is `text/plain`. Classic
+# scripts still run then; the play table's six script files (2026-09-25) would not survive
+# a move to modules. Stated here rather than left to the machine.
+mimetypes.add_type("text/javascript", ".js")
+
+
+def static_serve(request, path, **kwargs):
+    """The static view, told never to be trusted from cache without asking.
+
+    The Electron shell keeps its disk cache in the user data directory, which outlives
+    reinstalls, on an origin that never changes — World Bible served a five-day-old
+    stylesheet exactly that way. The play table's scripts carry a content stamp
+    (`play/templatetags/assets.py`); `no-cache` covers everything else.
+    """
+    response = _serve(request, path, **kwargs)
+    response["Cache-Control"] = "no-cache"
+    return response
 from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,

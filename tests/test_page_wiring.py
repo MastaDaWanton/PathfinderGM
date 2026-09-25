@@ -12,6 +12,7 @@ import pytest
 from django.test import Client, override_settings
 
 from rules.sheet import load_pc
+from pagesource import served
 
 
 @pytest.fixture
@@ -60,6 +61,6 @@ WIRING = {
 @pytest.mark.parametrize("page,needles", list(WIRING.items()),
                          ids=list(WIRING.keys()))
 def test_the_page_carries_the_code_its_buttons_need(client, page, needles):
-    html = client.get(page).content.decode("utf-8")
+    html = served(client, page)
     missing = [n for n in needles if n not in html]
     assert not missing, f"{page} renders buttons over nothing: {missing}"

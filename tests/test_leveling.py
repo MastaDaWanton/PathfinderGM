@@ -14,6 +14,7 @@ import pytest
 from rules import creation, leveling
 from rules.dice import Dice
 from rules.sheet import from_dict, load_pc, to_dict
+from pagesource import table_source
 
 
 def bender(**over):
@@ -151,7 +152,7 @@ def test_the_sheet_carries_the_progression_and_the_paths():
 def test_the_class_tab_exists_and_draws_the_table():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert '["class",     "Class",     s => tabClass(s)]' in page
     assert "function tabClass(s)" in page
     assert "The whole table" in page
@@ -217,7 +218,7 @@ def test_every_listed_ability_now_resolves_to_something():
 def test_the_page_shows_the_tiers_and_is_honest_about_the_engine():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert "Control Blood ${esc(tier)}" in page
     assert "the source does not describe it" in page
     assert "the engine does not" in page and "execute these yet" in page
@@ -360,7 +361,7 @@ def test_the_map_has_a_tab_of_its_own():
     a shape and not as a grid anybody could plan a move on."""
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert 'id="maptab"' in page and 'id="maptray"' in page
     assert "function showMap(" in page
     # It refills while open, so a token that moves during a turn moves here too.
@@ -456,7 +457,7 @@ def test_pools_survive_a_save(tmp_path, settings):
 def test_the_map_draws_them():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert "bloodpool" in page
     assert "pools of blood on the ground" in page or "pool${" in page
 
@@ -781,7 +782,7 @@ def test_a_character_with_no_paths_gets_no_buttons():
 def test_the_page_draws_them_as_buttons():
     from pathlib import Path
 
-    page = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    page = table_source()
     assert 'id="abilities"' in page and "renderAbilities" in page
     assert "data-ability" in page
 

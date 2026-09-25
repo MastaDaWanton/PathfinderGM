@@ -17,6 +17,7 @@ The rules that make it worth having:
 from pathlib import Path
 
 from play import gm_answers
+from pagesource import table_source
 
 
 def test_a_question_routes_to_what_it_asked_about():
@@ -89,7 +90,7 @@ def test_the_gm_view_house_rule_has_a_reader_and_a_renderer():
     2026-09-08 by grepping for it."""
     root = Path(__file__).resolve().parents[1]
     views = (root / "play" / "views.py").read_text(encoding="utf-8")
-    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    table = table_source()
     home = (root / "play" / "templates" / "play" / "home.html").read_text(encoding="utf-8")
 
     assert "schemes_mod.gm_view(c.scene)" in views, "the state no longer carries it"
