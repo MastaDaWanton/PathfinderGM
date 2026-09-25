@@ -1118,10 +1118,10 @@ class Actor:
         moved = [Modifier(m.value, m.source, m.type or "enhancement")
                  for m in self._buff_mods("speed", "land")]
         base = max(0, base + sum(m.value for m in stack(moved)))
-        for slowed in ("entangled", "exhausted"):
-            if self.has_condition(slowed):
-                base //= 2
-                break
+        # Asked of the vocabulary (`state.slowed`), not by naming two conditions in a
+        # tuple the three-laws ratchet could not see (2026-09-25).
+        if self.has_state("state.slowed"):
+            base //= 2
         # Rounded down to a whole square. A speed of 22 feet lets you cross four squares,
         # not four and a bit, and carrying the remainder makes the fifth square arrive one
         # move sooner than it should.
@@ -1803,9 +1803,7 @@ class Actor:
         else:
             mods = [Modifier(10, "base"), Modifier(self.bab, "BAB"),
                     Modifier(self.ability_mod("str"), "Str")]
-            loses_dex = flat_footed or any(
-                c.data.get("lose_dex_to_ac") for c in self.conditions
-            )
+            loses_dex = flat_footed or self.loses_dex_to_ac
             if not loses_dex:
                 mods.append(Modifier(self.ability_mod("dex"), "Dex"))
             size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
@@ -2775,7 +2773,11 @@ class Actor:
 
     @property
     def loses_dex_to_ac(self) -> bool:
-        return any(c.data.get("lose_dex_to_ac") for c in self.conditions)
+        """Denied Dex to AC — asked of the vocabulary (`state.exposed`), not of the
+        `lose_dex_to_ac` flag on the condition rows: that was a second authority beside
+        the tags, read in three places (2026-09-25), and a homebrew state could not
+        expose anybody without a row."""
+        return self.has_state("state.exposed")
 
     def _buff_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Everything timed or worn that moves this number.
