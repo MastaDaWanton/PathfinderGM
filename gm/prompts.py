@@ -1241,7 +1241,12 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     history newest-first. `report` is filled in with what happened so the caller can
     log it — a cut that nobody records is the failure this function exists to end.
     """
-    kept_recent = _from_a_user(history[-(keep * 2):] if keep else [])
+    # The last `keep` EXCHANGES, counted from the player's lines. It was
+    # `history[-(keep * 2):]`, but a turn writes three messages (the player's line, the
+    # plan, the prose — play/views.py), so "three exchanges" kept two (2026-09-25).
+    users = [i for i, m in enumerate(history) if m.get("role") == "user"]
+    kept_recent = (_from_a_user(history[users[-keep]:]) if keep and len(users) >= keep
+                   else _from_a_user(list(history)) if keep else [])
     older = history[:len(history) - len(kept_recent)] if kept_recent else list(history)
 
     # The ledger's room is reserved before anything competes for it, and rendered
@@ -1250,6 +1255,17 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     # ledger did not use, which is the safe direction.
     reserve = ledger_mod.BUDGET_CHARS if ledger else 0
     room = budget - _chars(head) - _chars(tail) - reserve
+    # The parts that are never cut already over the budget: the prompt goes anyway, since
+    # there is nothing left to drop, but it is SAID — measured 2026-09-25, this sent an
+    # over-budget prompt without a word in the report or the log, and Ollama then cuts
+    # the front of it silently, the failure this function exists to end.
+    over = room < 0
+    if over:
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "the prompt's fixed parts are %d characters over the %d budget; the model "
+            "will see it cut", -room, budget)
     # A floor this small means the brief itself has outgrown the window; send the turn
     # anyway. A turn that refuses to be built is worse than a turn built thin.
     while kept_recent and _chars(kept_recent) > room:
@@ -1293,6 +1309,7 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
             "examples": with_examples,
             "budget": budget,
             "remembered": remembered.count("  * "),
+            "over_budget": over,
         })
     return head + (examples if with_examples else []) + kept_history + tail
 
@@ -1548,7 +1565,7 @@ def scene_now(scene) -> str:
     # negotiation and the payment had left the context window and nothing carried the
     # agreement forward (2026-09-18, item 22 — docs/memory-policy.md's gap in its most
     # concrete form). Cleared when the party moves rooms.
-    agreed = [str(a) for a in ((getattr(scene, "said", None) or {}).get("agreements") or [])]
+    agreed = [str(a) for a in (getattr(scene, "agreements", None) or [])]
     if agreed:
         facts.append("WHAT WAS AGREED here (fact, still standing): " + "; ".join(agreed[-3:]))
     thread = getattr(scene, "thread", None) or {}

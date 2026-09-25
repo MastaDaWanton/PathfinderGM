@@ -120,7 +120,7 @@ def award_for_fallen(scene, pc) -> tuple[int, list[str]]:
     # A unit that ROUTED is no longer in the scene to be asked — it left the board with its
     # survivors — so the engine wrote the debt down where the scene remembers things
     # (`Engine._rout`), and this is where it is settled.
-    for gone in (scene.said.get("routed_xp") or []) if getattr(scene, "said", None) else []:
+    for gone in list(getattr(scene, "routed_xp", None) or []):
         if not isinstance(gone, dict):
             continue
         owed = max(0, int(gone.get("xp", 0) or 0))

@@ -276,6 +276,16 @@ class Scene:
     # remembered it had been said. Kept on the scene so a reload does not reset the
     # walk and hand the player the first line again.
     said: dict = field(default_factory=dict)
+    # Two records that lived in `said` beside the narrator's line rotation until
+    # 2026-09-25, in a dict with no schema: what a routed crowd still owes in experience
+    # (paid when the fight settles, `_rout` → `_settle_xp`), and the payments agreed in
+    # this room (the last five, for the brief). Their own fields now, saved as such; a
+    # save written before carries them in `said` and is moved over on load.
+    routed_xp: list = field(default_factory=list)
+    agreements: list = field(default_factory=list)
+    # The resolution record, for tests and debugging. Nothing in the app reads it, and it
+    # is deep-copied by every snapshot, so it keeps only the last LOG_KEPT outcomes.
+    LOG_KEPT = 200
     # Places minted in play (`rules/places.py`, doors two and three): the stored
     # exception to "derived, never stored", since the player made them. Place dicts
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
@@ -1378,7 +1388,7 @@ class Scene:
             self.at = place_id
             self.cast = []
             # What was agreed here is a fact of this room; the next room starts clean.
-            self.said.pop("agreements", None)
+            self.agreements = []
         return actor
 
     def settle_relations(self) -> list[str]:
@@ -2304,6 +2314,8 @@ class Engine:
             if intent.actor and intent.op in ("attack", "check", "move", "save"):
                 self.scene.acted.add(intent.actor)
             self.scene.log.append(outcome.as_dict())
+            if len(self.scene.log) > self.scene.LOG_KEPT:
+                del self.scene.log[:-self.scene.LOG_KEPT]
         return Resolution(outcomes=outcomes)
 
     # --- Reactions ---------------------------------------------------------------------
@@ -8078,7 +8090,7 @@ class Engine:
         # Paid once. The routed units' debt is remembered on the scene because they are gone
         # from it (`_rout`), and a second fight in the same room must not pay for the first
         # one's dead a second time.
-        self.scene.said.pop("routed_xp", None)
+        self.scene.routed_xp = []
         if not total:
             # A fight that killed something and paid nothing has to say so. Silence
             # reads as "this fight was not worth anything", and the real reason is
@@ -9529,10 +9541,9 @@ class Engine:
         # an encounter — so the amount is remembered where the scene remembers things.
         owed = troops_mod.xp_owed(target.troop)
         if owed:
-            ledger = list(self.scene.said.get("routed_xp") or [])
-            ledger.append({"who": str(target.name), "fallen": int(target.troop.fallen),
-                           "xp": int(owed)})
-            self.scene.said["routed_xp"] = ledger
+            self.scene.routed_xp.append({"who": str(target.name),
+                                         "fallen": int(target.troop.fallen),
+                                         "xp": int(owed)})
         # Off the board through the one destroyer, which takes the relational state with
         # them (guards at either end, wards, compulsions). They ran; they are not a body
         # lying here, and leaving them in the scene at 1 hp would make them a target.

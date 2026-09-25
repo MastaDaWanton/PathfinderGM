@@ -260,6 +260,8 @@ class Campaign:
                 "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
                 "cards": [dict(c) for c in self.scene.cards],
                 "said": dict(self.scene.said),
+                "routed_xp": [dict(r) for r in self.scene.routed_xp],
+                "agreements": list(self.scene.agreements),
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -381,7 +383,14 @@ class Campaign:
             # Absent in saves written before the pools were walked: an empty record
             # means the first line of each pool is next, which is where a new campaign
             # starts too.
-            said=dict(s.get("said") or {}),
+            said={k: v for k, v in (s.get("said") or {}).items()
+                  if k not in ("routed_xp", "agreements")},
+            # Their own fields since 2026-09-25; a save written before carries them in
+            # `said`, and they are moved over here rather than lost.
+            routed_xp=list(s.get("routed_xp") or (s.get("said") or {}).get("routed_xp")
+                           or []),
+            agreements=list(s.get("agreements") or (s.get("said") or {}).get("agreements")
+                            or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],

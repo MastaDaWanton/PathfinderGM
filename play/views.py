@@ -1838,10 +1838,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             tail = re.search(r"\bfor\s+([^.!?]{3,80})", judgement.redact_speech(player_input), re.I)
             line = f"{m.group(1)} paid {m.group(2)} {m.group(3)} {m.group(4)}" \
                    + (f" for {tail.group(1).strip()}" if tail else "")
-            agreed = list(c.scene.said.get("agreements") or [])
+            agreed = list(c.scene.agreements or [])
             if line not in agreed:
                 agreed.append(line)
-            c.scene.said["agreements"] = agreed[-5:]
+            c.scene.agreements = agreed[-5:]
     # Bodies age out on their own: two turns' grace to loot and mourn, then the
     # scene lets them go whether or not the player ever says the word "leave".
     swept = agent.engine.tidy_the_fallen()
