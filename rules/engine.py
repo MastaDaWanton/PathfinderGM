@@ -2235,9 +2235,21 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._settle_talk())
+        # A scheme that fails half-way leaves nothing of itself behind. Measured
+        # 2026-09-25: the tick reads and CHANGES the scene (steps advance, people are
+        # brought in, bodies fall), and a failure part-way kept whatever it had already
+        # done — the turn went on, and the next save wrote the half-run step. Snapshot
+        # only when there is a scheme to tick: a deep copy per turn for nothing is a cost.
+        undo = self.scene.snapshot() if getattr(self.scene, "schemes", None) else None
         try:
             extra = schemes_mod.tick(self, resolution.outcomes)
         except Exception as exc:  # noqa: BLE001 — a scheme must never take the turn down
+            if undo is not None:
+                self.scene.restore(undo)
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "a scheme's tick failed and was undone")
             extra = [Outcome(intent_id="", op="scheme", effects=[{"kind": "scheme_error",
                                                                    "error": str(exc)}],
                              tell="", because="")]
@@ -9437,7 +9449,12 @@ class Engine:
         return guards_mod.intercept(self.scene, packet)
 
     def _land(self, pk: Packet) -> dict:
-        target = self.scene.actors[pk.target]
+        # The store, not the here-view: a body in another room is still somebody the one
+        # damage door can reach. Measured 2026-09-25: a scheme's off-stage death wrote
+        # `who.hp -= amount` around this door because `scene.actors[...]` raised
+        # KeyError for a victim at the lodging while the player stood in the wild — so
+        # resistances, damage reduction and guards never applied off-stage.
+        target = self.scene.actors.get(pk.target) or self.scene.people[pk.target]
         amount = pk.amount
         # "A troop takes half again as much damage (+50%) from spells or effects that affect
         # an area" — the rule that makes a fireball feel right against a crowd, and the

@@ -902,21 +902,15 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
         who = _who(scene, filled, act.get("who", ""))
         if who is not None and not who.is_pc:
             amount = max(1, who.hp + abs(who.ability_score("con")) + 1)
-            if who.at == scene.at:
-                # In the room: the one damage door, packets landed like any blow.
-                hit = engine._apply_damage(who, amount, "untyped", lethality="lethal")
-            else:
-                # Off-stage: the door lands packets through the here-view and cannot
-                # reach a body in another room (measured: KeyError on the victim at
-                # the lodging while the player stood in the wild). The ladder is the
-                # same — hit points to the floor, `apply_hp_state` writes dead — and
-                # the number is on the instance with its provenance, which the door
-                # would have recorded had it been able to.
-                who.hp -= amount
-                hit = {"kind": "damage", "target": who.ref, "amount": amount,
-                       "dtype": "untyped", "off_stage": True}
+            # The one damage door, in the room or out of it. Off-stage this used to write
+            # `who.hp -= amount` because the door read the here-view and raised KeyError
+            # for a victim at the lodging; the door reads the store now (2026-09-25),
+            # so resistances and guards apply wherever the body is.
+            hit = engine._apply_damage(who, amount, "untyped", lethality="lethal")
             if isinstance(hit, dict):
                 hit["origin"] = source
+                if who.at != scene.at:
+                    hit["off_stage"] = True
             inst.setdefault("damage", []).append({"step": step_id, "who": who.ref,
                                                   "origin": source, "record": hit})
             who.apply_hp_state()
